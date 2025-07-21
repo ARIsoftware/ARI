@@ -1,7 +1,7 @@
 import { supabase, type Task } from "./supabase"
 
 export async function getTasks(): Promise<Task[]> {
-  const { data, error } = await supabase.from("ari-database").select("*").order("created_at", { ascending: false })
+  const { data, error } = await supabase.from("ari-database").select("*").order("order_index", { ascending: true })
 
   if (error) {
     console.error("Error fetching tasks:", error)
@@ -11,8 +11,26 @@ export async function getTasks(): Promise<Task[]> {
   return data || []
 }
 
-export async function createTask(task: Omit<Task, "id" | "created_at" | "updated_at">): Promise<Task> {
-  const { data, error } = await supabase.from("ari-database").insert([task]).select().single()
+export async function createTask(task: Omit<Task, "id" | "created_at" | "updated_at" | "order_index">): Promise<Task> {
+  // Get the highest order_index to place new task at the end
+  const { data: maxOrderData } = await supabase
+    .from("ari-database")
+    .select("order_index")
+    .order("order_index", { ascending: false })
+    .limit(1)
+
+  const nextOrderIndex = maxOrderData && maxOrderData.length > 0 ? (maxOrderData[0].order_index || 0) + 1 : 0
+
+  const { data, error } = await supabase
+    .from("ari-database")
+    .insert([
+      {
+        ...task,
+        order_index: nextOrderIndex,
+      },
+    ])
+    .select()
+    .single()
 
   if (error) {
     console.error("Error creating task:", error)
@@ -88,13 +106,22 @@ export async function toggleTaskStar(id: string): Promise<Task> {
 }
 
 export async function reorderTasks(taskIds: string[]): Promise<void> {
-  // Update the created_at timestamps to reflect the new order
+  // Update order_index for each task based on its position in the array
   const updates = taskIds.map((id, index) => ({
     id,
-    created_at: new Date(Date.now() - (taskIds.length - index) * 1000).toISOString(),
+    order_index: index,
   }))
 
+  // Use a transaction to update all tasks atomically
   for (const update of updates) {
-    await supabase.from("ari-database").update({ created_at: update.created_at }).eq("id", update.id)
+    const { error } = await supabase
+      .from("ari-database")
+      .update({ order_index: update.order_index })
+      .eq("id", update.id)
+
+    if (error) {
+      console.error("Error updating task order:", error)
+      throw error
+    }
   }
 }

@@ -32,14 +32,14 @@ const data = {
         },
         {
           title: "Add Task",
-          url: "#",
+          url: "/add-task",
           icon: Plus,
         },
         {
           title: "Completed",
           url: "#",
           icon: Archive,
-          isActive: true,
+          isActive: false,
         },
       ],
     },

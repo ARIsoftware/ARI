@@ -24,4 +24,5 @@ export type Task = {
   completed: boolean
   created_at: string
   updated_at: string
+  order_index: number
 }

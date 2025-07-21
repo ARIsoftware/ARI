@@ -22,6 +22,7 @@ import { useState, useEffect } from "react"
 import { getTasks, toggleTaskCompletion, toggleTaskStar, reorderTasks, type Task } from "@/lib/tasks"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
+import { useRouter } from "next/navigation"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -71,6 +72,7 @@ export default function TasksPage() {
   const [activeFilter, setActiveFilter] = useState("All")
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const router = useRouter()
 
   const filters = ["All", "Today", "In Progress", "Completed"]
 
@@ -274,7 +276,7 @@ export default function TasksPage() {
                   {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
                   Refresh
                 </Button>
-                <Button className="bg-black hover:bg-gray-800">
+                <Button className="bg-black hover:bg-gray-800" onClick={() => router.push("/add-task")}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add Task
                 </Button>
