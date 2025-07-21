@@ -1,5 +1,5 @@
 import { DM_Sans } from "next/font/google"
-import { AppSidebar } from "../../components/app-sidebar"
+import { AppSidebar } from "@/components/app-sidebar"
 import {
   Breadcrumb,
   BreadcrumbItem,
