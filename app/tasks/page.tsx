@@ -17,82 +17,16 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, Filter, List, Grid3X3, Calendar, Star, Bell } from "lucide-react"
-import { useState } from "react"
+import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2 } from "lucide-react"
+import { useState, useEffect } from "react"
+import { getTasks, toggleTaskCompletion, toggleTaskStar, reorderTasks, type Task } from "@/lib/tasks"
+import { useToast } from "@/hooks/use-toast"
+import { supabase } from "@/lib/supabase"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
 })
-
-const initialTasks = [
-  {
-    id: "1",
-    title: "Design homepage layout",
-    assignees: ["Emily Carter", "Liam Walker"],
-    dueDate: "Jun 4, 2023",
-    subtasks: { completed: 1, total: 2 },
-    status: "In Progress",
-    priority: "High",
-    starred: true,
-    completed: false,
-  },
-  {
-    id: "2",
-    title: "Conduct user interviews",
-    assignees: ["Liam Walker"],
-    dueDate: "Jun 11, 2023",
-    subtasks: { completed: 1, total: 2 },
-    status: "Pending",
-    priority: "Medium",
-    starred: false,
-    completed: false,
-  },
-  {
-    id: "3",
-    title: "Write unit tests",
-    assignees: ["Sophie Lee"],
-    dueDate: "Jun 6, 2023",
-    subtasks: { completed: 0, total: 2 },
-    status: "In Progress",
-    priority: "High",
-    starred: true,
-    completed: false,
-  },
-  {
-    id: "4",
-    title: "Prepare launch checklist",
-    assignees: ["Daniel Kim", "Olivia Adams"],
-    dueDate: "Jun 19, 2023",
-    subtasks: { completed: 0, total: 1 },
-    status: "Pending",
-    priority: "Low",
-    starred: false,
-    completed: false,
-  },
-  {
-    id: "5",
-    title: "Update privacy policy",
-    assignees: ["Olivia Adams"],
-    dueDate: "Jun 13, 2023",
-    subtasks: { completed: 1, total: 2 },
-    status: "In Progress",
-    priority: "Medium",
-    starred: false,
-    completed: false,
-  },
-  {
-    id: "6",
-    title: "Deploy to staging",
-    assignees: ["Noah Bennett"],
-    dueDate: "Jun 1, 2023",
-    subtasks: { completed: 2, total: 2 },
-    status: "Pending",
-    priority: "High",
-    starred: true,
-    completed: false,
-  },
-]
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -120,14 +54,76 @@ const getPriorityColor = (priority: string) => {
   }
 }
 
+const formatDate = (dateString: string | null) => {
+  if (!dateString) return "No due date"
+  return new Date(dateString).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+}
+
 export default function TasksPage() {
   const { user } = useUser()
-  const [tasks, setTasks] = useState(initialTasks)
+  const { toast } = useToast()
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [loading, setLoading] = useState(true)
   const [activeFilter, setActiveFilter] = useState("All")
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
 
   const filters = ["All", "Today", "In Progress", "Completed"]
+
+  // Load tasks from Supabase and set up real-time subscription
+  useEffect(() => {
+    loadTasks()
+
+    // Set up real-time subscription
+    const channel = supabase
+      .channel("ari-database-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "ari-database",
+        },
+        (payload) => {
+          console.log("Real-time update:", payload)
+
+          if (payload.eventType === "INSERT") {
+            setTasks((prev) => [payload.new as Task, ...prev])
+          } else if (payload.eventType === "UPDATE") {
+            setTasks((prev) => prev.map((task) => (task.id === payload.new.id ? (payload.new as Task) : task)))
+          } else if (payload.eventType === "DELETE") {
+            setTasks((prev) => prev.filter((task) => task.id !== payload.old.id))
+          }
+        },
+      )
+      .subscribe()
+
+    // Cleanup subscription on unmount
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
+  const loadTasks = async () => {
+    try {
+      setLoading(true)
+      const data = await getTasks()
+      setTasks(data)
+    } catch (error) {
+      console.error("Failed to load tasks:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load tasks. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filteredTasks = tasks.filter((task) => {
     const matchesFilter =
@@ -150,7 +146,7 @@ export default function TasksPage() {
     e.dataTransfer.dropEffect = "move"
   }
 
-  const handleDrop = (e: React.DragEvent, targetTaskId: string) => {
+  const handleDrop = async (e: React.DragEvent, targetTaskId: string) => {
     e.preventDefault()
 
     if (!draggedTask || draggedTask === targetTaskId) return
@@ -164,26 +160,80 @@ export default function TasksPage() {
     const [draggedItem] = newTasks.splice(draggedIndex, 1)
     newTasks.splice(targetIndex, 0, draggedItem)
 
+    // Update local state immediately for better UX
     setTasks(newTasks)
     setDraggedTask(null)
+
+    try {
+      // Update order in database
+      await reorderTasks(newTasks.map((task) => task.id))
+    } catch (error) {
+      console.error("Failed to reorder tasks:", error)
+      // Revert local state on error
+      setTasks(tasks)
+      toast({
+        title: "Error",
+        description: "Failed to reorder tasks. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleDragEnd = () => {
     setDraggedTask(null)
   }
 
-  const toggleTaskCompletion = (taskId: string) => {
-    setTasks(
-      tasks.map((task) =>
-        task.id === taskId
-          ? { ...task, completed: !task.completed, status: !task.completed ? "Completed" : "Pending" }
-          : task,
-      ),
-    )
+  const handleToggleCompletion = async (taskId: string) => {
+    try {
+      const updatedTask = await toggleTaskCompletion(taskId)
+      setTasks(tasks.map((task) => (task.id === taskId ? updatedTask : task)))
+      toast({
+        title: "Success",
+        description: `Task ${updatedTask.completed ? "completed" : "reopened"} successfully.`,
+      })
+    } catch (error) {
+      console.error("Failed to toggle task completion:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update task. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
-  const toggleStar = (taskId: string) => {
-    setTasks(tasks.map((task) => (task.id === taskId ? { ...task, starred: !task.starred } : task)))
+  const handleToggleStar = async (taskId: string) => {
+    try {
+      const updatedTask = await toggleTaskStar(taskId)
+      setTasks(tasks.map((task) => (task.id === taskId ? updatedTask : task)))
+    } catch (error) {
+      console.error("Failed to toggle task star:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update task. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50/50">
+        <div className="h-[35px] bg-black w-full relative z-50 flex items-center justify-center">
+          <span className={`text-white font-medium ${dmSans.className}`}>ARI-2</span>
+        </div>
+        <SidebarProvider>
+          <AppSidebar />
+          <SidebarInset>
+            <div className="flex items-center justify-center h-96">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-6 h-6 animate-spin" />
+                <span>Loading tasks...</span>
+              </div>
+            </div>
+          </SidebarInset>
+        </SidebarProvider>
+      </div>
+    )
   }
 
   return (
@@ -218,6 +268,16 @@ export default function TasksPage() {
                 {user && (
                   <p className="text-sm text-muted-foreground mt-1">Welcome back, {user.firstName || "there"}!</p>
                 )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={loadTasks} disabled={loading} className="bg-white">
+                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
+                  Refresh
+                </Button>
+                <Button className="bg-black hover:bg-gray-800">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Task
+                </Button>
               </div>
             </div>
 
@@ -281,7 +341,7 @@ export default function TasksPage() {
                   <input
                     type="checkbox"
                     checked={task.completed}
-                    onChange={() => toggleTaskCompletion(task.id)}
+                    onChange={() => handleToggleCompletion(task.id)}
                     className="w-5 h-5 mt-1 rounded border-gray-300"
                   />
 
@@ -294,7 +354,7 @@ export default function TasksPage() {
                         {task.title}
                       </h3>
                       <button
-                        onClick={() => toggleStar(task.id)}
+                        onClick={() => handleToggleStar(task.id)}
                         className={`transition-colors ${task.starred ? "text-white hover:text-yellow-400" : "text-gray-400 hover:text-yellow-500"}`}
                       >
                         <Star
@@ -321,14 +381,14 @@ export default function TasksPage() {
                       {/* Due Date */}
                       <div className="flex items-center gap-1.5">
                         <Calendar className="w-4 h-4" />
-                        <span>{task.dueDate}</span>
+                        <span>{formatDate(task.due_date)}</span>
                       </div>
 
                       {/* Subtasks */}
                       <div className="flex items-center gap-1.5">
                         <Bell className="w-4 h-4" />
                         <span>
-                          Subtasks: {task.subtasks.completed}/{task.subtasks.total}
+                          Subtasks: {task.subtasks_completed}/{task.subtasks_total}
                         </span>
                       </div>
                     </div>
@@ -353,8 +413,12 @@ export default function TasksPage() {
               ))}
             </div>
 
-            {filteredTasks.length === 0 && (
-              <div className="text-center py-12 text-gray-500">No tasks found matching your criteria.</div>
+            {filteredTasks.length === 0 && !loading && (
+              <div className="text-center py-12 text-gray-500">
+                {searchQuery || activeFilter !== "All"
+                  ? "No tasks found matching your criteria."
+                  : "No tasks yet. Click 'Add Task' to get started!"}
+              </div>
             )}
           </div>
         </SidebarInset>
