@@ -8,17 +8,9 @@ export default clerkMiddleware(async (auth, req) => {
   const response = NextResponse.next()
   response.headers.set("X-Robots-Tag", "noindex, nofollow")
 
-  // Only protect routes if Clerk is properly configured
-  if (
-    isProtectedRoute(req) &&
-    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
-    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY !== "pk_test_placeholder"
-  ) {
-    try {
-      await auth.protect()
-    } catch (error) {
-      console.log("Auth protection skipped - Clerk not configured")
-    }
+  // Protect routes if they match the protected route pattern
+  if (isProtectedRoute(req)) {
+    await auth.protect()
   }
 
   return response

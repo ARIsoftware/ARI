@@ -28,8 +28,11 @@ export default async function RootLayout({
   // Set X-Robots-Tag header
   const headersList = await headers()
 
-  // Use placeholder key if not configured
-  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "pk_test_placeholder"
+  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+
+  if (!publishableKey) {
+    throw new Error("Missing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY environment variable")
+  }
 
   return (
     <ClerkProvider
