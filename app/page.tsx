@@ -20,7 +20,7 @@ export default function Page() {
   return (
     <div className="min-h-screen">
       <div className="h-[35px] bg-black w-full relative z-50 flex items-center justify-center">
-        <span className={`text-white font-medium ${dmSans.className}`}>ARI</span>
+        <span className={`text-white font-medium ${dmSans.className}`}>ARI-1</span>
       </div>
       <SidebarProvider>
         <AppSidebar />
