@@ -56,7 +56,7 @@ Or `pnpm run dev`
 
 Or to enable Next.js Turbopack (for faster local development):
 
-pnpm next dev --turbo
+`pnpm next dev --turbo`
 
 5. Open web browser:
 
