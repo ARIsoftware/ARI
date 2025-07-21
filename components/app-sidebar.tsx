@@ -1,7 +1,7 @@
 import type * as React from "react"
-
 import { SearchForm } from "./search-form"
 import { VersionSwitcher } from "./version-switcher"
+import { UserProfileDropdown } from "./user-profile-dropdown"
 import {
   Sidebar,
   SidebarContent,
@@ -13,6 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarFooter,
 } from "@/components/ui/sidebar"
 import { CheckSquare, Plus, Archive, Dumbbell, Target, TrendingUp, Users, UserPlus, Settings } from "lucide-react"
 
@@ -118,6 +119,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarGroup>
         ))}
       </SidebarContent>
+      <SidebarFooter>
+        <div className="flex items-center justify-center p-2">
+          <UserProfileDropdown />
+        </div>
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   )

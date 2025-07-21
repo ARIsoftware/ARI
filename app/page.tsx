@@ -1,4 +1,5 @@
 import { DM_Sans } from "next/font/google"
+import { currentUser } from "@clerk/nextjs/server"
 import { AppSidebar } from "@/components/app-sidebar"
 import {
   Breadcrumb,
@@ -16,11 +17,13 @@ const dmSans = DM_Sans({
   weight: ["400", "500", "600", "700"],
 })
 
-export default function Page() {
+export default async function Page() {
+  const user = await currentUser()
+
   return (
     <div className="min-h-screen">
       <div className="h-[35px] bg-black w-full relative z-50 flex items-center justify-center">
-        <span className={`text-white font-medium ${dmSans.className}`}>ARI-1</span>
+        <span className={`text-white font-medium ${dmSans.className}`}>ARI-2</span>
       </div>
       <SidebarProvider>
         <AppSidebar />
@@ -31,18 +34,25 @@ export default function Page() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="#">Building Your Application</BreadcrumbLink>
+                  <BreadcrumbLink href="#">Dashboard</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Data Fetching</BreadcrumbPage>
+                  <BreadcrumbPage>Overview</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
           </header>
           <div className="flex flex-1 flex-col gap-4 p-4">
             <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-              <div className="aspect-video rounded-xl bg-muted/50" />
+              <div className="aspect-video rounded-xl bg-muted/50 flex items-center justify-center">
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold">Welcome back!</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {user?.firstName ? `Hello, ${user.firstName}` : "Hello there"}
+                  </p>
+                </div>
+              </div>
               <div className="aspect-video rounded-xl bg-muted/50" />
               <div className="aspect-video rounded-xl bg-muted/50" />
             </div>

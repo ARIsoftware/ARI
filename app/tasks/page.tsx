@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-
+import { useUser } from "@clerk/nextjs"
 import { DM_Sans } from "next/font/google"
 import { AppSidebar } from "../../components/app-sidebar"
 import {
@@ -121,6 +121,7 @@ const getPriorityColor = (priority: string) => {
 }
 
 export default function TasksPage() {
+  const { user } = useUser()
   const [tasks, setTasks] = useState(initialTasks)
   const [activeFilter, setActiveFilter] = useState("All")
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
@@ -188,7 +189,7 @@ export default function TasksPage() {
   return (
     <div className="min-h-screen bg-gray-50/50">
       <div className="h-[35px] bg-black w-full relative z-50 flex items-center justify-center">
-        <span className={`text-white font-medium ${dmSans.className}`}>ARI-1</span>
+        <span className={`text-white font-medium ${dmSans.className}`}>ARI-2</span>
       </div>
       <SidebarProvider>
         <AppSidebar />
@@ -212,7 +213,12 @@ export default function TasksPage() {
           <div className="flex flex-1 flex-col gap-6 p-6">
             {/* Header */}
             <div className="flex items-center justify-between">
-              <h1 className="text-3xl font-bold">Todo List</h1>
+              <div>
+                <h1 className="text-3xl font-bold">Todo List</h1>
+                {user && (
+                  <p className="text-sm text-muted-foreground mt-1">Welcome back, {user.firstName || "there"}!</p>
+                )}
+              </div>
             </div>
 
             {/* Filters and Search */}
