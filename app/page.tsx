@@ -18,7 +18,14 @@ const dmSans = DM_Sans({
 })
 
 export default async function Page() {
-  const user = await currentUser()
+  let user = null
+
+  // Try to get user, but don't fail if Clerk is not configured
+  try {
+    user = await currentUser()
+  } catch (error) {
+    console.log("Clerk not configured, continuing without user")
+  }
 
   return (
     <div className="min-h-screen">

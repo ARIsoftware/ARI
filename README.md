@@ -28,37 +28,3 @@ Continue building your app on:
 2. Deploy your chats from the v0 interface
 3. Changes are automatically pushed to this repository
 4. Vercel deploys the latest version from this repository
-
-
-## Run Locally (macos)
-1. Make sure you have node and pnpm. In terminal enter:
-
-`brew install node`
-
-`npm install -g pnpm`
-
-2. Download Code from Github:
-
-`git clone https://github.com/MorpheusNetwork/ARI.git .`
-
-Or to pull from a specific branch (for example the v0 branch):
-
-`git clone -b develop https://github.com/MorpheusNetwork/ARI.git .`
-
-3. Run pnpm:
-
-`pnpm install`
-
-4. Run the development server:
-
-`pnpm dev`
-
-Or `pnpm run dev`
-
-Or to enable Next.js Turbopack (for faster local development):
-
-`pnpm next dev --turbo`
-
-5. Open web browser:
-
-`http://localhost:3000`
