@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { ClerkProvider } from "@clerk/nextjs"
 import { ClerkErrorBoundary } from "@/components/clerk-error-boundary"
+import { Toaster } from "@/components/ui/toaster"
 import { headers } from "next/headers"
 import "./globals.css"
 
@@ -27,9 +28,12 @@ export default async function RootLayout({
   // Set X-Robots-Tag header
   const headersList = await headers()
 
+  // Use placeholder key if not configured
+  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "pk_test_placeholder"
+
   return (
     <ClerkProvider
-      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      publishableKey={publishableKey}
       appearance={{
         baseTheme: undefined,
         variables: {
@@ -42,7 +46,10 @@ export default async function RootLayout({
           <meta name="robots" content="noindex, nofollow" />
         </head>
         <body>
-          <ClerkErrorBoundary>{children}</ClerkErrorBoundary>
+          <ClerkErrorBoundary>
+            {children}
+            <Toaster />
+          </ClerkErrorBoundary>
         </body>
       </html>
     </ClerkProvider>

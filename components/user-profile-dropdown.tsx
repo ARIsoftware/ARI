@@ -17,7 +17,16 @@ export function UserProfileDropdown() {
   const { user } = useUser()
   const { signOut, openUserProfile } = useClerk()
 
-  if (!user) return null
+  // Fallback for when Clerk is not configured
+  if (!user) {
+    return (
+      <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+        <Avatar className="h-8 w-8">
+          <AvatarFallback>U</AvatarFallback>
+        </Avatar>
+      </Button>
+    )
+  }
 
   const userInitials =
     user.firstName && user.lastName
