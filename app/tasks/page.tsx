@@ -72,6 +72,7 @@ export default function TasksPage() {
   const [activeFilter, setActiveFilter] = useState("All")
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [viewMode, setViewMode] = useState<"list" | "card">("list")
   const router = useRouter()
 
   const filters = ["All", "Today", "In Progress", "Completed"]
@@ -315,18 +316,28 @@ export default function TasksPage() {
                   <Filter className="w-4 h-4" />
                 </Button>
                 <div className="flex items-center rounded-lg border bg-white">
-                  <Button variant="ghost" size="icon" className="rounded-r-none">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className={`rounded-r-none ${viewMode === "list" ? "bg-gray-100" : ""}`}
+                    onClick={() => setViewMode("list")}
+                  >
                     <List className="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="rounded-l-none bg-gray-100">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className={`rounded-l-none ${viewMode === "card" ? "bg-gray-100" : ""}`}
+                    onClick={() => setViewMode("card")}
+                  >
                     <Grid3X3 className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
             </div>
 
-            {/* Task List */}
-            <div className="space-y-3">
+            {/* Task List/Grid */}
+            <div className={viewMode === "card" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" : "space-y-3"}>
               {filteredTasks.map((task) => (
                 <div
                   key={task.id}
@@ -335,82 +346,155 @@ export default function TasksPage() {
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, task.id)}
                   onDragEnd={handleDragEnd}
-                  className={`flex items-start gap-4 p-4 border rounded-lg hover:shadow-sm transition-all cursor-move ${
+                  className={`${
+                    viewMode === "card" 
+                      ? "flex flex-col gap-3 p-4 border rounded-lg hover:shadow-md transition-all cursor-move h-full" 
+                      : "flex items-start gap-4 p-4 border rounded-lg hover:shadow-sm transition-all cursor-move"
+                  } ${
                     task.starred ? "bg-[#214b88] text-white shadow-lg" : "bg-white border-gray-200"
                   } ${draggedTask === task.id ? "opacity-50" : ""}`}
                 >
-                  {/* Checkbox */}
-                  <input
-                    type="checkbox"
-                    checked={task.completed}
-                    onChange={() => handleToggleCompletion(task.id)}
-                    className="w-5 h-5 mt-1 rounded border-gray-300"
-                  />
+                  {viewMode === "list" ? (
+                    <>
+                      {/* List View */}
+                      <input
+                        type="checkbox"
+                        checked={task.completed}
+                        onChange={() => handleToggleCompletion(task.id)}
+                        className="w-5 h-5 mt-1 rounded border-gray-300"
+                      />
 
-                  {/* Task Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3
-                        className={`font-medium ${task.completed ? "line-through text-gray-500" : task.starred ? "text-white" : "text-gray-800"}`}
-                      >
-                        {task.title}
-                      </h3>
-                      <button
-                        onClick={() => handleToggleStar(task.id)}
-                        className={`transition-colors ${task.starred ? "text-white hover:text-yellow-400" : "text-gray-400 hover:text-yellow-500"}`}
-                      >
-                        <Star
-                          className={`w-5 h-5 transition-colors ${task.starred ? "fill-yellow-400 text-yellow-500" : ""}`}
-                        />
-                      </button>
-                    </div>
-
-                    <div
-                      className={`flex items-center flex-wrap gap-x-4 gap-y-2 text-sm ${task.starred ? "text-gray-300" : "text-gray-600"}`}
-                    >
-                      {/* Assignees */}
-                      <div className="flex items-center gap-2">
-                        {task.assignees.map((name) => (
-                          <span
-                            key={name}
-                            className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.starred ? "bg-white/10 text-gray-200" : "bg-gray-100 text-gray-700"}`}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3
+                            className={`font-medium ${task.completed ? "line-through text-gray-500" : task.starred ? "text-white" : "text-gray-800"}`}
                           >
-                            {name}
-                          </span>
-                        ))}
+                            {task.title}
+                          </h3>
+                          <button
+                            onClick={() => handleToggleStar(task.id)}
+                            className={`transition-colors ${task.starred ? "text-white hover:text-yellow-400" : "text-gray-400 hover:text-yellow-500"}`}
+                          >
+                            <Star
+                              className={`w-5 h-5 transition-colors ${task.starred ? "fill-yellow-400 text-yellow-500" : ""}`}
+                            />
+                          </button>
+                        </div>
+
+                        <div
+                          className={`flex items-center flex-wrap gap-x-4 gap-y-2 text-sm ${task.starred ? "text-gray-300" : "text-gray-600"}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            {task.assignees.map((name) => (
+                              <span
+                                key={name}
+                                className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.starred ? "bg-white/10 text-gray-200" : "bg-gray-100 text-gray-700"}`}
+                              >
+                                {name}
+                              </span>
+                            ))}
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <Calendar className="w-4 h-4" />
+                            <span>{formatDate(task.due_date)}</span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <Bell className="w-4 h-4" />
+                            <span>
+                              Subtasks: {task.subtasks_completed}/{task.subtasks_total}
+                            </span>
+                          </div>
+                        </div>
                       </div>
 
-                      {/* Due Date */}
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="w-4 h-4" />
-                        <span>{formatDate(task.due_date)}</span>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge
+                          variant="secondary"
+                          className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getStatusColor(task.status)}`}
+                        >
+                          {task.status}
+                        </Badge>
+                        <Badge
+                          variant="secondary"
+                          className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getPriorityColor(task.priority)}`}
+                        >
+                          {task.priority}
+                        </Badge>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Card View */}
+                      <div className="flex items-start justify-between">
+                        <input
+                          type="checkbox"
+                          checked={task.completed}
+                          onChange={() => handleToggleCompletion(task.id)}
+                          className="w-5 h-5 rounded border-gray-300"
+                        />
+                        <button
+                          onClick={() => handleToggleStar(task.id)}
+                          className={`transition-colors ${task.starred ? "text-white hover:text-yellow-400" : "text-gray-400 hover:text-yellow-500"}`}
+                        >
+                          <Star
+                            className={`w-5 h-5 transition-colors ${task.starred ? "fill-yellow-400 text-yellow-500" : ""}`}
+                          />
+                        </button>
                       </div>
 
-                      {/* Subtasks */}
-                      <div className="flex items-center gap-1.5">
-                        <Bell className="w-4 h-4" />
-                        <span>
-                          Subtasks: {task.subtasks_completed}/{task.subtasks_total}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                      <div className="flex-1">
+                        <h3
+                          className={`font-medium text-base mb-3 line-clamp-2 ${task.completed ? "line-through text-gray-500" : task.starred ? "text-white" : "text-gray-800"}`}
+                        >
+                          {task.title}
+                        </h3>
 
-                  {/* Status and Priority */}
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge
-                      variant="secondary"
-                      className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getStatusColor(task.status)}`}
-                    >
-                      {task.status}
-                    </Badge>
-                    <Badge
-                      variant="secondary"
-                      className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getPriorityColor(task.priority)}`}
-                    >
-                      {task.priority}
-                    </Badge>
-                  </div>
+                        <div className={`space-y-2 text-sm ${task.starred ? "text-gray-300" : "text-gray-600"}`}>
+                          {task.assignees.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {task.assignees.map((name) => (
+                                <span
+                                  key={name}
+                                  className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.starred ? "bg-white/10 text-gray-200" : "bg-gray-100 text-gray-700"}`}
+                                >
+                                  {name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-1.5">
+                            <Calendar className="w-4 h-4" />
+                            <span className="text-xs">{formatDate(task.due_date)}</span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <Bell className="w-4 h-4" />
+                            <span className="text-xs">
+                              Subtasks: {task.subtasks_completed}/{task.subtasks_total}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 mt-auto pt-2">
+                        <Badge
+                          variant="secondary"
+                          className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getStatusColor(task.status)}`}
+                        >
+                          {task.status}
+                        </Badge>
+                        <Badge
+                          variant="secondary"
+                          className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getPriorityColor(task.priority)}`}
+                        >
+                          {task.priority}
+                        </Badge>
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
