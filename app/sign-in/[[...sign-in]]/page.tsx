@@ -35,7 +35,7 @@ export default function SignInPage() {
                   "w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent",
                 formFieldLabel: "block text-sm font-medium text-gray-700 mb-1",
                 formButtonPrimary:
-                  "w-full bg-black hover:bg-gray-800 text-white font-medium py-2.5 px-4 rounded-md transition-colors",
+                  "w-full bg-[#222222] hover:bg-[#000000] text-black font-medium py-2.5 px-4 rounded-md transition-colors",
                 footerActionLink: "text-blue-600 hover:text-blue-500 font-medium",
                 identityPreviewText: "text-gray-600",
                 identityPreviewEditButton: "text-blue-600 hover:text-blue-500",
