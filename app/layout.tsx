@@ -7,7 +7,7 @@ import { headers } from "next/headers"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "ARI-2 App",
+  title: "ARI",
   description: "Secure task management application",
   generator: "v0.dev",
   robots: {

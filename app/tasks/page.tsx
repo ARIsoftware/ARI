@@ -221,7 +221,7 @@ export default function TasksPage() {
     return (
       <div className="min-h-screen bg-gray-50/50">
         <div className="h-[35px] bg-black w-full relative z-50 flex items-center justify-center">
-          <span className={`text-white font-medium ${dmSans.className}`}>ARI-2</span>
+          <span className={`text-white font-medium ${dmSans.className}`}>ARI</span>
         </div>
         <SidebarProvider>
           <AppSidebar />
@@ -241,7 +241,7 @@ export default function TasksPage() {
   return (
     <div className="min-h-screen bg-gray-50/50">
       <div className="h-[35px] bg-black w-full relative z-50 flex items-center justify-center">
-        <span className={`text-white font-medium ${dmSans.className}`}>ARI-2</span>
+        <span className={`text-white font-medium ${dmSans.className}`}>ARI</span>
       </div>
       <SidebarProvider>
         <AppSidebar />
