@@ -58,6 +58,8 @@ Or to enable Next.js Turbopack (for faster local development):
 
 `pnpm next dev --turbo`
 
-5. Open web browser:
+5. Setup .env.local variables file. File is stored in 1Password.
+
+6. Open web browser:
 
 `http://localhost:3000`
