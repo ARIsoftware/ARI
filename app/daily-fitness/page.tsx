@@ -19,7 +19,8 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2 } from "lucide-react"
 import { useState, useEffect } from "react"
-import { getTasks, toggleTaskCompletion, toggleTaskStar, reorderTasks, type Task } from "@/lib/tasks"
+import { getFitnessTasks, toggleFitnessTaskCompletion, toggleFitnessTaskStar, reorderFitnessTasks, type FitnessTask, addSampleFitnessTasks } from "@/lib/fitness"
+import { testFitnessDatabase } from "@/lib/test-fitness-db"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
@@ -64,10 +65,10 @@ const formatDate = (dateString: string | null) => {
   })
 }
 
-export default function TasksPage() {
+export default function DailyFitnessPage() {
   const { user } = useUser()
   const { toast } = useToast()
-  const [tasks, setTasks] = useState<Task[]>([])
+  const [tasks, setTasks] = useState<FitnessTask[]>([])
   const [loading, setLoading] = useState(true)
   const [activeFilter, setActiveFilter] = useState("All")
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
@@ -83,21 +84,21 @@ export default function TasksPage() {
 
     // Set up real-time subscription
     const channel = supabase
-      .channel("ari-database-changes")
+      .channel("fitness_database-changes")
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
-          table: "ari-database",
+          table: "fitness_database",
         },
         (payload) => {
           console.log("Real-time update:", payload)
 
           if (payload.eventType === "INSERT") {
-            setTasks((prev) => [payload.new as Task, ...prev])
+            setTasks((prev) => [payload.new as FitnessTask, ...prev])
           } else if (payload.eventType === "UPDATE") {
-            setTasks((prev) => prev.map((task) => (task.id === payload.new.id ? (payload.new as Task) : task)))
+            setTasks((prev) => prev.map((task) => (task.id === payload.new.id ? (payload.new as FitnessTask) : task)))
           } else if (payload.eventType === "DELETE") {
             setTasks((prev) => prev.filter((task) => task.id !== payload.old.id))
           }
@@ -114,13 +115,28 @@ export default function TasksPage() {
   const loadTasks = async () => {
     try {
       setLoading(true)
-      const data = await getTasks()
-      setTasks(data)
+      
+      // First, test the database connection
+      console.log("Testing database connection...")
+      const dbTestResult = await testFitnessDatabase()
+      console.log("Database test result:", dbTestResult)
+      
+      const data = await getFitnessTasks()
+      
+      // If no tasks exist, add sample tasks
+      if (data.length === 0) {
+        console.log("No tasks found, adding sample tasks...")
+        await addSampleFitnessTasks()
+        const newData = await getFitnessTasks()
+        setTasks(newData)
+      } else {
+        setTasks(data)
+      }
     } catch (error) {
-      console.error("Failed to load tasks:", error)
+      console.error("Failed to load fitness tasks:", error)
       toast({
         title: "Error",
-        description: "Failed to load tasks. Please try again.",
+        description: "Failed to load fitness tasks. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -183,14 +199,14 @@ export default function TasksPage() {
 
     try {
       // Update order in database
-      await reorderTasks(updatedTasks.map((task) => task.id))
+      await reorderFitnessTasks(updatedTasks.map((task) => task.id))
     } catch (error) {
-      console.error("Failed to reorder tasks:", error)
+      console.error("Failed to reorder fitness tasks:", error)
       // Revert local state on error
       setTasks(tasks)
       toast({
         title: "Error",
-        description: "Failed to reorder tasks. Please try again.",
+        description: "Failed to reorder fitness tasks. Please try again.",
         variant: "destructive",
       })
     }
@@ -202,17 +218,17 @@ export default function TasksPage() {
 
   const handleToggleCompletion = async (taskId: string) => {
     try {
-      const updatedTask = await toggleTaskCompletion(taskId)
+      const updatedTask = await toggleFitnessTaskCompletion(taskId)
       setTasks(tasks.map((task) => (task.id === taskId ? updatedTask : task)))
       toast({
         title: "Success",
-        description: `Task ${updatedTask.completed ? "completed" : "reopened"} successfully.`,
+        description: `Exercise ${updatedTask.completed ? "completed" : "reopened"} successfully.`,
       })
     } catch (error) {
-      console.error("Failed to toggle task completion:", error)
+      console.error("Failed to toggle fitness task completion:", error)
       toast({
         title: "Error",
-        description: "Failed to update task. Please try again.",
+        description: "Failed to update fitness task. Please try again.",
         variant: "destructive",
       })
     }
@@ -220,13 +236,13 @@ export default function TasksPage() {
 
   const handleToggleStar = async (taskId: string) => {
     try {
-      const updatedTask = await toggleTaskStar(taskId)
+      const updatedTask = await toggleFitnessTaskStar(taskId)
       setTasks(tasks.map((task) => (task.id === taskId ? updatedTask : task)))
     } catch (error) {
-      console.error("Failed to toggle task star:", error)
+      console.error("Failed to toggle fitness task star:", error)
       toast({
         title: "Error",
-        description: "Failed to update task. Please try again.",
+        description: "Failed to update fitness task. Please try again.",
         variant: "destructive",
       })
     }
@@ -244,7 +260,7 @@ export default function TasksPage() {
             <div className="flex items-center justify-center h-96">
               <div className="flex items-center gap-2">
                 <Loader2 className="w-6 h-6 animate-spin" />
-                <span>Loading tasks...</span>
+                <span>Loading fitness tasks...</span>
               </div>
             </div>
           </SidebarInset>
@@ -267,11 +283,11 @@ export default function TasksPage() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="#">Todo</BreadcrumbLink>
+                  <BreadcrumbLink href="#">Fitness First</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>All Tasks</BreadcrumbPage>
+                  <BreadcrumbPage>Daily Fitness</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
@@ -281,7 +297,7 @@ export default function TasksPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold">Todo List</h1>
+                <h1 className="text-3xl font-bold">Daily Fitness</h1>
                 {user && (
                   <p className="text-sm text-muted-foreground mt-1">Welcome back, {user.firstName || "there"}!</p>
                 )}
@@ -291,9 +307,9 @@ export default function TasksPage() {
                   {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
                   Refresh
                 </Button>
-                <Button className="bg-black hover:bg-gray-800" onClick={() => router.push("/add-task")}>
+                <Button className="bg-black hover:bg-gray-800" onClick={() => router.push("/add-fitness")}>
                   <Plus className="w-4 h-4 mr-2" />
-                  Add Task
+                  Add Exercise
                 </Button>
               </div>
             </div>
@@ -320,7 +336,7 @@ export default function TasksPage() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <Input
-                    placeholder="Search tasks..."
+                    placeholder="Search exercises..."
                     className="pl-10 w-64 bg-white"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -417,7 +433,7 @@ export default function TasksPage() {
                           <div className="flex items-center gap-1.5">
                             <Bell className="w-4 h-4" />
                             <span>
-                              Subtasks: {task.subtasks_completed}/{task.subtasks_total}
+                              Reps: {task.subtasks_completed}/{task.subtasks_total}
                             </span>
                           </div>
                         </div>
@@ -487,7 +503,7 @@ export default function TasksPage() {
                           <div className="flex items-center gap-1.5">
                             <Bell className="w-4 h-4" />
                             <span className="text-xs">
-                              Subtasks: {task.subtasks_completed}/{task.subtasks_total}
+                              Reps: {task.subtasks_completed}/{task.subtasks_total}
                             </span>
                           </div>
                         </div>
@@ -516,8 +532,8 @@ export default function TasksPage() {
             {filteredTasks.length === 0 && !loading && (
               <div className="text-center py-12 text-gray-500">
                 {searchQuery || activeFilter !== "All"
-                  ? "No tasks found matching your criteria."
-                  : "No tasks yet. Click 'Add Task' to get started!"}
+                  ? "No exercises found matching your criteria."
+                  : "No exercises yet. Click 'Add Exercise' to get started!"}
               </div>
             )}
           </div>

@@ -40,13 +40,13 @@ const data = {
       ],
     },
     {
-      title: "Fitness",
+      title: "Fitness First",
       url: "#",
       icon: Dumbbell,
       items: [
         {
-          title: "Workouts",
-          url: "#",
+          title: "Daily Fitness",
+          url: "/daily-fitness",
           icon: Dumbbell,
         },
         {

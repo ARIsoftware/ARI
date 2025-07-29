@@ -26,3 +26,19 @@ export type Task = {
   updated_at: string
   order_index: number
 }
+
+export type FitnessTask = {
+  id: string
+  title: string
+  assignees: string[]
+  due_date: string | null
+  subtasks_completed: number
+  subtasks_total: number
+  status: "Pending" | "In Progress" | "Completed"
+  priority: "Low" | "Medium" | "High"
+  starred: boolean
+  completed: boolean
+  created_at: string
+  updated_at: string
+  order_index: number
+}
