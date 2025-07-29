@@ -1,5 +1,7 @@
 import { supabase, type Task } from "./supabase"
 
+export type { Task }
+
 export async function getTasks(): Promise<Task[]> {
   const { data, error } = await supabase.from("ari-database").select("*").order("order_index", { ascending: true })
 
