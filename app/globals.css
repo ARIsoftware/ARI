@@ -87,3 +87,8 @@
 .bg-sidebar {
   margin-top: 35px;
 }
+
+.taskdone {
+  opacity: 0.2;
+  transition: opacity 0.3s ease-in-out;
+}
