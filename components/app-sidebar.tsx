@@ -17,6 +17,28 @@ import { CheckSquare, Plus, Archive, Dumbbell, Target, TrendingUp, Users, UserPl
 const data = {
   navMain: [
     {
+      title: "Fitness First",
+      url: "#",
+      icon: Dumbbell,
+      items: [
+        {
+          title: "Daily Fitness",
+          url: "/daily-fitness",
+          icon: Dumbbell,
+        },
+        {
+          title: "Goals",
+          url: "#",
+          icon: Target,
+        },
+        {
+          title: "Progress",
+          url: "#",
+          icon: TrendingUp,
+        },
+      ],
+    },
+    {
       title: "Todo",
       url: "#",
       icon: CheckSquare,
@@ -36,28 +58,6 @@ const data = {
           url: "#",
           icon: Archive,
           isActive: false,
-        },
-      ],
-    },
-    {
-      title: "Fitness First",
-      url: "#",
-      icon: Dumbbell,
-      items: [
-        {
-          title: "Daily Fitness",
-          url: "/daily-fitness",
-          icon: Dumbbell,
-        },
-        {
-          title: "Goals",
-          url: "#",
-          icon: Target,
-        },
-        {
-          title: "Progress",
-          url: "#",
-          icon: TrendingUp,
         },
       ],
     },
