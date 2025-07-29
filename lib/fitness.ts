@@ -4,6 +4,11 @@ export type { FitnessTask }
 
 export async function getFitnessTasks(): Promise<FitnessTask[]> {
   console.log("Attempting to fetch fitness tasks from fitness_database table...")
+  
+  // Check authentication status
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  console.log("Current auth status:", { user: user?.email || 'Not authenticated', authError })
+  
   const { data, error } = await supabase.from("fitness_database").select("*").order("order_index", { ascending: true })
 
   if (error) {
