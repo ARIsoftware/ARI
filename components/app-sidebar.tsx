@@ -68,17 +68,17 @@ const data = {
       items: [
         {
           title: "All Contacts",
-          url: "#",
+          url: "/contacts",
           icon: Users,
         },
         {
           title: "Add Contact",
-          url: "#",
+          url: "/contacts/add",
           icon: UserPlus,
         },
         {
           title: "Settings",
-          url: "#",
+          url: "/settings",
           icon: Settings,
         },
       ],
