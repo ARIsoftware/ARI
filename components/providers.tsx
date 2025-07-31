@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { ClerkProvider } from "@clerk/nextjs"
 import { ClerkErrorBoundary } from "@/components/clerk-error-boundary"
 import { Toaster } from "@/components/ui/toaster"
@@ -11,11 +13,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
     throw new Error("Missing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY environment variable")
   }
 
-  // Type assertion to handle React 19 compatibility
-  const Provider = ClerkProvider as any
-
   return (
-    <Provider
+    <ClerkProvider
       publishableKey={publishableKey}
       appearance={{
         baseTheme: undefined,
@@ -28,6 +27,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
         {children}
         <Toaster />
       </ClerkErrorBoundary>
-    </Provider>
+    </ClerkProvider>
   )
 }

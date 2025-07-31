@@ -1,9 +1,20 @@
 "use client"
 
-import type React from "react"
-import { useUser } from "@clerk/nextjs"
-import { DM_Sans } from "next/font/google"
-import { AppSidebar } from "../../components/app-sidebar"
+import { useState, useEffect } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Plus, GripVertical, Calendar, User, CheckCircle2, Clock, AlertCircle } from "lucide-react"
+import { getTasks, updateTaskOrder, type Task } from "@/lib/tasks"
+import { toast } from "@/hooks/use-toast"
+import Link from "next/link"
+import { format } from "date-fns"
+import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd"
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
+import { AppSidebar } from "@/components/app-sidebar"
+import { Separator } from "@/components/ui/separator"
+import { SidebarTrigger } from "@/components/ui/sidebar"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -12,78 +23,19 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { Separator } from "@/components/ui/separator"
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2 } from "lucide-react"
-import { useState, useEffect } from "react"
-import { getTasks, toggleTaskCompletion, toggleTaskStar, reorderTasks, type Task } from "@/lib/tasks"
-import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabase"
-import { useRouter } from "next/navigation"
-
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-})
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "In Progress":
-      return "bg-purple-100 text-purple-600"
-    case "Pending":
-      return "bg-blue-100 text-blue-600"
-    case "Completed":
-      return "bg-green-100 text-green-600"
-    default:
-      return "bg-gray-100 text-gray-600"
-  }
-}
-
-const getPriorityColor = (priority: string) => {
-  switch (priority) {
-    case "High":
-      return "bg-red-100 text-red-600"
-    case "Medium":
-      return "bg-yellow-100 text-yellow-600"
-    case "Low":
-      return "bg-gray-200 text-gray-600"
-    default:
-      return "bg-gray-100 text-gray-600"
-  }
-}
-
-const formatDate = (dateString: string | null) => {
-  if (!dateString) return "No due date"
-  return new Date(dateString).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
-}
+import { createClient } from "@/lib/supabase"
 
 export default function TasksPage() {
-  const { user } = useUser()
-  const { toast } = useToast()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeFilter, setActiveFilter] = useState("All")
-  const [draggedTask, setDraggedTask] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [viewMode, setViewMode] = useState<"list" | "card">("list")
-  const router = useRouter()
 
-  const filters = ["All", "Today", "In Progress", "Completed"]
-
-  // Load tasks from Supabase and set up real-time subscription
   useEffect(() => {
     loadTasks()
 
     // Set up real-time subscription
+    const supabase = createClient()
     const channel = supabase
-      .channel("ari-database-changes")
+      .channel("tasks-changes")
       .on(
         "postgres_changes",
         {
@@ -93,19 +45,11 @@ export default function TasksPage() {
         },
         (payload) => {
           console.log("Real-time update:", payload)
-
-          if (payload.eventType === "INSERT") {
-            setTasks((prev) => [payload.new as Task, ...prev])
-          } else if (payload.eventType === "UPDATE") {
-            setTasks((prev) => prev.map((task) => (task.id === payload.new.id ? (payload.new as Task) : task)))
-          } else if (payload.eventType === "DELETE") {
-            setTasks((prev) => prev.filter((task) => task.id !== payload.old.id))
-          }
+          loadTasks() // Reload tasks when changes occur
         },
       )
       .subscribe()
 
-    // Cleanup subscription on unmount
     return () => {
       supabase.removeChannel(channel)
     }
@@ -113,11 +57,10 @@ export default function TasksPage() {
 
   const loadTasks = async () => {
     try {
-      setLoading(true)
-      const data = await getTasks()
-      setTasks(data)
+      const fetchedTasks = await getTasks()
+      setTasks(fetchedTasks)
     } catch (error) {
-      console.error("Failed to load tasks:", error)
+      console.error("Error loading tasks:", error)
       toast({
         title: "Error",
         description: "Failed to load tasks. Please try again.",
@@ -128,401 +71,265 @@ export default function TasksPage() {
     }
   }
 
-  const filteredTasks = tasks
-    .filter((task) => {
-      const matchesFilter =
-        activeFilter === "All" ||
-        (activeFilter === "Today" && task.starred) ||
-        (activeFilter !== "Today" && task.status === activeFilter)
-      const matchesSearch =
-        task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        task.assignees.some((assignee: string) => assignee.toLowerCase().includes(searchQuery.toLowerCase()))
-      return matchesFilter && matchesSearch
-    })
-    .sort((a, b) => {
-      // Sort completed tasks to the bottom
-      if (a.completed && !b.completed) return 1
-      if (!a.completed && b.completed) return -1
-      // If both have same completion status, maintain their order
-      return a.order_index - b.order_index
-    })
+  const handleDragEnd = async (result: DropResult) => {
+    if (!result.destination) return
 
-  const handleDragStart = (e: React.DragEvent, taskId: string) => {
-    setDraggedTask(taskId)
-    e.dataTransfer.effectAllowed = "move"
-  }
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = "move"
-  }
-
-  const handleDrop = async (e: React.DragEvent, targetTaskId: string) => {
-    e.preventDefault()
-
-    if (!draggedTask || draggedTask === targetTaskId) return
-
-    const draggedIndex = tasks.findIndex((task) => task.id === draggedTask)
-    const targetIndex = tasks.findIndex((task) => task.id === targetTaskId)
-
-    if (draggedIndex === -1 || targetIndex === -1) return
-
-    const newTasks = [...tasks]
-    const [draggedItem] = newTasks.splice(draggedIndex, 1)
-    newTasks.splice(targetIndex, 0, draggedItem)
-
-    // Update order_index for all tasks based on new positions
-    const updatedTasks = newTasks.map((task, index) => ({
-      ...task,
-      order_index: index
-    }))
+    const items = Array.from(tasks)
+    const [reorderedItem] = items.splice(result.source.index, 1)
+    items.splice(result.destination.index, 0, reorderedItem)
 
     // Update local state immediately for better UX
-    setTasks(updatedTasks)
-    setDraggedTask(null)
+    setTasks(items)
 
     try {
-      // Update order in database
-      await reorderTasks(updatedTasks.map((task) => task.id))
+      // Update the order in the database
+      await updateTaskOrder(items.map((task, index) => ({ id: task.id, order_index: index })))
+
+      toast({
+        title: "Tasks reordered",
+        description: "Task order has been updated successfully.",
+      })
     } catch (error) {
-      console.error("Failed to reorder tasks:", error)
-      // Revert local state on error
-      setTasks(tasks)
+      console.error("Error updating task order:", error)
+      // Revert the local state if the update failed
+      loadTasks()
       toast({
         title: "Error",
-        description: "Failed to reorder tasks. Please try again.",
+        description: "Failed to update task order. Please try again.",
         variant: "destructive",
       })
     }
   }
 
-  const handleDragEnd = () => {
-    setDraggedTask(null)
-  }
-
-  const handleToggleCompletion = async (taskId: string) => {
-    try {
-      const updatedTask = await toggleTaskCompletion(taskId)
-      setTasks(tasks.map((task) => (task.id === taskId ? updatedTask : task)))
-      toast({
-        title: "Success",
-        description: `Task ${updatedTask.completed ? "completed" : "reopened"} successfully.`,
-      })
-    } catch (error) {
-      console.error("Failed to toggle task completion:", error)
-      toast({
-        title: "Error",
-        description: "Failed to update task. Please try again.",
-        variant: "destructive",
-      })
+  const getPriorityColor = (priority: string) => {
+    switch (priority?.toLowerCase()) {
+      case "low":
+        return "bg-green-100 text-green-800"
+      case "medium":
+        return "bg-yellow-100 text-yellow-800"
+      case "high":
+        return "bg-orange-100 text-orange-800"
+      case "urgent":
+        return "bg-red-100 text-red-800"
+      default:
+        return "bg-gray-100 text-gray-800"
     }
   }
 
-  const handleToggleStar = async (taskId: string) => {
-    try {
-      const updatedTask = await toggleTaskStar(taskId)
-      setTasks(tasks.map((task) => (task.id === taskId ? updatedTask : task)))
-    } catch (error) {
-      console.error("Failed to toggle task star:", error)
-      toast({
-        title: "Error",
-        description: "Failed to update task. Please try again.",
-        variant: "destructive",
-      })
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "completed":
+        return "bg-green-100 text-green-800"
+      case "in-progress":
+        return "bg-blue-100 text-blue-800"
+      case "on-hold":
+        return "bg-gray-100 text-gray-800"
+      case "todo":
+        return "bg-purple-100 text-purple-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "completed":
+        return <CheckCircle2 className="h-4 w-4" />
+      case "in-progress":
+        return <Clock className="h-4 w-4" />
+      case "on-hold":
+        return <AlertCircle className="h-4 w-4" />
+      default:
+        return <Clock className="h-4 w-4" />
     }
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50/50">
-        <div className="h-[35px] bg-black w-full relative z-50 flex items-center justify-center">
-          <span className={`text-white font-medium ${dmSans.className}`}>ARI</span>
-        </div>
-        <SidebarProvider>
-          <AppSidebar />
-          <SidebarInset>
-            <div className="flex items-center justify-center h-96">
-              <div className="flex items-center gap-2">
-                <Loader2 className="w-6 h-6 animate-spin" />
-                <span>Loading tasks...</span>
-              </div>
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+            <div className="flex items-center gap-2 px-4">
+              <SidebarTrigger className="-ml-1" />
+              <Separator orientation="vertical" className="mr-2 h-4" />
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem className="hidden md:block">
+                    <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator className="hidden md:block" />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>Tasks</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
             </div>
-          </SidebarInset>
-        </SidebarProvider>
-      </div>
+          </header>
+          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+            <div className="space-y-4">
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      <div className="h-[35px] bg-black w-full relative z-50 flex items-center justify-center">
-        <span className={`text-white font-medium ${dmSans.className}`}>ARI</span>
-      </div>
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-white px-4">
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+          <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 h-4" />
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="#">Todo</BreadcrumbLink>
+                  <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>All Tasks</BreadcrumbPage>
+                  <BreadcrumbPage>Tasks</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-          </header>
-
-          <div className="flex flex-1 flex-col gap-6 p-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold">Todo List</h1>
-                {user && (
-                  <p className="text-sm text-muted-foreground mt-1">Welcome back, {user.firstName || "there"}!</p>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={loadTasks} disabled={loading} className="bg-white">
-                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
-                  Refresh
-                </Button>
-                <Button className="bg-black hover:bg-gray-800" onClick={() => router.push("/add-task")}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Task
-                </Button>
-              </div>
-            </div>
-
-            {/* Filters and Search */}
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-1 p-1 bg-gray-200/75 rounded-lg">
-                {filters.map((filter) => (
-                  <Button
-                    key={filter}
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setActiveFilter(filter)}
-                    className={`h-8 px-4 rounded-md transition-colors ${
-                      activeFilter === filter ? "bg-white text-gray-800 shadow-sm" : "text-gray-600 hover:bg-gray-200"
-                    }`}
-                  >
-                    {filter}
-                  </Button>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <Input
-                    placeholder="Search tasks..."
-                    className="pl-10 w-64 bg-white"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-                <Button variant="outline" size="icon" className="bg-white">
-                  <Filter className="w-4 h-4" />
-                </Button>
-                <div className="flex items-center rounded-lg border bg-white">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className={`rounded-r-none ${viewMode === "list" ? "bg-gray-100" : ""}`}
-                    onClick={() => setViewMode("list")}
-                  >
-                    <List className="w-4 h-4" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className={`rounded-l-none ${viewMode === "card" ? "bg-gray-100" : ""}`}
-                    onClick={() => setViewMode("card")}
-                  >
-                    <Grid3X3 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Task List/Grid */}
-            <div className={viewMode === "card" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" : "space-y-3"}>
-              {filteredTasks.map((task) => (
-                <div
-                  key={task.id}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, task.id)}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, task.id)}
-                  onDragEnd={handleDragEnd}
-                  className={`${
-                    viewMode === "card" 
-                      ? "flex flex-col gap-3 p-4 border rounded-lg hover:shadow-md transition-all cursor-move h-full" 
-                      : "flex items-start gap-4 p-4 border rounded-lg hover:shadow-sm transition-all cursor-move"
-                  } ${
-                    task.starred ? "bg-[#214b88] text-white shadow-lg" : "bg-white border-gray-200"
-                  } ${draggedTask === task.id ? "opacity-50" : ""} ${task.completed ? "taskdone" : ""}`}
-                >
-                  {viewMode === "list" ? (
-                    <>
-                      {/* List View */}
-                      <input
-                        type="checkbox"
-                        checked={task.completed}
-                        onChange={() => handleToggleCompletion(task.id)}
-                        className="w-5 h-5 mt-1 rounded border-gray-300"
-                      />
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3
-                            className={`font-medium ${task.completed ? "line-through text-gray-500" : task.starred ? "text-white" : "text-gray-800"}`}
-                          >
-                            {task.title}
-                          </h3>
-                          <button
-                            onClick={() => handleToggleStar(task.id)}
-                            className={`transition-colors ${task.starred ? "text-white hover:text-yellow-400" : "text-gray-400 hover:text-yellow-500"}`}
-                          >
-                            <Star
-                              className={`w-5 h-5 transition-colors ${task.starred ? "fill-yellow-400 text-yellow-500" : ""}`}
-                            />
-                          </button>
-                        </div>
-
-                        <div
-                          className={`flex items-center flex-wrap gap-x-4 gap-y-2 text-sm ${task.starred ? "text-gray-300" : "text-gray-600"}`}
-                        >
-                          <div className="flex items-center gap-2">
-                            {task.assignees.map((name: string) => (
-                              <span
-                                key={name}
-                                className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.starred ? "bg-white/10 text-gray-200" : "bg-gray-100 text-gray-700"}`}
-                              >
-                                {name}
-                              </span>
-                            ))}
-                          </div>
-
-                          <div className="flex items-center gap-1.5">
-                            <Calendar className="w-4 h-4" />
-                            <span>{formatDate(task.due_date)}</span>
-                          </div>
-
-                          <div className="flex items-center gap-1.5">
-                            <Bell className="w-4 h-4" />
-                            <span>
-                              Subtasks: {task.subtasks_completed}/{task.subtasks_total}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge
-                          variant="secondary"
-                          className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getStatusColor(task.status)}`}
-                        >
-                          {task.status}
-                        </Badge>
-                        <Badge
-                          variant="secondary"
-                          className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getPriorityColor(task.priority)}`}
-                        >
-                          {task.priority}
-                        </Badge>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {/* Card View */}
-                      <div className="flex items-start justify-between">
-                        <input
-                          type="checkbox"
-                          checked={task.completed}
-                          onChange={() => handleToggleCompletion(task.id)}
-                          className="w-5 h-5 rounded border-gray-300"
-                        />
-                        <button
-                          onClick={() => handleToggleStar(task.id)}
-                          className={`transition-colors ${task.starred ? "text-white hover:text-yellow-400" : "text-gray-400 hover:text-yellow-500"}`}
-                        >
-                          <Star
-                            className={`w-5 h-5 transition-colors ${task.starred ? "fill-yellow-400 text-yellow-500" : ""}`}
-                          />
-                        </button>
-                      </div>
-
-                      <div className="flex-1">
-                        <h3
-                          className={`font-medium text-base mb-3 line-clamp-2 ${task.completed ? "line-through text-gray-500" : task.starred ? "text-white" : "text-gray-800"}`}
-                        >
-                          {task.title}
-                        </h3>
-
-                        <div className={`space-y-2 text-sm ${task.starred ? "text-gray-300" : "text-gray-600"}`}>
-                          {task.assignees.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {task.assignees.map((name: string) => (
-                                <span
-                                  key={name}
-                                  className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.starred ? "bg-white/10 text-gray-200" : "bg-gray-100 text-gray-700"}`}
-                                >
-                                  {name}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-
-                          <div className="flex items-center gap-1.5">
-                            <Calendar className="w-4 h-4" />
-                            <span className="text-xs">{formatDate(task.due_date)}</span>
-                          </div>
-
-                          <div className="flex items-center gap-1.5">
-                            <Bell className="w-4 h-4" />
-                            <span className="text-xs">
-                              Subtasks: {task.subtasks_completed}/{task.subtasks_total}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 mt-auto pt-2">
-                        <Badge
-                          variant="secondary"
-                          className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getStatusColor(task.status)}`}
-                        >
-                          {task.status}
-                        </Badge>
-                        <Badge
-                          variant="secondary"
-                          className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getPriorityColor(task.priority)}`}
-                        >
-                          {task.priority}
-                        </Badge>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {filteredTasks.length === 0 && !loading && (
-              <div className="text-center py-12 text-gray-500">
-                {searchQuery || activeFilter !== "All"
-                  ? "No tasks found matching your criteria."
-                  : "No tasks yet. Click 'Add Task' to get started!"}
-              </div>
-            )}
           </div>
-        </SidebarInset>
-      </SidebarProvider>
-    </div>
+        </header>
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Tasks</h1>
+              <p className="text-muted-foreground">Manage and track your tasks efficiently</p>
+            </div>
+            <Link href="/add-task">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Task
+              </Button>
+            </Link>
+          </div>
+
+          {tasks.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <CheckCircle2 className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No tasks yet</h3>
+                <p className="text-muted-foreground text-center mb-4">
+                  Get started by creating your first task to stay organized and productive.
+                </p>
+                <Link href="/add-task">
+                  <Button>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Your First Task
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          ) : (
+            <DragDropContext onDragEnd={handleDragEnd}>
+              <Droppable droppableId="tasks">
+                {(provided) => (
+                  <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-4">
+                    {tasks.map((task, index) => (
+                      <Draggable key={task.id} draggableId={task.id} index={index}>
+                        {(provided, snapshot) => (
+                          <Card
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            className={`transition-all ${
+                              snapshot.isDragging ? "shadow-lg rotate-2" : ""
+                            } ${task.status === "completed" ? "bg-green-50 border-green-200" : ""}`}
+                          >
+                            <CardHeader>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing">
+                                    <GripVertical className="h-5 w-5 text-muted-foreground" />
+                                  </div>
+                                  <div>
+                                    <CardTitle
+                                      className={
+                                        task.status === "completed" ? "line-through text-muted-foreground" : ""
+                                      }
+                                    >
+                                      {task.title}
+                                    </CardTitle>
+                                    {task.description && (
+                                      <CardDescription className={task.status === "completed" ? "line-through" : ""}>
+                                        {task.description}
+                                      </CardDescription>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {task.priority && (
+                                    <Badge variant="secondary" className={getPriorityColor(task.priority)}>
+                                      {task.priority}
+                                    </Badge>
+                                  )}
+                                  <Badge
+                                    variant="outline"
+                                    className={`${getStatusColor(task.status)} flex items-center gap-1`}
+                                  >
+                                    {getStatusIcon(task.status)}
+                                    {task.status}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-3">
+                                {task.due_date && (
+                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Calendar className="h-4 w-4" />
+                                    Due: {format(new Date(task.due_date), "PPP")}
+                                  </div>
+                                )}
+                                {task.assignees && task.assignees.length > 0 && (
+                                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <User className="h-4 w-4" />
+                                    Assigned to: {task.assignees.join(", ")}
+                                  </div>
+                                )}
+                                {task.subtasks && task.subtasks.length > 0 && (
+                                  <div className="space-y-1">
+                                    <p className="text-sm font-medium">Subtasks:</p>
+                                    <div className="space-y-1">
+                                      {task.subtasks.map((subtask, idx) => (
+                                        <div
+                                          key={idx}
+                                          className="flex items-center gap-2 text-sm text-muted-foreground"
+                                        >
+                                          <CheckCircle2
+                                            className={`h-3 w-3 ${subtask.completed ? "text-green-600" : "text-gray-400"}`}
+                                          />
+                                          <span className={subtask.completed ? "line-through" : ""}>
+                                            {subtask.title}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            </DragDropContext>
+          )}
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   )
 }

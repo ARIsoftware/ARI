@@ -1,9 +1,27 @@
 "use client"
 
 import type React from "react"
-import { useUser } from "@clerk/nextjs"
-import { DM_Sans } from "next/font/google"
-import { AppSidebar } from "../../components/app-sidebar"
+
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { CalendarIcon, X, Plus } from "lucide-react"
+import { format } from "date-fns"
+import { cn } from "@/lib/utils"
+import { createTask } from "@/lib/tasks"
+import { useRouter } from "next/navigation"
+import { toast } from "@/hooks/use-toast"
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
+import { AppSidebar } from "@/components/app-sidebar"
+import { Separator } from "@/components/ui/separator"
+import { SidebarTrigger } from "@/components/ui/sidebar"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -12,165 +30,98 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { Separator } from "@/components/ui/separator"
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Switch } from "@/components/ui/switch"
-import { CalendarIcon, Plus, X, Star, ArrowLeft, Loader2 } from "lucide-react"
-import { useState } from "react"
-import { createTask } from "@/lib/tasks"
-import { useToast } from "@/hooks/use-toast"
-import { useRouter } from "next/navigation"
-import { format } from "date-fns"
-import { cn } from "@/lib/utils"
 
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-})
-
-const priorityOptions = [
-  { value: "Low", label: "Low Priority", color: "bg-gray-100 text-gray-600" },
-  { value: "Medium", label: "Medium Priority", color: "bg-yellow-100 text-yellow-600" },
-  { value: "High", label: "High Priority", color: "bg-red-100 text-red-600" },
-]
-
-const statusOptions = [
-  { value: "Pending", label: "Pending", color: "bg-blue-100 text-blue-600" },
-  { value: "In Progress", label: "In Progress", color: "bg-purple-100 text-purple-600" },
-  { value: "Completed", label: "Completed", color: "bg-green-100 text-green-600" },
-]
+interface Subtask {
+  id: string
+  title: string
+  completed: boolean
+}
 
 export default function AddTaskPage() {
-  const { user } = useUser()
-  const { toast } = useToast()
-  const router = useRouter()
-  const [loading, setLoading] = useState(false)
-  const [date, setDate] = useState<Date>()
-
-  // Form state
-  const [formData, setFormData] = useState({
-    title: "",
-    assignees: [] as string[],
-    subtasks_total: 0,
-    status: "Pending" as const,
-    priority: "Medium" as const,
-    starred: false,
-    completed: false,
-  })
-
+  const [title, setTitle] = useState("")
+  const [description, setDescription] = useState("")
+  const [status, setStatus] = useState("todo")
+  const [priority, setPriority] = useState("medium")
+  const [assignees, setAssignees] = useState<string[]>([])
   const [newAssignee, setNewAssignee] = useState("")
-
-  const handleInputChange = (field: string, value: any) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }))
-  }
+  const [dueDate, setDueDate] = useState<Date>()
+  const [subtasks, setSubtasks] = useState<Subtask[]>([])
+  const [newSubtask, setNewSubtask] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const router = useRouter()
 
   const addAssignee = () => {
-    if (newAssignee.trim() && !formData.assignees.includes(newAssignee.trim())) {
-      setFormData((prev) => ({
-        ...prev,
-        assignees: [...prev.assignees, newAssignee.trim()],
-      }))
+    if (newAssignee.trim() && !assignees.includes(newAssignee.trim())) {
+      setAssignees([...assignees, newAssignee.trim()])
       setNewAssignee("")
     }
   }
 
   const removeAssignee = (assignee: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      assignees: prev.assignees.filter((a) => a !== assignee),
-    }))
+    setAssignees(assignees.filter((a) => a !== assignee))
+  }
+
+  const addSubtask = () => {
+    if (newSubtask.trim()) {
+      const subtask: Subtask = {
+        id: Date.now().toString(),
+        title: newSubtask.trim(),
+        completed: false,
+      }
+      setSubtasks([...subtasks, subtask])
+      setNewSubtask("")
+    }
+  }
+
+  const removeSubtask = (id: string) => {
+    setSubtasks(subtasks.filter((s) => s.id !== id))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    if (!formData.title.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a task title.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setLoading(true)
+    setIsSubmitting(true)
 
     try {
-      const taskData = {
-        title: formData.title.trim(),
-        assignees: formData.assignees,
-        due_date: date ? date.toISOString().split("T")[0] : null,
-        subtasks_total: formData.subtasks_total,
-        subtasks_completed: 0,
-        status: formData.status,
-        priority: formData.priority,
-        starred: formData.starred,
-        completed: formData.completed,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-
-      await createTask(taskData)
-
-      toast({
-        title: "Success",
-        description: "Task created successfully!",
+      await createTask({
+        title,
+        description,
+        status,
+        priority,
+        assignees,
+        due_date: dueDate?.toISOString(),
+        subtasks,
       })
 
-      // Redirect to tasks page
+      toast({
+        title: "Success!",
+        description: "Task created successfully.",
+      })
+
       router.push("/tasks")
     } catch (error) {
-      console.error("Failed to create task:", error)
+      console.error("Error creating task:", error)
       toast({
         title: "Error",
         description: "Failed to create task. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setLoading(false)
+      setIsSubmitting(false)
     }
   }
 
-  const resetForm = () => {
-    setFormData({
-      title: "",
-      assignees: [],
-      subtasks_total: 0,
-      status: "Pending",
-      priority: "Medium",
-      starred: false,
-      completed: false,
-    })
-    setDate(undefined)
-    setNewAssignee("")
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      <div className="h-[35px] bg-black w-full relative z-50 flex items-center justify-center">
-        <span className={`text-white font-medium ${dmSans.className}`}>ARI</span>
-      </div>
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-white px-4">
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+          <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 h-4" />
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="/tasks">Todo</BreadcrumbLink>
+                  <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
@@ -178,201 +129,158 @@ export default function AddTaskPage() {
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-          </header>
-
-          <div className="flex flex-1 flex-col gap-6 p-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold">Add New Task</h1>
-                {user && <p className="text-sm text-muted-foreground mt-1">Create a new task for your todo list</p>}
-              </div>
-              <Button variant="outline" onClick={() => router.push("/tasks")} className="bg-white">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Tasks
-              </Button>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="max-w-2xl">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Plus className="w-5 h-5" />
-                    Task Details
-                  </CardTitle>
-                  <CardDescription>Fill in the information below to create a new task.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Task Title */}
+          </div>
+        </header>
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+          <div className="max-w-4xl mx-auto w-full">
+            <Card>
+              <CardHeader>
+                <CardTitle>Create New Task</CardTitle>
+                <CardDescription>Add a new task to your project with all the necessary details.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="space-y-2">
-                    <Label htmlFor="title" className="text-sm font-medium">
-                      Task Title *
-                    </Label>
+                    <Label htmlFor="title">Task Title *</Label>
                     <Input
                       id="title"
-                      placeholder="Enter task title..."
-                      value={formData.title}
-                      onChange={(e) => handleInputChange("title", e.target.value)}
-                      className="w-full"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="Enter task title"
                       required
                     />
                   </div>
 
-                  {/* Assignees */}
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Assignees</Label>
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Describe the task in detail..."
+                      rows={4}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="status">Status</Label>
+                      <Select value={status} onValueChange={setStatus}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todo">To Do</SelectItem>
+                          <SelectItem value="in-progress">In Progress</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="on-hold">On Hold</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="priority">Priority</Label>
+                      <Select value={priority} onValueChange={setPriority}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select priority" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                          <SelectItem value="urgent">Urgent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Due Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !dueDate && "text-muted-foreground",
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar mode="single" selected={dueDate} onSelect={setDueDate} initialFocus />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Assignees</Label>
                     <div className="flex gap-2">
                       <Input
-                        placeholder="Add assignee name..."
                         value={newAssignee}
                         onChange={(e) => setNewAssignee(e.target.value)}
+                        placeholder="Add assignee email or name"
                         onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addAssignee())}
-                        className="flex-1"
                       />
-                      <Button type="button" onClick={addAssignee} variant="outline" size="icon">
-                        <Plus className="w-4 h-4" />
+                      <Button type="button" onClick={addAssignee} variant="outline">
+                        Add
                       </Button>
                     </div>
-                    {formData.assignees.length > 0 && (
+                    {assignees.length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-2">
-                        {formData.assignees.map((assignee) => (
+                        {assignees.map((assignee) => (
                           <Badge key={assignee} variant="secondary" className="flex items-center gap-1">
                             {assignee}
-                            <button
-                              type="button"
-                              onClick={() => removeAssignee(assignee)}
-                              className="ml-1 hover:text-red-500"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
+                            <X className="h-3 w-3 cursor-pointer" onClick={() => removeAssignee(assignee)} />
                           </Badge>
                         ))}
                       </div>
                     )}
                   </div>
 
-                  {/* Due Date */}
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Due Date</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn("w-full justify-start text-left font-normal", !date && "text-muted-foreground")}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {date ? format(date, "PPP") : "Pick a date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={date} onSelect={setDate} initialFocus />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  {/* Subtasks */}
-                  <div className="space-y-2">
-                    <Label htmlFor="subtasks" className="text-sm font-medium">
-                      Number of Subtasks
-                    </Label>
-                    <Input
-                      id="subtasks"
-                      type="number"
-                      min="0"
-                      value={formData.subtasks_total}
-                      onChange={(e) => handleInputChange("subtasks_total", Number.parseInt(e.target.value) || 0)}
-                      className="w-full"
-                    />
-                  </div>
-
-                  {/* Status and Priority */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Status</Label>
-                      <Select
-                        value={formData.status}
-                        onValueChange={(value: any) => handleInputChange("status", value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {statusOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              <div className="flex items-center gap-2">
-                                <div className={`w-2 h-2 rounded-full ${option.color.split(" ")[0]}`} />
-                                {option.label}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <Label>Subtasks</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={newSubtask}
+                        onChange={(e) => setNewSubtask(e.target.value)}
+                        placeholder="Add a subtask"
+                        onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addSubtask())}
+                      />
+                      <Button type="button" onClick={addSubtask} variant="outline">
+                        <Plus className="h-4 w-4" />
+                      </Button>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Priority</Label>
-                      <Select
-                        value={formData.priority}
-                        onValueChange={(value: any) => handleInputChange("priority", value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {priorityOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              <div className="flex items-center gap-2">
-                                <div className={`w-2 h-2 rounded-full ${option.color.split(" ")[0]}`} />
-                                {option.label}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {subtasks.length > 0 && (
+                      <div className="space-y-2 mt-2">
+                        {subtasks.map((subtask) => (
+                          <div key={subtask.id} className="flex items-center justify-between p-2 border rounded">
+                            <span>{subtask.title}</span>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => removeSubtask(subtask.id)}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  {/* Starred */}
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-sm font-medium flex items-center gap-2">
-                        <Star className="w-4 h-4" />
-                        Mark as Important
-                      </Label>
-                      <p className="text-xs text-muted-foreground">Starred tasks will appear in the "Today" filter</p>
-                    </div>
-                    <Switch
-                      checked={formData.starred}
-                      onCheckedChange={(checked) => handleInputChange("starred", checked)}
-                    />
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex gap-3 pt-4">
-                    <Button type="submit" disabled={loading} className="bg-black hover:bg-gray-800">
-                      {loading ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Creating...
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="w-4 h-4 mr-2" />
-                          Create Task
-                        </>
-                      )}
+                  <div className="flex gap-4 pt-4">
+                    <Button type="submit" disabled={isSubmitting || !title.trim()}>
+                      {isSubmitting ? "Creating..." : "Create Task"}
                     </Button>
-                    <Button type="button" variant="outline" onClick={resetForm} disabled={loading}>
-                      Reset Form
+                    <Button type="button" variant="outline" onClick={() => router.push("/tasks")}>
+                      Cancel
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
-            </form>
+                </form>
+              </CardContent>
+            </Card>
           </div>
-        </SidebarInset>
-      </SidebarProvider>
-    </div>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   )
 }
