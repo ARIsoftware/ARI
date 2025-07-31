@@ -26,6 +26,15 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <meta name="robots" content="noindex, nofollow" />
+        <script
+          type="speculationrules"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              prerender: [{ where: { href_matches: "/*" }, eagerness: "moderate" }],
+              prefetch: [{ where: { href_matches: "/*" }, eagerness: "moderate" }],
+            }),
+          }}
+        />
       </head>
       <body>
         <Providers>{children}</Providers>
