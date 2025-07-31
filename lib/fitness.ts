@@ -4,11 +4,7 @@ export type { FitnessTask }
 
 export async function getFitnessTasks(): Promise<FitnessTask[]> {
   console.log("Attempting to fetch fitness tasks from fitness_database table...")
-  
-  // Check authentication status
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  console.log("Current auth status:", { user: user?.email || 'Not authenticated', authError })
-  
+
   const { data, error } = await supabase.from("fitness_database").select("*").order("order_index", { ascending: true })
 
   if (error) {
@@ -17,7 +13,7 @@ export async function getFitnessTasks(): Promise<FitnessTask[]> {
       message: error.message,
       code: error.code,
       details: error.details,
-      hint: error.hint
+      hint: error.hint,
     })
     throw error
   }
@@ -26,9 +22,11 @@ export async function getFitnessTasks(): Promise<FitnessTask[]> {
   return data || []
 }
 
-export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_at" | "updated_at" | "order_index">): Promise<FitnessTask> {
+export async function createFitnessTask(
+  task: Omit<FitnessTask, "id" | "created_at" | "updated_at" | "order_index">,
+): Promise<FitnessTask> {
   console.log("Attempting to create fitness task:", task)
-  
+
   // Get the highest order_index to place new task at the end
   const { data: maxOrderData, error: maxOrderError } = await supabase
     .from("fitness_database")
@@ -49,11 +47,7 @@ export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_
   }
   console.log("Task to insert:", taskToInsert)
 
-  const { data, error } = await supabase
-    .from("fitness_database")
-    .insert([taskToInsert])
-    .select()
-    .single()
+  const { data, error } = await supabase.from("fitness_database").insert([taskToInsert]).select().single()
 
   if (error) {
     console.error("Error creating fitness task:", error)
@@ -61,7 +55,7 @@ export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_
       message: error.message,
       code: error.code,
       details: error.details,
-      hint: error.hint
+      hint: error.hint,
     })
     throw error
   }
@@ -80,6 +74,28 @@ export async function updateFitnessTask(id: string, updates: Partial<FitnessTask
 
   if (error) {
     console.error("Error updating fitness task:", error)
+    throw error
+  }
+
+  return data
+}
+
+export async function updateFitnessTaskCompletion(id: string, completed: boolean): Promise<FitnessTask> {
+  const status = completed ? "Completed" : "Pending"
+
+  const { data, error } = await supabase
+    .from("fitness_database")
+    .update({
+      completed,
+      status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .select()
+    .single()
+
+  if (error) {
+    console.error("Error updating fitness task completion:", error)
     throw error
   }
 
@@ -162,7 +178,7 @@ export async function addSampleFitnessTasks(): Promise<void> {
     {
       title: "100 pushups",
       assignees: ["Me"],
-      due_date: new Date().toISOString().split('T')[0],
+      due_date: new Date().toISOString().split("T")[0],
       subtasks_completed: 0,
       subtasks_total: 0,
       status: "Pending" as const,
@@ -173,7 +189,7 @@ export async function addSampleFitnessTasks(): Promise<void> {
     {
       title: "100 jumping jacks",
       assignees: ["Me"],
-      due_date: new Date().toISOString().split('T')[0],
+      due_date: new Date().toISOString().split("T")[0],
       subtasks_completed: 0,
       subtasks_total: 0,
       status: "Pending" as const,
@@ -184,7 +200,7 @@ export async function addSampleFitnessTasks(): Promise<void> {
     {
       title: "15 minute jog",
       assignees: ["Me"],
-      due_date: new Date().toISOString().split('T')[0],
+      due_date: new Date().toISOString().split("T")[0],
       subtasks_completed: 0,
       subtasks_total: 0,
       status: "Pending" as const,

@@ -1,25 +1,26 @@
-import { supabase } from "./supabase"
+import { createClient } from "@/lib/supabase"
 
 export interface FitnessStats {
   averagePerDay: number
-  mostCompleted: Array<{ name: string; count: number }>
-  leastCompleted: Array<{ name: string; count: number }>
+  mostCompleted: Array<{ name: string }>
+  leastCompleted: Array<{ name: string }>
 }
 
 export interface TodoStats {
   totalTasks: number
-  completedTasks: number
-  pendingTasks: number
+  completedThisWeek: number
   completionRate: number
 }
 
 export async function getFitnessStats(): Promise<FitnessStats> {
   try {
-    // Get all fitness tasks
-    const { data: tasks, error } = await supabase.from("fitness_database").select("title, completed")
+    const supabase = createClient()
 
-    if (error) {
-      console.error("Error fetching fitness stats:", error)
+    // Get all fitness tasks (no user_id filter since the column doesn't exist)
+    const { data: tasks, error: tasksError } = await supabase.from("fitness_database").select("*")
+
+    if (tasksError) {
+      console.error("Error fetching fitness tasks:", tasksError)
       return {
         averagePerDay: 0,
         mostCompleted: [],
@@ -27,31 +28,26 @@ export async function getFitnessStats(): Promise<FitnessStats> {
       }
     }
 
-    if (!tasks || tasks.length === 0) {
-      return {
-        averagePerDay: 0,
-        mostCompleted: [],
-        leastCompleted: [],
-      }
-    }
+    const totalTasks = tasks?.length || 0
+    const completedTasks = tasks?.filter((task) => task.completed).length || 0
+    const averagePerDay = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) / 100 : 0
 
-    // Calculate completion stats
-    const completedTasks = tasks.filter((task) => task.completed)
-    const pendingTasks = tasks.filter((task) => !task.completed)
+    // Get most and least completed tasks
+    const mostCompleted =
+      tasks
+        ?.filter((task) => task.completed)
+        .slice(0, 3)
+        .map((task) => ({
+          name: task.title || "Unnamed Task",
+        })) || []
 
-    // Simple average calculation (could be enhanced with date-based logic)
-    const averagePerDay = Math.round((completedTasks.length / Math.max(tasks.length, 1)) * 100) / 100
-
-    // Get most and least completed (simplified - showing completed vs pending)
-    const mostCompleted = completedTasks.slice(0, 3).map((task) => ({
-      name: task.title,
-      count: 1,
-    }))
-
-    const leastCompleted = pendingTasks.slice(0, 3).map((task) => ({
-      name: task.title,
-      count: 0,
-    }))
+    const leastCompleted =
+      tasks
+        ?.filter((task) => !task.completed)
+        .slice(0, 3)
+        .map((task) => ({
+          name: task.title || "Unnamed Task",
+        })) || []
 
     return {
       averagePerDay,
@@ -70,45 +66,43 @@ export async function getFitnessStats(): Promise<FitnessStats> {
 
 export async function getTodoStats(): Promise<TodoStats> {
   try {
+    const supabase = createClient()
+
     // Get all tasks from the ari-database table
-    const { data: tasks, error } = await supabase.from("ari-database").select("title, completed, status")
+    const { data: tasks, error } = await supabase.from("ari-database").select("*")
 
     if (error) {
-      console.error("Error fetching todo stats:", error)
+      console.error("Error fetching tasks:", error)
       return {
         totalTasks: 0,
-        completedTasks: 0,
-        pendingTasks: 0,
+        completedThisWeek: 0,
         completionRate: 0,
       }
     }
 
-    if (!tasks || tasks.length === 0) {
-      return {
-        totalTasks: 0,
-        completedTasks: 0,
-        pendingTasks: 0,
-        completionRate: 0,
-      }
-    }
+    const totalTasks = tasks?.length || 0
+    const completedTasks = tasks?.filter((task) => task.status === "Completed").length || 0
 
-    const totalTasks = tasks.length
-    const completedTasks = tasks.filter((task) => task.completed || task.status === "Completed").length
-    const pendingTasks = totalTasks - completedTasks
+    // Calculate completed this week
+    const oneWeekAgo = new Date()
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+
+    const completedThisWeek =
+      tasks?.filter((task) => task.status === "Completed" && task.updated_at && new Date(task.updated_at) >= oneWeekAgo)
+        .length || 0
+
     const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
 
     return {
       totalTasks,
-      completedTasks,
-      pendingTasks,
+      completedThisWeek,
       completionRate,
     }
   } catch (error) {
     console.error("Error in getTodoStats:", error)
     return {
       totalTasks: 0,
-      completedTasks: 0,
-      pendingTasks: 0,
+      completedThisWeek: 0,
       completionRate: 0,
     }
   }
