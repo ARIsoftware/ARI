@@ -1,42 +1,41 @@
-import { createClient as createSupabaseClient } from "@supabase/supabase-js"
+import { createClient } from "@supabase/supabase-js"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-export const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  realtime: {
+    params: {
+      eventsPerSecond: 10,
+    },
+  },
+})
 
-export function createClient() {
-  return createSupabaseClient(supabaseUrl, supabaseAnonKey)
-}
-
-export interface Task {
+export type Task = {
   id: string
   title: string
-  description?: string
-  status: "Pending" | "In Progress" | "Completed"
-  priority: "Low" | "Medium" | "High"
   assignees: string[]
-  due_date?: string
+  due_date: string | null
   subtasks_completed: number
   subtasks_total: number
+  status: "Pending" | "In Progress" | "Completed"
+  priority: "Low" | "Medium" | "High"
   starred: boolean
   completed: boolean
   created_at: string
   updated_at: string
   order_index: number
-  user_id?: string
 }
 
-export interface FitnessTask {
+export type FitnessTask = {
   id: string
   title: string
-  description?: string
-  status: "Pending" | "In Progress" | "Completed"
-  priority: "Low" | "Medium" | "High"
   assignees: string[]
-  due_date?: string
+  due_date: string | null
   subtasks_completed: number
   subtasks_total: number
+  status: "Pending" | "In Progress" | "Completed"
+  priority: "Low" | "Medium" | "High"
   starred: boolean
   completed: boolean
   created_at: string
