@@ -1,9 +1,23 @@
 "use client"
 
 import type React from "react"
-import { useUser } from "@clerk/nextjs"
-import { DM_Sans } from "next/font/google"
-import { AppSidebar } from "../../components/app-sidebar"
+
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { X } from "lucide-react"
+import { createFitnessTask } from "@/lib/fitness"
+import { useRouter } from "next/navigation"
+import { toast } from "@/hooks/use-toast"
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
+import { AppSidebar } from "@/components/app-sidebar"
+import { Separator } from "@/components/ui/separator"
+import { SidebarTrigger } from "@/components/ui/sidebar"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -12,310 +26,189 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { Separator } from "@/components/ui/separator"
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Calendar, Plus, X, Star, Loader2 } from "lucide-react"
-import { useState } from "react"
-import { createFitnessTask } from "@/lib/fitness"
-import { useToast } from "@/hooks/use-toast"
-import { useRouter } from "next/navigation"
-
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-})
 
 export default function AddFitnessPage() {
-  const { user } = useUser()
-  const { toast } = useToast()
-  const router = useRouter()
-  
   const [title, setTitle] = useState("")
-  const [assignees, setAssignees] = useState<string[]>([])
-  const [newAssignee, setNewAssignee] = useState("")
-  const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0])
-  const [status, setStatus] = useState<"Pending" | "In Progress" | "Completed">("Pending")
-  const [priority, setPriority] = useState<"Low" | "Medium" | "High">("Medium")
-  const [starred, setStarred] = useState(false)
-  const [subtasksTotal, setSubtasksTotal] = useState(0)
-  const [loading, setLoading] = useState(false)
+  const [description, setDescription] = useState("")
+  const [category, setCategory] = useState("")
+  const [duration, setDuration] = useState("")
+  const [difficulty, setDifficulty] = useState("")
+  const [equipment, setEquipment] = useState<string[]>([])
+  const [newEquipment, setNewEquipment] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const router = useRouter()
 
-  const handleAddAssignee = () => {
-    if (newAssignee.trim() && !assignees.includes(newAssignee.trim())) {
-      setAssignees([...assignees, newAssignee.trim()])
-      setNewAssignee("")
+  const addEquipment = () => {
+    if (newEquipment.trim() && !equipment.includes(newEquipment.trim())) {
+      setEquipment([...equipment, newEquipment.trim()])
+      setNewEquipment("")
     }
   }
 
-  const handleRemoveAssignee = (assigneeToRemove: string) => {
-    setAssignees(assignees.filter(assignee => assignee !== assigneeToRemove))
+  const removeEquipment = (item: string) => {
+    setEquipment(equipment.filter((e) => e !== item))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!title.trim()) {
-      toast({
-        title: "Error",
-        description: "Exercise title is required.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setLoading(true)
+    setIsSubmitting(true)
 
     try {
       await createFitnessTask({
-        title: title.trim(),
-        assignees: assignees.length > 0 ? assignees : [user?.firstName || "Me"],
-        due_date: dueDate || null,
-        subtasks_completed: 0,
-        subtasks_total: subtasksTotal,
-        status,
-        priority,
-        starred,
-        completed: status === "Completed",
+        title,
+        description,
+        category,
+        duration: duration ? Number.parseInt(duration) : null,
+        difficulty,
+        equipment,
+        completed: false,
       })
 
       toast({
-        title: "Success",
-        description: "Exercise added successfully!",
+        title: "Success!",
+        description: "Fitness task created successfully.",
       })
 
       router.push("/daily-fitness")
     } catch (error) {
-      console.error("Failed to create fitness task:", error)
+      console.error("Error creating fitness task:", error)
       toast({
         title: "Error",
-        description: "Failed to add exercise. Please try again.",
+        description: "Failed to create fitness task. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setLoading(false)
+      setIsSubmitting(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      <div className="h-[35px] bg-black w-full relative z-50 flex items-center justify-center">
-        <span className={`text-white font-medium ${dmSans.className}`}>ARI</span>
-      </div>
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-white px-4">
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+          <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 h-4" />
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="#">Fitness First</BreadcrumbLink>
+                  <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbLink href="/daily-fitness">Daily Fitness</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>Add Exercise</BreadcrumbPage>
+                  <BreadcrumbPage>Add Fitness Task</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-          </header>
-
-          <div className="flex flex-1 flex-col gap-6 p-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <Button 
-                  variant="outline" 
-                  size="icon"
-                  onClick={() => router.push("/daily-fitness")}
-                  className="bg-white"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                </Button>
-                <div>
-                  <h1 className="text-3xl font-bold">Add New Exercise</h1>
-                  {user && (
-                    <p className="text-sm text-muted-foreground mt-1">Create a new fitness exercise</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Form */}
-            <Card className="max-w-2xl">
+          </div>
+        </header>
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+          <div className="max-w-2xl mx-auto w-full">
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Plus className="w-5 h-5" />
-                  Exercise Details
-                </CardTitle>
-                <CardDescription>
-                  Fill in the details for your new fitness exercise
-                </CardDescription>
+                <CardTitle>Add New Fitness Task</CardTitle>
+                <CardDescription>Create a new fitness task to track your daily activities.</CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
-                  {/* Exercise Title */}
                   <div className="space-y-2">
-                    <label htmlFor="title" className="text-sm font-medium">
-                      Exercise Title *
-                    </label>
+                    <Label htmlFor="title">Task Title *</Label>
                     <Input
                       id="title"
-                      placeholder="e.g., 100 pushups, 15 minute jog"
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
-                      className="bg-white"
+                      placeholder="e.g., Morning Run, Push-ups, Yoga Session"
                       required
                     />
                   </div>
 
-                  {/* Assignees */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Assigned to</label>
-                    <div className="flex items-center gap-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Describe your fitness task in detail..."
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="category">Category</Label>
+                      <Select value={category} onValueChange={setCategory}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cardio">Cardio</SelectItem>
+                          <SelectItem value="strength">Strength Training</SelectItem>
+                          <SelectItem value="flexibility">Flexibility</SelectItem>
+                          <SelectItem value="sports">Sports</SelectItem>
+                          <SelectItem value="yoga">Yoga</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="difficulty">Difficulty</Label>
+                      <Select value={difficulty} onValueChange={setDifficulty}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select difficulty" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="beginner">Beginner</SelectItem>
+                          <SelectItem value="intermediate">Intermediate</SelectItem>
+                          <SelectItem value="advanced">Advanced</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="duration">Duration (minutes)</Label>
+                    <Input
+                      id="duration"
+                      type="number"
+                      value={duration}
+                      onChange={(e) => setDuration(e.target.value)}
+                      placeholder="e.g., 30"
+                      min="1"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Equipment</Label>
+                    <div className="flex gap-2">
                       <Input
-                        placeholder="Add person"
-                        value={newAssignee}
-                        onChange={(e) => setNewAssignee(e.target.value)}
-                        onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), handleAddAssignee())}
-                        className="bg-white"
+                        value={newEquipment}
+                        onChange={(e) => setNewEquipment(e.target.value)}
+                        placeholder="Add equipment needed"
+                        onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addEquipment())}
                       />
-                      <Button type="button" onClick={handleAddAssignee} variant="outline" size="icon">
-                        <Plus className="w-4 h-4" />
+                      <Button type="button" onClick={addEquipment} variant="outline">
+                        Add
                       </Button>
                     </div>
-                    {assignees.length > 0 && (
+                    {equipment.length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-2">
-                        {assignees.map((assignee) => (
-                          <div
-                            key={assignee}
-                            className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-md text-sm"
-                          >
-                            <span>{assignee}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveAssignee(assignee)}
-                              className="text-gray-500 hover:text-red-500"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
+                        {equipment.map((item) => (
+                          <Badge key={item} variant="secondary" className="flex items-center gap-1">
+                            {item}
+                            <X className="h-3 w-3 cursor-pointer" onClick={() => removeEquipment(item)} />
+                          </Badge>
                         ))}
                       </div>
                     )}
                   </div>
 
-                  {/* Due Date */}
-                  <div className="space-y-2">
-                    <label htmlFor="dueDate" className="text-sm font-medium flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      Due Date
-                    </label>
-                    <Input
-                      id="dueDate"
-                      type="date"
-                      value={dueDate}
-                      onChange={(e) => setDueDate(e.target.value)}
-                      className="bg-white"
-                    />
-                  </div>
-
-                  {/* Total Reps/Sets */}
-                  <div className="space-y-2">
-                    <label htmlFor="subtasksTotal" className="text-sm font-medium">
-                      Total Reps/Sets
-                    </label>
-                    <Input
-                      id="subtasksTotal"
-                      type="number"
-                      min="0"
-                      placeholder="0"
-                      value={subtasksTotal}
-                      onChange={(e) => setSubtasksTotal(parseInt(e.target.value) || 0)}
-                      className="bg-white"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Status */}
-                    <div className="space-y-2">
-                      <label htmlFor="status" className="text-sm font-medium">
-                        Status
-                      </label>
-                      <select
-                        id="status"
-                        value={status}
-                        onChange={(e) => setStatus(e.target.value as "Pending" | "In Progress" | "Completed")}
-                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="Pending">Pending</option>
-                        <option value="In Progress">In Progress</option>
-                        <option value="Completed">Completed</option>
-                      </select>
-                    </div>
-
-                    {/* Priority */}
-                    <div className="space-y-2">
-                      <label htmlFor="priority" className="text-sm font-medium">
-                        Priority
-                      </label>
-                      <select
-                        id="priority"
-                        value={priority}
-                        onChange={(e) => setPriority(e.target.value as "Low" | "Medium" | "High")}
-                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="Low">Low</option>
-                        <option value="Medium">Medium</option>
-                        <option value="High">High</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Star Toggle */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setStarred(!starred)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-md border transition-colors ${
-                        starred
-                          ? "bg-yellow-50 border-yellow-200 text-yellow-700"
-                          : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                      }`}
-                    >
-                      <Star className={`w-4 h-4 ${starred ? "fill-yellow-400 text-yellow-500" : ""}`} />
-                      {starred ? "Remove from Today" : "Add to Today"}
-                    </button>
-                  </div>
-
-                  {/* Submit Button */}
-                  <div className="flex items-center gap-3 pt-4">
-                    <Button type="submit" disabled={loading} className="bg-black hover:bg-gray-800">
-                      {loading ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Adding Exercise...
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add Exercise
-                        </>
-                      )}
+                  <div className="flex gap-4 pt-4">
+                    <Button type="submit" disabled={isSubmitting || !title.trim()}>
+                      {isSubmitting ? "Creating..." : "Create Fitness Task"}
                     </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => router.push("/daily-fitness")}
-                      disabled={loading}
-                    >
+                    <Button type="button" variant="outline" onClick={() => router.push("/daily-fitness")}>
                       Cancel
                     </Button>
                   </div>
@@ -323,8 +216,8 @@ export default function AddFitnessPage() {
               </CardContent>
             </Card>
           </div>
-        </SidebarInset>
-      </SidebarProvider>
-    </div>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   )
 }

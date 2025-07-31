@@ -1,9 +1,20 @@
 "use client"
 
-import type React from "react"
-import { useUser } from "@clerk/nextjs"
-import { DM_Sans } from "next/font/google"
-import { AppSidebar } from "../../components/app-sidebar"
+import { useState, useEffect } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Plus, Clock, Target, Dumbbell, CheckCircle2, Circle } from "lucide-react"
+import { getFitnessTasks, updateFitnessTaskCompletion, type FitnessTask } from "@/lib/fitness"
+import { toast } from "@/hooks/use-toast"
+import Link from "next/link"
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
+import { AppSidebar } from "@/components/app-sidebar"
+import { Separator } from "@/components/ui/separator"
+import { SidebarTrigger } from "@/components/ui/sidebar"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -12,128 +23,22 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { Separator } from "@/components/ui/separator"
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2 } from "lucide-react"
-import { useState, useEffect } from "react"
-import { getFitnessTasks, toggleFitnessTaskCompletion, toggleFitnessTaskStar, reorderFitnessTasks, type FitnessTask, addSampleFitnessTasks } from "@/lib/fitness"
-import { testFitnessDatabase } from "@/lib/test-fitness-db"
-import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabase"
-import { useRouter } from "next/navigation"
-
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-})
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "In Progress":
-      return "bg-purple-100 text-purple-600"
-    case "Pending":
-      return "bg-blue-100 text-blue-600"
-    case "Completed":
-      return "bg-green-100 text-green-600"
-    default:
-      return "bg-gray-100 text-gray-600"
-  }
-}
-
-const getPriorityColor = (priority: string) => {
-  switch (priority) {
-    case "High":
-      return "bg-red-100 text-red-600"
-    case "Medium":
-      return "bg-yellow-100 text-yellow-600"
-    case "Low":
-      return "bg-gray-200 text-gray-600"
-    default:
-      return "bg-gray-100 text-gray-600"
-  }
-}
-
-const formatDate = (dateString: string | null) => {
-  if (!dateString) return "No due date"
-  return new Date(dateString).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })
-}
 
 export default function DailyFitnessPage() {
-  const { user } = useUser()
-  const { toast } = useToast()
   const [tasks, setTasks] = useState<FitnessTask[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeFilter, setActiveFilter] = useState("All")
-  const [draggedTask, setDraggedTask] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [viewMode, setViewMode] = useState<"list" | "card">("list")
-  const router = useRouter()
+  const [updatingTasks, setUpdatingTasks] = useState<Set<string>>(new Set())
 
-  const filters = ["All", "Today", "In Progress", "Completed"]
-
-  // Load tasks from Supabase and set up real-time subscription
   useEffect(() => {
     loadTasks()
-
-    // Set up real-time subscription
-    const channel = supabase
-      .channel("fitness_database-changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "fitness_database",
-        },
-        (payload) => {
-          console.log("Real-time update:", payload)
-
-          if (payload.eventType === "INSERT") {
-            setTasks((prev) => [payload.new as FitnessTask, ...prev])
-          } else if (payload.eventType === "UPDATE") {
-            setTasks((prev) => prev.map((task) => (task.id === payload.new.id ? (payload.new as FitnessTask) : task)))
-          } else if (payload.eventType === "DELETE") {
-            setTasks((prev) => prev.filter((task) => task.id !== payload.old.id))
-          }
-        },
-      )
-      .subscribe()
-
-    // Cleanup subscription on unmount
-    return () => {
-      supabase.removeChannel(channel)
-    }
   }, [])
 
   const loadTasks = async () => {
     try {
-      setLoading(true)
-      
-      // First, test the database connection
-      console.log("Testing database connection...")
-      const dbTestResult = await testFitnessDatabase()
-      console.log("Database test result:", dbTestResult)
-      
-      const data = await getFitnessTasks()
-      
-      // If no tasks exist, add sample tasks
-      if (data.length === 0) {
-        console.log("No tasks found, adding sample tasks...")
-        await addSampleFitnessTasks()
-        const newData = await getFitnessTasks()
-        setTasks(newData)
-      } else {
-        setTasks(data)
-      }
+      const fetchedTasks = await getFitnessTasks()
+      setTasks(fetchedTasks)
     } catch (error) {
-      console.error("Failed to load fitness tasks:", error)
+      console.error("Error loading fitness tasks:", error)
       toast({
         title: "Error",
         description: "Failed to load fitness tasks. Please try again.",
@@ -144,146 +49,108 @@ export default function DailyFitnessPage() {
     }
   }
 
-  const filteredTasks = tasks
-    .filter((task) => {
-      const matchesFilter =
-        activeFilter === "All" ||
-        (activeFilter === "Today" && task.starred) ||
-        (activeFilter !== "Today" && task.status === activeFilter)
-      const matchesSearch =
-        task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        task.assignees.some((assignee: string) => assignee.toLowerCase().includes(searchQuery.toLowerCase()))
-      return matchesFilter && matchesSearch
-    })
-    .sort((a, b) => {
-      // Sort completed tasks to the bottom
-      if (a.completed && !b.completed) return 1
-      if (!a.completed && b.completed) return -1
-      // If both have same completion status, maintain their order
-      return a.order_index - b.order_index
-    })
-
-  const handleDragStart = (e: React.DragEvent, taskId: string) => {
-    setDraggedTask(taskId)
-    e.dataTransfer.effectAllowed = "move"
-  }
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = "move"
-  }
-
-  const handleDrop = async (e: React.DragEvent, targetTaskId: string) => {
-    e.preventDefault()
-
-    if (!draggedTask || draggedTask === targetTaskId) return
-
-    const draggedIndex = tasks.findIndex((task) => task.id === draggedTask)
-    const targetIndex = tasks.findIndex((task) => task.id === targetTaskId)
-
-    if (draggedIndex === -1 || targetIndex === -1) return
-
-    const newTasks = [...tasks]
-    const [draggedItem] = newTasks.splice(draggedIndex, 1)
-    newTasks.splice(targetIndex, 0, draggedItem)
-
-    // Update order_index for all tasks based on new positions
-    const updatedTasks = newTasks.map((task, index) => ({
-      ...task,
-      order_index: index
-    }))
-
-    // Update local state immediately for better UX
-    setTasks(updatedTasks)
-    setDraggedTask(null)
+  const handleTaskToggle = async (taskId: string, completed: boolean) => {
+    setUpdatingTasks((prev) => new Set(prev).add(taskId))
 
     try {
-      // Update order in database
-      await reorderFitnessTasks(updatedTasks.map((task) => task.id))
+      await updateFitnessTaskCompletion(taskId, completed)
+      setTasks((prev) => prev.map((task) => (task.id === taskId ? { ...task, completed } : task)))
+
+      toast({
+        title: completed ? "Task Completed!" : "Task Unchecked",
+        description: completed ? "Great job on completing your fitness task!" : "Task marked as incomplete.",
+      })
     } catch (error) {
-      console.error("Failed to reorder fitness tasks:", error)
-      // Revert local state on error
-      setTasks(tasks)
+      console.error("Error updating task:", error)
       toast({
         title: "Error",
-        description: "Failed to reorder fitness tasks. Please try again.",
+        description: "Failed to update task. Please try again.",
         variant: "destructive",
+      })
+    } finally {
+      setUpdatingTasks((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(taskId)
+        return newSet
       })
     }
   }
 
-  const handleDragEnd = () => {
-    setDraggedTask(null)
-  }
+  const completedTasks = tasks.filter((task) => task.completed).length
+  const totalTasks = tasks.length
+  const completionPercentage = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0
 
-  const handleToggleCompletion = async (taskId: string) => {
-    try {
-      const updatedTask = await toggleFitnessTaskCompletion(taskId)
-      setTasks(tasks.map((task) => (task.id === taskId ? updatedTask : task)))
-      toast({
-        title: "Success",
-        description: `Exercise ${updatedTask.completed ? "completed" : "reopened"} successfully.`,
-      })
-    } catch (error) {
-      console.error("Failed to toggle fitness task completion:", error)
-      toast({
-        title: "Error",
-        description: "Failed to update fitness task. Please try again.",
-        variant: "destructive",
-      })
+  const getPriorityColor = (difficulty: string) => {
+    switch (difficulty?.toLowerCase()) {
+      case "beginner":
+        return "bg-green-100 text-green-800"
+      case "intermediate":
+        return "bg-yellow-100 text-yellow-800"
+      case "advanced":
+        return "bg-red-100 text-red-800"
+      default:
+        return "bg-gray-100 text-gray-800"
     }
   }
 
-  const handleToggleStar = async (taskId: string) => {
-    try {
-      const updatedTask = await toggleFitnessTaskStar(taskId)
-      setTasks(tasks.map((task) => (task.id === taskId ? updatedTask : task)))
-    } catch (error) {
-      console.error("Failed to toggle fitness task star:", error)
-      toast({
-        title: "Error",
-        description: "Failed to update fitness task. Please try again.",
-        variant: "destructive",
-      })
+  const getCategoryIcon = (category: string) => {
+    switch (category?.toLowerCase()) {
+      case "cardio":
+        return <Target className="h-4 w-4" />
+      case "strength":
+        return <Dumbbell className="h-4 w-4" />
+      default:
+        return <Circle className="h-4 w-4" />
     }
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50/50">
-        <div className="h-[35px] bg-black w-full relative z-50 flex items-center justify-center">
-          <span className={`text-white font-medium ${dmSans.className}`}>ARI</span>
-        </div>
-        <SidebarProvider>
-          <AppSidebar />
-          <SidebarInset>
-            <div className="flex items-center justify-center h-96">
-              <div className="flex items-center gap-2">
-                <Loader2 className="w-6 h-6 animate-spin" />
-                <span>Loading fitness tasks...</span>
-              </div>
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+            <div className="flex items-center gap-2 px-4">
+              <SidebarTrigger className="-ml-1" />
+              <Separator orientation="vertical" className="mr-2 h-4" />
+              <Breadcrumb>
+                <BreadcrumbList>
+                  <BreadcrumbItem className="hidden md:block">
+                    <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator className="hidden md:block" />
+                  <BreadcrumbItem>
+                    <BreadcrumbPage>Daily Fitness</BreadcrumbPage>
+                  </BreadcrumbItem>
+                </BreadcrumbList>
+              </Breadcrumb>
             </div>
-          </SidebarInset>
-        </SidebarProvider>
-      </div>
+          </header>
+          <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+            <div className="space-y-4">
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      <div className="h-[35px] bg-black w-full relative z-50 flex items-center justify-center">
-        <span className={`text-white font-medium ${dmSans.className}`}>ARI</span>
-      </div>
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-white px-4">
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+          <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 h-4" />
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="#">Fitness First</BreadcrumbLink>
+                  <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
@@ -291,254 +158,123 @@ export default function DailyFitnessPage() {
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-          </header>
-
-          <div className="flex flex-1 flex-col gap-6 p-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold">Daily Fitness</h1>
-                {user && (
-                  <p className="text-sm text-muted-foreground mt-1">Welcome back, {user.firstName || "there"}!</p>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={loadTasks} disabled={loading} className="bg-white">
-                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
-                  Refresh
-                </Button>
-                <Button className="bg-black hover:bg-gray-800" onClick={() => router.push("/add-fitness")}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Exercise
-                </Button>
-              </div>
+          </div>
+        </header>
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Daily Fitness</h1>
+              <p className="text-muted-foreground">Track your daily fitness activities and stay motivated!</p>
             </div>
+            <Link href="/add-fitness">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Fitness Task
+              </Button>
+            </Link>
+          </div>
 
-            {/* Filters and Search */}
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-1 p-1 bg-gray-200/75 rounded-lg">
-                {filters.map((filter) => (
-                  <Button
-                    key={filter}
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setActiveFilter(filter)}
-                    className={`h-8 px-4 rounded-md transition-colors ${
-                      activeFilter === filter ? "bg-white text-gray-800 shadow-sm" : "text-gray-600 hover:bg-gray-200"
-                    }`}
-                  >
-                    {filter}
-                  </Button>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <Input
-                    placeholder="Search exercises..."
-                    className="pl-10 w-64 bg-white"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
+          {/* Progress Overview */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5" />
+                Today's Progress
+              </CardTitle>
+              <CardDescription>
+                {completedTasks} of {totalTasks} tasks completed
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Progress</span>
+                  <span>{Math.round(completionPercentage)}%</span>
                 </div>
-                <Button variant="outline" size="icon" className="bg-white">
-                  <Filter className="w-4 h-4" />
-                </Button>
-                <div className="flex items-center rounded-lg border bg-white">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className={`rounded-r-none ${viewMode === "list" ? "bg-gray-100" : ""}`}
-                    onClick={() => setViewMode("list")}
-                  >
-                    <List className="w-4 h-4" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className={`rounded-l-none ${viewMode === "card" ? "bg-gray-100" : ""}`}
-                    onClick={() => setViewMode("card")}
-                  >
-                    <Grid3X3 className="w-4 h-4" />
-                  </Button>
-                </div>
+                <Progress value={completionPercentage} className="h-2" />
               </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Task List/Grid */}
-            <div className={viewMode === "card" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" : "space-y-3"}>
-              {filteredTasks.map((task) => (
-                <div
+          {/* Fitness Tasks */}
+          <div className="space-y-4">
+            {tasks.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Dumbbell className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No fitness tasks yet</h3>
+                  <p className="text-muted-foreground text-center mb-4">
+                    Start your fitness journey by adding your first task!
+                  </p>
+                  <Link href="/add-fitness">
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Your First Task
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            ) : (
+              tasks.map((task) => (
+                <Card
                   key={task.id}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, task.id)}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, task.id)}
-                  onDragEnd={handleDragEnd}
-                  className={`${
-                    viewMode === "card" 
-                      ? "flex flex-col gap-3 p-4 border rounded-lg hover:shadow-md transition-all cursor-move h-full" 
-                      : "flex items-start gap-4 p-4 border rounded-lg hover:shadow-sm transition-all cursor-move"
-                  } ${
-                    task.starred ? "bg-[#214b88] text-white shadow-lg" : "bg-white border-gray-200"
-                  } ${draggedTask === task.id ? "opacity-50" : ""} ${task.completed ? "taskdone" : ""}`}
+                  className={`transition-all ${task.completed ? "bg-green-50 border-green-200" : ""}`}
                 >
-                  {viewMode === "list" ? (
-                    <>
-                      {/* List View */}
-                      <input
-                        type="checkbox"
+                  <CardContent className="p-6">
+                    <div className="flex items-start space-x-4">
+                      <Checkbox
                         checked={task.completed}
-                        onChange={() => handleToggleCompletion(task.id)}
-                        className="w-5 h-5 mt-1 rounded border-gray-300"
+                        onCheckedChange={(checked) => handleTaskToggle(task.id, checked as boolean)}
+                        disabled={updatingTasks.has(task.id)}
+                        className="mt-1"
                       />
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3
-                            className={`font-medium ${task.completed ? "line-through text-gray-500" : task.starred ? "text-white" : "text-gray-800"}`}
-                          >
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h3 className={`font-semibold ${task.completed ? "line-through text-muted-foreground" : ""}`}>
                             {task.title}
                           </h3>
-                          <button
-                            onClick={() => handleToggleStar(task.id)}
-                            className={`transition-colors ${task.starred ? "text-white hover:text-yellow-400" : "text-gray-400 hover:text-yellow-500"}`}
-                          >
-                            <Star
-                              className={`w-5 h-5 transition-colors ${task.starred ? "fill-yellow-400 text-yellow-500" : ""}`}
-                            />
-                          </button>
-                        </div>
-
-                        <div
-                          className={`flex items-center flex-wrap gap-x-4 gap-y-2 text-sm ${task.starred ? "text-gray-300" : "text-gray-600"}`}
-                        >
                           <div className="flex items-center gap-2">
-                            {task.assignees.map((name: string) => (
-                              <span
-                                key={name}
-                                className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.starred ? "bg-white/10 text-gray-200" : "bg-gray-100 text-gray-700"}`}
-                              >
-                                {name}
-                              </span>
-                            ))}
-                          </div>
-
-                          <div className="flex items-center gap-1.5">
-                            <Calendar className="w-4 h-4" />
-                            <span>{formatDate(task.due_date)}</span>
-                          </div>
-
-                          <div className="flex items-center gap-1.5">
-                            <Bell className="w-4 h-4" />
-                            <span>
-                              Reps: {task.subtasks_completed}/{task.subtasks_total}
-                            </span>
+                            {task.difficulty && (
+                              <Badge variant="secondary" className={getPriorityColor(task.difficulty)}>
+                                {task.difficulty}
+                              </Badge>
+                            )}
+                            {task.category && (
+                              <Badge variant="outline" className="flex items-center gap-1">
+                                {getCategoryIcon(task.category)}
+                                {task.category}
+                              </Badge>
+                            )}
                           </div>
                         </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge
-                          variant="secondary"
-                          className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getStatusColor(task.status)}`}
-                        >
-                          {task.status}
-                        </Badge>
-                        <Badge
-                          variant="secondary"
-                          className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getPriorityColor(task.priority)}`}
-                        >
-                          {task.priority}
-                        </Badge>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {/* Card View */}
-                      <div className="flex items-start justify-between">
-                        <input
-                          type="checkbox"
-                          checked={task.completed}
-                          onChange={() => handleToggleCompletion(task.id)}
-                          className="w-5 h-5 rounded border-gray-300"
-                        />
-                        <button
-                          onClick={() => handleToggleStar(task.id)}
-                          className={`transition-colors ${task.starred ? "text-white hover:text-yellow-400" : "text-gray-400 hover:text-yellow-500"}`}
-                        >
-                          <Star
-                            className={`w-5 h-5 transition-colors ${task.starred ? "fill-yellow-400 text-yellow-500" : ""}`}
-                          />
-                        </button>
-                      </div>
-
-                      <div className="flex-1">
-                        <h3
-                          className={`font-medium text-base mb-3 line-clamp-2 ${task.completed ? "line-through text-gray-500" : task.starred ? "text-white" : "text-gray-800"}`}
-                        >
-                          {task.title}
-                        </h3>
-
-                        <div className={`space-y-2 text-sm ${task.starred ? "text-gray-300" : "text-gray-600"}`}>
-                          {task.assignees.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {task.assignees.map((name: string) => (
-                                <span
-                                  key={name}
-                                  className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.starred ? "bg-white/10 text-gray-200" : "bg-gray-100 text-gray-700"}`}
-                                >
-                                  {name}
-                                </span>
-                              ))}
+                        {task.description && (
+                          <p className={`text-sm text-muted-foreground ${task.completed ? "line-through" : ""}`}>
+                            {task.description}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          {task.duration && (
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-4 w-4" />
+                              {task.duration} min
                             </div>
                           )}
-
-                          <div className="flex items-center gap-1.5">
-                            <Calendar className="w-4 h-4" />
-                            <span className="text-xs">{formatDate(task.due_date)}</span>
-                          </div>
-
-                          <div className="flex items-center gap-1.5">
-                            <Bell className="w-4 h-4" />
-                            <span className="text-xs">
-                              Reps: {task.subtasks_completed}/{task.subtasks_total}
-                            </span>
-                          </div>
+                          {task.equipment && task.equipment.length > 0 && (
+                            <div className="flex items-center gap-1">
+                              <span>Equipment:</span>
+                              <span>{task.equipment.join(", ")}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-2 mt-auto pt-2">
-                        <Badge
-                          variant="secondary"
-                          className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getStatusColor(task.status)}`}
-                        >
-                          {task.status}
-                        </Badge>
-                        <Badge
-                          variant="secondary"
-                          className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getPriorityColor(task.priority)}`}
-                        >
-                          {task.priority}
-                        </Badge>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {filteredTasks.length === 0 && !loading && (
-              <div className="text-center py-12 text-gray-500">
-                {searchQuery || activeFilter !== "All"
-                  ? "No exercises found matching your criteria."
-                  : "No exercises yet. Click 'Add Exercise' to get started!"}
-              </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
             )}
           </div>
-        </SidebarInset>
-      </SidebarProvider>
-    </div>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   )
 }
