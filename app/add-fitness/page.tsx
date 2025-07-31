@@ -3,221 +3,102 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { createFitnessTask } from "@/lib/fitness"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { X } from "lucide-react"
-import { createFitnessTask } from "@/lib/fitness"
-import { useRouter } from "next/navigation"
-import { toast } from "@/hooks/use-toast"
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
-import { AppSidebar } from "@/components/app-sidebar"
-import { Separator } from "@/components/ui/separator"
-import { SidebarTrigger } from "@/components/ui/sidebar"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+import { Checkbox } from "@/components/ui/checkbox"
+import { ArrowLeft } from "lucide-react"
+import Link from "next/link"
 
 export default function AddFitnessPage() {
-  const [title, setTitle] = useState("")
-  const [description, setDescription] = useState("")
-  const [category, setCategory] = useState("")
-  const [duration, setDuration] = useState("")
-  const [difficulty, setDifficulty] = useState("")
-  const [equipment, setEquipment] = useState<string[]>([])
-  const [newEquipment, setNewEquipment] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter()
-
-  const addEquipment = () => {
-    if (newEquipment.trim() && !equipment.includes(newEquipment.trim())) {
-      setEquipment([...equipment, newEquipment.trim()])
-      setNewEquipment("")
-    }
-  }
-
-  const removeEquipment = (item: string) => {
-    setEquipment(equipment.filter((e) => e !== item))
-  }
+  const [isLoading, setIsLoading] = useState(false)
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    completed: false,
+  })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsSubmitting(true)
+    setIsLoading(true)
 
     try {
-      await createFitnessTask({
-        title,
-        description,
-        category,
-        duration: duration ? Number.parseInt(duration) : null,
-        difficulty,
-        equipment,
-        completed: false,
-      })
-
-      toast({
-        title: "Success!",
-        description: "Fitness task created successfully.",
-      })
-
-      router.push("/daily-fitness")
+      const task = await createFitnessTask(formData)
+      if (task) {
+        router.push("/daily-fitness")
+      }
     } catch (error) {
       console.error("Error creating fitness task:", error)
-      toast({
-        title: "Error",
-        description: "Failed to create fitness task. Please try again.",
-        variant: "destructive",
-      })
     } finally {
-      setIsSubmitting(false)
+      setIsLoading(false)
     }
   }
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
-          <div className="flex items-center gap-2 px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>Add Fitness Task</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
-        </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-          <div className="max-w-2xl mx-auto w-full">
-            <Card>
-              <CardHeader>
-                <CardTitle>Add New Fitness Task</CardTitle>
-                <CardDescription>Create a new fitness task to track your daily activities.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="title">Task Title *</Label>
-                    <Input
-                      id="title"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="e.g., Morning Run, Push-ups, Yoga Session"
-                      required
-                    />
-                  </div>
+    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+      <div className="flex items-center gap-4">
+        <Button variant="outline" size="icon" asChild>
+          <Link href="/daily-fitness">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        </Button>
+        <h2 className="text-3xl font-bold tracking-tight">Add New Fitness Task</h2>
+      </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Describe your fitness task in detail..."
-                      rows={3}
-                    />
-                  </div>
+      <Card className="max-w-2xl">
+        <CardHeader>
+          <CardTitle>Create Fitness Task</CardTitle>
+          <CardDescription>Add a new fitness task to your daily routine.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                placeholder="Enter fitness task title"
+                required
+              />
+            </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="category">Category</Label>
-                      <Select value={category} onValueChange={setCategory}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="cardio">Cardio</SelectItem>
-                          <SelectItem value="strength">Strength Training</SelectItem>
-                          <SelectItem value="flexibility">Flexibility</SelectItem>
-                          <SelectItem value="sports">Sports</SelectItem>
-                          <SelectItem value="yoga">Yoga</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Enter task description (optional)"
+                rows={3}
+              />
+            </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="difficulty">Difficulty</Label>
-                      <Select value={difficulty} onValueChange={setDifficulty}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select difficulty" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="beginner">Beginner</SelectItem>
-                          <SelectItem value="intermediate">Intermediate</SelectItem>
-                          <SelectItem value="advanced">Advanced</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="completed"
+                checked={formData.completed}
+                onCheckedChange={(checked) => setFormData({ ...formData, completed: checked as boolean })}
+              />
+              <Label htmlFor="completed">Mark as completed</Label>
+            </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="duration">Duration (minutes)</Label>
-                    <Input
-                      id="duration"
-                      type="number"
-                      value={duration}
-                      onChange={(e) => setDuration(e.target.value)}
-                      placeholder="e.g., 30"
-                      min="1"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Equipment</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        value={newEquipment}
-                        onChange={(e) => setNewEquipment(e.target.value)}
-                        placeholder="Add equipment needed"
-                        onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addEquipment())}
-                      />
-                      <Button type="button" onClick={addEquipment} variant="outline">
-                        Add
-                      </Button>
-                    </div>
-                    {equipment.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {equipment.map((item) => (
-                          <Badge key={item} variant="secondary" className="flex items-center gap-1">
-                            {item}
-                            <X className="h-3 w-3 cursor-pointer" onClick={() => removeEquipment(item)} />
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex gap-4 pt-4">
-                    <Button type="submit" disabled={isSubmitting || !title.trim()}>
-                      {isSubmitting ? "Creating..." : "Create Fitness Task"}
-                    </Button>
-                    <Button type="button" variant="outline" onClick={() => router.push("/daily-fitness")}>
-                      Cancel
-                    </Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+            <div className="flex gap-2">
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? "Creating..." : "Create Fitness Task"}
+              </Button>
+              <Button type="button" variant="outline" asChild>
+                <Link href="/daily-fitness">Cancel</Link>
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
