@@ -1,5 +1,6 @@
+"use client"
+
 import type * as React from "react"
-import { UserProfileDropdown } from "./user-profile-dropdown"
 import {
   Sidebar,
   SidebarContent,
@@ -12,18 +13,8 @@ import {
   SidebarRail,
   SidebarFooter,
 } from "@/components/ui/sidebar"
-import {
-  CheckSquare,
-  Plus,
-  Archive,
-  Dumbbell,
-  Target,
-  TrendingUp,
-  Users,
-  UserPlus,
-  Settings,
-  BarChart3,
-} from "lucide-react"
+import { CheckSquare, Plus, Archive, Dumbbell, Target, TrendingUp, Users, UserPlus, BarChart3 } from "lucide-react"
+import { UserProfileDropdown } from "./user-profile-dropdown"
 
 const data = {
   navMain: [
@@ -98,11 +89,6 @@ const data = {
           title: "Add Contact",
           url: "#",
           icon: UserPlus,
-        },
-        {
-          title: "Settings",
-          url: "#",
-          icon: Settings,
         },
       ],
     },
