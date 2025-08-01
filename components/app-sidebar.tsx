@@ -111,11 +111,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarGroup>
         ))}
       </SidebarContent>
-      <SidebarFooter>
-        <div className="flex items-center justify-center p-2">
-          <UserProfileDropdown />
-        </div>
-      </SidebarFooter>
+      <div className="mt-auto mb-16 flex items-center justify-center p-4">
+        <UserProfileDropdown />
+      </div>
       <SidebarRail />
     </Sidebar>
   )
