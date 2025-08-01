@@ -68,7 +68,7 @@ const data = {
       items: [
         {
           title: "All Contacts",
-          url: "#",
+          url: "/contacts",
           icon: Users,
         },
         {
