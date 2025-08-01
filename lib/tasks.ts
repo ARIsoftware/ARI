@@ -1,4 +1,5 @@
 import { supabase, type Task } from "./supabase"
+import { incrementTaskCompletion } from "./fitness-stats"
 
 export type { Task }
 
@@ -83,10 +84,23 @@ export async function toggleTaskCompletion(id: string): Promise<Task> {
   const newCompleted = !currentTask.completed
   const newStatus = newCompleted ? "Completed" : "Pending"
 
-  return updateTask(id, {
+  // Update the task
+  const updatedTask = await updateTask(id, {
     completed: newCompleted,
     status: newStatus,
   })
+
+  // If the task is being marked as completed, increment completion count
+  if (newCompleted) {
+    try {
+      await incrementTaskCompletion(id)
+    } catch (error) {
+      console.error("Failed to increment completion count:", error)
+      // Don't throw here - the task update was successful, completion count increment is secondary
+    }
+  }
+
+  return updatedTask
 }
 
 export async function toggleTaskStar(id: string): Promise<Task> {

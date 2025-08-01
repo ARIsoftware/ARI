@@ -12,10 +12,22 @@ import {
   SidebarRail,
   SidebarFooter,
 } from "@/components/ui/sidebar"
-import { CheckSquare, Plus, Archive, Dumbbell, Target, TrendingUp, Users, UserPlus, Settings } from "lucide-react"
+import { CheckSquare, Plus, Archive, Dumbbell, Target, TrendingUp, Users, UserPlus, Settings, BarChart3 } from "lucide-react"
 
 const data = {
   navMain: [
+    {
+      title: "Dashboard",
+      url: "/dashboard",
+      icon: BarChart3,
+      items: [
+        {
+          title: "Dashboard",
+          url: "/dashboard",
+          icon: BarChart3,
+        },
+      ],
+    },
     {
       title: "Fitness First",
       url: "#",
