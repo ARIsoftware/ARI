@@ -251,7 +251,7 @@ export default function DailyFitnessPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50/50">
-        <div className="h-[35px] bg-black w-full relative z-50 flex items-center justify-center">
+        <div className="topbar h-[35px] bg-black w-full relative z-50 flex items-center justify-center">
           <span className={`text-white font-medium ${dmSans.className}`}>ARI</span>
         </div>
         <SidebarProvider>
@@ -271,7 +271,7 @@ export default function DailyFitnessPage() {
 
   return (
     <div className="min-h-screen bg-gray-50/50">
-      <div className="h-[35px] bg-black w-full relative z-50 flex items-center justify-center">
+      <div className="topbar h-[35px] bg-black w-full relative z-50 flex items-center justify-center">
         <span className={`text-white font-medium ${dmSans.className}`}>ARI</span>
       </div>
       <SidebarProvider>
