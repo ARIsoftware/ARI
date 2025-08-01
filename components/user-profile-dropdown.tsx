@@ -20,9 +20,9 @@ export function UserProfileDropdown() {
   // Fallback for when Clerk is not configured
   if (!user) {
     return (
-      <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-        <Avatar className="h-8 w-8">
-          <AvatarFallback>U</AvatarFallback>
+      <Button variant="ghost" className="relative h-12 w-12 rounded-full p-0">
+        <Avatar className="h-12 w-12">
+          <AvatarFallback className="text-sm font-bold">U</AvatarFallback>
         </Avatar>
       </Button>
     )
@@ -36,10 +36,10 @@ export function UserProfileDropdown() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-          <Avatar className="h-8 w-8">
+        <Button variant="ghost" className="relative h-12 w-12 rounded-full p-0">
+          <Avatar className="h-12 w-12">
             <AvatarImage src={user.imageUrl || "/placeholder.svg"} alt={user.fullName || "User"} />
-            <AvatarFallback>{userInitials}</AvatarFallback>
+            <AvatarFallback className="text-sm font-bold">{userInitials}</AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
