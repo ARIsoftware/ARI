@@ -29,7 +29,7 @@ export default async function Page() {
 
   return (
     <div className="min-h-screen">
-      <div className="h-[35px] bg-black w-full relative z-50 flex items-center justify-center">
+      <div className="topbar h-[35px] bg-black w-full relative z-50 flex items-center justify-center">
         <span className={`text-white font-medium ${dmSans.className}`}>ARI</span>
       </div>
       <SidebarProvider>
