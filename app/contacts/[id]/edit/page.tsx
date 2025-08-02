@@ -253,7 +253,7 @@ export default function EditContactPage({ params }: { params: Promise<{ id: stri
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <div>
-                  <h1 className="text-2xl font-bold">{isNewContact ? "New Contact" : "Edit Contact"}</h1>
+                  <h1 className="text-2xl font-medium">{isNewContact ? "New Contact" : "Edit Contact"}</h1>
                   <p className="text-sm text-muted-foreground mt-1">
                     {isNewContact ? "Add a new contact to your list" : "Update contact information"}
                   </p>

@@ -297,7 +297,7 @@ export default function DailyFitnessPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold">Daily Fitness</h1>
+                <h1 className="text-3xl font-medium">Daily Fitness</h1>
                 {user && (
                   <p className="text-sm text-muted-foreground mt-1">Welcome back, {user.firstName || "there"}!</p>
                 )}
