@@ -22,7 +22,7 @@ export function UserProfileDropdown() {
     return (
       <Button variant="ghost" className="relative h-12 w-12 rounded-full p-0">
         <Avatar className="h-12 w-12">
-          <AvatarFallback className="text-sm font-bold">U</AvatarFallback>
+          <AvatarFallback className="text-sm font-medium">U</AvatarFallback>
         </Avatar>
       </Button>
     )
@@ -39,7 +39,7 @@ export function UserProfileDropdown() {
         <Button variant="ghost" className="relative h-12 w-12 rounded-full p-0">
           <Avatar className="h-12 w-12">
             <AvatarImage src={user.imageUrl || "/placeholder.svg"} alt={user.fullName || "User"} />
-            <AvatarFallback className="text-sm font-bold">{userInitials}</AvatarFallback>
+            <AvatarFallback className="text-sm font-medium">{userInitials}</AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>

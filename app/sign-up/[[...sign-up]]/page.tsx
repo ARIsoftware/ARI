@@ -24,7 +24,7 @@ export default function SignUpPage() {
               elements: {
                 rootBox: "mx-auto",
                 card: "bg-white shadow-lg border border-gray-200 rounded-lg p-8",
-                headerTitle: "text-2xl font-semibold text-gray-900 text-center mb-2",
+                headerTitle: "text-2xl font-medium text-gray-900 text-center mb-2",
                 headerSubtitle: "text-sm text-gray-600 text-center mb-6",
                 socialButtonsBlockButton:
                   "w-full border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-2.5 px-4 rounded-md transition-colors",

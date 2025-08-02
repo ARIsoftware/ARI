@@ -115,7 +115,7 @@ export default function DashboardPage() {
           <div className="flex flex-1 flex-col gap-6 p-6">
             {/* Welcome Header */}
             <div>
-              <h1 className="text-3xl font-bold">Dashboard</h1>
+              <h1 className="text-3xl font-medium">Dashboard</h1>
               <p className="text-sm text-muted-foreground mt-1">
                 Your productivity overview and fitness insights
               </p>
@@ -125,7 +125,7 @@ export default function DashboardPage() {
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <Target className="w-5 h-5 text-blue-600" />
-                <h2 className="text-xl font-semibold">Fitness Performance</h2>
+                <h2 className="text-xl font-medium">Fitness Performance</h2>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -136,7 +136,7 @@ export default function DashboardPage() {
                     <CalendarDays className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{fitnessStats.averageCompletionsPerDay.toFixed(1)}</div>
+                    <div className="text-2xl font-medium">{fitnessStats.averageCompletionsPerDay.toFixed(1)}</div>
                     <p className="text-xs text-muted-foreground">
                       fitness tasks completed per day
                     </p>
@@ -150,7 +150,7 @@ export default function DashboardPage() {
                     <Trophy className="h-4 w-4 text-yellow-600" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">
+                    <div className="text-2xl font-medium">
                       {fitnessStats.mostCompletedTask?.count || 0}
                     </div>
                     <p className="text-xs text-muted-foreground line-clamp-2">
@@ -166,7 +166,7 @@ export default function DashboardPage() {
                     <TrendingUp className="h-4 w-4 text-red-600" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">
+                    <div className="text-2xl font-medium">
                       {fitnessStats.leastCompletedTask?.count || 0}
                     </div>
                     <p className="text-xs text-muted-foreground line-clamp-2">
@@ -182,7 +182,7 @@ export default function DashboardPage() {
                     <CheckSquare className="h-4 w-4 text-green-600" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{fitnessStats.totalCompletions}</div>
+                    <div className="text-2xl font-medium">{fitnessStats.totalCompletions}</div>
                     <p className="text-xs text-muted-foreground">
                       all-time fitness task completions
                     </p>
@@ -193,7 +193,7 @@ export default function DashboardPage() {
 
             {/* Quick Stats Section */}
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold">Quick Overview</h2>
+              <h2 className="text-xl font-medium">Quick Overview</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Total Tasks */}
@@ -203,7 +203,7 @@ export default function DashboardPage() {
                     <CheckSquare className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{taskCount}</div>
+                    <div className="text-2xl font-medium">{taskCount}</div>
                     <p className="text-xs text-muted-foreground">
                       tasks in your system
                     </p>
@@ -217,7 +217,7 @@ export default function DashboardPage() {
                     <Users className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{contactCount}</div>
+                    <div className="text-2xl font-medium">{contactCount}</div>
                     <p className="text-xs text-muted-foreground">
                       contacts in your network
                     </p>
@@ -231,7 +231,7 @@ export default function DashboardPage() {
                     <div className="h-2 w-2 bg-green-500 rounded-full"></div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">Online</div>
+                    <div className="text-2xl font-medium">Online</div>
                     <p className="text-xs text-muted-foreground">
                       all systems operational
                     </p>
@@ -242,7 +242,7 @@ export default function DashboardPage() {
 
             {/* Recent Activity Placeholder */}
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold">Recent Activity</h2>
+              <h2 className="text-xl font-medium">Recent Activity</h2>
               <Card>
                 <CardHeader>
                   <CardTitle>Activity Feed</CardTitle>
