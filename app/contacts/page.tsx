@@ -170,7 +170,7 @@ export default function ContactsPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold">Contact Manager</h1>
+                <h1 className="text-3xl font-medium">Contact Manager</h1>
                 <p className="text-sm text-muted-foreground mt-1">
                   Manage your contacts efficiently with categories and search
                 </p>
@@ -200,15 +200,15 @@ export default function ContactsPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-white p-6 rounded-lg border">
                 <p className="text-sm text-gray-600 mb-2">Total Contacts</p>
-                <p className="text-3xl font-bold">{contacts.length}</p>
+                <p className="text-3xl font-medium">{contacts.length}</p>
               </div>
               <div className="bg-white p-6 rounded-lg border">
                 <p className="text-sm text-gray-600 mb-2">Categories</p>
-                <p className="text-3xl font-bold">5</p>
+                <p className="text-3xl font-medium">5</p>
               </div>
               <div className="bg-white p-6 rounded-lg border">
                 <p className="text-sm text-gray-600 mb-2">This Month</p>
-                <p className="text-3xl font-bold">
+                <p className="text-3xl font-medium">
                   {contacts.filter(c => {
                     const createdDate = new Date(c.created_at)
                     const now = new Date()
@@ -219,7 +219,7 @@ export default function ContactsPage() {
               </div>
               <div className="bg-white p-6 rounded-lg border">
                 <p className="text-sm text-gray-600 mb-2">Filtered Results</p>
-                <p className="text-3xl font-bold">{filteredContacts.length}</p>
+                <p className="text-3xl font-medium">{filteredContacts.length}</p>
               </div>
             </div>
 
@@ -291,7 +291,7 @@ export default function ContactsPage() {
                       </Button>
                     </div>
                     
-                    <h3 className="font-semibold text-lg mb-2">{contact.name}</h3>
+                    <h3 className="font-medium text-lg mb-2">{contact.name}</h3>
                     
                     <div className="space-y-2 text-sm text-gray-600 mb-4">
                       <div className="flex items-center gap-2">
@@ -337,7 +337,7 @@ export default function ContactsPage() {
                     
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold">{contact.name}</h3>
+                        <h3 className="font-medium">{contact.name}</h3>
                         <Badge variant="secondary" className="flex items-center gap-1">
                           <span className={`w-2 h-2 rounded-full ${getCategoryColor(contact.category)}`}></span>
                           {contact.category}

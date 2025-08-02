@@ -184,7 +184,7 @@ export default function AddTaskPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold">Add New Task</h1>
+                <h1 className="text-3xl font-medium">Add New Task</h1>
                 {user && <p className="text-sm text-muted-foreground mt-1">Create a new task for your todo list</p>}
               </div>
               <Button variant="outline" onClick={() => router.push("/tasks")} className="bg-white">

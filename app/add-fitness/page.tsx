@@ -140,7 +140,7 @@ export default function AddFitnessPage() {
                   <ArrowLeft className="w-4 h-4" />
                 </Button>
                 <div>
-                  <h1 className="text-3xl font-bold">Add New Exercise</h1>
+                  <h1 className="text-3xl font-medium">Add New Exercise</h1>
                   {user && (
                     <p className="text-sm text-muted-foreground mt-1">Create a new fitness exercise</p>
                   )}
