@@ -17,9 +17,9 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2 } from "lucide-react"
+import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2, Trash2 } from "lucide-react"
 import { useState, useEffect } from "react"
-import { getTasks, toggleTaskCompletion, toggleTaskStar, reorderTasks, type Task } from "@/lib/tasks"
+import { getTasks, toggleTaskCompletion, toggleTaskStar, reorderTasks, deleteTask, type Task } from "@/lib/tasks"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
@@ -232,6 +232,24 @@ export default function TasksPage() {
     }
   }
 
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      await deleteTask(taskId)
+      setTasks(tasks.filter((task) => task.id !== taskId))
+      toast({
+        title: "Success",
+        description: "Task deleted successfully.",
+      })
+    } catch (error) {
+      console.error("Failed to delete task:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete task. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50/50">
@@ -436,6 +454,17 @@ export default function TasksPage() {
                         >
                           {task.priority}
                         </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={`h-8 w-8 ${task.starred ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-red-600 hover:bg-red-50"}`}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteTask(task.id)
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     </>
                   ) : (
@@ -493,19 +522,32 @@ export default function TasksPage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 mt-auto pt-2">
-                        <Badge
-                          variant="secondary"
-                          className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getStatusColor(task.status)}`}
+                      <div className="flex items-center justify-between gap-2 mt-auto pt-2">
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant="secondary"
+                            className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getStatusColor(task.status)}`}
+                          >
+                            {task.status}
+                          </Badge>
+                          <Badge
+                            variant="secondary"
+                            className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getPriorityColor(task.priority)}`}
+                          >
+                            {task.priority}
+                          </Badge>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={`h-8 w-8 ${task.starred ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-red-600 hover:bg-red-50"}`}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteTask(task.id)
+                          }}
                         >
-                          {task.status}
-                        </Badge>
-                        <Badge
-                          variant="secondary"
-                          className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getPriorityColor(task.priority)}`}
-                        >
-                          {task.priority}
-                        </Badge>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     </>
                   )}
