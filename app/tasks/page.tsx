@@ -17,6 +17,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2, Trash2, Pencil, Columns } from "lucide-react"
 import { useState, useEffect } from "react"
 import { getTasks, toggleTaskCompletion, toggleTaskStar, reorderTasks, deleteTask, updateTask, type Task } from "@/lib/tasks"
@@ -74,6 +75,8 @@ export default function TasksPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [viewMode, setViewMode] = useState<"list" | "card" | "kanban">("list")
   const [fadingTasks, setFadingTasks] = useState<Set<string>>(new Set())
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
   const router = useRouter()
 
   const filters = ["All", "Today", "In Progress", "Completed"]
@@ -293,10 +296,20 @@ export default function TasksPage() {
     }
   }
 
-  const handleDeleteTask = async (taskId: string) => {
+  const handleDeleteTask = (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId)
+    if (task) {
+      setTaskToDelete(task)
+      setDeleteDialogOpen(true)
+    }
+  }
+
+  const confirmDeleteTask = async () => {
+    if (!taskToDelete) return
+    
     try {
-      await deleteTask(taskId)
-      setTasks(tasks.filter((task) => task.id !== taskId))
+      await deleteTask(taskToDelete.id)
+      setTasks(tasks.filter((task) => task.id !== taskToDelete.id))
       toast({
         title: "Success",
         description: "Task deleted successfully.",
@@ -308,6 +321,9 @@ export default function TasksPage() {
         description: "Failed to delete task. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setDeleteDialogOpen(false)
+      setTaskToDelete(null)
     }
   }
 
@@ -914,6 +930,26 @@ export default function TasksPage() {
           </div>
         </SidebarInset>
       </SidebarProvider>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Task</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete the task "{taskToDelete?.title}"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteTask}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

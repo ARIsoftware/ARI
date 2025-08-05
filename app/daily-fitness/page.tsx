@@ -17,6 +17,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2, Trash2, Pencil, Columns } from "lucide-react"
 import { useState, useEffect } from "react"
 import { getFitnessTasks, toggleFitnessTaskCompletion, toggleFitnessTaskStar, reorderFitnessTasks, deleteFitnessTask, updateFitnessTask, type FitnessTask, addSampleFitnessTasks } from "@/lib/fitness"
@@ -75,6 +76,8 @@ export default function DailyFitnessPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [viewMode, setViewMode] = useState<"list" | "card" | "kanban">("list")
   const [fadingTasks, setFadingTasks] = useState<Set<string>>(new Set())
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [taskToDelete, setTaskToDelete] = useState<FitnessTask | null>(null)
   const router = useRouter()
 
   const filters = ["All", "Today", "In Progress", "Completed"]
@@ -309,10 +312,20 @@ export default function DailyFitnessPage() {
     }
   }
 
-  const handleDeleteFitnessTask = async (taskId: string) => {
+  const handleDeleteFitnessTask = (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId)
+    if (task) {
+      setTaskToDelete(task)
+      setDeleteDialogOpen(true)
+    }
+  }
+
+  const confirmDeleteFitnessTask = async () => {
+    if (!taskToDelete) return
+    
     try {
-      await deleteFitnessTask(taskId)
-      setTasks(tasks.filter((task) => task.id !== taskId))
+      await deleteFitnessTask(taskToDelete.id)
+      setTasks(tasks.filter((task) => task.id !== taskToDelete.id))
       toast({
         title: "Success",
         description: "Exercise deleted successfully.",
@@ -324,6 +337,9 @@ export default function DailyFitnessPage() {
         description: "Failed to delete exercise. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setDeleteDialogOpen(false)
+      setTaskToDelete(null)
     }
   }
 
@@ -930,6 +946,26 @@ export default function DailyFitnessPage() {
           </div>
         </SidebarInset>
       </SidebarProvider>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Exercise</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete the exercise "{taskToDelete?.title}"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteFitnessTask}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
