@@ -73,6 +73,7 @@ export default function TasksPage() {
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [viewMode, setViewMode] = useState<"list" | "card" | "kanban">("list")
+  const [fadingTasks, setFadingTasks] = useState<Set<string>>(new Set())
   const router = useRouter()
 
   const filters = ["All", "Today", "In Progress", "Completed"]
@@ -130,6 +131,9 @@ export default function TasksPage() {
 
   const filteredTasks = tasks
     .filter((task) => {
+      // Hide completed tasks unless viewing "Completed" filter
+      if (task.completed && activeFilter !== "Completed") return false
+      
       const matchesFilter =
         activeFilter === "All" ||
         (activeFilter === "Today" && task.starred) ||
@@ -140,9 +144,6 @@ export default function TasksPage() {
       return matchesFilter && matchesSearch
     })
     .sort((a, b) => {
-      // Sort completed tasks to the bottom
-      if (a.completed && !b.completed) return 1
-      if (!a.completed && b.completed) return -1
       // If both have same completion status, maintain their order
       return a.order_index - b.order_index
     })
@@ -238,12 +239,36 @@ export default function TasksPage() {
 
   const handleToggleCompletion = async (taskId: string) => {
     try {
-      const updatedTask = await toggleTaskCompletion(taskId)
-      setTasks(tasks.map((task) => (task.id === taskId ? updatedTask : task)))
-      toast({
-        title: "Success",
-        description: `Task ${updatedTask.completed ? "completed" : "reopened"} successfully.`,
-      })
+      const task = tasks.find(t => t.id === taskId)
+      if (!task) return
+
+      // If marking as complete and not in Completed filter, add fade animation
+      if (!task.completed && activeFilter !== "Completed") {
+        setFadingTasks(prev => new Set(prev).add(taskId))
+        
+        // Wait for animation to complete before updating
+        setTimeout(async () => {
+          const updatedTask = await toggleTaskCompletion(taskId)
+          setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
+          setFadingTasks(prev => {
+            const newSet = new Set(prev)
+            newSet.delete(taskId)
+            return newSet
+          })
+          toast({
+            title: "Success",
+            description: "Task completed successfully.",
+          })
+        }, 300)
+      } else {
+        // If uncompleting or in Completed view, update immediately
+        const updatedTask = await toggleTaskCompletion(taskId)
+        setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
+        toast({
+          title: "Success",
+          description: `Task ${updatedTask.completed ? "completed" : "reopened"} successfully.`,
+        })
+      }
     } catch (error) {
       console.error("Failed to toggle task completion:", error)
       toast({
@@ -434,7 +459,7 @@ export default function TasksPage() {
                         onDragEnd={handleDragEnd}
                         className={`p-3 bg-white rounded-md shadow-sm hover:shadow-md transition-all cursor-move ${
                           draggedTask === task.id ? "opacity-50" : ""
-                        }`}
+                        } ${fadingTasks.has(task.id) ? "task-fade-out" : ""}`}
                       >
                         <div className="flex items-start justify-between mb-2">
                           <h4 className="text-sm font-medium flex-1 mr-2">{task.title}</h4>
@@ -497,7 +522,7 @@ export default function TasksPage() {
                         onDragEnd={handleDragEnd}
                         className={`p-3 bg-white rounded-md shadow-sm hover:shadow-md transition-all cursor-move ${
                           draggedTask === task.id ? "opacity-50" : ""
-                        }`}
+                        } ${fadingTasks.has(task.id) ? "task-fade-out" : ""}`}
                       >
                         <div className="flex items-start justify-between mb-2">
                           <h4 className="text-sm font-medium flex-1 mr-2">{task.title}</h4>
@@ -560,7 +585,7 @@ export default function TasksPage() {
                         onDragEnd={handleDragEnd}
                         className={`p-3 bg-white rounded-md shadow-sm hover:shadow-md transition-all cursor-move ${
                           draggedTask === task.id ? "opacity-50" : ""
-                        }`}
+                        } ${fadingTasks.has(task.id) ? "task-fade-out" : ""}`}
                       >
                         <div className="flex items-start justify-between mb-2">
                           <h4 className="text-sm font-medium flex-1 mr-2">{task.title}</h4>
@@ -623,7 +648,7 @@ export default function TasksPage() {
                         onDragEnd={handleDragEnd}
                         className={`p-3 bg-white rounded-md shadow-sm hover:shadow-md transition-all cursor-move ${
                           draggedTask === task.id ? "opacity-50" : ""
-                        }`}
+                        } ${fadingTasks.has(task.id) ? "task-fade-out" : ""}`}
                       >
                         <div className="flex items-start justify-between mb-2">
                           <h4 className="text-sm font-medium flex-1 mr-2">{task.title}</h4>
@@ -683,7 +708,7 @@ export default function TasksPage() {
                       : "flex items-start gap-4 p-4 border rounded-lg hover:shadow-sm transition-all cursor-move"
                   } ${
                     task.starred ? "bg-[#214b88] text-white shadow-lg" : "bg-white border-gray-200"
-                  } ${draggedTask === task.id ? "opacity-50" : ""} ${task.completed ? "taskdone" : ""}`}
+                  } ${draggedTask === task.id ? "opacity-50" : ""} ${task.completed ? "taskdone" : ""} ${fadingTasks.has(task.id) ? "task-fade-out" : ""}`}
                 >
                   {viewMode === "list" ? (
                     <>

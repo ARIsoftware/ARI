@@ -17,9 +17,9 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2, Trash2, Pencil } from "lucide-react"
+import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2, Trash2, Pencil, Columns } from "lucide-react"
 import { useState, useEffect } from "react"
-import { getFitnessTasks, toggleFitnessTaskCompletion, toggleFitnessTaskStar, reorderFitnessTasks, deleteFitnessTask, type FitnessTask, addSampleFitnessTasks } from "@/lib/fitness"
+import { getFitnessTasks, toggleFitnessTaskCompletion, toggleFitnessTaskStar, reorderFitnessTasks, deleteFitnessTask, updateFitnessTask, type FitnessTask, addSampleFitnessTasks } from "@/lib/fitness"
 import { testFitnessDatabase } from "@/lib/test-fitness-db"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
@@ -73,7 +73,8 @@ export default function DailyFitnessPage() {
   const [activeFilter, setActiveFilter] = useState("All")
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
-  const [viewMode, setViewMode] = useState<"list" | "card">("list")
+  const [viewMode, setViewMode] = useState<"list" | "card" | "kanban">("list")
+  const [fadingTasks, setFadingTasks] = useState<Set<string>>(new Set())
   const router = useRouter()
 
   const filters = ["All", "Today", "In Progress", "Completed"]
@@ -146,6 +147,9 @@ export default function DailyFitnessPage() {
 
   const filteredTasks = tasks
     .filter((task) => {
+      // Hide completed tasks unless viewing "Completed" filter
+      if (task.completed && activeFilter !== "Completed") return false
+      
       const matchesFilter =
         activeFilter === "All" ||
         (activeFilter === "Today" && task.starred) ||
@@ -156,9 +160,6 @@ export default function DailyFitnessPage() {
       return matchesFilter && matchesSearch
     })
     .sort((a, b) => {
-      // Sort completed tasks to the bottom
-      if (a.completed && !b.completed) return 1
-      if (!a.completed && b.completed) return -1
       // If both have same completion status, maintain their order
       return a.order_index - b.order_index
     })
@@ -216,14 +217,74 @@ export default function DailyFitnessPage() {
     setDraggedTask(null)
   }
 
-  const handleToggleCompletion = async (taskId: string) => {
+  const handleKanbanDrop = async (e: React.DragEvent, columnType: string) => {
+    e.preventDefault()
+    
+    if (!draggedTask) return
+
+    const task = tasks.find((t) => t.id === draggedTask)
+    if (!task) return
+
+    let updates: Partial<FitnessTask> = {}
+
+    if (columnType === "today") {
+      updates.starred = true
+    } else {
+      updates.starred = false
+      updates.priority = columnType.charAt(0).toUpperCase() + columnType.slice(1) as "High" | "Medium" | "Low"
+    }
+
     try {
-      const updatedTask = await toggleFitnessTaskCompletion(taskId)
-      setTasks(tasks.map((task) => (task.id === taskId ? updatedTask : task)))
+      await updateFitnessTask(draggedTask, updates)
+      setTasks(tasks.map((t) => t.id === draggedTask ? { ...t, ...updates } : t))
       toast({
         title: "Success",
-        description: `Exercise ${updatedTask.completed ? "completed" : "reopened"} successfully.`,
+        description: `Exercise moved to ${columnType === "today" ? "Today" : columnType + " priority"} column.`,
       })
+    } catch (error) {
+      console.error("Failed to update fitness task:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update exercise. Please try again.",
+        variant: "destructive",
+      })
+    }
+    
+    setDraggedTask(null)
+  }
+
+  const handleToggleCompletion = async (taskId: string) => {
+    try {
+      const task = tasks.find(t => t.id === taskId)
+      if (!task) return
+
+      // If marking as complete and not in Completed filter, add fade animation
+      if (!task.completed && activeFilter !== "Completed") {
+        setFadingTasks(prev => new Set(prev).add(taskId))
+        
+        // Wait for animation to complete before updating
+        setTimeout(async () => {
+          const updatedTask = await toggleFitnessTaskCompletion(taskId)
+          setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
+          setFadingTasks(prev => {
+            const newSet = new Set(prev)
+            newSet.delete(taskId)
+            return newSet
+          })
+          toast({
+            title: "Success",
+            description: "Exercise completed successfully.",
+          })
+        }, 300)
+      } else {
+        // If uncompleting or in Completed view, update immediately
+        const updatedTask = await toggleFitnessTaskCompletion(taskId)
+        setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
+        toast({
+          title: "Success",
+          description: `Exercise ${updatedTask.completed ? "completed" : "reopened"} successfully.`,
+        })
+      }
     } catch (error) {
       console.error("Failed to toggle fitness task completion:", error)
       toast({
@@ -375,17 +436,280 @@ export default function DailyFitnessPage() {
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className={`rounded-l-none ${viewMode === "card" ? "bg-gray-100" : ""}`}
+                    className={`border-x ${viewMode === "card" ? "bg-gray-100" : ""}`}
                     onClick={() => setViewMode("card")}
                   >
                     <Grid3X3 className="w-4 h-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className={`rounded-l-none ${viewMode === "kanban" ? "bg-gray-100" : ""}`}
+                    onClick={() => setViewMode("kanban")}
+                  >
+                    <Columns className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
             </div>
 
-            {/* Task List/Grid */}
-            <div className={viewMode === "card" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" : "space-y-3"}>
+            {/* Task List/Grid/Kanban */}
+            {viewMode === "kanban" ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Today Column */}
+                <div 
+                  className="bg-gray-50 rounded-lg p-4"
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleKanbanDrop(e, "today")}
+                >
+                  <h3 className="font-medium mb-3 flex items-center gap-2">
+                    <Star className="w-4 h-4 text-yellow-500" />
+                    Today
+                  </h3>
+                  <div className="space-y-2">
+                    {filteredTasks.filter(task => task.starred && !task.completed).map((task) => (
+                      <div
+                        key={task.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, task.id)}
+                        onDragEnd={handleDragEnd}
+                        className={`p-3 bg-white rounded-md shadow-sm hover:shadow-md transition-all cursor-move ${
+                          draggedTask === task.id ? "opacity-50" : ""
+                        } ${fadingTasks.has(task.id) ? "task-fade-out" : ""}`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <h4 className="text-sm font-medium flex-1 mr-2">{task.title}</h4>
+                          <input
+                            type="checkbox"
+                            checked={task.completed}
+                            onChange={() => handleToggleCompletion(task.id)}
+                            className="w-4 h-4 rounded border-gray-300"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                          <Calendar className="w-3 h-3" />
+                          <span>{formatDate(task.due_date)}</span>
+                        </div>
+                        <div className="flex items-center gap-1 mt-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              router.push(`/edit-fitness/${task.id}`)
+                            }}
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteFitnessTask(task.id)
+                            }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* High Priority Column */}
+                <div 
+                  className="bg-gray-50 rounded-lg p-4"
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleKanbanDrop(e, "high")}
+                >
+                  <h3 className="font-medium mb-3 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-red-500" />
+                    High Priority
+                  </h3>
+                  <div className="space-y-2">
+                    {filteredTasks.filter(task => !task.starred && task.priority === "High" && !task.completed).map((task) => (
+                      <div
+                        key={task.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, task.id)}
+                        onDragEnd={handleDragEnd}
+                        className={`p-3 bg-white rounded-md shadow-sm hover:shadow-md transition-all cursor-move ${
+                          draggedTask === task.id ? "opacity-50" : ""
+                        } ${fadingTasks.has(task.id) ? "task-fade-out" : ""}`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <h4 className="text-sm font-medium flex-1 mr-2">{task.title}</h4>
+                          <input
+                            type="checkbox"
+                            checked={task.completed}
+                            onChange={() => handleToggleCompletion(task.id)}
+                            className="w-4 h-4 rounded border-gray-300"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                          <Calendar className="w-3 h-3" />
+                          <span>{formatDate(task.due_date)}</span>
+                        </div>
+                        <div className="flex items-center gap-1 mt-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              router.push(`/edit-fitness/${task.id}`)
+                            }}
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteFitnessTask(task.id)
+                            }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Medium Priority Column */}
+                <div 
+                  className="bg-gray-50 rounded-lg p-4"
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleKanbanDrop(e, "medium")}
+                >
+                  <h3 className="font-medium mb-3 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                    Medium Priority
+                  </h3>
+                  <div className="space-y-2">
+                    {filteredTasks.filter(task => !task.starred && task.priority === "Medium" && !task.completed).map((task) => (
+                      <div
+                        key={task.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, task.id)}
+                        onDragEnd={handleDragEnd}
+                        className={`p-3 bg-white rounded-md shadow-sm hover:shadow-md transition-all cursor-move ${
+                          draggedTask === task.id ? "opacity-50" : ""
+                        } ${fadingTasks.has(task.id) ? "task-fade-out" : ""}`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <h4 className="text-sm font-medium flex-1 mr-2">{task.title}</h4>
+                          <input
+                            type="checkbox"
+                            checked={task.completed}
+                            onChange={() => handleToggleCompletion(task.id)}
+                            className="w-4 h-4 rounded border-gray-300"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                          <Calendar className="w-3 h-3" />
+                          <span>{formatDate(task.due_date)}</span>
+                        </div>
+                        <div className="flex items-center gap-1 mt-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              router.push(`/edit-fitness/${task.id}`)
+                            }}
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteFitnessTask(task.id)
+                            }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Low Priority Column */}
+                <div 
+                  className="bg-gray-50 rounded-lg p-4"
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleKanbanDrop(e, "low")}
+                >
+                  <h3 className="font-medium mb-3 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-gray-500" />
+                    Low Priority
+                  </h3>
+                  <div className="space-y-2">
+                    {filteredTasks.filter(task => !task.starred && task.priority === "Low" && !task.completed).map((task) => (
+                      <div
+                        key={task.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, task.id)}
+                        onDragEnd={handleDragEnd}
+                        className={`p-3 bg-white rounded-md shadow-sm hover:shadow-md transition-all cursor-move ${
+                          draggedTask === task.id ? "opacity-50" : ""
+                        } ${fadingTasks.has(task.id) ? "task-fade-out" : ""}`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <h4 className="text-sm font-medium flex-1 mr-2">{task.title}</h4>
+                          <input
+                            type="checkbox"
+                            checked={task.completed}
+                            onChange={() => handleToggleCompletion(task.id)}
+                            className="w-4 h-4 rounded border-gray-300"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                          <Calendar className="w-3 h-3" />
+                          <span>{formatDate(task.due_date)}</span>
+                        </div>
+                        <div className="flex items-center gap-1 mt-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              router.push(`/edit-fitness/${task.id}`)
+                            }}
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteFitnessTask(task.id)
+                            }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className={viewMode === "card" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" : "space-y-3"}>
               {filteredTasks.map((task) => (
                 <div
                   key={task.id}
@@ -400,7 +724,7 @@ export default function DailyFitnessPage() {
                       : "flex items-start gap-4 p-4 border rounded-lg hover:shadow-sm transition-all cursor-move"
                   } ${
                     task.starred ? "bg-[#214b88] text-white shadow-lg" : "bg-white border-gray-200"
-                  } ${draggedTask === task.id ? "opacity-50" : ""} ${task.completed ? "taskdone" : ""}`}
+                  } ${draggedTask === task.id ? "opacity-50" : ""} ${task.completed ? "taskdone" : ""} ${fadingTasks.has(task.id) ? "task-fade-out" : ""}`}
                 >
                   {viewMode === "list" ? (
                     <>
@@ -593,7 +917,8 @@ export default function DailyFitnessPage() {
                   )}
                 </div>
               ))}
-            </div>
+              </div>
+            )}
 
             {filteredTasks.length === 0 && !loading && (
               <div className="text-center py-12 text-gray-500">
