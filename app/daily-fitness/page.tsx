@@ -17,7 +17,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2, Trash2 } from "lucide-react"
+import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2, Trash2, Pencil } from "lucide-react"
 import { useState, useEffect } from "react"
 import { getFitnessTasks, toggleFitnessTaskCompletion, toggleFitnessTaskStar, reorderFitnessTasks, deleteFitnessTask, type FitnessTask, addSampleFitnessTasks } from "@/lib/fitness"
 import { testFitnessDatabase } from "@/lib/test-fitness-db"
@@ -473,6 +473,17 @@ export default function DailyFitnessPage() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          className={`h-8 w-8 ${task.starred ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-blue-600 hover:bg-blue-50"}`}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            router.push(`/edit-fitness/${task.id}`)
+                          }}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className={`h-8 w-8 ${task.starred ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-red-600 hover:bg-red-50"}`}
                           onClick={(e) => {
                             e.stopPropagation()
@@ -553,17 +564,30 @@ export default function DailyFitnessPage() {
                             {task.priority}
                           </Badge>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className={`h-8 w-8 ${task.starred ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-red-600 hover:bg-red-50"}`}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDeleteFitnessTask(task.id)
-                          }}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`h-8 w-8 ${task.starred ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-blue-600 hover:bg-blue-50"}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              router.push(`/edit-fitness/${task.id}`)
+                            }}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`h-8 w-8 ${task.starred ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-red-600 hover:bg-red-50"}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteFitnessTask(task.id)
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </>
                   )}
