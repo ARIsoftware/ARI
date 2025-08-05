@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { use } from "react"
 import { useUser } from "@clerk/nextjs"
 import { DM_Sans } from "next/font/google"
 import { AppSidebar } from "../../../components/app-sidebar"
@@ -48,7 +49,8 @@ const statusOptions = [
   { value: "Completed", label: "Completed", color: "bg-green-100 text-green-600" },
 ]
 
-export default function EditFitnessPage({ params }: { params: { id: string } }) {
+export default function EditFitnessPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
   const { user } = useUser()
   const { toast } = useToast()
   const router = useRouter()
@@ -76,7 +78,7 @@ export default function EditFitnessPage({ params }: { params: { id: string } }) 
     const loadTask = async () => {
       try {
         const tasks = await getFitnessTasks()
-        const foundTask = tasks.find((t) => t.id === params.id)
+        const foundTask = tasks.find((t) => t.id === id)
         
         if (!foundTask) {
           toast({
@@ -117,7 +119,7 @@ export default function EditFitnessPage({ params }: { params: { id: string } }) 
     }
 
     loadTask()
-  }, [params.id, router, toast])
+  }, [id, router, toast])
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({
@@ -170,7 +172,7 @@ export default function EditFitnessPage({ params }: { params: { id: string } }) 
         completed: formData.completed,
       }
 
-      await updateFitnessTask(params.id, updates)
+      await updateFitnessTask(id, updates)
 
       toast({
         title: "Success",
