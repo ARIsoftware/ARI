@@ -17,9 +17,9 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2, Trash2 } from "lucide-react"
+import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2, Trash2, Pencil, Columns } from "lucide-react"
 import { useState, useEffect } from "react"
-import { getTasks, toggleTaskCompletion, toggleTaskStar, reorderTasks, deleteTask, type Task } from "@/lib/tasks"
+import { getTasks, toggleTaskCompletion, toggleTaskStar, reorderTasks, deleteTask, updateTask, type Task } from "@/lib/tasks"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
@@ -72,7 +72,7 @@ export default function TasksPage() {
   const [activeFilter, setActiveFilter] = useState("All")
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
-  const [viewMode, setViewMode] = useState<"list" | "card">("list")
+  const [viewMode, setViewMode] = useState<"list" | "card" | "kanban">("list")
   const router = useRouter()
 
   const filters = ["All", "Today", "In Progress", "Completed"]
@@ -197,6 +197,42 @@ export default function TasksPage() {
   }
 
   const handleDragEnd = () => {
+    setDraggedTask(null)
+  }
+
+  const handleKanbanDrop = async (e: React.DragEvent, columnType: string) => {
+    e.preventDefault()
+    
+    if (!draggedTask) return
+
+    const task = tasks.find((t) => t.id === draggedTask)
+    if (!task) return
+
+    let updates: Partial<Task> = {}
+
+    if (columnType === "today") {
+      updates.starred = true
+    } else {
+      updates.starred = false
+      updates.priority = columnType.charAt(0).toUpperCase() + columnType.slice(1) as "High" | "Medium" | "Low"
+    }
+
+    try {
+      await updateTask(draggedTask, updates)
+      setTasks(tasks.map((t) => t.id === draggedTask ? { ...t, ...updates } : t))
+      toast({
+        title: "Success",
+        description: `Task moved to ${columnType === "today" ? "Today" : columnType + " priority"} column.`,
+      })
+    } catch (error) {
+      console.error("Failed to update task:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update task. Please try again.",
+        variant: "destructive",
+      })
+    }
+    
     setDraggedTask(null)
   }
 
@@ -359,17 +395,280 @@ export default function TasksPage() {
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className={`rounded-l-none ${viewMode === "card" ? "bg-gray-100" : ""}`}
+                    className={`border-x ${viewMode === "card" ? "bg-gray-100" : ""}`}
                     onClick={() => setViewMode("card")}
                   >
                     <Grid3X3 className="w-4 h-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className={`rounded-l-none ${viewMode === "kanban" ? "bg-gray-100" : ""}`}
+                    onClick={() => setViewMode("kanban")}
+                  >
+                    <Columns className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
             </div>
 
-            {/* Task List/Grid */}
-            <div className={viewMode === "card" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" : "space-y-3"}>
+            {/* Task List/Grid/Kanban */}
+            {viewMode === "kanban" ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Today Column */}
+                <div 
+                  className="bg-gray-50 rounded-lg p-4"
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleKanbanDrop(e, "today")}
+                >
+                  <h3 className="font-medium mb-3 flex items-center gap-2">
+                    <Star className="w-4 h-4 text-yellow-500" />
+                    Today
+                  </h3>
+                  <div className="space-y-2">
+                    {filteredTasks.filter(task => task.starred && !task.completed).map((task) => (
+                      <div
+                        key={task.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, task.id)}
+                        onDragEnd={handleDragEnd}
+                        className={`p-3 bg-white rounded-md shadow-sm hover:shadow-md transition-all cursor-move ${
+                          draggedTask === task.id ? "opacity-50" : ""
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <h4 className="text-sm font-medium flex-1 mr-2">{task.title}</h4>
+                          <input
+                            type="checkbox"
+                            checked={task.completed}
+                            onChange={() => handleToggleCompletion(task.id)}
+                            className="w-4 h-4 rounded border-gray-300"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                          <Calendar className="w-3 h-3" />
+                          <span>{formatDate(task.due_date)}</span>
+                        </div>
+                        <div className="flex items-center gap-1 mt-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              router.push(`/edit-task/${task.id}`)
+                            }}
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteTask(task.id)
+                            }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* High Priority Column */}
+                <div 
+                  className="bg-gray-50 rounded-lg p-4"
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleKanbanDrop(e, "high")}
+                >
+                  <h3 className="font-medium mb-3 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-red-500" />
+                    High Priority
+                  </h3>
+                  <div className="space-y-2">
+                    {filteredTasks.filter(task => !task.starred && task.priority === "High" && !task.completed).map((task) => (
+                      <div
+                        key={task.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, task.id)}
+                        onDragEnd={handleDragEnd}
+                        className={`p-3 bg-white rounded-md shadow-sm hover:shadow-md transition-all cursor-move ${
+                          draggedTask === task.id ? "opacity-50" : ""
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <h4 className="text-sm font-medium flex-1 mr-2">{task.title}</h4>
+                          <input
+                            type="checkbox"
+                            checked={task.completed}
+                            onChange={() => handleToggleCompletion(task.id)}
+                            className="w-4 h-4 rounded border-gray-300"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                          <Calendar className="w-3 h-3" />
+                          <span>{formatDate(task.due_date)}</span>
+                        </div>
+                        <div className="flex items-center gap-1 mt-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              router.push(`/edit-task/${task.id}`)
+                            }}
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteTask(task.id)
+                            }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Medium Priority Column */}
+                <div 
+                  className="bg-gray-50 rounded-lg p-4"
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleKanbanDrop(e, "medium")}
+                >
+                  <h3 className="font-medium mb-3 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                    Medium Priority
+                  </h3>
+                  <div className="space-y-2">
+                    {filteredTasks.filter(task => !task.starred && task.priority === "Medium" && !task.completed).map((task) => (
+                      <div
+                        key={task.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, task.id)}
+                        onDragEnd={handleDragEnd}
+                        className={`p-3 bg-white rounded-md shadow-sm hover:shadow-md transition-all cursor-move ${
+                          draggedTask === task.id ? "opacity-50" : ""
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <h4 className="text-sm font-medium flex-1 mr-2">{task.title}</h4>
+                          <input
+                            type="checkbox"
+                            checked={task.completed}
+                            onChange={() => handleToggleCompletion(task.id)}
+                            className="w-4 h-4 rounded border-gray-300"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                          <Calendar className="w-3 h-3" />
+                          <span>{formatDate(task.due_date)}</span>
+                        </div>
+                        <div className="flex items-center gap-1 mt-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              router.push(`/edit-task/${task.id}`)
+                            }}
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteTask(task.id)
+                            }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Low Priority Column */}
+                <div 
+                  className="bg-gray-50 rounded-lg p-4"
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleKanbanDrop(e, "low")}
+                >
+                  <h3 className="font-medium mb-3 flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-gray-500" />
+                    Low Priority
+                  </h3>
+                  <div className="space-y-2">
+                    {filteredTasks.filter(task => !task.starred && task.priority === "Low" && !task.completed).map((task) => (
+                      <div
+                        key={task.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, task.id)}
+                        onDragEnd={handleDragEnd}
+                        className={`p-3 bg-white rounded-md shadow-sm hover:shadow-md transition-all cursor-move ${
+                          draggedTask === task.id ? "opacity-50" : ""
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <h4 className="text-sm font-medium flex-1 mr-2">{task.title}</h4>
+                          <input
+                            type="checkbox"
+                            checked={task.completed}
+                            onChange={() => handleToggleCompletion(task.id)}
+                            className="w-4 h-4 rounded border-gray-300"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                          <Calendar className="w-3 h-3" />
+                          <span>{formatDate(task.due_date)}</span>
+                        </div>
+                        <div className="flex items-center gap-1 mt-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              router.push(`/edit-task/${task.id}`)
+                            }}
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteTask(task.id)
+                            }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className={viewMode === "card" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" : "space-y-3"}>
               {filteredTasks.map((task) => (
                 <div
                   key={task.id}
@@ -457,6 +756,17 @@ export default function TasksPage() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          className={`h-8 w-8 ${task.starred ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-blue-600 hover:bg-blue-50"}`}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            router.push(`/edit-task/${task.id}`)
+                          }}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className={`h-8 w-8 ${task.starred ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-red-600 hover:bg-red-50"}`}
                           onClick={(e) => {
                             e.stopPropagation()
@@ -537,23 +847,37 @@ export default function TasksPage() {
                             {task.priority}
                           </Badge>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className={`h-8 w-8 ${task.starred ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-red-600 hover:bg-red-50"}`}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDeleteTask(task.id)
-                          }}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`h-8 w-8 ${task.starred ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-blue-600 hover:bg-blue-50"}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              router.push(`/edit-task/${task.id}`)
+                            }}
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`h-8 w-8 ${task.starred ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-red-600 hover:bg-red-50"}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteTask(task.id)
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     </>
                   )}
                 </div>
               ))}
-            </div>
+              </div>
+            )}
 
             {filteredTasks.length === 0 && !loading && (
               <div className="text-center py-12 text-gray-500">
