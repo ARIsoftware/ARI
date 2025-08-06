@@ -9,6 +9,11 @@ Icon
 # Thumbnails
 ._*
 
+
+# Markdown Reports
+*-report.md
+
+
 # Files that might appear on external volumes
 .Spotlight-V100
 .Trashes
