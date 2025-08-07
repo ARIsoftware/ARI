@@ -27,7 +27,7 @@ export async function getFitnessTasks(): Promise<FitnessTask[]> {
   return data || []
 }
 
-export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_at" | "updated_at" | "order_index">): Promise<FitnessTask> {
+export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_at" | "updated_at" | "order_index"> & { youtube_url?: string | null }): Promise<FitnessTask> {
   console.log("Attempting to create fitness task:", task)
   
   // Get the highest order_index to place new task at the end
@@ -44,10 +44,18 @@ export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_
   const nextOrderIndex = maxOrderData && maxOrderData.length > 0 ? (maxOrderData[0].order_index || 0) + 1 : 0
   console.log("Next order index:", nextOrderIndex)
 
-  const taskToInsert = {
-    ...task,
+  // Remove youtube_url if it's null or undefined to avoid database errors
+  const { youtube_url, ...taskWithoutYoutube } = task
+  const taskToInsert: any = {
+    ...taskWithoutYoutube,
     order_index: nextOrderIndex,
   }
+  
+  // Only add youtube_url if it has a value
+  if (youtube_url && youtube_url.trim()) {
+    taskToInsert.youtube_url = youtube_url
+  }
+  
   console.log("Task to insert:", taskToInsert)
 
   const { data, error } = await supabase
@@ -72,9 +80,18 @@ export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_
 }
 
 export async function updateFitnessTask(id: string, updates: Partial<FitnessTask>): Promise<FitnessTask> {
+  // Filter out youtube_url if it's undefined to avoid database errors
+  const { youtube_url, ...otherUpdates } = updates
+  const finalUpdates: any = { ...otherUpdates, updated_at: new Date().toISOString() }
+  
+  // Only include youtube_url if it's explicitly set (including null for removal)
+  if (youtube_url !== undefined) {
+    finalUpdates.youtube_url = youtube_url
+  }
+  
   const { data, error } = await supabase
     .from("fitness_database")
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update(finalUpdates)
     .eq("id", id)
     .select()
     .single()
