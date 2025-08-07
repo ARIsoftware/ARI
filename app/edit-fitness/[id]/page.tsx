@@ -69,6 +69,7 @@ export default function EditFitnessPage({ params }: { params: Promise<{ id: stri
     priority: "Medium" as const,
     starred: false,
     completed: false,
+    youtube_url: "",
   })
 
   const [newAssignee, setNewAssignee] = useState("")
@@ -100,6 +101,7 @@ export default function EditFitnessPage({ params }: { params: Promise<{ id: stri
           priority: foundTask.priority,
           starred: foundTask.starred,
           completed: foundTask.completed,
+          youtube_url: foundTask.youtube_url || "",
         })
         
         if (foundTask.due_date) {
@@ -170,6 +172,7 @@ export default function EditFitnessPage({ params }: { params: Promise<{ id: stri
         priority: formData.priority,
         starred: formData.starred,
         completed: formData.completed,
+        youtube_url: formData.youtube_url.trim() || null,
       }
 
       await updateFitnessTask(id, updates)
@@ -275,6 +278,22 @@ export default function EditFitnessPage({ params }: { params: Promise<{ id: stri
                       className="w-full"
                       required
                     />
+                  </div>
+
+                  {/* YouTube Video URL */}
+                  <div className="space-y-2">
+                    <Label htmlFor="youtube_url" className="text-sm font-medium">
+                      YouTube Video URL
+                    </Label>
+                    <Input
+                      id="youtube_url"
+                      placeholder="Enter YouTube video URL (e.g., https://www.youtube.com/watch?v=...)..."
+                      value={formData.youtube_url}
+                      onChange={(e) => handleInputChange("youtube_url", e.target.value)}
+                      className="w-full"
+                      type="url"
+                    />
+                    <p className="text-xs text-muted-foreground">Optional: Add a YouTube video for exercise demonstration</p>
                   </div>
 
                   {/* Assignees */}

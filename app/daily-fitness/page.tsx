@@ -18,13 +18,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2, Trash2, Pencil, Columns } from "lucide-react"
+import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2, Trash2, Pencil, Columns, Play } from "lucide-react"
 import { useState, useEffect } from "react"
 import { getFitnessTasks, toggleFitnessTaskCompletion, toggleFitnessTaskStar, reorderFitnessTasks, deleteFitnessTask, updateFitnessTask, type FitnessTask, addSampleFitnessTasks } from "@/lib/fitness"
 import { testFitnessDatabase } from "@/lib/test-fitness-db"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
+import { YouTubeModal } from "@/components/youtube-modal"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -78,6 +79,9 @@ export default function DailyFitnessPage() {
   const [fadingTasks, setFadingTasks] = useState<Set<string>>(new Set())
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState<FitnessTask | null>(null)
+  const [videoModalOpen, setVideoModalOpen] = useState(false)
+  const [selectedVideoUrl, setSelectedVideoUrl] = useState<string>("") 
+  const [selectedVideoTitle, setSelectedVideoTitle] = useState<string>("")
   const router = useRouter()
 
   const filters = ["All", "Today", "In Progress", "Completed"]
@@ -507,6 +511,21 @@ export default function DailyFitnessPage() {
                           <span>{formatDate(task.due_date)}</span>
                         </div>
                         <div className="flex items-center gap-1 mt-2">
+                          {task.youtube_url && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-gray-400 hover:text-green-600 hover:bg-green-50"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedVideoUrl(task.youtube_url || "")
+                                setSelectedVideoTitle(task.title)
+                                setVideoModalOpen(true)
+                              }}
+                            >
+                              <Play className="w-3 h-3" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -570,6 +589,21 @@ export default function DailyFitnessPage() {
                           <span>{formatDate(task.due_date)}</span>
                         </div>
                         <div className="flex items-center gap-1 mt-2">
+                          {task.youtube_url && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-gray-400 hover:text-green-600 hover:bg-green-50"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedVideoUrl(task.youtube_url || "")
+                                setSelectedVideoTitle(task.title)
+                                setVideoModalOpen(true)
+                              }}
+                            >
+                              <Play className="w-3 h-3" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -633,6 +667,21 @@ export default function DailyFitnessPage() {
                           <span>{formatDate(task.due_date)}</span>
                         </div>
                         <div className="flex items-center gap-1 mt-2">
+                          {task.youtube_url && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-gray-400 hover:text-green-600 hover:bg-green-50"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedVideoUrl(task.youtube_url || "")
+                                setSelectedVideoTitle(task.title)
+                                setVideoModalOpen(true)
+                              }}
+                            >
+                              <Play className="w-3 h-3" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -696,6 +745,21 @@ export default function DailyFitnessPage() {
                           <span>{formatDate(task.due_date)}</span>
                         </div>
                         <div className="flex items-center gap-1 mt-2">
+                          {task.youtube_url && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-gray-400 hover:text-green-600 hover:bg-green-50"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedVideoUrl(task.youtube_url || "")
+                                setSelectedVideoTitle(task.title)
+                                setVideoModalOpen(true)
+                              }}
+                            >
+                              <Play className="w-3 h-3" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -810,6 +874,21 @@ export default function DailyFitnessPage() {
                         >
                           {task.priority}
                         </Badge>
+                        {task.youtube_url && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`h-8 w-8 ${task.starred ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-green-600 hover:bg-green-50"}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedVideoUrl(task.youtube_url || "")
+                              setSelectedVideoTitle(task.title)
+                              setVideoModalOpen(true)
+                            }}
+                          >
+                            <Play className="w-4 h-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -905,6 +984,21 @@ export default function DailyFitnessPage() {
                           </Badge>
                         </div>
                         <div className="flex items-center gap-1">
+                          {task.youtube_url && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className={`h-8 w-8 ${task.starred ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-green-600 hover:bg-green-50"}`}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedVideoUrl(task.youtube_url || "")
+                                setSelectedVideoTitle(task.title)
+                                setVideoModalOpen(true)
+                              }}
+                            >
+                              <Play className="w-4 h-4" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -966,6 +1060,14 @@ export default function DailyFitnessPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* YouTube Video Modal */}
+      <YouTubeModal
+        isOpen={videoModalOpen}
+        onClose={() => setVideoModalOpen(false)}
+        videoUrl={selectedVideoUrl}
+        title={selectedVideoTitle}
+      />
     </div>
   )
 }
