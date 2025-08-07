@@ -41,6 +41,7 @@ export default function AddFitnessPage() {
   const [priority, setPriority] = useState<"Low" | "Medium" | "High">("Medium")
   const [starred, setStarred] = useState(false)
   const [subtasksTotal, setSubtasksTotal] = useState(0)
+  const [youtubeUrl, setYoutubeUrl] = useState("")
   const [loading, setLoading] = useState(false)
 
   const handleAddAssignee = () => {
@@ -79,6 +80,7 @@ export default function AddFitnessPage() {
         priority,
         starred,
         completed: status === "Completed",
+        youtube_url: youtubeUrl.trim() || null,
       })
 
       toast({
@@ -174,6 +176,22 @@ export default function AddFitnessPage() {
                       className="bg-white"
                       required
                     />
+                  </div>
+
+                  {/* YouTube Video URL */}
+                  <div className="space-y-2">
+                    <label htmlFor="youtube_url" className="text-sm font-medium">
+                      YouTube Video URL
+                    </label>
+                    <Input
+                      id="youtube_url"
+                      placeholder="Enter YouTube video URL (e.g., https://www.youtube.com/watch?v=...)"
+                      value={youtubeUrl}
+                      onChange={(e) => setYoutubeUrl(e.target.value)}
+                      className="bg-white"
+                      type="url"
+                    />
+                    <p className="text-xs text-muted-foreground">Optional: Add a YouTube video for exercise demonstration</p>
                   </div>
 
                   {/* Assignees */}

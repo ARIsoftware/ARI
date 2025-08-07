@@ -41,4 +41,5 @@ export type FitnessTask = {
   created_at: string
   updated_at: string
   order_index: number
+  youtube_url?: string | null
 }
