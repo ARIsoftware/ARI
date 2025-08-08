@@ -54,14 +54,14 @@ export function TaskAnnouncement() {
 
   if (loading || !lastTask) {
     return (
-      <div className="topbar h-[38px] bg-black w-full relative z-50 flex items-center justify-center">
+      <div className="topbar h-[45x] bg-black w-full relative z-50 flex items-center justify-center">
         <span className={`text-white font-medium ${dmSans.className}`}>ARI</span>
       </div>
     )
   }
 
   return (
-    <div className="topbar h-[38px] bg-black w-full relative z-50 flex items-center justify-center">
+    <div className="topbar h-[45px] bg-black w-full relative z-50 flex items-center justify-center">
       <Announcement className="bg-white border-gray-200 hover:bg-gray-50 shadow-sm">
         <AnnouncementTag className="bg-gray-100 text-gray-700 font-medium">
           Task Complete
