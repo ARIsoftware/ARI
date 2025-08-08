@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
+import { TaskAnnouncement } from "@/components/task-announcement"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { CalendarDays, TrendingUp, Trophy, Target, Users, CheckSquare, Loader2 } from "lucide-react"
@@ -74,9 +75,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50/50">
-        <div className="topbar h-[35px] bg-black w-full relative z-50 flex items-center justify-center">
-          <span className={`text-white font-medium ${dmSans.className}`}>ARI</span>
-        </div>
+        <TaskAnnouncement />
         <SidebarProvider>
           <AppSidebar />
           <SidebarInset>
