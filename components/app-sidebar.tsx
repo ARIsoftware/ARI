@@ -34,6 +34,11 @@ const data = {
       icon: Dumbbell,
       items: [
         {
+          title: "Hyrox",
+          url: "/hyrox",
+          icon: Target,
+        },
+        {
           title: "Daily Fitness",
           url: "/daily-fitness",
           icon: Dumbbell,
