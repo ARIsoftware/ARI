@@ -40,7 +40,7 @@ export function YouTubeModal({ isOpen, onClose, videoUrl, title }: YouTubeModalP
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[800px] p-0 border-0 rounded-[20px] overflow-hidden">
+      <DialogContent className="sm:max-w-[800px] p-0 border-0 rounded-[20px] overflow-hidden bg-black">
         <DialogHeader className="bg-black text-white p-4 pb-2 rounded-t-[20px]">
           <DialogTitle className="text-white">{title || "Exercise Video"}</DialogTitle>
         </DialogHeader>
