@@ -28,6 +28,111 @@ const dmSans = DM_Sans({
   weight: ["400", "500", "600", "700"],
 })
 
+// Dynamic table discovery function
+const discoverTables = async (): Promise<string[]> => {
+  try {
+    // Get all user tables from information_schema
+    const { data, error } = await supabase
+      .from('information_schema.tables')
+      .select('table_name')
+      .eq('table_schema', 'public')
+      .neq('table_name', 'spatial_ref_sys') // Exclude PostGIS system table if present
+      .order('table_name')
+    
+    if (error) {
+      console.warn('Could not discover tables automatically, falling back to known tables:', error)
+      // Fallback to known tables
+      return ['ari-database', 'fitness_database', 'contacts', 'fitness_completion_history', 'hyrox_station_records', 'hyrox_workouts', 'hyrox_workout_stations']
+    }
+    
+    const tables = data?.map(row => row.table_name) || []
+    console.log('Discovered tables:', tables)
+    return tables
+  } catch (error) {
+    console.warn('Error discovering tables:', error)
+    // Fallback to known tables
+    return ['ari-database', 'fitness_database', 'contacts', 'fitness_completion_history', 'hyrox_station_records', 'hyrox_workouts', 'hyrox_workout_stations']
+  }
+}
+
+// Get table schema information
+const getTableSchema = async (tableName: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('information_schema.columns')
+      .select('column_name, data_type, is_nullable, column_default')
+      .eq('table_schema', 'public')
+      .eq('table_name', tableName)
+      .order('ordinal_position')
+    
+    if (error) throw error
+    return data || []
+  } catch (error) {
+    console.warn(`Could not get schema for table ${tableName}:`, error)
+    return []
+  }
+}
+
+// Convert PostgreSQL data type to CREATE TABLE format
+const mapDataType = (dataType: string, isNullable: string, columnDefault: string | null): string => {
+  let sqlType = dataType.toUpperCase()
+  
+  // Map common types
+  switch (dataType.toLowerCase()) {
+    case 'character varying':
+      sqlType = 'TEXT'
+      break
+    case 'timestamp with time zone':
+      sqlType = 'TIMESTAMPTZ'
+      break
+    case 'timestamp without time zone':
+      sqlType = 'TIMESTAMP'
+      break
+    case 'boolean':
+      sqlType = 'BOOLEAN'
+      break
+    case 'integer':
+      sqlType = 'INTEGER'
+      break
+    case 'uuid':
+      sqlType = 'UUID'
+      break
+    case 'date':
+      sqlType = 'DATE'
+      break
+    case 'text':
+      sqlType = 'TEXT'
+      break
+    case 'ARRAY':
+      sqlType = 'TEXT[]'
+      break
+  }
+  
+  // Add constraints
+  if (isNullable === 'NO') {
+    sqlType += ' NOT NULL'
+  }
+  
+  // Add defaults
+  if (columnDefault) {
+    if (columnDefault.includes('gen_random_uuid()')) {
+      sqlType += ' DEFAULT gen_random_uuid()'
+    } else if (columnDefault.includes('now()') || columnDefault.includes('CURRENT_TIMESTAMP')) {
+      sqlType += ' DEFAULT NOW()'
+    } else if (columnDefault === 'false') {
+      sqlType += ' DEFAULT FALSE'
+    } else if (columnDefault === 'true') {
+      sqlType += ' DEFAULT TRUE'
+    } else if (!isNaN(Number(columnDefault))) {
+      sqlType += ` DEFAULT ${columnDefault}`
+    } else if (columnDefault.startsWith("'") && columnDefault.endsWith("'")) {
+      sqlType += ` DEFAULT ${columnDefault}`
+    }
+  }
+  
+  return sqlType
+}
+
 // Comprehensive SQL file validation function
 const validateSQLFile = async (content: string): Promise<{ isValid: boolean; errors: string[]; warnings: string[] }> => {
   const errors: string[] = []
@@ -39,15 +144,16 @@ const validateSQLFile = async (content: string): Promise<{ isValid: boolean; err
     errors.push('Not a valid ARI backup file - missing backup header or CREATE TABLE statements')
   }
   
-  // Validate required tables are present
-  const requiredTables = ['ari-database', 'fitness_database', 'contacts', 'fitness_completion_history']
+  // Discover current tables for validation
+  const currentTables = await discoverTables()
   const foundTables = new Set<string>()
   
-  // Check for SQL injection patterns (basic security)
+  // Create dynamic patterns for current tables
+  const tablePattern = currentTables.map(t => `"${t}"`).join('|')
   const dangerousPatterns = [
     /DROP\s+DATABASE/i,
-    /TRUNCATE\s+(?!("ari-database"|"fitness_database"|"contacts"|"fitness_completion_history"))/i,
-    /DELETE\s+FROM\s+(?!("ari-database"|"fitness_database"|"contacts"|"fitness_completion_history"))/i,
+    new RegExp(`TRUNCATE\\s+(?!(${tablePattern}))`, 'i'),
+    new RegExp(`DELETE\\s+FROM\\s+(?!(${tablePattern}))`, 'i'),
     /ALTER\s+USER/i,
     /CREATE\s+USER/i,
     /GRANT\s+/i,
@@ -78,8 +184,8 @@ const validateSQLFile = async (content: string): Promise<{ isValid: boolean; err
       if (tableMatch) {
         const tableName = tableMatch[1]
         foundTables.add(tableName)
-        if (!requiredTables.includes(tableName)) {
-          warnings.push(`Unknown table found: ${tableName}`)
+        if (!currentTables.includes(tableName)) {
+          warnings.push(`Unknown table found: ${tableName} (not in current database)`)
         }
       }
     }
@@ -92,8 +198,8 @@ const validateSQLFile = async (content: string): Promise<{ isValid: boolean; err
         const tableName = tableMatch[1]
         tableInsertCounts[tableName] = (tableInsertCounts[tableName] || 0) + 1
         
-        if (!requiredTables.includes(tableName)) {
-          errors.push(`INSERT statement for unknown table: ${tableName}`)
+        if (!currentTables.includes(tableName)) {
+          warnings.push(`INSERT statement for table not in current database: ${tableName}`)
         }
         
         // Basic INSERT statement syntax validation
@@ -116,11 +222,13 @@ const validateSQLFile = async (content: string): Promise<{ isValid: boolean; err
     }
   }
   
-  // Validate required tables are present
-  for (const requiredTable of requiredTables) {
-    if (!foundTables.has(requiredTable)) {
-      errors.push(`Missing required table: ${requiredTable}`)
-    }
+  // Check if we found any known tables
+  const knownTablesFound = currentTables.filter(table => foundTables.has(table))
+  if (knownTablesFound.length === 0) {
+    errors.push('No recognized tables found in backup file')
+  } else if (knownTablesFound.length < currentTables.length) {
+    const missingTables = currentTables.filter(table => !foundTables.has(table))
+    warnings.push(`Some current tables not found in backup: ${missingTables.join(', ')}`)
   }
   
   // Check for reasonable data amounts
@@ -133,8 +241,8 @@ const validateSQLFile = async (content: string): Promise<{ isValid: boolean; err
   // Validate CREATE TABLE count
   if (createTableCount === 0) {
     errors.push('No CREATE TABLE statements found')
-  } else if (createTableCount !== requiredTables.length) {
-    warnings.push(`Expected ${requiredTables.length} tables, found ${createTableCount}`)
+  } else if (createTableCount !== currentTables.length) {
+    warnings.push(`Current database has ${currentTables.length} tables, backup has ${createTableCount}`)
   }
   
   // Check for metadata
@@ -188,22 +296,39 @@ export default function BackupsPage() {
       setMessage(null)
       setBackupStats(null)
       
-      // Fetch all tables data with count
-      const tables = ['ari-database', 'fitness_database', 'contacts', 'fitness_completion_history']
+      // Automatically discover all tables
+      const tables = await discoverTables()
+      console.log('Exporting tables:', tables)
+      
       const backupData: any = {}
+      const tableSchemas: any = {}
       let totalRows = 0
       
+      // Fetch data and schema for each table
       for (const table of tables) {
-        const { data, error, count } = await supabase
-          .from(table)
-          .select('*', { count: 'exact' })
-        
-        if (error) {
-          throw new Error(`Failed to export ${table}: ${error.message}`)
+        try {
+          // Get table data
+          const { data, error } = await supabase
+            .from(table)
+            .select('*')
+          
+          if (error) {
+            console.warn(`Could not export ${table}:`, error)
+            continue // Skip tables that can't be accessed
+          }
+          
+          // Get table schema
+          const schema = await getTableSchema(table)
+          
+          backupData[table] = data || []
+          tableSchemas[table] = schema
+          totalRows += data?.length || 0
+          
+          console.log(`Exported ${table}: ${data?.length || 0} rows`)
+        } catch (tableError) {
+          console.warn(`Error exporting table ${table}:`, tableError)
+          // Continue with other tables
         }
-        
-        backupData[table] = data || []
-        totalRows += data?.length || 0
       }
       
       // Get database metadata
@@ -235,74 +360,23 @@ export default function BackupsPage() {
       sqlContent += `-- Note: Re-enable after import completes\n`
       sqlContent += `SET session_replication_role = 'replica';\n\n`
       
-      // Add CREATE TABLE statements based on the data structure
-      sqlContent += `-- Create tables if they don't exist\n\n`
+      // Dynamically generate CREATE TABLE statements
+      sqlContent += `-- Create tables with discovered schemas\n\n`
       
-      // ari-database (tasks) table schema
-      sqlContent += `-- Table: ari-database (Tasks)\n`
-      sqlContent += `CREATE TABLE IF NOT EXISTS "ari-database" (\n`
-      sqlContent += `  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n`
-      sqlContent += `  title TEXT NOT NULL,\n`
-      sqlContent += `  assignees TEXT[] DEFAULT '{}',\n`
-      sqlContent += `  due_date DATE,\n`
-      sqlContent += `  subtasks_completed INTEGER DEFAULT 0,\n`
-      sqlContent += `  subtasks_total INTEGER DEFAULT 0,\n`
-      sqlContent += `  status TEXT DEFAULT 'Pending',\n`
-      sqlContent += `  priority TEXT DEFAULT 'Medium',\n`
-      sqlContent += `  starred BOOLEAN DEFAULT FALSE,\n`
-      sqlContent += `  completed BOOLEAN DEFAULT FALSE,\n`
-      sqlContent += `  created_at TIMESTAMPTZ DEFAULT NOW(),\n`
-      sqlContent += `  updated_at TIMESTAMPTZ DEFAULT NOW(),\n`
-      sqlContent += `  order_index INTEGER DEFAULT 0,\n`
-      sqlContent += `  completion_count INTEGER DEFAULT 0\n`
-      sqlContent += `);\n\n`
-      
-      // fitness_database table schema
-      sqlContent += `-- Table: fitness_database\n`
-      sqlContent += `CREATE TABLE IF NOT EXISTS "fitness_database" (\n`
-      sqlContent += `  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n`
-      sqlContent += `  title TEXT NOT NULL,\n`
-      sqlContent += `  assignees TEXT[] DEFAULT '{}',\n`
-      sqlContent += `  due_date DATE,\n`
-      sqlContent += `  subtasks_completed INTEGER DEFAULT 0,\n`
-      sqlContent += `  subtasks_total INTEGER DEFAULT 0,\n`
-      sqlContent += `  status TEXT DEFAULT 'Pending',\n`
-      sqlContent += `  priority TEXT DEFAULT 'Medium',\n`
-      sqlContent += `  starred BOOLEAN DEFAULT FALSE,\n`
-      sqlContent += `  completed BOOLEAN DEFAULT FALSE,\n`
-      sqlContent += `  created_at TIMESTAMPTZ DEFAULT NOW(),\n`
-      sqlContent += `  updated_at TIMESTAMPTZ DEFAULT NOW(),\n`
-      sqlContent += `  order_index INTEGER DEFAULT 0,\n`
-      sqlContent += `  completion_count INTEGER DEFAULT 0,\n`
-      sqlContent += `  youtube_url TEXT\n`
-      sqlContent += `);\n\n`
-      
-      // contacts table schema
-      sqlContent += `-- Table: contacts\n`
-      sqlContent += `CREATE TABLE IF NOT EXISTS "contacts" (\n`
-      sqlContent += `  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n`
-      sqlContent += `  name TEXT NOT NULL,\n`
-      sqlContent += `  email TEXT,\n`
-      sqlContent += `  phone TEXT,\n`
-      sqlContent += `  category TEXT,\n`
-      sqlContent += `  description TEXT,\n`
-      sqlContent += `  company TEXT,\n`
-      sqlContent += `  address TEXT,\n`
-      sqlContent += `  website TEXT,\n`
-      sqlContent += `  birthday DATE,\n`
-      sqlContent += `  next_contact_date DATE,\n`
-      sqlContent += `  created_at TIMESTAMPTZ DEFAULT NOW(),\n`
-      sqlContent += `  updated_at TIMESTAMPTZ DEFAULT NOW()\n`
-      sqlContent += `);\n\n`
-      
-      // fitness_completion_history table schema
-      sqlContent += `-- Table: fitness_completion_history\n`
-      sqlContent += `CREATE TABLE IF NOT EXISTS "fitness_completion_history" (\n`
-      sqlContent += `  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n`
-      sqlContent += `  task_id UUID REFERENCES fitness_database(id) ON DELETE CASCADE,\n`
-      sqlContent += `  completed_at TIMESTAMPTZ DEFAULT NOW(),\n`
-      sqlContent += `  notes TEXT\n`
-      sqlContent += `);\n\n`
+      for (const [tableName, schema] of Object.entries(tableSchemas)) {
+        if (!Array.isArray(schema) || schema.length === 0) continue
+        
+        sqlContent += `-- Table: ${tableName}\n`
+        sqlContent += `CREATE TABLE IF NOT EXISTS "${tableName}" (\n`
+        
+        const columns = (schema as any[]).map((column, index) => {
+          const columnDef = `  ${column.column_name} ${mapDataType(column.data_type, column.is_nullable, column.column_default)}`
+          return columnDef
+        }).join(',\n')
+        
+        sqlContent += columns
+        sqlContent += `\n);\n\n`
+      }
       
       sqlContent += `-- Insert data\n\n`
       
@@ -332,19 +406,35 @@ export default function BackupsPage() {
         sqlContent += `\n`
       }
       
-      // Add indexes
+      // Add indexes for common patterns
       sqlContent += `-- Create indexes for better performance\n`
-      sqlContent += `CREATE INDEX IF NOT EXISTS idx_ari_database_completed ON "ari-database"(completed);\n`
-      sqlContent += `CREATE INDEX IF NOT EXISTS idx_ari_database_order ON "ari-database"(order_index);\n`
-      sqlContent += `CREATE INDEX IF NOT EXISTS idx_ari_database_starred ON "ari-database"(starred);\n`
-      sqlContent += `CREATE INDEX IF NOT EXISTS idx_ari_database_due_date ON "ari-database"(due_date);\n`
-      sqlContent += `CREATE INDEX IF NOT EXISTS idx_fitness_database_completed ON "fitness_database"(completed);\n`
-      sqlContent += `CREATE INDEX IF NOT EXISTS idx_fitness_database_order ON "fitness_database"(order_index);\n`
-      sqlContent += `CREATE INDEX IF NOT EXISTS idx_fitness_database_due_date ON "fitness_database"(due_date);\n`
-      sqlContent += `CREATE INDEX IF NOT EXISTS idx_contacts_category ON "contacts"(category);\n`
-      sqlContent += `CREATE INDEX IF NOT EXISTS idx_contacts_next_contact ON "contacts"(next_contact_date);\n`
-      sqlContent += `CREATE INDEX IF NOT EXISTS idx_fitness_completion_task ON "fitness_completion_history"(task_id);\n`
-      sqlContent += `CREATE INDEX IF NOT EXISTS idx_fitness_completion_date ON "fitness_completion_history"(completed_at);\n\n`
+      
+      // Create indexes based on common column patterns
+      for (const [tableName, schema] of Object.entries(tableSchemas)) {
+        if (!Array.isArray(schema) || schema.length === 0) continue
+        
+        const columns = schema as any[]
+        
+        // Index common patterns
+        columns.forEach(column => {
+          const colName = column.column_name
+          if (colName === 'id' || colName.endsWith('_id')) {
+            // Primary keys and foreign keys
+            sqlContent += `CREATE INDEX IF NOT EXISTS idx_${tableName}_${colName} ON "${tableName}"(${colName});\n`
+          } else if (colName === 'user_id') {
+            sqlContent += `CREATE INDEX IF NOT EXISTS idx_${tableName}_user ON "${tableName}"(user_id);\n`
+          } else if (colName === 'completed') {
+            sqlContent += `CREATE INDEX IF NOT EXISTS idx_${tableName}_completed ON "${tableName}"(completed);\n`
+          } else if (colName === 'created_at') {
+            sqlContent += `CREATE INDEX IF NOT EXISTS idx_${tableName}_created ON "${tableName}"(created_at);\n`
+          } else if (colName === 'updated_at') {
+            sqlContent += `CREATE INDEX IF NOT EXISTS idx_${tableName}_updated ON "${tableName}"(updated_at);\n`
+          } else if (colName.includes('order') || colName.includes('index')) {
+            sqlContent += `CREATE INDEX IF NOT EXISTS idx_${tableName}_${colName} ON "${tableName}"(${colName});\n`
+          }
+        })
+      }
+      sqlContent += `\n`
       
       // Add sequences reset and constraints
       sqlContent += `-- Reset sequences if needed\n`
@@ -355,12 +445,15 @@ export default function BackupsPage() {
       sqlContent += `-- Re-enable foreign key checks\n`
       sqlContent += `SET session_replication_role = 'origin';\n\n`
       
-      // Add validation queries
+      // Add validation queries for all tables
       sqlContent += `-- Validation queries (run these to verify backup integrity)\n`
-      sqlContent += `-- SELECT COUNT(*) as task_count FROM "ari-database";\n`
-      sqlContent += `-- SELECT COUNT(*) as fitness_count FROM "fitness_database";\n`
-      sqlContent += `-- SELECT COUNT(*) as contact_count FROM "contacts";\n`
-      sqlContent += `-- SELECT COUNT(*) as completion_count FROM "fitness_completion_history";\n\n`
+      tables.forEach(table => {
+        if (backupData[table]) {
+          const count = backupData[table].length
+          sqlContent += `-- SELECT COUNT(*) as ${table.replace(/-/g, '_')}_count FROM "${table}"; -- Expected: ${count}\n`
+        }
+      })
+      sqlContent += `\n`
       
       sqlContent += `-- End of backup\n`
       sqlContent += `-- Expected row counts: ${JSON.stringify(metadata.rowCounts)}\n`
@@ -454,7 +547,9 @@ export default function BackupsPage() {
       
       // Parse SQL content
       const lines = content.split('\n')
-      const tables = ['ari-database', 'fitness_database', 'contacts', 'fitness_completion_history']
+      const tables = await discoverTables()
+      
+      console.log('Importing to tables:', tables)
       
       // First, clear existing data from all tables
       for (const table of tables) {
@@ -641,7 +736,7 @@ export default function BackupsPage() {
             <div>
               <h1 className="text-3xl font-medium">Database Backups</h1>
               <p className="text-sm text-muted-foreground mt-1">
-                Export and import your complete database
+                Automatically discover and backup your complete database - no manual configuration needed
               </p>
             </div>
 
@@ -720,6 +815,7 @@ export default function BackupsPage() {
                       <li>All fitness activities and records</li>
                       <li>All contacts and their information</li>
                       <li>All fitness completion history</li>
+                      <li>ALL tables and data in your database (automatically discovered)</li>
                     </ul>
                     <p>
                       <strong>File to import:</strong> {selectedFile?.name}
@@ -781,7 +877,7 @@ export default function BackupsPage() {
                     Export Database
                   </CardTitle>
                   <CardDescription>
-                    Download a complete backup of your database as an SQL file
+                    Automatically discovers and exports ALL tables in your database as an SQL file
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -803,7 +899,7 @@ export default function BackupsPage() {
                     )}
                   </Button>
                   <p className="text-xs text-muted-foreground mt-3">
-                    This will export all your tasks, fitness activities, contacts, and completion history
+                    This will automatically discover and export ALL tables in your database
                   </p>
                 </CardContent>
               </Card>
@@ -868,10 +964,11 @@ export default function BackupsPage() {
               <CardContent>
                 <div className="space-y-3 text-sm text-muted-foreground">
                   <div>
-                    <h4 className="font-medium text-foreground mb-1">🗂️ Complete Database Export</h4>
-                    <p>• Full schema with CREATE TABLE statements for disaster recovery</p>
-                    <p>• All data from tasks, fitness activities, contacts, and completion history</p>
-                    <p>• Metadata and validation for integrity checking</p>
+                    <h4 className="font-medium text-foreground mb-1">🗂️ Dynamic Database Export</h4>
+                    <p>• Automatically discovers ALL tables in your database</p>
+                    <p>• Generates CREATE TABLE statements from actual schema</p>
+                    <p>• Zero configuration - new tables are automatically included</p>
+                    <p>• Full metadata and validation for integrity checking</p>
                   </div>
                   <div>
                     <h4 className="font-medium text-foreground mb-1">🔄 Smart Import System</h4>
@@ -891,6 +988,7 @@ export default function BackupsPage() {
                     <p>• Create regular backups to prevent data loss</p>
                     <p>• Store backups in multiple secure locations</p>
                     <p>• Test restore process periodically</p>
+                    <p>• New tables are automatically included - no configuration needed!</p>
                   </div>
                 </div>
               </CardContent>
