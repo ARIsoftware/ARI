@@ -116,7 +116,7 @@
 ## 📋 Migration Path
 
 ### Immediate Actions Required
-1. **Add Environment Variable**: `SUPABASE_SERVICE_ROLE_KEY`
+1. **Add Environment Variable**: `SUPABASE_SECRET_KEY`
 2. **Run SQL Script**: `scripts/create-backup-functions.sql`
 3. **Test System**: Verify export/import with sample data
 

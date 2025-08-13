@@ -45,16 +45,16 @@ export function useSupabaseWithClerk() {
   return supabaseClient
 }
 
-// Alternative: Use service role key for development
-// WARNING: Never expose service role key in production!
+// Alternative: Use secret key for development
+// WARNING: Never expose secret key in production!
 export const supabaseServiceRole = () => {
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!serviceRoleKey) {
-    console.warn("Service role key not found, using anon key")
+  const secretKey = process.env.SUPABASE_SECRET_KEY
+  if (!secretKey) {
+    console.warn("Secret key not found, using anon key")
     return createClient(supabaseUrl, supabaseAnonKey)
   }
   
-  return createClient(supabaseUrl, serviceRoleKey, {
+  return createClient(supabaseUrl, secretKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
