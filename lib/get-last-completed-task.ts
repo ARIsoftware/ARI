@@ -1,33 +1,18 @@
-import { getAuthenticatedSupabase } from "./supabase"
-
 export async function getLastCompletedTask(userId?: string) {
   try {
-    const client = await getAuthenticatedSupabase()
+    const url = userId 
+      ? `/api/last-completed-task?userId=${encodeURIComponent(userId)}`
+      : '/api/last-completed-task'
     
-    let query = client
-      .from("ari-database")
-      .select("title, updated_at")
-      .eq("completed", true)
+    const response = await fetch(url)
     
-    // Add user_id filter if provided
-    if (userId) {
-      query = query.eq("user_id", userId)
-    }
-    
-    const { data, error } = await query
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .single()
-
-    if (error) {
-      // Don't log error if no rows found (this is normal)
-      if (error.code !== 'PGRST116') {
-        console.error("Error fetching last completed task:", error)
-      }
+    if (!response.ok) {
+      const error = await response.json()
+      console.error("Error fetching last completed task:", error)
       return null
     }
 
-    return data
+    return await response.json()
   } catch (error) {
     console.error("Error in getLastCompletedTask:", error)
     return null

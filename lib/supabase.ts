@@ -12,25 +12,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 })
 
 // Create a function to get authenticated supabase client
+// NOTE: This function is now deprecated - use API routes instead
+// Secret keys can no longer be used in browser environments
 export const getAuthenticatedSupabase = async () => {
-  // Use service role key to bypass RLS while keeping it enabled
-  // This is a temporary solution until Clerk JWT is properly configured
-  const serviceRoleKey = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY || 
-                         process.env.SUPABASE_SERVICE_ROLE_KEY ||
-                         'REDACTED_SUPABASE_LEGACY_KEY'
-  
-  if (serviceRoleKey) {
-    // Use service role key which bypasses RLS
-    return createClient(supabaseUrl, serviceRoleKey, {
-      realtime: {
-        params: {
-          eventsPerSecond: 10,
-        },
-      },
-    })
-  }
-  
-  // Fallback to regular client
+  // Fallback to regular client with anon key
+  // All database operations should now go through API routes
   return supabase
 }
 

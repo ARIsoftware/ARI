@@ -285,7 +285,7 @@ export default function DailyFitnessPage() {
         // Wait for animation to complete before updating
         setTimeout(async () => {
           if (user?.id) {
-            const updatedTask = await toggleFitnessTaskCompletion(taskId, user.id)
+            const updatedTask = await toggleFitnessTaskCompletion(taskId, user.id, task.completed)
             setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
           }
           setFadingTasks(prev => {
@@ -301,7 +301,7 @@ export default function DailyFitnessPage() {
       } else {
         // If uncompleting or in Completed view, update immediately
         if (user?.id) {
-          const updatedTask = await toggleFitnessTaskCompletion(taskId, user.id)
+          const updatedTask = await toggleFitnessTaskCompletion(taskId, user.id, task.completed)
           setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
         }
         toast({
@@ -323,7 +323,10 @@ export default function DailyFitnessPage() {
     if (!user?.id) return
     
     try {
-      const updatedTask = await toggleFitnessTaskStar(taskId, user.id)
+      const task = tasks.find(t => t.id === taskId)
+      if (!task) return
+      
+      const updatedTask = await toggleFitnessTaskStar(taskId, user.id, task.starred)
       setTasks(tasks.map((task) => (task.id === taskId ? updatedTask : task)))
     } catch (error) {
       console.error("Failed to toggle fitness task star:", error)

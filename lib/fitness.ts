@@ -1,4 +1,4 @@
-import { supabase, getAuthenticatedSupabase, type FitnessTask } from "./supabase"
+import { type FitnessTask } from "./supabase"
 import { incrementFitnessTaskCompletion } from "./fitness-stats"
 
 export type { FitnessTask }
@@ -6,140 +6,73 @@ export type { FitnessTask }
 export async function getFitnessTasks(userId: string): Promise<FitnessTask[]> {
   console.log("Attempting to fetch fitness tasks from fitness_database table for user:", userId)
   
-  const client = await getAuthenticatedSupabase()
-  const { data, error } = await client
-    .from("fitness_database")
-    .select("*")
-    .eq("user_id", userId)
-    .order("order_index", { ascending: true })
-
-  if (error) {
+  const response = await fetch(`/api/fitness-tasks?userId=${encodeURIComponent(userId)}`)
+  
+  if (!response.ok) {
+    const error = await response.json()
     console.error("Error fetching fitness tasks:", error)
-    console.error("Error details:", {
-      message: error.message,
-      code: error.code,
-      details: error.details,
-      hint: error.hint
-    })
-    throw error
+    throw new Error(error.error || 'Failed to fetch fitness tasks')
   }
 
+  const data = await response.json()
   console.log("Successfully fetched fitness tasks:", data)
-  return data || []
+  return data
 }
 
 export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_at" | "updated_at" | "order_index"> & { youtube_url?: string | null }, userId: string): Promise<FitnessTask> {
   console.log("Attempting to create fitness task:", task, "for user:", userId)
   
-  const client = await getAuthenticatedSupabase()
-  // Get the highest order_index for this user to place new task at the end
-  const { data: maxOrderData, error: maxOrderError } = await client
-    .from("fitness_database")
-    .select("order_index")
-    .eq("user_id", userId)
-    .order("order_index", { ascending: false })
-    .limit(1)
+  const response = await fetch('/api/fitness-tasks', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ task, userId }),
+  })
 
-  if (maxOrderError) {
-    console.error("Error getting max order index:", maxOrderError)
-  }
-
-  const nextOrderIndex = maxOrderData && maxOrderData.length > 0 ? (maxOrderData[0].order_index || 0) + 1 : 0
-  console.log("Next order index:", nextOrderIndex)
-
-  // Remove youtube_url if it's null or undefined to avoid database errors
-  const { youtube_url, ...taskWithoutYoutube } = task
-  const taskToInsert: any = {
-    ...taskWithoutYoutube,
-    user_id: userId,
-    order_index: nextOrderIndex,
-  }
-  
-  // Only add youtube_url if it has a value
-  if (youtube_url && youtube_url.trim()) {
-    taskToInsert.youtube_url = youtube_url
-  }
-  
-  console.log("Task to insert:", taskToInsert)
-
-  const { data, error } = await client
-    .from("fitness_database")
-    .insert([taskToInsert])
-    .select()
-    .single()
-
-  if (error) {
+  if (!response.ok) {
+    const error = await response.json()
     console.error("Error creating fitness task:", error)
-    console.error("Error details:", {
-      message: error.message,
-      code: error.code,
-      details: error.details,
-      hint: error.hint
-    })
-    throw error
+    throw new Error(error.error || 'Failed to create fitness task')
   }
 
+  const data = await response.json()
   console.log("Successfully created fitness task:", data)
   return data
 }
 
 export async function updateFitnessTask(id: string, updates: Partial<FitnessTask>, userId: string): Promise<FitnessTask> {
-  // Filter out youtube_url if it's undefined to avoid database errors
-  const { youtube_url, ...otherUpdates } = updates
-  const finalUpdates: any = { ...otherUpdates, updated_at: new Date().toISOString() }
-  
-  // Only include youtube_url if it's explicitly set (including null for removal)
-  if (youtube_url !== undefined) {
-    finalUpdates.youtube_url = youtube_url
-  }
-  
-  const client = await getAuthenticatedSupabase()
-  const { data, error } = await client
-    .from("fitness_database")
-    .update(finalUpdates)
-    .eq("id", id)
-    .eq("user_id", userId)
-    .select()
-    .single()
+  const response = await fetch('/api/fitness-tasks', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ id, updates, userId }),
+  })
 
-  if (error) {
+  if (!response.ok) {
+    const error = await response.json()
     console.error("Error updating fitness task:", error)
-    throw error
+    throw new Error(error.error || 'Failed to update fitness task')
   }
 
-  return data
+  return await response.json()
 }
 
 export async function deleteFitnessTask(id: string, userId: string): Promise<void> {
-  const client = await getAuthenticatedSupabase()
-  const { error } = await client
-    .from("fitness_database")
-    .delete()
-    .eq("id", id)
-    .eq("user_id", userId)
+  const response = await fetch(`/api/fitness-tasks?id=${encodeURIComponent(id)}&userId=${encodeURIComponent(userId)}`, {
+    method: 'DELETE',
+  })
 
-  if (error) {
+  if (!response.ok) {
+    const error = await response.json()
     console.error("Error deleting fitness task:", error)
-    throw error
+    throw new Error(error.error || 'Failed to delete fitness task')
   }
 }
 
-export async function toggleFitnessTaskCompletion(id: string, userId: string): Promise<FitnessTask> {
-  // First get the current task
-  const client = await getAuthenticatedSupabase()
-  const { data: currentTask, error: fetchError } = await client
-    .from("fitness_database")
-    .select("completed, status")
-    .eq("id", id)
-    .eq("user_id", userId)
-    .single()
-
-  if (fetchError) {
-    console.error("Error fetching fitness task:", fetchError)
-    throw fetchError
-  }
-
-  const newCompleted = !currentTask.completed
+export async function toggleFitnessTaskCompletion(id: string, userId: string, currentCompleted: boolean): Promise<FitnessTask> {
+  const newCompleted = !currentCompleted
   const newStatus = newCompleted ? "Completed" : "Pending"
 
   // Update the fitness task
@@ -161,43 +94,18 @@ export async function toggleFitnessTaskCompletion(id: string, userId: string): P
   return updatedTask
 }
 
-export async function toggleFitnessTaskStar(id: string, userId: string): Promise<FitnessTask> {
-  // First get the current task
-  const client = await getAuthenticatedSupabase()
-  const { data: currentTask, error: fetchError } = await client
-    .from("fitness_database")
-    .select("starred")
-    .eq("id", id)
-    .eq("user_id", userId)
-    .single()
-
-  if (fetchError) {
-    console.error("Error fetching fitness task:", fetchError)
-    throw fetchError
-  }
-
+export async function toggleFitnessTaskStar(id: string, userId: string, currentStarred: boolean): Promise<FitnessTask> {
   return updateFitnessTask(id, {
-    starred: !currentTask.starred,
+    starred: !currentStarred,
   }, userId)
 }
 
 export async function reorderFitnessTasks(taskIds: string[], userId: string): Promise<void> {
   // Update order_index for each task based on its position in the array
-  const updates = taskIds.map((id, index) => ({
-    id,
-    order_index: index,
-  }))
-
-  const client = await getAuthenticatedSupabase()
-  // Use a transaction to update all tasks atomically
-  for (const update of updates) {
-    const { error } = await client
-      .from("fitness_database")
-      .update({ order_index: update.order_index })
-      .eq("id", update.id)
-      .eq("user_id", userId)
-
-    if (error) {
+  for (let i = 0; i < taskIds.length; i++) {
+    try {
+      await updateFitnessTask(taskIds[i], { order_index: i }, userId)
+    } catch (error) {
       console.error("Error updating fitness task order:", error)
       throw error
     }
@@ -206,47 +114,17 @@ export async function reorderFitnessTasks(taskIds: string[], userId: string): Pr
 
 // Add sample fitness tasks
 export async function addSampleFitnessTasks(userId: string): Promise<void> {
-  const sampleTasks = [
-    {
-      title: "100 pushups",
-      assignees: ["Me"],
-      due_date: new Date().toISOString().split('T')[0],
-      subtasks_completed: 0,
-      subtasks_total: 0,
-      status: "Pending" as const,
-      priority: "High" as const,
-      starred: false,
-      completed: false,
+  const response = await fetch('/api/sample-fitness-tasks', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
     },
-    {
-      title: "100 jumping jacks",
-      assignees: ["Me"],
-      due_date: new Date().toISOString().split('T')[0],
-      subtasks_completed: 0,
-      subtasks_total: 0,
-      status: "Pending" as const,
-      priority: "Medium" as const,
-      starred: false,
-      completed: false,
-    },
-    {
-      title: "15 minute jog",
-      assignees: ["Me"],
-      due_date: new Date().toISOString().split('T')[0],
-      subtasks_completed: 0,
-      subtasks_total: 0,
-      status: "Pending" as const,
-      priority: "High" as const,
-      starred: true,
-      completed: false,
-    },
-  ]
+    body: JSON.stringify({ userId }),
+  })
 
-  for (const task of sampleTasks) {
-    try {
-      await createFitnessTask(task, userId)
-    } catch (error) {
-      console.error("Error adding sample fitness task:", error)
-    }
+  if (!response.ok) {
+    const error = await response.json()
+    console.error("Error adding sample fitness tasks:", error)
+    throw new Error(error.error || 'Failed to add sample fitness tasks')
   }
 }
