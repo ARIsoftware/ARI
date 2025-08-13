@@ -22,7 +22,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2, Trash2, Pencil, Columns, Play } from "lucide-react"
 import { useState, useEffect } from "react"
 import { getFitnessTasks, toggleFitnessTaskCompletion, toggleFitnessTaskStar, reorderFitnessTasks, deleteFitnessTask, updateFitnessTask, type FitnessTask, addSampleFitnessTasks } from "@/lib/fitness"
-import { testFitnessDatabase } from "@/lib/test-fitness-db"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
@@ -132,11 +131,6 @@ export default function DailyFitnessPage() {
 
     try {
       setLoading(true)
-      
-      // First, test the database connection
-      console.log("Testing database connection...")
-      const dbTestResult = await testFitnessDatabase(user.id)
-      console.log("Database test result:", dbTestResult)
       
       const data = await getFitnessTasks(user.id)
       
