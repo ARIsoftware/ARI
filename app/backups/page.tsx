@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Download, Upload, AlertCircle, CheckCircle2, Loader2, Database } from "lucide-react"
-import { supabase } from "@/lib/supabase"
+import { getAuthenticatedSupabase } from "@/lib/supabase"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -32,7 +32,8 @@ const dmSans = DM_Sans({
 const discoverTables = async (): Promise<string[]> => {
   try {
     // Get all user tables from information_schema
-    const { data, error } = await supabase
+    const client = await getAuthenticatedSupabase()
+    const { data, error } = await client
       .from('information_schema.tables')
       .select('table_name')
       .eq('table_schema', 'public')
@@ -58,7 +59,8 @@ const discoverTables = async (): Promise<string[]> => {
 // Get table schema information
 const getTableSchema = async (tableName: string) => {
   try {
-    const { data, error } = await supabase
+    const client = await getAuthenticatedSupabase()
+    const { data, error } = await client
       .from('information_schema.columns')
       .select('column_name, data_type, is_nullable, column_default')
       .eq('table_schema', 'public')
@@ -296,6 +298,9 @@ export default function BackupsPage() {
       setMessage(null)
       setBackupStats(null)
       
+      // Get authenticated client
+      const client = await getAuthenticatedSupabase()
+      
       // Automatically discover all tables
       const tables = await discoverTables()
       console.log('Exporting tables:', tables)
@@ -308,7 +313,7 @@ export default function BackupsPage() {
       for (const table of tables) {
         try {
           // Get table data
-          const { data, error } = await supabase
+          const { data, error } = await client
             .from(table)
             .select('*')
           
