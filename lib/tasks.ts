@@ -1,85 +1,65 @@
-import { supabase, getAuthenticatedSupabase, type Task } from "./supabase"
+import { type Task } from "./supabase"
 import { incrementTaskCompletion } from "./fitness-stats"
 
 export type { Task }
 
 export async function getTasks(userId: string): Promise<Task[]> {
-  const client = await getAuthenticatedSupabase()
-  const { data, error } = await client
-    .from("ari-database")
-    .select("*")
-    .eq("user_id", userId)
-    .order("order_index", { ascending: true })
-
-  if (error) {
+  const response = await fetch(`/api/tasks?userId=${encodeURIComponent(userId)}`)
+  
+  if (!response.ok) {
+    const error = await response.json()
     console.error("Error fetching tasks:", error)
-    throw error
+    throw new Error(error.error || 'Failed to fetch tasks')
   }
 
-  return data || []
+  return await response.json()
 }
 
 export async function createTask(task: Omit<Task, "id" | "created_at" | "updated_at" | "order_index">, userId: string): Promise<Task> {
-  const client = await getAuthenticatedSupabase()
-  // Get the highest order_index for this user to place new task at the end
-  const { data: maxOrderData } = await client
-    .from("ari-database")
-    .select("order_index")
-    .eq("user_id", userId)
-    .order("order_index", { ascending: false })
-    .limit(1)
+  const response = await fetch('/api/tasks', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ task, userId }),
+  })
 
-  const nextOrderIndex = maxOrderData && maxOrderData.length > 0 ? (maxOrderData[0].order_index || 0) + 1 : 0
-
-  const { data, error } = await client
-    .from("ari-database")
-    .insert([
-      {
-        ...task,
-        user_id: userId,
-        order_index: nextOrderIndex,
-      },
-    ])
-    .select()
-    .single()
-
-  if (error) {
+  if (!response.ok) {
+    const error = await response.json()
     console.error("Error creating task:", error)
-    throw error
+    throw new Error(error.error || 'Failed to create task')
   }
 
-  return data
+  return await response.json()
 }
 
 export async function updateTask(id: string, updates: Partial<Task>, userId: string): Promise<Task> {
-  const client = await getAuthenticatedSupabase()
-  const { data, error } = await client
-    .from("ari-database")
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("user_id", userId)
-    .select()
-    .single()
+  const response = await fetch('/api/tasks', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ id, updates, userId }),
+  })
 
-  if (error) {
+  if (!response.ok) {
+    const error = await response.json()
     console.error("Error updating task:", error)
-    throw error
+    throw new Error(error.error || 'Failed to update task')
   }
 
-  return data
+  return await response.json()
 }
 
 export async function deleteTask(id: string, userId: string): Promise<void> {
-  const client = await getAuthenticatedSupabase()
-  const { error } = await client
-    .from("ari-database")
-    .delete()
-    .eq("id", id)
-    .eq("user_id", userId)
+  const response = await fetch(`/api/tasks?id=${encodeURIComponent(id)}&userId=${encodeURIComponent(userId)}`, {
+    method: 'DELETE',
+  })
 
-  if (error) {
+  if (!response.ok) {
+    const error = await response.json()
     console.error("Error deleting task:", error)
-    throw error
+    throw new Error(error.error || 'Failed to delete task')
   }
 }
 
