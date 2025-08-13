@@ -122,7 +122,16 @@ export default function AddTaskPage() {
         updated_at: new Date().toISOString(),
       }
 
-      await createTask(taskData)
+      if (!user?.id) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to create tasks.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      await createTask(taskData, user.id)
 
       toast({
         title: "Success",

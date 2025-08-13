@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { useUser } from "@clerk/nextjs"
 import { DM_Sans } from "next/font/google"
 import { TaskAnnouncement } from "@/components/task-announcement"
 import { AppSidebar } from "../../components/app-sidebar"
@@ -44,6 +45,7 @@ const dmSans = DM_Sans({
 })
 
 export default function ContactsPage() {
+  const { user } = useUser()
   const router = useRouter()
   const { toast } = useToast()
   const [contacts, setContacts] = useState<Contact[]>([])
@@ -56,47 +58,55 @@ export default function ContactsPage() {
 
   // Load contacts from Supabase
   useEffect(() => {
-    loadContacts()
+    if (user?.id) {
+      loadContacts()
 
-    // Set up real-time subscription
-    const channel = supabase
-      .channel("contacts-changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "contacts",
-        },
-        (payload) => {
-          console.log("Real-time update:", payload)
+      // Set up real-time subscription
+      const channel = supabase
+        .channel("contacts-changes")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "contacts",
+          },
+          (payload) => {
+            console.log("Real-time update:", payload)
 
-          if (payload.eventType === "INSERT") {
-            setContacts((prev) => [...prev, payload.new as Contact].sort((a, b) => a.name.localeCompare(b.name)))
-          } else if (payload.eventType === "UPDATE") {
-            setContacts((prev) => {
-              const updated = prev.map((contact) => 
-                contact.id === payload.new.id ? (payload.new as Contact) : contact
-              )
-              return updated.sort((a, b) => a.name.localeCompare(b.name))
-            })
-          } else if (payload.eventType === "DELETE") {
-            setContacts((prev) => prev.filter((contact) => contact.id !== payload.old.id))
+            if (payload.eventType === "INSERT") {
+              setContacts((prev) => [...prev, payload.new as Contact].sort((a, b) => a.name.localeCompare(b.name)))
+            } else if (payload.eventType === "UPDATE") {
+              setContacts((prev) => {
+                const updated = prev.map((contact) => 
+                  contact.id === payload.new.id ? (payload.new as Contact) : contact
+                )
+                return updated.sort((a, b) => a.name.localeCompare(b.name))
+              })
+            } else if (payload.eventType === "DELETE") {
+              setContacts((prev) => prev.filter((contact) => contact.id !== payload.old.id))
+            }
           }
-        }
-      )
-      .subscribe()
+        )
+        .subscribe()
 
-    // Cleanup subscription on unmount
-    return () => {
-      supabase.removeChannel(channel)
+      // Cleanup subscription on unmount
+      return () => {
+        supabase.removeChannel(channel)
+      }
     }
-  }, [])
+  }, [user?.id])
 
   const loadContacts = async () => {
+    if (!user?.id) {
+      console.log("User not authenticated, skipping contacts load")
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
-      const data = await getContacts()
+      const data = await getContacts(user.id)
       setContacts(data)
     } catch (error) {
       console.error("Failed to load contacts:", error)

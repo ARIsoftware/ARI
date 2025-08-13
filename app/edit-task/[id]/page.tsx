@@ -77,8 +77,10 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
   // Load task data
   useEffect(() => {
     const loadTask = async () => {
+      if (!user?.id) return // Wait for user to be loaded
+      
       try {
-        const tasks = await getTasks()
+        const tasks = await getTasks(user.id)
         const foundTask = tasks.find((t) => t.id === id)
         
         if (!foundTask) {
@@ -120,7 +122,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
     }
 
     loadTask()
-  }, [id, router, toast])
+  }, [id, router, toast, user?.id])
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({
@@ -173,7 +175,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
         completed: formData.completed,
       }
 
-      await updateTask(id, updates)
+      await updateTask(id, updates, user?.id || "")
 
       toast({
         title: "Success",

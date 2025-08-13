@@ -89,54 +89,62 @@ export default function DailyFitnessPage() {
 
   // Load tasks from Supabase and set up real-time subscription
   useEffect(() => {
-    loadTasks()
+    if (user?.id) {
+      loadTasks()
 
-    // Set up real-time subscription
-    const channel = supabase
-      .channel("fitness_database-changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "fitness_database",
-        },
-        (payload) => {
-          console.log("Real-time update:", payload)
+      // Set up real-time subscription
+      const channel = supabase
+        .channel("fitness_database-changes")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "fitness_database",
+          },
+          (payload) => {
+            console.log("Real-time update:", payload)
 
-          if (payload.eventType === "INSERT") {
-            setTasks((prev) => [payload.new as FitnessTask, ...prev])
-          } else if (payload.eventType === "UPDATE") {
-            setTasks((prev) => prev.map((task) => (task.id === payload.new.id ? (payload.new as FitnessTask) : task)))
-          } else if (payload.eventType === "DELETE") {
-            setTasks((prev) => prev.filter((task) => task.id !== payload.old.id))
-          }
-        },
-      )
-      .subscribe()
+            if (payload.eventType === "INSERT") {
+              setTasks((prev) => [payload.new as FitnessTask, ...prev])
+            } else if (payload.eventType === "UPDATE") {
+              setTasks((prev) => prev.map((task) => (task.id === payload.new.id ? (payload.new as FitnessTask) : task)))
+            } else if (payload.eventType === "DELETE") {
+              setTasks((prev) => prev.filter((task) => task.id !== payload.old.id))
+            }
+          },
+        )
+        .subscribe()
 
-    // Cleanup subscription on unmount
-    return () => {
-      supabase.removeChannel(channel)
+      // Cleanup subscription on unmount
+      return () => {
+        supabase.removeChannel(channel)
+      }
     }
-  }, [])
+  }, [user?.id])
 
   const loadTasks = async () => {
+    if (!user?.id) {
+      console.log("User not authenticated, skipping task load")
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
       
       // First, test the database connection
       console.log("Testing database connection...")
-      const dbTestResult = await testFitnessDatabase()
+      const dbTestResult = await testFitnessDatabase(user.id)
       console.log("Database test result:", dbTestResult)
       
-      const data = await getFitnessTasks()
+      const data = await getFitnessTasks(user.id)
       
       // If no tasks exist, add sample tasks
       if (data.length === 0) {
         console.log("No tasks found, adding sample tasks...")
-        await addSampleFitnessTasks()
-        const newData = await getFitnessTasks()
+        await addSampleFitnessTasks(user.id)
+        const newData = await getFitnessTasks(user.id)
         setTasks(newData)
       } else {
         setTasks(data)
@@ -208,7 +216,9 @@ export default function DailyFitnessPage() {
 
     try {
       // Update order in database
-      await reorderFitnessTasks(updatedTasks.map((task) => task.id))
+      if (user?.id) {
+        await reorderFitnessTasks(updatedTasks.map((task) => task.id), user.id)
+      }
     } catch (error) {
       console.error("Failed to reorder fitness tasks:", error)
       // Revert local state on error
@@ -243,8 +253,10 @@ export default function DailyFitnessPage() {
     }
 
     try {
-      await updateFitnessTask(draggedTask, updates)
-      setTasks(tasks.map((t) => t.id === draggedTask ? { ...t, ...updates } : t))
+      if (user?.id) {
+        await updateFitnessTask(draggedTask, updates, user.id)
+        setTasks(tasks.map((t) => t.id === draggedTask ? { ...t, ...updates } : t))
+      }
       toast({
         title: "Success",
         description: `Exercise moved to ${columnType === "today" ? "Today" : columnType + " priority"} column.`,
@@ -272,8 +284,10 @@ export default function DailyFitnessPage() {
         
         // Wait for animation to complete before updating
         setTimeout(async () => {
-          const updatedTask = await toggleFitnessTaskCompletion(taskId)
-          setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
+          if (user?.id) {
+            const updatedTask = await toggleFitnessTaskCompletion(taskId, user.id)
+            setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
+          }
           setFadingTasks(prev => {
             const newSet = new Set(prev)
             newSet.delete(taskId)
@@ -286,8 +300,10 @@ export default function DailyFitnessPage() {
         }, 300)
       } else {
         // If uncompleting or in Completed view, update immediately
-        const updatedTask = await toggleFitnessTaskCompletion(taskId)
-        setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
+        if (user?.id) {
+          const updatedTask = await toggleFitnessTaskCompletion(taskId, user.id)
+          setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
+        }
         toast({
           title: "Success",
           description: `Exercise ${updatedTask.completed ? "completed" : "reopened"} successfully.`,
@@ -304,8 +320,10 @@ export default function DailyFitnessPage() {
   }
 
   const handleToggleStar = async (taskId: string) => {
+    if (!user?.id) return
+    
     try {
-      const updatedTask = await toggleFitnessTaskStar(taskId)
+      const updatedTask = await toggleFitnessTaskStar(taskId, user.id)
       setTasks(tasks.map((task) => (task.id === taskId ? updatedTask : task)))
     } catch (error) {
       console.error("Failed to toggle fitness task star:", error)
@@ -329,8 +347,10 @@ export default function DailyFitnessPage() {
     if (!taskToDelete) return
     
     try {
-      await deleteFitnessTask(taskToDelete.id)
-      setTasks(tasks.filter((task) => task.id !== taskToDelete.id))
+      if (user?.id) {
+        await deleteFitnessTask(taskToDelete.id, user.id)
+        setTasks(tasks.filter((task) => task.id !== taskToDelete.id))
+      }
       toast({
         title: "Success",
         description: "Exercise deleted successfully.",

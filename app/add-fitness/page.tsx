@@ -68,6 +68,15 @@ export default function AddFitnessPage() {
       return
     }
 
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to add exercises.",
+        variant: "destructive",
+      })
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -82,7 +91,7 @@ export default function AddFitnessPage() {
         starred,
         completed: status === "Completed",
         youtube_url: youtubeUrl.trim() || null,
-      })
+      }, user.id)
 
       toast({
         title: "Success",

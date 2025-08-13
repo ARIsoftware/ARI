@@ -78,8 +78,10 @@ export default function EditFitnessPage({ params }: { params: Promise<{ id: stri
   // Load task data
   useEffect(() => {
     const loadTask = async () => {
+      if (!user?.id) return // Wait for user to be loaded
+      
       try {
-        const tasks = await getFitnessTasks()
+        const tasks = await getFitnessTasks(user.id)
         const foundTask = tasks.find((t) => t.id === id)
         
         if (!foundTask) {
@@ -122,7 +124,7 @@ export default function EditFitnessPage({ params }: { params: Promise<{ id: stri
     }
 
     loadTask()
-  }, [id, router, toast])
+  }, [id, router, toast, user?.id])
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({
@@ -176,7 +178,7 @@ export default function EditFitnessPage({ params }: { params: Promise<{ id: stri
         youtube_url: formData.youtube_url.trim() || null,
       }
 
-      await updateFitnessTask(id, updates)
+      await updateFitnessTask(id, updates, user?.id || "")
 
       toast({
         title: "Success",
