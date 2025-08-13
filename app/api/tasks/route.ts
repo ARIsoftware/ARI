@@ -8,10 +8,21 @@ const supabase = createClient(supabaseUrl, supabaseSecretKey)
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('🔍 API /tasks called')
+    console.log('Environment check:', {
+      hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      hasSecret: !!process.env.SUPABASE_SECRET_KEY,
+      url: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      secretStart: process.env.SUPABASE_SECRET_KEY?.substring(0, 10) + '...'
+    })
+    
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
     
+    console.log('User ID:', userId)
+    
     if (!userId) {
+      console.log('❌ No user ID provided')
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
     }
 
@@ -22,13 +33,14 @@ export async function GET(request: NextRequest) {
       .order('order_index', { ascending: true })
 
     if (error) {
-      console.error('Error fetching tasks:', error)
+      console.error('❌ Supabase error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    console.log('✅ Tasks fetched:', data?.length || 0, 'tasks')
     return NextResponse.json(data)
   } catch (err) {
-    console.error('API error:', err)
+    console.error('❌ API error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
