@@ -5,8 +5,9 @@ import { ArrowUpRight } from "lucide-react"
 import { DM_Sans } from "next/font/google"
 import { Announcement, AnnouncementTag, AnnouncementTitle } from "@/components/ui/kibo-ui/announcement"
 import { getLastCompletedTask, truncateTaskName } from "@/lib/get-last-completed-task"
-import { supabase } from "@/lib/supabase"
+import { getAuthenticatedSupabase } from "@/lib/supabase"
 import { useIsMobile } from "@/components/ui/use-mobile"
+import { useUser } from "@clerk/nextjs"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -17,37 +18,47 @@ export function TaskAnnouncement() {
   const [lastTask, setLastTask] = useState<{ title: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const isMobile = useIsMobile()
+  const { user } = useUser()
 
   useEffect(() => {
     // Load initial task
     loadLastTask()
 
     // Set up real-time subscription for task completions
-    const channel = supabase
-      .channel("task-completions")
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "ari-database",
-          filter: "completed=eq.true",
-        },
-        (payload) => {
-          if (payload.new && payload.new.completed === true) {
-            setLastTask({ title: payload.new.title })
+    const setupSubscription = async () => {
+      const client = await getAuthenticatedSupabase()
+      const channel = client
+        .channel("task-completions")
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "ari-database",
+            filter: "completed=eq.true",
+          },
+          (payload) => {
+            if (payload.new && payload.new.completed === true) {
+              setLastTask({ title: payload.new.title })
+            }
           }
-        }
-      )
-      .subscribe()
+        )
+        .subscribe()
 
-    return () => {
-      supabase.removeChannel(channel)
+      return () => {
+        client.removeChannel(channel)
+      }
     }
-  }, [])
+
+    const cleanup = setupSubscription()
+    
+    return () => {
+      cleanup.then(fn => fn && fn())
+    }
+  }, [user?.id])
 
   const loadLastTask = async () => {
-    const task = await getLastCompletedTask()
+    const task = await getLastCompletedTask(user?.id)
     setLastTask(task)
     setLoading(false)
   }

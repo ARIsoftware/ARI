@@ -1,16 +1,17 @@
-import { supabase, type FitnessTask } from "./supabase"
+import { supabase, getAuthenticatedSupabase, type FitnessTask } from "./supabase"
 import { incrementFitnessTaskCompletion } from "./fitness-stats"
 
 export type { FitnessTask }
 
-export async function getFitnessTasks(): Promise<FitnessTask[]> {
-  console.log("Attempting to fetch fitness tasks from fitness_database table...")
+export async function getFitnessTasks(userId: string): Promise<FitnessTask[]> {
+  console.log("Attempting to fetch fitness tasks from fitness_database table for user:", userId)
   
-  // Check authentication status
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  console.log("Current auth status:", { user: user?.email || 'Not authenticated', authError })
-  
-  const { data, error } = await supabase.from("fitness_database").select("*").order("order_index", { ascending: true })
+  const client = await getAuthenticatedSupabase()
+  const { data, error } = await client
+    .from("fitness_database")
+    .select("*")
+    .eq("user_id", userId)
+    .order("order_index", { ascending: true })
 
   if (error) {
     console.error("Error fetching fitness tasks:", error)
@@ -27,13 +28,15 @@ export async function getFitnessTasks(): Promise<FitnessTask[]> {
   return data || []
 }
 
-export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_at" | "updated_at" | "order_index"> & { youtube_url?: string | null }): Promise<FitnessTask> {
-  console.log("Attempting to create fitness task:", task)
+export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_at" | "updated_at" | "order_index"> & { youtube_url?: string | null }, userId: string): Promise<FitnessTask> {
+  console.log("Attempting to create fitness task:", task, "for user:", userId)
   
-  // Get the highest order_index to place new task at the end
-  const { data: maxOrderData, error: maxOrderError } = await supabase
+  const client = await getAuthenticatedSupabase()
+  // Get the highest order_index for this user to place new task at the end
+  const { data: maxOrderData, error: maxOrderError } = await client
     .from("fitness_database")
     .select("order_index")
+    .eq("user_id", userId)
     .order("order_index", { ascending: false })
     .limit(1)
 
@@ -48,6 +51,7 @@ export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_
   const { youtube_url, ...taskWithoutYoutube } = task
   const taskToInsert: any = {
     ...taskWithoutYoutube,
+    user_id: userId,
     order_index: nextOrderIndex,
   }
   
@@ -58,7 +62,7 @@ export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_
   
   console.log("Task to insert:", taskToInsert)
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("fitness_database")
     .insert([taskToInsert])
     .select()
@@ -79,7 +83,7 @@ export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_
   return data
 }
 
-export async function updateFitnessTask(id: string, updates: Partial<FitnessTask>): Promise<FitnessTask> {
+export async function updateFitnessTask(id: string, updates: Partial<FitnessTask>, userId: string): Promise<FitnessTask> {
   // Filter out youtube_url if it's undefined to avoid database errors
   const { youtube_url, ...otherUpdates } = updates
   const finalUpdates: any = { ...otherUpdates, updated_at: new Date().toISOString() }
@@ -89,10 +93,12 @@ export async function updateFitnessTask(id: string, updates: Partial<FitnessTask
     finalUpdates.youtube_url = youtube_url
   }
   
-  const { data, error } = await supabase
+  const client = await getAuthenticatedSupabase()
+  const { data, error } = await client
     .from("fitness_database")
     .update(finalUpdates)
     .eq("id", id)
+    .eq("user_id", userId)
     .select()
     .single()
 
@@ -104,8 +110,13 @@ export async function updateFitnessTask(id: string, updates: Partial<FitnessTask
   return data
 }
 
-export async function deleteFitnessTask(id: string): Promise<void> {
-  const { error } = await supabase.from("fitness_database").delete().eq("id", id)
+export async function deleteFitnessTask(id: string, userId: string): Promise<void> {
+  const client = await getAuthenticatedSupabase()
+  const { error } = await client
+    .from("fitness_database")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", userId)
 
   if (error) {
     console.error("Error deleting fitness task:", error)
@@ -113,12 +124,14 @@ export async function deleteFitnessTask(id: string): Promise<void> {
   }
 }
 
-export async function toggleFitnessTaskCompletion(id: string): Promise<FitnessTask> {
+export async function toggleFitnessTaskCompletion(id: string, userId: string): Promise<FitnessTask> {
   // First get the current task
-  const { data: currentTask, error: fetchError } = await supabase
+  const client = await getAuthenticatedSupabase()
+  const { data: currentTask, error: fetchError } = await client
     .from("fitness_database")
     .select("completed, status")
     .eq("id", id)
+    .eq("user_id", userId)
     .single()
 
   if (fetchError) {
@@ -133,7 +146,7 @@ export async function toggleFitnessTaskCompletion(id: string): Promise<FitnessTa
   const updatedTask = await updateFitnessTask(id, {
     completed: newCompleted,
     status: newStatus,
-  })
+  }, userId)
 
   // If the task is being marked as completed, increment completion count and add to history
   if (newCompleted) {
@@ -148,12 +161,14 @@ export async function toggleFitnessTaskCompletion(id: string): Promise<FitnessTa
   return updatedTask
 }
 
-export async function toggleFitnessTaskStar(id: string): Promise<FitnessTask> {
+export async function toggleFitnessTaskStar(id: string, userId: string): Promise<FitnessTask> {
   // First get the current task
-  const { data: currentTask, error: fetchError } = await supabase
+  const client = await getAuthenticatedSupabase()
+  const { data: currentTask, error: fetchError } = await client
     .from("fitness_database")
     .select("starred")
     .eq("id", id)
+    .eq("user_id", userId)
     .single()
 
   if (fetchError) {
@@ -163,22 +178,24 @@ export async function toggleFitnessTaskStar(id: string): Promise<FitnessTask> {
 
   return updateFitnessTask(id, {
     starred: !currentTask.starred,
-  })
+  }, userId)
 }
 
-export async function reorderFitnessTasks(taskIds: string[]): Promise<void> {
+export async function reorderFitnessTasks(taskIds: string[], userId: string): Promise<void> {
   // Update order_index for each task based on its position in the array
   const updates = taskIds.map((id, index) => ({
     id,
     order_index: index,
   }))
 
+  const client = await getAuthenticatedSupabase()
   // Use a transaction to update all tasks atomically
   for (const update of updates) {
-    const { error } = await supabase
+    const { error } = await client
       .from("fitness_database")
       .update({ order_index: update.order_index })
       .eq("id", update.id)
+      .eq("user_id", userId)
 
     if (error) {
       console.error("Error updating fitness task order:", error)
@@ -188,7 +205,7 @@ export async function reorderFitnessTasks(taskIds: string[]): Promise<void> {
 }
 
 // Add sample fitness tasks
-export async function addSampleFitnessTasks(): Promise<void> {
+export async function addSampleFitnessTasks(userId: string): Promise<void> {
   const sampleTasks = [
     {
       title: "100 pushups",
@@ -227,7 +244,7 @@ export async function addSampleFitnessTasks(): Promise<void> {
 
   for (const task of sampleTasks) {
     try {
-      await createFitnessTask(task)
+      await createFitnessTask(task, userId)
     } catch (error) {
       console.error("Error adding sample fitness task:", error)
     }

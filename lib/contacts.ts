@@ -1,4 +1,4 @@
-import { supabase } from "./supabase"
+import { supabase, getAuthenticatedSupabase } from "./supabase"
 
 export type Contact = {
   id: string
@@ -16,10 +16,12 @@ export type Contact = {
   updated_at: string
 }
 
-export async function getContacts(): Promise<Contact[]> {
-  const { data, error } = await supabase
+export async function getContacts(userId: string): Promise<Contact[]> {
+  const client = await getAuthenticatedSupabase()
+  const { data, error } = await client
     .from("contacts")
     .select("*")
+    .eq("user_id", userId)
     .order("name", { ascending: true })
 
   if (error) {
@@ -30,11 +32,13 @@ export async function getContacts(): Promise<Contact[]> {
   return data || []
 }
 
-export async function getContact(id: string): Promise<Contact | null> {
-  const { data, error } = await supabase
+export async function getContact(id: string, userId: string): Promise<Contact | null> {
+  const client = await getAuthenticatedSupabase()
+  const { data, error } = await client
     .from("contacts")
     .select("*")
     .eq("id", id)
+    .eq("user_id", userId) // Ensure user can only access their own contacts
     .single()
 
   if (error) {
@@ -46,11 +50,13 @@ export async function getContact(id: string): Promise<Contact | null> {
 }
 
 export async function createContact(
-  contact: Omit<Contact, "id" | "created_at" | "updated_at">
+  contact: Omit<Contact, "id" | "created_at" | "updated_at">,
+  userId: string
 ): Promise<Contact> {
-  const { data, error } = await supabase
+  const client = await getAuthenticatedSupabase()
+  const { data, error } = await client
     .from("contacts")
-    .insert([contact])
+    .insert([{ ...contact, user_id: userId }])
     .select()
     .single()
 
@@ -64,12 +70,15 @@ export async function createContact(
 
 export async function updateContact(
   id: string,
-  updates: Partial<Omit<Contact, "id" | "created_at" | "updated_at">>
+  updates: Partial<Omit<Contact, "id" | "created_at" | "updated_at">>,
+  userId: string
 ): Promise<Contact> {
-  const { data, error } = await supabase
+  const client = await getAuthenticatedSupabase()
+  const { data, error } = await client
     .from("contacts")
     .update(updates)
     .eq("id", id)
+    .eq("user_id", userId) // Ensure user can only update their own contacts
     .select()
     .single()
 
@@ -81,11 +90,13 @@ export async function updateContact(
   return data
 }
 
-export async function deleteContact(id: string): Promise<void> {
-  const { error } = await supabase
+export async function deleteContact(id: string, userId: string): Promise<void> {
+  const client = await getAuthenticatedSupabase()
+  const { error } = await client
     .from("contacts")
     .delete()
     .eq("id", id)
+    .eq("user_id", userId) // Ensure user can only delete their own contacts
 
   if (error) {
     console.error("Error deleting contact:", error)
