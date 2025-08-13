@@ -70,7 +70,7 @@ export async function toggleTaskCompletion(id: string, userId: string): Promise<
     .from("ari-database")
     .select("completed, status")
     .eq("id", id)
-    .eq("user_id", userId)
+    .contains("user_ids", [userId])
     .single()
 
   if (fetchError) {
@@ -107,7 +107,7 @@ export async function toggleTaskStar(id: string, userId: string): Promise<Task> 
     .from("ari-database")
     .select("starred")
     .eq("id", id)
-    .eq("user_id", userId)
+    .contains("user_ids", [userId])
     .single()
 
   if (fetchError) {
@@ -134,7 +134,7 @@ export async function reorderTasks(taskIds: string[], userId: string): Promise<v
       .from("ari-database")
       .update({ order_index: update.order_index })
       .eq("id", update.id)
-      .eq("user_id", userId)
+      .contains("user_ids", [userId])
 
     if (error) {
       console.error("Error updating task order:", error)

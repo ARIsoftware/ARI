@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase
       .from('fitness_database')
       .select('*')
-      .eq('user_id', userId)
+      .contains('user_ids', [userId])
       .order('order_index', { ascending: true })
 
     if (error) {
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     const { data: maxOrderData } = await supabase
       .from('fitness_database')
       .select('order_index')
-      .eq('user_id', userId)
+      .contains('user_ids', [userId])
       .order('order_index', { ascending: false })
       .limit(1)
 
@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
       .insert([{
         ...taskToInsert,
         user_id: userId,
+        user_ids: [userId],
         order_index: nextOrderIndex,
       }])
       .select()
@@ -91,7 +92,7 @@ export async function PUT(request: NextRequest) {
       .from('fitness_database')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id)
-      .eq('user_id', userId)
+      .contains('user_ids', [userId])
       .select()
       .single()
 
@@ -121,7 +122,7 @@ export async function DELETE(request: NextRequest) {
       .from('fitness_database')
       .delete()
       .eq('id', id)
-      .eq('user_id', userId)
+      .contains('user_ids', [userId])
 
     if (error) {
       console.error('Error deleting fitness task:', error)
