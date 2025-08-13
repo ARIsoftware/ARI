@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { supabase, getAuthenticatedSupabase } from './supabase'
 
 // Types
 export interface HyroxStationRecord {
@@ -103,7 +103,8 @@ const defaultStationRecords = [
 // Get all station records for a user
 export async function getHyroxStationRecords(userId: string): Promise<HyroxStationRecord[]> {
   try {
-    const { data, error } = await supabase
+    const client = await getAuthenticatedSupabase()
+    const { data, error } = await client
       .from('hyrox_station_records')
       .select('*')
       .eq('user_id', userId)

@@ -1,10 +1,15 @@
-import { supabase, type Task } from "./supabase"
+import { supabase, getAuthenticatedSupabase, type Task } from "./supabase"
 import { incrementTaskCompletion } from "./fitness-stats"
 
 export type { Task }
 
-export async function getTasks(): Promise<Task[]> {
-  const { data, error } = await supabase.from("ari-database").select("*").order("order_index", { ascending: true })
+export async function getTasks(userId: string): Promise<Task[]> {
+  const client = await getAuthenticatedSupabase()
+  const { data, error } = await client
+    .from("ari-database")
+    .select("*")
+    .eq("user_id", userId)
+    .order("order_index", { ascending: true })
 
   if (error) {
     console.error("Error fetching tasks:", error)
@@ -14,21 +19,24 @@ export async function getTasks(): Promise<Task[]> {
   return data || []
 }
 
-export async function createTask(task: Omit<Task, "id" | "created_at" | "updated_at" | "order_index">): Promise<Task> {
-  // Get the highest order_index to place new task at the end
-  const { data: maxOrderData } = await supabase
+export async function createTask(task: Omit<Task, "id" | "created_at" | "updated_at" | "order_index">, userId: string): Promise<Task> {
+  const client = await getAuthenticatedSupabase()
+  // Get the highest order_index for this user to place new task at the end
+  const { data: maxOrderData } = await client
     .from("ari-database")
     .select("order_index")
+    .eq("user_id", userId)
     .order("order_index", { ascending: false })
     .limit(1)
 
   const nextOrderIndex = maxOrderData && maxOrderData.length > 0 ? (maxOrderData[0].order_index || 0) + 1 : 0
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("ari-database")
     .insert([
       {
         ...task,
+        user_id: userId,
         order_index: nextOrderIndex,
       },
     ])
@@ -43,11 +51,13 @@ export async function createTask(task: Omit<Task, "id" | "created_at" | "updated
   return data
 }
 
-export async function updateTask(id: string, updates: Partial<Task>): Promise<Task> {
-  const { data, error } = await supabase
+export async function updateTask(id: string, updates: Partial<Task>, userId: string): Promise<Task> {
+  const client = await getAuthenticatedSupabase()
+  const { data, error } = await client
     .from("ari-database")
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq("id", id)
+    .eq("user_id", userId)
     .select()
     .single()
 
@@ -59,8 +69,13 @@ export async function updateTask(id: string, updates: Partial<Task>): Promise<Ta
   return data
 }
 
-export async function deleteTask(id: string): Promise<void> {
-  const { error } = await supabase.from("ari-database").delete().eq("id", id)
+export async function deleteTask(id: string, userId: string): Promise<void> {
+  const client = await getAuthenticatedSupabase()
+  const { error } = await client
+    .from("ari-database")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", userId)
 
   if (error) {
     console.error("Error deleting task:", error)
@@ -68,12 +83,14 @@ export async function deleteTask(id: string): Promise<void> {
   }
 }
 
-export async function toggleTaskCompletion(id: string): Promise<Task> {
+export async function toggleTaskCompletion(id: string, userId: string): Promise<Task> {
   // First get the current task
-  const { data: currentTask, error: fetchError } = await supabase
+  const client = await getAuthenticatedSupabase()
+  const { data: currentTask, error: fetchError } = await client
     .from("ari-database")
     .select("completed, status")
     .eq("id", id)
+    .eq("user_id", userId)
     .single()
 
   if (fetchError) {
@@ -88,7 +105,7 @@ export async function toggleTaskCompletion(id: string): Promise<Task> {
   const updatedTask = await updateTask(id, {
     completed: newCompleted,
     status: newStatus,
-  })
+  }, userId)
 
   // If the task is being marked as completed, increment completion count
   if (newCompleted) {
@@ -103,12 +120,14 @@ export async function toggleTaskCompletion(id: string): Promise<Task> {
   return updatedTask
 }
 
-export async function toggleTaskStar(id: string): Promise<Task> {
+export async function toggleTaskStar(id: string, userId: string): Promise<Task> {
   // First get the current task
-  const { data: currentTask, error: fetchError } = await supabase
+  const client = await getAuthenticatedSupabase()
+  const { data: currentTask, error: fetchError } = await client
     .from("ari-database")
     .select("starred")
     .eq("id", id)
+    .eq("user_id", userId)
     .single()
 
   if (fetchError) {
@@ -118,22 +137,24 @@ export async function toggleTaskStar(id: string): Promise<Task> {
 
   return updateTask(id, {
     starred: !currentTask.starred,
-  })
+  }, userId)
 }
 
-export async function reorderTasks(taskIds: string[]): Promise<void> {
+export async function reorderTasks(taskIds: string[], userId: string): Promise<void> {
   // Update order_index for each task based on its position in the array
   const updates = taskIds.map((id, index) => ({
     id,
     order_index: index,
   }))
 
+  const client = await getAuthenticatedSupabase()
   // Use a transaction to update all tasks atomically
   for (const update of updates) {
-    const { error } = await supabase
+    const { error } = await client
       .from("ari-database")
       .update({ order_index: update.order_index })
       .eq("id", update.id)
+      .eq("user_id", userId)
 
     if (error) {
       console.error("Error updating task order:", error)

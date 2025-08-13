@@ -69,6 +69,14 @@ const formatDate = (dateString: string | null) => {
 export default function TasksPage() {
   const { user } = useUser()
   const { toast } = useToast()
+  
+  // Temporary: Log user ID to console for RLS migration
+  useEffect(() => {
+    if (user?.id) {
+      console.log("🔑 Your Clerk User ID:", user.id)
+      console.log("Copy this ID for your RLS migration!")
+    }
+  }, [user?.id])
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [activeFilter, setActiveFilter] = useState("All")
@@ -84,42 +92,50 @@ export default function TasksPage() {
 
   // Load tasks from Supabase and set up real-time subscription
   useEffect(() => {
-    loadTasks()
+    if (user?.id) {
+      loadTasks()
 
-    // Set up real-time subscription
-    const channel = supabase
-      .channel("ari-database-changes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "ari-database",
-        },
-        (payload) => {
-          console.log("Real-time update:", payload)
+      // Set up real-time subscription
+      const channel = supabase
+        .channel("ari-database-changes")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "ari-database",
+          },
+          (payload) => {
+            console.log("Real-time update:", payload)
 
-          if (payload.eventType === "INSERT") {
-            setTasks((prev) => [payload.new as Task, ...prev])
-          } else if (payload.eventType === "UPDATE") {
-            setTasks((prev) => prev.map((task) => (task.id === payload.new.id ? (payload.new as Task) : task)))
-          } else if (payload.eventType === "DELETE") {
-            setTasks((prev) => prev.filter((task) => task.id !== payload.old.id))
-          }
-        },
-      )
-      .subscribe()
+            if (payload.eventType === "INSERT") {
+              setTasks((prev) => [payload.new as Task, ...prev])
+            } else if (payload.eventType === "UPDATE") {
+              setTasks((prev) => prev.map((task) => (task.id === payload.new.id ? (payload.new as Task) : task)))
+            } else if (payload.eventType === "DELETE") {
+              setTasks((prev) => prev.filter((task) => task.id !== payload.old.id))
+            }
+          },
+        )
+        .subscribe()
 
-    // Cleanup subscription on unmount
-    return () => {
-      supabase.removeChannel(channel)
+      // Cleanup subscription on unmount
+      return () => {
+        supabase.removeChannel(channel)
+      }
     }
-  }, [])
+  }, [user?.id])
 
   const loadTasks = async () => {
+    if (!user?.id) {
+      console.log("User not authenticated, skipping task load")
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
-      const data = await getTasks()
+      const data = await getTasks(user.id)
       setTasks(data)
     } catch (error) {
       console.error("Failed to load tasks:", error)
@@ -188,7 +204,9 @@ export default function TasksPage() {
 
     try {
       // Update order in database
-      await reorderTasks(updatedTasks.map((task) => task.id))
+      if (user?.id) {
+        await reorderTasks(updatedTasks.map((task) => task.id), user.id)
+      }
     } catch (error) {
       console.error("Failed to reorder tasks:", error)
       // Revert local state on error
@@ -223,8 +241,10 @@ export default function TasksPage() {
     }
 
     try {
-      await updateTask(draggedTask, updates)
-      setTasks(tasks.map((t) => t.id === draggedTask ? { ...t, ...updates } : t))
+      if (user?.id) {
+        await updateTask(draggedTask, updates, user.id)
+        setTasks(tasks.map((t) => t.id === draggedTask ? { ...t, ...updates } : t))
+      }
       toast({
         title: "Success",
         description: `Task moved to ${columnType === "today" ? "Today" : columnType + " priority"} column.`,
@@ -252,8 +272,10 @@ export default function TasksPage() {
         
         // Wait for animation to complete before updating
         setTimeout(async () => {
-          const updatedTask = await toggleTaskCompletion(taskId)
-          setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
+          if (user?.id) {
+            const updatedTask = await toggleTaskCompletion(taskId, user.id)
+            setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
+          }
           setFadingTasks(prev => {
             const newSet = new Set(prev)
             newSet.delete(taskId)
@@ -266,8 +288,10 @@ export default function TasksPage() {
         }, 300)
       } else {
         // If uncompleting or in Completed view, update immediately
-        const updatedTask = await toggleTaskCompletion(taskId)
-        setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
+        if (user?.id) {
+          const updatedTask = await toggleTaskCompletion(taskId, user.id)
+          setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
+        }
         toast({
           title: "Success",
           description: `Task ${updatedTask.completed ? "completed" : "reopened"} successfully.`,
@@ -284,8 +308,10 @@ export default function TasksPage() {
   }
 
   const handleToggleStar = async (taskId: string) => {
+    if (!user?.id) return
+    
     try {
-      const updatedTask = await toggleTaskStar(taskId)
+      const updatedTask = await toggleTaskStar(taskId, user.id)
       setTasks(tasks.map((task) => (task.id === taskId ? updatedTask : task)))
     } catch (error) {
       console.error("Failed to toggle task star:", error)
@@ -309,8 +335,10 @@ export default function TasksPage() {
     if (!taskToDelete) return
     
     try {
-      await deleteTask(taskToDelete.id)
-      setTasks(tasks.filter((task) => task.id !== taskToDelete.id))
+      if (user?.id) {
+        await deleteTask(taskToDelete.id, user.id)
+        setTasks(tasks.filter((task) => task.id !== taskToDelete.id))
+      }
       toast({
         title: "Success",
         description: "Task deleted successfully.",
