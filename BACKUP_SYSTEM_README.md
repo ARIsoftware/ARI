@@ -93,7 +93,7 @@ The system includes several PostgreSQL functions for secure operations:
 
 Add to your `.env.local`:
 ```bash
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+SUPABASE_SECRET_KEY=your_secret_key_here
 ```
 
 ## Setup Instructions
@@ -101,8 +101,8 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 1. **Install Database Functions**:
    Run the SQL script: `scripts/create-backup-functions.sql`
 
-2. **Add Service Role Key**:
-   Add `SUPABASE_SERVICE_ROLE_KEY` to your environment variables
+2. **Add Secret Key**:
+   Add `SUPABASE_SECRET_KEY` to your environment variables
 
 3. **Deploy API Routes**:
    The new API routes are in `app/api/backup/`
@@ -225,11 +225,11 @@ The new system is backward compatible with v1.0 backup files, but v2.0 files inc
 
 ### Common Issues
 
-1. **Missing Service Role Key**
+1. **Missing Secret Key**
    ```
    Error: Missing Supabase environment variables
    ```
-   Solution: Add `SUPABASE_SERVICE_ROLE_KEY` to environment
+   Solution: Add `SUPABASE_SECRET_KEY` to environment
 
 2. **Large File Import Timeouts**
    ```
