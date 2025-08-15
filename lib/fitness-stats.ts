@@ -127,34 +127,27 @@ export async function incrementFitnessTaskCompletion(taskId: string): Promise<vo
 }
 
 // Keep the old function for regular tasks (ari-database)
-export async function incrementTaskCompletion(taskId: string): Promise<void> {
+export async function incrementTaskCompletion(taskId: string, userId?: string): Promise<void> {
+  // This function needs userId to work with the API
+  // If not provided, we'll skip the increment (backwards compatibility)
+  if (!userId) {
+    console.warn("incrementTaskCompletion called without userId, skipping")
+    return
+  }
+
   try {
-    // Get current completion count
-    const { data: task, error: fetchError } = await supabase
-      .from("ari-database")
-      .select("completion_count")
-      .eq("id", taskId)
-      .single()
+    const response = await fetch('/api/tasks/increment-completion', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ taskId, userId }),
+    })
 
-    if (fetchError) {
-      console.error("Error fetching task for completion increment:", fetchError)
-      throw fetchError
-    }
-
-    // Increment the completion count
-    const newCount = (task?.completion_count || 0) + 1
-
-    const { error: updateError } = await supabase
-      .from("ari-database")
-      .update({ 
-        completion_count: newCount,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", taskId)
-
-    if (updateError) {
-      console.error("Error incrementing task completion:", updateError)
-      throw updateError
+    if (!response.ok) {
+      const error = await response.json()
+      console.error("Error incrementing task completion:", error)
+      throw new Error(error.error || 'Failed to increment task completion')
     }
   } catch (error) {
     console.error("Failed to increment task completion:", error)
