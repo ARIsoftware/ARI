@@ -64,18 +64,20 @@ export async function deleteTask(id: string, userId: string): Promise<void> {
 }
 
 export async function toggleTaskCompletion(id: string, userId: string): Promise<Task> {
-  // First get the current task
-  const client = await getAuthenticatedSupabase()
-  const { data: currentTask, error: fetchError } = await client
-    .from("ari-database")
-    .select("completed, status")
-    .eq("id", id)
-    .contains("user_ids", [userId])
-    .single()
+  // First get the current task state
+  const response = await fetch(`/api/tasks?userId=${encodeURIComponent(userId)}`)
+  
+  if (!response.ok) {
+    const error = await response.json()
+    console.error("Error fetching tasks:", error)
+    throw new Error(error.error || 'Failed to fetch tasks')
+  }
 
-  if (fetchError) {
-    console.error("Error fetching task:", fetchError)
-    throw fetchError
+  const tasks = await response.json()
+  const currentTask = tasks.find((t: Task) => t.id === id)
+  
+  if (!currentTask) {
+    throw new Error('Task not found')
   }
 
   const newCompleted = !currentTask.completed
@@ -90,7 +92,7 @@ export async function toggleTaskCompletion(id: string, userId: string): Promise<
   // If the task is being marked as completed, increment completion count
   if (newCompleted) {
     try {
-      await incrementTaskCompletion(id)
+      await incrementTaskCompletion(id, userId)
     } catch (error) {
       console.error("Failed to increment completion count:", error)
       // Don't throw here - the task update was successful, completion count increment is secondary
@@ -101,18 +103,20 @@ export async function toggleTaskCompletion(id: string, userId: string): Promise<
 }
 
 export async function toggleTaskStar(id: string, userId: string): Promise<Task> {
-  // First get the current task
-  const client = await getAuthenticatedSupabase()
-  const { data: currentTask, error: fetchError } = await client
-    .from("ari-database")
-    .select("starred")
-    .eq("id", id)
-    .contains("user_ids", [userId])
-    .single()
+  // First get the current task state
+  const response = await fetch(`/api/tasks?userId=${encodeURIComponent(userId)}`)
+  
+  if (!response.ok) {
+    const error = await response.json()
+    console.error("Error fetching tasks:", error)
+    throw new Error(error.error || 'Failed to fetch tasks')
+  }
 
-  if (fetchError) {
-    console.error("Error fetching task:", fetchError)
-    throw fetchError
+  const tasks = await response.json()
+  const currentTask = tasks.find((t: Task) => t.id === id)
+  
+  if (!currentTask) {
+    throw new Error('Task not found')
   }
 
   return updateTask(id, {
@@ -127,18 +131,24 @@ export async function reorderTasks(taskIds: string[], userId: string): Promise<v
     order_index: index,
   }))
 
-  const client = await getAuthenticatedSupabase()
-  // Use a transaction to update all tasks atomically
+  // Update each task's order using the API
   for (const update of updates) {
-    const { error } = await client
-      .from("ari-database")
-      .update({ order_index: update.order_index })
-      .eq("id", update.id)
-      .contains("user_ids", [userId])
+    const response = await fetch('/api/tasks', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        id: update.id, 
+        updates: { order_index: update.order_index }, 
+        userId 
+      }),
+    })
 
-    if (error) {
+    if (!response.ok) {
+      const error = await response.json()
       console.error("Error updating task order:", error)
-      throw error
+      throw new Error(error.error || 'Failed to update task order')
     }
   }
 }

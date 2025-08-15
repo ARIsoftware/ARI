@@ -170,7 +170,11 @@ export default function DailyFitnessPage() {
       return matchesFilter && matchesSearch
     })
     .sort((a, b) => {
-      // If both have same completion status, maintain their order
+      // For completed tasks, sort by updated_at (most recent first)
+      if (activeFilter === "Completed") {
+        return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      }
+      // For other filters, maintain order_index
       return a.order_index - b.order_index
     })
 

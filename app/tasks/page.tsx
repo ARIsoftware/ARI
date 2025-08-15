@@ -164,7 +164,11 @@ export default function TasksPage() {
       return matchesFilter && matchesSearch
     })
     .sort((a, b) => {
-      // If both have same completion status, maintain their order
+      // For completed tasks, sort by updated_at (most recent first)
+      if (activeFilter === "Completed") {
+        return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      }
+      // For other filters, maintain order_index
       return a.order_index - b.order_index
     })
 
@@ -291,11 +295,11 @@ export default function TasksPage() {
         if (user?.id) {
           const updatedTask = await toggleTaskCompletion(taskId, user.id)
           setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
+          toast({
+            title: "Success",
+            description: `Task ${updatedTask.completed ? "completed" : "reopened"} successfully.`,
+          })
         }
-        toast({
-          title: "Success",
-          description: `Task ${updatedTask.completed ? "completed" : "reopened"} successfully.`,
-        })
       }
     } catch (error) {
       console.error("Failed to toggle task completion:", error)
