@@ -1,0 +1,91 @@
+<svg width="700" height="850" viewBox="0 0 700 850" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg4" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a1a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2d2d2d;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="700" height="850" fill="url(#bg4)"/>
+  
+  <!-- Title -->
+  <text x="350" y="280" font-family="Arial Black, sans-serif" font-size="56" font-weight="900" text-anchor="middle" fill="white">
+    WHAT
+  </text>
+  <text x="350" y="350" font-family="Arial Black, sans-serif" font-size="56" font-weight="900" text-anchor="middle" fill="#d4af37">
+    CARBS
+  </text>
+  <text x="350" y="420" font-family="Arial Black, sans-serif" font-size="56" font-weight="900" text-anchor="middle" fill="white">
+    ACTUALLY
+  </text>
+  <text x="350" y="490" font-family="Arial Black, sans-serif" font-size="56" font-weight="900" text-anchor="middle" fill="white">
+    LOOK LIKE
+  </text>
+  
+  <!-- Carb Amount Examples -->
+  <g transform="translate(50, 120)">
+    <rect x="0" y="0" width="120" height="120" fill="#333" rx="10"/>
+    <text x="60" y="80" font-family="Arial Black, sans-serif" font-size="36" font-weight="900" text-anchor="middle" fill="#d4af37">
+      25 G
+    </text>
+    <text x="60" y="105" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="white">
+      LIGHT SNACK
+    </text>
+  </g>
+  
+  <g transform="translate(200, 120)">
+    <rect x="0" y="0" width="120" height="120" fill="#333" rx="10"/>
+    <text x="60" y="80" font-family="Arial Black, sans-serif" font-size="36" font-weight="900" text-anchor="middle" fill="#d4af37">
+      50 G
+    </text>
+    <text x="60" y="105" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="white">
+      MINI MEAL
+    </text>
+  </g>
+  
+  <g transform="translate(50, 550)">
+    <rect x="0" y="0" width="120" height="120" fill="#333" rx="10"/>
+    <text x="60" y="80" font-family="Arial Black, sans-serif" font-size="36" font-weight="900" text-anchor="middle" fill="#d4af37">
+      75-80 G
+    </text>
+    <text x="60" y="100" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="white">
+      CARB LOADING
+    </text>
+    <text x="60" y="115" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#d4af37">
+      NIGHT BEFORE
+    </text>
+  </g>
+  
+  <g transform="translate(200, 550)">
+    <rect x="0" y="0" width="120" height="120" fill="#333" rx="10"/>
+    <text x="60" y="80" font-family="Arial Black, sans-serif" font-size="36" font-weight="900" text-anchor="middle" fill="#d4af37">
+      100 G
+    </text>
+    <text x="60" y="100" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="white">
+      HEAVY LOAD
+    </text>
+    <text x="60" y="115" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#d4af37">
+      18-36 HRS OUT
+    </text>
+  </g>
+  
+  <!-- Food Item Examples (simplified representations) -->
+  <text x="500" y="170" font-family="Arial, sans-serif" font-size="14" fill="white">• Toast with jam</text>
+  <text x="500" y="190" font-family="Arial, sans-serif" font-size="14" fill="white">• Banana</text>
+  <text x="500" y="210" font-family="Arial, sans-serif" font-size="14" fill="white">• Gummy bears</text>
+  <text x="500" y="230" font-family="Arial, sans-serif" font-size="14" fill="white">• Pretzels</text>
+  
+  <text x="500" y="280" font-family="Arial, sans-serif" font-size="14" fill="white">• Oatmeal bowl</text>
+  <text x="500" y="300" font-family="Arial, sans-serif" font-size="14" fill="white">• Energy bar</text>
+  <text x="500" y="320" font-family="Arial, sans-serif" font-size="14" fill="white">• Sports drink</text>
+  
+  <text x="500" y="600" font-family="Arial, sans-serif" font-size="14" fill="white">• Pasta dinner</text>
+  <text x="500" y="620" font-family="Arial, sans-serif" font-size="14" fill="white">• Rice bowl</text>
+  <text x="500" y="640" font-family="Arial, sans-serif" font-size="14" fill="white">• Sweet potatoes</text>
+  
+  <!-- Bottom dots -->
+  <circle cx="320" cy="780" r="6" fill="#666"/>
+  <circle cx="340" cy="780" r="6" fill="#666"/>
+  <circle cx="360" cy="780" r="6" fill="#666"/>
+  <circle cx="380" cy="780" r="6" fill="white"/>
+  <circle cx="400" cy="780" r="6" fill="#666"/>
+</svg>

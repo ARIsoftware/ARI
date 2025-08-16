@@ -26,6 +26,13 @@ import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
 import { YouTubeModal } from "@/components/youtube-modal"
 import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel"
+import {
   getHyroxStationRecords,
   updateStationRecord,
   createHyroxWorkout,
@@ -37,7 +44,8 @@ import {
   getTimeDifference,
   type HyroxStationRecord,
   type HyroxWorkout,
-} from "@/lib/hyrox"
+} from "@/lib/hyrox-client"
+import { testHyroxDatabase } from "@/lib/hyrox"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -265,7 +273,7 @@ export default function HyroxPage() {
     
     // Save station time to database
     if (currentWorkout && user?.id) {
-      await addWorkoutStation(
+      const stationResult = await addWorkoutStation(
         currentWorkout.id,
         currentStationData.name,
         currentStationData.order,
@@ -273,8 +281,20 @@ export default function HyroxPage() {
         true
       )
 
+      if (!stationResult) {
+        console.error('Failed to save station time for:', currentStationData.name)
+        toast({
+          title: "Warning",
+          description: "Station time might not have been saved. Please check your connection.",
+          variant: "destructive",
+        })
+      }
+
       // Update personal best if applicable
-      await updateStationRecord(user.id, currentStationData.name, stationTime)
+      const recordResult = await updateStationRecord(user.id, currentStationData.name, stationTime)
+      if (!recordResult) {
+        console.error('Failed to update station record for:', currentStationData.name)
+      }
     }
     
     if (currentStation < workoutStations.length - 1) {
@@ -301,13 +321,22 @@ export default function HyroxPage() {
     
     // Save skipped station to database
     if (currentWorkout && user?.id) {
-      await addWorkoutStation(
+      const result = await addWorkoutStation(
         currentWorkout.id,
         currentStationData.name,
         currentStationData.order,
         null,
         false
       )
+      
+      if (!result) {
+        console.error('Failed to save skipped station:', currentStationData.name)
+        toast({
+          title: "Warning",
+          description: "Skipped station might not have been saved.",
+          variant: "destructive",
+        })
+      }
     }
     
     if (currentStation < workoutStations.length - 1) {
@@ -317,6 +346,37 @@ export default function HyroxPage() {
   }
 
   const progress = ((currentStation) / workoutStations.length) * 100
+
+  const runDatabaseTest = async () => {
+    console.log('Running database diagnostics...')
+    const result = await testHyroxDatabase()
+    console.log('Database test result:', result)
+    
+    if (!result.success) {
+      toast({
+        title: "Database Connection Failed",
+        description: result.error,
+        variant: "destructive",
+      })
+    } else {
+      const missingTables = Object.entries(result.tables)
+        .filter(([table, exists]) => !exists)
+        .map(([table]) => table)
+      
+      if (missingTables.length > 0) {
+        toast({
+          title: "Missing Tables",
+          description: `Missing: ${missingTables.join(', ')}`,
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Database OK",
+          description: "All tables exist and are accessible",
+        })
+      }
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50/50">
@@ -349,14 +409,23 @@ export default function HyroxPage() {
                   <p className="text-sm text-muted-foreground mt-1">Track your Hyrox performance</p>
                 )}
               </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={runDatabaseTest}
+                className="text-xs"
+              >
+                Test Database
+              </Button>
             </div>
 
             {/* Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full max-w-[600px] grid-cols-3">
+              <TabsList className="grid w-full max-w-[800px] grid-cols-4">
                 <TabsTrigger value="station-records">Station Records</TabsTrigger>
                 <TabsTrigger value="progress-tracking">Progress Tracking</TabsTrigger>
                 <TabsTrigger value="race-simulation">Race Simulation</TabsTrigger>
+                <TabsTrigger value="nutrition">Nutrition</TabsTrigger>
               </TabsList>
 
               {/* Station Records Tab */}
@@ -837,6 +906,78 @@ export default function HyroxPage() {
                       </CardContent>
                     </Card>
                   )}
+                </div>
+              </TabsContent>
+
+              {/* Nutrition Tab */}
+              <TabsContent value="nutrition" className="mt-6">
+                <div className="flex flex-col items-center justify-center w-full">
+                  <Carousel className="w-full max-w-[750px]">
+                    <CarouselContent>
+                      <CarouselItem>
+                        <div className="p-1">
+                          <div className="flex items-center justify-center">
+                            <img 
+                              src="/nutrition/nutrition-1.png" 
+                              alt="HYROX Race Nutrition - The Final 48 Hours" 
+                              className="rounded-lg shadow-lg"
+                              style={{ width: '700px', height: '850px', objectFit: 'cover' }}
+                            />
+                          </div>
+                        </div>
+                      </CarouselItem>
+                      <CarouselItem>
+                        <div className="p-1">
+                          <div className="flex items-center justify-center">
+                            <img 
+                              src="/nutrition/nutrition-2.png" 
+                              alt="Pre-Race Goals" 
+                              className="rounded-lg shadow-lg"
+                              style={{ width: '700px', height: '850px', objectFit: 'cover' }}
+                            />
+                          </div>
+                        </div>
+                      </CarouselItem>
+                      <CarouselItem>
+                        <div className="p-1">
+                          <div className="flex items-center justify-center">
+                            <img 
+                              src="/nutrition/nutrition-3.png" 
+                              alt="Carb Loading & Energy Needs" 
+                              className="rounded-lg shadow-lg"
+                              style={{ width: '700px', height: '850px', objectFit: 'cover' }}
+                            />
+                          </div>
+                        </div>
+                      </CarouselItem>
+                      <CarouselItem>
+                        <div className="p-1">
+                          <div className="flex items-center justify-center">
+                            <img 
+                              src="/nutrition/nutrition-4.png" 
+                              alt="What Carbs Actually Look Like" 
+                              className="rounded-lg shadow-lg"
+                              style={{ width: '700px', height: '850px', objectFit: 'cover' }}
+                            />
+                          </div>
+                        </div>
+                      </CarouselItem>
+                      <CarouselItem>
+                        <div className="p-1">
+                          <div className="flex items-center justify-center">
+                            <img 
+                              src="/nutrition/nutrition-5.png" 
+                              alt="Hydration Strategy" 
+                              className="rounded-lg shadow-lg"
+                              style={{ width: '700px', height: '850px', objectFit: 'cover' }}
+                            />
+                          </div>
+                        </div>
+                      </CarouselItem>
+                    </CarouselContent>
+                    <CarouselPrevious />
+                    <CarouselNext />
+                  </Carousel>
                 </div>
               </TabsContent>
             </Tabs>

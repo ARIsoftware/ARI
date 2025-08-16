@@ -1,0 +1,75 @@
+<svg width="700" height="850" viewBox="0 0 700 850" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a1a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2d2d2d;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="700" height="850" fill="url(#bg2)"/>
+  
+  <!-- Title -->
+  <text x="350" y="150" font-family="Arial Black, sans-serif" font-size="64" font-weight="900" text-anchor="middle">
+    <tspan fill="#d4af37">PRE-RACE</tspan>
+    <tspan fill="white"> GOALS</tspan>
+  </text>
+  
+  <!-- Goal Items -->
+  <g transform="translate(0, 250)">
+    <rect x="50" y="0" width="600" height="100" fill="#333" rx="5"/>
+    <text x="100" y="35" font-family="Arial, sans-serif" font-size="24" font-weight="600" fill="white">
+      MAXIMISE GLYCOGEN
+    </text>
+    <text x="100" y="65" font-family="Arial, sans-serif" font-size="24" font-weight="600" fill="white">
+      STORES
+    </text>
+    <text x="570" y="50" font-family="Arial Black, sans-serif" font-size="48" font-weight="900" fill="#d4af37">
+      01
+    </text>
+  </g>
+  
+  <g transform="translate(0, 370)">
+    <rect x="50" y="0" width="600" height="100" fill="#333" rx="5"/>
+    <text x="100" y="35" font-family="Arial, sans-serif" font-size="24" font-weight="600" fill="white">
+      OPTIMISE HYDRATION &amp;
+    </text>
+    <text x="100" y="65" font-family="Arial, sans-serif" font-size="24" font-weight="600" fill="white">
+      ELECTROLYTE BALANCE
+    </text>
+    <text x="570" y="50" font-family="Arial Black, sans-serif" font-size="48" font-weight="900" fill="#d4af37">
+      02
+    </text>
+  </g>
+  
+  <g transform="translate(0, 490)">
+    <rect x="50" y="0" width="600" height="100" fill="#333" rx="5"/>
+    <text x="100" y="35" font-family="Arial, sans-serif" font-size="24" font-weight="600" fill="white">
+      MINIMISE GASTRIC
+    </text>
+    <text x="100" y="65" font-family="Arial, sans-serif" font-size="24" font-weight="600" fill="white">
+      DISTRESS
+    </text>
+    <text x="570" y="50" font-family="Arial Black, sans-serif" font-size="48" font-weight="900" fill="#d4af37">
+      03
+    </text>
+  </g>
+  
+  <g transform="translate(0, 610)">
+    <rect x="50" y="0" width="600" height="100" fill="#333" rx="5"/>
+    <text x="100" y="35" font-family="Arial, sans-serif" font-size="24" font-weight="600" fill="white">
+      RACE FEELING
+    </text>
+    <text x="100" y="65" font-family="Arial, sans-serif" font-size="24" font-weight="600" fill="white">
+      ENERGISED &amp; STRONG
+    </text>
+    <text x="570" y="50" font-family="Arial Black, sans-serif" font-size="48" font-weight="900" fill="#d4af37">
+      04
+    </text>
+  </g>
+  
+  <!-- Bottom dots -->
+  <circle cx="320" cy="780" r="6" fill="#666"/>
+  <circle cx="340" cy="780" r="6" fill="white"/>
+  <circle cx="360" cy="780" r="6" fill="#666"/>
+  <circle cx="380" cy="780" r="6" fill="#666"/>
+  <circle cx="400" cy="780" r="6" fill="#666"/>
+</svg>

@@ -1,0 +1,38 @@
+<svg width="700" height="850" viewBox="0 0 700 850" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a1a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2d2d2d;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="700" height="850" fill="url(#bg1)"/>
+  
+  <!-- Title -->
+  <text x="350" y="180" font-family="Arial Black, sans-serif" font-size="56" font-weight="900" text-anchor="middle" fill="white" letter-spacing="2">
+    HYROX
+  </text>
+  <text x="350" y="280" font-family="Arial Black, sans-serif" font-size="72" font-weight="900" text-anchor="middle" fill="white" letter-spacing="3">
+    RACE
+  </text>
+  <text x="350" y="380" font-family="Arial Black, sans-serif" font-size="72" font-weight="900" text-anchor="middle" fill="#d4af37" letter-spacing="3">
+    NUTRITION
+  </text>
+  
+  <!-- Subtitle -->
+  <text x="350" y="480" font-family="Arial, sans-serif" font-size="28" font-weight="600" text-anchor="middle" fill="white">
+    WHAT TO EAT &amp; WHY IT MATTERS
+  </text>
+  <text x="350" y="560" font-family="Arial Black, sans-serif" font-size="42" font-weight="900" text-anchor="middle" fill="white">
+    THE FINAL 48 HOURS
+  </text>
+  
+  <!-- Arrow -->
+  <path d="M 550 580 L 600 580 L 590 590 M 600 580 L 590 570" stroke="#d4af37" stroke-width="4" fill="none"/>
+  
+  <!-- Bottom dots -->
+  <circle cx="320" cy="780" r="6" fill="white"/>
+  <circle cx="340" cy="780" r="6" fill="#666"/>
+  <circle cx="360" cy="780" r="6" fill="#666"/>
+  <circle cx="380" cy="780" r="6" fill="#666"/>
+  <circle cx="400" cy="780" r="6" fill="#666"/>
+</svg>
