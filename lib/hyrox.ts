@@ -1,4 +1,54 @@
-import { supabase, getAuthenticatedSupabase } from './supabase'
+import { supabase } from './supabase'
+import { supabaseServiceRole } from './supabase-with-clerk'
+
+// Diagnostic function to test database connectivity and table existence
+export async function testHyroxDatabase() {
+  try {
+    // Use service role for testing
+    const client = supabaseServiceRole()
+    
+    // Test basic connectivity
+    const { data: authTest, error: authError } = await client.auth.getUser()
+    if (authError) {
+      console.error('Auth error:', authError)
+      return { success: false, error: 'Authentication failed', details: authError }
+    }
+
+    // Test table existence by trying to count rows
+    const { data: workoutsTest, error: workoutsError } = await client
+      .from('hyrox_workouts')
+      .select('count')
+      .limit(1)
+      
+    const { data: stationsTest, error: stationsError } = await client
+      .from('hyrox_workout_stations')
+      .select('count')
+      .limit(1)
+      
+    const { data: recordsTest, error: recordsError } = await client
+      .from('hyrox_station_records')
+      .select('count')
+      .limit(1)
+
+    return {
+      success: true,
+      tables: {
+        hyrox_workouts: !workoutsError,
+        hyrox_workout_stations: !stationsError,
+        hyrox_station_records: !recordsError
+      },
+      errors: {
+        workouts: workoutsError,
+        stations: stationsError,
+        records: recordsError
+      },
+      user: authTest.user?.id
+    }
+  } catch (error) {
+    console.error('Database test failed:', error)
+    return { success: false, error: 'Database connection failed', details: error }
+  }
+}
 
 // Types
 export interface HyroxStationRecord {
@@ -103,7 +153,7 @@ const defaultStationRecords = [
 // Get all station records for a user
 export async function getHyroxStationRecords(userId: string): Promise<HyroxStationRecord[]> {
   try {
-    const client = await getAuthenticatedSupabase()
+    const client = supabaseServiceRole()
     const { data, error } = await client
       .from('hyrox_station_records')
       .select('*')
@@ -118,22 +168,60 @@ export async function getHyroxStationRecords(userId: string): Promise<HyroxStati
       return getHyroxStationRecords(userId)
     }
 
-    return data
+    // Check if any records have 0 times and reset them to defaults
+    const recordsWithDefaults = data.map(record => {
+      if (record.best_time === 0 || !record.best_time) {
+        const defaultRecord = defaultStationRecords.find(
+          dr => dr.station_name === record.station_name
+        )
+        if (defaultRecord) {
+          // Update the record in the database with default values
+          updateStationRecordToDefault(userId, record.station_name, defaultRecord.best_time)
+          return {
+            ...record,
+            best_time: defaultRecord.best_time,
+            goal_time: record.goal_time || defaultRecord.goal_time
+          }
+        }
+      }
+      return record
+    })
+
+    return recordsWithDefaults
   } catch (error) {
     console.error('Error fetching Hyrox station records:', error)
     return []
   }
 }
 
+// Helper function to update a station record to default values
+async function updateStationRecordToDefault(
+  userId: string,
+  stationName: string,
+  defaultBestTime: number
+): Promise<void> {
+  try {
+    const client = supabaseServiceRole()
+    await client
+      .from('hyrox_station_records')
+      .update({ best_time: defaultBestTime })
+      .eq('user_id', userId)
+      .eq('station_name', stationName)
+  } catch (error) {
+    console.error('Error updating station record to default:', error)
+  }
+}
+
 // Initialize default station records for a new user
 export async function initializeStationRecords(userId: string): Promise<void> {
   try {
+    const client = supabaseServiceRole()
     const records = defaultStationRecords.map(record => ({
       ...record,
       user_id: userId,
     }))
 
-    const { error } = await supabase
+    const { error } = await client
       .from('hyrox_station_records')
       .insert(records)
 
@@ -150,8 +238,10 @@ export async function updateStationRecord(
   newTime: number
 ): Promise<HyroxStationRecord | null> {
   try {
+    const client = supabaseServiceRole()
+    
     // First get the current record
-    const { data: currentRecord, error: fetchError } = await supabase
+    const { data: currentRecord, error: fetchError } = await client
       .from('hyrox_station_records')
       .select('*')
       .eq('user_id', userId)
@@ -162,7 +252,7 @@ export async function updateStationRecord(
 
     // Only update if new time is better (lower)
     if (currentRecord && newTime < currentRecord.best_time) {
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('hyrox_station_records')
         .update({ best_time: newTime })
         .eq('user_id', userId)
@@ -184,7 +274,8 @@ export async function updateStationRecord(
 // Create a new workout session
 export async function createHyroxWorkout(userId: string): Promise<HyroxWorkout | null> {
   try {
-    const { data, error } = await supabase
+    const client = supabaseServiceRole()
+    const { data, error } = await client
       .from('hyrox_workouts')
       .insert({
         user_id: userId,
@@ -197,7 +288,10 @@ export async function createHyroxWorkout(userId: string): Promise<HyroxWorkout |
     if (error) throw error
     return data
   } catch (error) {
-    console.error('Error creating Hyrox workout:', error)
+    console.error('Error creating Hyrox workout:', {
+      error,
+      userId
+    })
     return null
   }
 }
@@ -208,7 +302,8 @@ export async function completeHyroxWorkout(
   totalTime: number
 ): Promise<HyroxWorkout | null> {
   try {
-    const { data, error } = await supabase
+    const client = supabaseServiceRole()
+    const { data, error } = await client
       .from('hyrox_workouts')
       .update({
         total_time: totalTime,
@@ -236,7 +331,8 @@ export async function addWorkoutStation(
   completed: boolean = true
 ): Promise<HyroxWorkoutStation | null> {
   try {
-    const { data, error } = await supabase
+    const client = supabaseServiceRole()
+    const { data, error } = await client
       .from('hyrox_workout_stations')
       .insert({
         workout_id: workoutId,
@@ -251,7 +347,14 @@ export async function addWorkoutStation(
     if (error) throw error
     return data
   } catch (error) {
-    console.error('Error adding workout station:', error)
+    console.error('Error adding workout station:', {
+      error,
+      workoutId,
+      stationName,
+      stationOrder,
+      stationTime,
+      completed
+    })
     return null
   }
 }
@@ -262,7 +365,8 @@ export async function getHyroxWorkoutHistory(
   limit: number = 10
 ): Promise<HyroxWorkout[]> {
   try {
-    const { data, error } = await supabase
+    const client = supabaseServiceRole()
+    const { data, error } = await client
       .from('hyrox_workouts')
       .select('*')
       .eq('user_id', userId)
@@ -283,7 +387,8 @@ export async function getWorkoutStations(
   workoutId: string
 ): Promise<HyroxWorkoutStation[]> {
   try {
-    const { data, error } = await supabase
+    const client = supabaseServiceRole()
+    const { data, error } = await client
       .from('hyrox_workout_stations')
       .select('*')
       .eq('workout_id', workoutId)
@@ -307,6 +412,10 @@ export function calculateProgress(currentTime: number, goalTime: number): number
 
 // Format milliseconds to MM:SS
 export function formatTime(milliseconds: number): string {
+  // If the time is 0 or invalid, return a placeholder
+  if (!milliseconds || milliseconds === 0) {
+    return '0:00'
+  }
   const totalSeconds = Math.floor(milliseconds / 1000)
   const minutes = Math.floor(totalSeconds / 60)
   const seconds = totalSeconds % 60
