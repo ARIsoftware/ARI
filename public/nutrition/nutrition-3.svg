@@ -1,0 +1,118 @@
+<svg width="700" height="850" viewBox="0 0 700 850" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a1a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2d2d2d;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="700" height="850" fill="url(#bg3)"/>
+  
+  <!-- Title -->
+  <text x="350" y="100" font-family="Arial Black, sans-serif" font-size="56" font-weight="900" text-anchor="middle" fill="white">
+    CARB LOADING
+  </text>
+  <text x="350" y="180" font-family="Arial Black, sans-serif" font-size="56" font-weight="900" text-anchor="middle" fill="#d4af37">
+    &amp; ENERGY NEEDS
+  </text>
+  
+  <!-- Main Content Boxes -->
+  <g transform="translate(50, 250)">
+    <!-- Carbs Box -->
+    <rect x="0" y="0" width="140" height="280" fill="#333" stroke="#d4af37" stroke-width="2" rx="5"/>
+    <text x="70" y="40" font-family="Arial, sans-serif" font-size="22" font-weight="600" text-anchor="middle" fill="white">
+      CARBS
+    </text>
+    <path d="M 70 60 L 70 100" stroke="#d4af37" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <text x="70" y="130" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="white">
+      Maximise
+    </text>
+    <text x="70" y="150" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="white">
+      glycogen stores
+    </text>
+    <text x="70" y="200" font-family="Arial, sans-serif" font-size="16" font-weight="600" text-anchor="middle" fill="#d4af37">
+      8-12 g/kg
+    </text>
+    <text x="70" y="220" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="white">
+      bodyweight
+    </text>
+  </g>
+  
+  <g transform="translate(210, 250)">
+    <!-- Protein Box -->
+    <rect x="0" y="0" width="140" height="280" fill="#333" stroke="#d4af37" stroke-width="2" rx="5"/>
+    <text x="70" y="40" font-family="Arial, sans-serif" font-size="22" font-weight="600" text-anchor="middle" fill="white">
+      PROTEIN
+    </text>
+    <path d="M 70 60 L 70 80 L 60 90 M 70 80 L 80 90" stroke="#d4af37" stroke-width="3" fill="none"/>
+    <text x="70" y="130" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="white">
+      Moderate to
+    </text>
+    <text x="70" y="150" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="white">
+      support muscles
+    </text>
+    <text x="70" y="200" font-family="Arial, sans-serif" font-size="16" font-weight="600" text-anchor="middle" fill="#d4af37">
+      1.2-1.6 g/kg
+    </text>
+    <text x="70" y="220" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="white">
+      bodyweight
+    </text>
+  </g>
+  
+  <g transform="translate(370, 250)">
+    <!-- Fats Box -->
+    <rect x="0" y="0" width="140" height="280" fill="#333" stroke="#d4af37" stroke-width="2" rx="5"/>
+    <text x="70" y="40" font-family="Arial, sans-serif" font-size="22" font-weight="600" text-anchor="middle" fill="white">
+      FATS
+    </text>
+    <path d="M 70 100 L 70 60" stroke="#d4af37" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <text x="70" y="130" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="white">
+      Relatively low
+    </text>
+    <text x="70" y="150" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="white">
+      to avoid GI
+    </text>
+    <text x="70" y="170" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="white">
+      discomfort
+    </text>
+    <text x="70" y="200" font-family="Arial, sans-serif" font-size="16" font-weight="600" text-anchor="middle" fill="#d4af37">
+      Small portions
+    </text>
+  </g>
+  
+  <g transform="translate(530, 250)">
+    <!-- Hydration Box -->
+    <rect x="0" y="0" width="140" height="280" fill="#333" stroke="#d4af37" stroke-width="2" rx="5"/>
+    <text x="70" y="40" font-family="Arial, sans-serif" font-size="20" font-weight="600" text-anchor="middle" fill="white">
+      HYDRATION
+    </text>
+    <path d="M 70 60 L 70 100" stroke="#d4af37" stroke-width="3" marker-end="url(#arrowhead)"/>
+    <text x="70" y="130" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="white">
+      As important
+    </text>
+    <text x="70" y="150" font-family="Arial, sans-serif" font-size="14" text-anchor="middle" fill="white">
+      as fueling
+    </text>
+    <text x="70" y="200" font-family="Arial, sans-serif" font-size="16" font-weight="600" text-anchor="middle" fill="#d4af37">
+      2-3 L per day
+    </text>
+  </g>
+  
+  <!-- Bottom Message -->
+  <rect x="50" y="580" width="600" height="60" fill="#d4af37" rx="5"/>
+  <text x="350" y="615" font-family="Arial, sans-serif" font-size="20" font-weight="700" text-anchor="middle" fill="#1a1a1a">
+    ENERGY (OR CALORIE) INTAKE SHOULD REMAIN ABOUT THE SAME
+  </text>
+  
+  <!-- Bottom dots -->
+  <circle cx="320" cy="780" r="6" fill="#666"/>
+  <circle cx="340" cy="780" r="6" fill="#666"/>
+  <circle cx="360" cy="780" r="6" fill="white"/>
+  <circle cx="380" cy="780" r="6" fill="#666"/>
+  <circle cx="400" cy="780" r="6" fill="#666"/>
+  
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#d4af37"/>
+    </marker>
+  </defs>
+</svg>
