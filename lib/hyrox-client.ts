@@ -191,6 +191,8 @@ export async function getHyroxWorkoutHistory(
 
 // Calculate progress percentage for a station
 export function calculateProgress(currentTime: number, goalTime: number): number {
+  // If no time is set, return 0 progress
+  if (currentTime === 0) return 0
   if (currentTime <= goalTime) return 100
   const maxTime = goalTime * 1.5 // Consider 150% of goal as 0% progress
   const progress = ((maxTime - currentTime) / (maxTime - goalTime)) * 100
@@ -199,8 +201,8 @@ export function calculateProgress(currentTime: number, goalTime: number): number
 
 // Format milliseconds to MM:SS
 export function formatTime(milliseconds: number): string {
-  // If the time is 0 or invalid, return a placeholder
-  if (!milliseconds || milliseconds === 0) {
+  // Handle invalid, missing, or 0 times (0 means no time set)
+  if (milliseconds === undefined || milliseconds === null || milliseconds === 0 || milliseconds < 0) {
     return '0:00'
   }
   const totalSeconds = Math.floor(milliseconds / 1000)
@@ -211,6 +213,13 @@ export function formatTime(milliseconds: number): string {
 
 // Get time difference for display (e.g., "+15s" or "-10s")
 export function getTimeDifference(currentTime: number, goalTime: number): string {
+  // If no time is set, show the goal time as the difference
+  if (currentTime === 0) {
+    const goalSeconds = Math.round(goalTime / 1000)
+    const minutes = Math.floor(goalSeconds / 60)
+    const seconds = goalSeconds % 60
+    return `-${minutes}:${seconds.toString().padStart(2, '0')}`
+  }
   const diff = Math.abs(currentTime - goalTime) / 1000
   const sign = currentTime > goalTime ? '+' : '-'
   return `${sign}${Math.round(diff)}s`

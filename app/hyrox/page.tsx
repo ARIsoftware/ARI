@@ -109,7 +109,16 @@ export default function HyroxPage() {
         getHyroxStationRecords(user.id),
         getHyroxWorkoutHistory(user.id, 1) // Get last workout
       ])
-      setStationRecords(records)
+      console.log('Loaded station records:', records)
+      
+      // Ensure records have valid best_time values
+      const validRecords = records.map(record => ({
+        ...record,
+        best_time: record.best_time || 0,
+        goal_time: record.goal_time || 0
+      }))
+      
+      setStationRecords(validRecords)
       setLastWorkout(workoutHistory[0] || null)
     } catch (error) {
       console.error('Error loading data:', error)
@@ -198,8 +207,8 @@ export default function HyroxPage() {
   useEffect(() => {
     if (workoutActive && !isPaused) {
       intervalRef.current = setInterval(() => {
-        setElapsedTime(prev => prev + 10)
-      }, 10)
+        setElapsedTime(prev => prev + 1000)
+      }, 1000)
     } else {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
@@ -294,6 +303,10 @@ export default function HyroxPage() {
       const recordResult = await updateStationRecord(user.id, currentStationData.name, stationTime)
       if (!recordResult) {
         console.error('Failed to update station record for:', currentStationData.name)
+      } else {
+        console.log('Successfully updated station record:', currentStationData.name, 'with time:', stationTime)
+        // Reload station records to reflect the update
+        loadStationRecords()
       }
     }
     
@@ -378,6 +391,45 @@ export default function HyroxPage() {
     }
   }
 
+  const resetStationRecords = async () => {
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "Please sign in to reset records",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const response = await fetch('/api/hyrox/reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to reset records')
+      }
+
+      toast({
+        title: "Records Reset",
+        description: "Station records have been reset. Reload the page to see changes.",
+      })
+      
+      // Reload the records
+      loadStationRecords()
+    } catch (error) {
+      console.error('Error resetting records:', error)
+      toast({
+        title: "Error",
+        description: "Failed to reset station records",
+        variant: "destructive",
+      })
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50/50">
       <TaskAnnouncement />
@@ -409,14 +461,24 @@ export default function HyroxPage() {
                   <p className="text-sm text-muted-foreground mt-1">Track your Hyrox performance</p>
                 )}
               </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={runDatabaseTest}
-                className="text-xs"
-              >
-                Test Database
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={resetStationRecords}
+                  className="text-xs"
+                >
+                  Reset Records
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={runDatabaseTest}
+                  className="text-xs"
+                >
+                  Test Database
+                </Button>
+              </div>
             </div>
 
             {/* Tabs */}
