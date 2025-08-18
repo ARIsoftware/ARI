@@ -7,13 +7,6 @@ export async function testHyroxDatabase() {
     // Use service role for testing
     const client = supabaseServiceRole()
     
-    // Test basic connectivity
-    const { data: authTest, error: authError } = await client.auth.getUser()
-    if (authError) {
-      console.error('Auth error:', authError)
-      return { success: false, error: 'Authentication failed', details: authError }
-    }
-
     // Test table existence by trying to count rows
     const { data: workoutsTest, error: workoutsError } = await client
       .from('hyrox_workouts')
@@ -30,8 +23,11 @@ export async function testHyroxDatabase() {
       .select('count')
       .limit(1)
 
+    // If all queries succeed, database is working
+    const success = !workoutsError && !stationsError && !recordsError
+
     return {
-      success: true,
+      success,
       tables: {
         hyrox_workouts: !workoutsError,
         hyrox_workout_stations: !stationsError,
@@ -41,8 +37,7 @@ export async function testHyroxDatabase() {
         workouts: workoutsError,
         stations: stationsError,
         records: recordsError
-      },
-      user: authTest.user?.id
+      }
     }
   } catch (error) {
     console.error('Database test failed:', error)
