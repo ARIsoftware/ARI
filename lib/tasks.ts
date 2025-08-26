@@ -3,8 +3,8 @@ import { incrementTaskCompletion } from "./fitness-stats"
 
 export type { Task }
 
-export async function getTasks(userId: string): Promise<Task[]> {
-  const response = await fetch(`/api/tasks?userId=${encodeURIComponent(userId)}`)
+export async function getTasks(): Promise<Task[]> {
+  const response = await fetch('/api/tasks')
   
   if (!response.ok) {
     const error = await response.json()
@@ -15,13 +15,13 @@ export async function getTasks(userId: string): Promise<Task[]> {
   return await response.json()
 }
 
-export async function createTask(task: Omit<Task, "id" | "created_at" | "updated_at" | "order_index">, userId: string): Promise<Task> {
+export async function createTask(task: Omit<Task, "id" | "created_at" | "updated_at" | "order_index">): Promise<Task> {
   const response = await fetch('/api/tasks', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ task, userId }),
+    body: JSON.stringify({ task }),
   })
 
   if (!response.ok) {
@@ -33,13 +33,13 @@ export async function createTask(task: Omit<Task, "id" | "created_at" | "updated
   return await response.json()
 }
 
-export async function updateTask(id: string, updates: Partial<Task>, userId: string): Promise<Task> {
+export async function updateTask(id: string, updates: Partial<Task>): Promise<Task> {
   const response = await fetch('/api/tasks', {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ id, updates, userId }),
+    body: JSON.stringify({ id, updates }),
   })
 
   if (!response.ok) {
@@ -51,8 +51,8 @@ export async function updateTask(id: string, updates: Partial<Task>, userId: str
   return await response.json()
 }
 
-export async function deleteTask(id: string, userId: string): Promise<void> {
-  const response = await fetch(`/api/tasks?id=${encodeURIComponent(id)}&userId=${encodeURIComponent(userId)}`, {
+export async function deleteTask(id: string): Promise<void> {
+  const response = await fetch(`/api/tasks?id=${encodeURIComponent(id)}`, {
     method: 'DELETE',
   })
 
@@ -63,9 +63,9 @@ export async function deleteTask(id: string, userId: string): Promise<void> {
   }
 }
 
-export async function toggleTaskCompletion(id: string, userId: string): Promise<Task> {
+export async function toggleTaskCompletion(id: string): Promise<Task> {
   // First get the current task state
-  const response = await fetch(`/api/tasks?userId=${encodeURIComponent(userId)}`)
+  const response = await fetch('/api/tasks')
   
   if (!response.ok) {
     const error = await response.json()
@@ -87,12 +87,12 @@ export async function toggleTaskCompletion(id: string, userId: string): Promise<
   const updatedTask = await updateTask(id, {
     completed: newCompleted,
     status: newStatus,
-  }, userId)
+  })
 
   // If the task is being marked as completed, increment completion count
   if (newCompleted) {
     try {
-      await incrementTaskCompletion(id, userId)
+      await incrementTaskCompletion(id)
     } catch (error) {
       console.error("Failed to increment completion count:", error)
       // Don't throw here - the task update was successful, completion count increment is secondary
@@ -102,9 +102,9 @@ export async function toggleTaskCompletion(id: string, userId: string): Promise<
   return updatedTask
 }
 
-export async function toggleTaskStar(id: string, userId: string): Promise<Task> {
+export async function toggleTaskStar(id: string): Promise<Task> {
   // First get the current task state
-  const response = await fetch(`/api/tasks?userId=${encodeURIComponent(userId)}`)
+  const response = await fetch('/api/tasks')
   
   if (!response.ok) {
     const error = await response.json()
@@ -121,10 +121,10 @@ export async function toggleTaskStar(id: string, userId: string): Promise<Task> 
 
   return updateTask(id, {
     starred: !currentTask.starred,
-  }, userId)
+  })
 }
 
-export async function reorderTasks(taskIds: string[], userId: string): Promise<void> {
+export async function reorderTasks(taskIds: string[]): Promise<void> {
   // Update order_index for each task based on its position in the array
   const updates = taskIds.map((id, index) => ({
     id,
@@ -140,8 +140,7 @@ export async function reorderTasks(taskIds: string[], userId: string): Promise<v
       },
       body: JSON.stringify({ 
         id: update.id, 
-        updates: { order_index: update.order_index }, 
-        userId 
+        updates: { order_index: update.order_index }
       }),
     })
 

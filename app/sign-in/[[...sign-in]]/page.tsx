@@ -61,7 +61,7 @@ export default function SignInPage() {
                 borderRadius: "0.375rem",
               },
             }}
-            redirectUrl="/"
+            forceRedirectUrl={typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'http://localhost:3000/' : '/'}
             signUpUrl="/sign-up"
           />
         </div>

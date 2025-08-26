@@ -8,17 +8,9 @@ const supabase = createClient(supabaseUrl, supabaseSecretKey)
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
-    }
-
     const { data, error } = await supabase
       .from('fitness_database')
       .select('*')
-      .contains('user_ids', [userId])
       .order('order_index', { ascending: true })
 
     if (error) {
@@ -35,17 +27,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { task, userId } = await request.json()
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
-    }
+    const { task } = await request.json()
 
-    // Get the highest order_index for this user
+    // Get the highest order_index
     const { data: maxOrderData } = await supabase
       .from('fitness_database')
       .select('order_index')
-      .contains('user_ids', [userId])
       .order('order_index', { ascending: false })
       .limit(1)
 
@@ -61,8 +48,6 @@ export async function POST(request: NextRequest) {
       .from('fitness_database')
       .insert([{
         ...taskToInsert,
-        user_id: userId,
-        user_ids: [userId],
         order_index: nextOrderIndex,
       }])
       .select()
@@ -82,17 +67,16 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { id, updates, userId } = await request.json()
+    const { id, updates } = await request.json()
     
-    if (!userId || !id) {
-      return NextResponse.json({ error: 'User ID and task ID are required' }, { status: 400 })
+    if (!id) {
+      return NextResponse.json({ error: 'Task ID is required' }, { status: 400 })
     }
 
     const { data, error } = await supabase
       .from('fitness_database')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id)
-      .contains('user_ids', [userId])
       .select()
       .single()
 
@@ -112,17 +96,15 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
-    const userId = searchParams.get('userId')
     
-    if (!userId || !id) {
-      return NextResponse.json({ error: 'User ID and task ID are required' }, { status: 400 })
+    if (!id) {
+      return NextResponse.json({ error: 'Task ID is required' }, { status: 400 })
     }
 
     const { error } = await supabase
       .from('fitness_database')
       .delete()
       .eq('id', id)
-      .contains('user_ids', [userId])
 
     if (error) {
       console.error('Error deleting fitness task:', error)

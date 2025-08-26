@@ -145,22 +145,21 @@ const defaultStationRecords = [
   },
 ]
 
-// Get all station records for a user
-export async function getHyroxStationRecords(userId: string): Promise<HyroxStationRecord[]> {
+// Get all station records
+export async function getHyroxStationRecords(): Promise<HyroxStationRecord[]> {
   try {
     const client = supabaseServiceRole()
     const { data, error } = await client
       .from('hyrox_station_records')
       .select('*')
-      .eq('user_id', userId)
       .order('station_name')
 
     if (error) throw error
 
     // If no records exist, create default records
     if (!data || data.length === 0) {
-      await initializeStationRecords(userId)
-      return getHyroxStationRecords(userId)
+      await initializeStationRecords()
+      return getHyroxStationRecords()
     }
 
     // Check if any records have 0 times and reset them to defaults
@@ -171,7 +170,7 @@ export async function getHyroxStationRecords(userId: string): Promise<HyroxStati
         )
         if (defaultRecord) {
           // Update the record in the database with default values
-          updateStationRecordToDefault(userId, record.station_name, defaultRecord.best_time)
+          updateStationRecordToDefault(record.station_name, defaultRecord.best_time)
           return {
             ...record,
             best_time: defaultRecord.best_time,
@@ -191,7 +190,6 @@ export async function getHyroxStationRecords(userId: string): Promise<HyroxStati
 
 // Helper function to update a station record to default values
 async function updateStationRecordToDefault(
-  userId: string,
   stationName: string,
   defaultBestTime: number
 ): Promise<void> {
@@ -200,20 +198,18 @@ async function updateStationRecordToDefault(
     await client
       .from('hyrox_station_records')
       .update({ best_time: defaultBestTime })
-      .eq('user_id', userId)
       .eq('station_name', stationName)
   } catch (error) {
     console.error('Error updating station record to default:', error)
   }
 }
 
-// Initialize default station records for a new user
-export async function initializeStationRecords(userId: string): Promise<void> {
+// Initialize default station records
+export async function initializeStationRecords(): Promise<void> {
   try {
     const client = supabaseServiceRole()
     const records = defaultStationRecords.map(record => ({
       ...record,
-      user_id: userId,
     }))
 
     const { error } = await client
@@ -228,7 +224,6 @@ export async function initializeStationRecords(userId: string): Promise<void> {
 
 // Update a station record (new personal best)
 export async function updateStationRecord(
-  userId: string,
   stationName: string,
   newTime: number
 ): Promise<HyroxStationRecord | null> {
@@ -239,7 +234,6 @@ export async function updateStationRecord(
     const { data: currentRecord, error: fetchError } = await client
       .from('hyrox_station_records')
       .select('*')
-      .eq('user_id', userId)
       .eq('station_name', stationName)
       .single()
 
@@ -250,7 +244,6 @@ export async function updateStationRecord(
       const { data, error } = await client
         .from('hyrox_station_records')
         .update({ best_time: newTime })
-        .eq('user_id', userId)
         .eq('station_name', stationName)
         .select()
         .single()
@@ -267,13 +260,12 @@ export async function updateStationRecord(
 }
 
 // Create a new workout session
-export async function createHyroxWorkout(userId: string): Promise<HyroxWorkout | null> {
+export async function createHyroxWorkout(): Promise<HyroxWorkout | null> {
   try {
     const client = supabaseServiceRole()
     const { data, error } = await client
       .from('hyrox_workouts')
       .insert({
-        user_id: userId,
         total_time: 0,
         completed: false,
       })
@@ -283,10 +275,7 @@ export async function createHyroxWorkout(userId: string): Promise<HyroxWorkout |
     if (error) throw error
     return data
   } catch (error) {
-    console.error('Error creating Hyrox workout:', {
-      error,
-      userId
-    })
+    console.error('Error creating Hyrox workout:', error)
     return null
   }
 }
@@ -354,9 +343,8 @@ export async function addWorkoutStation(
   }
 }
 
-// Get workout history for a user
+// Get workout history
 export async function getHyroxWorkoutHistory(
-  userId: string,
   limit: number = 10
 ): Promise<HyroxWorkout[]> {
   try {
@@ -364,7 +352,6 @@ export async function getHyroxWorkoutHistory(
     const { data, error } = await client
       .from('hyrox_workouts')
       .select('*')
-      .eq('user_id', userId)
       .eq('completed', true)
       .order('completed_at', { ascending: false })
       .limit(limit)

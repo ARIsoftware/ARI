@@ -80,7 +80,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
       if (!user?.id) return // Wait for user to be loaded
       
       try {
-        const tasks = await getTasks(user.id)
+        const tasks = await getTasks()
         const foundTask = tasks.find((t) => t.id === id)
         
         if (!foundTask) {
@@ -175,7 +175,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
         completed: formData.completed,
       }
 
-      await updateTask(id, updates, user?.id || "")
+      await updateTask(id, updates)
 
       toast({
         title: "Success",

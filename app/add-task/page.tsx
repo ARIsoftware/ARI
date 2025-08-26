@@ -131,7 +131,7 @@ export default function AddTaskPage() {
         return
       }
 
-      await createTask(taskData, user.id)
+      await createTask(taskData)
 
       toast({
         title: "Success",

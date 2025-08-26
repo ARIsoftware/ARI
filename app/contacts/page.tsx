@@ -106,7 +106,7 @@ export default function ContactsPage() {
 
     try {
       setLoading(true)
-      const data = await getContacts(user.id)
+      const data = await getContacts()
       setContacts(data)
     } catch (error) {
       console.error("Failed to load contacts:", error)

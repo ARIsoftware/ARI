@@ -26,7 +26,6 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabase
       .from('hyrox_workouts')
       .select('*')
-      .eq('user_id', user.id)
       .eq('completed', true)
       .order('completed_at', { ascending: false })
       .limit(limit)
@@ -64,7 +63,6 @@ export async function POST(req: NextRequest) {
     const { data, error } = await supabase
       .from('hyrox_workouts')
       .insert({
-        user_id: user.id,
         total_time: 0,
         completed: false,
       })
@@ -111,7 +109,6 @@ export async function PUT(req: NextRequest) {
         completed_at: new Date().toISOString(),
       })
       .eq('id', workoutId)
-      .eq('user_id', user.id) // Extra security check
       .select()
       .single()
 
