@@ -135,7 +135,7 @@ export default function TasksPage() {
 
     try {
       setLoading(true)
-      const data = await getTasks(user.id)
+      const data = await getTasks()
       setTasks(data)
     } catch (error) {
       console.error("Failed to load tasks:", error)
@@ -209,7 +209,7 @@ export default function TasksPage() {
     try {
       // Update order in database
       if (user?.id) {
-        await reorderTasks(updatedTasks.map((task) => task.id), user.id)
+        await reorderTasks(updatedTasks.map((task) => task.id))
       }
     } catch (error) {
       console.error("Failed to reorder tasks:", error)
@@ -246,7 +246,7 @@ export default function TasksPage() {
 
     try {
       if (user?.id) {
-        await updateTask(draggedTask, updates, user.id)
+        await updateTask(draggedTask, updates)
         setTasks(tasks.map((t) => t.id === draggedTask ? { ...t, ...updates } : t))
       }
       toast({
@@ -277,7 +277,7 @@ export default function TasksPage() {
         // Wait for animation to complete before updating
         setTimeout(async () => {
           if (user?.id) {
-            const updatedTask = await toggleTaskCompletion(taskId, user.id)
+            const updatedTask = await toggleTaskCompletion(taskId)
             setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
           }
           setFadingTasks(prev => {
@@ -293,7 +293,7 @@ export default function TasksPage() {
       } else {
         // If uncompleting or in Completed view, update immediately
         if (user?.id) {
-          const updatedTask = await toggleTaskCompletion(taskId, user.id)
+          const updatedTask = await toggleTaskCompletion(taskId)
           setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
           toast({
             title: "Success",
@@ -315,7 +315,7 @@ export default function TasksPage() {
     if (!user?.id) return
     
     try {
-      const updatedTask = await toggleTaskStar(taskId, user.id)
+      const updatedTask = await toggleTaskStar(taskId)
       setTasks(tasks.map((task) => (task.id === taskId ? updatedTask : task)))
     } catch (error) {
       console.error("Failed to toggle task star:", error)
@@ -340,7 +340,7 @@ export default function TasksPage() {
     
     try {
       if (user?.id) {
-        await deleteTask(taskToDelete.id, user.id)
+        await deleteTask(taskToDelete.id)
         setTasks(tasks.filter((task) => task.id !== taskToDelete.id))
       }
       toast({

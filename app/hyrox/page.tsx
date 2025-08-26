@@ -106,8 +106,8 @@ export default function HyroxPage() {
     try {
       setLoading(true)
       const [records, workoutHistory] = await Promise.all([
-        getHyroxStationRecords(user.id),
-        getHyroxWorkoutHistory(user.id, 1) // Get last workout
+        getHyroxStationRecords(),
+        getHyroxWorkoutHistory(1) // Get last workout
       ])
       console.log('Loaded station records:', records)
       
@@ -247,7 +247,7 @@ export default function HyroxPage() {
     }
 
     try {
-      const workout = await createHyroxWorkout(user.id)
+      const workout = await createHyroxWorkout()
       if (workout) {
         setCurrentWorkout(workout)
         setWorkoutActive(true)
@@ -300,7 +300,7 @@ export default function HyroxPage() {
       }
 
       // Update personal best if applicable
-      const recordResult = await updateStationRecord(user.id, currentStationData.name, stationTime)
+      const recordResult = await updateStationRecord(currentStationData.name, stationTime)
       if (!recordResult) {
         console.error('Failed to update station record for:', currentStationData.name)
       } else {

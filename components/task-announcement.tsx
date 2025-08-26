@@ -58,7 +58,7 @@ export function TaskAnnouncement() {
   }, [user?.id])
 
   const loadLastTask = async () => {
-    const task = await getLastCompletedTask(user?.id)
+    const task = await getLastCompletedTask()
     setLastTask(task)
     setLoading(false)
   }

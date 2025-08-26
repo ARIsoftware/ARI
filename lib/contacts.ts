@@ -16,12 +16,11 @@ export type Contact = {
   updated_at: string
 }
 
-export async function getContacts(userId: string): Promise<Contact[]> {
+export async function getContacts(): Promise<Contact[]> {
   const client = await getAuthenticatedSupabase()
   const { data, error } = await client
     .from("contacts")
     .select("*")
-    .eq("user_id", userId)
     .order("name", { ascending: true })
 
   if (error) {
@@ -32,13 +31,12 @@ export async function getContacts(userId: string): Promise<Contact[]> {
   return data || []
 }
 
-export async function getContact(id: string, userId: string): Promise<Contact | null> {
+export async function getContact(id: string): Promise<Contact | null> {
   const client = await getAuthenticatedSupabase()
   const { data, error } = await client
     .from("contacts")
     .select("*")
     .eq("id", id)
-    .eq("user_id", userId) // Ensure user can only access their own contacts
     .single()
 
   if (error) {
@@ -50,13 +48,12 @@ export async function getContact(id: string, userId: string): Promise<Contact | 
 }
 
 export async function createContact(
-  contact: Omit<Contact, "id" | "created_at" | "updated_at">,
-  userId: string
+  contact: Omit<Contact, "id" | "created_at" | "updated_at">
 ): Promise<Contact> {
   const client = await getAuthenticatedSupabase()
   const { data, error } = await client
     .from("contacts")
-    .insert([{ ...contact, user_id: userId }])
+    .insert([contact])
     .select()
     .single()
 
@@ -70,15 +67,13 @@ export async function createContact(
 
 export async function updateContact(
   id: string,
-  updates: Partial<Omit<Contact, "id" | "created_at" | "updated_at">>,
-  userId: string
+  updates: Partial<Omit<Contact, "id" | "created_at" | "updated_at">>
 ): Promise<Contact> {
   const client = await getAuthenticatedSupabase()
   const { data, error } = await client
     .from("contacts")
     .update(updates)
     .eq("id", id)
-    .eq("user_id", userId) // Ensure user can only update their own contacts
     .select()
     .single()
 
@@ -90,13 +85,12 @@ export async function updateContact(
   return data
 }
 
-export async function deleteContact(id: string, userId: string): Promise<void> {
+export async function deleteContact(id: string): Promise<void> {
   const client = await getAuthenticatedSupabase()
   const { error } = await client
     .from("contacts")
     .delete()
     .eq("id", id)
-    .eq("user_id", userId) // Ensure user can only delete their own contacts
 
   if (error) {
     console.error("Error deleting contact:", error)
