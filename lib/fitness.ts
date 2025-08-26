@@ -3,10 +3,10 @@ import { incrementFitnessTaskCompletion } from "./fitness-stats"
 
 export type { FitnessTask }
 
-export async function getFitnessTasks(userId: string): Promise<FitnessTask[]> {
-  console.log("Attempting to fetch fitness tasks from fitness_database table for user:", userId)
+export async function getFitnessTasks(): Promise<FitnessTask[]> {
+  console.log("Attempting to fetch fitness tasks from fitness_database table")
   
-  const response = await fetch(`/api/fitness-tasks?userId=${encodeURIComponent(userId)}`)
+  const response = await fetch('/api/fitness-tasks')
   
   if (!response.ok) {
     const error = await response.json()
@@ -19,15 +19,15 @@ export async function getFitnessTasks(userId: string): Promise<FitnessTask[]> {
   return data
 }
 
-export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_at" | "updated_at" | "order_index"> & { youtube_url?: string | null }, userId: string): Promise<FitnessTask> {
-  console.log("Attempting to create fitness task:", task, "for user:", userId)
+export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_at" | "updated_at" | "order_index"> & { youtube_url?: string | null }): Promise<FitnessTask> {
+  console.log("Attempting to create fitness task:", task)
   
   const response = await fetch('/api/fitness-tasks', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ task, userId }),
+    body: JSON.stringify({ task }),
   })
 
   if (!response.ok) {
@@ -41,13 +41,13 @@ export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_
   return data
 }
 
-export async function updateFitnessTask(id: string, updates: Partial<FitnessTask>, userId: string): Promise<FitnessTask> {
+export async function updateFitnessTask(id: string, updates: Partial<FitnessTask>): Promise<FitnessTask> {
   const response = await fetch('/api/fitness-tasks', {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ id, updates, userId }),
+    body: JSON.stringify({ id, updates }),
   })
 
   if (!response.ok) {
@@ -59,8 +59,8 @@ export async function updateFitnessTask(id: string, updates: Partial<FitnessTask
   return await response.json()
 }
 
-export async function deleteFitnessTask(id: string, userId: string): Promise<void> {
-  const response = await fetch(`/api/fitness-tasks?id=${encodeURIComponent(id)}&userId=${encodeURIComponent(userId)}`, {
+export async function deleteFitnessTask(id: string): Promise<void> {
+  const response = await fetch(`/api/fitness-tasks?id=${encodeURIComponent(id)}`, {
     method: 'DELETE',
   })
 
@@ -71,7 +71,7 @@ export async function deleteFitnessTask(id: string, userId: string): Promise<voi
   }
 }
 
-export async function toggleFitnessTaskCompletion(id: string, userId: string, currentCompleted: boolean): Promise<FitnessTask> {
+export async function toggleFitnessTaskCompletion(id: string, currentCompleted: boolean): Promise<FitnessTask> {
   const newCompleted = !currentCompleted
   const newStatus = newCompleted ? "Completed" : "Pending"
 
@@ -79,7 +79,7 @@ export async function toggleFitnessTaskCompletion(id: string, userId: string, cu
   const updatedTask = await updateFitnessTask(id, {
     completed: newCompleted,
     status: newStatus,
-  }, userId)
+  })
 
   // If the task is being marked as completed, increment completion count and add to history
   if (newCompleted) {
@@ -94,17 +94,17 @@ export async function toggleFitnessTaskCompletion(id: string, userId: string, cu
   return updatedTask
 }
 
-export async function toggleFitnessTaskStar(id: string, userId: string, currentStarred: boolean): Promise<FitnessTask> {
+export async function toggleFitnessTaskStar(id: string, currentStarred: boolean): Promise<FitnessTask> {
   return updateFitnessTask(id, {
     starred: !currentStarred,
-  }, userId)
+  })
 }
 
-export async function reorderFitnessTasks(taskIds: string[], userId: string): Promise<void> {
+export async function reorderFitnessTasks(taskIds: string[]): Promise<void> {
   // Update order_index for each task based on its position in the array
   for (let i = 0; i < taskIds.length; i++) {
     try {
-      await updateFitnessTask(taskIds[i], { order_index: i }, userId)
+      await updateFitnessTask(taskIds[i], { order_index: i })
     } catch (error) {
       console.error("Error updating fitness task order:", error)
       throw error
@@ -113,13 +113,13 @@ export async function reorderFitnessTasks(taskIds: string[], userId: string): Pr
 }
 
 // Add sample fitness tasks
-export async function addSampleFitnessTasks(userId: string): Promise<void> {
+export async function addSampleFitnessTasks(): Promise<void> {
   const response = await fetch('/api/sample-fitness-tasks', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ userId }),
+    body: JSON.stringify({}),
   })
 
   if (!response.ok) {

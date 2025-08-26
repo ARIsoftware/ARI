@@ -14,9 +14,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
   // Type assertion to handle React 19 compatibility
   const Provider = ClerkProvider as any
 
+  // Determine if we're on localhost
+  const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+  const redirectUrl = isLocalhost ? 'http://localhost:3000/' : '/'
+
   return (
     <Provider
       publishableKey={publishableKey}
+      signInFallbackRedirectUrl={redirectUrl}
+      signUpFallbackRedirectUrl={redirectUrl}
+      afterSignInUrl={redirectUrl}
+      afterSignUpUrl={redirectUrl}
       appearance={{
         baseTheme: undefined,
         variables: {

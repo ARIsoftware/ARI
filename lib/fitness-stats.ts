@@ -111,7 +111,6 @@ export async function incrementFitnessTaskCompletion(taskId: string): Promise<vo
     const { error: historyError } = await supabase
       .from("fitness_completion_history")
       .insert([{
-        user_id: null, // You may want to add actual user tracking later
         fitness_task_title: task?.title || "Unknown Task",
         completed_at: new Date().toISOString()
       }])
@@ -127,21 +126,14 @@ export async function incrementFitnessTaskCompletion(taskId: string): Promise<vo
 }
 
 // Keep the old function for regular tasks (ari-database)
-export async function incrementTaskCompletion(taskId: string, userId?: string): Promise<void> {
-  // This function needs userId to work with the API
-  // If not provided, we'll skip the increment (backwards compatibility)
-  if (!userId) {
-    console.warn("incrementTaskCompletion called without userId, skipping")
-    return
-  }
-
+export async function incrementTaskCompletion(taskId: string): Promise<void> {
   try {
     const response = await fetch('/api/tasks/increment-completion', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ taskId, userId }),
+      body: JSON.stringify({ taskId }),
     })
 
     if (!response.ok) {
