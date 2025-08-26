@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useUser } from "@clerk/nextjs"
+import { useUser, useAuth } from "@clerk/nextjs"
 import { DM_Sans } from "next/font/google"
 import { AppSidebar } from "../../components/app-sidebar"
 import {
@@ -91,15 +91,40 @@ const getTaskAgeColor = (createdAt: string, isStarred: boolean = false) => {
 
 export default function TasksPage() {
   const { user } = useUser()
+  const { getToken } = useAuth()
   const { toast } = useToast()
   
-  // Temporary: Log user ID to console for RLS migration
+  // JWT Debugging for RLS Setup
   useEffect(() => {
-    if (user?.id) {
-      console.log("🔑 Your Clerk User ID:", user.id)
-      console.log("Copy this ID for your RLS migration!")
+    const debugJWT = async () => {
+      if (user?.id && user?.emailAddresses?.[0]?.emailAddress) {
+        console.log("🔑 RLS Debug Info:")
+        console.log("  User ID:", user.id)
+        console.log("  Email:", user.emailAddresses[0].emailAddress)
+        
+        try {
+          const token = await getToken({ template: "supabase" })
+          if (token) {
+            // Decode JWT payload (safe - just reading claims)
+            const payload = JSON.parse(atob(token.split('.')[1]))
+            console.log("  JWT Claims:", {
+              sub: payload.sub,
+              email: payload.email,
+              iss: payload.iss,
+              exp: new Date(payload.exp * 1000).toISOString()
+            })
+            console.log("✅ JWT contains email:", !!payload.email)
+          } else {
+            console.log("❌ No Supabase JWT token available")
+          }
+        } catch (error) {
+          console.error("❌ JWT Debug Error:", error)
+        }
+      }
     }
-  }, [user?.id])
+    
+    debugJWT()
+  }, [user?.id, user?.emailAddresses, getToken])
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [activeFilter, setActiveFilter] = useState("All")
