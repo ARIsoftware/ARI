@@ -81,7 +81,7 @@ export default function EditFitnessPage({ params }: { params: Promise<{ id: stri
       if (!user?.id) return // Wait for user to be loaded
       
       try {
-        const tasks = await getFitnessTasks(user.id)
+        const tasks = await getFitnessTasks()
         const foundTask = tasks.find((t) => t.id === id)
         
         if (!foundTask) {
@@ -178,7 +178,7 @@ export default function EditFitnessPage({ params }: { params: Promise<{ id: stri
         youtube_url: formData.youtube_url.trim() || null,
       }
 
-      await updateFitnessTask(id, updates, user?.id || "")
+      await updateFitnessTask(id, updates)
 
       toast({
         title: "Success",

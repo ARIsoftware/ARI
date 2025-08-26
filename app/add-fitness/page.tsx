@@ -91,7 +91,7 @@ export default function AddFitnessPage() {
         starred,
         completed: status === "Completed",
         youtube_url: youtubeUrl.trim() || null,
-      }, user.id)
+      })
 
       toast({
         title: "Success",

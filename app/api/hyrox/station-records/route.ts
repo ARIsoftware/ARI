@@ -124,7 +124,7 @@ export async function GET(req: NextRequest) {
       if (insertError) {
         console.error('Error inserting default records:', insertError)
         // Return the default records even if insert fails
-        const fallbackRecords = records.map(record => ({
+        const fallbackRecords = defaultStationRecords.map(record => ({
           ...record,
           id: `temp-${record.station_name}`,
           created_at: new Date().toISOString(),
@@ -220,7 +220,6 @@ export async function PUT(req: NextRequest) {
           best_time: newTime,
           updated_at: new Date().toISOString()
         })
-        .eq('user_id', user.id)
         .eq('station_name', stationName)
         .select()
         .single()
