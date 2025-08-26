@@ -66,6 +66,29 @@ const formatDate = (dateString: string | null) => {
   })
 }
 
+const calculateTaskAge = (createdAt: string) => {
+  const createdDate = new Date(createdAt)
+  const currentDate = new Date()
+  const timeDiff = currentDate.getTime() - createdDate.getTime()
+  const daysDiff = Math.floor(timeDiff / (1000 * 3600 * 24))
+  return daysDiff
+}
+
+const formatTaskAge = (createdAt: string) => {
+  const days = calculateTaskAge(createdAt)
+  if (days === 0) return "Today"
+  if (days === 1) return "1 day"
+  return `${days} days`
+}
+
+const getTaskAgeColor = (createdAt: string, isStarred: boolean = false) => {
+  const days = calculateTaskAge(createdAt)
+  if (days > 4) {
+    return "text-red-600"
+  }
+  return isStarred ? "text-gray-300" : "text-gray-600"
+}
+
 export default function TasksPage() {
   const { user } = useUser()
   const { toast } = useToast()
@@ -521,6 +544,11 @@ export default function TasksPage() {
                           <Calendar className="w-3 h-3" />
                           <span>{formatDate(task.due_date)}</span>
                         </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className={getTaskAgeColor(task.created_at, false)}>
+                            {formatTaskAge(task.created_at)}
+                          </span>
+                        </div>
                         <div className="flex items-center gap-1 mt-2">
                           <Button
                             variant="ghost"
@@ -583,6 +611,11 @@ export default function TasksPage() {
                         <div className="flex items-center gap-2 text-xs text-gray-600">
                           <Calendar className="w-3 h-3" />
                           <span>{formatDate(task.due_date)}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className={getTaskAgeColor(task.created_at, false)}>
+                            {formatTaskAge(task.created_at)}
+                          </span>
                         </div>
                         <div className="flex items-center gap-1 mt-2">
                           <Button
@@ -647,6 +680,11 @@ export default function TasksPage() {
                           <Calendar className="w-3 h-3" />
                           <span>{formatDate(task.due_date)}</span>
                         </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className={getTaskAgeColor(task.created_at, false)}>
+                            {formatTaskAge(task.created_at)}
+                          </span>
+                        </div>
                         <div className="flex items-center gap-1 mt-2">
                           <Button
                             variant="ghost"
@@ -709,6 +747,11 @@ export default function TasksPage() {
                         <div className="flex items-center gap-2 text-xs text-gray-600">
                           <Calendar className="w-3 h-3" />
                           <span>{formatDate(task.due_date)}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className={getTaskAgeColor(task.created_at, false)}>
+                            {formatTaskAge(task.created_at)}
+                          </span>
                         </div>
                         <div className="flex items-center gap-1 mt-2">
                           <Button
@@ -809,6 +852,12 @@ export default function TasksPage() {
                               Subtasks: {task.subtasks_completed}/{task.subtasks_total}
                             </span>
                           </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-sm ${getTaskAgeColor(task.created_at, task.starred)}`}>
+                              {formatTaskAge(task.created_at)}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
@@ -899,6 +948,12 @@ export default function TasksPage() {
                             <Bell className="w-4 h-4" />
                             <span className="text-xs">
                               Subtasks: {task.subtasks_completed}/{task.subtasks_total}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-xs ${getTaskAgeColor(task.created_at, task.starred)}`}>
+                              {formatTaskAge(task.created_at)}
                             </span>
                           </div>
                         </div>
