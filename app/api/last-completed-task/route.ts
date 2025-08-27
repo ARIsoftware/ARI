@@ -1,27 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY!
-
-const supabase = createClient(supabaseUrl, supabaseSecretKey)
+import { createAuthenticatedSupabaseClient } from '@/lib/supabase-auth-api'
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
-    
-    let query = supabase
+    const { supabase, userId } = await createAuthenticatedSupabaseClient()
+    console.log('✅ User authenticated:', userId)
+
+    const { data, error } = await supabase
       .from('ari-database')
       .select('title, updated_at')
       .eq('completed', true)
-    
-    // Add user_id filter if provided
-    if (userId) {
-      query = query.eq('user_id', userId)
-    }
-    
-    const { data, error } = await query
       .order('updated_at', { ascending: false })
       .limit(1)
       .single()
@@ -38,6 +26,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data)
   } catch (err) {
     console.error('API error:', err)
+    
+    if (err instanceof Error && err.message.includes('Unauthorized')) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
+    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
