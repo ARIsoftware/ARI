@@ -9,6 +9,20 @@ import { getAuthenticatedSupabase } from "@/lib/supabase"
 import { useIsMobile } from "@/components/ui/use-mobile"
 import { useUser } from "@clerk/nextjs"
 
+// Import focus timer state
+let globalTimerState = {
+  isActive: false,
+  timeRemaining: 0,
+  listeners: [] as Array<(isActive: boolean, timeRemaining: number) => void>
+}
+
+// Make sure we're using the same global state as the focus timer
+if (typeof window !== 'undefined' && (window as any).globalTimerState) {
+  globalTimerState = (window as any).globalTimerState
+} else if (typeof window !== 'undefined') {
+  (window as any).globalTimerState = globalTimerState
+}
+
 const dmSans = DM_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
@@ -17,12 +31,28 @@ const dmSans = DM_Sans({
 export function TaskAnnouncement() {
   const [lastTask, setLastTask] = useState<{ title: string } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [focusTimer, setFocusTimer] = useState({ isActive: false, timeRemaining: 0, isComplete: false })
   const isMobile = useIsMobile()
   const { user } = useUser()
 
   useEffect(() => {
     // Load initial task
     loadLastTask()
+
+    // Set up focus timer listener
+    const listener = (isActive: boolean, timeRemaining: number) => {
+      if (!isActive && timeRemaining === 0 && focusTimer.isActive) {
+        // Timer just completed
+        setFocusTimer({ isActive: false, timeRemaining: 0, isComplete: true })
+        // Auto-dismiss completion message after 5 seconds
+        setTimeout(() => {
+          setFocusTimer({ isActive: false, timeRemaining: 0, isComplete: false })
+        }, 5000)
+      } else {
+        setFocusTimer({ isActive, timeRemaining, isComplete: false })
+      }
+    }
+    globalTimerState.listeners.push(listener)
 
     // Set up real-time subscription for task completions
     const setupSubscription = async () => {
@@ -54,6 +84,8 @@ export function TaskAnnouncement() {
     
     return () => {
       cleanup.then(fn => fn && fn())
+      // Clean up focus timer listener
+      globalTimerState.listeners = globalTimerState.listeners.filter(l => l !== listener)
     }
   }, [user?.id])
 
@@ -63,9 +95,37 @@ export function TaskAnnouncement() {
     setLoading(false)
   }
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
+
+  // Show focus timer when active
+  if (focusTimer.isActive) {
+    return (
+      <div className="topbar bg-black w-full relative z-50 flex items-center justify-center" style={{ height: '90vh' }}>
+        <h1 className="text-white text-6xl font-bold">
+          FOCUS TIME {formatTime(focusTimer.timeRemaining)}
+        </h1>
+      </div>
+    )
+  }
+
+  // Show completion message
+  if (focusTimer.isComplete) {
+    return (
+      <div className="topbar bg-black w-full relative z-50 flex items-center justify-center" style={{ height: '90vh' }}>
+        <h1 className="text-white text-6xl font-bold">
+          FOCUS TIME COMPLETE 💪
+        </h1>
+      </div>
+    )
+  }
+
   if (loading || !lastTask) {
     return (
-      <div className="topbar h-[45x] bg-black w-full relative z-50 flex items-center justify-center">
+      <div className="topbar h-[45px] bg-black w-full relative z-50 flex items-center justify-center">
         <span className={`text-white font-medium ${dmSans.className}`}>ARI</span>
       </div>
     )

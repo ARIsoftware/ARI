@@ -5,44 +5,23 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Clock, StopCircle } from "lucide-react"
 
+// Use global window object to ensure state is shared across components
 let globalTimerState = {
   isActive: false,
   timeRemaining: 0,
   listeners: [] as Array<(isActive: boolean, timeRemaining: number) => void>
 }
 
-export function FocusTimerDisplay() {
-  const [state, setState] = useState(globalTimerState)
-  
-  useEffect(() => {
-    const listener = (isActive: boolean, timeRemaining: number) => {
-      setState({ ...globalTimerState, isActive, timeRemaining })
-    }
-    globalTimerState.listeners.push(listener)
-    
-    return () => {
-      globalTimerState.listeners = globalTimerState.listeners.filter(l => l !== listener)
-    }
-  }, [])
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+// Make sure we're using the same global state across components
+if (typeof window !== 'undefined') {
+  if ((window as any).globalTimerState) {
+    globalTimerState = (window as any).globalTimerState
+  } else {
+    (window as any).globalTimerState = globalTimerState
   }
-
-  if (!state.isActive) return null
-
-  return (
-    <div className="w-full bg-black flex items-center justify-center" style={{ height: '80vh' }}>
-      <div className="text-center">
-        <h1 className="text-white text-6xl font-bold">
-          FOCUS TIME {formatTime(state.timeRemaining)}
-        </h1>
-      </div>
-    </div>
-  )
 }
+
+// FocusTimerDisplay is now handled by TaskAnnouncement component
 
 export function FocusTimer() {
   const [isSelectOpen, setIsSelectOpen] = useState(false)

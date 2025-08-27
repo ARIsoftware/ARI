@@ -103,31 +103,34 @@ export default function NorthstarPage() {
     }
 
     try {
-      const response = await fetch("/api/goals", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${await getToken()}`,
-        },
-        body: JSON.stringify(newGoal),
-      })
-
-      if (response.ok) {
-        const createdGoal = await response.json()
-        setGoals([...goals, createdGoal])
-        setIsAddModalOpen(false)
-        setNewGoal({
-          title: "",
-          description: "",
-          category: "",
-          priority: "medium",
-          deadline: "",
-        })
-        toast({
-          title: "Success",
-          description: "Goal created successfully",
-        })
+      // Create a new goal object
+      const createdGoal: Goal = {
+        id: crypto.randomUUID(),
+        title: newGoal.title,
+        description: newGoal.description,
+        category: newGoal.category || "Personal",
+        priority: newGoal.priority,
+        deadline: newGoal.deadline || null,
+        progress: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       }
+
+      // Add to local state for now (will integrate with API once database is ready)
+      setGoals([...goals, createdGoal])
+      setIsAddModalOpen(false)
+      setNewGoal({
+        title: "",
+        description: "",
+        category: "",
+        priority: "medium",
+        deadline: "",
+      })
+      
+      toast({
+        title: "Success",
+        description: "Goal created successfully",
+      })
     } catch (error) {
       console.error("Error creating goal:", error)
       toast({
@@ -147,20 +150,15 @@ export default function NorthstarPage() {
       : Math.max(goal.progress - 10, 0)
 
     try {
-      const response = await fetch(`/api/goals/${goalId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${await getToken()}`,
-        },
-        body: JSON.stringify({ progress: newProgress }),
+      // Update local state for now (will integrate with API once database is ready)
+      setGoals(goals.map(g => 
+        g.id === goalId ? { ...g, progress: newProgress, updated_at: new Date().toISOString() } : g
+      ))
+      
+      toast({
+        title: "Progress Updated",
+        description: `Goal progress ${action === "increment" ? "increased" : "decreased"} by 10%`,
       })
-
-      if (response.ok) {
-        setGoals(goals.map(g => 
-          g.id === goalId ? { ...g, progress: newProgress } : g
-        ))
-      }
     } catch (error) {
       console.error("Error updating goal progress:", error)
       toast({
@@ -177,6 +175,59 @@ export default function NorthstarPage() {
     : 0
   const activeGoals = goals.filter(g => g.progress < 100).length
 
+  // Initialize with some example goals
+  useEffect(() => {
+    if (goals.length === 0) {
+      const initialGoals: Goal[] = [
+        {
+          id: "1",
+          title: "Learn a New Language",
+          description: "Become conversational in Spanish by practicing daily",
+          category: "Personal Growth",
+          priority: "high",
+          deadline: "2024-12-30",
+          progress: 65,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          id: "2",
+          title: "Run a Marathon",
+          description: "Complete a full 26.2 mile marathon race",
+          category: "Health & Fitness",
+          priority: "medium",
+          deadline: "2024-10-14",
+          progress: 40,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          id: "3",
+          title: "Save for Emergency Fund",
+          description: "Build a 6-month emergency fund for financial security",
+          category: "Financial",
+          priority: "high",
+          deadline: "2024-08-29",
+          progress: 80,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          id: "4",
+          title: "Read 24 Books",
+          description: "Read 2 books per month to expand knowledge",
+          category: "Learning",
+          priority: "low",
+          deadline: "2024-12-30",
+          progress: 50,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ]
+      setGoals(initialGoals)
+    }
+    setIsLoading(false)
+  }, [goals.length])
 
   return (
     <SidebarProvider>
