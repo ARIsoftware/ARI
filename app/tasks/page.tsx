@@ -184,7 +184,8 @@ export default function TasksPage() {
 
     try {
       setLoading(true)
-      const data = await getTasks()
+      const tokenFn = async () => await getToken({ template: 'supabase' })
+      const data = await getTasks(tokenFn)
       setTasks(data)
     } catch (error) {
       console.error("Failed to load tasks:", error)
@@ -258,7 +259,8 @@ export default function TasksPage() {
     try {
       // Update order in database
       if (user?.id) {
-        await reorderTasks(updatedTasks.map((task) => task.id))
+        const tokenFn = async () => await getToken({ template: 'supabase' })
+        await reorderTasks(updatedTasks.map((task) => task.id), tokenFn)
       }
     } catch (error) {
       console.error("Failed to reorder tasks:", error)
@@ -295,7 +297,8 @@ export default function TasksPage() {
 
     try {
       if (user?.id) {
-        await updateTask(draggedTask, updates)
+        const tokenFn = async () => await getToken({ template: 'supabase' })
+        await updateTask(draggedTask, updates, tokenFn)
         setTasks(tasks.map((t) => t.id === draggedTask ? { ...t, ...updates } : t))
       }
       toast({
@@ -326,7 +329,8 @@ export default function TasksPage() {
         // Wait for animation to complete before updating
         setTimeout(async () => {
           if (user?.id) {
-            const updatedTask = await toggleTaskCompletion(taskId)
+            const tokenFn = async () => await getToken({ template: 'supabase' })
+            const updatedTask = await toggleTaskCompletion(taskId, tokenFn)
             setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
           }
           setFadingTasks(prev => {
@@ -342,7 +346,8 @@ export default function TasksPage() {
       } else {
         // If uncompleting or in Completed view, update immediately
         if (user?.id) {
-          const updatedTask = await toggleTaskCompletion(taskId)
+          const tokenFn = async () => await getToken({ template: 'supabase' })
+          const updatedTask = await toggleTaskCompletion(taskId, tokenFn)
           setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
           toast({
             title: "Success",
@@ -364,7 +369,8 @@ export default function TasksPage() {
     if (!user?.id) return
     
     try {
-      const updatedTask = await toggleTaskStar(taskId)
+      const tokenFn = async () => await getToken({ template: 'supabase' })
+      const updatedTask = await toggleTaskStar(taskId, tokenFn)
       setTasks(tasks.map((task) => (task.id === taskId ? updatedTask : task)))
     } catch (error) {
       console.error("Failed to toggle task star:", error)
@@ -389,7 +395,8 @@ export default function TasksPage() {
     
     try {
       if (user?.id) {
-        await deleteTask(taskToDelete.id)
+        const tokenFn = async () => await getToken({ template: 'supabase' })
+        await deleteTask(taskToDelete.id, tokenFn)
         setTasks(tasks.filter((task) => task.id !== taskToDelete.id))
       }
       toast({
