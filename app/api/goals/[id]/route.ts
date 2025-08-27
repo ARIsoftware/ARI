@@ -1,49 +1,39 @@
 import { NextRequest, NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase"
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY!
+
+const supabase = createClient(supabaseUrl, supabaseSecretKey)
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const authHeader = request.headers.get("authorization")
-    
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Missing or invalid authorization header" }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const decoded = JSON.parse(atob(token.split('.')[1]))
-    const userEmail = decoded.email
-
-    if (!userEmail) {
-      return NextResponse.json({ error: "No email found in token" }, { status: 401 })
-    }
-
     const body = await request.json()
     const goalId = params.id
+    
+    if (!goalId) {
+      return NextResponse.json({ error: 'Goal ID is required' }, { status: 400 })
+    }
 
     const { data, error } = await supabase
       .from("goals")
-      .update(body)
-      .eq("id", goalId)
-      .eq("user_email", userEmail)
+      .update({ ...body, updated_at: new Date().toISOString() })
+      .eq('id', goalId)
       .select()
       .single()
 
     if (error) {
-      console.error("Supabase error:", error)
-      return NextResponse.json({ error: "Database error" }, { status: 500 })
-    }
-
-    if (!data) {
-      return NextResponse.json({ error: "Goal not found" }, { status: 404 })
+      console.error('Error updating goal:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
     return NextResponse.json(data)
-  } catch (error) {
-    console.error("API error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  } catch (err) {
+    console.error('API error:', err)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -52,36 +42,25 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const authHeader = request.headers.get("authorization")
-    
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Missing or invalid authorization header" }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const decoded = JSON.parse(atob(token.split('.')[1]))
-    const userEmail = decoded.email
-
-    if (!userEmail) {
-      return NextResponse.json({ error: "No email found in token" }, { status: 401 })
-    }
-
     const goalId = params.id
+    
+    if (!goalId) {
+      return NextResponse.json({ error: 'Goal ID is required' }, { status: 400 })
+    }
 
     const { error } = await supabase
       .from("goals")
       .delete()
-      .eq("id", goalId)
-      .eq("user_email", userEmail)
+      .eq('id', goalId)
 
     if (error) {
-      console.error("Supabase error:", error)
-      return NextResponse.json({ error: "Database error" }, { status: 500 })
+      console.error('Error deleting goal:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ message: "Goal deleted successfully" })
-  } catch (error) {
-    console.error("API error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    console.error('API error:', err)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
