@@ -1,10 +1,31 @@
 import { type Task } from "./supabase"
 import { incrementTaskCompletion } from "./fitness-stats"
 
+// Helper function to create authenticated fetch requests
+async function authenticatedFetch(url: string, options: RequestInit = {}, getToken: () => Promise<string | null>) {
+  const token = await getToken()
+  
+  if (!token) {
+    throw new Error('Authentication required')
+  }
+
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...options.headers,
+      'Authorization': `Bearer ${token}`,
+    },
+  })
+}
+
 export type { Task }
 
-export async function getTasks(): Promise<Task[]> {
-  const response = await fetch('/api/tasks')
+export async function getTasks(getToken?: () => Promise<string | null>): Promise<Task[]> {
+  if (!getToken) {
+    throw new Error('Authentication token provider required')
+  }
+  
+  const response = await authenticatedFetch('/api/tasks', {}, getToken)
   
   if (!response.ok) {
     const error = await response.json()
@@ -15,14 +36,14 @@ export async function getTasks(): Promise<Task[]> {
   return await response.json()
 }
 
-export async function createTask(task: Omit<Task, "id" | "created_at" | "updated_at" | "order_index">): Promise<Task> {
-  const response = await fetch('/api/tasks', {
+export async function createTask(task: Omit<Task, "id" | "created_at" | "updated_at" | "order_index">, getToken: () => Promise<string | null>): Promise<Task> {
+  const response = await authenticatedFetch('/api/tasks', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ task }),
-  })
+  }, getToken)
 
   if (!response.ok) {
     const error = await response.json()
@@ -33,14 +54,14 @@ export async function createTask(task: Omit<Task, "id" | "created_at" | "updated
   return await response.json()
 }
 
-export async function updateTask(id: string, updates: Partial<Task>): Promise<Task> {
-  const response = await fetch('/api/tasks', {
+export async function updateTask(id: string, updates: Partial<Task>, getToken: () => Promise<string | null>): Promise<Task> {
+  const response = await authenticatedFetch('/api/tasks', {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ id, updates }),
-  })
+  }, getToken)
 
   if (!response.ok) {
     const error = await response.json()
@@ -51,10 +72,10 @@ export async function updateTask(id: string, updates: Partial<Task>): Promise<Ta
   return await response.json()
 }
 
-export async function deleteTask(id: string): Promise<void> {
-  const response = await fetch(`/api/tasks?id=${encodeURIComponent(id)}`, {
+export async function deleteTask(id: string, getToken: () => Promise<string | null>): Promise<void> {
+  const response = await authenticatedFetch(`/api/tasks?id=${encodeURIComponent(id)}`, {
     method: 'DELETE',
-  })
+  }, getToken)
 
   if (!response.ok) {
     const error = await response.json()
@@ -63,9 +84,9 @@ export async function deleteTask(id: string): Promise<void> {
   }
 }
 
-export async function toggleTaskCompletion(id: string): Promise<Task> {
+export async function toggleTaskCompletion(id: string, getToken: () => Promise<string | null>): Promise<Task> {
   // First get the current task state
-  const response = await fetch('/api/tasks')
+  const response = await authenticatedFetch('/api/tasks', {}, getToken)
   
   if (!response.ok) {
     const error = await response.json()
@@ -87,12 +108,12 @@ export async function toggleTaskCompletion(id: string): Promise<Task> {
   const updatedTask = await updateTask(id, {
     completed: newCompleted,
     status: newStatus,
-  })
+  }, getToken)
 
   // If the task is being marked as completed, increment completion count
   if (newCompleted) {
     try {
-      await incrementTaskCompletion(id)
+      await incrementTaskCompletion(id, getToken)
     } catch (error) {
       console.error("Failed to increment completion count:", error)
       // Don't throw here - the task update was successful, completion count increment is secondary
@@ -102,9 +123,9 @@ export async function toggleTaskCompletion(id: string): Promise<Task> {
   return updatedTask
 }
 
-export async function toggleTaskStar(id: string): Promise<Task> {
+export async function toggleTaskStar(id: string, getToken: () => Promise<string | null>): Promise<Task> {
   // First get the current task state
-  const response = await fetch('/api/tasks')
+  const response = await authenticatedFetch('/api/tasks', {}, getToken)
   
   if (!response.ok) {
     const error = await response.json()
@@ -121,10 +142,10 @@ export async function toggleTaskStar(id: string): Promise<Task> {
 
   return updateTask(id, {
     starred: !currentTask.starred,
-  })
+  }, getToken)
 }
 
-export async function reorderTasks(taskIds: string[]): Promise<void> {
+export async function reorderTasks(taskIds: string[], getToken: () => Promise<string | null>): Promise<void> {
   // Update order_index for each task based on its position in the array
   const updates = taskIds.map((id, index) => ({
     id,
@@ -133,7 +154,7 @@ export async function reorderTasks(taskIds: string[]): Promise<void> {
 
   // Update each task's order using the API
   for (const update of updates) {
-    const response = await fetch('/api/tasks', {
+    const response = await authenticatedFetch('/api/tasks', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -142,7 +163,7 @@ export async function reorderTasks(taskIds: string[]): Promise<void> {
         id: update.id, 
         updates: { order_index: update.order_index }
       }),
-    })
+    }, getToken)
 
     if (!response.ok) {
       const error = await response.json()

@@ -126,12 +126,19 @@ export async function incrementFitnessTaskCompletion(taskId: string): Promise<vo
 }
 
 // Keep the old function for regular tasks (ari-database)
-export async function incrementTaskCompletion(taskId: string): Promise<void> {
+export async function incrementTaskCompletion(taskId: string, getToken: () => Promise<string | null>): Promise<void> {
   try {
+    const token = await getToken()
+    
+    if (!token) {
+      throw new Error('Authentication required')
+    }
+
     const response = await fetch('/api/tasks/increment-completion', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({ taskId }),
     })
