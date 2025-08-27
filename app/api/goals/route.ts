@@ -1,89 +1,61 @@
 import { NextRequest, NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase"
-import { clerkClient } from "@clerk/nextjs/server"
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY!
+
+const supabase = createClient(supabaseUrl, supabaseSecretKey)
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get("authorization")
-    
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Missing or invalid authorization header" }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    
-    const decoded = JSON.parse(atob(token.split('.')[1]))
-    const userEmail = decoded.email
-
-    if (!userEmail) {
-      return NextResponse.json({ error: "No email found in token" }, { status: 401 })
-    }
+    console.log('🔍 API /goals called')
+    console.log('Environment check:', {
+      hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      hasSecret: !!process.env.SUPABASE_SECRET_KEY,
+      url: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      secretStart: process.env.SUPABASE_SECRET_KEY?.substring(0, 10) + '...'
+    })
 
     const { data, error } = await supabase
       .from("goals")
       .select("*")
-      .eq("user_email", userEmail)
       .order("created_at", { ascending: false })
 
     if (error) {
-      console.error("Supabase error:", error)
-      return NextResponse.json({ error: "Database error" }, { status: 500 })
+      console.error('❌ Supabase error:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    console.log('✅ Goals fetched:', data?.length || 0, 'goals')
     return NextResponse.json(data)
-  } catch (error) {
-    console.error("API error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  } catch (err) {
+    console.error('❌ API error:', err)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const authHeader = request.headers.get("authorization")
-    
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Missing or invalid authorization header" }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-    const decoded = JSON.parse(atob(token.split('.')[1]))
-    const userEmail = decoded.email
-
-    if (!userEmail) {
-      return NextResponse.json({ error: "No email found in token" }, { status: 401 })
-    }
-
-    const body = await request.json()
-    const { title, description, category, priority, deadline } = body
-
-    if (!title || !description) {
-      return NextResponse.json({ error: "Title and description are required" }, { status: 400 })
-    }
-
-    const goalData = {
-      title,
-      description,
-      category: category || null,
-      priority: priority || "medium",
-      deadline: deadline || null,
-      progress: 0,
-      user_email: userEmail,
-    }
+    const { goal } = await request.json()
 
     const { data, error } = await supabase
       .from("goals")
-      .insert([goalData])
+      .insert([{
+        ...goal,
+        progress: 0,
+        user_email: "noam@morpheus.network", // Single user app
+      }])
       .select()
       .single()
 
     if (error) {
-      console.error("Supabase error:", error)
-      return NextResponse.json({ error: "Database error" }, { status: 500 })
+      console.error('Error creating goal:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json(data, { status: 201 })
-  } catch (error) {
-    console.error("API error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json(data)
+  } catch (err) {
+    console.error('API error:', err)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
