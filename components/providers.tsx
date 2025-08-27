@@ -4,6 +4,7 @@ import { ClerkProvider } from "@clerk/nextjs"
 import { ClerkErrorBoundary } from "@/components/clerk-error-boundary"
 import { Toaster } from "@/components/ui/toaster"
 import { RLSDebug } from "@/components/rls-debug"
+import { ExerciseReminder } from "@/components/exercise-reminder"
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
@@ -36,6 +37,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <ClerkErrorBoundary>
         {children}
         <Toaster />
+        <ExerciseReminder />
         <RLSDebug />
       </ClerkErrorBoundary>
     </Provider>
