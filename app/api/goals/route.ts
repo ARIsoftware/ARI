@@ -1,20 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY!
-
-const supabase = createClient(supabaseUrl, supabaseSecretKey)
+import { createAuthenticatedSupabaseClient } from '@/lib/supabase-auth-api'
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔍 API /goals called')
-    console.log('Environment check:', {
-      hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-      hasSecret: !!process.env.SUPABASE_SECRET_KEY,
-      url: process.env.NEXT_PUBLIC_SUPABASE_URL,
-      secretStart: process.env.SUPABASE_SECRET_KEY?.substring(0, 10) + '...'
-    })
+    console.log('🔍 API /goals called with authentication')
+
+    // Create authenticated Supabase client
+    const { supabase, userId } = await createAuthenticatedSupabaseClient()
+    console.log('✅ User authenticated:', userId)
 
     const { data, error } = await supabase
       .from("goals")
@@ -30,6 +23,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data)
   } catch (err) {
     console.error('❌ API error:', err)
+    
+    if (err instanceof Error && err.message.includes('Unauthorized')) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
+    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -38,12 +36,16 @@ export async function POST(request: NextRequest) {
   try {
     const { goal } = await request.json()
 
+    // Create authenticated Supabase client
+    const { supabase, userId } = await createAuthenticatedSupabaseClient()
+    console.log('✅ User authenticated for POST:', userId)
+
     const { data, error } = await supabase
       .from("goals")
       .insert([{
         ...goal,
         progress: 0,
-        user_email: "hello@ari.software", // Single user app
+        // Note: Remove hardcoded user_email - let RLS handle user association
       }])
       .select()
       .single()
@@ -56,6 +58,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data)
   } catch (err) {
     console.error('API error:', err)
+    
+    if (err instanceof Error && err.message.includes('Unauthorized')) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
+    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

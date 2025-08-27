@@ -1,25 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY!
-
-const supabase = createClient(supabaseUrl, supabaseSecretKey)
+import { createAuthenticatedSupabaseClient } from '@/lib/supabase-auth-api'
 
 export async function POST(request: NextRequest) {
   try {
-    const { taskId, userId } = await request.json()
+    const { taskId } = await request.json()
     
-    if (!taskId || !userId) {
-      return NextResponse.json({ error: 'Task ID and User ID are required' }, { status: 400 })
+    if (!taskId) {
+      return NextResponse.json({ error: 'Task ID is required' }, { status: 400 })
     }
+
+    const { supabase, userId } = await createAuthenticatedSupabaseClient()
+    console.log('✅ User authenticated for POST:', userId)
 
     // Get current completion count
     const { data: task, error: fetchError } = await supabase
       .from('ari-database')
       .select('completion_count')
       .eq('id', taskId)
-      .contains('user_ids', [userId])
       .single()
 
     if (fetchError) {
@@ -37,7 +34,6 @@ export async function POST(request: NextRequest) {
         updated_at: new Date().toISOString()
       })
       .eq('id', taskId)
-      .contains('user_ids', [userId])
 
     if (updateError) {
       console.error('Error incrementing task completion:', updateError)
@@ -47,6 +43,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, completion_count: newCount })
   } catch (err) {
     console.error('API error:', err)
+    
+    if (err instanceof Error && err.message.includes('Unauthorized')) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
+    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

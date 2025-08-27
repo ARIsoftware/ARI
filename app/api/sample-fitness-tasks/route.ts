@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY!
-
-const supabase = createClient(supabaseUrl, supabaseSecretKey)
+import { createAuthenticatedSupabaseClient } from '@/lib/supabase-auth-api'
 
 const sampleFitnessTasks = [
   {
@@ -58,16 +53,12 @@ const sampleFitnessTasks = [
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await request.json()
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
-    }
+    const { supabase, userId } = await createAuthenticatedSupabaseClient()
+    console.log('✅ User authenticated for POST:', userId)
 
     // Add sample tasks with proper order_index
     const tasksToInsert = sampleFitnessTasks.map((task, index) => ({
       ...task,
-      user_id: userId,
       order_index: index,
     }))
 
@@ -84,6 +75,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data)
   } catch (err) {
     console.error('API error:', err)
+    
+    if (err instanceof Error && err.message.includes('Unauthorized')) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
+    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

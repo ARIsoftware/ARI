@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY!
-
-const supabase = createClient(supabaseUrl, supabaseSecretKey)
+import { createAuthenticatedSupabaseClient } from '@/lib/supabase-auth-api'
 
 export async function PATCH(
   request: NextRequest,
@@ -17,6 +12,9 @@ export async function PATCH(
     if (!goalId) {
       return NextResponse.json({ error: 'Goal ID is required' }, { status: 400 })
     }
+
+    const { supabase, userId } = await createAuthenticatedSupabaseClient()
+    console.log('✅ User authenticated for PATCH:', userId)
 
     const { data, error } = await supabase
       .from("goals")
@@ -33,34 +31,11 @@ export async function PATCH(
     return NextResponse.json(data)
   } catch (err) {
     console.error('API error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
-}
-
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const goalId = params.id
     
-    if (!goalId) {
-      return NextResponse.json({ error: 'Goal ID is required' }, { status: 400 })
+    if (err instanceof Error && err.message.includes('Unauthorized')) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
-
-    const { error } = await supabase
-      .from("goals")
-      .delete()
-      .eq('id', goalId)
-
-    if (error) {
-      console.error('Error deleting goal:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json({ success: true })
-  } catch (err) {
-    console.error('API error:', err)
+    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
