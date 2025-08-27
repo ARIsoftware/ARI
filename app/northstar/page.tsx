@@ -25,24 +25,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { CheckCircle2, TrendingUp, Target, Plus, X, Calendar } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabase"
+import { getGoals, createGoal, updateGoalProgress, type Goal } from "@/lib/goals"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
 })
 
-type Goal = {
-  id: string
-  title: string
-  description: string
-  category: string
-  priority: "low" | "medium" | "high"
-  deadline: string | null
-  progress: number
-  created_at: string
-  updated_at: string
-}
 
 const priorityColors = {
   high: "bg-red-100 text-red-700 border-red-300",
@@ -71,15 +60,8 @@ export default function NorthstarPage() {
 
   const fetchGoals = async () => {
     try {
-      const response = await fetch("/api/goals", {
-        headers: {
-          Authorization: `Bearer ${await getToken()}`,
-        },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setGoals(data)
-      }
+      const data = await getGoals()
+      setGoals(data)
     } catch (error) {
       console.error("Error fetching goals:", error)
       toast({
@@ -103,20 +85,7 @@ export default function NorthstarPage() {
     }
 
     try {
-      // Create a new goal object
-      const createdGoal: Goal = {
-        id: crypto.randomUUID(),
-        title: newGoal.title,
-        description: newGoal.description,
-        category: newGoal.category || "Personal",
-        priority: newGoal.priority,
-        deadline: newGoal.deadline || null,
-        progress: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }
-
-      // Add to local state for now (will integrate with API once database is ready)
+      const createdGoal = await createGoal(newGoal)
       setGoals([...goals, createdGoal])
       setIsAddModalOpen(false)
       setNewGoal({
@@ -126,7 +95,6 @@ export default function NorthstarPage() {
         priority: "medium",
         deadline: "",
       })
-      
       toast({
         title: "Success",
         description: "Goal created successfully",
@@ -141,7 +109,7 @@ export default function NorthstarPage() {
     }
   }
 
-  const updateGoalProgress = async (goalId: string, action: "increment" | "decrement") => {
+  const updateGoalProgressHandler = async (goalId: string, action: "increment" | "decrement") => {
     const goal = goals.find(g => g.id === goalId)
     if (!goal) return
 
@@ -150,11 +118,10 @@ export default function NorthstarPage() {
       : Math.max(goal.progress - 10, 0)
 
     try {
-      // Update local state for now (will integrate with API once database is ready)
+      const updatedGoal = await updateGoalProgress(goalId, newProgress)
       setGoals(goals.map(g => 
-        g.id === goalId ? { ...g, progress: newProgress, updated_at: new Date().toISOString() } : g
+        g.id === goalId ? updatedGoal : g
       ))
-      
       toast({
         title: "Progress Updated",
         description: `Goal progress ${action === "increment" ? "increased" : "decreased"} by 10%`,
@@ -175,59 +142,6 @@ export default function NorthstarPage() {
     : 0
   const activeGoals = goals.filter(g => g.progress < 100).length
 
-  // Initialize with some example goals
-  useEffect(() => {
-    if (goals.length === 0) {
-      const initialGoals: Goal[] = [
-        {
-          id: "1",
-          title: "Learn a New Language",
-          description: "Become conversational in Spanish by practicing daily",
-          category: "Personal Growth",
-          priority: "high",
-          deadline: "2024-12-30",
-          progress: 65,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          id: "2",
-          title: "Run a Marathon",
-          description: "Complete a full 26.2 mile marathon race",
-          category: "Health & Fitness",
-          priority: "medium",
-          deadline: "2024-10-14",
-          progress: 40,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          id: "3",
-          title: "Save for Emergency Fund",
-          description: "Build a 6-month emergency fund for financial security",
-          category: "Financial",
-          priority: "high",
-          deadline: "2024-08-29",
-          progress: 80,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          id: "4",
-          title: "Read 24 Books",
-          description: "Read 2 books per month to expand knowledge",
-          category: "Learning",
-          priority: "low",
-          deadline: "2024-12-30",
-          progress: 50,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ]
-      setGoals(initialGoals)
-    }
-    setIsLoading(false)
-  }, [goals.length])
 
   return (
     <SidebarProvider>
@@ -339,14 +253,14 @@ export default function NorthstarPage() {
                       <Button 
                         size="sm" 
                         variant="outline"
-                        onClick={() => updateGoalProgress(goal.id, "increment")}
+                        onClick={() => updateGoalProgressHandler(goal.id, "increment")}
                       >
                         +10%
                       </Button>
                       <Button 
                         size="sm" 
                         variant="outline"
-                        onClick={() => updateGoalProgress(goal.id, "decrement")}
+                        onClick={() => updateGoalProgressHandler(goal.id, "decrement")}
                       >
                         -10%
                       </Button>
