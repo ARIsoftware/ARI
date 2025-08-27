@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2, Trash2, Pencil, Columns } from "lucide-react"
-import { FocusTimer, FocusTimerDisplay } from "@/components/focus-timer"
+import { FocusTimer } from "@/components/focus-timer"
 import { useState, useEffect } from "react"
 import { getTasks, toggleTaskCompletion, toggleTaskStar, reorderTasks, deleteTask, updateTask, type Task } from "@/lib/tasks"
 import { useToast } from "@/hooks/use-toast"
@@ -451,8 +451,6 @@ export default function TasksPage() {
               </BreadcrumbList>
             </Breadcrumb>
           </header>
-
-          <FocusTimerDisplay />
           
           <div className="flex flex-1 flex-col gap-6 p-6">
               {/* Header */}
