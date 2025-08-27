@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2, Trash2, Pencil, Columns, Play } from "lucide-react"
+import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2, Trash2, Pencil, Columns, Play, Activity } from "lucide-react"
 import { useState, useEffect } from "react"
 import { getFitnessTasks, toggleFitnessTaskCompletion, toggleFitnessTaskStar, reorderFitnessTasks, deleteFitnessTask, updateFitnessTask, type FitnessTask, addSampleFitnessTasks } from "@/lib/fitness"
 import { useToast } from "@/hooks/use-toast"
@@ -423,6 +423,19 @@ export default function DailyFitnessPage() {
                 <Button variant="outline" onClick={loadTasks} disabled={loading} className="bg-white">
                   {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
                   Refresh
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && (window as any).testExerciseReminder) {
+                      (window as any).testExerciseReminder()
+                    }
+                  }} 
+                  className="bg-white"
+                  title="Test exercise reminder"
+                >
+                  <Activity className="w-4 h-4 mr-2" />
+                  Test Reminder
                 </Button>
                 <Button className="bg-black hover:bg-gray-800" onClick={() => router.push("/add-fitness")}>
                   <Plus className="w-4 h-4 mr-2" />

@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2, Trash2, Pencil, Columns } from "lucide-react"
+import { FocusTimer, FocusTimerDisplay } from "@/components/focus-timer"
 import { useState, useEffect } from "react"
 import { getTasks, toggleTaskCompletion, toggleTaskStar, reorderTasks, deleteTask, updateTask, type Task } from "@/lib/tasks"
 import { useToast } from "@/hooks/use-toast"
@@ -451,9 +452,11 @@ export default function TasksPage() {
             </Breadcrumb>
           </header>
 
+          <FocusTimerDisplay />
+          
           <div className="flex flex-1 flex-col gap-6 p-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
+              {/* Header */}
+              <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-medium">Todo List</h1>
                 {user && (
@@ -461,6 +464,7 @@ export default function TasksPage() {
                 )}
               </div>
               <div className="flex items-center gap-2">
+                <FocusTimer />
                 <Button variant="outline" onClick={loadTasks} disabled={loading} className="bg-white">
                   {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
                   Refresh
