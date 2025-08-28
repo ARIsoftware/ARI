@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 const protectedRoutes = ["/", "/tasks", "/dashboard", "/daily-fitness", "/add-task", "/add-fitness", "/edit-task", "/edit-fitness", "/northstar", "/contacts", "/hyrox"]
-const publicRoutes = ["/sign-in", "/sign-up", "/auth"]
+const publicRoutes = ["/sign-in", "/auth"]
 
 export async function middleware(req: NextRequest) {
   let supabaseResponse = NextResponse.next({
