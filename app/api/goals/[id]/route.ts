@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAuthenticatedSupabaseClient } from '@/lib/supabase-auth-api'
+import { getAuthenticatedUser } from '@/lib/auth-helpers'
 
 export async function PATCH(
   request: NextRequest,
@@ -8,13 +8,15 @@ export async function PATCH(
   try {
     const body = await request.json()
     const goalId = params.id
+    const { user, supabase } = await getAuthenticatedUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
     
     if (!goalId) {
       return NextResponse.json({ error: 'Goal ID is required' }, { status: 400 })
     }
-
-    const { supabase, userId } = await createAuthenticatedSupabaseClient()
-    console.log('✅ User authenticated for PATCH:', userId)
 
     const { data, error } = await supabase
       .from("goals")
@@ -31,11 +33,6 @@ export async function PATCH(
     return NextResponse.json(data)
   } catch (err) {
     console.error('API error:', err)
-    
-    if (err instanceof Error && err.message.includes('Unauthorized')) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
-    }
-    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

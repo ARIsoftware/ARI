@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { currentUser } from "@clerk/nextjs/server"
+import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { createClient } from "@supabase/supabase-js"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -7,9 +7,10 @@ const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY || process.env.NEXT_P
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await currentUser()
+    const { user } = await getAuthenticatedUser()
+    
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
     const { workoutId, stationName, stationOrder, stationTime, completed } = await req.json()
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (workoutError || !workout || workout.user_id !== user.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
     const { data, error } = await supabase

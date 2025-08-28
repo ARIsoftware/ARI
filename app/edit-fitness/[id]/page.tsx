@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { use } from "react"
-import { useUser } from "@clerk/nextjs"
+import { useSessionContext, useSupabaseClient } from "@supabase/auth-helpers-react"
 import { DM_Sans } from "next/font/google"
 import { TaskAnnouncement } from "@/components/task-announcement"
 import { AppSidebar } from "../../../components/app-sidebar"
@@ -52,7 +52,9 @@ const statusOptions = [
 
 export default function EditFitnessPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const { user } = useUser()
+  const { session } = useSessionContext()
+  const supabase = useSupabaseClient()
+  const user = session?.user
   const { toast } = useToast()
   const router = useRouter()
   const [loading, setLoading] = useState(false)

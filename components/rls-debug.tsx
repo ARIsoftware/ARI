@@ -1,11 +1,12 @@
 "use client"
 
-import { useUser, useAuth } from "@clerk/nextjs"
+import { useSessionContext, useSupabaseClient } from "@supabase/auth-helpers-react"
 import { useEffect } from "react"
 
 export function RLSDebug() {
-  const { user } = useUser()
-  const { getToken } = useAuth()
+  const { session } = useSessionContext()
+  const supabase = useSupabaseClient()
+  const user = session?.user
   
   useEffect(() => {
     const debugJWT = async () => {
@@ -17,10 +18,10 @@ export function RLSDebug() {
       }
       
       console.log("👤 User found:", user.id)
-      console.log("📧 Email:", user.emailAddresses?.[0]?.emailAddress)
+      console.log("📧 Email:", user.email)
       
       try {
-        const token = await getToken({ template: "supabase" })
+        const token = session?.access_token
         if (token) {
           console.log("🎫 JWT Token obtained")
           // Decode JWT payload (safe - just reading claims)
@@ -43,7 +44,7 @@ export function RLSDebug() {
     // Run debug after a short delay to ensure user is loaded
     const timer = setTimeout(debugJWT, 1000)
     return () => clearTimeout(timer)
-  }, [user, getToken])
+  }, [user, session?.access_token])
   
   // Don't render anything visible
   return null
