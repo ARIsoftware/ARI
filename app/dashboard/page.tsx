@@ -21,6 +21,7 @@ import { CalendarDays, TrendingUp, Trophy, Target, Users, CheckSquare, Loader2 }
 import { getFitnessStats } from "@/lib/fitness-stats"
 import { getContacts } from "@/lib/contacts"
 import { getTasks } from "@/lib/tasks"
+import { useSessionContext, useSupabaseClient } from "@supabase/auth-helpers-react"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -35,6 +36,8 @@ interface FitnessStats {
 }
 
 export default function DashboardPage() {
+  const { session } = useSessionContext()
+  const supabase = useSupabaseClient()
   const [loading, setLoading] = useState(true)
   const [fitnessStats, setFitnessStats] = useState<FitnessStats>({
     averageCompletionsPerDay: 0,
@@ -62,7 +65,8 @@ export default function DashboardPage() {
       setContactCount(contacts.length)
       
       // Load task count  
-      const tasks = await getTasks()
+      const tokenFn = async () => session?.access_token || null
+      const tasks = await getTasks(tokenFn)
       setTaskCount(tasks.length)
       
     } catch (error) {

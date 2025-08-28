@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@clerk/nextjs/server"
+import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { createClient } from "@supabase/supabase-js"
 import crypto from "crypto"
 
@@ -203,10 +203,11 @@ async function executeInTransaction(
 export async function POST(req: NextRequest) {
   try {
     // Authenticate user
-    const { userId } = await auth()
-    if (!userId) {
+    const { user, supabase: userSupabase } = await getAuthenticatedUser()
+    
+    if (!user) {
       return NextResponse.json(
-        { error: "Unauthorized" },
+        { error: "Authentication required" },
         { status: 401 }
       )
     }
@@ -353,9 +354,10 @@ export async function POST(req: NextRequest) {
 // Validation endpoint - separate from import
 export async function PUT(req: NextRequest) {
   try {
-    const { userId } = await auth()
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const { user, supabase } = await getAuthenticatedUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
     const formData = await req.formData()

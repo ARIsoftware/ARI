@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useUser, useAuth } from "@clerk/nextjs"
+import { useSessionContext, useSupabaseClient } from "@supabase/auth-helpers-react"
 import { DM_Sans } from "next/font/google"
 import { AppSidebar } from "../../components/app-sidebar"
 import {
@@ -91,20 +91,21 @@ const getTaskAgeColor = (createdAt: string, isStarred: boolean = false) => {
 }
 
 export default function TasksPage() {
-  const { user } = useUser()
-  const { getToken } = useAuth()
+  const { session } = useSessionContext()
+  const supabase = useSupabaseClient()
+  const user = session?.user
   const { toast } = useToast()
   
   // JWT Debugging for RLS Setup
   useEffect(() => {
     const debugJWT = async () => {
-      if (user?.id && user?.emailAddresses?.[0]?.emailAddress) {
+      if (user?.id && user?.email) {
         console.log("🔑 RLS Debug Info:")
         console.log("  User ID:", user.id)
-        console.log("  Email:", user.emailAddresses[0].emailAddress)
+        console.log("  Email:", user.email)
         
         try {
-          const token = await getToken({ template: "supabase" })
+          const token = session?.access_token
           if (token) {
             // Decode JWT payload (safe - just reading claims)
             const payload = JSON.parse(atob(token.split('.')[1]))
@@ -125,7 +126,7 @@ export default function TasksPage() {
     }
     
     debugJWT()
-  }, [user?.id, user?.emailAddresses, getToken])
+  }, [user?.id, user?.email, session?.access_token])
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [activeFilter, setActiveFilter] = useState("All")
@@ -175,6 +176,14 @@ export default function TasksPage() {
     }
   }, [user?.id])
 
+  // Redirect to sign-in if user is not authenticated
+  useEffect(() => {
+    if (user === null) {
+      console.log("❌ User not authenticated, redirecting to sign-in")
+      router.push('/sign-in')
+    }
+  }, [user, router])
+
   const loadTasks = async () => {
     if (!user?.id) {
       console.log("User not authenticated, skipping task load")
@@ -184,7 +193,11 @@ export default function TasksPage() {
 
     try {
       setLoading(true)
-      const tokenFn = async () => await getToken({ template: 'supabase' })
+      const tokenFn = async () => {
+        const token = session?.access_token || null
+        console.log('🔑 Token generated:', token ? 'SUCCESS' : 'FAILED')
+        return token
+      }
       const data = await getTasks(tokenFn)
       setTasks(data)
     } catch (error) {
@@ -259,7 +272,7 @@ export default function TasksPage() {
     try {
       // Update order in database
       if (user?.id) {
-        const tokenFn = async () => await getToken({ template: 'supabase' })
+        const tokenFn = async () => session?.access_token || null
         await reorderTasks(updatedTasks.map((task) => task.id), tokenFn)
       }
     } catch (error) {
@@ -297,7 +310,7 @@ export default function TasksPage() {
 
     try {
       if (user?.id) {
-        const tokenFn = async () => await getToken({ template: 'supabase' })
+        const tokenFn = async () => session?.access_token || null
         await updateTask(draggedTask, updates, tokenFn)
         setTasks(tasks.map((t) => t.id === draggedTask ? { ...t, ...updates } : t))
       }
@@ -329,7 +342,7 @@ export default function TasksPage() {
         // Wait for animation to complete before updating
         setTimeout(async () => {
           if (user?.id) {
-            const tokenFn = async () => await getToken({ template: 'supabase' })
+            const tokenFn = async () => session?.access_token || null
             const updatedTask = await toggleTaskCompletion(taskId, tokenFn)
             setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
           }
@@ -346,7 +359,7 @@ export default function TasksPage() {
       } else {
         // If uncompleting or in Completed view, update immediately
         if (user?.id) {
-          const tokenFn = async () => await getToken({ template: 'supabase' })
+          const tokenFn = async () => session?.access_token || null
           const updatedTask = await toggleTaskCompletion(taskId, tokenFn)
           setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
           toast({
@@ -395,7 +408,7 @@ export default function TasksPage() {
     
     try {
       if (user?.id) {
-        const tokenFn = async () => await getToken({ template: 'supabase' })
+        const tokenFn = async () => session?.access_token || null
         await deleteTask(taskToDelete.id, tokenFn)
         setTasks(tasks.filter((task) => task.id !== taskToDelete.id))
       }
@@ -465,7 +478,7 @@ export default function TasksPage() {
               <div>
                 <h1 className="text-3xl font-medium">Todo List</h1>
                 {user && (
-                  <p className="text-sm text-muted-foreground mt-1">Welcome back, {user.firstName || "there"}!</p>
+                  <p className="text-sm text-muted-foreground mt-1">Welcome back, {user.user_metadata?.first_name || user.email || "there"}!</p>
                 )}
               </div>
               <div className="flex items-center gap-2">

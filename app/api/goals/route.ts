@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAuthenticatedSupabaseClient } from '@/lib/supabase-auth-api'
+import { getAuthenticatedUser } from '@/lib/auth-helpers'
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔍 API /goals called with authentication')
-
-    // Create authenticated Supabase client
-    const { supabase, userId } = await createAuthenticatedSupabaseClient()
-    console.log('✅ User authenticated:', userId)
+    const { user, supabase } = await getAuthenticatedUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
 
     const { data, error } = await supabase
       .from("goals")
@@ -15,19 +15,13 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false })
 
     if (error) {
-      console.error('❌ Supabase error:', error)
+      console.error('Error fetching goals:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    console.log('✅ Goals fetched:', data?.length || 0, 'goals')
     return NextResponse.json(data)
   } catch (err) {
-    console.error('❌ API error:', err)
-    
-    if (err instanceof Error && err.message.includes('Unauthorized')) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
-    }
-    
+    console.error('API error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -35,17 +29,17 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { goal } = await request.json()
-
-    // Create authenticated Supabase client
-    const { supabase, userId } = await createAuthenticatedSupabaseClient()
-    console.log('✅ User authenticated for POST:', userId)
+    const { user, supabase } = await getAuthenticatedUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
 
     const { data, error } = await supabase
       .from("goals")
       .insert([{
         ...goal,
         progress: 0,
-        // Note: Remove hardcoded user_email - let RLS handle user association
       }])
       .select()
       .single()
@@ -58,11 +52,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data)
   } catch (err) {
     console.error('API error:', err)
-    
-    if (err instanceof Error && err.message.includes('Unauthorized')) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
-    }
-    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -1,6 +1,7 @@
 "use client"
 
-import { useUser, useClerk } from "@clerk/nextjs"
+import { useSessionContext, useSupabaseClient } from "@supabase/auth-helpers-react"
+import { useRouter } from "next/navigation"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,10 +15,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { User, Settings, LogOut, Shield } from "lucide-react"
 
 export function UserProfileDropdown() {
-  const { user } = useUser()
-  const { signOut, openUserProfile } = useClerk()
+  const { session } = useSessionContext()
+  const supabase = useSupabaseClient()
+  const router = useRouter()
+  const user = session?.user
 
-  // Fallback for when Clerk is not configured
+  // Fallback for when user is not authenticated
   if (!user) {
     return (
       <Button variant="ghost" className="relative h-12 w-12 rounded-full p-0">
@@ -28,17 +31,19 @@ export function UserProfileDropdown() {
     )
   }
 
+  const firstName = user.user_metadata?.first_name || user.user_metadata?.full_name?.split(' ')[0]
+  const lastName = user.user_metadata?.last_name || user.user_metadata?.full_name?.split(' ')[1]
   const userInitials =
-    user.firstName && user.lastName
-      ? `${user.firstName[0]}${user.lastName[0]}`
-      : user.emailAddresses[0]?.emailAddress[0].toUpperCase() || "U"
+    firstName && lastName
+      ? `${firstName[0]}${lastName[0]}`
+      : user.email?.[0].toUpperCase() || "U"
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-12 w-12 rounded-full p-0">
           <Avatar className="h-12 w-12">
-            <AvatarImage src={user.imageUrl || "/placeholder.svg"} alt={user.fullName || "User"} />
+            <AvatarImage src={user.user_metadata?.avatar_url || "/placeholder.svg"} alt={user.user_metadata?.full_name || "User"} />
             <AvatarFallback className="text-sm font-medium">{userInitials}</AvatarFallback>
           </Avatar>
         </Button>
@@ -46,25 +51,28 @@ export function UserProfileDropdown() {
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.fullName || "User"}</p>
-            <p className="text-xs leading-none text-muted-foreground">{user.emailAddresses[0]?.emailAddress}</p>
+            <p className="text-sm font-medium leading-none">{user.user_metadata?.full_name || "User"}</p>
+            <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => openUserProfile()}>
+        <DropdownMenuItem onClick={() => router.push('/profile')}>
           <User className="mr-2 h-4 w-4" />
           <span>Profile</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => openUserProfile()}>
+        <DropdownMenuItem onClick={() => router.push('/settings')}>
           <Settings className="mr-2 h-4 w-4" />
           <span>Settings</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => openUserProfile()}>
+        <DropdownMenuItem onClick={() => router.push('/security')}>
           <Shield className="mr-2 h-4 w-4" />
           <span>Security</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => signOut()} className="text-red-600 focus:text-red-600">
+        <DropdownMenuItem onClick={async () => {
+          await supabase.auth.signOut()
+          router.push('/login')
+        }} className="text-red-600 focus:text-red-600">
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
         </DropdownMenuItem>
