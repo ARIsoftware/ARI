@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { currentUser } from "@clerk/nextjs/server"
+import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { createClient } from "@supabase/supabase-js"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -74,9 +74,10 @@ const defaultStationRecords = [
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await currentUser()
+    const { user } = await getAuthenticatedUser()
+    
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
     // Create Supabase client with service role key to bypass RLS
@@ -150,9 +151,10 @@ export async function GET(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const user = await currentUser()
+    const { user } = await getAuthenticatedUser()
+    
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
     const { stationName, newTime } = await req.json()

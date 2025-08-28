@@ -1,10 +1,11 @@
-import { useAuth } from '@clerk/nextjs'
+import { useSessionContext, useSupabaseClient } from '@supabase/auth-helpers-react'
 
 export function useAuthenticatedFetch() {
-  const { getToken } = useAuth()
+  const { session } = useSessionContext()
+  const supabase = useSupabaseClient()
 
   const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
-    const token = await getToken({ template: 'supabase' })
+    const token = session?.access_token
     
     if (!token) {
       throw new Error('Authentication required')
@@ -25,10 +26,11 @@ export function useAuthenticatedFetch() {
 // For server-side or non-hook contexts
 export async function getAuthenticatedFetch() {
   // This will be used by server components if needed
-  const { auth } = await import('@clerk/nextjs/server')
-  const { getToken } = auth()
+  const { createSupabaseServerClient } = await import('@/lib/supabase-auth')
+  const supabase = createSupabaseServerClient()
+  const { data: { session } } = await supabase.auth.getSession()
   
-  const token = await getToken({ template: 'supabase' })
+  const token = session?.access_token
   
   if (!token) {
     throw new Error('Authentication required')

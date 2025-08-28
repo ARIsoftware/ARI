@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useUser } from "@clerk/nextjs"
+import { useSessionContext, useSupabaseClient } from "@supabase/auth-helpers-react"
 import { DM_Sans } from "next/font/google"
 import { TaskAnnouncement } from "@/components/task-announcement"
 import { AppSidebar } from "../../components/app-sidebar"
@@ -68,7 +68,9 @@ const formatDate = (dateString: string | null) => {
 }
 
 export default function DailyFitnessPage() {
-  const { user } = useUser()
+  const { session } = useSessionContext()
+  const supabase = useSupabaseClient()
+  const user = session?.user
   const { toast } = useToast()
   const [tasks, setTasks] = useState<FitnessTask[]>([])
   const [loading, setLoading] = useState(true)
@@ -132,13 +134,14 @@ export default function DailyFitnessPage() {
     try {
       setLoading(true)
       
-      const data = await getFitnessTasks()
+      const tokenFn = async () => session?.access_token || null
+      const data = await getFitnessTasks(tokenFn)
       
       // If no tasks exist, add sample tasks
       if (data.length === 0) {
         console.log("No tasks found, adding sample tasks...")
-        await addSampleFitnessTasks()
-        const newData = await getFitnessTasks()
+        await addSampleFitnessTasks(tokenFn)
+        const newData = await getFitnessTasks(tokenFn)
         setTasks(newData)
       } else {
         setTasks(data)
@@ -215,7 +218,8 @@ export default function DailyFitnessPage() {
     try {
       // Update order in database
       if (user?.id) {
-        await reorderFitnessTasks(updatedTasks.map((task) => task.id))
+        const tokenFn = async () => session?.access_token || null
+        await reorderFitnessTasks(updatedTasks.map((task) => task.id), tokenFn)
       }
     } catch (error) {
       console.error("Failed to reorder fitness tasks:", error)
@@ -252,7 +256,8 @@ export default function DailyFitnessPage() {
 
     try {
       if (user?.id) {
-        await updateFitnessTask(draggedTask, updates)
+        const tokenFn = async () => session?.access_token || null
+        await updateFitnessTask(draggedTask, updates, tokenFn)
         setTasks(tasks.map((t) => t.id === draggedTask ? { ...t, ...updates } : t))
       }
       toast({
@@ -283,7 +288,8 @@ export default function DailyFitnessPage() {
         // Wait for animation to complete before updating
         setTimeout(async () => {
           if (user?.id) {
-            const updatedTask = await toggleFitnessTaskCompletion(taskId, task.completed)
+            const tokenFn = async () => session?.access_token || null
+            const updatedTask = await toggleFitnessTaskCompletion(taskId, task.completed, tokenFn)
             setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
           }
           setFadingTasks(prev => {
@@ -299,13 +305,14 @@ export default function DailyFitnessPage() {
       } else {
         // If uncompleting or in Completed view, update immediately
         if (user?.id) {
-          const updatedTask = await toggleFitnessTaskCompletion(taskId, task.completed)
+          const tokenFn = async () => session?.access_token || null
+          const updatedTask = await toggleFitnessTaskCompletion(taskId, task.completed, tokenFn)
           setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
+          toast({
+            title: "Success",
+            description: `Exercise ${updatedTask.completed ? "completed" : "reopened"} successfully.`,
+          })
         }
-        toast({
-          title: "Success",
-          description: `Exercise ${updatedTask.completed ? "completed" : "reopened"} successfully.`,
-        })
       }
     } catch (error) {
       console.error("Failed to toggle fitness task completion:", error)
@@ -324,7 +331,8 @@ export default function DailyFitnessPage() {
       const task = tasks.find(t => t.id === taskId)
       if (!task) return
       
-      const updatedTask = await toggleFitnessTaskStar(taskId, task.starred)
+      const tokenFn = async () => session?.access_token || null
+      const updatedTask = await toggleFitnessTaskStar(taskId, task.starred, tokenFn)
       setTasks(tasks.map((task) => (task.id === taskId ? updatedTask : task)))
     } catch (error) {
       console.error("Failed to toggle fitness task star:", error)
@@ -349,7 +357,8 @@ export default function DailyFitnessPage() {
     
     try {
       if (user?.id) {
-        await deleteFitnessTask(taskToDelete.id)
+        const tokenFn = async () => session?.access_token || null
+        await deleteFitnessTask(taskToDelete.id, tokenFn)
         setTasks(tasks.filter((task) => task.id !== taskToDelete.id))
       }
       toast({

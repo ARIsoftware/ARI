@@ -1,45 +1,56 @@
 "use client"
 
-import { ClerkProvider } from "@clerk/nextjs"
-import { ClerkErrorBoundary } from "@/components/clerk-error-boundary"
+import { createSupabaseClient } from "@/lib/supabase-auth"
+import { createContext, useContext, useEffect, useState } from 'react'
 import { Toaster } from "@/components/ui/toaster"
-import { RLSDebug } from "@/components/rls-debug"
 import { ExerciseReminder } from "@/components/exercise-reminder"
+import { User, Session } from '@supabase/supabase-js'
+
+type SupabaseContext = {
+  supabase: ReturnType<typeof createSupabaseClient>
+  user: User | null
+  session: Session | null
+}
+
+const Context = createContext<SupabaseContext | undefined>(undefined)
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+  const [supabase] = useState(() => createSupabaseClient())
+  const [user, setUser] = useState<User | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
 
-  if (!publishableKey) {
-    throw new Error("Missing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY environment variable")
-  }
+  useEffect(() => {
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setSession(session)
+      setUser(session?.user ?? null)
+    }
 
-  // Type assertion to handle React 19 compatibility
-  const Provider = ClerkProvider as any
+    getSession()
 
-  // Determine if we're on localhost
-  const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-  const redirectUrl = isLocalhost ? 'http://localhost:3000/' : '/'
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setSession(session)
+        setUser(session?.user ?? null)
+      }
+    )
+
+    return () => subscription.unsubscribe()
+  }, [supabase])
 
   return (
-    <Provider
-      publishableKey={publishableKey}
-      signInFallbackRedirectUrl={redirectUrl}
-      signUpFallbackRedirectUrl={redirectUrl}
-      afterSignInUrl={redirectUrl}
-      afterSignUpUrl={redirectUrl}
-      appearance={{
-        baseTheme: undefined,
-        variables: {
-          colorPrimary: "#000000",
-        },
-      }}
-    >
-      <ClerkErrorBoundary>
-        {children}
-        <Toaster />
-        <ExerciseReminder />
-        <RLSDebug />
-      </ClerkErrorBoundary>
-    </Provider>
+    <Context.Provider value={{ supabase, user, session }}>
+      {children}
+      <Toaster />
+      <ExerciseReminder />
+    </Context.Provider>
   )
+}
+
+export const useSupabase = () => {
+  const context = useContext(Context)
+  if (context === undefined) {
+    throw new Error('useSupabase must be used inside SupabaseProvider')
+  }
+  return context
 }

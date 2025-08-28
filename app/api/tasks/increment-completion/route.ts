@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAuthenticatedSupabaseClient } from '@/lib/supabase-auth-api'
+import { getAuthenticatedUser } from '@/lib/auth-helpers'
 
 export async function POST(request: NextRequest) {
   try {
     const { taskId } = await request.json()
+    const { user, supabase } = await getAuthenticatedUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
     
     if (!taskId) {
       return NextResponse.json({ error: 'Task ID is required' }, { status: 400 })
     }
-
-    const { supabase, userId } = await createAuthenticatedSupabaseClient()
-    console.log('✅ User authenticated for POST:', userId)
 
     // Get current completion count
     const { data: task, error: fetchError } = await supabase
@@ -43,11 +45,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, completion_count: newCount })
   } catch (err) {
     console.error('API error:', err)
-    
-    if (err instanceof Error && err.message.includes('Unauthorized')) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
-    }
-    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

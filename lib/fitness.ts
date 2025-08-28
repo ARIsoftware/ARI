@@ -3,10 +3,20 @@ import { incrementFitnessTaskCompletion } from "./fitness-stats"
 
 export type { FitnessTask }
 
-export async function getFitnessTasks(): Promise<FitnessTask[]> {
+export async function getFitnessTasks(getToken: () => Promise<string | null>): Promise<FitnessTask[]> {
   console.log("Attempting to fetch fitness tasks from fitness_database table")
   
-  const response = await fetch('/api/fitness-tasks')
+  const token = await getToken()
+  
+  if (!token) {
+    throw new Error('Authentication required')
+  }
+
+  const response = await fetch('/api/fitness-tasks', {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  })
   
   if (!response.ok) {
     const error = await response.json()
@@ -19,13 +29,20 @@ export async function getFitnessTasks(): Promise<FitnessTask[]> {
   return data
 }
 
-export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_at" | "updated_at" | "order_index"> & { youtube_url?: string | null }): Promise<FitnessTask> {
+export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_at" | "updated_at" | "order_index"> & { youtube_url?: string | null }, getToken: () => Promise<string | null>): Promise<FitnessTask> {
   console.log("Attempting to create fitness task:", task)
   
+  const token = await getToken()
+  
+  if (!token) {
+    throw new Error('Authentication required')
+  }
+
   const response = await fetch('/api/fitness-tasks', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
     },
     body: JSON.stringify({ task }),
   })
@@ -41,11 +58,18 @@ export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_
   return data
 }
 
-export async function updateFitnessTask(id: string, updates: Partial<FitnessTask>): Promise<FitnessTask> {
+export async function updateFitnessTask(id: string, updates: Partial<FitnessTask>, getToken: () => Promise<string | null>): Promise<FitnessTask> {
+  const token = await getToken()
+  
+  if (!token) {
+    throw new Error('Authentication required')
+  }
+
   const response = await fetch('/api/fitness-tasks', {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
     },
     body: JSON.stringify({ id, updates }),
   })
@@ -59,9 +83,18 @@ export async function updateFitnessTask(id: string, updates: Partial<FitnessTask
   return await response.json()
 }
 
-export async function deleteFitnessTask(id: string): Promise<void> {
+export async function deleteFitnessTask(id: string, getToken: () => Promise<string | null>): Promise<void> {
+  const token = await getToken()
+  
+  if (!token) {
+    throw new Error('Authentication required')
+  }
+
   const response = await fetch(`/api/fitness-tasks?id=${encodeURIComponent(id)}`, {
     method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
   })
 
   if (!response.ok) {
@@ -71,7 +104,7 @@ export async function deleteFitnessTask(id: string): Promise<void> {
   }
 }
 
-export async function toggleFitnessTaskCompletion(id: string, currentCompleted: boolean): Promise<FitnessTask> {
+export async function toggleFitnessTaskCompletion(id: string, currentCompleted: boolean, getToken: () => Promise<string | null>): Promise<FitnessTask> {
   const newCompleted = !currentCompleted
   const newStatus = newCompleted ? "Completed" : "Pending"
 
@@ -79,7 +112,7 @@ export async function toggleFitnessTaskCompletion(id: string, currentCompleted: 
   const updatedTask = await updateFitnessTask(id, {
     completed: newCompleted,
     status: newStatus,
-  })
+  }, getToken)
 
   // If the task is being marked as completed, increment completion count and add to history
   if (newCompleted) {
@@ -94,17 +127,17 @@ export async function toggleFitnessTaskCompletion(id: string, currentCompleted: 
   return updatedTask
 }
 
-export async function toggleFitnessTaskStar(id: string, currentStarred: boolean): Promise<FitnessTask> {
+export async function toggleFitnessTaskStar(id: string, currentStarred: boolean, getToken: () => Promise<string | null>): Promise<FitnessTask> {
   return updateFitnessTask(id, {
     starred: !currentStarred,
-  })
+  }, getToken)
 }
 
-export async function reorderFitnessTasks(taskIds: string[]): Promise<void> {
+export async function reorderFitnessTasks(taskIds: string[], getToken: () => Promise<string | null>): Promise<void> {
   // Update order_index for each task based on its position in the array
   for (let i = 0; i < taskIds.length; i++) {
     try {
-      await updateFitnessTask(taskIds[i], { order_index: i })
+      await updateFitnessTask(taskIds[i], { order_index: i }, getToken)
     } catch (error) {
       console.error("Error updating fitness task order:", error)
       throw error
@@ -113,11 +146,18 @@ export async function reorderFitnessTasks(taskIds: string[]): Promise<void> {
 }
 
 // Add sample fitness tasks
-export async function addSampleFitnessTasks(): Promise<void> {
+export async function addSampleFitnessTasks(getToken: () => Promise<string | null>): Promise<void> {
+  const token = await getToken()
+  
+  if (!token) {
+    throw new Error('Authentication required')
+  }
+
   const response = await fetch('/api/sample-fitness-tasks', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
     },
     body: JSON.stringify({}),
   })
