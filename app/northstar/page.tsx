@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useUser, useAuth } from "@clerk/nextjs"
+import { useSessionContext, useSupabaseClient } from "@supabase/auth-helpers-react"
 import { DM_Sans } from "next/font/google"
 import { AppSidebar } from "../../components/app-sidebar"
 import {
@@ -40,8 +40,9 @@ const priorityColors = {
 }
 
 export default function NorthstarPage() {
-  const { user } = useUser()
-  const { getToken } = useAuth()
+  const { session } = useSessionContext()
+  const supabase = useSupabaseClient()
+  const user = session?.user
   const { toast } = useToast()
   const [goals, setGoals] = useState<Goal[]>([])
   const [isLoading, setIsLoading] = useState(true)

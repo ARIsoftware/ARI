@@ -1,13 +1,14 @@
 import { createClient } from "@supabase/supabase-js"
-import { useAuth } from "@clerk/nextjs"
+import { useSessionContext, useSupabaseClient } from "@supabase/auth-helpers-react"
 import { useEffect, useState } from "react"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// Create a Supabase client that works with Clerk authentication
-export function useSupabaseWithClerk() {
-  const { getToken } = useAuth()
+// Create a Supabase client that works with native Supabase authentication
+export function useSupabaseAuthenticated() {
+  const { session } = useSessionContext()
+  const baseClient = useSupabaseClient()
   const [supabaseClient, setSupabaseClient] = useState(() =>
     createClient(supabaseUrl, supabaseAnonKey)
   )
@@ -15,11 +16,11 @@ export function useSupabaseWithClerk() {
   useEffect(() => {
     const updateSupabaseAuth = async () => {
       try {
-        // Get the Clerk session token
-        const token = await getToken({ template: "supabase" })
+        // Get the session access token
+        const token = session?.access_token
         
         if (token) {
-          // Create a new Supabase client with the Clerk token
+          // Create a new Supabase client with the session token
           const client = createClient(supabaseUrl, supabaseAnonKey, {
             global: {
               headers: {
@@ -33,16 +34,25 @@ export function useSupabaseWithClerk() {
             },
           })
           setSupabaseClient(client)
+        } else {
+          // If no token, use the base client from auth helpers
+          setSupabaseClient(baseClient)
         }
       } catch (error) {
-        console.error("Error getting Clerk token for Supabase:", error)
+        console.error("Error getting session token for Supabase:", error)
       }
     }
 
     updateSupabaseAuth()
-  }, [getToken])
+  }, [session?.access_token, baseClient])
 
   return supabaseClient
+}
+
+// Get authenticated Supabase client (non-hook version)
+export async function getAuthenticatedSupabase() {
+  const { createSupabaseClient } = await import('@/lib/supabase-auth')
+  return createSupabaseClient()
 }
 
 // Alternative: Use secret key for development

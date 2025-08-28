@@ -1,34 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAuthenticatedSupabaseClient } from '@/lib/supabase-auth-api'
+import { getAuthenticatedUser } from '@/lib/auth-helpers'
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔍 API /tasks called with authentication')
+    const { user, supabase } = await getAuthenticatedUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
 
-    // Create authenticated Supabase client (this will throw if not authenticated)
-    const { supabase, userId } = await createAuthenticatedSupabaseClient()
-    console.log('✅ User authenticated:', userId)
-
+    // With RLS enabled, this will automatically filter by auth.uid()
     const { data, error } = await supabase
       .from('ari-database')
       .select('*')
       .order('order_index', { ascending: true })
-
+    
     if (error) {
-      console.error('❌ Supabase error:', error)
+      console.error('Error fetching tasks:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    console.log('✅ Tasks fetched:', data?.length || 0, 'tasks')
     return NextResponse.json(data)
   } catch (err) {
-    console.error('❌ API error:', err)
-    
-    // Handle authentication errors specifically
-    if (err instanceof Error && err.message.includes('Unauthorized')) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
-    }
-    
+    console.error('API error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -36,12 +30,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { task } = await request.json()
+    const { user, supabase } = await getAuthenticatedUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
 
-    // Create authenticated Supabase client
-    const { supabase, userId } = await createAuthenticatedSupabaseClient()
-    console.log('✅ User authenticated for POST:', userId)
-
-    // Get the highest order_index
+    // Get the highest order_index for this user
     const { data: maxOrderData } = await supabase
       .from('ari-database')
       .select('order_index')
@@ -50,6 +45,7 @@ export async function POST(request: NextRequest) {
 
     const nextOrderIndex = maxOrderData && maxOrderData.length > 0 ? (maxOrderData[0].order_index || 0) + 1 : 0
 
+    // RLS will automatically set user_id to auth.uid()
     const { data, error } = await supabase
       .from('ari-database')
       .insert([{
@@ -67,11 +63,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data)
   } catch (err) {
     console.error('API error:', err)
-    
-    if (err instanceof Error && err.message.includes('Unauthorized')) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
-    }
-    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -79,15 +70,17 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const { id, updates } = await request.json()
+    const { user, supabase } = await getAuthenticatedUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
     
     if (!id) {
       return NextResponse.json({ error: 'Task ID is required' }, { status: 400 })
     }
 
-    // Create authenticated Supabase client
-    const { supabase, userId } = await createAuthenticatedSupabaseClient()
-    console.log('✅ User authenticated for PUT:', userId)
-
+    // RLS will ensure user can only update their own tasks
     const { data, error } = await supabase
       .from('ari-database')
       .update({ ...updates, updated_at: new Date().toISOString() })
@@ -103,11 +96,6 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json(data)
   } catch (err) {
     console.error('API error:', err)
-    
-    if (err instanceof Error && err.message.includes('Unauthorized')) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
-    }
-    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -116,15 +104,17 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
+    const { user, supabase } = await getAuthenticatedUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
     
     if (!id) {
       return NextResponse.json({ error: 'Task ID is required' }, { status: 400 })
     }
 
-    // Create authenticated Supabase client
-    const { supabase, userId } = await createAuthenticatedSupabaseClient()
-    console.log('✅ User authenticated for DELETE:', userId)
-
+    // RLS will ensure user can only delete their own tasks
     const { error } = await supabase
       .from('ari-database')
       .delete()
@@ -138,11 +128,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error('API error:', err)
-    
-    if (err instanceof Error && err.message.includes('Unauthorized')) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
-    }
-    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

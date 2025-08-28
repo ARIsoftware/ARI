@@ -7,7 +7,7 @@ import { Announcement, AnnouncementTag, AnnouncementTitle } from "@/components/u
 import { getLastCompletedTask, truncateTaskName } from "@/lib/get-last-completed-task"
 import { getAuthenticatedSupabase } from "@/lib/supabase"
 import { useIsMobile } from "@/components/ui/use-mobile"
-import { useUser } from "@clerk/nextjs"
+import { useSessionContext, useSupabaseClient } from "@supabase/auth-helpers-react"
 
 // Import focus timer state
 let globalTimerState = {
@@ -33,7 +33,9 @@ export function TaskAnnouncement() {
   const [loading, setLoading] = useState(true)
   const [focusTimer, setFocusTimer] = useState({ isActive: false, timeRemaining: 0, isComplete: false })
   const isMobile = useIsMobile()
-  const { user } = useUser()
+  const { session } = useSessionContext()
+  const supabase = useSupabaseClient()
+  const user = session?.user
 
   useEffect(() => {
     // Load initial task
@@ -90,7 +92,8 @@ export function TaskAnnouncement() {
   }, [user?.id])
 
   const loadLastTask = async () => {
-    const task = await getLastCompletedTask()
+    const tokenFn = async () => session?.access_token || null
+    const task = await getLastCompletedTask(tokenFn)
     setLastTask(task)
     setLoading(false)
   }

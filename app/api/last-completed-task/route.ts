@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAuthenticatedSupabaseClient } from '@/lib/supabase-auth-api'
+import { getAuthenticatedUser } from '@/lib/auth-helpers'
 
 export async function GET(request: NextRequest) {
   try {
-    const { supabase, userId } = await createAuthenticatedSupabaseClient()
-    console.log('✅ User authenticated:', userId)
+    const { user, supabase } = await getAuthenticatedUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
 
     const { data, error } = await supabase
       .from('ari-database')
@@ -26,11 +29,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data)
   } catch (err) {
     console.error('API error:', err)
-    
-    if (err instanceof Error && err.message.includes('Unauthorized')) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
-    }
-    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
