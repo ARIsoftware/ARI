@@ -115,23 +115,16 @@ export function AuthForm({ mode }: AuthFormProps) {
           </Button>
         </form>
 
-        <div className="mt-4 text-center text-sm">
-          {mode === 'sign-in' ? (
-            <p>
-              Don't have an account?{' '}
-              <a href="/sign-up" className="text-blue-600 hover:underline">
-                Sign up
-              </a>
-            </p>
-          ) : (
+        {mode === 'sign-up' && (
+          <div className="mt-4 text-center text-sm">
             <p>
               Already have an account?{' '}
               <a href="/sign-in" className="text-blue-600 hover:underline">
                 Sign in
               </a>
             </p>
-          )}
-        </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
