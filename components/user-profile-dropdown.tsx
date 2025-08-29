@@ -1,6 +1,6 @@
 "use client"
 
-import { useSessionContext, useSupabaseClient } from "@supabase/auth-helpers-react"
+import { useSupabase } from "@/components/providers"
 import { useRouter } from "next/navigation"
 import {
   DropdownMenu,
@@ -15,8 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { User, Settings, LogOut, Shield } from "lucide-react"
 
 export function UserProfileDropdown() {
-  const { session } = useSessionContext()
-  const supabase = useSupabaseClient()
+  const { session, supabase } = useSupabase()
   const router = useRouter()
   const user = session?.user
 
@@ -71,7 +70,7 @@ export function UserProfileDropdown() {
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={async () => {
           await supabase.auth.signOut()
-          router.push('/login')
+          router.push('/sign-in')
         }} className="text-red-600 focus:text-red-600">
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>

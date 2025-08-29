@@ -21,7 +21,7 @@ import { CalendarDays, TrendingUp, Trophy, Target, Users, CheckSquare, Loader2 }
 import { getFitnessStats } from "@/lib/fitness-stats"
 import { getContacts } from "@/lib/contacts"
 import { getTasks } from "@/lib/tasks"
-import { useSessionContext, useSupabaseClient } from "@supabase/auth-helpers-react"
+import { useSupabase } from "@/components/providers"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -36,8 +36,7 @@ interface FitnessStats {
 }
 
 export default function DashboardPage() {
-  const { session } = useSessionContext()
-  const supabase = useSupabaseClient()
+  const { session } = useSupabase()
   const [loading, setLoading] = useState(true)
   const [fitnessStats, setFitnessStats] = useState<FitnessStats>({
     averageCompletionsPerDay: 0,

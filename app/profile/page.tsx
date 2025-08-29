@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSessionContext, useSupabaseClient } from '@supabase/auth-helpers-react'
+import { useSupabase } from '@/components/providers'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,8 +13,7 @@ import { Separator } from '@/components/ui/separator'
 import { ArrowLeft, User, Mail, Calendar, Shield } from 'lucide-react'
 
 export default function ProfilePage() {
-  const { session } = useSessionContext()
-  const supabase = useSupabaseClient()
+  const { session, supabase } = useSupabase()
   const router = useRouter()
   
   const [loading, setLoading] = useState(false)

@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useSessionContext, useSupabaseClient } from "@supabase/auth-helpers-react"
+import { useSupabase } from "@/components/providers"
 import { DM_Sans } from "next/font/google"
 import { TaskAnnouncement } from "@/components/task-announcement"
 import { AppSidebar } from "../../components/app-sidebar"
@@ -45,8 +45,7 @@ const dmSans = DM_Sans({
 })
 
 export default function ContactsPage() {
-  const { session } = useSessionContext()
-  const supabase = useSupabaseClient()
+  const { session, supabase } = useSupabase()
   const user = session?.user
   const router = useRouter()
   const { toast } = useToast()
