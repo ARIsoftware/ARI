@@ -1,11 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { useSessionContext, useSupabaseClient } from "@supabase/auth-helpers-react"
+import { useSupabase } from "@/components/providers"
 
 export default function LogsPage() {
-  const { session } = useSessionContext()
-  const supabase = useSupabaseClient()
+  const { session, supabase } = useSupabase()
   const user = session?.user
   const isSignedIn = !!session
   const userId = user?.id
