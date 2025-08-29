@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { use } from "react"
-import { useSessionContext, useSupabaseClient } from "@supabase/auth-helpers-react"
+import { useSupabase } from "@/components/providers"
 import { DM_Sans } from "next/font/google"
 import { TaskAnnouncement } from "@/components/task-announcement"
 import { AppSidebar } from "../../../components/app-sidebar"
@@ -52,8 +52,7 @@ const statusOptions = [
 
 export default function EditFitnessPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const { session } = useSessionContext()
-  const supabase = useSupabaseClient()
+  const { session, supabase } = useSupabase()
   const user = session?.user
   const { toast } = useToast()
   const router = useRouter()

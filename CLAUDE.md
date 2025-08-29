@@ -1,59 +1,49 @@
 # ARI Application - Claude Memory & Setup Documentation
 
 ## Overview
-ARI is a Next.js 15 (React 19) application using Clerk for authentication and Supabase for database operations with Row Level Security (RLS) enabled.
+ARI is a Next.js 15 (React 19) application using Supabase for both authentication and database operations with Row Level Security (RLS) enabled.
 
 ## Authentication & Database Architecture
 
-### Clerk + Supabase + JWT Integration
-The app uses a sophisticated setup combining:
-- **Clerk** for user authentication and session management
-- **Supabase** for database operations with PostgreSQL
-- **JWT Tokens** for secure communication between Clerk and Supabase
+### Supabase Auth + RLS Integration
+The app uses native Supabase authentication:
+- **Supabase Auth** for user authentication and session management
+- **Supabase Database** for all data operations with PostgreSQL
 - **Row Level Security (RLS)** for database-level user isolation
+- **SSR Support** via @supabase/ssr package for server-side rendering
 
 ### Key Components:
 
-#### 1. JWT Token Flow
-- Clerk generates JWT tokens with a custom "supabase" template
-- These tokens contain user claims (sub, email, iss, exp)
-- Supabase uses these tokens to enforce RLS policies
-- Token obtained via: `getToken({ template: "supabase" })`
+#### 1. Authentication Flow
+- Users sign in via Supabase Auth with email/password
+- Session tokens are managed by Supabase automatically
+- RLS policies use `auth.uid()` to filter user data
+- Middleware handles protected routes
 
-#### 2. Supabase Client Setup (`lib/supabase-with-clerk.ts`)
+#### 2. Supabase Client Setup (`lib/supabase-auth.ts`)
 ```typescript
-// Dynamic Supabase client that updates with Clerk auth
-export function useSupabaseWithClerk() {
-  const { getToken } = useAuth()
-  
-  // Gets Clerk JWT token and creates authenticated Supabase client
-  const token = await getToken({ template: "supabase" })
-  const client = createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    },
-  })
+// Browser client for client components
+export function createSupabaseClient() {
+  return createBrowserClient(supabaseUrl, supabaseAnonKey)
 }
 ```
 
-#### 3. RLS Debug Component (`components/rls-debug.tsx`)
-- Provides real-time debugging of JWT tokens in development
-- Logs user info, token claims, and authentication status
-- Helps troubleshoot RLS policy issues
+#### 3. Context Provider (`components/providers.tsx`)
+- Provides Supabase client and session to all components
+- Handles auth state changes automatically
+- Exposes `useSupabase()` hook for easy access
 
 ### Database Schema
 Main tables:
 - `ari-database` - Main tasks table with RLS policies
 - `ari-fitness-database` - Fitness tasks with RLS
-- User isolation enforced at database level via RLS policies
+- User isolation enforced at database level via RLS policies using `auth.uid()`
 
 ### Key Files:
-- `/lib/supabase.ts` - Basic Supabase client (legacy, now uses anon key only)
-- `/lib/supabase-with-clerk.ts` - Authenticated Supabase with Clerk JWT
-- `/components/rls-debug.tsx` - JWT debugging component
-- `/components/providers.tsx` - App-level providers including Clerk and RLS debug
+- `/lib/supabase-auth.ts` - Supabase client setup with SSR support
+- `/components/providers.tsx` - App-level providers with auth context
+- `/middleware.ts` - Route protection and auth checks
+- `/components/auth/auth-form.tsx` - Sign in/sign up forms
 
 ## Application Features
 
@@ -75,26 +65,25 @@ Main tables:
 - Tailwind CSS for styling
 - Shadcn/ui components
 - DM Sans font family
-- Clerk components for auth UI
+- Custom auth UI components
 - Next.js 15 with React 19
 
 ## Development Notes
-- RLS policies must match JWT token claims
-- Always test with RLSDebug component enabled
-- Use `getAuthenticatedSupabase()` for operations requiring user context
-- Secret keys deprecated for browser use - all operations through authenticated clients
+- RLS policies use `auth.uid()` to filter by authenticated user
+- Middleware handles session refresh and route protection
+- Use `useSupabase()` hook in client components for auth access
+- Server components can use server-side Supabase client
 - Component state management uses global window object for cross-component communication
 
 ## Environment Variables Required
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
-- `CLERK_SECRET_KEY`
-- Optional: `SUPABASE_SECRET_KEY` (server-side only)
+- Optional: `SUPABASE_SECRET_KEY` (server-side only, bypasses RLS)
 
-## Recent Commits
-- "Working RLS Enabled" - Final RLS implementation
-- "Supabase RLS Fixes" - RLS policy corrections
-- "RLS compatible Backups" - Backup system with RLS
+## Recent Changes
+- Migrated from Clerk to native Supabase Auth
+- Updated all components to use Supabase context provider
+- Removed deprecated @supabase/auth-helpers-react package
+- Implemented custom user profile dropdown with Supabase auth
 
-This setup ensures secure, user-isolated data access while maintaining real-time capabilities and proper authentication flow.
+This setup ensures secure, user-isolated data access with native Supabase authentication and RLS policies.

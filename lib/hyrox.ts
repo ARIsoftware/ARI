@@ -1,5 +1,18 @@
 import { supabase } from './supabase'
-import { supabaseServiceRole } from './supabase-with-clerk'
+import { createClient } from '@supabase/supabase-js'
+
+// Create service role client for admin operations
+const supabaseServiceRole = () => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY
+  
+  if (!supabaseSecretKey) {
+    console.error('SUPABASE_SECRET_KEY not configured')
+    return supabase // Fallback to regular client
+  }
+  
+  return createClient(supabaseUrl, supabaseSecretKey)
+}
 
 // Diagnostic function to test database connectivity and table existence
 export async function testHyroxDatabase() {

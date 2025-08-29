@@ -1,11 +1,10 @@
 "use client"
 
-import { useSessionContext, useSupabaseClient } from "@supabase/auth-helpers-react"
+import { useSupabase } from "@/components/providers"
 import { useEffect } from "react"
 
 export function RLSDebug() {
-  const { session } = useSessionContext()
-  const supabase = useSupabaseClient()
+  const { session, supabase } = useSupabase()
   const user = session?.user
   
   useEffect(() => {

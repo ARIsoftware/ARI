@@ -1,8 +1,7 @@
-import { useSessionContext, useSupabaseClient } from '@supabase/auth-helpers-react'
+import { useSupabase } from '@/components/providers'
 
 export function useAuthenticatedFetch() {
-  const { session } = useSessionContext()
-  const supabase = useSupabaseClient()
+  const { session, supabase } = useSupabase()
 
   const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
     const token = session?.access_token

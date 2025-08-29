@@ -7,7 +7,7 @@ import { Announcement, AnnouncementTag, AnnouncementTitle } from "@/components/u
 import { getLastCompletedTask, truncateTaskName } from "@/lib/get-last-completed-task"
 import { getAuthenticatedSupabase } from "@/lib/supabase"
 import { useIsMobile } from "@/components/ui/use-mobile"
-import { useSessionContext, useSupabaseClient } from "@supabase/auth-helpers-react"
+import { useSupabase } from "@/components/providers"
 
 // Import focus timer state
 let globalTimerState = {
@@ -33,8 +33,7 @@ export function TaskAnnouncement() {
   const [loading, setLoading] = useState(true)
   const [focusTimer, setFocusTimer] = useState({ isActive: false, timeRemaining: 0, isComplete: false })
   const isMobile = useIsMobile()
-  const { session } = useSessionContext()
-  const supabase = useSupabaseClient()
+  const { session, supabase } = useSupabase()
   const user = session?.user
 
   useEffect(() => {
