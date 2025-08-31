@@ -1,26 +1,30 @@
 # ARI Application - Claude Memory & Setup Documentation
 
 ## Overview
-ARI is a Next.js 15 (React 19) application using Supabase for both authentication and database operations with Row Level Security (RLS) enabled.
+ARI is a Next.js 15 (React 19) application using Supabase for authentication, database operations, and Row Level Security (RLS).
 
-## Authentication & Database Architecture
+## Tech Stack
+- **Framework**: Next.js 15.2.4 with React 19
+- **Authentication**: Supabase Auth (native email/password)
+- **Database**: Supabase (PostgreSQL with RLS)
+- **Styling**: Tailwind CSS + Shadcn/ui components
+- **Font**: DM Sans
+- **Deployment**: Vercel-ready
 
-### Supabase Auth + RLS Integration
-The app uses native Supabase authentication:
-- **Supabase Auth** for user authentication and session management
-- **Supabase Database** for all data operations with PostgreSQL
-- **Row Level Security (RLS)** for database-level user isolation
-- **SSR Support** via @supabase/ssr package for server-side rendering
+## Authentication Architecture
 
-### Key Components:
+### Supabase Auth Integration
+The app uses native Supabase authentication with the following components:
 
 #### 1. Authentication Flow
-- Users sign in via Supabase Auth with email/password
-- Session tokens are managed by Supabase automatically
-- RLS policies use `auth.uid()` to filter user data
-- Middleware handles protected routes
+- **Sign In/Up**: Custom forms at `/sign-in` using Supabase Auth
+- **Session Management**: Handled automatically by Supabase
+- **Protected Routes**: Middleware validates sessions before allowing access
+- **RLS Policies**: Database uses `auth.uid()` to filter user-specific data
 
-#### 2. Supabase Client Setup (`lib/supabase-auth.ts`)
+#### 2. Key Authentication Files
+
+##### `/lib/supabase-auth.ts`
 ```typescript
 // Browser client for client components
 export function createSupabaseClient() {
@@ -28,62 +32,223 @@ export function createSupabaseClient() {
 }
 ```
 
-#### 3. Context Provider (`components/providers.tsx`)
-- Provides Supabase client and session to all components
-- Handles auth state changes automatically
-- Exposes `useSupabase()` hook for easy access
+##### `/components/providers.tsx`
+- Global context provider for Supabase client and session
+- Exposes `useSupabase()` hook for all components
+- Manages auth state changes and real-time subscriptions
 
-### Database Schema
-Main tables:
-- `ari-database` - Main tasks table with RLS policies
-- `ari-fitness-database` - Fitness tasks with RLS
-- User isolation enforced at database level via RLS policies using `auth.uid()`
+##### `/middleware.ts`
+- Protects routes requiring authentication
+- Refreshes sessions automatically
+- Redirects unauthenticated users to `/sign-in`
+- Protected routes: `/dashboard`, `/tasks`, `/contacts`, `/fitness`, etc.
 
-### Key Files:
-- `/lib/supabase-auth.ts` - Supabase client setup with SSR support
-- `/components/providers.tsx` - App-level providers with auth context
-- `/middleware.ts` - Route protection and auth checks
-- `/components/auth/auth-form.tsx` - Sign in/sign up forms
+##### `/components/auth/auth-form.tsx`
+- Reusable authentication form component
+- Handles both sign-in and sign-up flows
+- Email/password authentication only (sign-ups can be disabled)
+
+## Database Schema
+
+### Main Tables
+- **`ari-database`**: Main tasks table with user isolation via RLS
+- **`ari-fitness-database`**: Fitness tracking with RLS
+- **`northstar_entries`**: Goal tracking entries
+- **`contacts`**: User contacts management
+- **`hyrox_workouts`**: HYROX training data
+- **`hyrox_workout_stations`**: HYROX station performance
+
+### RLS Implementation
+All tables use Row Level Security with policies based on `auth.uid()`:
+- Each user can only access their own data
+- Policies enforce user isolation at the database level
+- No data leakage between users
 
 ## Application Features
 
-### Focus Timer System
-- Global state management using window object
-- Timer display integrated with TaskAnnouncement component
-- Uses existing `.topbar` infrastructure (90vh when active, 45px normally)
-- Completion message shows "FOCUS TIME COMPLETE 💪" for 5 seconds
+### Core Features
+
+#### Task Management
+- Create, edit, delete tasks
+- Task prioritization and status tracking
+- Bulk operations support
+- Real-time updates
+
+#### Fitness Tracking
+- Daily fitness tasks
+- HYROX training module
+- Progress tracking and analytics
+- Performance statistics dashboard
+
+#### Contact Management
+- Add and manage contacts
+- Contact categorization
+- Quick contact actions
+
+#### Northstar Goals
+- Goal setting and tracking
+- Progress visualization
+- Milestone management
+
+### UI Components
+
+#### Focus Timer System
+- Global timer state using window object
+- Integrated with TaskAnnouncement component
+- Visual feedback in topbar (expands when active)
 - Time options: 5, 10, 20, 30 minutes
+- Completion notification: "FOCUS TIME COMPLETE 💪"
 
-### Exercise Reminder System
-- Triggers at :50 and :51 minutes past each hour
-- Checks every 90 seconds for performance
-- Centered popup with dark blue background (#091a32)
-- Uses Dialog component, dismissible only via "DONE" button
-- Integrated via ExerciseReminder component in providers
+#### Exercise Reminder System
+- Hourly reminders at :50 and :51 minutes
+- Modal popup with exercise prompt
+- Dark blue background (#091a32)
+- Dismissible only via "DONE" button
 
-### UI Framework
-- Tailwind CSS for styling
-- Shadcn/ui components
-- DM Sans font family
-- Custom auth UI components
-- Next.js 15 with React 19
+#### User Profile Dropdown
+- Custom profile management UI
+- Update user information
+- Change password functionality
+- Sign out option
+- Located in sidebar footer
 
-## Development Notes
-- RLS policies use `auth.uid()` to filter by authenticated user
-- Middleware handles session refresh and route protection
-- Use `useSupabase()` hook in client components for auth access
-- Server components can use server-side Supabase client
-- Component state management uses global window object for cross-component communication
+## File Structure
 
-## Environment Variables Required
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- Optional: `SUPABASE_SECRET_KEY` (server-side only, bypasses RLS)
+### Key Directories
+```
+/app                    # Next.js app router pages
+  /dashboard           # Main dashboard
+  /tasks              # Task management
+  /contacts           # Contact management
+  /daily-fitness      # Fitness tracking
+  /hyrox             # HYROX training
+  /northstar         # Goal tracking
+  /sign-in           # Authentication
+  /profile           # User profile
 
-## Recent Changes
-- Migrated from Clerk to native Supabase Auth
-- Updated all components to use Supabase context provider
-- Removed deprecated @supabase/auth-helpers-react package
-- Implemented custom user profile dropdown with Supabase auth
+/components            # React components
+  /ui                # Shadcn/ui components
+  /auth              # Authentication components
+  /providers.tsx     # Global providers
+  /app-sidebar.tsx   # Main navigation
 
-This setup ensures secure, user-isolated data access with native Supabase authentication and RLS policies.
+/lib                  # Utilities and helpers
+  /supabase-auth.ts  # Supabase client setup
+  /supabase.ts       # Legacy client (anon key only)
+  /tasks.ts          # Task operations
+  /contacts.ts       # Contact operations
+  /fitness-stats.ts  # Fitness analytics
+
+/middleware.ts        # Route protection
+```
+
+## Environment Variables
+
+### Required
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+### Optional
+```env
+SUPABASE_SECRET_KEY=your_service_role_key  # Server-side only, bypasses RLS
+```
+
+## Development Guide
+
+### Local Development
+```bash
+# Install dependencies
+npm install
+
+# Run development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Run production build
+npm start
+```
+
+### Authentication Testing
+1. Create test account at `/sign-in`
+2. Use Supabase dashboard to manage users
+3. Test RLS policies with different users
+4. Monitor auth state in browser DevTools
+
+### Database Management
+- Use Supabase dashboard for schema changes
+- Test RLS policies before deploying
+- Use migrations for production changes
+- Monitor database performance in Supabase dashboard
+
+## Security Considerations
+
+### Authentication
+- All routes protected by middleware
+- Sessions expire and refresh automatically
+- No sensitive data in localStorage
+- HTTPS required in production
+
+### Database
+- RLS policies on all tables
+- User isolation at database level
+- No direct database access from client
+- Service role key never exposed to client
+
+### API Security
+- All API routes require authentication
+- Rate limiting via Supabase
+- Input validation on all endpoints
+- CORS configured for production domain
+
+## Deployment
+
+### Vercel Deployment
+1. Connect GitHub repository
+2. Set environment variables in Vercel dashboard
+3. Deploy with automatic builds on push
+4. Monitor performance and errors
+
+### Post-Deployment
+- Verify authentication flow
+- Test all protected routes
+- Check RLS policies
+- Monitor error logs
+
+## Recent Migration (August 2025)
+
+Successfully migrated from Clerk to Supabase Auth:
+- Removed all Clerk dependencies
+- Implemented custom authentication UI
+- Updated all components to use Supabase context
+- Maintained full functionality with improved performance
+- Simplified authentication architecture
+
+## Troubleshooting
+
+### Common Issues
+1. **"Module not found" errors**: Run `npm install`
+2. **Authentication failures**: Check Supabase project status
+3. **RLS errors**: Verify user is authenticated and policies are correct
+4. **Build errors**: Clear `.next` folder and rebuild
+
+### Debug Tools
+- Browser DevTools for network requests
+- Supabase dashboard for auth logs
+- RLS Debug component (development only)
+- Next.js error overlay in development
+
+## Performance Optimizations
+
+- Static generation where possible
+- Dynamic imports for heavy components
+- Image optimization with Next.js Image
+- Prefetching enabled for navigation
+- Edge middleware for auth checks
+
+---
+
+This documentation reflects the current state of the ARI application after the Supabase Auth migration completed in August 2025.
