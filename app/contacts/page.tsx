@@ -107,7 +107,8 @@ export default function ContactsPage() {
 
     try {
       setLoading(true)
-      const data = await getContacts()
+      const tokenFn = async () => session?.access_token || null
+      const data = await getContacts(tokenFn)
       setContacts(data)
     } catch (error) {
       console.error("Failed to load contacts:", error)

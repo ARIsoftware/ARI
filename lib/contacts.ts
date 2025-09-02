@@ -1,5 +1,3 @@
-import { supabase, getAuthenticatedSupabase } from "./supabase"
-
 export type Contact = {
   id: string
   name: string
@@ -16,85 +14,125 @@ export type Contact = {
   updated_at: string
 }
 
-export async function getContacts(): Promise<Contact[]> {
-  const client = await getAuthenticatedSupabase()
-  const { data, error } = await client
-    .from("contacts")
-    .select("*")
-    .order("name", { ascending: true })
-
-  if (error) {
-    console.error("Error fetching contacts:", error)
-    throw error
+export async function getContacts(getToken: () => Promise<string | null>): Promise<Contact[]> {
+  const token = await getToken()
+  
+  if (!token) {
+    throw new Error('Authentication required')
   }
 
-  return data || []
+  const response = await fetch('/api/contacts', {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  })
+  
+  if (!response.ok) {
+    const error = await response.json()
+    console.error("Error fetching contacts:", error)
+    throw new Error(error.error || 'Failed to fetch contacts')
+  }
+
+  return await response.json()
 }
 
-export async function getContact(id: string): Promise<Contact | null> {
-  const client = await getAuthenticatedSupabase()
-  const { data, error } = await client
-    .from("contacts")
-    .select("*")
-    .eq("id", id)
-    .single()
-
-  if (error) {
-    console.error("Error fetching contact:", error)
-    throw error
+export async function getContact(id: string, getToken: () => Promise<string | null>): Promise<Contact | null> {
+  const token = await getToken()
+  
+  if (!token) {
+    throw new Error('Authentication required')
   }
 
-  return data
+  const response = await fetch(`/api/contacts/${id}`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  })
+  
+  if (!response.ok) {
+    const error = await response.json()
+    console.error("Error fetching contact:", error)
+    throw new Error(error.error || 'Failed to fetch contact')
+  }
+
+  return await response.json()
 }
 
 export async function createContact(
-  contact: Omit<Contact, "id" | "created_at" | "updated_at">
+  contact: Omit<Contact, "id" | "created_at" | "updated_at">,
+  getToken: () => Promise<string | null>
 ): Promise<Contact> {
-  const client = await getAuthenticatedSupabase()
-  const { data, error } = await client
-    .from("contacts")
-    .insert([contact])
-    .select()
-    .single()
-
-  if (error) {
-    console.error("Error creating contact:", error)
-    throw error
+  const token = await getToken()
+  
+  if (!token) {
+    throw new Error('Authentication required')
   }
 
-  return data
+  const response = await fetch('/api/contacts', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ contact }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    console.error("Error creating contact:", error)
+    throw new Error(error.error || 'Failed to create contact')
+  }
+
+  return await response.json()
 }
 
 export async function updateContact(
   id: string,
-  updates: Partial<Omit<Contact, "id" | "created_at" | "updated_at">>
+  updates: Partial<Omit<Contact, "id" | "created_at" | "updated_at">>,
+  getToken: () => Promise<string | null>
 ): Promise<Contact> {
-  const client = await getAuthenticatedSupabase()
-  const { data, error } = await client
-    .from("contacts")
-    .update(updates)
-    .eq("id", id)
-    .select()
-    .single()
-
-  if (error) {
-    console.error("Error updating contact:", error)
-    throw error
+  const token = await getToken()
+  
+  if (!token) {
+    throw new Error('Authentication required')
   }
 
-  return data
+  const response = await fetch(`/api/contacts/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(updates),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    console.error("Error updating contact:", error)
+    throw new Error(error.error || 'Failed to update contact')
+  }
+
+  return await response.json()
 }
 
-export async function deleteContact(id: string): Promise<void> {
-  const client = await getAuthenticatedSupabase()
-  const { error } = await client
-    .from("contacts")
-    .delete()
-    .eq("id", id)
+export async function deleteContact(id: string, getToken: () => Promise<string | null>): Promise<void> {
+  const token = await getToken()
+  
+  if (!token) {
+    throw new Error('Authentication required')
+  }
 
-  if (error) {
+  const response = await fetch(`/api/contacts/${id}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
     console.error("Error deleting contact:", error)
-    throw error
+    throw new Error(error.error || 'Failed to delete contact')
   }
 }
 

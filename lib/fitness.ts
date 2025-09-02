@@ -117,7 +117,7 @@ export async function toggleFitnessTaskCompletion(id: string, currentCompleted: 
   // If the task is being marked as completed, increment completion count and add to history
   if (newCompleted) {
     try {
-      await incrementFitnessTaskCompletion(id)
+      await incrementFitnessTaskCompletion(id, getToken)
     } catch (error) {
       console.error("Failed to increment fitness task completion:", error)
       // Don't throw here - the task update was successful, completion count increment is secondary

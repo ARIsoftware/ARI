@@ -81,6 +81,7 @@ export default function AddFitnessPage() {
     setLoading(true)
 
     try {
+      const tokenFn = async () => session?.access_token || null
       await createFitnessTask({
         title: title.trim(),
         assignees: assignees.length > 0 ? assignees : [user?.firstName || "Me"],
@@ -92,7 +93,7 @@ export default function AddFitnessPage() {
         starred,
         completed: status === "Completed",
         youtube_url: youtubeUrl.trim() || null,
-      })
+      }, tokenFn)
 
       toast({
         title: "Success",
