@@ -132,7 +132,8 @@ export default function AddTaskPage() {
         return
       }
 
-      await createTask(taskData)
+      const tokenFn = async () => session?.access_token || null
+      await createTask(taskData, tokenFn)
 
       toast({
         title: "Success",

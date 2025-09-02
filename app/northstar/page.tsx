@@ -60,7 +60,8 @@ export default function NorthstarPage() {
 
   const fetchGoals = async () => {
     try {
-      const data = await getGoals()
+      const tokenFn = async () => session?.access_token || null
+      const data = await getGoals(tokenFn)
       setGoals(data)
     } catch (error) {
       console.error("Error fetching goals:", error)
@@ -85,7 +86,8 @@ export default function NorthstarPage() {
     }
 
     try {
-      const createdGoal = await createGoal(newGoal)
+      const tokenFn = async () => session?.access_token || null
+      const createdGoal = await createGoal(newGoal, tokenFn)
       setGoals([...goals, createdGoal])
       setIsAddModalOpen(false)
       setNewGoal({
@@ -118,7 +120,8 @@ export default function NorthstarPage() {
       : Math.max(goal.progress - 10, 0)
 
     try {
-      const updatedGoal = await updateGoalProgress(goalId, newProgress)
+      const tokenFn = async () => session?.access_token || null
+      const updatedGoal = await updateGoalProgress(goalId, newProgress, tokenFn)
       setGoals(goals.map(g => 
         g.id === goalId ? updatedGoal : g
       ))
