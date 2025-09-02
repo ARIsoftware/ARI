@@ -7,18 +7,27 @@ export interface FitnessStats {
   totalCompletions: number
 }
 
-export async function getFitnessStats(): Promise<FitnessStats> {
+export async function getFitnessStats(getToken: () => Promise<string | null>): Promise<FitnessStats> {
   try {
-    // Get all fitness tasks with their completion counts
-    const { data: tasks, error } = await supabase
-      .from("fitness_database")
-      .select("id, title, completion_count, created_at")
-      .order("completion_count", { ascending: false })
-
-    if (error) {
-      console.error("Error fetching fitness stats:", error)
-      throw error
+    const token = await getToken()
+    
+    if (!token) {
+      throw new Error('Authentication required')
     }
+
+    const response = await fetch('/api/fitness-stats', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    })
+    
+    if (!response.ok) {
+      const error = await response.json()
+      console.error("Error fetching fitness stats:", error)
+      throw new Error(error.error || 'Failed to fetch fitness stats')
+    }
+
+    const tasks = await response.json()
 
     if (!tasks || tasks.length === 0) {
       return {
@@ -75,49 +84,27 @@ export async function getFitnessStats(): Promise<FitnessStats> {
 }
 
 // Function to increment completion count when a FITNESS task is completed
-export async function incrementFitnessTaskCompletion(taskId: string): Promise<void> {
+export async function incrementFitnessTaskCompletion(taskId: string, getToken: () => Promise<string | null>): Promise<void> {
   try {
-    // Get current fitness task details
-    const { data: task, error: fetchError } = await supabase
-      .from("fitness_database")
-      .select("completion_count, title")
-      .eq("id", taskId)
-      .single()
-
-    if (fetchError) {
-      console.error("Error fetching fitness task for completion increment:", fetchError)
-      throw fetchError
+    const token = await getToken()
+    
+    if (!token) {
+      throw new Error('Authentication required')
     }
 
-    // Increment the completion count
-    const newCount = (task?.completion_count || 0) + 1
+    const response = await fetch('/api/fitness-tasks/increment-completion', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ taskId }),
+    })
 
-    // Update the completion count in fitness_database
-    const { error: updateError } = await supabase
-      .from("fitness_database")  
-      .update({ 
-        completion_count: newCount,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", taskId)
-
-    if (updateError) {
-      console.error("Error incrementing fitness task completion:", updateError)
-      throw updateError
-    }
-
-    // Add entry to fitness_completion_history
-    // Note: This table uses fitness_task_title (not fitness_task_id) based on the schema
-    const { error: historyError } = await supabase
-      .from("fitness_completion_history")
-      .insert([{
-        fitness_task_title: task?.title || "Unknown Task",
-        completed_at: new Date().toISOString()
-      }])
-
-    if (historyError) {
-      console.error("Error adding to fitness completion history:", historyError)
-      // Don't throw here - the main completion count update was successful
+    if (!response.ok) {
+      const error = await response.json()
+      console.error("Error incrementing fitness task completion:", error)
+      throw new Error(error.error || 'Failed to increment fitness task completion')
     }
   } catch (error) {
     console.error("Failed to increment fitness task completion:", error)

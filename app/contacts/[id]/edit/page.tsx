@@ -35,6 +35,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { getContact, updateContact, createContact, type Contact } from "@/lib/contacts"
+import { useSupabase } from "@/components/providers"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -57,6 +58,7 @@ interface ContactFormData {
 export default function EditContactPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
   const { toast } = useToast()
+  const { session, supabase } = useSupabase()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [contactId, setContactId] = useState<string | null>(null)
@@ -95,7 +97,8 @@ export default function EditContactPage({ params }: { params: Promise<{ id: stri
   const loadContact = async (id: string) => {
     try {
       setLoading(true)
-      const contact = await getContact(id)
+      const tokenFn = async () => session?.access_token || null
+      const contact = await getContact(id, tokenFn)
       if (contact) {
         setFormData({
           name: contact.name,
@@ -161,14 +164,16 @@ export default function EditContactPage({ params }: { params: Promise<{ id: stri
         next_contact_date: formData.nextContactDate ? formData.nextContactDate.toISOString() : null
       }
 
+      const tokenFn = async () => session?.access_token || null
+      
       if (isNewContact) {
-        await createContact(contactData)
+        await createContact(contactData, tokenFn)
         toast({
           title: "Success",
           description: "Contact created successfully",
         })
       } else if (contactId) {
-        await updateContact(contactId, contactData)
+        await updateContact(contactId, contactData, tokenFn)
         toast({
           title: "Success",
           description: "Contact updated successfully",
