@@ -33,11 +33,11 @@ SET
     effort = COALESCE(effort, 3),
     strategic_fit = COALESCE(strategic_fit, 3),
     priority_score = SQRT(
-        POWER((impact::DECIMAL / 5) - 1, 2) +
-        POWER((severity::DECIMAL / 5) - 1, 2) +
-        POWER((timeliness::DECIMAL / 5) - 1, 2) +
-        POWER(1 - (effort::DECIMAL / 5), 2) +  -- Inverted: lower effort is better
-        POWER((strategic_fit::DECIMAL / 5) - 1, 2)
+        POWER(((impact::DECIMAL - 1) / 4) - 1, 2) +                    -- Normalize to 0-1, target 1
+        POWER(((severity::DECIMAL - 1) / 4) - 1, 2) +                  -- Normalize to 0-1, target 1  
+        POWER(((timeliness::DECIMAL - 1) / 4) - 1, 2) +                -- Normalize to 0-1, target 1
+        POWER((1 - ((effort::DECIMAL - 1) / 4)) - 1, 2) +              -- Invert and normalize, target 1
+        POWER(((strategic_fit::DECIMAL - 1) / 4) - 1, 2)               -- Normalize to 0-1, target 1
     )
 WHERE priority_score IS NULL OR priority_score = 0;
 ```
