@@ -24,7 +24,11 @@ export const createTaskSchema = z.object({
     status: TaskStatus.default('Pending'),
     priority: TaskPriority.default('Medium'),
     assignees: z.array(z.string().max(100)).max(10, 'Too many assignees').default([]),
-    due_date: z.string().datetime('Invalid date format').optional(),
+    due_date: z.union([
+      z.string().datetime(),
+      z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
+      z.null()
+    ]).optional(),
     starred: z.boolean().default(false),
     completed: z.boolean().default(false),
     subtasks_total: nonNegativeNumber.max(100, 'Too many subtasks').default(0),
@@ -50,7 +54,11 @@ export const updateTaskSchema = z.object({
     status: TaskStatus.optional(),
     priority: TaskPriority.optional(),
     assignees: z.array(z.string().max(100)).max(10, 'Too many assignees').optional(),
-    due_date: z.string().datetime('Invalid date format').optional(),
+    due_date: z.union([
+      z.string().datetime(),
+      z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
+      z.null()
+    ]).optional(),
     starred: z.boolean().optional(),
     completed: z.boolean().optional(),
     subtasks_total: nonNegativeNumber.max(100, 'Too many subtasks').optional(),
@@ -120,7 +128,11 @@ export const createGoalSchema = z.object({
     title: nonEmptyString.max(255, 'Title too long'),
     description: z.string().max(2000, 'Description too long').optional(),
     completed: z.boolean().default(false),
-    target_date: z.string().datetime('Invalid date format').optional(),
+    target_date: z.union([
+      z.string().datetime(),
+      z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
+      z.null()
+    ]).optional(),
     progress: z.number().min(0, 'Progress cannot be negative').max(100, 'Progress cannot exceed 100%').default(0)
   })
 })
@@ -130,7 +142,11 @@ export const updateGoalSchema = z.object({
     title: nonEmptyString.max(255, 'Title too long').optional(),
     description: z.string().max(2000, 'Description too long').optional(),
     completed: z.boolean().optional(),
-    target_date: z.string().datetime('Invalid date format').optional(),
+    target_date: z.union([
+      z.string().datetime(),
+      z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
+      z.null()
+    ]).optional(),
     progress: z.number().min(0, 'Progress cannot be negative').max(100, 'Progress cannot exceed 100%').optional()
   })
 })

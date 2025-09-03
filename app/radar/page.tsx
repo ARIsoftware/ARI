@@ -35,6 +35,7 @@ import { useSupabase } from "@/components/providers"
 import { Task } from "@/lib/supabase"
 import { transformTaskForRadar, getTaskPriorityLevel } from "@/lib/priority-utils"
 import { TaskPriorityModal } from "@/components/task-priority-modal"
+import { RadarTaskDots } from "@/components/radar-task-dots"
 
 const chartConfig = {
   value: {
@@ -238,64 +239,45 @@ export default function RadarPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pb-0">
-                  <ChartContainer
-                    config={chartConfig}
-                    className="mx-auto aspect-square max-h-[400px]"
-                  >
-                    <RadarChart data={radarData}>
-                      <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                      <PolarAngleAxis dataKey="axis" />
-                      <PolarGrid radialLines={false} />
-                      <PolarRadiusAxis 
-                        angle={90} 
-                        domain={[0, 100]} 
-                        tickCount={6}
-                        axisLine={false}
-                        tick={false}
-                      />
-                      <Radar
-                        dataKey="value"
-                        stroke="hsl(var(--chart-1))"
-                        fill="hsl(var(--chart-1))"
-                        fillOpacity={0.3}
-                        strokeWidth={2}
-                      />
-                      
-                      {/* Render task dots on the radar */}
-                      {transformedTasks.slice(0, 20).map((task) => {
-                        const angleRad = (task.angle - 90) * Math.PI / 180
-                        const r = task.radius * 150 // Scale radius to chart size
-                        const x = r * Math.cos(angleRad)
-                        const y = r * Math.sin(angleRad)
-                        
-                        return (
-                          <circle
-                            key={task.id}
-                            cx={200 + x}
-                            cy={200 + y}
-                            r={task.size}
-                            fill={task.color}
-                            fillOpacity={hoveredTask === task.id ? 1 : 0.7}
-                            stroke="white"
-                            strokeWidth={2}
-                            style={{ cursor: 'pointer' }}
-                            onMouseEnter={() => setHoveredTask(task.id)}
-                            onMouseLeave={() => setHoveredTask(null)}
-                            onClick={() => {
-                              const fullTask = tasks.find(t => t.id === task.id)
-                              if (fullTask) handleTaskClick(fullTask)
-                            }}
-                          >
-                            <title>{task.title.substring(0, 30)}...</title>
-                          </circle>
-                        )
-                      })}
-                    </RadarChart>
-                  </ChartContainer>
+                  <div className="relative">
+                    <ChartContainer
+                      config={chartConfig}
+                      className="mx-auto aspect-square max-h-[400px]"
+                    >
+                      <RadarChart data={radarData}>
+                        <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                        <PolarAngleAxis dataKey="axis" />
+                        <PolarGrid radialLines={false} />
+                        <PolarRadiusAxis 
+                          angle={90} 
+                          domain={[0, 100]} 
+                          tickCount={6}
+                          axisLine={false}
+                          tick={false}
+                        />
+                        <Radar
+                          dataKey="value"
+                          stroke="hsl(var(--chart-1))"
+                          fill="hsl(var(--chart-1))"
+                          fillOpacity={0.3}
+                          strokeWidth={2}
+                        />
+                      </RadarChart>
+                    </ChartContainer>
+                    
+                    {/* Overlay task dots - only show 5 highest priority */}
+                    <RadarTaskDots
+                      tasks={filteredTasks}
+                      hoveredTask={hoveredTask}
+                      onTaskHover={setHoveredTask}
+                      onTaskClick={handleTaskClick}
+                      limit={5}
+                    />
+                  </div>
                 </CardContent>
                 <CardFooter className="flex-col gap-2 text-sm">
                   <div className="text-muted-foreground flex items-center gap-2 leading-none">
-                    Tasks closer to center have higher priority
+                    Showing 5 highest priority tasks - closer to center = higher priority
                   </div>
                   <div className="flex gap-4 mt-2">
                     <div className="flex items-center gap-1">
@@ -319,7 +301,7 @@ export default function RadarPage() {
                 <CardHeader>
                   <CardTitle>Priority Tasks</CardTitle>
                   <CardDescription>
-                    Top priority tasks based on calculated scores
+                    Top 5 priority tasks based on calculated scores
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -329,7 +311,7 @@ export default function RadarPage() {
                     ) : transformedTasks.length === 0 ? (
                       <p className="text-muted-foreground">No tasks found</p>
                     ) : (
-                      transformedTasks.slice(0, 10).map((task, index) => {
+                      transformedTasks.slice(0, 5).map((task, index) => {
                         const fullTask = tasks.find(t => t.id === task.id)
                         if (!fullTask) return null
                         
