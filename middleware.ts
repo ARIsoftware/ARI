@@ -10,8 +10,50 @@ export async function middleware(req: NextRequest) {
     request: req,
   })
 
-  // Add X-Robots-Tag header to prevent indexing
+  // Add comprehensive security headers
   supabaseResponse.headers.set("X-Robots-Tag", "noindex, nofollow")
+  
+  // Content Security Policy
+  supabaseResponse.headers.set(
+    "Content-Security-Policy",
+    [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.pusher.com https://stats.pusher.com https://sockjs-us3.pusher.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com data:",
+      "img-src 'self' data: https: blob:",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://js.pusher.com https://sockjs-us3.pusher.com wss://ws-us3.pusher.com",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "media-src 'self'"
+    ].join("; ")
+  )
+  
+  // HTTP Strict Transport Security
+  supabaseResponse.headers.set(
+    "Strict-Transport-Security",
+    "max-age=31536000; includeSubDomains; preload"
+  )
+  
+  // X-Frame-Options
+  supabaseResponse.headers.set("X-Frame-Options", "DENY")
+  
+  // X-Content-Type-Options
+  supabaseResponse.headers.set("X-Content-Type-Options", "nosniff")
+  
+  // X-XSS-Protection
+  supabaseResponse.headers.set("X-XSS-Protection", "1; mode=block")
+  
+  // Referrer-Policy
+  supabaseResponse.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
+  
+  // Permissions-Policy
+  supabaseResponse.headers.set(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=()"
+  )
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

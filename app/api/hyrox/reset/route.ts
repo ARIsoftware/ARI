@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { createClient } from "@supabase/supabase-js"
+import { logger } from '@/lib/logger'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -32,10 +33,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to reset records' }, { status: 500 })
     }
 
-    console.log(`Reset station records for user ${user.id}`)
+    logger.info(`Reset station records for user ${user.id}`)
     return NextResponse.json({ success: true, message: 'Station records reset successfully' })
   } catch (error) {
-    console.error('API Error:', error)
+    logger.error('API Error:', error)
     return NextResponse.json(
       { error: 'Failed to reset station records' },
       { status: 500 }
