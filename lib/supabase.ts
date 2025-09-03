@@ -34,6 +34,12 @@ export type Task = {
   created_at: string
   updated_at: string
   order_index: number
+  impact?: number
+  severity?: number
+  timeliness?: number
+  effort?: number
+  strategic_fit?: number
+  priority_score?: number
 }
 
 export type FitnessTask = {
