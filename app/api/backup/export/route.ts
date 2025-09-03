@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { requireAdmin, isProductionSafeOperation } from '@/lib/admin-helpers'
 import { createClient } from "@supabase/supabase-js"
+import { logger } from '@/lib/logger'
 import crypto from "crypto"
 
 // Create service role client for full database access
@@ -34,16 +35,17 @@ async function discoverTables(client: any): Promise<string[]> {
     if (error) throw error
     return data?.map((row: any) => row.table_name) || []
   } catch (error) {
-    console.error('Error discovering tables:', error)
+    logger.error('Error discovering tables:', error)
     // Fallback to known tables
     return [
-      'ari-database', 
+      'tasks', 
       'fitness_database', 
       'contacts', 
       'fitness_completion_history', 
       'hyrox_station_records', 
       'hyrox_workouts', 
-      'hyrox_workout_stations'
+      'hyrox_workout_stations',
+      'goals'
     ]
   }
 }
@@ -61,7 +63,7 @@ async function getTableSchema(client: any, tableName: string) {
     if (error) throw error
     return data || []
   } catch (error) {
-    console.warn(`Could not get schema for table ${tableName}:`, error)
+    logger.warn(`Could not get schema for table ${tableName}:`, error)
     return []
   }
 }
@@ -166,7 +168,7 @@ export async function POST(req: NextRequest) {
     
     // Discover all tables
     const tables = await discoverTables(client)
-    console.log('Exporting tables:', tables)
+    logger.info('Exporting tables:', tables)
     
     const backupData: any = {}
     const tableSchemas: any = {}
@@ -202,7 +204,7 @@ export async function POST(req: NextRequest) {
               .range(offset, offset + chunkSize - 1)
             
             if (unorderedError) {
-              console.warn(`Could not export ${table}:`, unorderedError)
+              logger.warn(`Could not export ${table}:`, unorderedError)
               errors.push(`Warning: Could not export table ${table}`)
               hasMore = false
               continue
@@ -222,9 +224,9 @@ export async function POST(req: NextRequest) {
         checksums[table] = calculateChecksum(allData)
         totalRows += allData.length
         
-        console.log(`Exported ${table}: ${allData.length} rows`)
+        logger.info(`Exported ${table}: ${allData.length} rows`)
       } catch (tableError: any) {
-        console.error(`Error exporting table ${table}:`, tableError)
+        logger.error(`Error exporting table ${table}:`, tableError)
         errors.push(`Error exporting ${table}: ${tableError.message}`)
       }
     }
@@ -340,7 +342,7 @@ export async function POST(req: NextRequest) {
     // Reset sequences
     sqlContent += `-- Reset sequences if needed\n`
     for (const table of tables) {
-      if (table === 'ari-database' || table === 'fitness_database') {
+      if (table === 'tasks' || table === 'fitness_database') {
         sqlContent += `SELECT setval(pg_get_serial_sequence('"${table}"', 'order_index'), COALESCE((SELECT MAX(order_index) FROM "${table}"), 0) + 1, false);\n`
       }
     }
@@ -387,7 +389,7 @@ export async function POST(req: NextRequest) {
     })
     
   } catch (error: any) {
-    console.error('Export error:', error)
+    logger.error('Export error:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to export database' },
       { status: 500 }

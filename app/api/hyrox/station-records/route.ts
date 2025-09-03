@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { logger } from '@/lib/logger'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { createClient } from "@supabase/supabase-js"
 
@@ -110,7 +111,7 @@ export async function GET(req: NextRequest) {
 
     // If no records exist, create default records
     if (!data || data.length === 0) {
-      console.log('No records found, creating defaults for user:', user.id)
+      logger.info('No records found, creating defaults for user:', user.id)
       
       const records = defaultStationRecords.map(record => ({
         ...record,
@@ -123,7 +124,7 @@ export async function GET(req: NextRequest) {
         .select()
 
       if (insertError) {
-        console.error('Error inserting default records:', insertError)
+        logger.error('Error inserting default records:', insertError)
         // Return the default records even if insert fails
         const fallbackRecords = defaultStationRecords.map(record => ({
           ...record,
@@ -138,10 +139,10 @@ export async function GET(req: NextRequest) {
     }
 
     // Return the data as-is, keeping 0 values to indicate no time set
-    console.log(`Returning ${data.length} station records for user ${user.id}`)
+    logger.info(`Returning ${data.length} station records for user ${user.id}`)
     return NextResponse.json(data)
   } catch (error) {
-    console.error('API Error:', error)
+    logger.error('API Error:', error)
     return NextResponse.json(
       { error: 'Failed to fetch station records' },
       { status: 500 }
@@ -159,7 +160,7 @@ export async function PUT(req: NextRequest) {
 
     const { stationName, newTime } = await req.json()
     
-    console.log(`Updating station record: user=${user.id}, station=${stationName}, newTime=${newTime}`)
+    logger.info(`Updating station record: user=${user.id}, station=${stationName}, newTime=${newTime}`)
 
     // Create Supabase client with service role key to bypass RLS
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
@@ -203,14 +204,14 @@ export async function PUT(req: NextRequest) {
           throw insertError
         }
         
-        console.log(`Created new record for ${stationName} with time ${newTime}`)
+        logger.info(`Created new record for ${stationName} with time ${newTime}`)
         return NextResponse.json(insertedData)
       }
       
       throw fetchError
     }
 
-    console.log(`Current best time for ${stationName}: ${currentRecord.best_time}, new time: ${newTime}`)
+    logger.info(`Current best time for ${stationName}: ${currentRecord.best_time}, new time: ${newTime}`)
     
     // Update if:
     // 1. Current time is 0 (no time set yet), OR
@@ -231,14 +232,14 @@ export async function PUT(req: NextRequest) {
         throw error
       }
       
-      console.log(`Updated ${stationName} from ${currentRecord.best_time} to ${newTime}`)
+      logger.info(`Updated ${stationName} from ${currentRecord.best_time} to ${newTime}`)
       return NextResponse.json(data)
     }
 
-    console.log(`Not updating ${stationName} - current time ${currentRecord.best_time} is better than ${newTime}`)
+    logger.info(`Not updating ${stationName} - current time ${currentRecord.best_time} is better than ${newTime}`)
     return NextResponse.json(currentRecord)
   } catch (error) {
-    console.error('API Error:', error)
+    logger.error('API Error:', error)
     return NextResponse.json(
       { error: 'Failed to update station record' },
       { status: 500 }
