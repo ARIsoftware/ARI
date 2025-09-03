@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { requireAdmin, isProductionSafeOperation } from '@/lib/admin-helpers'
 import { createClient } from "@supabase/supabase-js"
 import crypto from "crypto"
 
@@ -139,6 +140,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
+      )
+    }
+
+    // Require admin access
+    try {
+      requireAdmin(user.id)
+    } catch (error) {
+      return NextResponse.json(
+        { error: "Admin access required" },
+        { status: 403 }
+      )
+    }
+
+    // Check if operation is safe in production
+    if (!isProductionSafeOperation()) {
+      return NextResponse.json(
+        { error: "Backup operations disabled in production. Set ALLOW_BACKUP_OPERATIONS=true to enable." },
+        { status: 403 }
       )
     }
 
