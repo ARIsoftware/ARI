@@ -88,9 +88,14 @@ export function TaskAnnouncement() {
       // Clean up focus timer listener
       globalTimerState.listeners = globalTimerState.listeners.filter(l => l !== listener)
     }
-  }, [user?.id])
+  }, [user?.id, session?.access_token])
 
   const loadLastTask = async () => {
+    if (!session?.access_token) {
+      setLoading(false)
+      return
+    }
+    
     const tokenFn = async () => session?.access_token || null
     const task = await getLastCompletedTask(tokenFn)
     setLastTask(task)
