@@ -132,6 +132,12 @@ export default function RadarPage() {
     setFilteredTasks(filtered)
   }, [tasks, filterStatus])
 
+  // Get top 5 incomplete tasks for priority display and radar dots
+  const priorityTasks = tasks
+    .filter(task => !task.completed) // Always exclude completed tasks
+    .sort((a, b) => (a.priority_score || 999) - (b.priority_score || 999))
+    .slice(0, 5)
+
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task)
     setIsModalOpen(true)
@@ -165,6 +171,7 @@ export default function RadarPage() {
 
   const radarData = prepareRadarData(filteredTasks)
   const transformedTasks = filteredTasks.map(transformTaskForRadar)
+  const transformedPriorityTasks = priorityTasks.map(transformTaskForRadar)
 
   return (
     <div className="min-h-screen bg-gray-50/50">
@@ -242,11 +249,18 @@ export default function RadarPage() {
                   <div className="relative">
                     <ChartContainer
                       config={chartConfig}
-                      className="mx-auto aspect-square max-h-[400px]"
+                      className="mx-auto aspect-square max-h-[450px] w-full p-4"
                     >
-                      <RadarChart data={radarData}>
+                      <RadarChart 
+                        data={radarData}
+                        margin={{ top: 20, right: 80, bottom: 20, left: 80 }}
+                      >
                         <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                        <PolarAngleAxis dataKey="axis" />
+                        <PolarAngleAxis 
+                          dataKey="axis" 
+                          tick={{ fontSize: 12, fill: '#666', textAnchor: 'middle' }}
+                          className="text-xs"
+                        />
                         <PolarGrid radialLines={false} />
                         <PolarRadiusAxis 
                           angle={90} 
@@ -265,9 +279,9 @@ export default function RadarPage() {
                       </RadarChart>
                     </ChartContainer>
                     
-                    {/* Overlay task dots - only show 5 highest priority */}
+                    {/* Overlay task dots - only show 5 highest priority incomplete tasks */}
                     <RadarTaskDots
-                      tasks={filteredTasks}
+                      tasks={priorityTasks}
                       hoveredTask={hoveredTask}
                       onTaskHover={setHoveredTask}
                       onTaskClick={handleTaskClick}
@@ -308,10 +322,10 @@ export default function RadarPage() {
                   <div className="space-y-2 max-h-[400px] overflow-y-auto">
                     {loading ? (
                       <p className="text-muted-foreground">Loading tasks...</p>
-                    ) : transformedTasks.length === 0 ? (
-                      <p className="text-muted-foreground">No tasks found</p>
+                    ) : transformedPriorityTasks.length === 0 ? (
+                      <p className="text-muted-foreground">No incomplete tasks found</p>
                     ) : (
-                      transformedTasks.slice(0, 5).map((task, index) => {
+                      transformedPriorityTasks.map((task, index) => {
                         const fullTask = tasks.find(t => t.id === task.id)
                         if (!fullTask) return null
                         
