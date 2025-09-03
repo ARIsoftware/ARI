@@ -177,7 +177,8 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
         completed: formData.completed,
       }
 
-      await updateTask(id, updates)
+      const tokenFn = async () => session?.access_token || null
+      await updateTask(id, updates, tokenFn)
 
       toast({
         title: "Success",

@@ -1,7 +1,8 @@
 "use client"
 
-import { TrendingUp } from "lucide-react"
-import { PolarAngleAxis, PolarGrid, Radar, RadarChart } from "recharts"
+import { useEffect, useState } from "react"
+import { Filter, TrendingUp } from "lucide-react"
+import { PolarAngleAxis, PolarGrid, Radar, RadarChart, PolarRadiusAxis } from "recharts"
 import { AppSidebar } from "@/components/app-sidebar"
 import {
   Breadcrumb,
@@ -28,24 +29,142 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart"
 import { TaskAnnouncement } from "@/components/task-announcement"
-
-const chartData = [
-  { month: "January", desktop: 186 },
-  { month: "February", desktop: 305 },
-  { month: "March", desktop: 237 },
-  { month: "April", desktop: 273 },
-  { month: "May", desktop: 209 },
-  { month: "June", desktop: 214 },
-]
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { useSupabase } from "@/components/providers"
+import { Task } from "@/lib/supabase"
+import { transformTaskForRadar, getTaskPriorityLevel } from "@/lib/priority-utils"
+import { TaskPriorityModal } from "@/components/task-priority-modal"
 
 const chartConfig = {
-  desktop: {
-    label: "Desktop",
+  value: {
+    label: "Priority",
     color: "var(--chart-1)",
   },
 } satisfies ChartConfig
 
+// Transform tasks to radar chart data format
+function prepareRadarData(tasks: Task[]) {
+  // Define the 5 axes for the radar chart
+  const axes = [
+    { axis: "Impact", key: "impact" },
+    { axis: "Severity", key: "severity" },
+    { axis: "Timeliness", key: "timeliness" },
+    { axis: "Effort", key: "effort" },
+    { axis: "Strategic Fit", key: "strategic_fit" },
+  ]
+  
+  // For visualization, we'll show average values across all tasks
+  // and individual task dots on the chart
+  const avgData = axes.map(({ axis, key }) => {
+    const values = tasks.map(t => {
+      const value = t[key as keyof Task] as number || 3
+      // Invert effort for display (high effort = lower on chart)
+      return key === 'effort' ? (6 - value) : value
+    })
+    const avg = values.length > 0 
+      ? values.reduce((a, b) => a + b, 0) / values.length 
+      : 3
+    
+    return {
+      axis,
+      value: (avg / 5) * 100, // Convert to percentage
+    }
+  })
+  
+  return avgData
+}
+
 export default function RadarPage() {
+  const { supabase, session } = useSupabase()
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [filteredTasks, setFilteredTasks] = useState<Task[]>([])
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [filterStatus, setFilterStatus] = useState<string>("all")
+  const [hoveredTask, setHoveredTask] = useState<string | null>(null)
+
+  // Fetch tasks with priority data
+  useEffect(() => {
+    fetchTasks()
+  }, [session])
+
+  const fetchTasks = async () => {
+    if (!session?.access_token) return
+    
+    try {
+      const response = await fetch('/api/tasks/priorities', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+      
+      if (!response.ok) throw new Error('Failed to fetch tasks')
+      
+      const data = await response.json()
+      setTasks(data)
+      setFilteredTasks(data)
+    } catch (error) {
+      console.error('Error fetching tasks:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Apply filters
+  useEffect(() => {
+    let filtered = [...tasks]
+    
+    if (filterStatus !== "all") {
+      filtered = filtered.filter(task => {
+        if (filterStatus === "completed") return task.completed
+        if (filterStatus === "pending") return !task.completed
+        if (filterStatus === "starred") return task.starred
+        return true
+      })
+    }
+    
+    // Sort by priority score (lower is higher priority)
+    filtered.sort((a, b) => (a.priority_score || 999) - (b.priority_score || 999))
+    
+    setFilteredTasks(filtered)
+  }, [tasks, filterStatus])
+
+  const handleTaskClick = (task: Task) => {
+    setSelectedTask(task)
+    setIsModalOpen(true)
+  }
+
+  const handleTaskUpdate = async (taskId: string, axes: any) => {
+    if (!session?.access_token) return
+    
+    try {
+      const response = await fetch('/api/tasks/priorities', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ taskId, axes })
+      })
+      
+      if (!response.ok) throw new Error('Failed to update task')
+      
+      const updatedTask = await response.json()
+      
+      // Update local state
+      setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t))
+      setIsModalOpen(false)
+      setSelectedTask(null)
+    } catch (error) {
+      console.error('Error updating task:', error)
+    }
+  }
+
+  const radarData = prepareRadarData(filteredTasks)
+  const transformedTasks = filteredTasks.map(transformTaskForRadar)
+
   return (
     <div className="min-h-screen bg-gray-50/50">
       <TaskAnnouncement />
@@ -62,24 +181,60 @@ export default function RadarPage() {
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Radar</BreadcrumbPage>
+                  <BreadcrumbPage>Task Priority Radar</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
           </header>
           
           <div className="flex flex-1 flex-col gap-6 p-6">
-            <div>
-              <h1 className="text-3xl font-medium">Radar</h1>
-              <p className="text-sm text-muted-foreground mt-1">Task radar prioritization view</p>
+            <div className="flex justify-between items-start">
+              <div>
+                <h1 className="text-3xl font-medium">Task Priority Radar</h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Visualize and prioritize tasks based on multiple factors
+                </p>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button
+                  variant={filterStatus === "all" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFilterStatus("all")}
+                >
+                  All
+                </Button>
+                <Button
+                  variant={filterStatus === "pending" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFilterStatus("pending")}
+                >
+                  Pending
+                </Button>
+                <Button
+                  variant={filterStatus === "completed" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFilterStatus("completed")}
+                >
+                  Completed
+                </Button>
+                <Button
+                  variant={filterStatus === "starred" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setFilterStatus("starred")}
+                >
+                  Starred
+                </Button>
+              </div>
             </div>
 
-            <div className="flex items-center justify-center">
-              <Card className="w-full max-w-2xl">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Radar Chart */}
+              <Card>
                 <CardHeader className="items-center">
-                  <CardTitle>Radar Chart - Dots</CardTitle>
+                  <CardTitle>Priority Distribution</CardTitle>
                   <CardDescription>
-                    Showing total visitors for the last 6 months
+                    Average task scores across all priority axes
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pb-0">
@@ -87,35 +242,201 @@ export default function RadarPage() {
                     config={chartConfig}
                     className="mx-auto aspect-square max-h-[400px]"
                   >
-                    <RadarChart data={chartData}>
+                    <RadarChart data={radarData}>
                       <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                      <PolarAngleAxis dataKey="month" />
-                      <PolarGrid />
-                      <Radar
-                        dataKey="desktop"
-                        fill="var(--color-desktop)"
-                        fillOpacity={0.6}
-                        dot={{
-                          r: 4,
-                          fillOpacity: 1,
-                        }}
+                      <PolarAngleAxis dataKey="axis" />
+                      <PolarGrid radialLines={false} />
+                      <PolarRadiusAxis 
+                        angle={90} 
+                        domain={[0, 100]} 
+                        tickCount={6}
+                        axisLine={false}
+                        tick={false}
                       />
+                      <Radar
+                        dataKey="value"
+                        stroke="hsl(var(--chart-1))"
+                        fill="hsl(var(--chart-1))"
+                        fillOpacity={0.3}
+                        strokeWidth={2}
+                      />
+                      
+                      {/* Render task dots on the radar */}
+                      {transformedTasks.slice(0, 20).map((task) => {
+                        const angleRad = (task.angle - 90) * Math.PI / 180
+                        const r = task.radius * 150 // Scale radius to chart size
+                        const x = r * Math.cos(angleRad)
+                        const y = r * Math.sin(angleRad)
+                        
+                        return (
+                          <circle
+                            key={task.id}
+                            cx={200 + x}
+                            cy={200 + y}
+                            r={task.size}
+                            fill={task.color}
+                            fillOpacity={hoveredTask === task.id ? 1 : 0.7}
+                            stroke="white"
+                            strokeWidth={2}
+                            style={{ cursor: 'pointer' }}
+                            onMouseEnter={() => setHoveredTask(task.id)}
+                            onMouseLeave={() => setHoveredTask(null)}
+                            onClick={() => {
+                              const fullTask = tasks.find(t => t.id === task.id)
+                              if (fullTask) handleTaskClick(fullTask)
+                            }}
+                          >
+                            <title>{task.title.substring(0, 30)}...</title>
+                          </circle>
+                        )
+                      })}
                     </RadarChart>
                   </ChartContainer>
                 </CardContent>
                 <CardFooter className="flex-col gap-2 text-sm">
-                  <div className="flex items-center gap-2 leading-none font-medium">
-                    Trending up by 5.2% this month <TrendingUp className="h-4 w-4" />
-                  </div>
                   <div className="text-muted-foreground flex items-center gap-2 leading-none">
-                    January - June 2024
+                    Tasks closer to center have higher priority
+                  </div>
+                  <div className="flex gap-4 mt-2">
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded-full bg-red-500" />
+                      <span className="text-xs">Overdue</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded-full bg-orange-500" />
+                      <span className="text-xs">Due Soon</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded-full bg-green-500" />
+                      <span className="text-xs">Not Urgent</span>
+                    </div>
                   </div>
                 </CardFooter>
               </Card>
+
+              {/* Priority List */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Priority Tasks</CardTitle>
+                  <CardDescription>
+                    Top priority tasks based on calculated scores
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                    {loading ? (
+                      <p className="text-muted-foreground">Loading tasks...</p>
+                    ) : transformedTasks.length === 0 ? (
+                      <p className="text-muted-foreground">No tasks found</p>
+                    ) : (
+                      transformedTasks.slice(0, 10).map((task, index) => {
+                        const fullTask = tasks.find(t => t.id === task.id)
+                        if (!fullTask) return null
+                        
+                        return (
+                          <div
+                            key={task.id}
+                            className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50 cursor-pointer transition-colors"
+                            onClick={() => handleTaskClick(fullTask)}
+                            onMouseEnter={() => setHoveredTask(task.id)}
+                            onMouseLeave={() => setHoveredTask(null)}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div 
+                                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium text-white"
+                                style={{ backgroundColor: task.color }}
+                              >
+                                {index + 1}
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-medium text-sm line-clamp-1">
+                                  {task.title}
+                                </p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Badge variant={
+                                    task.priorityLevel === 'critical' ? 'destructive' :
+                                    task.priorityLevel === 'high' ? 'default' :
+                                    task.priorityLevel === 'medium' ? 'secondary' :
+                                    'outline'
+                                  } className="text-xs">
+                                    {task.priorityLevel}
+                                  </Badge>
+                                  {task.dueDate && (
+                                    <span className="text-xs text-muted-foreground">
+                                      Due: {new Date(task.dueDate).toLocaleDateString()}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Score: {task.score.toFixed(2)}
+                            </div>
+                          </div>
+                        )
+                      })
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
+
+            {/* Legend and Info */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Understanding the Priority Radar</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                  <div>
+                    <h4 className="font-medium mb-1">Impact</h4>
+                    <p className="text-sm text-muted-foreground">
+                      How much this task affects your goals (1-5)
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="font-medium mb-1">Severity</h4>
+                    <p className="text-sm text-muted-foreground">
+                      How critical the issue is (1-5)
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="font-medium mb-1">Timeliness</h4>
+                    <p className="text-sm text-muted-foreground">
+                      How urgent the task is (1-5)
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="font-medium mb-1">Effort</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Resources required (1-5, lower is better)
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="font-medium mb-1">Strategic Fit</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Alignment with strategy (1-5)
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </SidebarInset>
       </SidebarProvider>
+
+      {/* Task Priority Edit Modal */}
+      {selectedTask && (
+        <TaskPriorityModal
+          task={selectedTask}
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false)
+            setSelectedTask(null)
+          }}
+          onUpdate={handleTaskUpdate}
+        />
+      )}
     </div>
   )
 }
