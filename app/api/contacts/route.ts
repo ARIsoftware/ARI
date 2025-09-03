@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
+import { createContactSchema } from '@/lib/validation'
 
 // GET /api/contacts - Fetch all contacts
 export async function GET(request: NextRequest) {
@@ -30,11 +32,17 @@ export async function GET(request: NextRequest) {
 // POST /api/contacts - Create a new contact
 export async function POST(request: NextRequest) {
   try {
-    const { contact } = await request.json()
+    // Validate request body
+    const validation = await validateRequestBody(request, createContactSchema)
+    if (!validation.success) {
+      return validation.response
+    }
+
+    const { contact } = validation.data
     const { user, supabase } = await getAuthenticatedUser()
     
     if (!user) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      return createErrorResponse('Authentication required', 401)
     }
 
     const { data, error } = await supabase
@@ -45,12 +53,12 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error creating contact:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return createErrorResponse(error.message, 500)
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(data, { status: 201 })
   } catch (error) {
     console.error('Unexpected error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return createErrorResponse('Internal server error', 500)
   }
 }

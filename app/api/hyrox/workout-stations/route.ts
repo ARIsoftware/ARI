@@ -1,39 +1,37 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { createClient } from "@supabase/supabase-js"
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
+import { addWorkoutStationSchema } from '@/lib/validation'
 
 export async function POST(req: NextRequest) {
   try {
-    const { user } = await getAuthenticatedUser()
+    const { user, supabase } = await getAuthenticatedUser()
     
     if (!user) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+      return createErrorResponse("Authentication required", 401)
     }
 
-    const { workoutId, stationName, stationOrder, stationTime, completed } = await req.json()
+    // Validate request body
+    const validation = await validateRequestBody(req, addWorkoutStationSchema)
+    if (!validation.success) {
+      return validation.response
+    }
 
-    // Create Supabase client with service role key to bypass RLS
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
+    const { workoutId, stationName, stationOrder, stationTime, completed } = validation.data
 
-    // Verify the workout belongs to this user
+    // Verify the workout belongs to this user using RLS-enabled client
     const { data: workout, error: workoutError } = await supabase
       .from('hyrox_workouts')
-      .select('user_id')
+      .select('user_id, id')
       .eq('id', workoutId)
+      .eq('user_id', user.id)  // CRITICAL: Explicit user verification
       .single()
 
-    if (workoutError || !workout || workout.user_id !== user.id) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    if (workoutError || !workout) {
+      return createErrorResponse("Workout not found or access denied", 404)
     }
 
+    // Use user-scoped client with RLS
     const { data, error } = await supabase
       .from('hyrox_workout_stations')
       .insert({
@@ -48,15 +46,12 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error('Error adding workout station:', error)
-      throw error
+      return createErrorResponse('Failed to add workout station', 500)
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(data, { status: 201 })
   } catch (error) {
     console.error('API Error:', error)
-    return NextResponse.json(
-      { error: 'Failed to add workout station' },
-      { status: 500 }
-    )
+    return createErrorResponse('Failed to add workout station', 500)
   }
 }
