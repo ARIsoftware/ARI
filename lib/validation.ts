@@ -28,7 +28,12 @@ export const createTaskSchema = z.object({
     starred: z.boolean().default(false),
     completed: z.boolean().default(false),
     subtasks_total: nonNegativeNumber.max(100, 'Too many subtasks').default(0),
-    subtasks_completed: nonNegativeNumber.default(0)
+    subtasks_completed: nonNegativeNumber.default(0),
+    impact: z.number().min(1).max(5).default(3).optional(),
+    severity: z.number().min(1).max(5).default(3).optional(),
+    timeliness: z.number().min(1).max(5).default(3).optional(),
+    effort: z.number().min(1).max(5).default(3).optional(),
+    strategic_fit: z.number().min(1).max(5).default(3).optional()
   })
 }).refine(
   (data) => data.task.subtasks_completed <= data.task.subtasks_total,
@@ -49,7 +54,13 @@ export const updateTaskSchema = z.object({
     starred: z.boolean().optional(),
     completed: z.boolean().optional(),
     subtasks_total: nonNegativeNumber.max(100, 'Too many subtasks').optional(),
-    subtasks_completed: nonNegativeNumber.optional()
+    subtasks_completed: nonNegativeNumber.optional(),
+    impact: z.number().min(1).max(5).optional(),
+    severity: z.number().min(1).max(5).optional(),
+    timeliness: z.number().min(1).max(5).optional(),
+    effort: z.number().min(1).max(5).optional(),
+    strategic_fit: z.number().min(1).max(5).optional(),
+    priority_score: z.number().optional()
   }).refine(
     (data) => !data.subtasks_completed || !data.subtasks_total || data.subtasks_completed <= data.subtasks_total,
     {
