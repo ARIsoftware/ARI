@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
 
     // With RLS enabled, this will automatically filter by auth.uid()
     const { data, error } = await supabase
-      .from('ari-database')
+      .from('tasks')
       .select('*')
       .order('order_index', { ascending: true })
     
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     // Get the highest order_index for this user
     const { data: maxOrderData } = await supabase
-      .from('ari-database')
+      .from('tasks')
       .select('order_index')
       .order('order_index', { ascending: false })
       .limit(1)
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     // RLS will automatically set user_id to auth.uid()
     const { data, error } = await supabase
-      .from('ari-database')
+      .from('tasks')
       .insert([{
         ...task,
         order_index: nextOrderIndex,
@@ -82,7 +82,7 @@ export async function PUT(request: NextRequest) {
 
     // RLS will ensure user can only update their own tasks
     const { data, error } = await supabase
-      .from('ari-database')
+      .from('tasks')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id)
       .select()
@@ -116,7 +116,7 @@ export async function DELETE(request: NextRequest) {
 
     // RLS will ensure user can only delete their own tasks
     const { error } = await supabase
-      .from('ari-database')
+      .from('tasks')
       .delete()
       .eq('id', id)
 

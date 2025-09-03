@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
     // Get current completion count
     const { data: task, error: fetchError } = await supabase
-      .from('ari-database')
+      .from('tasks')
       .select('completion_count')
       .eq('id', taskId)
       .single()
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     const newCount = (task?.completion_count || 0) + 1
 
     const { error: updateError } = await supabase
-      .from('ari-database')
+      .from('tasks')
       .update({ 
         completion_count: newCount,
         updated_at: new Date().toISOString()

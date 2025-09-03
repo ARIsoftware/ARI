@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { data, error } = await supabase
-      .from('ari-database')
+      .from('tasks')
       .select('title, updated_at')
       .eq('completed', true)
       .order('updated_at', { ascending: false })

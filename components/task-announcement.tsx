@@ -65,7 +65,7 @@ export function TaskAnnouncement() {
           {
             event: "UPDATE",
             schema: "public",
-            table: "ari-database",
+            table: "tasks",
             filter: "completed=eq.true",
           },
           (payload) => {
