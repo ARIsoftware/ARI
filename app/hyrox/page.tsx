@@ -379,17 +379,18 @@ export default function HyroxPage() {
           .filter(([table, exists]) => !exists)
           .map(([table]) => table)
       
-      if (missingTables.length > 0) {
-        toast({
-          title: "Missing Tables",
-          description: `Missing: ${missingTables.join(', ')}`,
-          variant: "destructive",
-        })
-      } else {
-        toast({
-          title: "Database OK",
-          description: "All tables exist and are accessible",
-        })
+        if (missingTables.length > 0) {
+          toast({
+            title: "Missing Tables",
+            description: `Missing: ${missingTables.join(', ')}`,
+            variant: "destructive",
+          })
+        } else {
+          toast({
+            title: "Database OK",
+            description: "All tables exist and are accessible",
+          })
+        }
       }
     } catch (error) {
       console.error('Error testing database:', error)
@@ -519,7 +520,7 @@ export default function HyroxPage() {
                         const timeDiff = Math.abs(station.best_time - station.goal_time) / 1000
                         
                         return (
-                          <Card key={station.station_name} className="relative overflow-hidden">
+                          <Card key={`${station.id}-${station.station_name}`} className="relative overflow-hidden">
                             <CardHeader className="pb-3">
                               <div className="flex items-start justify-between">
                                 <div>
