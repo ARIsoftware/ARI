@@ -25,13 +25,16 @@ import { Badge } from "@/components/ui/badge"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Switch } from "@/components/ui/switch"
-import { CalendarIcon, Save, X, Star, ArrowLeft, Loader2, Pencil } from "lucide-react"
+import { Slider } from "@/components/ui/slider"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { CalendarIcon, Save, X, Star, ArrowLeft, Loader2, Pencil, Info } from "lucide-react"
 import { useState, useEffect } from "react"
 import { getTasks, updateTask, type Task } from "@/lib/tasks"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
+import { calculatePriorityScore, getTaskPriorityLevel } from "@/lib/priority-utils"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -49,6 +52,14 @@ const statusOptions = [
   { value: "In Progress", label: "In Progress", color: "bg-purple-100 text-purple-600" },
   { value: "Completed", label: "Completed", color: "bg-green-100 text-green-600" },
 ]
+
+const axisDescriptions = {
+  impact: "How much this task affects your goals and objectives",
+  severity: "How critical or severe the problem/opportunity is",
+  timeliness: "How urgent this task is based on deadlines",
+  effort: "Amount of resources/time needed (lower is better)",
+  strategic_fit: "How well this aligns with your strategic priorities"
+}
 
 export default function EditTaskPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
@@ -71,6 +82,11 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
     priority: "Medium" as const,
     starred: false,
     completed: false,
+    impact: 3,
+    severity: 3,
+    timeliness: 3,
+    effort: 3,
+    strategic_fit: 3,
   })
 
   const [newAssignee, setNewAssignee] = useState("")
@@ -105,6 +121,11 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
           priority: foundTask.priority,
           starred: foundTask.starred,
           completed: foundTask.completed,
+          impact: foundTask.impact || 3,
+          severity: foundTask.severity || 3,
+          timeliness: foundTask.timeliness || 3,
+          effort: foundTask.effort || 3,
+          strategic_fit: foundTask.strategic_fit || 3,
         })
         
         if (foundTask.due_date) {
@@ -175,6 +196,11 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
         priority: formData.priority,
         starred: formData.starred,
         completed: formData.completed,
+        impact: formData.impact,
+        severity: formData.severity,
+        timeliness: formData.timeliness,
+        effort: formData.effort,
+        strategic_fit: formData.strategic_fit,
       }
 
       const tokenFn = async () => session?.access_token || null
@@ -434,6 +460,231 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
                       checked={formData.completed}
                       onCheckedChange={(checked) => handleInputChange("completed", checked)}
                     />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Priority Score Section */}
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    Priority Score
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl font-bold">
+                        {calculatePriorityScore({
+                          impact: formData.impact,
+                          severity: formData.severity,
+                          timeliness: formData.timeliness,
+                          effort: formData.effort,
+                          strategic_fit: formData.strategic_fit,
+                        }).toFixed(2)}
+                      </span>
+                      <Badge variant={
+                        getTaskPriorityLevel(calculatePriorityScore({
+                          impact: formData.impact,
+                          severity: formData.severity,
+                          timeliness: formData.timeliness,
+                          effort: formData.effort,
+                          strategic_fit: formData.strategic_fit,
+                        })) === 'critical' ? 'destructive' :
+                        getTaskPriorityLevel(calculatePriorityScore({
+                          impact: formData.impact,
+                          severity: formData.severity,
+                          timeliness: formData.timeliness,
+                          effort: formData.effort,
+                          strategic_fit: formData.strategic_fit,
+                        })) === 'high' ? 'default' :
+                        getTaskPriorityLevel(calculatePriorityScore({
+                          impact: formData.impact,
+                          severity: formData.severity,
+                          timeliness: formData.timeliness,
+                          effort: formData.effort,
+                          strategic_fit: formData.strategic_fit,
+                        })) === 'medium' ? 'secondary' :
+                        'outline'
+                      }>
+                        {getTaskPriorityLevel(calculatePriorityScore({
+                          impact: formData.impact,
+                          severity: formData.severity,
+                          timeliness: formData.timeliness,
+                          effort: formData.effort,
+                          strategic_fit: formData.strategic_fit,
+                        }))}
+                      </Badge>
+                    </div>
+                  </CardTitle>
+                  <CardDescription>Lower score = higher priority</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Impact */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-sm font-medium">Impact</Label>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs text-xs">{axisDescriptions.impact}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <span className="text-sm font-medium w-8 text-right">{formData.impact}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-muted-foreground w-8">Low</span>
+                      <Slider
+                        value={[formData.impact]}
+                        onValueChange={(value) => handleInputChange("impact", value[0])}
+                        min={1}
+                        max={5}
+                        step={1}
+                        className="flex-1"
+                      />
+                      <span className="text-xs text-muted-foreground w-8">High</span>
+                    </div>
+                  </div>
+
+                  {/* Severity */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-sm font-medium">Severity</Label>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs text-xs">{axisDescriptions.severity}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <span className="text-sm font-medium w-8 text-right">{formData.severity}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-muted-foreground w-8">Low</span>
+                      <Slider
+                        value={[formData.severity]}
+                        onValueChange={(value) => handleInputChange("severity", value[0])}
+                        min={1}
+                        max={5}
+                        step={1}
+                        className="flex-1"
+                      />
+                      <span className="text-xs text-muted-foreground w-8">High</span>
+                    </div>
+                  </div>
+
+                  {/* Timeliness */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-sm font-medium">Timeliness</Label>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs text-xs">{axisDescriptions.timeliness}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <span className="text-sm font-medium w-8 text-right">{formData.timeliness}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-muted-foreground w-8">Low</span>
+                      <Slider
+                        value={[formData.timeliness]}
+                        onValueChange={(value) => handleInputChange("timeliness", value[0])}
+                        min={1}
+                        max={5}
+                        step={1}
+                        className="flex-1"
+                      />
+                      <span className="text-xs text-muted-foreground w-8">High</span>
+                    </div>
+                  </div>
+
+                  {/* Effort */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-sm font-medium">Effort</Label>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs text-xs">{axisDescriptions.effort}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <span className="text-sm font-medium w-8 text-right">{formData.effort}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-muted-foreground w-8">Low</span>
+                      <Slider
+                        value={[formData.effort]}
+                        onValueChange={(value) => handleInputChange("effort", value[0])}
+                        min={1}
+                        max={5}
+                        step={1}
+                        className="flex-1"
+                      />
+                      <span className="text-xs text-muted-foreground w-8">High</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground italic">
+                      Note: Lower effort = higher priority
+                    </p>
+                  </div>
+
+                  {/* Strategic Fit */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-sm font-medium">Strategic Fit</Label>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs text-xs">{axisDescriptions.strategic_fit}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <span className="text-sm font-medium w-8 text-right">{formData.strategic_fit}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-muted-foreground w-8">Low</span>
+                      <Slider
+                        value={[formData.strategic_fit]}
+                        onValueChange={(value) => handleInputChange("strategic_fit", value[0])}
+                        min={1}
+                        max={5}
+                        step={1}
+                        className="flex-1"
+                      />
+                      <span className="text-xs text-muted-foreground w-8">High</span>
+                    </div>
+                  </div>
+
+                  {/* Tip */}
+                  <div className="p-3 bg-blue-50 rounded-lg">
+                    <p className="text-xs text-blue-700">
+                      <strong>Tip:</strong> Tasks with high impact, severity, and timeliness but low effort 
+                      will appear closer to the center of the radar chart (higher priority).
+                    </p>
                   </div>
 
                   {/* Action Buttons */}
