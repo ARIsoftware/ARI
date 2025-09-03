@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, validateQueryParams, createErrorResponse } from '@/lib/api-helpers'
 import { createTaskSchema, updateTaskSchema, uuidParamSchema } from '@/lib/validation'
+import { calculatePriorityScore } from '@/lib/priority-utils'
 import { z } from 'zod'
 
 export async function GET(request: NextRequest) {
@@ -54,12 +55,26 @@ export async function POST(request: NextRequest) {
 
     const nextOrderIndex = maxOrderData && maxOrderData.length > 0 ? (maxOrderData[0].order_index || 0) + 1 : 0
 
+    // Calculate priority score if axes are provided
+    let priorityScore = undefined
+    if (task.impact || task.severity || task.timeliness || task.effort || task.strategic_fit) {
+      const axes = {
+        impact: task.impact || 3,
+        severity: task.severity || 3,
+        timeliness: task.timeliness || 3,
+        effort: task.effort || 3,
+        strategic_fit: task.strategic_fit || 3
+      }
+      priorityScore = calculatePriorityScore(axes)
+    }
+
     // RLS will automatically set user_id to auth.uid()
     const { data, error } = await supabase
       .from('tasks')
       .insert([{
         ...task,
         order_index: nextOrderIndex,
+        priority_score: priorityScore
       }])
       .select()
       .single()
@@ -96,10 +111,39 @@ export async function PUT(request: NextRequest) {
       return createErrorResponse('Authentication required', 401)
     }
 
+    // Calculate priority score if axes are being updated
+    let priorityScore = updates.priority_score
+    if (updates.impact !== undefined || updates.severity !== undefined || 
+        updates.timeliness !== undefined || updates.effort !== undefined || 
+        updates.strategic_fit !== undefined) {
+      
+      // Fetch current task to get existing axes values
+      const { data: currentTask } = await supabase
+        .from('tasks')
+        .select('impact, severity, timeliness, effort, strategic_fit')
+        .eq('id', id)
+        .single()
+      
+      if (currentTask) {
+        const axes = {
+          impact: updates.impact ?? currentTask.impact ?? 3,
+          severity: updates.severity ?? currentTask.severity ?? 3,
+          timeliness: updates.timeliness ?? currentTask.timeliness ?? 3,
+          effort: updates.effort ?? currentTask.effort ?? 3,
+          strategic_fit: updates.strategic_fit ?? currentTask.strategic_fit ?? 3
+        }
+        priorityScore = calculatePriorityScore(axes)
+      }
+    }
+
     // RLS will ensure user can only update their own tasks
     const { data, error } = await supabase
       .from('tasks')
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update({ 
+        ...updates, 
+        priority_score: priorityScore,
+        updated_at: new Date().toISOString() 
+      })
       .eq('id', id)
       .select()
       .single()
