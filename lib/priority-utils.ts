@@ -22,7 +22,7 @@ const TARGET_VALUES: NormalizedAxes = {
   impact: 1,        // Want high impact
   severity: 1,      // Want to address high severity issues
   timeliness: 1,    // Want to address urgent tasks
-  effort: 0,        // Want low effort (inverted)
+  effort: 1,        // Want low effort (already inverted in normalization)
   strategic_fit: 1  // Want high strategic alignment
 }
 
