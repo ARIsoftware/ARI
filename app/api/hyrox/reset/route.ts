@@ -1,45 +1,31 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { createClient } from "@supabase/supabase-js"
 import { logger } from '@/lib/logger'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+import { createErrorResponse } from '@/lib/api-helpers'
 
 export async function POST(req: NextRequest) {
   try {
-    const { user } = await getAuthenticatedUser()
+    const { user, supabase } = await getAuthenticatedUser()
     
     if (!user) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+      return createErrorResponse("Authentication required", 401)
     }
 
-    // Create Supabase client with service role key to bypass RLS
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
-
-    // Delete all existing records for the user
+    // Use user-scoped client with RLS - explicitly filter by user_id for security
     const { error: deleteError } = await supabase
       .from('hyrox_station_records')
       .delete()
-      .eq('user_id', user.id)
+      .eq('user_id', user.id)  // CRITICAL: Explicit user filtering
 
     if (deleteError) {
       console.error('Error deleting records:', deleteError)
-      return NextResponse.json({ error: 'Failed to reset records' }, { status: 500 })
+      return createErrorResponse('Failed to reset records', 500)
     }
 
     logger.info(`Reset station records for user ${user.id}`)
     return NextResponse.json({ success: true, message: 'Station records reset successfully' })
   } catch (error) {
     logger.error('API Error:', error)
-    return NextResponse.json(
-      { error: 'Failed to reset station records' },
-      { status: 500 }
-    )
+    return createErrorResponse('Failed to reset station records', 500)
   }
 }

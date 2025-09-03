@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { logger } from '@/lib/logger'
+import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
+import { updateStationRecordSchema } from '@/lib/validation'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { createClient } from "@supabase/supabase-js"
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 // Default station records data
 const defaultStationRecords = [
@@ -75,25 +73,17 @@ const defaultStationRecords = [
 
 export async function GET(req: NextRequest) {
   try {
-    const { user } = await getAuthenticatedUser()
+    const { user, supabase } = await getAuthenticatedUser()
     
     if (!user) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+      return createErrorResponse("Authentication required", 401)
     }
 
-    // Create Supabase client with service role key to bypass RLS
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
-
-    // Fetch station records for the user
+    // Use user-scoped client with RLS - explicitly filter by user_id for security
     const { data, error } = await supabase
       .from('hyrox_station_records')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', user.id)  // CRITICAL: Explicit user filtering
       .order('station_name')
 
     if (error) {
@@ -152,23 +142,21 @@ export async function GET(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const { user } = await getAuthenticatedUser()
+    const { user, supabase } = await getAuthenticatedUser()
     
     if (!user) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+      return createErrorResponse("Authentication required", 401)
     }
 
-    const { stationName, newTime } = await req.json()
+    // Validate request body
+    const validation = await validateRequestBody(req, updateStationRecordSchema)
+    if (!validation.success) {
+      return validation.response
+    }
+
+    const { stationName, newTime } = validation.data
     
     logger.info(`Updating station record: user=${user.id}, station=${stationName}, newTime=${newTime}`)
-
-    // Create Supabase client with service role key to bypass RLS
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
 
     // First get the current record
     const { data: currentRecord, error: fetchError } = await supabase

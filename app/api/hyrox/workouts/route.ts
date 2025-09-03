@@ -1,39 +1,38 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { createClient } from "@supabase/supabase-js"
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+import { validateRequestBody, validateQueryParams, createErrorResponse } from '@/lib/api-helpers'
+import { completeHyroxWorkoutSchema, paginationSchema } from '@/lib/validation'
 
 export async function GET(req: NextRequest) {
   try {
-    const { user } = await getAuthenticatedUser()
+    const { user, supabase } = await getAuthenticatedUser()
     
     if (!user) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+      return createErrorResponse("Authentication required", 401)
     }
 
     const { searchParams } = new URL(req.url)
-    const limit = parseInt(searchParams.get('limit') || '10')
+    
+    // Validate query parameters
+    const queryValidation = validateQueryParams(searchParams, paginationSchema)
+    if (!queryValidation.success) {
+      return queryValidation.response
+    }
 
-    // Create Supabase client with service role key to bypass RLS
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
+    const { limit } = queryValidation.data
 
+    // Use user-scoped client with RLS - explicitly filter by user_id for security
     const { data, error } = await supabase
       .from('hyrox_workouts')
       .select('*')
+      .eq('user_id', user.id)  // CRITICAL: Explicit user filtering
       .eq('completed', true)
       .order('completed_at', { ascending: false })
       .limit(limit)
 
     if (error) {
       console.error('Error fetching workout history:', error)
-      throw error
+      return createErrorResponse('Failed to fetch workout history', 500)
     }
 
     return NextResponse.json(data || [])
@@ -48,23 +47,17 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { user } = await getAuthenticatedUser()
+    const { user, supabase } = await getAuthenticatedUser()
     
     if (!user) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+      return createErrorResponse("Authentication required", 401)
     }
 
-    // Create Supabase client with service role key to bypass RLS
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
-
+    // Use user-scoped client with RLS - user_id will be automatically set by RLS
     const { data, error } = await supabase
       .from('hyrox_workouts')
       .insert({
+        user_id: user.id,  // CRITICAL: Explicit user association
         total_time: 0,
         completed: false,
       })
@@ -73,10 +66,10 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error('Error creating workout:', error)
-      throw error
+      return createErrorResponse('Failed to create workout', 500)
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(data, { status: 201 })
   } catch (error) {
     console.error('API Error:', error)
     return NextResponse.json(
@@ -88,22 +81,21 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const { user } = await getAuthenticatedUser()
+    const { user, supabase } = await getAuthenticatedUser()
     
     if (!user) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+      return createErrorResponse("Authentication required", 401)
     }
 
-    const { workoutId, totalTime } = await req.json()
+    // Validate request body
+    const validation = await validateRequestBody(req, completeHyroxWorkoutSchema)
+    if (!validation.success) {
+      return validation.response
+    }
 
-    // Create Supabase client with service role key to bypass RLS
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    })
+    const { workoutId, totalTime } = validation.data
 
+    // Use user-scoped client with RLS - explicitly filter by user_id for security
     const { data, error } = await supabase
       .from('hyrox_workouts')
       .update({
@@ -112,12 +104,17 @@ export async function PUT(req: NextRequest) {
         completed_at: new Date().toISOString(),
       })
       .eq('id', workoutId)
+      .eq('user_id', user.id)  // CRITICAL: Only update user's own workouts
       .select()
       .single()
 
     if (error) {
       console.error('Error completing workout:', error)
-      throw error
+      return createErrorResponse('Failed to complete workout', 500)
+    }
+
+    if (!data) {
+      return createErrorResponse('Workout not found or access denied', 404)
     }
 
     return NextResponse.json(data)

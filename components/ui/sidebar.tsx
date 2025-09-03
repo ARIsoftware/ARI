@@ -7,6 +7,7 @@ import { PanelLeft } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
+import { setSecureCookie } from "@/lib/cookies"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
@@ -66,8 +67,13 @@ const SidebarProvider = React.forwardRef<
         _setOpen(openState)
       }
 
-      // This sets the cookie to keep the sidebar state.
-      document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
+      // This sets the cookie to keep the sidebar state with secure attributes.
+      setSecureCookie(SIDEBAR_COOKIE_NAME, openState.toString(), {
+        path: '/',
+        maxAge: SIDEBAR_COOKIE_MAX_AGE,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production'
+      })
     },
     [setOpenProp, open],
   )
