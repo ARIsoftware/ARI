@@ -33,19 +33,13 @@ import {
   CarouselPrevious,
 } from "@/components/ui/carousel"
 import {
-  getHyroxStationRecords,
-  updateStationRecord,
-  createHyroxWorkout,
-  completeHyroxWorkout,
-  addWorkoutStation,
-  getHyroxWorkoutHistory,
   calculateProgress,
   formatTime as formatTimeUtil,
   getTimeDifference,
   type HyroxStationRecord,
   type HyroxWorkout,
-} from "@/lib/hyrox-client"
-import { testHyroxDatabase } from "@/lib/hyrox"
+} from "@/lib/hyrox"
+// Removed direct import of testHyroxDatabase - now using API route
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -363,19 +357,21 @@ export default function HyroxPage() {
 
   const runDatabaseTest = async () => {
     console.log('Running database diagnostics...')
-    const result = await testHyroxDatabase()
-    console.log('Database test result:', result)
-    
-    if (!result.success) {
-      toast({
-        title: "Database Connection Failed",
-        description: result.error,
-        variant: "destructive",
-      })
-    } else {
-      const missingTables = Object.entries(result.tables)
-        .filter(([table, exists]) => !exists)
-        .map(([table]) => table)
+    try {
+      const response = await fetch('/api/hyrox/test-database')
+      const result = await response.json()
+      console.log('Database test result:', result)
+      
+      if (!result.success) {
+        toast({
+          title: "Database Connection Failed",
+          description: result.error,
+          variant: "destructive",
+        })
+      } else {
+        const missingTables = Object.entries(result.tables)
+          .filter(([table, exists]) => !exists)
+          .map(([table]) => table)
       
       if (missingTables.length > 0) {
         toast({
@@ -389,6 +385,13 @@ export default function HyroxPage() {
           description: "All tables exist and are accessible",
         })
       }
+    } catch (error) {
+      console.error('Error testing database:', error)
+      toast({
+        title: "Error",
+        description: "Failed to test database connection",
+        variant: "destructive",
+      })
     }
   }
 
