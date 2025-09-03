@@ -482,9 +482,8 @@ export default function TasksPage() {
               </div>
               <div className="flex items-center gap-2">
                 <FocusTimer />
-                <Button variant="outline" onClick={loadTasks} disabled={loading} className="bg-white">
-                  {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
-                  Refresh
+                <Button variant="outline" className="bg-white" onClick={() => router.push("/radar")}>
+                  Radar
                 </Button>
                 <Button className="bg-black hover:bg-gray-800" onClick={() => router.push("/add-task")}>
                   <Plus className="w-4 h-4 mr-2" />
