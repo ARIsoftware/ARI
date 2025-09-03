@@ -1,5 +1,7 @@
 # ARI Application - Claude Memory & Setup Documentation
 
+This documentation reflects the current state of the ARI application as of September 2025, including the latest priority radar feature and authentication architecture.
+
 ## Overview
 ARI is a Next.js 15 (React 19) application using Supabase for authentication, database operations, and Row Level Security (RLS).
 
@@ -51,7 +53,7 @@ export function createSupabaseClient() {
 ## Database Schema
 
 ### Main Tables
-- **`ari-database`**: Main tasks table with user isolation via RLS
+- **`tasks`**: Main tasks table with user isolation via RLS and priority scoring
 - **`ari-fitness-database`**: Fitness tracking with RLS
 - **`northstar_entries`**: Goal tracking entries
 - **`contacts`**: User contacts management
@@ -70,7 +72,8 @@ All tables use Row Level Security with policies based on `auth.uid()`:
 
 #### Task Management
 - Create, edit, delete tasks
-- Task prioritization and status tracking
+- Advanced priority scoring system with radar chart visualization
+- Task prioritization based on Impact, Severity, Timeliness, Effort, and Strategic Fit (1-5 scale)
 - Bulk operations support
 - Real-time updates
 
@@ -89,6 +92,14 @@ All tables use Row Level Security with policies based on `auth.uid()`:
 - Goal setting and tracking
 - Progress visualization
 - Milestone management
+
+#### Task Priority Radar System
+- Interactive radar chart visualization showing task priorities
+- 5-axis priority calculation: Impact, Severity, Timeliness, Effort, Strategic Fit
+- Tasks closer to center = higher priority (lower calculated score)
+- Color-coded by due date urgency (red=overdue, orange=soon, green=not urgent)
+- Click-to-edit priority factors via modal interface
+- Automatic priority score calculation using weighted Euclidean distance
 
 ### UI Components
 
@@ -119,18 +130,24 @@ All tables use Row Level Security with policies based on `auth.uid()`:
 /app                    # Next.js app router pages
   /dashboard           # Main dashboard
   /tasks              # Task management
+  /radar              # Task priority radar visualization
   /contacts           # Contact management
   /daily-fitness      # Fitness tracking
   /hyrox             # HYROX training
   /northstar         # Goal tracking
   /sign-in           # Authentication
   /profile           # User profile
+  /api                # API routes
+    /tasks            # Task CRUD operations
+      /priorities     # Priority scoring endpoints
 
 /components            # React components
   /ui                # Shadcn/ui components
   /auth              # Authentication components
   /providers.tsx     # Global providers
   /app-sidebar.tsx   # Main navigation
+  /radar-task-dots.tsx  # Radar chart task visualization
+  /task-priority-modal.tsx  # Priority editing modal
 
 /lib                  # Utilities and helpers
   /supabase-auth.ts  # Supabase client setup
@@ -138,6 +155,9 @@ All tables use Row Level Security with policies based on `auth.uid()`:
   /tasks.ts          # Task operations
   /contacts.ts       # Contact operations
   /fitness-stats.ts  # Fitness analytics
+  /priority-utils.ts # Priority scoring calculations
+  /auth-helpers.ts   # Authentication utilities
+  /api-helpers.ts    # API validation helpers
 
 /middleware.ts        # Route protection
 ```
@@ -199,7 +219,8 @@ npm start
 - Service role key never exposed to client
 
 ### API Security
-- All API routes require authentication
+- All API routes require authentication via Bearer tokens
+- Comprehensive Zod validation on all endpoints
 - Rate limiting via Supabase
 - Input validation on all endpoints
 - CORS configured for production domain
@@ -218,14 +239,24 @@ npm start
 - Check RLS policies
 - Monitor error logs
 
-## Recent Migration (August 2025)
+## Recent Updates
 
+### Authentication Migration (August 2025)
 Successfully migrated from Clerk to Supabase Auth:
 - Removed all Clerk dependencies
 - Implemented custom authentication UI
 - Updated all components to use Supabase context
 - Maintained full functionality with improved performance
 - Simplified authentication architecture
+
+### Priority Radar Feature (September 2025)
+Added comprehensive task priority visualization system:
+- Interactive radar chart at `/radar` route
+- 5-axis priority scoring: Impact, Severity, Timeliness, Effort, Strategic Fit
+- Automatic priority score calculation using weighted Euclidean distance
+- Task database schema extended with priority columns
+- Real-time priority editing with modal interface
+- Color-coded urgency indicators based on due dates
 
 ## Troubleshooting
 
@@ -250,5 +281,3 @@ Successfully migrated from Clerk to Supabase Auth:
 - Edge middleware for auth checks
 
 ---
-
-This documentation reflects the current state of the ARI application after the Supabase Auth migration completed in August 2025.
