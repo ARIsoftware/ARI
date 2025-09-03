@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { validateRequestBody, validateQueryParams, createErrorResponse } from '@/lib/api-helpers'
+import { createTaskSchema, updateTaskSchema, uuidParamSchema } from '@/lib/validation'
+import { z } from 'zod'
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,11 +32,17 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { task } = await request.json()
+    // Validate request body
+    const validation = await validateRequestBody(request, createTaskSchema)
+    if (!validation.success) {
+      return validation.response
+    }
+
+    const { task } = validation.data
     const { user, supabase } = await getAuthenticatedUser()
     
     if (!user) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      return createErrorResponse('Authentication required', 401)
     }
 
     // Get the highest order_index for this user
@@ -57,27 +66,34 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error creating task:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return createErrorResponse(error.message, 500)
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(data, { status: 201 })
   } catch (err) {
     console.error('API error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return createErrorResponse('Internal server error', 500)
   }
 }
 
 export async function PUT(request: NextRequest) {
   try {
-    const { id, updates } = await request.json()
+    // Validate request body
+    const updateRequestSchema = z.object({
+      id: z.string().uuid('Invalid task ID format'),
+      updates: updateTaskSchema.shape.task
+    })
+
+    const validation = await validateRequestBody(request, updateRequestSchema)
+    if (!validation.success) {
+      return validation.response
+    }
+
+    const { id, updates } = validation.data
     const { user, supabase } = await getAuthenticatedUser()
     
     if (!user) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
-    }
-    
-    if (!id) {
-      return NextResponse.json({ error: 'Task ID is required' }, { status: 400 })
+      return createErrorResponse('Authentication required', 401)
     }
 
     // RLS will ensure user can only update their own tasks
@@ -90,28 +106,35 @@ export async function PUT(request: NextRequest) {
 
     if (error) {
       console.error('Error updating task:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return createErrorResponse(error.message, 500)
     }
 
     return NextResponse.json(data)
   } catch (err) {
     console.error('API error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return createErrorResponse('Internal server error', 500)
   }
 }
 
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const id = searchParams.get('id')
+    
+    // Validate query parameters
+    const deleteQuerySchema = z.object({
+      id: z.string().uuid('Invalid task ID format')
+    })
+
+    const queryValidation = validateQueryParams(searchParams, deleteQuerySchema)
+    if (!queryValidation.success) {
+      return queryValidation.response
+    }
+
+    const { id } = queryValidation.data
     const { user, supabase } = await getAuthenticatedUser()
     
     if (!user) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
-    }
-    
-    if (!id) {
-      return NextResponse.json({ error: 'Task ID is required' }, { status: 400 })
+      return createErrorResponse('Authentication required', 401)
     }
 
     // RLS will ensure user can only delete their own tasks
@@ -122,12 +145,12 @@ export async function DELETE(request: NextRequest) {
 
     if (error) {
       console.error('Error deleting task:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return createErrorResponse(error.message, 500)
     }
 
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error('API error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return createErrorResponse('Internal server error', 500)
   }
 }

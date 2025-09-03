@@ -55,19 +55,5 @@ export async function getAuthenticatedSupabase() {
   return createSupabaseClient()
 }
 
-// Alternative: Use secret key for development
-// WARNING: Never expose secret key in production!
-export const supabaseServiceRole = () => {
-  const secretKey = process.env.SUPABASE_SECRET_KEY
-  if (!secretKey) {
-    console.warn("Secret key not found, using anon key")
-    return createClient(supabaseUrl, supabaseAnonKey)
-  }
-  
-  return createClient(supabaseUrl, secretKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  })
-}
+// Note: Service role functions have been moved to server-only modules
+// Use /lib/hyrox-admin.ts for admin operations in API routes only

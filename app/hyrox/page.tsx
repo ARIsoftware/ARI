@@ -33,12 +33,18 @@ import {
   CarouselPrevious,
 } from "@/components/ui/carousel"
 import {
+  getHyroxStationRecords,
+  getHyroxWorkoutHistory,
+  createHyroxWorkout,
+  addWorkoutStation,
+  updateStationRecord,
+  completeHyroxWorkout,
   calculateProgress,
   formatTime as formatTimeUtil,
   getTimeDifference,
   type HyroxStationRecord,
   type HyroxWorkout,
-} from "@/lib/hyrox"
+} from "@/lib/hyrox-client"
 // Removed direct import of testHyroxDatabase - now using API route
 
 const dmSans = DM_Sans({
@@ -101,8 +107,8 @@ export default function HyroxPage() {
     try {
       setLoading(true)
       const [records, workoutHistory] = await Promise.all([
-        getHyroxStationRecords(),
-        getHyroxWorkoutHistory(1) // Get last workout
+        getHyroxStationRecords(user.id),
+        getHyroxWorkoutHistory(user.id, 1) // Get last workout
       ])
       console.log('Loaded station records:', records)
       
@@ -242,7 +248,7 @@ export default function HyroxPage() {
     }
 
     try {
-      const workout = await createHyroxWorkout()
+      const workout = await createHyroxWorkout(user.id)
       if (workout) {
         setCurrentWorkout(workout)
         setWorkoutActive(true)
@@ -295,7 +301,7 @@ export default function HyroxPage() {
       }
 
       // Update personal best if applicable
-      const recordResult = await updateStationRecord(currentStationData.name, stationTime)
+      const recordResult = await updateStationRecord(user.id, currentStationData.name, stationTime)
       if (!recordResult) {
         console.error('Failed to update station record for:', currentStationData.name)
       } else {

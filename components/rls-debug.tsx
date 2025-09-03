@@ -3,11 +3,18 @@
 import { useSupabase } from "@/components/providers"
 import { useEffect } from "react"
 
+const isDevelopment = process.env.NODE_ENV === 'development'
+
 export function RLSDebug() {
   const { session, supabase } = useSupabase()
   const user = session?.user
   
   useEffect(() => {
+    // Only run in development environment
+    if (!isDevelopment) {
+      return
+    }
+    
     const debugJWT = async () => {
       console.log("🔍 RLS Debug Component Loaded")
       

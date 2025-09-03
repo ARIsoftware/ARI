@@ -8,6 +8,13 @@ import { cn } from "@/lib/utils"
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: "", dark: ".dark" } as const
 
+/**
+ * Chart configuration for colors and themes.
+ * 
+ * SECURITY WARNING: Only pass trusted, static configuration objects.
+ * Never pass user-controlled data directly to ChartConfig as it generates CSS.
+ * Colors are validated, but config should come from trusted sources only.
+ */
 export type ChartConfig = {
   [k in string]: {
     label?: React.ReactNode
@@ -67,6 +74,45 @@ const ChartContainer = React.forwardRef<
 })
 ChartContainer.displayName = "Chart"
 
+// Validate and sanitize CSS color values
+function isValidCSSColor(color: string): boolean {
+  if (typeof color !== 'string') return false
+  
+  // Allow hex colors (#fff, #ffffff)
+  if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(color)) return true
+  
+  // Allow rgb/rgba colors
+  if (/^rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*(,\s*[\d.]+)?\s*\)$/.test(color)) return true
+  
+  // Allow hsl/hsla colors
+  if (/^hsla?\(\s*\d+\s*,\s*\d+%\s*,\s*\d+%\s*(,\s*[\d.]+)?\s*\)$/.test(color)) return true
+  
+  // Allow CSS custom properties
+  if (/^var\(--[\w-]+\)$/.test(color)) return true
+  
+  // Allow common CSS color keywords (basic set)
+  const colorKeywords = [
+    'transparent', 'currentColor', 'inherit', 'initial', 'unset',
+    'black', 'white', 'red', 'green', 'blue', 'yellow', 'cyan', 'magenta',
+    'gray', 'grey', 'orange', 'purple', 'brown', 'pink'
+  ]
+  if (colorKeywords.includes(color.toLowerCase())) return true
+  
+  return false
+}
+
+// Sanitize CSS key to prevent injection
+function sanitizeCSSKey(key: string): string {
+  // Only allow alphanumeric, hyphens, and underscores
+  return key.replace(/[^a-zA-Z0-9_-]/g, '')
+}
+
+// Sanitize chart ID to prevent injection
+function sanitizeChartId(id: string): string {
+  // Only allow alphanumeric, hyphens, and underscores
+  return id.replace(/[^a-zA-Z0-9_-]/g, '')
+}
+
 const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   const colorConfig = Object.entries(config).filter(
     ([_, config]) => config.theme || config.color
@@ -76,25 +122,43 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
     return null
   }
 
+  // Sanitize the chart ID to prevent CSS injection
+  const safeId = sanitizeChartId(id)
+
+  // Generate CSS safely without dangerouslySetInnerHTML
+  const cssRules = Object.entries(THEMES)
+    .map(([theme, prefix]) => {
+      const selector = prefix ? `${prefix} [data-chart="${safeId}"]` : `[data-chart="${safeId}"]`
+      
+      const cssVars = colorConfig
+        .map(([key, itemConfig]) => {
+          const sanitizedKey = sanitizeCSSKey(key)
+          if (!sanitizedKey) return null
+          
+          const color =
+            itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
+            itemConfig.color
+          
+          if (!color || !isValidCSSColor(color)) return null
+          
+          return `  --color-${sanitizedKey}: ${color};`
+        })
+        .filter(Boolean)
+        .join('\n')
+      
+      if (!cssVars) return null
+      
+      return `${selector} {\n${cssVars}\n}`
+    })
+    .filter(Boolean)
+    .join('\n')
+
+  if (!cssRules) return null
+
   return (
     <style
       dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
-          .map(
-            ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
-${colorConfig
-  .map(([key, itemConfig]) => {
-    const color =
-      itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
-      itemConfig.color
-    return color ? `  --color-${key}: ${color};` : null
-  })
-  .join("\n")}
-}
-`
-          )
-          .join("\n"),
+        __html: cssRules,
       }}
     />
   )
