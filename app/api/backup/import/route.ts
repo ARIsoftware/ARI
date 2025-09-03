@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { requireAdmin, isProductionSafeOperation } from '@/lib/admin-helpers'
 import { createClient } from "@supabase/supabase-js"
+import { logger } from '@/lib/logger'
 import crypto from "crypto"
 
 // Create service role client for full database access
@@ -270,7 +271,7 @@ export async function POST(req: NextRequest) {
     // Parse SQL statements
     const { creates, inserts, indexes, other } = parseSQLStatements(content)
     
-    console.log(`Parsed SQL: ${creates.length} creates, ${inserts.length} inserts, ${indexes.length} indexes`)
+    logger.info(`Parsed SQL: ${creates.length} creates, ${inserts.length} inserts, ${indexes.length} indexes`)
     
     // Create a restore point (backup current data)
     const restorePoint = {
@@ -280,7 +281,7 @@ export async function POST(req: NextRequest) {
     }
     
     // Store restore point metadata (you might want to save this to a separate table)
-    console.log('Creating restore point:', restorePoint)
+    logger.info('Creating restore point:', restorePoint)
     
     const allStatements = [
       'SET session_replication_role = \'replica\';',
@@ -301,7 +302,7 @@ export async function POST(req: NextRequest) {
       (current, total) => {
         const progress = Math.floor((current / total) * 100)
         if (progress > lastProgress + 5) {
-          console.log(`Import progress: ${progress}%`)
+          logger.info(`Import progress: ${progress}%`)
           lastProgress = progress
         }
       }
@@ -336,7 +337,7 @@ export async function POST(req: NextRequest) {
             integrityCheck.failures.push(`${table}: checksum mismatch`)
           }
         } catch (error) {
-          console.warn(`Could not verify ${table}:`, error)
+          logger.warn(`Could not verify ${table}:`, error)
         }
       }
     }
@@ -359,7 +360,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(response, { status: 200 })
     
   } catch (error: any) {
-    console.error('Import error:', error)
+    logger.error('Import error:', error)
     return NextResponse.json(
       { 
         error: error.message || 'Failed to import database',
