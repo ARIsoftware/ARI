@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
+import { createGoalSchema } from '@/lib/validation'
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,11 +30,17 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { goal } = await request.json()
+    // Validate request body
+    const validation = await validateRequestBody(request, createGoalSchema)
+    if (!validation.success) {
+      return validation.response
+    }
+
+    const { goal } = validation.data
     const { user, supabase } = await getAuthenticatedUser()
     
     if (!user) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      return createErrorResponse('Authentication required', 401)
     }
 
     const { data, error } = await supabase
@@ -46,12 +54,12 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error creating goal:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return createErrorResponse(error.message, 500)
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(data, { status: 201 })
   } catch (err) {
     console.error('API error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return createErrorResponse('Internal server error', 500)
   }
 }
