@@ -4,6 +4,7 @@ import { createSupabaseClient } from "@/lib/supabase-auth"
 import { createContext, useContext, useEffect, useState } from 'react'
 import { Toaster } from "@/components/ui/toaster"
 import { ExerciseReminder } from "@/components/exercise-reminder"
+import { YouTubeMusicPlayer } from "@/components/youtube-music-player"
 import { User, Session } from '@supabase/supabase-js'
 
 type SupabaseContext = {
@@ -43,6 +44,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       {children}
       <Toaster />
       <ExerciseReminder />
+      <div className="fixed top-[58px] right-6 z-50">
+        <YouTubeMusicPlayer />
+      </div>
     </Context.Provider>
   )
 }
