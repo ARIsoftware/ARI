@@ -48,23 +48,27 @@ export default function DashboardPage() {
   const [taskCount, setTaskCount] = useState(0)
 
   useEffect(() => {
-    loadDashboardData()
-  }, [])
+    if (session) {
+      loadDashboardData()
+    }
+  }, [session])
 
   const loadDashboardData = async () => {
     try {
       setLoading(true)
       
+      // Create token function for all API calls
+      const tokenFn = async () => session?.access_token || null
+      
       // Load fitness stats
-      const stats = await getFitnessStats()
+      const stats = await getFitnessStats(tokenFn)
       setFitnessStats(stats)
       
       // Load contact count
-      const contacts = await getContacts()
+      const contacts = await getContacts(tokenFn)
       setContactCount(contacts.length)
       
       // Load task count  
-      const tokenFn = async () => session?.access_token || null
       const tasks = await getTasks(tokenFn)
       setTaskCount(tasks.length)
       
@@ -75,7 +79,7 @@ export default function DashboardPage() {
     }
   }
 
-  if (loading) {
+  if (!session || loading) {
     return (
       <div className="min-h-screen bg-gray-50/50">
         <TaskAnnouncement />
