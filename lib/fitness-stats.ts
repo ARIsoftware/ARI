@@ -27,50 +27,14 @@ export async function getFitnessStats(getToken: () => Promise<string | null>): P
       throw new Error(error.error || 'Failed to fetch fitness stats')
     }
 
-    const tasks = await response.json()
+    const data = await response.json()
 
-    if (!tasks || tasks.length === 0) {
-      return {
-        averageCompletionsPerDay: 0,
-        mostCompletedTask: null,
-        leastCompletedTask: null,
-        totalCompletions: 0
-      }
-    }
-
-    // Calculate total completions
-    const totalCompletions = tasks.reduce((sum, task) => sum + (task.completion_count || 0), 0)
-
-    // Find most and least completed tasks (only include tasks with completions > 0)
-    const tasksWithCompletions = tasks.filter(task => (task.completion_count || 0) > 0)
-    
-    const mostCompletedTask = tasksWithCompletions.length > 0 
-      ? { title: tasksWithCompletions[0].title, count: tasksWithCompletions[0].completion_count || 0 }
-      : null
-
-    const leastCompletedTask = tasksWithCompletions.length > 0
-      ? { 
-          title: tasksWithCompletions[tasksWithCompletions.length - 1].title, 
-          count: tasksWithCompletions[tasksWithCompletions.length - 1].completion_count || 0 
-        }
-      : null
-
-    // Calculate average completions per day
-    // Get the earliest task creation date to calculate days since start
-    const earliestTask = tasks.reduce((earliest, task) => {
-      const taskDate = new Date(task.created_at)
-      const earliestDate = new Date(earliest.created_at)
-      return taskDate < earliestDate ? task : earliest
-    }, tasks[0])
-
-    const daysSinceStart = Math.max(1, Math.ceil((Date.now() - new Date(earliestTask.created_at).getTime()) / (1000 * 60 * 60 * 24)))
-    const averageCompletionsPerDay = totalCompletions / daysSinceStart
-
+    // The API now returns the stats object directly
     return {
-      averageCompletionsPerDay,
-      mostCompletedTask,
-      leastCompletedTask,
-      totalCompletions
+      averageCompletionsPerDay: data.averageCompletionsPerDay || 0,
+      mostCompletedTask: data.mostCompletedTask || null,
+      leastCompletedTask: data.leastCompletedTask || null,
+      totalCompletions: data.totalCompletions || 0
     }
   } catch (error) {
     console.error("Failed to calculate fitness stats:", error)
