@@ -126,14 +126,17 @@ export const updateFitnessTaskSchema = z.object({
 export const createGoalSchema = z.object({
   goal: z.object({
     title: nonEmptyString.max(255, 'Title too long'),
-    description: z.string().max(2000, 'Description too long').optional(),
-    completed: z.boolean().default(false),
-    target_date: z.union([
+    description: z.string().max(2000, 'Description too long'),
+    category: z.string().max(100, 'Category too long'),
+    priority: z.enum(['low', 'medium', 'high'], {
+      errorMap: () => ({ message: 'Invalid priority level' })
+    }),
+    deadline: z.union([
       z.string().datetime(),
       z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
+      z.string().length(0),
       z.null()
-    ]).optional(),
-    progress: z.number().min(0, 'Progress cannot be negative').max(100, 'Progress cannot exceed 100%').default(0)
+    ]).optional()
   })
 })
 
