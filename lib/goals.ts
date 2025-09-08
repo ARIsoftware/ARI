@@ -11,17 +11,9 @@ export type Goal = {
   updated_at: string
 }
 
-export async function getGoals(getToken: () => Promise<string | null>): Promise<Goal[]> {
-  const token = await getToken()
-  
-  if (!token) {
-    throw new Error('Authentication required')
-  }
-
+export async function getGoals(): Promise<Goal[]> {
   const response = await fetch('/api/goals', {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
+    credentials: 'include',
   })
   
   if (!response.ok) {
@@ -33,19 +25,13 @@ export async function getGoals(getToken: () => Promise<string | null>): Promise<
   return await response.json()
 }
 
-export async function createGoal(goal: Omit<Goal, "id" | "created_at" | "updated_at" | "progress" | "user_email">, getToken: () => Promise<string | null>): Promise<Goal> {
-  const token = await getToken()
-  
-  if (!token) {
-    throw new Error('Authentication required')
-  }
-
+export async function createGoal(goal: Omit<Goal, "id" | "created_at" | "updated_at" | "progress" | "user_email">): Promise<Goal> {
   const response = await fetch('/api/goals', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
     },
+    credentials: 'include',
     body: JSON.stringify({ goal }),
   })
 
@@ -58,19 +44,13 @@ export async function createGoal(goal: Omit<Goal, "id" | "created_at" | "updated
   return await response.json()
 }
 
-export async function updateGoal(id: string, updates: Partial<Goal>, getToken: () => Promise<string | null>): Promise<Goal> {
-  const token = await getToken()
-  
-  if (!token) {
-    throw new Error('Authentication required')
-  }
-
+export async function updateGoal(id: string, updates: Partial<Goal>): Promise<Goal> {
   const response = await fetch(`/api/goals/${id}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
     },
+    credentials: 'include',
     body: JSON.stringify(updates),
   })
 
@@ -83,18 +63,10 @@ export async function updateGoal(id: string, updates: Partial<Goal>, getToken: (
   return await response.json()
 }
 
-export async function deleteGoal(id: string, getToken: () => Promise<string | null>): Promise<void> {
-  const token = await getToken()
-  
-  if (!token) {
-    throw new Error('Authentication required')
-  }
-
+export async function deleteGoal(id: string): Promise<void> {
   const response = await fetch(`/api/goals/${id}`, {
     method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
+    credentials: 'include',
   })
 
   if (!response.ok) {
@@ -104,6 +76,6 @@ export async function deleteGoal(id: string, getToken: () => Promise<string | nu
   }
 }
 
-export async function updateGoalProgress(id: string, progress: number, getToken: () => Promise<string | null>): Promise<Goal> {
-  return updateGoal(id, { progress }, getToken)
+export async function updateGoalProgress(id: string, progress: number): Promise<Goal> {
+  return updateGoal(id, { progress })
 }

@@ -43,12 +43,17 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Authentication required', 401)
     }
 
+    // Handle empty deadline string - convert to null for DATE field
+    const goalData = {
+      ...goal,
+      deadline: goal.deadline && goal.deadline !== '' ? goal.deadline : null,
+      progress: 0,
+      user_id: user.id
+    }
+
     const { data, error } = await supabase
       .from("goals")
-      .insert([{
-        ...goal,
-        progress: 0,
-      }])
+      .insert([goalData])
       .select()
       .single()
 
