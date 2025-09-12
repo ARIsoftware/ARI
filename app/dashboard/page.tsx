@@ -120,8 +120,8 @@ export default function DashboardPage() {
             {/* Welcome Header */}
             <div>
               <h1 className="text-3xl font-medium">Dashboard</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Your productivity overview and fitness insights
+              <p className="text-sm text-[#aa2020] mt-1">
+                Burn like fire. Pour like rain.
               </p>
             </div>
 
