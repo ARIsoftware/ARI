@@ -93,6 +93,12 @@ All tables use Row Level Security with policies based on `auth.uid()`:
 - Progress visualization
 - Milestone management
 
+#### AI Assistant
+- ChatGPT-powered conversational interface
+- Located at `/assist` route
+- Real-time streaming responses
+- Clean, minimal chat UI with user/assistant message distinction
+
 #### Task Priority Radar System
 - Interactive radar chart visualization showing task priorities
 - 5-axis priority calculation: Impact, Severity, Timeliness, Effort, Strategic Fit
@@ -173,6 +179,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ### Optional
 ```env
 SUPABASE_SECRET_KEY=your_service_role_key  # Server-side only, bypasses RLS
+OPENAI_API_KEY=your_openai_api_key  # For AI Assistant feature
 ```
 
 ## Development Guide
