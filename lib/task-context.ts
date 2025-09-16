@@ -1,5 +1,6 @@
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { Task } from '@/lib/supabase'
+import { Shipment } from '@/lib/shipments'
 
 export interface TaskContext {
   totalTasks: number
@@ -17,6 +18,12 @@ export interface TaskContext {
   allTasks: Task[]
   completionRate: number
   lastCompletionDate: string | null
+  allShipments: Shipment[]
+  totalShipments: number
+  deliveredShipments: number
+  inTransitShipments: number
+  pendingShipments: number
+  delayedShipments: number
 }
 
 export async function getTaskContext(): Promise<TaskContext> {
@@ -42,6 +49,18 @@ export async function getTaskContext(): Promise<TaskContext> {
       return createEmptyContext()
     }
 
+    // Fetch all shipments for the authenticated user
+    const { data: shipments, error: shipmentsError } = await supabase
+      .from('shipments')
+      .select('*')
+      .order('created_at', { ascending: false })
+    
+    if (shipmentsError) {
+      console.warn('Error fetching shipments for context:', shipmentsError)
+      // Continue without shipments if fetch fails
+    }
+
+    const allShipments = shipments || []
     const now = new Date()
     
     // Calculate metrics
@@ -82,6 +101,13 @@ export async function getTaskContext(): Promise<TaskContext> {
       ? recentCompletions[0].updated_at 
       : null
 
+    // Calculate shipment metrics
+    const totalShipments = allShipments.length
+    const deliveredShipments = allShipments.filter(s => s.status === 'delivered').length
+    const inTransitShipments = allShipments.filter(s => s.status === 'in_transit').length
+    const pendingShipments = allShipments.filter(s => s.status === 'pending').length
+    const delayedShipments = allShipments.filter(s => s.status === 'delayed').length
+
     return {
       totalTasks,
       completedTasks,
@@ -97,7 +123,13 @@ export async function getTaskContext(): Promise<TaskContext> {
       highPriorityPendingTasks,
       allTasks: tasks,
       completionRate: Math.round(completionRate * 100) / 100,
-      lastCompletionDate
+      lastCompletionDate,
+      allShipments,
+      totalShipments,
+      deliveredShipments,
+      inTransitShipments,
+      pendingShipments,
+      delayedShipments
     }
   } catch (error) {
     console.error('Error getting task context:', error)
@@ -121,7 +153,13 @@ function createEmptyContext(): TaskContext {
     highPriorityPendingTasks: [],
     allTasks: [],
     completionRate: 0,
-    lastCompletionDate: null
+    lastCompletionDate: null,
+    allShipments: [],
+    totalShipments: 0,
+    deliveredShipments: 0,
+    inTransitShipments: 0,
+    pendingShipments: 0,
+    delayedShipments: 0
   }
 }
 
@@ -136,12 +174,18 @@ export function formatTaskContextForAI(context: TaskContext): string {
     recentCompletions,
     highPriorityPendingTasks,
     completionRate,
-    lastCompletionDate
+    lastCompletionDate,
+    totalShipments,
+    deliveredShipments,
+    inTransitShipments,
+    pendingShipments,
+    delayedShipments,
+    allShipments
   } = context
 
-  let contextText = `## User's Task Summary\n\n`
+  let contextText = `## User's Task & Shipment Summary\n\n`
   
-  contextText += `**Overall Statistics:**\n`
+  contextText += `**Task Statistics:**\n`
   contextText += `- Total tasks: ${totalTasks}\n`
   contextText += `- Completed: ${completedTasks}\n`
   contextText += `- Pending: ${pendingTasks}\n`
@@ -149,6 +193,13 @@ export function formatTaskContextForAI(context: TaskContext): string {
   contextText += `- Completion rate: ${completionRate}%\n`
   contextText += `- High priority tasks: ${highPriorityTasks}\n`
   contextText += `- Overdue tasks: ${overdueTasks}\n\n`
+
+  contextText += `**Shipment Statistics:**\n`
+  contextText += `- Total shipments: ${totalShipments}\n`
+  contextText += `- Delivered: ${deliveredShipments}\n`
+  contextText += `- In Transit: ${inTransitShipments}\n`
+  contextText += `- Pending: ${pendingShipments}\n`
+  contextText += `- Delayed: ${delayedShipments}\n\n`
 
   if (lastCompletionDate) {
     const lastCompletion = new Date(lastCompletionDate)
@@ -179,18 +230,75 @@ export function formatTaskContextForAI(context: TaskContext): string {
     const priority = task.priority === 'High' ? '🔴' : (task.priority === 'Medium' ? '🟡' : '🟢')
     const starred = task.starred ? '⭐' : ''
     const dueInfo = task.due_date ? ` (due: ${new Date(task.due_date).toLocaleDateString()})` : ''
+    const createdDate = new Date(task.created_at).toLocaleDateString()
     
     contextText += `${status} ${priority} ${starred} ${task.title}${dueInfo}\n`
+    contextText += `  Created: ${createdDate}, Order: ${task.order_index}, Completed: ${task.completion_count || 0} times\n`
+    
     if (task.assignees && task.assignees.length > 0) {
       contextText += `  Assignees: ${task.assignees.join(', ')}\n`
     }
     if (task.subtasks_total > 0) {
       contextText += `  Subtasks: ${task.subtasks_completed}/${task.subtasks_total}\n`
     }
+    
+    // Add priority scoring details if available
+    if (task.impact || task.severity || task.timeliness || task.effort || task.strategic_fit) {
+      contextText += `  Priority Analysis: Impact=${task.impact || 3}, Severity=${task.severity || 3}, Timeliness=${task.timeliness || 3}, Effort=${task.effort || 3}, Strategic Fit=${task.strategic_fit || 3}`
+      if (task.priority_score) {
+        contextText += `, Score=${task.priority_score}`
+      }
+      contextText += `\n`
+    }
   })
 
+  if (allShipments.length > 0) {
+    contextText += `\n**All Shipments Details:**\n`
+    allShipments.forEach(shipment => {
+      const statusIcon = getShipmentStatusIcon(shipment.status)
+      const createdDate = new Date(shipment.created_at).toLocaleDateString()
+      const updatedDate = new Date(shipment.updated_at).toLocaleDateString()
+      const expectedDelivery = shipment.expected_delivery 
+        ? new Date(shipment.expected_delivery).toLocaleDateString() 
+        : 'Not specified'
+      
+      contextText += `${statusIcon} ${shipment.name}\n`
+      contextText += `  Status: ${shipment.status}\n`
+      contextText += `  Tracking: ${shipment.tracking_code || 'Not provided'}\n`
+      contextText += `  Carrier: ${shipment.carrier || 'Not specified'}\n`
+      contextText += `  Expected Delivery: ${expectedDelivery}\n`
+      contextText += `  Created: ${createdDate}, Updated: ${updatedDate}\n`
+      
+      if (shipment.tracking_link) {
+        contextText += `  Tracking Link: ${shipment.tracking_link}\n`
+      }
+      if (shipment.notes) {
+        contextText += `  Notes: ${shipment.notes}\n`
+      }
+      contextText += `\n`
+    })
+  }
+
   contextText += `\n---\n\n`
-  contextText += `You can answer questions about these tasks, such as completion rates, priorities, deadlines, etc.`
+  contextText += `You can answer questions about tasks (completion rates, priorities, deadlines) and shipments (tracking, delivery status, carriers, etc.).`
 
   return contextText
+}
+
+function getShipmentStatusIcon(status: string): string {
+  switch (status) {
+    case 'delivered':
+      return '✅'
+    case 'in_transit':
+      return '🚚'
+    case 'out_for_delivery':
+      return '🚛'
+    case 'delayed':
+      return '⚠️'
+    case 'returned':
+      return '↩️'
+    case 'pending':
+    default:
+      return '📦'
+  }
 }
