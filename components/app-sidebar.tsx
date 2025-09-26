@@ -12,7 +12,7 @@ import {
   SidebarRail,
   SidebarFooter,
 } from "@/components/ui/sidebar"
-import { CheckSquare, Plus, Archive, Dumbbell, Target, TrendingUp, Users, UserPlus, Settings, BarChart3, Database, Compass, Bot, Package } from "lucide-react"
+import { CheckSquare, Plus, Archive, Dumbbell, Target, TrendingUp, Users, UserPlus, Settings, BarChart3, Database, Compass, Bot, Package, Sparkles } from "lucide-react"
 
 const data = {
   navMain: [
@@ -49,6 +49,18 @@ const data = {
           title: "Northstar",
           url: "/northstar",
           icon: Compass,
+        },
+      ],
+    },
+    {
+      title: "Motivation",
+      url: "/motivation",
+      icon: Sparkles,
+      items: [
+        {
+          title: "Motivation",
+          url: "/motivation",
+          icon: Sparkles,
         },
       ],
     },
