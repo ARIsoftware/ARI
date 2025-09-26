@@ -1,16 +1,27 @@
 import { createClient } from "@supabase/supabase-js";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { getAuthenticatedUser } from '@/lib/auth-helpers';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    // Use service role key for admin operations
+    // Authenticate user first
+    const { user, supabase: userSupabase } = await getAuthenticatedUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    // Use service role key only for storage bucket operations
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.SUPABASE_SECRET_KEY!
     );
 
-    // Check if table exists by querying information schema
-    const { data: tableExists } = await supabaseAdmin
+    // Check if table exists using user's authenticated client
+    const { data: tableExists } = await userSupabase
       .from("motivation_content")
       .select("id")
       .limit(1);
