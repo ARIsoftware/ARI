@@ -1,26 +1,32 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { getAuthenticatedUser } from '@/lib/auth-helpers';
 
 export async function POST(req: NextRequest) {
   try {
+    // Authenticate user first
+    const { user, supabase } = await getAuthenticatedUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     const { items } = await req.json();
 
     if (!items || !Array.isArray(items)) {
       return NextResponse.json({ error: "Invalid items array" }, { status: 400 });
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-
-    // Update positions for all items
+    // Update positions for all items (RLS ensures user can only update their own items)
     const updates = items.map((item, index) => ({
       id: item.id,
       position: index,
     }));
 
-    // Batch update all positions
+    // Batch update all positions - RLS automatically restricts to user's own items
     for (const update of updates) {
       const { error } = await supabase
         .from("motivation_content")
