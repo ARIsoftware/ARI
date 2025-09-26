@@ -25,27 +25,74 @@ const getServiceSupabase = () => {
 // Dynamic table discovery
 async function discoverTables(client: any): Promise<string[]> {
   try {
+    logger.info('Starting table discovery...');
+
+    // Method 1: Try querying each known table to see if it exists
+    const knownTables = [
+      'tasks',
+      'fitness_database',
+      'contacts',
+      'fitness_completion_history',
+      'hyrox_station_records',
+      'hyrox_workouts',
+      'hyrox_workout_stations',
+      'goals',
+      'motivation_content',
+      'northstar_entries'
+    ];
+
+    const existingTables: string[] = [];
+
+    for (const table of knownTables) {
+      try {
+        const { error } = await client
+          .from(table)
+          .select('*')
+          .limit(1);
+
+        if (!error) {
+          existingTables.push(table);
+          logger.info(`Found table: ${table}`);
+        }
+      } catch (tableError) {
+        logger.info(`Table ${table} does not exist or is not accessible`);
+      }
+    }
+
+    if (existingTables.length > 0) {
+      logger.info('Discovered existing tables:', existingTables);
+      return existingTables;
+    }
+
+    // Method 2: Fallback to information_schema query
     const { data, error } = await client
       .from('information_schema.tables')
       .select('table_name')
       .eq('table_schema', 'public')
       .not('table_name', 'in', '(spatial_ref_sys,schema_migrations)')
-      .order('table_name')
-    
-    if (error) throw error
-    return data?.map((row: any) => row.table_name) || []
+      .order('table_name');
+
+    if (!error && data && data.length > 0) {
+      const tables = data.map((row: any) => row.table_name).filter(Boolean);
+      logger.info('Discovered tables via information_schema:', tables);
+      return tables;
+    }
+
+    logger.warn('Information schema query failed or returned no results:', error);
   } catch (error) {
     logger.error('Error discovering tables:', error)
     // Fallback to known tables
     return [
-      'tasks', 
-      'fitness_database', 
-      'contacts', 
-      'fitness_completion_history', 
-      'hyrox_station_records', 
-      'hyrox_workouts', 
+      'tasks',
+      'fitness_database',
+      'contacts',
+      'fitness_completion_history',
+      'hyrox_station_records',
+      'hyrox_workouts',
       'hyrox_workout_stations',
-      'goals'
+      'goals',
+      'motivation_content',
+      'northstar_entries'
     ]
   }
 }
