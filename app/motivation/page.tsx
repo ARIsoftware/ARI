@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Play, AlertCircle, Sparkles, Instagram, Twitter, GripVertical } from "lucide-react";
+import { Plus, Trash2, Play, AlertCircle, Sparkles, Instagram, Twitter, GripVertical, Edit } from "lucide-react";
 import { useSupabase } from "@/components/providers";
 import { AddMotivationModal } from "@/components/motivation/add-motivation-modal";
+import { EditMotivationModal } from "@/components/motivation/edit-motivation-modal";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Image from "next/image";
 import { AppSidebar } from "@/components/app-sidebar";
@@ -51,10 +52,11 @@ interface MotivationItem {
 }
 
 // Sortable Item Component
-function SortableItem({ item, onDelete, onPlay }: {
+function SortableItem({ item, onDelete, onPlay, onEdit }: {
   item: MotivationItem;
   onDelete: (id: string) => void;
   onPlay: (item: MotivationItem) => void;
+  onEdit: (item: MotivationItem) => void;
 }) {
   const {
     attributes,
@@ -186,10 +188,18 @@ function SortableItem({ item, onDelete, onPlay }: {
       <div
         {...attributes}
         {...listeners}
-        className="absolute top-2 right-12 bg-gray-800 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-move z-10"
+        className="absolute top-2 right-20 bg-gray-800 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-move z-10"
       >
         <GripVertical className="h-4 w-4" />
       </div>
+
+      {/* Edit button */}
+      <button
+        onClick={() => onEdit(item)}
+        className="absolute top-2 right-11 bg-blue-500 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-10"
+      >
+        <Edit className="h-4 w-4" />
+      </button>
 
       {/* Delete button */}
       <button
@@ -226,6 +236,8 @@ export default function MotivationPage() {
   const [selectedVideoUrl, setSelectedVideoUrl] = useState("");
   const [selectedVideoTitle, setSelectedVideoTitle] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<MotivationItem | null>(null);
   const { supabase } = useSupabase();
 
   const sensors = useSensors(
@@ -308,6 +320,11 @@ export default function MotivationPage() {
     } catch (error) {
       console.error("Error deleting item:", error);
     }
+  };
+
+  const handleEdit = (item: MotivationItem) => {
+    setEditingItem(item);
+    setIsEditModalOpen(true);
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -445,6 +462,7 @@ export default function MotivationPage() {
                         item={item}
                         onDelete={handleDelete}
                         onPlay={handlePlayItem}
+                        onEdit={handleEdit}
                       />
                     ))}
                   </div>
@@ -466,6 +484,20 @@ export default function MotivationPage() {
                 loadMotivationItems();
                 setIsAddModalOpen(false);
               }}
+            />
+
+            <EditMotivationModal
+              isOpen={isEditModalOpen}
+              onClose={() => {
+                setIsEditModalOpen(false);
+                setEditingItem(null);
+              }}
+              onSuccess={() => {
+                loadMotivationItems();
+                setIsEditModalOpen(false);
+                setEditingItem(null);
+              }}
+              item={editingItem}
             />
           </div>
         </SidebarInset>
