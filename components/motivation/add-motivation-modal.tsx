@@ -74,6 +74,21 @@ export function AddMotivationModal({
     return publicUrl;
   };
 
+  const getNextPosition = async () => {
+    const { data, error } = await supabase
+      .from("motivation_content")
+      .select("position")
+      .eq("user_id", session?.user?.id)
+      .order("position", { ascending: false })
+      .limit(1);
+
+    if (error || !data || data.length === 0) {
+      return 0;
+    }
+
+    return (data[0].position || 0) + 1;
+  };
+
   const handleYoutubeSubmit = async () => {
     if (!youtubeUrl || !session?.user?.id) {
       alert("Please enter a YouTube URL");
@@ -93,6 +108,7 @@ export function AddMotivationModal({
       }
 
       const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+      const position = await getNextPosition();
 
       const { error } = await supabase.from("motivation_content").insert({
         user_id: session.user.id,
@@ -100,6 +116,7 @@ export function AddMotivationModal({
         title: youtubeTitle || "YouTube Video",
         url: youtubeUrl,
         thumbnail_url: thumbnailUrl,
+        position: position,
       });
 
       if (error) {
@@ -154,12 +171,15 @@ export function AddMotivationModal({
         console.log("Could not fetch Instagram metadata, continuing without thumbnail");
       }
 
+      const position = await getNextPosition();
+
       const { error } = await supabase.from("motivation_content").insert({
         user_id: session.user.id,
         type: "instagram",
         title: instagramTitle || fetchedTitle || "Instagram Post",
         url: instagramUrl,
         thumbnail_url: thumbnailUrl,
+        position: position,
       });
 
       if (error) {
@@ -196,11 +216,14 @@ export function AddMotivationModal({
         return;
       }
 
+      const position = await getNextPosition();
+
       const { error } = await supabase.from("motivation_content").insert({
         user_id: session.user.id,
         type: "photo",
         title: photoTitle || "Photo",
         image_url: imageUrl,
+        position: position,
       });
 
       if (error) {
@@ -231,11 +254,14 @@ export function AddMotivationModal({
 
     setLoading(true);
     try {
+      const position = await getNextPosition();
+
       const { error } = await supabase.from("motivation_content").insert({
         user_id: session.user.id,
         type: "twitter",
         title: twitterTitle || "Twitter Post",
         url: twitterUrl,
+        position: position,
       });
 
       if (error) {
