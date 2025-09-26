@@ -225,12 +225,6 @@ export default function MotivationPage() {
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [selectedVideoUrl, setSelectedVideoUrl] = useState("");
   const [selectedVideoTitle, setSelectedVideoTitle] = useState("");
-  const [instagramModalOpen, setInstagramModalOpen] = useState(false);
-  const [selectedInstagramUrl, setSelectedInstagramUrl] = useState("");
-  const [selectedInstagramTitle, setSelectedInstagramTitle] = useState("");
-  const [twitterModalOpen, setTwitterModalOpen] = useState(false);
-  const [selectedTwitterUrl, setSelectedTwitterUrl] = useState("");
-  const [selectedTwitterTitle, setSelectedTwitterTitle] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
   const { supabase } = useSupabase();
 
@@ -357,31 +351,14 @@ export default function MotivationPage() {
         setVideoModalOpen(true);
         break;
       case "instagram":
-        setSelectedInstagramUrl(item.url || "");
-        setSelectedInstagramTitle(item.title || "Instagram Post");
-        setInstagramModalOpen(true);
+        // Open Instagram directly in new tab
+        window.open(item.url, '_blank');
         break;
       case "twitter":
-        setSelectedTwitterUrl(item.url || "");
-        setSelectedTwitterTitle(item.title || "Twitter Post");
-        setTwitterModalOpen(true);
+        // Open Twitter/X directly in new tab
+        window.open(item.url, '_blank');
         break;
     }
-  };
-
-  const getInstagramEmbed = (url: string) => {
-    return url.replace(/\/$/, "") + "/embed";
-  };
-
-  const getTwitterEmbed = (url: string) => {
-    // Convert x.com to twitter.com for embeds
-    const twitterUrl = url.replace("x.com", "twitter.com");
-    // Extract tweet ID
-    const match = twitterUrl.match(/status\/(\d+)/);
-    if (match) {
-      return `https://platform.twitter.com/embed/Tweet.html?id=${match[1]}`;
-    }
-    return url;
   };
 
   return (
@@ -502,45 +479,6 @@ export default function MotivationPage() {
         title={selectedVideoTitle}
       />
 
-      {/* Instagram Modal */}
-      <Dialog open={instagramModalOpen} onOpenChange={setInstagramModalOpen}>
-        <DialogContent className="sm:max-w-[800px] p-0 border-0 rounded-[20px] overflow-hidden bg-white">
-          <DialogHeader className="bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 text-white p-4 pb-2 rounded-t-[20px]">
-            <DialogTitle className="text-white">{selectedInstagramTitle}</DialogTitle>
-          </DialogHeader>
-          <div className="relative w-full bg-white" style={{ paddingBottom: "125%" }}>
-            <iframe
-              className="absolute top-0 left-0 w-full h-full"
-              src={getInstagramEmbed(selectedInstagramUrl)}
-              frameBorder="0"
-              scrolling="no"
-              allowTransparency={true}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Twitter/X Modal */}
-      <Dialog open={twitterModalOpen} onOpenChange={setTwitterModalOpen}>
-        <DialogContent className="sm:max-w-[600px] p-0 border-0 rounded-[20px] overflow-hidden bg-black">
-          <DialogHeader className="bg-black text-white p-4 pb-2 rounded-t-[20px]">
-            <DialogTitle className="text-white flex items-center gap-2">
-              <Twitter className="h-5 w-5" fill="white" />
-              {selectedTwitterTitle}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="relative w-full bg-white" style={{ minHeight: "400px" }}>
-            <iframe
-              className="w-full"
-              height="400"
-              src={getTwitterEmbed(selectedTwitterUrl)}
-              frameBorder="0"
-              scrolling="no"
-              allowTransparency={true}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

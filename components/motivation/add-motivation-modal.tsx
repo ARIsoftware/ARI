@@ -146,10 +146,41 @@ export function AddMotivationModal({
 
     setLoading(true);
     try {
-      // Try to fetch Instagram metadata for thumbnail
+      // Generate a beautiful Instagram-styled thumbnail
       let thumbnailUrl = null;
       let fetchedTitle = null;
 
+      // Create a nice Instagram gradient placeholder that always works
+      const createInstagramThumbnail = () => {
+        // Extract post ID for a unique color variation
+        const postIdMatch = instagramUrl.match(/\/p\/([A-Za-z0-9_-]+)/);
+        const postId = postIdMatch ? postIdMatch[1] : 'default';
+
+        // Create a data URL for an Instagram-style gradient
+        const canvas = document.createElement('canvas');
+        canvas.width = 400;
+        canvas.height = 400;
+        const ctx = canvas.getContext('2d');
+
+        // Instagram gradient
+        const gradient = ctx.createLinearGradient(0, 0, 400, 400);
+        gradient.addColorStop(0, '#833AB4');
+        gradient.addColorStop(0.5, '#FD1D1D');
+        gradient.addColorStop(1, '#F77737');
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 400, 400);
+
+        // Add Instagram icon (simple representation)
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 60px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('📷', 200, 220);
+
+        return canvas.toDataURL('image/png');
+      };
+
+      // Try to fetch real thumbnail, but always fall back to our custom one
       try {
         const metadataResponse = await fetch("/api/instagram/metadata", {
           method: "POST",
@@ -161,14 +192,26 @@ export function AddMotivationModal({
 
         if (metadataResponse.ok) {
           const metadata = await metadataResponse.json();
-          thumbnailUrl = metadata.thumbnail;
-          // Only use fetched title if user didn't provide one
+          // Only use the fetched thumbnail if it's not our placeholder
+          if (metadata.thumbnail && !metadata.thumbnail.includes('placeholder')) {
+            thumbnailUrl = metadata.thumbnail;
+          }
           if (!instagramTitle && metadata.title) {
-            fetchedTitle = metadata.title.substring(0, 100); // Limit length
+            fetchedTitle = metadata.title.substring(0, 100);
           }
         }
       } catch (metadataError) {
-        console.log("Could not fetch Instagram metadata, continuing without thumbnail");
+        console.log("Could not fetch Instagram metadata, using custom thumbnail");
+      }
+
+      // If we don't have a real thumbnail, create our custom one
+      if (!thumbnailUrl) {
+        try {
+          thumbnailUrl = createInstagramThumbnail();
+        } catch (canvasError) {
+          // Final fallback if canvas fails
+          thumbnailUrl = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjQwMCIgdmlld0JveD0iMCAwIDQwMCA0MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxkZWZzPgo8bGluZWFyR3JhZGllbnQgaWQ9ImlnR3JhZGllbnQiIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPgo8c3RvcCBvZmZzZXQ9IjAlIiBzdHlsZT0ic3RvcC1jb2xvcjojODMzQUI0O3N0b3Atb3BhY2l0eToxIiAvPgo8c3RvcCBvZmZzZXQ9IjUwJSIgc3R5bGU9InN0b3AtY29sb3I6I0ZEMUQxRDtzdG9wLW9wYWNpdHk6MSIgLz4KPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdHlsZT0ic3RvcC1jb2xvcjojRjc3NzM3O3N0b3Atb3BhY2l0eToxIiAvPgo8L2xpbmVhckdyYWRpZW50Pgo8L2RlZnM+CjxyZWN0IHdpZHRoPSI0MDAiIGhlaWdodD0iNDAwIiBmaWxsPSJ1cmwoI2lnR3JhZGllbnQpIi8+Cjx0ZXh0IHg9IjIwMCIgeT0iMjIwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iNjAiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+8J+TtwogPC90ZXh0Pgo8L3N2Zz4K";
+        }
       }
 
       const position = await getNextPosition();
