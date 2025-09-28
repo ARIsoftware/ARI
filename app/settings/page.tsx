@@ -328,9 +328,9 @@ export default function SettingsPage() {
                     <TabsTrigger value="backups">Backups</TabsTrigger>
                   </TabsList>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
+                    <Button variant="outline" size="sm" onClick={() => window.location.href = '/debug'}>
                       <Sparkles className="mr-2 h-4 w-4" />
-                      Need guidance?
+                      Run Diagnostics
                     </Button>
                     <Button size="sm" onClick={handleSaveChanges} disabled={isSaving}>
                       {isSaving ? (
