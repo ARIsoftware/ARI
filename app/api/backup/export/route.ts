@@ -38,6 +38,7 @@ async function discoverTables(client: any): Promise<string[]> {
       'hyrox_workout_stations',
       'northstar',
       'motivation_content',
+      'shipments',
     ];
 
     const existingTables: string[] = [];
