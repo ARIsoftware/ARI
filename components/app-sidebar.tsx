@@ -149,9 +149,9 @@ const data = {
       icon: Settings,
       items: [
         {
-          title: "Backup",
-          url: "/backups",
-          icon: Database,
+          title: "Preferences",
+          url: "/settings",
+          icon: Settings,
         },
       ],
     },
