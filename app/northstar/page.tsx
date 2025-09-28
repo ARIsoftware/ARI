@@ -3,6 +3,7 @@
 import type React from "react"
 import { useSupabase } from "@/components/providers"
 import { DM_Sans } from "next/font/google"
+import { TaskAnnouncement } from "@/components/task-announcement"
 import { AppSidebar } from "../../components/app-sidebar"
 import {
   Breadcrumb,
@@ -144,32 +145,36 @@ export default function NorthstarPage() {
 
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-14 items-center gap-4 px-6">
-          <SidebarTrigger />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbPage>Northstar</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-        </header>
-        <div className={`flex flex-1 flex-col gap-8 p-6 ${dmSans.className}`}>
-          {/* Header with Quote */}
-          <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold flex items-center justify-center gap-2">
-              <Target className="w-8 h-8 text-blue-500" />
-              Personal Northstar
-            </h1>
-            <p className="text-gray-600 italic max-w-2xl mx-auto">
-              "Success is not final, failure is not fatal:<br />
-              it is the courage to continue that counts."
-            </p>
-          </div>
+    <div className="min-h-screen bg-gray-50/50">
+      <TaskAnnouncement />
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-white px-4">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-2 h-4" />
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbPage>Northstar</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          </header>
+          <div className="flex flex-1 flex-col gap-6 p-6">
+            {/* Header */}
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-3xl font-medium">Northstar</h1>
+                <p className="text-sm text-[#aa2020] mt-1">
+                  "Success is not final, failure is not fatal: It is the courage to continue that counts."
+                </p>
+              </div>
+              <Button onClick={() => setIsAddModalOpen(true)} className="bg-black hover:bg-gray-800">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Goal
+              </Button>
+            </div>
 
           {/* Stats Cards */}
           <div className="grid gap-4 md:grid-cols-3">
@@ -212,12 +217,8 @@ export default function NorthstarPage() {
 
           {/* Goals Section */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="mb-6">
               <h2 className="text-2xl font-bold">Your Goals</h2>
-              <Button onClick={() => setIsAddModalOpen(true)} className="gap-2">
-                <Plus className="w-4 h-4" />
-                Add Goal
-              </Button>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -359,7 +360,8 @@ export default function NorthstarPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </SidebarInset>
-    </SidebarProvider>
+        </SidebarInset>
+      </SidebarProvider>
+    </div>
   )
 }
