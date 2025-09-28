@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { data, error } = await supabase
-      .from("goals")
+      .from("northstar")
       .select("*")
       .order("created_at", { ascending: false })
 
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data, error } = await supabase
-      .from("goals")
+      .from("northstar")
       .insert([goalData])
       .select()
       .single()

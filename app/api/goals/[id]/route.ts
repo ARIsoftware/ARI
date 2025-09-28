@@ -19,7 +19,7 @@ export async function PATCH(
     }
 
     const { data, error } = await supabase
-      .from("goals")
+      .from("northstar")
       .update({ ...body, updated_at: new Date().toISOString() })
       .eq('id', goalId)
       .select()

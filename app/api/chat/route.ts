@@ -1,7 +1,17 @@
 import { getTaskContext, formatTaskContextForAI } from '@/lib/task-context'
+import { getAuthenticatedUser } from '@/lib/auth-helpers'
 
 export async function POST(req: Request) {
   try {
+    const { user } = await getAuthenticatedUser()
+
+    if (!user) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
     const { messages } = await req.json();
 
     // Check if API key is available

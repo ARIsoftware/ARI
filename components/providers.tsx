@@ -43,7 +43,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <Context.Provider value={{ supabase, user, session }}>
       {children}
       <Toaster />
-      <ExerciseReminder />
+      {/* Only show exercise reminder when user is authenticated */}
+      {user && <ExerciseReminder />}
       <div className="fixed top-[58px] right-6 z-50">
         <YouTubeMusicPlayer />
       </div>
