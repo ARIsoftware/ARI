@@ -5,7 +5,7 @@ import { createSupabaseClient } from '@/lib/supabase-auth'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { AlertCircle, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
+import { AlertCircle, CheckCircle2, XCircle, Loader2, Shield, ShieldAlert, ShieldCheck } from 'lucide-react'
 
 interface TestResult {
   name: string
@@ -13,6 +13,21 @@ interface TestResult {
   message?: string
   data?: any
   error?: any
+}
+
+interface ApiEndpoint {
+  path: string
+  methods: string[]
+  description?: string
+}
+
+interface SecurityTestResult {
+  endpoint: string
+  method: string
+  status: 'pending' | 'testing' | 'secure' | 'vulnerable' | 'error'
+  message?: string
+  responseStatus?: number
+  error?: string
 }
 
 export default function DatabaseTestPage() {
@@ -29,12 +44,131 @@ export default function DatabaseTestPage() {
     { name: 'Fetch Fitness Data', status: 'pending' },
     { name: 'Test RLS Policies', status: 'pending' },
   ])
+  const [securityResults, setSecurityResults] = useState<SecurityTestResult[]>([])
   const [isRunning, setIsRunning] = useState(false)
+  const [isRunningSecurityTests, setIsRunningSecurityTests] = useState(false)
+
+  // Define all API endpoints for testing
+  const apiEndpoints: ApiEndpoint[] = [
+    { path: '/api/tasks', methods: ['GET', 'POST'], description: 'Tasks management' },
+    { path: '/api/tasks/increment-completion', methods: ['POST'], description: 'Increment task completion' },
+    { path: '/api/tasks/priorities', methods: ['GET', 'PUT'], description: 'Task priorities' },
+    { path: '/api/contacts', methods: ['GET', 'POST'], description: 'Contacts management' },
+    { path: '/api/goals', methods: ['GET', 'POST'], description: 'Goals/NorthStar management' },
+    { path: '/api/fitness-stats', methods: ['GET'], description: 'Fitness statistics' },
+    { path: '/api/fitness-tasks', methods: ['GET', 'POST'], description: 'Fitness tasks' },
+    { path: '/api/hyrox/workouts', methods: ['GET', 'POST'], description: 'HYROX workouts' },
+    { path: '/api/hyrox/setup', methods: ['POST'], description: 'HYROX setup' },
+    { path: '/api/hyrox/reset', methods: ['POST'], description: 'HYROX reset' },
+    { path: '/api/hyrox/station-records', methods: ['GET'], description: 'HYROX station records' },
+    { path: '/api/hyrox/workout-stations', methods: ['GET', 'POST'], description: 'HYROX workout stations' },
+    { path: '/api/backup/export', methods: ['POST'], description: 'Database export' },
+    { path: '/api/backup/import', methods: ['POST', 'PUT'], description: 'Database import' },
+    { path: '/api/chat', methods: ['POST'], description: 'AI chat assistant' },
+    { path: '/api/last-completed-task', methods: ['GET'], description: 'Last completed task' },
+    { path: '/api/sample-fitness-tasks', methods: ['GET'], description: 'Sample fitness tasks' },
+    { path: '/api/shipments', methods: ['GET', 'POST'], description: 'Shipments management' },
+    { path: '/api/motivation/setup', methods: ['POST'], description: 'Motivation setup' },
+    { path: '/api/motivation/reorder', methods: ['POST'], description: 'Motivation reorder' },
+    { path: '/api/instagram/metadata', methods: ['GET'], description: 'Instagram metadata' },
+  ]
 
   const updateTestResult = (name: string, update: Partial<TestResult>) => {
     setTestResults(prev => prev.map(test =>
       test.name === name ? { ...test, ...update } : test
     ))
+  }
+
+  const updateSecurityResult = (endpoint: string, method: string, update: Partial<SecurityTestResult>) => {
+    setSecurityResults(prev => {
+      const key = `${method} ${endpoint}`
+      const existing = prev.find(r => r.endpoint === endpoint && r.method === method)
+      if (existing) {
+        return prev.map(r => r.endpoint === endpoint && r.method === method ? { ...r, ...update } : r)
+      } else {
+        return [...prev, { endpoint, method, status: 'pending', ...update }]
+      }
+    })
+  }
+
+  const testApiEndpointSecurity = async (endpoint: string, method: string) => {
+    updateSecurityResult(endpoint, method, { status: 'testing' })
+
+    try {
+      const options: RequestInit = {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        // Don't include credentials to test unauthorized access
+      }
+
+      // For POST/PUT requests, include minimal body if needed
+      if (method === 'POST' || method === 'PUT') {
+        options.body = JSON.stringify({})
+      }
+
+      const response = await fetch(endpoint, options)
+
+      // Check if endpoint properly rejects unauthorized requests
+      if (response.status === 401 || response.status === 403) {
+        updateSecurityResult(endpoint, method, {
+          status: 'secure',
+          message: 'Properly requires authentication',
+          responseStatus: response.status
+        })
+      } else if (response.status === 200 || response.status === 201) {
+        updateSecurityResult(endpoint, method, {
+          status: 'vulnerable',
+          message: 'WARNING: Endpoint accessible without authentication!',
+          responseStatus: response.status
+        })
+      } else if (response.status === 404) {
+        updateSecurityResult(endpoint, method, {
+          status: 'secure',
+          message: 'Endpoint not found (expected for some routes)',
+          responseStatus: response.status
+        })
+      } else if (response.status === 405) {
+        updateSecurityResult(endpoint, method, {
+          status: 'secure',
+          message: 'Method not allowed (secure)',
+          responseStatus: response.status
+        })
+      } else {
+        updateSecurityResult(endpoint, method, {
+          status: 'error',
+          message: `Unexpected response: ${response.status}`,
+          responseStatus: response.status
+        })
+      }
+    } catch (error: any) {
+      updateSecurityResult(endpoint, method, {
+        status: 'error',
+        message: 'Network error during test',
+        error: error.message
+      })
+    }
+  }
+
+  const runSecurityTests = async () => {
+    setIsRunningSecurityTests(true)
+    console.log('🔒 Starting API security tests...')
+
+    // Clear previous results
+    setSecurityResults([])
+
+    // Test each endpoint with each method
+    for (const endpoint of apiEndpoints) {
+      for (const method of endpoint.methods) {
+        await testApiEndpointSecurity(endpoint.path, method)
+        // Small delay to avoid overwhelming the server
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+    }
+
+    setIsRunningSecurityTests(false)
+    console.log('🔒 API security tests complete!')
   }
 
   const runTests = async () => {
@@ -459,6 +593,21 @@ export default function DatabaseTestPage() {
     }
   }
 
+  const getSecurityIcon = (status: SecurityTestResult['status']) => {
+    switch (status) {
+      case 'pending':
+        return <Shield className="h-5 w-5 text-gray-400" />
+      case 'testing':
+        return <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
+      case 'secure':
+        return <ShieldCheck className="h-5 w-5 text-green-500" />
+      case 'vulnerable':
+        return <ShieldAlert className="h-5 w-5 text-red-500" />
+      case 'error':
+        return <XCircle className="h-5 w-5 text-yellow-500" />
+    }
+  }
+
   const getStatusBadge = (status: TestResult['status']) => {
     const variants: Record<TestResult['status'], 'default' | 'secondary' | 'destructive' | 'outline'> = {
       pending: 'outline',
@@ -475,6 +624,30 @@ export default function DatabaseTestPage() {
     )
   }
 
+  const getSecurityBadge = (status: SecurityTestResult['status']) => {
+    const variants: Record<SecurityTestResult['status'], 'default' | 'secondary' | 'destructive' | 'outline'> = {
+      pending: 'outline',
+      testing: 'secondary',
+      secure: 'default',
+      vulnerable: 'destructive',
+      error: 'secondary'
+    }
+
+    const labels: Record<SecurityTestResult['status'], string> = {
+      pending: 'Pending',
+      testing: 'Testing',
+      secure: 'Secure',
+      vulnerable: 'Vulnerable',
+      error: 'Error'
+    }
+
+    return (
+      <Badge variant={variants[status]}>
+        {labels[status]}
+      </Badge>
+    )
+  }
+
   useEffect(() => {
     // Log initial page load
     console.log('🚀 Database Test Page loaded')
@@ -484,86 +657,215 @@ export default function DatabaseTestPage() {
     })
   }, [])
 
+  // Calculate security summary
+  const securitySummary = {
+    total: securityResults.length,
+    secure: securityResults.filter(r => r.status === 'secure').length,
+    vulnerable: securityResults.filter(r => r.status === 'vulnerable').length,
+    errors: securityResults.filter(r => r.status === 'error').length,
+  }
+
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Database Connection Test</CardTitle>
-          <p className="text-sm text-muted-foreground mt-2">
-            Run comprehensive tests to diagnose database connection issues
-          </p>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center mb-6">
-              <Button
-                onClick={runTests}
-                disabled={isRunning}
-                size="lg"
-              >
-                {isRunning ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Running Tests...
-                  </>
-                ) : (
-                  'Run All Tests'
-                )}
-              </Button>
-              <p className="text-sm text-muted-foreground">
-                Open browser console for detailed logs
-              </p>
-            </div>
+    <div className="container mx-auto p-6 max-w-6xl">
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Database Tests */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl">Database Connection Test</CardTitle>
+            <p className="text-sm text-muted-foreground mt-2">
+              Run comprehensive tests to diagnose database connection issues
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center mb-6">
+                <Button
+                  onClick={runTests}
+                  disabled={isRunning}
+                  size="lg"
+                >
+                  {isRunning ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Running Tests...
+                    </>
+                  ) : (
+                    'Run Database Tests'
+                  )}
+                </Button>
+                <p className="text-sm text-muted-foreground">
+                  Open browser console for detailed logs
+                </p>
+              </div>
 
-            <div className="space-y-3">
-              {testResults.map((test) => (
-                <Card key={test.name} className="border">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3 flex-1">
-                        {getStatusIcon(test.status)}
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-medium">{test.name}</h3>
-                            {getStatusBadge(test.status)}
-                          </div>
+              <div className="space-y-3">
+                {testResults.map((test) => (
+                  <Card key={test.name} className="border">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3 flex-1">
+                          {getStatusIcon(test.status)}
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-medium">{test.name}</h3>
+                              {getStatusBadge(test.status)}
+                            </div>
 
-                          {test.message && (
-                            <p className="text-sm text-muted-foreground mt-1">
-                              {test.message}
-                            </p>
-                          )}
-
-                          {test.error && (
-                            <div className="mt-2 p-2 bg-red-50 dark:bg-red-950 rounded text-sm">
-                              <p className="text-red-600 dark:text-red-400 font-medium">
-                                Error: {test.error}
+                            {test.message && (
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {test.message}
                               </p>
-                              {test.data && (
-                                <pre className="text-xs mt-1 text-red-500 dark:text-red-300">
+                            )}
+
+                            {test.error && (
+                              <div className="mt-2 p-2 bg-red-50 dark:bg-red-950 rounded text-sm">
+                                <p className="text-red-600 dark:text-red-400 font-medium">
+                                  Error: {test.error}
+                                </p>
+                                {test.data && (
+                                  <pre className="text-xs mt-1 text-red-500 dark:text-red-300">
+                                    {JSON.stringify(test.data, null, 2)}
+                                  </pre>
+                                )}
+                              </div>
+                            )}
+
+                            {test.data && test.status === 'success' && (
+                              <div className="mt-2 p-2 bg-green-50 dark:bg-green-950 rounded">
+                                <pre className="text-xs text-green-600 dark:text-green-400">
                                   {JSON.stringify(test.data, null, 2)}
                                 </pre>
-                              )}
-                            </div>
-                          )}
-
-                          {test.data && test.status === 'success' && (
-                            <div className="mt-2 p-2 bg-green-50 dark:bg-green-950 rounded">
-                              <pre className="text-xs text-green-600 dark:text-green-400">
-                                {JSON.stringify(test.data, null, 2)}
-                              </pre>
-                            </div>
-                          )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* API Security Tests */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl flex items-center gap-2">
+              <Shield className="h-6 w-6" />
+              API Security Tests
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-2">
+              Verify that all API endpoints require proper authentication
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center mb-6">
+                <Button
+                  onClick={runSecurityTests}
+                  disabled={isRunningSecurityTests}
+                  size="lg"
+                  variant="outline"
+                >
+                  {isRunningSecurityTests ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Testing Security...
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="mr-2 h-4 w-4" />
+                      Run Security Tests
+                    </>
+                  )}
+                </Button>
+                <div className="text-sm text-muted-foreground text-right">
+                  <p>Tests unauthorized access to API endpoints</p>
+                </div>
+              </div>
+
+              {/* Security Summary */}
+              {securityResults.length > 0 && (
+                <Card className="border-2">
+                  <CardContent className="p-4">
+                    <h3 className="font-medium mb-3">Security Summary</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="flex justify-between">
+                        <span>Total Endpoints:</span>
+                        <Badge variant="outline">{securitySummary.total}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Secure:</span>
+                        <Badge variant="default">{securitySummary.secure}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Vulnerable:</span>
+                        <Badge variant="destructive">{securitySummary.vulnerable}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Errors:</span>
+                        <Badge variant="secondary">{securitySummary.errors}</Badge>
+                      </div>
                     </div>
+                    {securitySummary.vulnerable > 0 && (
+                      <div className="mt-3 p-2 bg-red-50 dark:bg-red-950 rounded text-sm">
+                        <p className="text-red-600 dark:text-red-400 font-medium">
+                          ⚠️ WARNING: {securitySummary.vulnerable} endpoint(s) may be publicly accessible!
+                        </p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
-              ))}
+              )}
+
+              {/* Security Test Results */}
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {securityResults.map((result, index) => (
+                  <Card key={index} className="border">
+                    <CardContent className="p-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3 flex-1">
+                          {getSecurityIcon(result.status)}
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <code className="text-xs font-mono bg-gray-100 dark:bg-gray-800 px-1 rounded">
+                                {result.method}
+                              </code>
+                              <span className="text-sm font-medium">{result.endpoint}</span>
+                              {getSecurityBadge(result.status)}
+                            </div>
+
+                            {result.message && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {result.message}
+                              </p>
+                            )}
+
+                            {result.responseStatus && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                HTTP {result.responseStatus}
+                              </p>
+                            )}
+
+                            {result.error && (
+                              <div className="mt-2 p-2 bg-red-50 dark:bg-red-950 rounded text-xs">
+                                <p className="text-red-600 dark:text-red-400">
+                                  {result.error}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
