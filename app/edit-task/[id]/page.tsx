@@ -27,9 +27,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { CalendarIcon, Save, X, Star, ArrowLeft, Loader2, Pencil, Info } from "lucide-react"
+import { CalendarIcon, Save, X, Star, ArrowLeft, Loader2, Pencil, Info, Compass } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 import { useState, useEffect } from "react"
 import { getTasks, updateTask, type Task } from "@/lib/tasks"
+import { getGoals, type Goal } from "@/lib/goals"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
@@ -71,13 +73,13 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
   const [initialLoading, setInitialLoading] = useState(true)
   const [date, setDate] = useState<Date>()
   const [task, setTask] = useState<Task | null>(null)
+  const [northStars, setNorthStars] = useState<Goal[]>([])
+  const [selectedNorthStars, setSelectedNorthStars] = useState<string[]>([])
 
   // Form state
   const [formData, setFormData] = useState({
     title: "",
     assignees: [] as string[],
-    subtasks_total: 0,
-    subtasks_completed: 0,
     status: "Pending" as const,
     priority: "Medium" as const,
     starred: false,
@@ -91,16 +93,17 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
 
   const [newAssignee, setNewAssignee] = useState("")
 
-  // Load task data
+  // Load task data and northstars
   useEffect(() => {
-    const loadTask = async () => {
+    const loadData = async () => {
       if (!user?.id) return // Wait for user to be loaded
-      
+
       try {
+        // Load task
         const tokenFn = async () => session?.access_token || null
         const tasks = await getTasks(tokenFn)
         const foundTask = tasks.find((t) => t.id === id)
-        
+
         if (!foundTask) {
           toast({
             title: "Error",
@@ -115,8 +118,6 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
         setFormData({
           title: foundTask.title,
           assignees: foundTask.assignees,
-          subtasks_total: foundTask.subtasks_total,
-          subtasks_completed: foundTask.subtasks_completed,
           status: foundTask.status,
           priority: foundTask.priority,
           starred: foundTask.starred,
@@ -127,15 +128,24 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
           effort: foundTask.effort || 3,
           strategic_fit: foundTask.strategic_fit || 3,
         })
-        
+
         if (foundTask.due_date) {
           setDate(new Date(foundTask.due_date))
         }
+
+        // Load northstars/goals
+        const goals = await getGoals()
+        setNorthStars(goals)
+
+        // If task has northstar_ids stored (you'll need to add this field to the database)
+        // For now, we'll initialize as empty
+        setSelectedNorthStars([])
+
       } catch (error) {
-        console.error("Failed to load task:", error)
+        console.error("Failed to load data:", error)
         toast({
           title: "Error",
-          description: "Failed to load task. Please try again.",
+          description: "Failed to load data. Please try again.",
           variant: "destructive",
         })
         router.push("/tasks")
@@ -144,7 +154,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
       }
     }
 
-    loadTask()
+    loadData()
   }, [id, router, toast, user?.id])
 
   const handleInputChange = (field: string, value: any) => {
@@ -190,8 +200,6 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
         title: formData.title.trim(),
         assignees: formData.assignees,
         due_date: date ? date.toISOString().split("T")[0] : null,
-        subtasks_total: formData.subtasks_total,
-        subtasks_completed: formData.subtasks_completed,
         status: formData.status,
         priority: formData.priority,
         starred: formData.starred,
@@ -201,6 +209,8 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
         timeliness: formData.timeliness,
         effort: formData.effort,
         strategic_fit: formData.strategic_fit,
+        // Note: northstar_ids would need to be added to the database schema
+        // northstar_ids: selectedNorthStars,
       }
 
       const tokenFn = async () => session?.access_token || null
@@ -357,37 +367,6 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
                     </Popover>
                   </div>
 
-                  {/* Subtasks */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="subtasks_completed" className="text-sm font-medium">
-                        Subtasks Completed
-                      </Label>
-                      <Input
-                        id="subtasks_completed"
-                        type="number"
-                        min="0"
-                        max={formData.subtasks_total}
-                        value={formData.subtasks_completed}
-                        onChange={(e) => handleInputChange("subtasks_completed", Number.parseInt(e.target.value) || 0)}
-                        className="w-full"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="subtasks_total" className="text-sm font-medium">
-                        Total Subtasks
-                      </Label>
-                      <Input
-                        id="subtasks_total"
-                        type="number"
-                        min="0"
-                        value={formData.subtasks_total}
-                        onChange={(e) => handleInputChange("subtasks_total", Number.parseInt(e.target.value) || 0)}
-                        className="w-full"
-                      />
-                    </div>
-                  </div>
-
                   {/* Status and Priority */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -435,14 +414,14 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
                     </div>
                   </div>
 
-                  {/* Starred */}
+                  {/* Mark for Today */}
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label className="text-sm font-medium flex items-center gap-2">
                         <Star className="w-4 h-4" />
-                        Mark as Important
+                        Mark for Today
                       </Label>
-                      <p className="text-xs text-muted-foreground">Starred tasks will appear in the "Today" filter</p>
+                      <p className="text-xs text-muted-foreground">Marked tasks will appear in the "Today" filter</p>
                     </div>
                     <Switch
                       checked={formData.starred}
@@ -461,6 +440,59 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
                       onCheckedChange={(checked) => handleInputChange("completed", checked)}
                     />
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* NorthStar Alignment Section */}
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Compass className="w-5 h-5" />
+                    NorthStar Alignment
+                  </CardTitle>
+                  <CardDescription>Select the NorthStar goals this task aligns with</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {northStars.length > 0 ? (
+                    <div className="space-y-3">
+                      {northStars.map((northstar) => (
+                        <div key={northstar.id} className="flex items-start space-x-3">
+                          <Checkbox
+                            id={northstar.id}
+                            checked={selectedNorthStars.includes(northstar.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedNorthStars([...selectedNorthStars, northstar.id])
+                              } else {
+                                setSelectedNorthStars(selectedNorthStars.filter((id) => id !== northstar.id))
+                              }
+                            }}
+                            className="mt-0.5"
+                          />
+                          <div className="flex-1">
+                            <label
+                              htmlFor={northstar.id}
+                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                            >
+                              {northstar.title}
+                            </label>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {northstar.description}
+                            </p>
+                            {northstar.category && (
+                              <Badge variant="outline" className="mt-1">
+                                {northstar.category}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No NorthStar goals found. Create some goals in the NorthStar section first.
+                    </p>
+                  )}
                 </CardContent>
               </Card>
 
