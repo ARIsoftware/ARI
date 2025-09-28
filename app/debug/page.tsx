@@ -100,7 +100,9 @@ export default function DatabaseTestPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        // Don't include credentials to test unauthorized access
+        // Force browser to omit cookies so we truly test unauthenticated access
+        credentials: 'omit',
+        redirect: 'manual'
       }
 
       // For POST/PUT requests, include minimal body if needed
@@ -110,17 +112,30 @@ export default function DatabaseTestPage() {
 
       const response = await fetch(endpoint, options)
 
+      const redirectedToSignIn = response.type === 'opaqueredirect' ||
+        response.redirected ||
+        (response.url && response.url.includes('/sign-in')) ||
+        (response.status >= 300 && response.status < 400)
+
       // Check if endpoint properly rejects unauthorized requests
-      if (response.status === 401 || response.status === 403) {
+      if (response.status === 401 || response.status === 403 || redirectedToSignIn) {
         updateSecurityResult(endpoint, method, {
           status: 'secure',
-          message: 'Properly requires authentication',
-          responseStatus: response.status
+          message: redirectedToSignIn
+            ? 'Redirected to sign-in (secure)'
+            : 'Properly requires authentication',
+          responseStatus: response.status || (response.type === 'opaqueredirect' ? 0 : undefined)
         })
       } else if (response.status === 200 || response.status === 201) {
         updateSecurityResult(endpoint, method, {
           status: 'vulnerable',
           message: 'WARNING: Endpoint accessible without authentication!',
+          responseStatus: response.status
+        })
+      } else if (response.status === 400) {
+        updateSecurityResult(endpoint, method, {
+          status: 'warning',
+          message: 'Received 400 (likely validation blocking unauthenticated request); review manually',
           responseStatus: response.status
         })
       } else if (response.status === 404) {
@@ -465,7 +480,7 @@ export default function DatabaseTestPage() {
     try {
       console.log('📊 Attempting to fetch northstar entries...')
       const { data, error, status } = await supabase
-        .from('northstar_entries')
+        .from('northstar')
         .select('*')
         .limit(5)
 
@@ -496,7 +511,7 @@ export default function DatabaseTestPage() {
     try {
       console.log('📊 Attempting to fetch fitness data...')
       const { data, error, status } = await supabase
-        .from('ari-fitness-database')
+        .from('fitness_database')
         .select('*')
         .limit(5)
 
