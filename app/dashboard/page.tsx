@@ -17,11 +17,14 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { TaskAnnouncement } from "@/components/task-announcement"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CalendarDays, TrendingUp, Trophy, Target, Users, CheckSquare, Loader2 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { CalendarDays, TrendingUp, Trophy, Target, Users, CheckSquare, Loader2, Plus, Eye, BarChart3, Activity } from "lucide-react"
 import { getFitnessStats } from "@/lib/fitness-stats"
 import { getContacts } from "@/lib/contacts"
 import { getTasks } from "@/lib/tasks"
 import { useSupabase } from "@/components/providers"
+import { TaskAnalyticsChart } from "@/components/task-analytics-chart"
+import { RecentActivityFeed } from "@/components/recent-activity-feed"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -118,12 +121,28 @@ export default function DashboardPage() {
 
           <div className="flex flex-1 flex-col gap-6 p-6">
             {/* Welcome Header */}
-            <div>
-              <h1 className="text-3xl font-medium">Dashboard</h1>
-              <p className="text-sm text-[#aa2020] mt-1">
-                Burn like fire. Pour like rain.
-              </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-medium">Dashboard</h1>
+                <p className="text-sm text-[#aa2020] mt-1">
+                  Burn like fire. Pour like rain.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => window.location.href = '/tasks'}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Task
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => window.location.href = '/radar'}>
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  Priority Radar
+                </Button>
+              </div>
             </div>
+
+            {/* Task Analytics Chart */}
+            <TaskAnalyticsChart token={session?.access_token || null} />
+
 
             {/* Fitness Stats Section */}
             <div className="space-y-4">
@@ -197,71 +216,103 @@ export default function DashboardPage() {
 
             {/* Quick Stats Section */}
             <div className="space-y-4">
-              <h2 className="text-xl font-medium">Quick Overview</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="flex items-center gap-2">
+                <Activity className="w-5 h-5 text-emerald-600" />
+                <h2 className="text-xl font-medium">Quick Overview</h2>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Total Tasks */}
-                <Card>
+                <Card className="hover:shadow-md transition-shadow">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
-                    <CheckSquare className="h-4 w-4 text-muted-foreground" />
+                    <CheckSquare className="h-4 w-4 text-blue-600" />
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-medium">{taskCount}</div>
                     <p className="text-xs text-muted-foreground">
                       tasks in your system
                     </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full mt-2 text-xs"
+                      onClick={() => window.location.href = '/tasks'}
+                    >
+                      <Eye className="w-3 h-3 mr-1" />
+                      View All
+                    </Button>
                   </CardContent>
                 </Card>
 
                 {/* Total Contacts */}
-                <Card>
+                <Card className="hover:shadow-md transition-shadow">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total Contacts</CardTitle>
-                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <Users className="h-4 w-4 text-purple-600" />
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-medium">{contactCount}</div>
                     <p className="text-xs text-muted-foreground">
                       contacts in your network
                     </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full mt-2 text-xs"
+                      onClick={() => window.location.href = '/contacts'}
+                    >
+                      <Eye className="w-3 h-3 mr-1" />
+                      View All
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Fitness Performance */}
+                <Card className="hover:shadow-md transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Fitness Score</CardTitle>
+                    <Trophy className="h-4 w-4 text-yellow-600" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-medium">{fitnessStats.totalCompletions}</div>
+                    <p className="text-xs text-muted-foreground">
+                      total completions
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full mt-2 text-xs"
+                      onClick={() => window.location.href = '/daily-fitness'}
+                    >
+                      <Eye className="w-3 h-3 mr-1" />
+                      View Fitness
+                    </Button>
                   </CardContent>
                 </Card>
 
                 {/* System Status */}
-                <Card>
+                <Card className="hover:shadow-md transition-shadow">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">System Status</CardTitle>
-                    <div className="h-2 w-2 bg-green-500 rounded-full"></div>
+                    <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-medium">Online</div>
                     <p className="text-xs text-muted-foreground">
                       all systems operational
                     </p>
+                    <Badge variant="secondary" className="mt-2 text-xs">
+                      <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                      Healthy
+                    </Badge>
                   </CardContent>
                 </Card>
               </div>
             </div>
 
-            {/* Recent Activity Placeholder */}
-            <div className="space-y-4">
-              <h2 className="text-xl font-medium">Recent Activity</h2>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Activity Feed</CardTitle>
-                  <CardDescription>
-                    Recent actions and updates across your tasks and contacts
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p>Activity feed coming soon...</p>
-                    <p className="text-sm mt-2">This will show your recent task completions and contact updates</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            {/* Recent Activity Feed */}
+            <RecentActivityFeed token={session?.access_token || null} />
           </div>
         </SidebarInset>
       </SidebarProvider>
