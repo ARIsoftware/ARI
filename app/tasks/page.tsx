@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2, Trash2, Pencil, Columns } from "lucide-react"
+import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2, Trash2, Pencil, Columns, StickyNote } from "lucide-react"
 import { FocusTimer } from "@/components/focus-timer"
 import { useState, useEffect } from "react"
 import { getTasks, toggleTaskCompletion, toggleTaskStar, reorderTasks, deleteTask, updateTask, type Task } from "@/lib/tasks"
@@ -26,6 +26,7 @@ import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { TaskAnnouncement } from "@/components/task-announcement"
+import { Notepad } from "@/components/notepad"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -135,6 +136,7 @@ export default function TasksPage() {
   const [fadingTasks, setFadingTasks] = useState<Set<string>>(new Set())
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
+  const [isNotepadOpen, setIsNotepadOpen] = useState(false)
   const router = useRouter()
 
   const filters = ["All", "Today", "In Progress", "Completed"]
@@ -481,6 +483,15 @@ export default function TasksPage() {
                 )}
               </div>
               <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setIsNotepadOpen(true)}
+                  className="bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                  title="Open Notepad"
+                >
+                  <StickyNote className="w-5 h-5" />
+                </Button>
                 <FocusTimer />
                 <Button variant="outline" className="bg-white" onClick={() => router.push("/radar")}>
                   Radar
@@ -1061,6 +1072,9 @@ export default function TasksPage() {
           </div>
         </SidebarInset>
       </SidebarProvider>
+
+      {/* Notepad Sliding Panel */}
+      <Notepad isOpen={isNotepadOpen} onClose={() => setIsNotepadOpen(false)} />
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
