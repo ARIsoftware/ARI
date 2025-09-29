@@ -1058,46 +1058,6 @@ export default function SettingsPage() {
                     </Card>
                   </div>
 
-                  {/* Info Card */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Database className="h-5 w-5" />
-                        Backup Features
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3 text-sm text-muted-foreground">
-                        <div>
-                          <h4 className="font-medium text-foreground mb-1">🗂️ Dynamic Database Export</h4>
-                          <p>• Automatically discovers ALL tables in your database</p>
-                          <p>• Generates CREATE TABLE statements from actual schema</p>
-                          <p>• Zero configuration - new tables are automatically included</p>
-                          <p>• Full metadata and validation for integrity checking</p>
-                        </div>
-                        <div>
-                          <h4 className="font-medium text-foreground mb-1">🔄 Smart Import System</h4>
-                          <p>• Progress tracking and detailed error reporting</p>
-                          <p>• File validation and size limits (50MB max)</p>
-                          <p>• Data integrity verification with expected vs actual counts</p>
-                        </div>
-                        <div>
-                          <h4 className="font-medium text-foreground mb-1">🛡️ Safety Features</h4>
-                          <p>• Foreign key management during import</p>
-                          <p>• Sequence reset for proper data ordering</p>
-                          <p>• Performance indexes automatically created</p>
-                          <p>• Validation queries included for manual verification</p>
-                        </div>
-                        <div>
-                          <h4 className="font-medium text-foreground mb-1">💾 Best Practices</h4>
-                          <p>• Create regular backups to prevent data loss</p>
-                          <p>• Store backups in multiple secure locations</p>
-                          <p>• Test restore process periodically</p>
-                          <p>• New tables are automatically included - no configuration needed!</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
                 </TabsContent>
               </Tabs>
 
