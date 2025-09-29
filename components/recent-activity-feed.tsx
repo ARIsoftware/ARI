@@ -130,9 +130,8 @@ export function RecentActivityFeed({ token }: RecentActivityFeedProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="w-5 h-5 text-blue-600" />
-            Recent Activity
+            Activity
           </CardTitle>
-          <CardDescription>Latest actions across your workspace</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center h-[300px]">
@@ -152,9 +151,8 @@ export function RecentActivityFeed({ token }: RecentActivityFeedProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="w-5 h-5 text-blue-600" />
-            Recent Activity
+            Activity
           </CardTitle>
-          <CardDescription>Latest actions across your workspace</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center h-[300px]">
@@ -174,9 +172,8 @@ export function RecentActivityFeed({ token }: RecentActivityFeedProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="w-5 h-5 text-blue-600" />
-            Recent Activity
+            Activity
           </CardTitle>
-          <CardDescription>Latest actions across your workspace</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center h-[300px]">
@@ -196,9 +193,8 @@ export function RecentActivityFeed({ token }: RecentActivityFeedProps) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Activity className="w-5 h-5 text-blue-600" />
-          Recent Activity
+          Activity
         </CardTitle>
-        <CardDescription>Latest actions across your workspace</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-4 max-h-[400px] overflow-y-auto">

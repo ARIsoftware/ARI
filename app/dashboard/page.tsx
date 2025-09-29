@@ -119,200 +119,204 @@ export default function DashboardPage() {
             </Breadcrumb>
           </header>
 
-          <div className="flex flex-1 flex-col gap-6 p-6">
-            {/* Welcome Header */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-medium">Dashboard</h1>
-                <p className="text-sm text-[#aa2020] mt-1">
-                  Burn like fire. Pour like rain.
-                </p>
+          <div className="flex flex-1">
+            {/* Main Content */}
+            <div className="flex-1 flex flex-col gap-6 p-6 pr-3">
+              {/* Welcome Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-3xl font-medium">Dashboard</h1>
+                  <p className="text-sm text-[#aa2020] mt-1">
+                    Burn like fire. Pour like rain.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => window.location.href = '/tasks'}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    New Task
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => window.location.href = '/radar'}>
+                    <BarChart3 className="w-4 h-4 mr-2" />
+                    Priority Radar
+                  </Button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <Button size="sm" onClick={() => window.location.href = '/tasks'}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Task
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => window.location.href = '/radar'}>
-                  <BarChart3 className="w-4 h-4 mr-2" />
-                  Priority Radar
-                </Button>
+
+              {/* Task Analytics Chart */}
+              <TaskAnalyticsChart token={session?.access_token || null} />
+
+              {/* Fitness Stats Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Target className="w-5 h-5 text-blue-600" />
+                  <h2 className="text-xl font-medium">Fitness Performance</h2>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Average Completions Per Day */}
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Daily Average</CardTitle>
+                      <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-medium">{fitnessStats.averageCompletionsPerDay.toFixed(1)}</div>
+                      <p className="text-xs text-muted-foreground">
+                        fitness tasks completed per day
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  {/* Most Completed Task */}
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Top Performer</CardTitle>
+                      <Trophy className="h-4 w-4 text-yellow-600" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-medium">
+                        {fitnessStats.mostCompletedTask?.count || 0}
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {fitnessStats.mostCompletedTask?.title || "No tasks completed yet"}
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  {/* Least Completed Task */}
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Needs Attention</CardTitle>
+                      <TrendingUp className="h-4 w-4 text-red-600" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-medium">
+                        {fitnessStats.leastCompletedTask?.count || 0}
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {fitnessStats.leastCompletedTask?.title || "No tasks to show"}
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  {/* Total Completions */}
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Total Completions</CardTitle>
+                      <CheckSquare className="h-4 w-4 text-green-600" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-medium">{fitnessStats.totalCompletions}</div>
+                      <p className="text-xs text-muted-foreground">
+                        all-time fitness task completions
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              {/* Quick Stats Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-emerald-600" />
+                  <h2 className="text-xl font-medium">Quick Overview</h2>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Total Tasks */}
+                  <Card className="hover:shadow-md transition-shadow">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
+                      <CheckSquare className="h-4 w-4 text-blue-600" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-medium">{taskCount}</div>
+                      <p className="text-xs text-muted-foreground">
+                        tasks in your system
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full mt-2 text-xs"
+                        onClick={() => window.location.href = '/tasks'}
+                      >
+                        <Eye className="w-3 h-3 mr-1" />
+                        View All
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  {/* Total Contacts */}
+                  <Card className="hover:shadow-md transition-shadow">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Total Contacts</CardTitle>
+                      <Users className="h-4 w-4 text-purple-600" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-medium">{contactCount}</div>
+                      <p className="text-xs text-muted-foreground">
+                        contacts in your network
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full mt-2 text-xs"
+                        onClick={() => window.location.href = '/contacts'}
+                      >
+                        <Eye className="w-3 h-3 mr-1" />
+                        View All
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  {/* Fitness Performance */}
+                  <Card className="hover:shadow-md transition-shadow">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">Fitness Score</CardTitle>
+                      <Trophy className="h-4 w-4 text-yellow-600" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-medium">{fitnessStats.totalCompletions}</div>
+                      <p className="text-xs text-muted-foreground">
+                        total completions
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full mt-2 text-xs"
+                        onClick={() => window.location.href = '/daily-fitness'}
+                      >
+                        <Eye className="w-3 h-3 mr-1" />
+                        View Fitness
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  {/* System Status */}
+                  <Card className="hover:shadow-md transition-shadow">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">System Status</CardTitle>
+                      <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-medium">Online</div>
+                      <p className="text-xs text-muted-foreground">
+                        all systems operational
+                      </p>
+                      <Badge variant="secondary" className="mt-2 text-xs">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                        Healthy
+                      </Badge>
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
             </div>
 
-            {/* Task Analytics Chart */}
-            <TaskAnalyticsChart token={session?.access_token || null} />
-
-
-            {/* Fitness Stats Section */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Target className="w-5 h-5 text-blue-600" />
-                <h2 className="text-xl font-medium">Fitness Performance</h2>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Average Completions Per Day */}
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Daily Average</CardTitle>
-                    <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-medium">{fitnessStats.averageCompletionsPerDay.toFixed(1)}</div>
-                    <p className="text-xs text-muted-foreground">
-                      fitness tasks completed per day
-                    </p>
-                  </CardContent>
-                </Card>
-
-                {/* Most Completed Task */}
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Top Performer</CardTitle>
-                    <Trophy className="h-4 w-4 text-yellow-600" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-medium">
-                      {fitnessStats.mostCompletedTask?.count || 0}
-                    </div>
-                    <p className="text-xs text-muted-foreground line-clamp-2">
-                      {fitnessStats.mostCompletedTask?.title || "No tasks completed yet"}
-                    </p>
-                  </CardContent>
-                </Card>
-
-                {/* Least Completed Task */}
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Needs Attention</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-red-600" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-medium">
-                      {fitnessStats.leastCompletedTask?.count || 0}
-                    </div>
-                    <p className="text-xs text-muted-foreground line-clamp-2">
-                      {fitnessStats.leastCompletedTask?.title || "No tasks to show"}
-                    </p>
-                  </CardContent>
-                </Card>
-
-                {/* Total Completions */}
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Completions</CardTitle>
-                    <CheckSquare className="h-4 w-4 text-green-600" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-medium">{fitnessStats.totalCompletions}</div>
-                    <p className="text-xs text-muted-foreground">
-                      all-time fitness task completions
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
+            {/* Right Sidebar - Recent Activity */}
+            <div className="w-80 bg-white p-6 pl-3">
+              <RecentActivityFeed token={session?.access_token || null} />
             </div>
-
-            {/* Quick Stats Section */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-emerald-600" />
-                <h2 className="text-xl font-medium">Quick Overview</h2>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Total Tasks */}
-                <Card className="hover:shadow-md transition-shadow">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
-                    <CheckSquare className="h-4 w-4 text-blue-600" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-medium">{taskCount}</div>
-                    <p className="text-xs text-muted-foreground">
-                      tasks in your system
-                    </p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full mt-2 text-xs"
-                      onClick={() => window.location.href = '/tasks'}
-                    >
-                      <Eye className="w-3 h-3 mr-1" />
-                      View All
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {/* Total Contacts */}
-                <Card className="hover:shadow-md transition-shadow">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Contacts</CardTitle>
-                    <Users className="h-4 w-4 text-purple-600" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-medium">{contactCount}</div>
-                    <p className="text-xs text-muted-foreground">
-                      contacts in your network
-                    </p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full mt-2 text-xs"
-                      onClick={() => window.location.href = '/contacts'}
-                    >
-                      <Eye className="w-3 h-3 mr-1" />
-                      View All
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {/* Fitness Performance */}
-                <Card className="hover:shadow-md transition-shadow">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Fitness Score</CardTitle>
-                    <Trophy className="h-4 w-4 text-yellow-600" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-medium">{fitnessStats.totalCompletions}</div>
-                    <p className="text-xs text-muted-foreground">
-                      total completions
-                    </p>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full mt-2 text-xs"
-                      onClick={() => window.location.href = '/daily-fitness'}
-                    >
-                      <Eye className="w-3 h-3 mr-1" />
-                      View Fitness
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {/* System Status */}
-                <Card className="hover:shadow-md transition-shadow">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">System Status</CardTitle>
-                    <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-medium">Online</div>
-                    <p className="text-xs text-muted-foreground">
-                      all systems operational
-                    </p>
-                    <Badge variant="secondary" className="mt-2 text-xs">
-                      <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
-                      Healthy
-                    </Badge>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-
-            {/* Recent Activity Feed */}
-            <RecentActivityFeed token={session?.access_token || null} />
           </div>
         </SidebarInset>
       </SidebarProvider>
