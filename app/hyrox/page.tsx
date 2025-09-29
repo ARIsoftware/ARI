@@ -473,21 +473,13 @@ export default function HyroxPage() {
                 )}
               </div>
               <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={resetStationRecords}
                   className="text-xs"
                 >
                   Reset Records
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={runDatabaseTest}
-                  className="text-xs"
-                >
-                  Test Database
                 </Button>
               </div>
             </div>
