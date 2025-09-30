@@ -209,7 +209,7 @@ export function RecentActivityFeed({ token }: RecentActivityFeedProps) {
               <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted/80 transition-colors">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className={`p-2 rounded-full bg-background ${activity.color} cursor-help`}>
+                    <div className={`p-2 rounded-full bg-background ${activity.color} cursor-default`}>
                       {activity.icon}
                     </div>
                   </TooltipTrigger>
