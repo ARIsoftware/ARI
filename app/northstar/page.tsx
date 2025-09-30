@@ -23,10 +23,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { Carousel, CarouselContent, CarouselItem, CarouselApi } from "@/components/ui/carousel"
 import { CheckCircle2, TrendingUp, Target, Plus, X, Calendar } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { getGoals, createGoal, updateGoalProgress, type Goal } from "@/lib/goals"
+import { cn } from "@/lib/utils"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -47,6 +49,8 @@ export default function NorthstarPage() {
   const [goals, setGoals] = useState<Goal[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [api, setApi] = useState<CarouselApi>()
+  const [current, setCurrent] = useState(0)
   const [newGoal, setNewGoal] = useState({
     title: "",
     description: "",
@@ -58,6 +62,18 @@ export default function NorthstarPage() {
   useEffect(() => {
     fetchGoals()
   }, [])
+
+  useEffect(() => {
+    if (!api) {
+      return
+    }
+
+    setCurrent(api.selectedScrollSnap())
+
+    api.on("select", () => {
+      setCurrent(api.selectedScrollSnap())
+    })
+  }, [api])
 
   const fetchGoals = async () => {
     try {
@@ -216,60 +232,115 @@ export default function NorthstarPage() {
           </div>
 
           {/* Goals Section */}
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="mb-6">
               <h2 className="text-2xl font-bold">Your Goals</h2>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              {goals.map((goal) => (
-                <Card key={goal.id} className="relative">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <CardTitle className="text-lg">{goal.title}</CardTitle>
-                      <Badge 
-                        variant="outline" 
-                        className={priorityColors[goal.priority]}
-                      >
-                        {goal.priority}
-                      </Badge>
-                    </div>
-                    <CardDescription>{goal.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Progress</span>
-                        <span className="font-bold text-blue-600">{goal.progress}%</span>
-                      </div>
-                      <Progress value={goal.progress} className="h-2" />
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <Badge variant="secondary">{goal.category}</Badge>
-                      <span className="text-gray-500">
-                        Due: {goal.deadline ? new Date(goal.deadline).toLocaleDateString() : "No deadline"}
-                      </span>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => updateGoalProgressHandler(goal.id, "increment")}
-                      >
-                        +10%
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => updateGoalProgressHandler(goal.id, "decrement")}
-                      >
-                        -10%
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            {goals.length > 0 ? (
+              <div className="space-y-6">
+                {/* Carousel */}
+                <Carousel
+                  setApi={setApi}
+                  className="w-full"
+                  opts={{
+                    align: "center",
+                    loop: false,
+                  }}
+                >
+                  <CarouselContent className="-ml-2 md:-ml-4">
+                    {goals.map((goal) => (
+                      <CarouselItem key={goal.id} className="pl-2 md:pl-4 basis-[95%] md:basis-[85%] lg:basis-[80%]">
+                        <Card className="border-2">
+                          <CardContent className="p-4 md:p-8 lg:p-12">
+                            <div className="flex flex-col items-center justify-center min-h-[250px] md:min-h-[300px] space-y-4 md:space-y-6">
+                              <div className="text-center space-y-3 md:space-y-4 w-full max-w-2xl">
+                                <div className="flex items-center justify-center gap-4">
+                                  <h3 className="text-4xl md:text-5xl lg:text-6xl font-bold">{current + 1}</h3>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-center gap-2 flex-wrap">
+                                    <h4 className="text-xl md:text-2xl font-semibold">{goal.title}</h4>
+                                    <Badge
+                                      variant="outline"
+                                      className={priorityColors[goal.priority]}
+                                    >
+                                      {goal.priority}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-muted-foreground text-sm md:text-base lg:text-lg">{goal.description}</p>
+                                </div>
+
+                                <div className="space-y-2 md:space-y-3 pt-2 md:pt-4">
+                                  <div className="flex justify-between text-sm">
+                                    <span>Progress</span>
+                                    <span className="font-bold text-blue-600 text-lg md:text-xl">{goal.progress}%</span>
+                                  </div>
+                                  <Progress value={goal.progress} className="h-2 md:h-3" />
+                                </div>
+
+                                <div className="flex items-center justify-center gap-2 md:gap-4 pt-2 flex-wrap">
+                                  <Badge variant="secondary" className="text-xs md:text-sm">{goal.category}</Badge>
+                                  <span className="text-gray-500 text-xs md:text-sm">
+                                    Due: {goal.deadline ? new Date(goal.deadline).toLocaleDateString() : "No deadline"}
+                                  </span>
+                                </div>
+
+                                <div className="flex gap-2 md:gap-3 justify-center pt-2 md:pt-4">
+                                  <Button
+                                    size="default"
+                                    className="md:text-base"
+                                    variant="outline"
+                                    onClick={() => updateGoalProgressHandler(goal.id, "increment")}
+                                  >
+                                    +10%
+                                  </Button>
+                                  <Button
+                                    size="default"
+                                    className="md:text-base"
+                                    variant="outline"
+                                    onClick={() => updateGoalProgressHandler(goal.id, "decrement")}
+                                  >
+                                    -10%
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </CarouselItem>
+                    ))}
+                  </CarouselContent>
+                </Carousel>
+
+                {/* Navigation Dots */}
+                <div className="flex justify-center gap-1 md:gap-2 flex-wrap">
+                  {goals.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => api?.scrollTo(index)}
+                      className={cn(
+                        "w-12 h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-xl md:rounded-2xl border-2 text-base md:text-lg font-semibold transition-all",
+                        current === index
+                          ? "bg-black text-white border-black"
+                          : "bg-white text-gray-400 border-gray-200 hover:border-gray-400"
+                      )}
+                    >
+                      {index + 1}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="p-12">
+                  <div className="text-center text-muted-foreground">
+                    <p>No goals yet. Click "Add Goal" to create your first goal.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
 
