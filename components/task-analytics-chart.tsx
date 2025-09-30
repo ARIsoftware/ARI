@@ -110,7 +110,6 @@ export function TaskAnalyticsChart({ token }: TaskAnalyticsChartProps) {
             <TrendingUp className="w-5 h-5 text-blue-600" />
             Task Activity Timeline
           </CardTitle>
-          <CardDescription>Daily task creation and completion over the last 30 days</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center h-[300px]">
@@ -132,7 +131,6 @@ export function TaskAnalyticsChart({ token }: TaskAnalyticsChartProps) {
             <TrendingUp className="w-5 h-5 text-blue-600" />
             Task Activity Timeline
           </CardTitle>
-          <CardDescription>Daily task creation and completion over the last 30 days</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center h-[300px]">
@@ -155,7 +153,6 @@ export function TaskAnalyticsChart({ token }: TaskAnalyticsChartProps) {
               <TrendingUp className="w-5 h-5 text-blue-600" />
               Task Activity Timeline
             </CardTitle>
-            <CardDescription>Daily task creation and completion over the last 30 days</CardDescription>
           </div>
           {summary && (
             <div className="flex gap-2">

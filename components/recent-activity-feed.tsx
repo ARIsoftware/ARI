@@ -9,6 +9,12 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { Loader2, Activity, CheckCircle, Clock, Plus, User } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 
@@ -197,26 +203,34 @@ export function RecentActivityFeed({ token }: RecentActivityFeedProps) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4 max-h-[400px] overflow-y-auto">
-          {activities.map((activity) => (
-            <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted/80 transition-colors">
-              <div className={`p-2 rounded-full bg-background ${activity.color}`}>
-                {activity.icon}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <p className="text-sm font-medium">{activity.title}</p>
-                  <Badge variant="secondary" className="text-xs">
-                    {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
-                  </Badge>
+        <TooltipProvider>
+          <div className="space-y-4 max-h-[400px] overflow-y-auto">
+            {activities.map((activity) => (
+              <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted/80 transition-colors">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className={`p-2 rounded-full bg-background ${activity.color} cursor-help`}>
+                      {activity.icon}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="max-w-xs">
+                    <div className="text-xs">
+                      <p className="font-semibold">{activity.title}</p>
+                      <p className="text-muted-foreground">
+                        {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
+                      </p>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-muted-foreground truncate">
+                    {activity.description}
+                  </p>
                 </div>
-                <p className="text-sm text-muted-foreground truncate">
-                  {activity.description}
-                </p>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </TooltipProvider>
       </CardContent>
     </Card>
   )
