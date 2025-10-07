@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { createErrorResponse } from '@/lib/api-helpers'
 
-const MAX_CONTENT_LENGTH = 2250
-
 export async function GET(request: NextRequest) {
   try {
     const { user, supabase } = await getAuthenticatedUser()
@@ -12,28 +10,26 @@ export async function GET(request: NextRequest) {
       return createErrorResponse('Authentication required', 401)
     }
 
+    // Fetch all revisions for this user, ordered by revision number descending
     const { data, error } = await supabase
-      .from("notepad")
-      .select("content, updated_at")
+      .from("notepad_revisions")
+      .select("id, content, created_at, revision_number")
       .eq("user_id", user.id)
-      .single()
+      .order("revision_number", { ascending: false })
 
     if (error) {
-      // If no notepad exists yet, return empty content
-      if (error.code === 'PGRST116') {
-        return NextResponse.json({ content: "", updated_at: null })
-      }
-      console.error('Error fetching notepad:', error)
+      console.error('Error fetching notepad revisions:', error)
       return createErrorResponse(error.message, 500)
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(data || [])
   } catch (err) {
     console.error('API error:', err)
     return createErrorResponse('Internal server error', 500)
   }
 }
 
+// POST endpoint to restore a specific revision
 export async function POST(request: NextRequest) {
   try {
     const { user, supabase } = await getAuthenticatedUser()
@@ -43,18 +39,26 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { content } = body
+    const { revision_id } = body
 
-    // Validate content length
-    if (!content || typeof content !== 'string') {
-      return createErrorResponse('Content is required', 400)
+    if (!revision_id) {
+      return createErrorResponse('revision_id is required', 400)
     }
 
-    if (content.length > MAX_CONTENT_LENGTH) {
-      return createErrorResponse(`Content exceeds maximum length of ${MAX_CONTENT_LENGTH} characters`, 400)
+    // Fetch the specific revision
+    const { data: revision, error: fetchError } = await supabase
+      .from("notepad_revisions")
+      .select("content, revision_number")
+      .eq("id", revision_id)
+      .eq("user_id", user.id) // Ensure user owns this revision
+      .single()
+
+    if (fetchError || !revision) {
+      console.error('Error fetching revision:', fetchError)
+      return createErrorResponse('Revision not found', 404)
     }
 
-    // Get the next revision number using the database function
+    // Get the next revision number
     const { data: revisionData, error: revisionError } = await supabase
       .rpc('get_next_revision_number', { p_user_id: user.id })
 
@@ -63,25 +67,25 @@ export async function POST(request: NextRequest) {
       return createErrorResponse(revisionError.message, 500)
     }
 
-    const revisionNumber = revisionData as number
+    const newRevisionNumber = revisionData as number
 
-    // Insert new revision
+    // Create a new revision with the restored content
     const { data: newRevision, error: insertError } = await supabase
       .from("notepad_revisions")
       .insert([{
-        content,
+        content: revision.content,
         user_id: user.id,
-        revision_number: revisionNumber
+        revision_number: newRevisionNumber
       }])
       .select()
       .single()
 
     if (insertError) {
-      console.error('Error saving notepad revision:', insertError)
+      console.error('Error creating restored revision:', insertError)
       return createErrorResponse(insertError.message, 500)
     }
 
-    // Update the main notepad table (for quick access to latest content)
+    // Update the main notepad table
     const { data: existingData } = await supabase
       .from("notepad")
       .select("id")
@@ -89,16 +93,14 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (existingData) {
-      // Update existing notepad
       await supabase
         .from("notepad")
-        .update({ content })
+        .update({ content: revision.content })
         .eq("user_id", user.id)
     } else {
-      // Create new notepad
       await supabase
         .from("notepad")
-        .insert([{ content, user_id: user.id }])
+        .insert([{ content: revision.content, user_id: user.id }])
     }
 
     return NextResponse.json(newRevision)
