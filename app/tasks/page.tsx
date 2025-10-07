@@ -27,6 +27,7 @@ import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { TaskAnnouncement } from "@/components/task-announcement"
 import { Notepad } from "@/components/notepad"
+import { schoolPride } from "@/lib/confetti"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -339,7 +340,12 @@ export default function TasksPage() {
       // If marking as complete and not in Completed filter, add fade animation
       if (!task.completed && activeFilter !== "Completed") {
         setFadingTasks(prev => new Set(prev).add(taskId))
-        
+
+        // Trigger confetti after 1 second
+        setTimeout(() => {
+          schoolPride()
+        }, 1000)
+
         // Wait for animation to complete before updating
         setTimeout(async () => {
           if (user?.id) {
@@ -363,6 +369,14 @@ export default function TasksPage() {
           const tokenFn = async () => session?.access_token || null
           const updatedTask = await toggleTaskCompletion(taskId, tokenFn)
           setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
+
+          // Trigger confetti only if completing (not uncompleting) - with 1 second delay
+          if (updatedTask.completed) {
+            setTimeout(() => {
+              schoolPride()
+            }, 1000)
+          }
+
           toast({
             title: "Success",
             description: `Task ${updatedTask.completed ? "completed" : "reopened"} successfully.`,
