@@ -204,7 +204,7 @@ export function RecentActivityFeed({ token }: RecentActivityFeedProps) {
       </CardHeader>
       <CardContent>
         <TooltipProvider>
-          <div className="space-y-4 max-h-[400px] overflow-y-auto">
+          <div className="space-y-4 max-h-[800px] overflow-y-auto">
             {activities.map((activity) => (
               <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted/80 transition-colors">
                 <Tooltip>
