@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { TaskAnnouncement } from "@/components/task-announcement"
+import { getAllFeatures } from "@/lib/menu-config"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -31,6 +32,7 @@ import {
   CheckCircle2,
   Database,
   Download,
+  Grid3x3,
   Loader2,
   Lock,
   Palette,
@@ -52,6 +54,15 @@ interface BetaFeatureSettings {
   smartPriorities: boolean
   predictiveScheduling: boolean
   aiMeetingNotes: boolean
+}
+
+interface FeaturePreference {
+  id: string
+  user_id: string
+  feature_name: string
+  enabled: boolean
+  created_at: string
+  updated_at: string
 }
 
 export default function SettingsPage() {
@@ -86,6 +97,11 @@ export default function SettingsPage() {
   const [sessionTimeout, setSessionTimeout] = useState("30")
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(true)
   const [deviceApprovals, setDeviceApprovals] = useState(true)
+  const [featurePreferences, setFeaturePreferences] = useState<Record<string, boolean>>({})
+  const [loadingFeatures, setLoadingFeatures] = useState(true)
+
+  // Get all menu features dynamically from menu config
+  const menuFeatures = getAllFeatures()
 
   const toggleNotification = (key: keyof NotificationSettings) => {
     setNotificationSettings((prev) => ({
@@ -100,6 +116,64 @@ export default function SettingsPage() {
       [key]: !prev[key],
     }))
   }
+
+  const toggleFeature = async (featureName: string) => {
+    const currentState = featurePreferences[featureName] ?? true
+    const newState = !currentState
+
+    // Optimistically update UI
+    setFeaturePreferences((prev) => ({
+      ...prev,
+      [featureName]: newState
+    }))
+
+    try {
+      const response = await fetch('/api/features', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          feature_name: featureName,
+          enabled: newState
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update feature preference')
+      }
+    } catch (error) {
+      console.error('Error updating feature:', error)
+      // Revert on error
+      setFeaturePreferences((prev) => ({
+        ...prev,
+        [featureName]: currentState
+      }))
+      setMessage({ type: 'error', text: 'Failed to update feature preference' })
+    }
+  }
+
+  // Load feature preferences on mount
+  useEffect(() => {
+    const loadFeaturePreferences = async () => {
+      try {
+        const response = await fetch('/api/features')
+        if (response.ok) {
+          const data: FeaturePreference[] = await response.json()
+          const preferences: Record<string, boolean> = {}
+          data.forEach(pref => {
+            preferences[pref.feature_name] = pref.enabled
+          })
+          setFeaturePreferences(preferences)
+        }
+      } catch (error) {
+        console.error('Error loading feature preferences:', error)
+      } finally {
+        setLoadingFeatures(false)
+      }
+    }
+    loadFeaturePreferences()
+  }, [])
 
   const handleSaveChanges = () => {
     setIsSaving(true)
@@ -322,6 +396,7 @@ export default function SettingsPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
                   <TabsList>
                     <TabsTrigger value="general">General</TabsTrigger>
+                    <TabsTrigger value="features">Features</TabsTrigger>
                     <TabsTrigger value="notifications">Notifications</TabsTrigger>
                     <TabsTrigger value="security">Security</TabsTrigger>
                     <TabsTrigger value="integrations">Integrations</TabsTrigger>
@@ -495,6 +570,68 @@ export default function SettingsPage() {
                         />
                       </div>
                     </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="features" className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Grid3x3 className="h-5 w-5 text-blue-500" />
+                        Menu Features
+                      </CardTitle>
+                      <CardDescription>
+                        Enable or disable features to customize your navigation menu and available pages.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {loadingFeatures ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : (
+                        menuFeatures.map((feature) => {
+                          const isEnabled = featurePreferences[feature.name] ?? true
+                          return (
+                            <div key={feature.name} className="flex items-start justify-between rounded-lg border p-4">
+                              <div className="pr-4 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-medium">{feature.label}</p>
+                                  {!feature.canBeDisabled && (
+                                    <Badge variant="secondary" className="text-xs">Required</Badge>
+                                  )}
+                                </div>
+                                <p className="text-sm text-muted-foreground">{feature.description}</p>
+                                <p className="text-xs text-muted-foreground mt-1">URL: {feature.url}</p>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                {feature.canBeDisabled ? (
+                                  <>
+                                    <span className="text-sm font-medium text-muted-foreground">
+                                      {isEnabled ? 'On' : 'Off'}
+                                    </span>
+                                    <Switch
+                                      checked={isEnabled}
+                                      onCheckedChange={() => toggleFeature(feature.name)}
+                                    />
+                                  </>
+                                ) : (
+                                  <span className="text-sm font-medium text-muted-foreground">
+                                    Always On
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })
+                      )}
+                    </CardContent>
+                    <CardFooter className="border-t bg-muted/60">
+                      <div className="flex w-full items-center text-sm text-muted-foreground">
+                        <AlertCircle className="mr-2 h-4 w-4" />
+                        <span>Disabled features will be hidden from the menu and their URLs will be inaccessible.</span>
+                      </div>
+                    </CardFooter>
                   </Card>
                 </TabsContent>
 
