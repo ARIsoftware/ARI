@@ -26,6 +26,7 @@ import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { YouTubeModal } from "@/components/youtube-modal"
+import { schoolPride } from "@/lib/confetti"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -283,7 +284,12 @@ export default function DailyFitnessPage() {
       // If marking as complete and not in Completed filter, add fade animation
       if (!task.completed && activeFilter !== "Completed") {
         setFadingTasks(prev => new Set(prev).add(taskId))
-        
+
+        // Trigger confetti after 1 second
+        setTimeout(() => {
+          schoolPride()
+        }, 1000)
+
         // Wait for animation to complete before updating
         setTimeout(async () => {
           if (user?.id) {
@@ -307,6 +313,14 @@ export default function DailyFitnessPage() {
           const tokenFn = async () => session?.access_token || null
           const updatedTask = await toggleFitnessTaskCompletion(taskId, task.completed, tokenFn)
           setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
+
+          // Trigger confetti only if completing (not uncompleting) - with 1 second delay
+          if (updatedTask.completed) {
+            setTimeout(() => {
+              schoolPride()
+            }, 1000)
+          }
+
           toast({
             title: "Success",
             description: `Exercise ${updatedTask.completed ? "completed" : "reopened"} successfully.`,
