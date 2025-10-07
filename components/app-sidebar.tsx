@@ -1,5 +1,9 @@
+"use client"
+
 import type * as React from "react"
 import { UserProfileDropdown } from "./user-profile-dropdown"
+import { useFeatures } from "@/lib/features-context"
+import { menuConfig, getUrlToFeatureMap } from "@/lib/menu-config"
 import {
   Sidebar,
   SidebarContent,
@@ -12,163 +16,50 @@ import {
   SidebarRail,
   SidebarFooter,
 } from "@/components/ui/sidebar"
-import { CheckSquare, Plus, Archive, Dumbbell, Target, TrendingUp, Users, UserPlus, Settings, BarChart3, Database, Compass, Bot, Package, Sparkles, Grid3x3 } from "lucide-react"
 
-const data = {
-  navMain: [
-    {
-      title: "Dashboard",
-      url: "/dashboard",
-      icon: BarChart3,
-      items: [
-        {
-          title: "Dashboard",
-          url: "/dashboard",
-          icon: BarChart3,
-        },
-        {
-          title: "HD Dashboard",
-          url: "/hd-dashboard",
-          icon: Grid3x3,
-        },
-      ],
-    },
-    {
-      title: "Assist",
-      url: "/assist",
-      icon: Bot,
-      items: [
-        {
-          title: "Assist",
-          url: "/assist",
-          icon: Bot,
-        },
-      ],
-    },
-    {
-      title: "Northstar",
-      url: "/northstar",
-      icon: Compass,
-      items: [
-        {
-          title: "Northstar",
-          url: "/northstar",
-          icon: Compass,
-        },
-      ],
-    },
-    {
-      title: "Motivation",
-      url: "/motivation",
-      icon: Sparkles,
-      items: [
-        {
-          title: "Motivation",
-          url: "/motivation",
-          icon: Sparkles,
-        },
-      ],
-    },
-    {
-      title: "Fitness First",
-      url: "#",
-      icon: Dumbbell,
-      items: [
-        {
-          title: "Hyrox",
-          url: "/hyrox",
-          icon: Target,
-        },
-        {
-          title: "Daily Fitness",
-          url: "/daily-fitness",
-          icon: Dumbbell,
-        },
-        {
-          title: "Goals",
-          url: "#",
-          icon: Target,
-        },
-        {
-          title: "Progress",
-          url: "#",
-          icon: TrendingUp,
-        },
-      ],
-    },
-    {
-      title: "Todo",
-      url: "#",
-      icon: CheckSquare,
-      items: [
-        {
-          title: "All Tasks",
-          url: "/tasks",
-          icon: CheckSquare,
-        },
-        {
-          title: "Add Task",
-          url: "/add-task",
-          icon: Plus,
-        },
-        {
-          title: "Completed",
-          url: "#",
-          icon: Archive,
-          isActive: false,
-        },
-      ],
-    },
-    {
-      title: "People",
-      url: "#",
-      icon: Users,
-      items: [
-        {
-          title: "All Contacts",
-          url: "/contacts",
-          icon: Users,
-        },
-        {
-          title: "Add Contact",
-          url: "#",
-          icon: UserPlus,
-        },
-      ],
-    },
-    {
-      title: "Shipments",
-      url: "/shipments",
-      icon: Package,
-      items: [
-        {
-          title: "All Shipments",
-          url: "/shipments",
-          icon: Package,
-        },
-      ],
-    },
-    {
-      title: "Settings",
-      url: "#",
-      icon: Settings,
-      items: [
-        {
-          title: "Preferences",
-          url: "/settings",
-          icon: Settings,
-        },
-      ],
-    },
-  ],
-}
+// Get URL to feature name mapping dynamically
+const URL_TO_FEATURE_MAP = getUrlToFeatureMap()
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { isFeatureEnabled, loading } = useFeatures()
+
+  // Filter items based on feature preferences
+  const filterItems = (items: typeof menuConfig[0]['items']) => {
+    return items.filter(item => {
+      const featureName = URL_TO_FEATURE_MAP[item.url]
+      // If URL is not mapped to a feature (e.g., '#' placeholders), show it
+      if (!featureName) return true
+      // Otherwise check if feature is enabled
+      return isFeatureEnabled(featureName)
+    })
+  }
+
+  // Filter groups that have at least one visible item
+  const filteredNavMain = menuConfig
+    .map(group => ({
+      ...group,
+      items: filterItems(group.items)
+    }))
+    .filter(group => group.items.length > 0)
+
+  if (loading) {
+    return (
+      <Sidebar {...props}>
+        <SidebarContent>
+          <div className="flex items-center justify-center p-8">
+            <div className="text-sm text-muted-foreground">Loading...</div>
+          </div>
+        </SidebarContent>
+        <SidebarRail />
+      </Sidebar>
+    )
+  }
+
   return (
     <Sidebar {...props}>
       <SidebarContent>
         {/* We create a SidebarGroup for each parent. */}
-        {data.navMain.map((item) => (
+        {filteredNavMain.map((item) => (
           <SidebarGroup key={item.title}>
             <SidebarGroupLabel>{item.title}</SidebarGroupLabel>
             <SidebarGroupContent>
