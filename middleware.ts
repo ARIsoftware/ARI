@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { getUserFeaturePreferences, isFeatureEnabled } from '@/lib/features-helpers'
 
 const protectedRoutes = [
   "/",
@@ -112,9 +113,19 @@ export async function middleware(req: NextRequest) {
 
   // Check authentication for protected routes
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
-  
+
   if (isProtectedRoute && !session) {
     return NextResponse.redirect(new URL('/sign-in', req.url))
+  }
+
+  // Check if feature is disabled for authenticated users
+  if (session?.user) {
+    const preferences = await getUserFeaturePreferences(req, session.user.id)
+
+    if (!isFeatureEnabled(pathname, preferences)) {
+      // Redirect to dashboard if trying to access a disabled feature
+      return NextResponse.redirect(new URL('/dashboard', req.url))
+    }
   }
 
   return supabaseResponse
