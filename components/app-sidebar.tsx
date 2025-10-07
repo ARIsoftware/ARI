@@ -12,7 +12,7 @@ import {
   SidebarRail,
   SidebarFooter,
 } from "@/components/ui/sidebar"
-import { CheckSquare, Plus, Archive, Dumbbell, Target, TrendingUp, Users, UserPlus, Settings, BarChart3, Database, Compass, Bot, Package, Sparkles } from "lucide-react"
+import { CheckSquare, Plus, Archive, Dumbbell, Target, TrendingUp, Users, UserPlus, Settings, BarChart3, Database, Compass, Bot, Package, Sparkles, Grid3x3 } from "lucide-react"
 
 const data = {
   navMain: [
@@ -25,6 +25,11 @@ const data = {
           title: "Dashboard",
           url: "/dashboard",
           icon: BarChart3,
+        },
+        {
+          title: "HD Dashboard",
+          url: "/hd-dashboard",
+          icon: Grid3x3,
         },
       ],
     },
