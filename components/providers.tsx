@@ -58,7 +58,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <Toaster />
         {/* Only show exercise reminder when user is authenticated */}
         {user && <ExerciseReminder />}
-        <div className="fixed top-[58px] right-6 z-50">
+        <div className="fixed top-[53px] right-6 z-50">
           <YouTubeMusicPlayer />
         </div>
       </FeaturesProvider>
