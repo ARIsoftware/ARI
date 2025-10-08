@@ -111,7 +111,7 @@ export function YouTubeMusicPlayer() {
         onClick={togglePlayPause}
         size="icon"
         variant="outline"
-        className="h-10 w-10 rounded-lg bg-white hover:bg-gray-100 border-gray-200"
+        className="h-8 w-8"
         disabled={!isReady}
       >
         {isPlaying ? (
