@@ -6,8 +6,8 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
 export async function getAuthenticatedUser(req?: NextRequest) {
-  const cookieStore = cookies()
-  
+  const cookieStore = await cookies()
+
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
@@ -26,23 +26,27 @@ export async function getAuthenticatedUser(req?: NextRequest) {
       },
     },
   })
-  
-  const { data: { session }, error } = await supabase.auth.getSession()
-  
-  if (error || !session) {
+
+  // Use getUser() for secure user verification
+  const { data: { user }, error } = await supabase.auth.getUser()
+
+  if (error || !user) {
     return { user: null, session: null, supabase }
   }
-  
-  return { 
-    user: session.user, 
-    session, 
-    supabase 
+
+  // Get session for token access
+  const { data: { session } } = await supabase.auth.getSession()
+
+  return {
+    user,
+    session,
+    supabase
   }
 }
 
-export function createAuthenticatedClient() {
-  const cookieStore = cookies()
-  
+export async function createAuthenticatedClient() {
+  const cookieStore = await cookies()
+
   return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {

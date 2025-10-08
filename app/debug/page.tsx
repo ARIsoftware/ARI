@@ -390,21 +390,25 @@ export default function DatabaseTestPage() {
     try {
       console.log('🔑 Checking session status...')
 
-      const { data: { session }, error } = await supabase.auth.getSession()
+      // Verify user securely with getUser()
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
 
-      if (error) throw error
+      if (userError) throw userError
+
+      // Get session for token info
+      const { data: { session } } = await supabase.auth.getSession()
 
       updateTestResult('Session Status', {
-        status: session ? 'success' : 'warning',
-        message: session ? 'Active session found' : 'No active session',
-        data: session ? {
-          access_token: session.access_token ? 'Present' : 'Missing',
-          refresh_token: session.refresh_token ? 'Present' : 'Missing',
-          expires_at: session.expires_at,
-          user_id: session.user?.id
+        status: user ? 'success' : 'warning',
+        message: user ? 'Active session found' : 'No active session',
+        data: user ? {
+          access_token: session?.access_token ? 'Present' : 'Missing',
+          refresh_token: session?.refresh_token ? 'Present' : 'Missing',
+          expires_at: session?.expires_at,
+          user_id: user.id
         } : null
       })
-      console.log('Session check:', session ? 'Session found' : 'No session')
+      console.log('Session check:', user ? 'User authenticated' : 'No user')
     } catch (error: any) {
       updateTestResult('Session Status', {
         status: 'error',

@@ -25,14 +25,22 @@ export function useAuthenticatedFetch() {
 // For server-side or non-hook contexts
 export async function getAuthenticatedFetch() {
   // This will be used by server components if needed
-  const { createSupabaseServerClient } = await import('@/lib/supabase-auth')
-  const supabase = createSupabaseServerClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  
-  const token = session?.access_token
-  
-  if (!token) {
+  const { createAuthenticatedClient } = await import('@/lib/auth-helpers')
+  const supabase = await createAuthenticatedClient()
+
+  // Use getUser() for secure verification
+  const { data: { user }, error } = await supabase.auth.getUser()
+
+  if (error || !user) {
     throw new Error('Authentication required')
+  }
+
+  // Get session for token access
+  const { data: { session } } = await supabase.auth.getSession()
+  const token = session?.access_token
+
+  if (!token) {
+    throw new Error('Authentication token not available')
   }
 
   return (url: string, options: RequestInit = {}) => {

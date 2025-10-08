@@ -22,18 +22,29 @@ export function Providers({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
 
   useEffect(() => {
-    const getSession = async () => {
+    const initAuth = async () => {
+      // Get session for tokens
       const { data: { session } } = await supabase.auth.getSession()
       setSession(session)
-      setUser(session?.user ?? null)
+
+      // Verify user authenticity with getUser()
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
     }
 
-    getSession()
+    initAuth()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setSession(session)
-        setUser(session?.user ?? null)
+
+        // Verify user on auth state changes
+        if (session) {
+          const { data: { user } } = await supabase.auth.getUser()
+          setUser(user)
+        } else {
+          setUser(null)
+        }
       }
     )
 
