@@ -1,16 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getAuthenticatedUser } from '@/lib/auth-helpers'
 
 export async function GET() {
-  const { user } = await getAuthenticatedUser()
-
-  if (!user) {
-    return NextResponse.json({
-      success: false,
-      error: 'Authentication required'
-    }, { status: 401 })
-  }
-
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 

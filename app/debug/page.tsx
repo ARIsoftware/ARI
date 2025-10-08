@@ -277,62 +277,53 @@ export default function DatabaseTestPage() {
       console.error('❌ Network connectivity test failed:', error)
     }
 
-    // Test 4: Connection Test - Quick health check with timeout
+    // Test 4: Connection Test - Direct fetch without Supabase client
     updateTestResult('Connection Test', { status: 'testing' })
     try {
       console.log('🔌 Testing basic connection to Supabase...')
-      console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
 
-      // Create a timeout promise
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Connection test timed out after 3 seconds')), 3000)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 3000)
+
+      // Direct REST API call to test connectivity
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/tasks?select=id&limit=1`, {
+        method: 'GET',
+        headers: {
+          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+        },
+        signal: controller.signal
       })
 
-      // Try a simple health check query with timeout
-      const queryPromise = (async () => {
-        try {
-          const result = await supabase
-            .from('tasks')
-            .select('id')
-            .limit(1)
-            .maybeSingle() // Use maybeSingle instead of single to avoid error if no rows
-          return result
-        } catch (err) {
-          return { data: null, error: err }
-        }
-      })()
+      clearTimeout(timeoutId)
 
-      const result = await Promise.race([queryPromise, timeoutPromise]) as any
-      const { data, error } = result || { data: null, error: new Error('Query result was undefined') }
-
-      console.log('Connection test result:', { data, error })
-
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows, which is fine
-        throw error
+      if (response.ok || response.status === 401) {
+        // 401 means connection works but not authenticated - that's fine for this test
+        updateTestResult('Connection Test', {
+          status: 'success',
+          message: 'Successfully connected to Supabase database',
+          data: {
+            connected: true,
+            status: response.status,
+            statusText: response.statusText
+          }
+        })
+        console.log('✅ Connection test passed')
+      } else {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
-
-      updateTestResult('Connection Test', {
-        status: 'success',
-        message: 'Successfully connected to Supabase database',
-        data: {
-          connected: true,
-          responseReceived: true
-        }
-      })
-      console.log('✅ Connection test passed')
     } catch (error: any) {
       updateTestResult('Connection Test', {
         status: 'error',
         error: error.message,
         data: {
-          code: error.code,
-          details: error.details,
-          hint: error.hint || 'Check your network connection and Supabase configuration',
+          hint: error.name === 'AbortError'
+            ? 'Connection timed out - check your network and Supabase URL'
+            : 'Check your network connection and Supabase configuration',
           url: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + '...'
         }
       })
       console.error('❌ Connection test failed:', error)
-      console.error('Full error object:', error)
 
       // Continue with other tests even if connection fails
       console.warn('⚠️ Continuing tests despite connection failure...')
@@ -343,42 +334,50 @@ export default function DatabaseTestPage() {
     try {
       console.log('🔐 Starting authentication check...')
 
-      // Add timeout to auth check
-      const authPromise = supabase.auth.getUser()
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Authentication check timed out after 5 seconds')), 5000)
-      )
+      // First check session (fast, from cookies)
+      const { data: sessionData } = await supabase.auth.getSession()
 
-      const result = await Promise.race([authPromise, timeoutPromise]) as any
-      const { data: { user }, error } = result
+      if (!sessionData.session) {
+        // No session found - user is not authenticated
+        updateTestResult('Authentication Status', {
+          status: 'warning',
+          message: 'Not authenticated - please sign in',
+          data: { note: 'No user session found', hint: 'Visit /sign-in to authenticate' }
+        })
+        console.log('⚠️ Not authenticated - skipping user verification')
+      } else {
+        // Session exists - verify with getUser() with timeout
+        const authPromise = supabase.auth.getUser()
+        const timeoutPromise = new Promise<any>((_, reject) =>
+          setTimeout(() => reject(new Error('User verification timed out after 5 seconds')), 5000)
+        )
 
-      if (error) {
-        console.error('Auth error details:', error)
-        throw error
-      }
+        const result = await Promise.race([authPromise, timeoutPromise])
+        const { data, error } = result || {}
+        const user = data?.user
 
-      updateTestResult('Authentication Status', {
-        status: user ? 'success' : 'error',
-        message: user ? `Authenticated as ${user.email}` : 'Not authenticated - please sign in',
-        data: user ? {
-          id: user.id,
-          email: user.email,
-          created_at: user.created_at
-        } : { note: 'No user session found' }
-      })
-      console.log('✅ Auth check:', user ? 'Authenticated' : 'Not authenticated')
+        if (error) {
+          console.error('Auth error details:', error)
+          throw error
+        }
 
-      // Continue with tests even if not authenticated
-      if (!user) {
-        console.warn('⚠️ Continuing tests without authentication - some may fail due to RLS policies')
+        updateTestResult('Authentication Status', {
+          status: user ? 'success' : 'warning',
+          message: user ? `Authenticated as ${user.email}` : 'Session found but user verification failed',
+          data: user ? {
+            id: user.id,
+            email: user.email,
+            created_at: user.created_at
+          } : { note: 'Could not verify user' }
+        })
+        console.log('✅ Auth check:', user ? 'Authenticated' : 'Verification failed')
       }
     } catch (error: any) {
       updateTestResult('Authentication Status', {
         status: 'error',
         error: error.message,
         data: {
-          hint: 'This might be a network or configuration issue',
-          errorDetails: error
+          hint: 'This might be a network or configuration issue'
         }
       })
       console.error('❌ Auth check failed:', error)
@@ -390,25 +389,29 @@ export default function DatabaseTestPage() {
     try {
       console.log('🔑 Checking session status...')
 
-      // Verify user securely with getUser()
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
-
-      if (userError) throw userError
-
-      // Get session for token info
+      // Get session first (fast, from cookies)
       const { data: { session } } = await supabase.auth.getSession()
 
-      updateTestResult('Session Status', {
-        status: user ? 'success' : 'warning',
-        message: user ? 'Active session found' : 'No active session',
-        data: user ? {
-          access_token: session?.access_token ? 'Present' : 'Missing',
-          refresh_token: session?.refresh_token ? 'Present' : 'Missing',
-          expires_at: session?.expires_at,
-          user_id: user.id
-        } : null
-      })
-      console.log('Session check:', user ? 'User authenticated' : 'No user')
+      if (!session) {
+        updateTestResult('Session Status', {
+          status: 'warning',
+          message: 'No active session',
+          data: { hint: 'Sign in at /sign-in to create a session' }
+        })
+        console.log('⚠️ No session found')
+      } else {
+        updateTestResult('Session Status', {
+          status: 'success',
+          message: 'Active session found',
+          data: {
+            access_token: session.access_token ? 'Present' : 'Missing',
+            refresh_token: session.refresh_token ? 'Present' : 'Missing',
+            expires_at: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : 'Unknown',
+            user_id: session.user?.id || 'Unknown'
+          }
+        })
+        console.log('✅ Session found for user:', session.user?.email)
+      }
     } catch (error: any) {
       updateTestResult('Session Status', {
         status: 'error',
@@ -421,12 +424,26 @@ export default function DatabaseTestPage() {
     updateTestResult('Fetch Tasks', { status: 'testing' })
     try {
       console.log('📊 Attempting to fetch tasks...')
-      const { data, error, status } = await supabase
+
+      // Check if user is authenticated first
+      const { data: authData } = await supabase.auth.getSession()
+      if (!authData.session) {
+        throw new Error('Not authenticated - please sign in to test data fetching')
+      }
+
+      const queryPromise = supabase
         .from('tasks')
         .select('*')
         .limit(5)
 
-      console.log('Tasks query response:', { data, error, status })
+      const timeoutPromise = new Promise<any>((_, reject) =>
+        setTimeout(() => reject(new Error('Tasks fetch timed out after 5 seconds')), 5000)
+      )
+
+      const result = await Promise.race([queryPromise, timeoutPromise])
+      const { data, error } = result
+
+      console.log('Tasks query response:', { data, error })
 
       if (error) throw error
 
@@ -434,16 +451,15 @@ export default function DatabaseTestPage() {
         status: 'success',
         message: `Found ${data?.length || 0} tasks`,
         data: {
-          count: data?.length || 0,
-          sample: data?.[0] || null
+          count: data?.length || 0
         }
       })
       console.log('✅ Tasks fetched:', data?.length || 0)
     } catch (error: any) {
       updateTestResult('Fetch Tasks', {
-        status: 'error',
+        status: 'warning',
         error: error.message,
-        data: { code: error.code, details: error.details }
+        data: { hint: error.message.includes('authenticated') ? 'Sign in at /sign-in to test data queries' : 'Check RLS policies' }
       })
       console.error('❌ Tasks fetch failed:', error)
     }
