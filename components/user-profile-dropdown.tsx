@@ -19,6 +19,19 @@ export function UserProfileDropdown() {
   const router = useRouter()
   const user = session?.user
 
+  const handleLogout = async () => {
+    try {
+      // Call API route to sign out server-side
+      await fetch('/api/auth/logout', { method: 'POST' })
+      // Hard redirect to clear all client state
+      window.location.href = '/sign-in'
+    } catch (error) {
+      console.error('Logout failed:', error)
+      // Force redirect anyway
+      window.location.href = '/sign-in'
+    }
+  }
+
   // Fallback for when user is not authenticated
   if (!user) {
     return (
@@ -68,10 +81,13 @@ export function UserProfileDropdown() {
           <span>Security</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={async () => {
-          await supabase.auth.signOut()
-          router.push('/sign-in')
-        }} className="text-red-600 focus:text-red-600">
+        <DropdownMenuItem
+          onSelect={(e) => {
+            e.preventDefault()
+            handleLogout()
+          }}
+          className="text-red-600 focus:text-red-600 cursor-pointer"
+        >
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log out</span>
         </DropdownMenuItem>
