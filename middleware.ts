@@ -102,11 +102,11 @@ export async function middleware(req: NextRequest) {
     }
   )
 
-  // Refresh session if expired - required for Server Components
-  const { data: { session } } = await supabase.auth.getSession()
+  // Verify user authentication - use getUser() for security
+  const { data: { user }, error } = await supabase.auth.getUser()
 
   const { pathname } = req.nextUrl
-  
+
   // Allow public routes
   if (publicRoutes.some(route => pathname.startsWith(route))) {
     return supabaseResponse
@@ -115,13 +115,13 @@ export async function middleware(req: NextRequest) {
   // Check authentication for protected routes
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
 
-  if (isProtectedRoute && !session) {
+  if (isProtectedRoute && !user) {
     return NextResponse.redirect(new URL('/sign-in', req.url))
   }
 
   // Check if feature is disabled for authenticated users
-  if (session?.user) {
-    const preferences = await getUserFeaturePreferences(req, session.user.id)
+  if (user) {
+    const preferences = await getUserFeaturePreferences(req, user.id)
 
     if (!isFeatureEnabled(pathname, preferences)) {
       // Redirect to dashboard if trying to access a disabled feature
