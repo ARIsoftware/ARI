@@ -108,6 +108,18 @@ export function TaskAnnouncement() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
+  // Get custom top bar settings from environment variables
+  const customMessage = process.env.NEXT_PUBLIC_TOP_BAR_MESSAGE
+  const customColor = process.env.NEXT_PUBLIC_TOP_BAR_COLOR || '#000000'
+
+  // Debug logging - remove after confirming it works
+  console.log('🔍 Top Bar Debug:', {
+    customMessage,
+    customColor,
+    rawMessage: process.env.NEXT_PUBLIC_TOP_BAR_MESSAGE,
+    rawColor: process.env.NEXT_PUBLIC_TOP_BAR_COLOR
+  })
+
   // Show focus timer when active
   if (focusTimer.isActive) {
     return (
@@ -130,16 +142,47 @@ export function TaskAnnouncement() {
     )
   }
 
+  // Determine background color class or inline style
+  const getBgStyle = () => {
+    return customColor !== '#000000'
+      ? { backgroundColor: customColor }
+      : {};
+  };
+
+  const getBgClass = () => {
+    return customColor === '#000000' ? 'bg-black' : '';
+  };
+
+  // If custom message is set, show it instead of task completion
+  if (customMessage) {
+    return (
+      <div
+        className={`topbar h-[45px] w-full relative z-50 flex items-center justify-center ${getBgClass()}`}
+        style={getBgStyle()}
+      >
+        <span className={`text-white font-medium ${dmSans.className}`}>
+          {customMessage}
+        </span>
+      </div>
+    )
+  }
+
   if (loading || !lastTask) {
     return (
-      <div className="topbar h-[45px] bg-black w-full relative z-50 flex items-center justify-center">
+      <div
+        className={`topbar h-[45px] w-full relative z-50 flex items-center justify-center ${getBgClass()}`}
+        style={getBgStyle()}
+      >
         <span className={`text-white font-medium ${dmSans.className}`}>ARI</span>
       </div>
     )
   }
 
   return (
-    <div className="topbar h-[45px] bg-black w-full relative z-50 flex items-center justify-center">
+    <div
+      className={`topbar h-[45px] w-full relative z-50 flex items-center justify-center ${getBgClass()}`}
+      style={getBgStyle()}
+    >
       <Announcement className="bg-white border-gray-200 hover:bg-gray-50 shadow-sm">
         <AnnouncementTag className="bg-gray-100 text-gray-700 font-medium">
           Task Complete
