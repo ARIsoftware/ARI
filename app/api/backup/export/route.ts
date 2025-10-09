@@ -96,32 +96,148 @@ async function discoverTables(client: any): Promise<string[]> {
   }
 }
 
-// Get table schema information
+// Get table schema information using SQL query
 async function getTableSchema(client: any, tableName: string) {
   try {
-    const { data, error } = await client
-      .from('information_schema.columns')
-      .select('column_name, data_type, is_nullable, column_default')
-      .eq('table_schema', 'public')
-      .eq('table_name', tableName)
-      .order('ordinal_position')
-    
-    if (error) throw error
-    return data || []
+    // Query information_schema directly using SQL
+    const query = `
+      SELECT
+        column_name,
+        data_type,
+        is_nullable,
+        column_default,
+        character_maximum_length,
+        ordinal_position
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = '${tableName}'
+      ORDER BY ordinal_position;
+    `
+
+    const { data, error } = await client.rpc('exec_sql', { query }).catch(() => ({ data: null, error: null }))
+
+    if (data && Array.isArray(data) && data.length > 0) {
+      logger.info(`Got schema for ${tableName} via RPC: ${data.length} columns`)
+      return data
+    }
+
+    // Fallback: Get a sample row and infer types
+    logger.warn(`RPC failed for ${tableName}, using sample row fallback`)
+    const { data: sampleData } = await client
+      .from(tableName)
+      .select('*')
+      .limit(1)
+      .single()
+
+    if (sampleData) {
+      // Build basic schema from sample data
+      const schema = Object.entries(sampleData).map(([columnName, value], index) => {
+        let dataType = 'text'
+        let isNullable = value === null ? 'YES' : 'NO'
+
+        if (value === null) {
+          dataType = 'text'
+        } else if (typeof value === 'boolean') {
+          dataType = 'boolean'
+        } else if (typeof value === 'number') {
+          dataType = Number.isInteger(value) ? 'integer' : 'numeric'
+        } else if (typeof value === 'string') {
+          // Check if it's a UUID
+          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
+            dataType = 'uuid'
+          } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+            dataType = 'timestamp with time zone'
+          } else if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+            dataType = 'date'
+          } else {
+            dataType = 'text'
+          }
+        } else if (Array.isArray(value)) {
+          dataType = 'array'  // Use lowercase to match PostgreSQL
+        } else if (typeof value === 'object') {
+          dataType = 'jsonb'
+        }
+
+        return {
+          column_name: columnName,
+          data_type: dataType,
+          is_nullable: isNullable,
+          column_default: columnName === 'id' ? 'gen_random_uuid()' : (columnName.includes('created_at') || columnName.includes('updated_at') ? 'now()' : null),
+          character_maximum_length: null,
+          ordinal_position: index + 1
+        }
+      })
+
+      logger.info(`Inferred schema for ${tableName}: ${schema.length} columns`)
+      return schema
+    }
+
+    logger.warn(`Could not get schema for table ${tableName} - no sample data available`)
+    return []
   } catch (error) {
-    logger.warn(`Could not get schema for table ${tableName}:`, error)
+    logger.error(`Error getting schema for table ${tableName}:`, error)
     return []
   }
 }
 
+// Get primary key constraints
+async function getTableConstraints(client: any, tableName: string) {
+  try {
+    // Get primary key
+    const { data: pkData } = await client.rpc('get_table_pk', { table_name: tableName }).catch(() => ({ data: null }))
+
+    // Fallback: query information_schema for constraints
+    const { data, error } = await client
+      .from('information_schema.table_constraints')
+      .select('constraint_name, constraint_type')
+      .eq('table_schema', 'public')
+      .eq('table_name', tableName)
+
+    if (error) {
+      logger.warn(`Could not get constraints for ${tableName}:`, error)
+      return { primaryKeys: [], uniqueKeys: [], foreignKeys: [] }
+    }
+
+    // Get key column usage
+    const { data: keyData } = await client
+      .from('information_schema.key_column_usage')
+      .select('column_name, constraint_name')
+      .eq('table_schema', 'public')
+      .eq('table_name', tableName)
+
+    const constraints = data || []
+    const keyColumns = keyData || []
+
+    const primaryKeys = constraints
+      .filter((c: any) => c.constraint_type === 'PRIMARY KEY')
+      .map((c: any) => {
+        const cols = keyColumns.filter((k: any) => k.constraint_name === c.constraint_name)
+        return cols.map((k: any) => k.column_name)
+      })
+      .flat()
+
+    const uniqueKeys = constraints
+      .filter((c: any) => c.constraint_type === 'UNIQUE')
+      .map((c: any) => {
+        const cols = keyColumns.filter((k: any) => k.constraint_name === c.constraint_name)
+        return { name: c.constraint_name, columns: cols.map((k: any) => k.column_name) }
+      })
+
+    return { primaryKeys, uniqueKeys, foreignKeys: [] }
+  } catch (error) {
+    logger.warn(`Could not get constraints for ${tableName}:`, error)
+    return { primaryKeys: [], uniqueKeys: [], foreignKeys: [] }
+  }
+}
+
 // Convert PostgreSQL data type to CREATE TABLE format
-function mapDataType(dataType: string, isNullable: string, columnDefault: string | null): string {
+function mapDataType(dataType: string, isNullable: string, columnDefault: string | null, charMaxLength: number | null = null): string {
   let sqlType = dataType.toUpperCase()
-  
+
   // Map common types
   switch (dataType.toLowerCase()) {
     case 'character varying':
-      sqlType = 'TEXT'
+      sqlType = charMaxLength ? `VARCHAR(${charMaxLength})` : 'TEXT'
       break
     case 'timestamp with time zone':
       sqlType = 'TIMESTAMPTZ'
@@ -135,40 +251,70 @@ function mapDataType(dataType: string, isNullable: string, columnDefault: string
     case 'integer':
       sqlType = 'INTEGER'
       break
+    case 'bigint':
+      sqlType = 'BIGINT'
+      break
+    case 'smallint':
+      sqlType = 'SMALLINT'
+      break
+    case 'numeric':
+    case 'decimal':
+      sqlType = 'NUMERIC'
+      break
+    case 'double precision':
+      sqlType = 'DOUBLE PRECISION'
+      break
+    case 'real':
+      sqlType = 'REAL'
+      break
     case 'uuid':
       sqlType = 'UUID'
       break
     case 'date':
       sqlType = 'DATE'
       break
+    case 'time':
+    case 'time without time zone':
+      sqlType = 'TIME'
+      break
     case 'text':
       sqlType = 'TEXT'
       break
+    case 'json':
+      sqlType = 'JSON'
+      break
+    case 'jsonb':
+      sqlType = 'JSONB'
+      break
+    case 'array':
     case 'ARRAY':
       sqlType = 'TEXT[]'
       break
   }
-  
+
   // Add constraints
   if (isNullable === 'NO') {
     sqlType += ' NOT NULL'
   }
-  
+
   // Add defaults
   if (columnDefault) {
     if (columnDefault.includes('gen_random_uuid()')) {
       sqlType += ' DEFAULT gen_random_uuid()'
     } else if (columnDefault.includes('now()') || columnDefault.includes('CURRENT_TIMESTAMP')) {
       sqlType += ' DEFAULT NOW()'
-    } else if (columnDefault === 'false') {
+    } else if (columnDefault === 'false' || columnDefault.includes('false')) {
       sqlType += ' DEFAULT FALSE'
-    } else if (columnDefault === 'true') {
+    } else if (columnDefault === 'true' || columnDefault.includes('true')) {
       sqlType += ' DEFAULT TRUE'
-    } else if (!isNaN(Number(columnDefault))) {
-      sqlType += ` DEFAULT ${columnDefault}`
+    } else if (columnDefault.match(/^nextval\(/)) {
+      // Don't add serial defaults - they'll be handled by SERIAL type
+      return sqlType
+    } else if (!isNaN(Number(columnDefault.replace(/[()::]/g, '')))) {
+      sqlType += ` DEFAULT ${columnDefault.replace(/[()::]/g, '')}`
     }
   }
-  
+
   return sqlType
 }
 
@@ -218,16 +364,23 @@ export async function POST(req: NextRequest) {
     
     const backupData: any = {}
     const tableSchemas: any = {}
+    const tableConstraints: any = {}
     const checksums: any = {}
     let totalRows = 0
     let errors: string[] = []
-    
+
     // Use chunked fetching for large tables
     for (const table of tables) {
       try {
         // Get table schema first
         const schema = await getTableSchema(client, table)
+        logger.info(`Schema for ${table}:`, schema?.length || 0, 'columns')
         tableSchemas[table] = schema
+
+        // Get table constraints
+        const constraints = await getTableConstraints(client, table)
+        logger.info(`Constraints for ${table}:`, constraints)
+        tableConstraints[table] = constraints
         
         // Fetch data in chunks to avoid memory issues
         const chunkSize = 1000
@@ -313,18 +466,85 @@ export async function POST(req: NextRequest) {
     
     // Generate CREATE TABLE statements
     sqlContent += `-- Create tables with discovered schemas\n\n`
-    
-    for (const [tableName, schema] of Object.entries(tableSchemas)) {
-      if (!Array.isArray(schema) || schema.length === 0) continue
-      
+
+    for (const tableName of tables) {
+      let schema = tableSchemas[tableName]
+
+      // If schema is empty, try to infer from backup data
+      if (!Array.isArray(schema) || schema.length === 0) {
+        logger.warn(`No schema found for ${tableName}, inferring from data...`)
+        const tableData = backupData[tableName]
+
+        if (tableData && tableData.length > 0) {
+          const sampleRow = tableData[0]
+          schema = Object.entries(sampleRow).map(([columnName, value], index) => {
+            let dataType = 'text'
+
+            if (value === null) {
+              dataType = 'text'
+            } else if (typeof value === 'boolean') {
+              dataType = 'boolean'
+            } else if (typeof value === 'number') {
+              dataType = Number.isInteger(value) ? 'integer' : 'numeric'
+            } else if (typeof value === 'string') {
+              if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
+                dataType = 'uuid'
+              } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+                dataType = 'timestamp with time zone'
+              } else if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+                dataType = 'date'
+              } else {
+                dataType = 'text'
+              }
+            } else if (Array.isArray(value)) {
+              dataType = 'array'  // Use lowercase to match PostgreSQL
+            } else if (typeof value === 'object') {
+              dataType = 'jsonb'
+            }
+
+            return {
+              column_name: columnName,
+              data_type: dataType,
+              is_nullable: 'YES',
+              column_default: columnName === 'id' ? 'gen_random_uuid()' : (columnName.includes('created_at') || columnName.includes('updated_at') ? 'now()' : null),
+              character_maximum_length: null
+            }
+          })
+
+          logger.info(`Inferred schema for ${tableName} from data: ${schema.length} columns`)
+        } else {
+          logger.warn(`Cannot create table ${tableName} - no schema and no data`)
+          continue
+        }
+      }
+
+      const constraints = tableConstraints[tableName] || { primaryKeys: [], uniqueKeys: [] }
+
       sqlContent += `-- Table: ${tableName}\n`
-      sqlContent += `CREATE TABLE IF NOT EXISTS "${tableName}" (\n`
-      
+      sqlContent += `DROP TABLE IF EXISTS "${tableName}" CASCADE;\n`
+      sqlContent += `CREATE TABLE "${tableName}" (\n`
+
       const columns = (schema as any[]).map((column) => {
-        return `  "${column.column_name}" ${mapDataType(column.data_type, column.is_nullable, column.column_default)}`
-      }).join(',\n')
-      
-      sqlContent += columns
+        return `  "${column.column_name}" ${mapDataType(column.data_type, column.is_nullable, column.column_default, column.character_maximum_length)}`
+      })
+
+      // Add primary key constraint
+      if (constraints.primaryKeys && constraints.primaryKeys.length > 0) {
+        const pkColumns = constraints.primaryKeys.map((col: string) => `"${col}"`).join(', ')
+        columns.push(`  PRIMARY KEY (${pkColumns})`)
+      }
+
+      // Add unique constraints
+      if (constraints.uniqueKeys && constraints.uniqueKeys.length > 0) {
+        constraints.uniqueKeys.forEach((uk: any) => {
+          if (uk.columns && uk.columns.length > 0) {
+            const ukColumns = uk.columns.map((col: string) => `"${col}"`).join(', ')
+            columns.push(`  CONSTRAINT "${uk.name}" UNIQUE (${ukColumns})`)
+          }
+        })
+      }
+
+      sqlContent += columns.join(',\n')
       sqlContent += `\n);\n\n`
     }
     

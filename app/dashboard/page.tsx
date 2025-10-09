@@ -59,22 +59,21 @@ export default function DashboardPage() {
   const loadDashboardData = async () => {
     try {
       setLoading(true)
-      
+
       // Create token function for all API calls
       const tokenFn = async () => session?.access_token || null
-      
-      // Load fitness stats
-      const stats = await getFitnessStats(tokenFn)
+
+      // Load all data in parallel
+      const [stats, contacts, tasks] = await Promise.all([
+        getFitnessStats(tokenFn),
+        getContacts(tokenFn),
+        getTasks(tokenFn)
+      ])
+
       setFitnessStats(stats)
-      
-      // Load contact count
-      const contacts = await getContacts(tokenFn)
       setContactCount(contacts.length)
-      
-      // Load task count  
-      const tasks = await getTasks(tokenFn)
       setTaskCount(tasks.length)
-      
+
     } catch (error) {
       console.error("Failed to load dashboard data:", error)
     } finally {
