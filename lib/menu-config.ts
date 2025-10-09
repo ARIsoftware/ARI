@@ -30,6 +30,11 @@ export const menuConfig: MenuGroup[] = [
         url: "/hd-dashboard",
         icon: Grid3x3,
       },
+      {
+        title: "HD2 Dashboard",
+        url: "/hd2-dashboard",
+        icon: Grid3x3,
+      },
     ],
   },
   {
@@ -241,6 +246,7 @@ function getFeatureDescription(title: string, url: string): string {
   const descriptions: Record<string, string> = {
     '/dashboard': 'Overview of your tasks, fitness, and goals',
     '/hd-dashboard': 'High-density dashboard view',
+    '/hd2-dashboard': 'High-density dashboard with blueprint theme',
     '/assist': 'AI-powered assistant',
     '/northstar': 'Track your goals and milestones',
     '/motivation': 'Inspirational content and quotes',
