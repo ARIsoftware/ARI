@@ -22,7 +22,44 @@ export async function POST() {
     }
   )
 
+  // Sign out from Supabase
   await supabase.auth.signOut()
 
-  return NextResponse.json({ success: true })
+  // Explicitly delete all Supabase cookies with proper options
+  const allCookies = cookieStore.getAll()
+  allCookies.forEach((cookie) => {
+    if (cookie.name.startsWith('sb-')) {
+      // Delete with all possible path/domain combinations
+      cookieStore.delete({
+        name: cookie.name,
+        path: '/',
+      })
+      cookieStore.set({
+        name: cookie.name,
+        value: '',
+        path: '/',
+        maxAge: 0,
+        expires: new Date(0),
+      })
+    }
+  })
+
+  // Create response with additional cookie clearing headers
+  const response = NextResponse.json({ success: true })
+
+  // Add headers to clear cookies on client side as well
+  allCookies.forEach((cookie) => {
+    if (cookie.name.startsWith('sb-')) {
+      response.cookies.delete(cookie.name)
+      response.cookies.set({
+        name: cookie.name,
+        value: '',
+        path: '/',
+        maxAge: 0,
+        expires: new Date(0),
+      })
+    }
+  })
+
+  return response
 }
