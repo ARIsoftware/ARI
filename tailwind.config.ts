@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import plugin from "tailwindcss/plugin";
 
 // all in fixtures is set to tailwind v3 as interims solutions
 
@@ -93,6 +94,11 @@ const config: Config = {
   		}
   	}
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    require("tailwindcss-animate"),
+    plugin(function({ addVariant }) {
+      addVariant('blue', '.blue &')
+    })
+  ],
 };
 export default config;
