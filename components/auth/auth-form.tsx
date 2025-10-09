@@ -19,7 +19,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
-  
+
   const router = useRouter()
   const supabase = createSupabaseClient()
 
@@ -38,18 +38,18 @@ export function AuthForm({ mode }: AuthFormProps) {
             emailRedirectTo: `${window.location.origin}/auth/callback`
           }
         })
-        
+
         if (error) throw error
-        
+
         setMessage('Check your email for the confirmation link!')
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         })
-        
+
         if (error) throw error
-        
+
         router.push('/dashboard')
         router.refresh()
       }
