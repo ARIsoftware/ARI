@@ -95,15 +95,15 @@ export default function HDDashboardPage() {
   if (!session || loading) {
     return (
       <DarkModeProvider>
-        <div className="min-h-screen bg-white dark:bg-gray-900">
+        <div className="min-h-screen bg-white dark:bg-gray-900 blue:bg-[#056baa]">
           <TaskAnnouncement />
           <SidebarProvider defaultOpen={false}>
             <AppSidebar />
-            <SidebarInset>
-              <div className="flex items-center justify-center h-96">
+            <SidebarInset className="blue:bg-[#056baa]">
+              <div className="flex items-center justify-center h-96 blue:bg-[#056baa]">
                 <div className="flex items-center gap-2">
-                  <Loader2 className="w-6 h-6 animate-spin dark:text-white" />
-                  <span className="text-xs dark:text-white">Loading HD Dashboard...</span>
+                  <Loader2 className="w-6 h-6 animate-spin dark:text-white blue:text-white blue:text-white" />
+                  <span className="text-xs dark:text-white blue:text-white blue:text-white">Loading HD Dashboard...</span>
                 </div>
               </div>
             </SidebarInset>
@@ -142,18 +142,18 @@ export default function HDDashboardPage() {
 
   return (
     <DarkModeProvider>
-      <div className="min-h-screen bg-white dark:bg-gray-900 transition-colors">
+      <div className="min-h-screen bg-white dark:bg-gray-900 blue:bg-[#056baa] transition-colors">
         <TaskAnnouncement />
         <SidebarProvider defaultOpen={false}>
           <AppSidebar />
-          <SidebarInset>
-            <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-white dark:bg-gray-800 dark:border-gray-700 px-3">
-              <SidebarTrigger className="-ml-1 dark:text-white" />
-              <Separator orientation="vertical" className="mr-2 h-4 dark:bg-gray-600" />
+          <SidebarInset className="blue:bg-[#056baa]">
+            <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-white dark:bg-gray-800 blue:bg-transparent dark:border-gray-700 blue:bg-[#056baa] blue:border-white px-3">
+              <SidebarTrigger className="-ml-1 dark:text-white blue:text-white blue:text-white" />
+              <Separator orientation="vertical" className="mr-2 h-4 dark:bg-gray-600 blue:bg-white" />
               <Breadcrumb>
                 <BreadcrumbList>
                   <BreadcrumbItem>
-                    <BreadcrumbPage className="text-sm dark:text-white">HD Dashboard</BreadcrumbPage>
+                    <BreadcrumbPage className="text-sm dark:text-white blue:text-white blue:text-white">HD Dashboard</BreadcrumbPage>
                   </BreadcrumbItem>
                 </BreadcrumbList>
               </Breadcrumb>
@@ -162,99 +162,99 @@ export default function HDDashboardPage() {
               </div>
             </header>
 
-          <div className="p-2 dark:bg-gray-900">
+          <div className="p-2 dark:bg-gray-900 blue:bg-[#056baa] min-h-screen">
             {/* Top Stats Row - Ultra Compact */}
             <div className="grid grid-cols-8 gap-1 mb-2">
-              <div className="border dark:border-gray-700 rounded p-1.5 bg-blue-50 dark:bg-blue-900/20">
+              <div className="border dark:border-gray-700 blue:border-white rounded p-1.5 bg-blue-50 dark:bg-blue-900/20 blue:bg-transparent">
                 <div className="flex items-center gap-1">
                   <CheckSquare className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300">Tasks</span>
+                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300 blue:text-gray-200">Tasks</span>
                 </div>
                 <div className="text-lg font-bold text-blue-900 dark:text-blue-300">{tasks.length}</div>
-                <div className="text-[9px] text-gray-500 dark:text-gray-400">{completedTasks.length} done</div>
+                <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-gray-300">{completedTasks.length} done</div>
               </div>
 
-              <div className="border dark:border-gray-700 rounded p-1.5 bg-red-50 dark:bg-red-900/20">
+              <div className="border dark:border-gray-700 blue:border-white rounded p-1.5 bg-red-50 dark:bg-red-900/20 blue:bg-transparent">
                 <div className="flex items-center gap-1">
                   <AlertCircle className="w-3 h-3 text-red-600 dark:text-red-400" />
-                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300">Overdue</span>
+                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300 blue:text-gray-200">Overdue</span>
                 </div>
                 <div className="text-lg font-bold text-red-900 dark:text-red-300">{overdueTasks.length}</div>
-                <div className="text-[9px] text-gray-500 dark:text-gray-400">needs attention</div>
+                <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-gray-300">needs attention</div>
               </div>
 
-              <div className="border dark:border-gray-700 rounded p-1.5 bg-orange-50 dark:bg-orange-900/20">
+              <div className="border dark:border-gray-700 blue:border-white rounded p-1.5 bg-orange-50 dark:bg-orange-900/20 blue:bg-transparent">
                 <div className="flex items-center gap-1">
                   <Clock className="w-3 h-3 text-orange-600 dark:text-orange-400" />
-                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300">Today</span>
+                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300 blue:text-gray-200">Today</span>
                 </div>
                 <div className="text-lg font-bold text-orange-900 dark:text-orange-300">{todayTasks.length}</div>
-                <div className="text-[9px] text-gray-500 dark:text-gray-400">due today</div>
+                <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-gray-300">due today</div>
               </div>
 
-              <div className="border dark:border-gray-700 rounded p-1.5 bg-purple-50 dark:bg-purple-900/20">
+              <div className="border dark:border-gray-700 blue:border-white rounded p-1.5 bg-purple-50 dark:bg-purple-900/20">
                 <div className="flex items-center gap-1">
                   <Users className="w-3 h-3 text-purple-600 dark:text-purple-400" />
-                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300">Contacts</span>
+                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300 blue:text-gray-200">Contacts</span>
                 </div>
                 <div className="text-lg font-bold text-purple-900 dark:text-purple-300">{contacts.length}</div>
-                <div className="text-[9px] text-gray-500 dark:text-gray-400">in network</div>
+                <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-gray-300">in network</div>
               </div>
 
-              <div className="border dark:border-gray-700 rounded p-1.5 bg-green-50 dark:bg-green-900/20">
+              <div className="border dark:border-gray-700 blue:border-white rounded p-1.5 bg-green-50 dark:bg-green-900/20 blue:bg-transparent">
                 <div className="flex items-center gap-1">
                   <Trophy className="w-3 h-3 text-green-600 dark:text-green-400" />
-                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300">Fitness</span>
+                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300 blue:text-gray-200">Fitness</span>
                 </div>
                 <div className="text-lg font-bold text-green-900 dark:text-green-300">{fitnessStats.totalCompletions}</div>
-                <div className="text-[9px] text-gray-500 dark:text-gray-400">completions</div>
+                <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-gray-300">completions</div>
               </div>
 
-              <div className="border dark:border-gray-700 rounded p-1.5 bg-yellow-50 dark:bg-yellow-900/20">
+              <div className="border dark:border-gray-700 blue:border-white rounded p-1.5 bg-yellow-50 dark:bg-yellow-900/20 blue:bg-transparent">
                 <div className="flex items-center gap-1">
                   <Dumbbell className="w-3 h-3 text-yellow-600 dark:text-yellow-400" />
-                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300">Avg/Day</span>
+                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300 blue:text-gray-200">Avg/Day</span>
                 </div>
                 <div className="text-lg font-bold text-yellow-900 dark:text-yellow-300">{fitnessStats.averageCompletionsPerDay.toFixed(1)}</div>
-                <div className="text-[9px] text-gray-500 dark:text-gray-400">fitness avg</div>
+                <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-gray-300">fitness avg</div>
               </div>
 
-              <div className="border dark:border-gray-700 rounded p-1.5 bg-indigo-50 dark:bg-indigo-900/20">
+              <div className="border dark:border-gray-700 blue:border-white rounded p-1.5 bg-indigo-50 dark:bg-indigo-900/20">
                 <div className="flex items-center gap-1">
                   <Target className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
-                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300">Active</span>
+                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300 blue:text-gray-200">Active</span>
                 </div>
                 <div className="text-lg font-bold text-indigo-900 dark:text-indigo-300">{incompleteTasks.length}</div>
-                <div className="text-[9px] text-gray-500 dark:text-gray-400">incomplete</div>
+                <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-gray-300">incomplete</div>
               </div>
 
-              <div className="border dark:border-gray-700 rounded p-1.5 bg-emerald-50 dark:bg-emerald-900/20">
+              <div className="border dark:border-gray-700 blue:border-white rounded p-1.5 bg-emerald-50 dark:bg-emerald-900/20">
                 <div className="flex items-center gap-1">
                   <TrendingUp className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300">Rate</span>
+                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300 blue:text-gray-200">Rate</span>
                 </div>
                 <div className="text-lg font-bold text-emerald-900 dark:text-emerald-300">
                   {tasks.length > 0 ? Math.round((completedTasks.length / tasks.length) * 100) : 0}%
                 </div>
-                <div className="text-[9px] text-gray-500 dark:text-gray-400">completion</div>
+                <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-gray-300">completion</div>
               </div>
             </div>
 
             {/* Main Content Grid - 3 Columns */}
             <div className="grid grid-cols-3 gap-2">
               {/* Column 1: High Priority Tasks */}
-              <div className="border dark:border-gray-700 rounded p-2 dark:bg-gray-800">
-                <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 dark:text-white">
+              <div className="border dark:border-gray-700 blue:border-white rounded p-2 dark:bg-gray-800 blue:bg-transparent">
+                <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 dark:text-white blue:text-white">
                   <Target className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
                   Top Priority Tasks ({highPriorityTasks.length})
                 </h3>
                 <div className="space-y-0.5">
                   {highPriorityTasks.map((task, idx) => (
-                    <div key={task.id} className="flex items-start gap-1.5 py-0.5 px-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded text-[11px] border-b border-gray-100 dark:border-gray-700">
-                      <span className="text-[9px] text-gray-400 dark:text-gray-500 font-mono mt-0.5">{idx + 1}</span>
-                      <Circle className="w-2.5 h-2.5 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
+                    <div key={task.id} className="flex items-start gap-1.5 py-0.5 px-1 hover:bg-gray-50 dark:hover:bg-gray-700 blue:hover:bg-transparent rounded text-[11px] border-b border-gray-100 dark:border-gray-700">
+                      <span className="text-[9px] text-gray-400 dark:text-gray-500 blue:text-gray-300 font-mono mt-0.5">{idx + 1}</span>
+                      <Circle className="w-2.5 h-2.5 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500 blue:text-gray-300" />
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-900 dark:text-gray-100 truncate">{task.title}</div>
+                        <div className="font-medium text-gray-900 dark:text-gray-100 blue:text-white truncate">{task.title}</div>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           {task.due_date && (
                             <Badge className={`text-[8px] px-1 py-0 h-3.5 ${getUrgencyColor(task)}`}>
@@ -280,7 +280,7 @@ export default function HDDashboardPage() {
                     </div>
                   ))}
                   {highPriorityTasks.length === 0 && (
-                    <div className="text-[10px] text-gray-400 dark:text-gray-500 text-center py-4">No priority tasks</div>
+                    <div className="text-[10px] text-gray-400 dark:text-gray-500 blue:text-gray-300 text-center py-4">No priority tasks</div>
                   )}
                 </div>
               </div>
@@ -289,16 +289,16 @@ export default function HDDashboardPage() {
               <div className="space-y-2">
                 {/* Overdue Tasks */}
                 {overdueTasks.length > 0 && (
-                  <div className="border dark:border-gray-700 rounded p-2 bg-red-50 dark:bg-red-900/20">
+                  <div className="border dark:border-gray-700 blue:border-white rounded p-2 bg-red-50 dark:bg-red-900/20 blue:bg-transparent">
                     <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 text-red-900 dark:text-red-300">
                       <AlertCircle className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
                       Overdue ({overdueTasks.length})
                     </h3>
                     <div className="space-y-0.5">
                       {overdueTasks.slice(0, 8).map((task) => (
-                        <div key={task.id} className="flex items-center gap-1.5 py-0.5 px-1 bg-white dark:bg-gray-800 rounded text-[11px]">
+                        <div key={task.id} className="flex items-center gap-1.5 py-0.5 px-1 bg-white dark:bg-gray-800 blue:bg-transparent rounded text-[11px]">
                           <Circle className="w-2.5 h-2.5 flex-shrink-0 text-red-600 dark:text-red-400" />
-                          <div className="flex-1 min-w-0 truncate font-medium dark:text-gray-100">{task.title}</div>
+                          <div className="flex-1 min-w-0 truncate font-medium dark:text-gray-100 blue:text-white">{task.title}</div>
                           {task.due_date && (
                             <span className="text-[9px] text-red-600 flex-shrink-0">
                               {formatDate(task.due_date)}
@@ -312,16 +312,16 @@ export default function HDDashboardPage() {
 
                 {/* Today's Tasks */}
                 {todayTasks.length > 0 && (
-                  <div className="border dark:border-gray-700 rounded p-2 bg-orange-50 dark:bg-orange-900/20">
+                  <div className="border dark:border-gray-700 blue:border-white rounded p-2 bg-orange-50 dark:bg-orange-900/20 blue:bg-transparent">
                     <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 text-orange-900 dark:text-orange-300">
                       <Clock className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
                       Due Today ({todayTasks.length})
                     </h3>
                     <div className="space-y-0.5">
                       {todayTasks.slice(0, 6).map((task) => (
-                        <div key={task.id} className="flex items-center gap-1.5 py-0.5 px-1 bg-white dark:bg-gray-800 rounded text-[11px]">
+                        <div key={task.id} className="flex items-center gap-1.5 py-0.5 px-1 bg-white dark:bg-gray-800 blue:bg-transparent rounded text-[11px]">
                           <Circle className="w-2.5 h-2.5 flex-shrink-0 text-orange-600 dark:text-orange-400" />
-                          <div className="flex-1 min-w-0 truncate font-medium dark:text-gray-100">{task.title}</div>
+                          <div className="flex-1 min-w-0 truncate font-medium dark:text-gray-100 blue:text-white">{task.title}</div>
                         </div>
                       ))}
                     </div>
@@ -329,16 +329,16 @@ export default function HDDashboardPage() {
                 )}
 
                 {/* All Incomplete Tasks */}
-                <div className="border dark:border-gray-700 rounded p-2 dark:bg-gray-800">
-                  <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 dark:text-white">
+                <div className="border dark:border-gray-700 blue:border-white rounded p-2 dark:bg-gray-800 blue:bg-transparent">
+                  <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 dark:text-white blue:text-white">
                     <CheckSquare className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                     Active Tasks ({incompleteTasks.length})
                   </h3>
                   <div className="space-y-0.5 max-h-[300px] overflow-y-auto">
                     {incompleteTasks.slice(0, 20).map((task) => (
-                      <div key={task.id} className="flex items-center gap-1.5 py-0.5 px-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded text-[11px]">
+                      <div key={task.id} className="flex items-center gap-1.5 py-0.5 px-1 hover:bg-gray-50 dark:hover:bg-gray-700 blue:hover:bg-transparent rounded text-[11px]">
                         <Circle className="w-2.5 h-2.5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
-                        <div className="flex-1 min-w-0 truncate dark:text-gray-100">{task.title}</div>
+                        <div className="flex-1 min-w-0 truncate dark:text-gray-100 blue:text-white">{task.title}</div>
                         {task.due_date && (
                           <Badge className={`text-[8px] px-1 py-0 h-3.5 ${getUrgencyColor(task)}`}>
                             {formatDate(task.due_date)}
@@ -350,25 +350,25 @@ export default function HDDashboardPage() {
                 </div>
 
                 {/* Fitness Stats */}
-                <div className="border dark:border-gray-700 rounded p-2 bg-green-50 dark:bg-green-900/20">
+                <div className="border dark:border-gray-700 blue:border-white rounded p-2 bg-green-50 dark:bg-green-900/20 blue:bg-transparent">
                   <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 text-green-900 dark:text-green-300">
                     <Dumbbell className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
                     Fitness Performance
                   </h3>
                   <div className="grid grid-cols-2 gap-1.5">
-                    <div className="bg-white dark:bg-gray-800 rounded p-1.5">
-                      <div className="text-[9px] text-gray-500 dark:text-gray-400">Total</div>
+                    <div className="bg-white dark:bg-gray-800 blue:bg-transparent rounded p-1.5">
+                      <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-gray-300">Total</div>
                       <div className="text-sm font-bold text-green-900 dark:text-green-300">{fitnessStats.totalCompletions}</div>
                     </div>
-                    <div className="bg-white dark:bg-gray-800 rounded p-1.5">
-                      <div className="text-[9px] text-gray-500 dark:text-gray-400">Daily Avg</div>
+                    <div className="bg-white dark:bg-gray-800 blue:bg-transparent rounded p-1.5">
+                      <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-gray-300">Daily Avg</div>
                       <div className="text-sm font-bold text-green-900 dark:text-green-300">{fitnessStats.averageCompletionsPerDay.toFixed(1)}</div>
                     </div>
                   </div>
                   {fitnessStats.mostCompletedTask && (
-                    <div className="mt-1.5 bg-white dark:bg-gray-800 rounded p-1.5">
-                      <div className="text-[9px] text-gray-500 dark:text-gray-400 mb-0.5">Top Exercise</div>
-                      <div className="text-[11px] font-medium text-gray-900 dark:text-gray-100 truncate">
+                    <div className="mt-1.5 bg-white dark:bg-gray-800 blue:bg-transparent rounded p-1.5">
+                      <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-gray-300 mb-0.5">Top Exercise</div>
+                      <div className="text-[11px] font-medium text-gray-900 dark:text-gray-100 blue:text-white truncate">
                         {fitnessStats.mostCompletedTask.title}
                       </div>
                       <div className="text-[9px] text-green-600 dark:text-green-400">
@@ -382,59 +382,59 @@ export default function HDDashboardPage() {
               {/* Column 3: Contacts + Notepad */}
               <div className="space-y-2">
                 {/* Contacts List */}
-                <div className="border dark:border-gray-700 rounded p-2 dark:bg-gray-800">
-                  <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 dark:text-white">
+                <div className="border dark:border-gray-700 blue:border-white rounded p-2 dark:bg-gray-800 blue:bg-transparent">
+                  <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 dark:text-white blue:text-white">
                     <Users className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
                     Contacts ({contacts.length})
                   </h3>
                   <div className="space-y-0.5 max-h-[250px] overflow-y-auto">
                     {contacts.map((contact) => (
-                      <div key={contact.id} className="py-1 px-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 rounded border-b border-gray-100 dark:border-gray-700">
-                        <div className="text-[11px] font-medium text-gray-900 dark:text-gray-100">{contact.name}</div>
+                      <div key={contact.id} className="py-1 px-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 blue:hover:bg-transparent rounded border-b border-gray-100 dark:border-gray-700">
+                        <div className="text-[11px] font-medium text-gray-900 dark:text-gray-100 blue:text-white">{contact.name}</div>
                         {contact.company && (
-                          <div className="text-[9px] text-gray-500 dark:text-gray-400">{contact.company}</div>
+                          <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-gray-300">{contact.company}</div>
                         )}
                         <div className="flex gap-2 mt-0.5">
                           {contact.email && (
                             <div className="text-[9px] text-blue-600 dark:text-blue-400 truncate">{contact.email}</div>
                           )}
                           {contact.phone && (
-                            <div className="text-[9px] text-gray-500 dark:text-gray-400">{contact.phone}</div>
+                            <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-gray-300">{contact.phone}</div>
                           )}
                         </div>
                       </div>
                     ))}
                     {contacts.length === 0 && (
-                      <div className="text-[10px] text-gray-400 dark:text-gray-500 text-center py-4">No contacts</div>
+                      <div className="text-[10px] text-gray-400 dark:text-gray-500 blue:text-gray-300 text-center py-4">No contacts</div>
                     )}
                   </div>
                 </div>
 
                 {/* Notepad Preview */}
-                <div className="border dark:border-gray-700 rounded p-2 bg-yellow-50 dark:bg-yellow-900/20">
+                <div className="border dark:border-gray-700 blue:border-white rounded p-2 bg-yellow-50 dark:bg-yellow-900/20 blue:bg-transparent">
                   <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 text-yellow-900 dark:text-yellow-300">
                     <Compass className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400" />
                     Notepad
                   </h3>
-                  <div className="bg-white dark:bg-gray-800 rounded p-2 text-[10px] text-gray-700 dark:text-gray-300 max-h-[200px] overflow-y-auto whitespace-pre-wrap font-mono leading-tight">
+                  <div className="bg-white dark:bg-gray-800 blue:bg-transparent rounded p-2 text-[10px] text-gray-700 dark:text-gray-300 blue:text-gray-200 max-h-[200px] overflow-y-auto whitespace-pre-wrap font-mono leading-tight">
                     {notepadContent || "No notes yet"}
                   </div>
                 </div>
 
                 {/* Task Completion Rate */}
-                <div className="border dark:border-gray-700 rounded p-2 bg-blue-50 dark:bg-blue-900/20">
+                <div className="border dark:border-gray-700 blue:border-white rounded p-2 bg-blue-50 dark:bg-blue-900/20 blue:bg-transparent">
                   <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 text-blue-900 dark:text-blue-300">
                     <TrendingUp className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                     Completion Rate
                   </h3>
-                  <div className="bg-white dark:bg-gray-800 rounded p-2">
+                  <div className="bg-white dark:bg-gray-800 blue:bg-transparent rounded p-2">
                     <div className="flex justify-between items-baseline mb-1">
-                      <span className="text-[9px] text-gray-500 dark:text-gray-400">Progress</span>
+                      <span className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-gray-300">Progress</span>
                       <span className="text-lg font-bold text-blue-900 dark:text-blue-300">
                         {tasks.length > 0 ? Math.round((completedTasks.length / tasks.length) * 100) : 0}%
                       </span>
                     </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 blue:bg-transparent rounded-full h-2">
                       <div
                         className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all"
                         style={{
@@ -442,7 +442,7 @@ export default function HDDashboardPage() {
                         }}
                       />
                     </div>
-                    <div className="flex justify-between mt-1 text-[9px] text-gray-500 dark:text-gray-400">
+                    <div className="flex justify-between mt-1 text-[9px] text-gray-500 dark:text-gray-400 blue:text-gray-300">
                       <span>{completedTasks.length} completed</span>
                       <span>{incompleteTasks.length} remaining</span>
                     </div>
@@ -453,14 +453,14 @@ export default function HDDashboardPage() {
 
             {/* Bottom Section: Recently Completed Tasks */}
             {completedTasks.length > 0 && (
-              <div className="border dark:border-gray-700 rounded p-2 mt-2 bg-gray-50 dark:bg-gray-800">
-                <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 text-gray-900 dark:text-gray-100">
-                  <CheckSquare className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400" />
+              <div className="border dark:border-gray-700 blue:border-white rounded p-2 mt-2 bg-gray-50 dark:bg-gray-800 blue:bg-transparent">
+                <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 text-gray-900 dark:text-gray-100 blue:text-white">
+                  <CheckSquare className="w-3.5 h-3.5 text-gray-600 dark:text-gray-400 blue:text-gray-300" />
                   Recently Completed ({completedTasks.length})
                 </h3>
                 <div className="grid grid-cols-4 gap-1">
                   {completedTasks.slice(0, 16).map((task) => (
-                    <div key={task.id} className="bg-white dark:bg-gray-700 rounded px-2 py-1 text-[10px] text-gray-500 dark:text-gray-300 truncate border dark:border-gray-600">
+                    <div key={task.id} className="bg-white dark:bg-gray-700 blue:bg-transparent rounded px-2 py-1 text-[10px] text-gray-500 dark:text-gray-300 blue:text-gray-200 truncate border dark:border-gray-600">
                       <CheckSquare className="w-2.5 h-2.5 inline mr-1 text-green-600 dark:text-green-400" />
                       {task.title}
                     </div>
