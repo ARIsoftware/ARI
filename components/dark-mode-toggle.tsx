@@ -1,6 +1,6 @@
 "use client"
 
-import { Moon, Sun, Building2 } from "lucide-react"
+import { Moon, Sun, Building2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useDarkMode } from "@/lib/dark-mode-context"
 
@@ -14,6 +14,8 @@ export function DarkModeToggle() {
       case 'dark':
         return <Building2 className="h-4 w-4" />
       case 'blue':
+        return <Sparkles className="h-4 w-4" />
+      case 'clean':
         return <Sun className="h-4 w-4" />
       default:
         return <Moon className="h-4 w-4" />
