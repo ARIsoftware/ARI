@@ -98,6 +98,7 @@ const config: Config = {
     require("tailwindcss-animate"),
     plugin(function({ addVariant }) {
       addVariant('blue', '.blue &')
+      addVariant('clean', '.clean &')
     })
   ],
 };
