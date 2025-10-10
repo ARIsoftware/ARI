@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 
-export type Theme = 'light' | 'dark' | 'blue'
+export type Theme = 'light' | 'dark' | 'blue' | 'clean'
 
 type DarkModeContext = {
   theme: Theme
@@ -19,7 +19,7 @@ export function DarkModeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Load theme preference from localStorage
     const stored = localStorage.getItem('theme') as Theme | null
-    if (stored && ['light', 'dark', 'blue'].includes(stored)) {
+    if (stored && ['light', 'dark', 'blue', 'clean'].includes(stored)) {
       setTheme(stored)
     } else {
       // Migrate old darkMode setting
@@ -32,12 +32,14 @@ export function DarkModeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Apply theme class to document
-    document.documentElement.classList.remove('dark', 'blue')
+    document.documentElement.classList.remove('dark', 'blue', 'clean')
 
     if (theme === 'dark') {
       document.documentElement.classList.add('dark')
     } else if (theme === 'blue') {
       document.documentElement.classList.add('blue')
+    } else if (theme === 'clean') {
+      document.documentElement.classList.add('clean')
     }
 
     // Save preference
@@ -48,6 +50,7 @@ export function DarkModeProvider({ children }: { children: React.ReactNode }) {
     setTheme(prev => {
       if (prev === 'light') return 'dark'
       if (prev === 'dark') return 'blue'
+      if (prev === 'blue') return 'clean'
       return 'light'
     })
   }
