@@ -126,7 +126,7 @@ export default function DashboardPage() {
                 <div>
                   <h1 className="text-3xl font-medium">Dashboard</h1>
                   <p className="text-sm text-[#aa2020] mt-1">
-                    Winter Arc Fantastical
+                    Autumn Arc Fantastical
                   </p>
                 </div>
                 <div className="flex gap-2">
