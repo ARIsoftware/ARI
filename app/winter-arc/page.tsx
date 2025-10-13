@@ -1,0 +1,279 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useSupabase } from '@/components/providers';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { AppSidebar } from '@/components/app-sidebar';
+import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from '@/components/ui/breadcrumb';
+import { Separator } from '@/components/ui/separator';
+import { TaskAnnouncement } from '@/components/task-announcement';
+import { Loader2 } from 'lucide-react';
+import { getJournalEntry, saveJournalEntry } from '@/lib/journal';
+import { useToast } from '@/hooks/use-toast';
+
+const QUESTIONS = [
+  {
+    id: 'limiting_thoughts',
+    question: "What limiting thoughts are currently holding you back from achieving your goals in health, wealth, or freedom?",
+  },
+  {
+    id: 'barrier_behaviors',
+    question: "What specific behaviors or speech patterns might be creating barriers to your progress?",
+  },
+  {
+    id: 'stuck_emotions',
+    question: "Which emotions keep you stuck in your current situation, and why do they feel familiar or safe?",
+  },
+  {
+    id: 'empowering_thoughts',
+    question: "What new empowering thoughts do you want to consciously rewire into your brain?",
+  },
+  {
+    id: 'daily_behaviors',
+    question: "What daily behaviors reflect the person you want to become?",
+  },
+  {
+    id: 'reinforcement_practices',
+    question: "How can you practice and reinforce these new thought and behavior patterns each day?",
+  },
+  {
+    id: 'future_feelings',
+    question: "What would it feel like emotionally to have already achieved your goals?",
+  },
+  {
+    id: 'embody_now',
+    question: "How can you embody that future feeling right now, in your present state?",
+  },
+  {
+    id: 'daily_actions',
+    question: "What small daily actions could help your body and mind align with your desired future?",
+  },
+];
+
+export default function WinterArcPage() {
+  const { session } = useSupabase();
+  const { toast } = useToast();
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+
+  // Calculate countdown to Dec 31st 2025
+  useEffect(() => {
+    const calculateCountdown = () => {
+      const now = new Date();
+      const target = new Date('2025-12-31T23:59:59');
+      const difference = target.getTime() - now.getTime();
+
+      if (difference > 0) {
+        const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+
+        setCountdown({ days, hours, minutes, seconds });
+      }
+    };
+
+    calculateCountdown();
+    const interval = setInterval(calculateCountdown, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Load existing journal entry
+  useEffect(() => {
+    async function loadEntry() {
+      if (!session?.user?.id) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const tokenFn = async () => session?.access_token || null;
+        const data = await getJournalEntry('winter_arc', tokenFn);
+
+        if (data) {
+          const loadedAnswers: Record<string, string> = {};
+          QUESTIONS.forEach(q => {
+            if (data[q.id]) {
+              loadedAnswers[q.id] = data[q.id];
+            }
+          });
+          setAnswers(loadedAnswers);
+        }
+      } catch (error) {
+        console.error('Error loading journal entry:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (session) {
+      loadEntry();
+    }
+  }, [session]);
+
+  const handleSave = async () => {
+    if (!session?.user?.id) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to save entries.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const tokenFn = async () => session?.access_token || null;
+
+      const journalData = {
+        entry_type: 'winter_arc',
+        limiting_thoughts: answers.limiting_thoughts || null,
+        barrier_behaviors: answers.barrier_behaviors || null,
+        stuck_emotions: answers.stuck_emotions || null,
+        empowering_thoughts: answers.empowering_thoughts || null,
+        daily_behaviors: answers.daily_behaviors || null,
+        reinforcement_practices: answers.reinforcement_practices || null,
+        future_feelings: answers.future_feelings || null,
+        embody_now: answers.embody_now || null,
+        daily_actions: answers.daily_actions || null,
+      };
+
+      await saveJournalEntry(journalData, tokenFn);
+
+      toast({
+        title: "Success",
+        description: "Your Winter Arc journal has been saved!",
+      });
+    } catch (error: any) {
+      console.error('Error saving journal entry:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save your journal entry.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50/50">
+        <TaskAnnouncement />
+        <SidebarProvider>
+          <AppSidebar />
+          <SidebarInset>
+            <div className="flex items-center justify-center h-96">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          </SidebarInset>
+        </SidebarProvider>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50/50">
+      <TaskAnnouncement />
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-white px-4">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-2 h-4" />
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbPage>Winter Arc</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          </header>
+
+          <div className="flex flex-1 flex-col gap-6 p-6">
+            <div className="max-w-4xl mx-auto w-full">
+              <div className="mb-8">
+                <h1 className="text-4xl font-bold mb-4">Winter Arc 2026</h1>
+                <p className="text-muted-foreground mb-6">
+                  Transform yourself through conscious rewiring. Answer these questions to align your thoughts, behaviors, and emotions with your desired future.
+                </p>
+
+                {/* Countdown Timer */}
+                <Card className="mb-8">
+                  <CardHeader>
+                    <CardTitle className="text-center text-2xl">Time Until Dec 31st, 2025</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-4 gap-4 text-center">
+                      <div className="bg-gray-50 rounded-lg p-4 border">
+                        <div className="text-4xl font-bold">{countdown.days}</div>
+                        <div className="text-sm uppercase text-muted-foreground">Days</div>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-4 border">
+                        <div className="text-4xl font-bold">{countdown.hours}</div>
+                        <div className="text-sm uppercase text-muted-foreground">Hours</div>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-4 border">
+                        <div className="text-4xl font-bold">{countdown.minutes}</div>
+                        <div className="text-sm uppercase text-muted-foreground">Minutes</div>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-4 border">
+                        <div className="text-4xl font-bold">{countdown.seconds}</div>
+                        <div className="text-sm uppercase text-muted-foreground">Seconds</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Journal Questions */}
+              <div className="space-y-6">
+                {QUESTIONS.map((item, index) => (
+                  <Card key={item.id}>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Question {index + 1}</CardTitle>
+                      <CardDescription className="text-base">{item.question}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Textarea
+                        value={answers[item.id] || ''}
+                        onChange={(e) => setAnswers({ ...answers, [item.id]: e.target.value })}
+                        placeholder="Type your answer here..."
+                        className="min-h-[150px]"
+                      />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
+              {/* Save Button */}
+              <div className="mt-8 flex justify-center">
+                <Button
+                  onClick={handleSave}
+                  disabled={saving}
+                  size="lg"
+                  className="w-full sm:w-auto"
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Journal Entry'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    </div>
+  );
+}
