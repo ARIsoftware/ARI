@@ -72,8 +72,9 @@ export default async function ModuleCatchAllPage({
       notFound()
     }
 
-    // Determine if sidebar should be shown (default: true)
-    const showSidebar = moduleInfo.sidebar !== false
+    // Determine if fullscreen mode is enabled (default: false)
+    // When fullscreen is true, hide sidebar and top bar
+    const isFullscreen = moduleInfo.fullscreen === true
 
     // Wrap module page in error boundary to prevent crashes
     const pageContent = (
@@ -84,8 +85,16 @@ export default async function ModuleCatchAllPage({
       </ErrorBoundary>
     )
 
-    // Conditionally wrap with sidebar based on module.json sidebar field
-    if (showSidebar) {
+    // Conditionally wrap based on fullscreen mode
+    if (isFullscreen) {
+      // Fullscreen mode - no sidebar, no top bar
+      return (
+        <div className="min-h-screen bg-gray-50/50">
+          {pageContent}
+        </div>
+      )
+    } else {
+      // Normal mode - show sidebar and top bar (default)
       return (
         <div className="min-h-screen bg-gray-50/50">
           <SidebarProvider>
@@ -94,13 +103,6 @@ export default async function ModuleCatchAllPage({
               {pageContent}
             </SidebarInset>
           </SidebarProvider>
-        </div>
-      )
-    } else {
-      // No sidebar - full width layout
-      return (
-        <div className="min-h-screen bg-gray-50/50">
-          {pageContent}
         </div>
       )
     }

@@ -81,7 +81,7 @@ export default function DashboardPage() {
     }
   }
 
-  if (!session || loading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50/50">
         <TaskAnnouncement />
