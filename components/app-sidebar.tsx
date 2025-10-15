@@ -26,8 +26,26 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { isFeatureEnabled, loading } = useFeatures()
 
   // Load modules for sidebar positions
-  const { modules: mainModules, loading: modulesLoading } = useModulesByPosition('main')
-  const { modules: bottomModules } = useModulesByPosition('bottom')
+  const { modules: mainModulesUnsorted, loading: modulesLoading } = useModulesByPosition('main')
+  const { modules: bottomModulesUnsorted } = useModulesByPosition('bottom')
+
+  // Sort modules by menuPriority (lower first), then alphabetically
+  const sortModules = (modules: typeof mainModulesUnsorted) => {
+    return [...modules].sort((a, b) => {
+      const priorityA = a.menuPriority ?? 50
+      const priorityB = b.menuPriority ?? 50
+
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB
+      }
+
+      // Same priority - sort alphabetically
+      return a.name.localeCompare(b.name)
+    })
+  }
+
+  const mainModules = sortModules(mainModulesUnsorted)
+  const bottomModules = sortModules(bottomModulesUnsorted)
 
   // Filter items based on feature preferences
   const filterItems = (items: typeof menuConfig[0]['items']) => {
