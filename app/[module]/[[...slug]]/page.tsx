@@ -17,7 +17,17 @@ import { notFound } from 'next/navigation'
 import { getEnabledModule } from '@/lib/modules/module-registry'
 import { ErrorBoundary, ModuleErrorFallback } from '@/components/error-boundary'
 import { AppSidebar } from '@/components/app-sidebar'
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar'
+import { Separator } from '@/components/ui/separator'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb'
+import { TaskAnnouncement } from '@/components/task-announcement'
 
 // Import all module pages at build time
 // This is the only way to make dynamic routing work with Next.js App Router
@@ -90,6 +100,7 @@ export default async function ModuleCatchAllPage({
       // Fullscreen mode - no sidebar, no top bar
       return (
         <div className="min-h-screen bg-gray-50/50">
+          <TaskAnnouncement />
           {pageContent}
         </div>
       )
@@ -97,9 +108,25 @@ export default async function ModuleCatchAllPage({
       // Normal mode - show sidebar and top bar (default)
       return (
         <div className="min-h-screen bg-gray-50/50">
+          <TaskAnnouncement />
           <SidebarProvider>
             <AppSidebar />
             <SidebarInset>
+              <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-white px-4">
+                <SidebarTrigger className="-ml-1" />
+                <Separator orientation="vertical" className="mr-2 h-4" />
+                <Breadcrumb>
+                  <BreadcrumbList>
+                    <BreadcrumbItem>
+                      <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      <BreadcrumbPage>{moduleInfo.name}</BreadcrumbPage>
+                    </BreadcrumbItem>
+                  </BreadcrumbList>
+                </Breadcrumb>
+              </header>
               {pageContent}
             </SidebarInset>
           </SidebarProvider>
