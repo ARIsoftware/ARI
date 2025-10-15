@@ -104,54 +104,51 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         ))}
 
         {/* Module navigation - Main position */}
-        {mainModules.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Modules</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {mainModules.map((module) =>
-                  module.routes?.map((route) => {
-                    const Icon = getLucideIcon(route.icon || module.icon)
-                    return (
-                      <SidebarMenuItem key={route.path}>
-                        <SidebarMenuButton asChild>
-                          <a href={route.path} className="flex items-center">
-                            <Icon className="mr-2 size-4" />
-                            {route.label}
-                          </a>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    )
-                  })
-                )}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+        {mainModules.map((module) =>
+          module.routes?.map((route) => {
+            const Icon = getLucideIcon(route.icon || module.icon)
+            return (
+              <SidebarGroup key={route.path}>
+                {module.title && <SidebarGroupLabel>{module.title}</SidebarGroupLabel>}
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild>
+                        <a href={route.path} className="flex items-center">
+                          <Icon className="mr-2 size-4" />
+                          <span>{route.label}</span>
+                        </a>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )
+          })
         )}
 
         {/* Module navigation - Bottom position */}
-        {bottomModules.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {bottomModules.map((module) =>
-                  module.routes?.map((route) => {
-                    const Icon = getLucideIcon(route.icon || module.icon)
-                    return (
-                      <SidebarMenuItem key={route.path}>
-                        <SidebarMenuButton asChild>
-                          <a href={route.path} className="flex items-center">
-                            <Icon className="mr-2 size-4" />
-                            {route.label}
-                          </a>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    )
-                  })
-                )}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+        {bottomModules.map((module) =>
+          module.routes?.map((route) => {
+            const Icon = getLucideIcon(route.icon || module.icon)
+            return (
+              <SidebarGroup key={route.path}>
+                {module.title && <SidebarGroupLabel>{module.title}</SidebarGroupLabel>}
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild>
+                        <a href={route.path} className="flex items-center">
+                          <Icon className="mr-2 size-4" />
+                          <span>{route.label}</span>
+                        </a>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )
+          })
         )}
       </SidebarContent>
       <div className="mt-auto mb-16 flex items-center justify-center p-4">
