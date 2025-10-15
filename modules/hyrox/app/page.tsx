@@ -4,18 +4,6 @@ import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import { useSupabase } from "@/components/providers"
 import { DM_Sans } from "next/font/google"
-import { TaskAnnouncement } from "@/components/task-announcement"
-import { AppSidebar } from "../../components/app-sidebar"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import { Separator } from "@/components/ui/separator"
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
@@ -44,8 +32,7 @@ import {
   getTimeDifference,
   type HyroxStationRecord,
   type HyroxWorkout,
-} from "@/lib/hyrox-client"
-// Removed direct import of testHyroxDatabase - now using API route
+} from "@/modules/hyrox/lib/hyrox-client"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -364,7 +351,7 @@ export default function HyroxPage() {
   const runDatabaseTest = async () => {
     console.log('Running database diagnostics...')
     try {
-      const response = await fetch('/api/hyrox/test-database')
+      const response = await fetch('/api/modules/hyrox/test-database')
       const result = await response.json()
       console.log('Database test result:', result)
       
@@ -413,7 +400,7 @@ export default function HyroxPage() {
     }
 
     try {
-      const response = await fetch('/api/hyrox/reset', {
+      const response = await fetch('/api/modules/hyrox/reset', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -442,28 +429,7 @@ export default function HyroxPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      <TaskAnnouncement />
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-white px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="#">Fitness First</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>Hyrox</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </header>
-
-          <div className="flex flex-1 flex-col gap-6 p-6">
+    <div className="flex flex-1 flex-col gap-6 p-6">
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
@@ -1046,9 +1012,6 @@ export default function HyroxPage() {
                 </div>
               </TabsContent>
             </Tabs>
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
 
       {/* YouTube Video Modal */}
       <YouTubeModal

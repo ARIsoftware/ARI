@@ -35,7 +35,7 @@ export interface HyroxWorkoutStation {
 // Get all station records for a user
 export async function getHyroxStationRecords(userId: string): Promise<HyroxStationRecord[]> {
   try {
-    const response = await fetch('/api/hyrox/station-records', {
+    const response = await fetch('/api/modules/hyrox/station-records', {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -61,7 +61,7 @@ export async function updateStationRecord(
   newTime: number
 ): Promise<HyroxStationRecord | null> {
   try {
-    const response = await fetch('/api/hyrox/station-records', {
+    const response = await fetch('/api/modules/hyrox/station-records', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -84,7 +84,7 @@ export async function updateStationRecord(
 // Create a new workout session
 export async function createHyroxWorkout(userId: string): Promise<HyroxWorkout | null> {
   try {
-    const response = await fetch('/api/hyrox/workouts', {
+    const response = await fetch('/api/modules/hyrox/workouts', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -109,7 +109,7 @@ export async function completeHyroxWorkout(
   totalTime: number
 ): Promise<HyroxWorkout | null> {
   try {
-    const response = await fetch('/api/hyrox/workouts', {
+    const response = await fetch('/api/modules/hyrox/workouts', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -138,7 +138,7 @@ export async function addWorkoutStation(
   completed: boolean = true
 ): Promise<HyroxWorkoutStation | null> {
   try {
-    const response = await fetch('/api/hyrox/workout-stations', {
+    const response = await fetch('/api/modules/hyrox/workout-stations', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
