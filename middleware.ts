@@ -26,7 +26,8 @@ const protectedRoutes = [
   "/profile",
   "/logs",
   "/radar",
-  "/debug"
+  "/debug",
+  "/api" // All API routes require authentication (defense-in-depth)
 ]
 const publicRoutes = ["/sign-in", "/auth"]
 

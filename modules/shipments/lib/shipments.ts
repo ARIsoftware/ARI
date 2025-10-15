@@ -13,12 +13,12 @@ export type Shipment = {
 
 export async function getShipments(getToken: () => Promise<string | null>): Promise<Shipment[]> {
   const token = await getToken()
-  
+
   if (!token) {
     throw new Error('Authentication required')
   }
 
-  const response = await fetch('/api/shipments', {
+  const response = await fetch('/api/modules/shipments/items', {
     headers: {
       'Authorization': `Bearer ${token}`,
     },
@@ -40,7 +40,7 @@ export async function getShipment(id: string, getToken: () => Promise<string | n
     throw new Error('Authentication required')
   }
 
-  const response = await fetch(`/api/shipments/${id}`, {
+  const response = await fetch(`/api/modules/shipments/items?id=${id}`, {
     headers: {
       'Authorization': `Bearer ${token}`,
     },
@@ -65,7 +65,7 @@ export async function createShipment(
     throw new Error('Authentication required')
   }
 
-  const response = await fetch('/api/shipments', {
+  const response = await fetch('/api/modules/shipments/items', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -94,7 +94,7 @@ export async function updateShipment(
     throw new Error('Authentication required')
   }
 
-  const response = await fetch(`/api/shipments/${id}`, {
+  const response = await fetch(`/api/modules/shipments/items?id=${id}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -119,7 +119,7 @@ export async function deleteShipment(id: string, getToken: () => Promise<string 
     throw new Error('Authentication required')
   }
 
-  const response = await fetch(`/api/shipments/${id}`, {
+  const response = await fetch(`/api/modules/shipments/items?id=${id}`, {
     method: 'DELETE',
     headers: {
       'Authorization': `Bearer ${token}`,
