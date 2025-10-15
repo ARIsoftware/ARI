@@ -27,10 +27,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       const { data: { session } } = await supabase.auth.getSession()
       setSession(session)
 
-      // Verify user authenticity with getUser() only if session exists
-      if (session) {
-        const { data: { user } } = await supabase.auth.getUser()
-        setUser(user)
+      // Get user from session (no network call needed)
+      if (session?.user) {
+        setUser(session.user)
       }
     }
 
@@ -42,10 +41,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
         console.log('[Auth] State change event:', event)
         setSession(session)
 
-        // Verify user on auth state changes
-        if (session) {
-          const { data: { user } } = await supabase.auth.getUser()
-          setUser(user)
+        // Get user from session (no network call needed)
+        if (session?.user) {
+          setUser(session.user)
         } else {
           setUser(null)
         }
@@ -66,9 +64,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
       } else if (session) {
         console.log('[Auth] Session refreshed successfully')
         setSession(session)
-        // Optionally verify user after refresh
-        const { data: { user } } = await supabase.auth.getUser()
-        setUser(user)
+        // Get user from refreshed session (no network call needed)
+        if (session.user) {
+          setUser(session.user)
+        }
       }
     }, 30 * 60 * 1000) // 30 minutes
 
