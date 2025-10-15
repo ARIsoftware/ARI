@@ -96,6 +96,10 @@ export interface ModuleManifest {
   icon?: string
   /** Default enabled state for new users */
   enabled?: boolean
+  /** Show sidebar navigation (default: true) */
+  sidebar?: boolean
+  /** Menu priority for ordering (1-100, lower appears first, default: 50) */
+  menuPriority?: number
   /** Module capabilities (metadata only) */
   permissions?: ModulePermissions
   /** Navigation routes */

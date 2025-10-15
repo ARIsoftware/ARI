@@ -16,6 +16,8 @@
 import { notFound } from 'next/navigation'
 import { getEnabledModule } from '@/lib/modules/module-registry'
 import { ErrorBoundary, ModuleErrorFallback } from '@/components/error-boundary'
+import { AppSidebar } from '@/components/app-sidebar'
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 
 // Import all module pages at build time
 // This is the only way to make dynamic routing work with Next.js App Router
@@ -70,14 +72,38 @@ export default async function ModuleCatchAllPage({
       notFound()
     }
 
+    // Determine if sidebar should be shown (default: true)
+    const showSidebar = moduleInfo.sidebar !== false
+
     // Wrap module page in error boundary to prevent crashes
-    return (
+    const pageContent = (
       <ErrorBoundary
         fallback={<ModuleErrorFallback moduleName={moduleInfo.name} />}
       >
         <PageComponent.default />
       </ErrorBoundary>
     )
+
+    // Conditionally wrap with sidebar based on module.json sidebar field
+    if (showSidebar) {
+      return (
+        <div className="min-h-screen bg-gray-50/50">
+          <SidebarProvider>
+            <AppSidebar />
+            <SidebarInset>
+              {pageContent}
+            </SidebarInset>
+          </SidebarProvider>
+        </div>
+      )
+    } else {
+      // No sidebar - full width layout
+      return (
+        <div className="min-h-screen bg-gray-50/50">
+          {pageContent}
+        </div>
+      )
+    }
   } catch (error: any) {
     // Log the error for debugging
     console.error(`Failed to load module ${module} page:`, error)
