@@ -97,10 +97,9 @@ export default async function ModuleCatchAllPage({
 
     // Conditionally wrap based on fullscreen mode
     if (isFullscreen) {
-      // Fullscreen mode - no sidebar, no top bar
+      // Fullscreen mode - pure module content only, no sidebar, no top bar
       return (
         <div className="min-h-screen bg-gray-50/50">
-          <TaskAnnouncement />
           {pageContent}
         </div>
       )
