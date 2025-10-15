@@ -1,18 +1,46 @@
 /**
  * Module API Catch-All Route
  *
- * Dynamically imports and executes module API handlers.
+ * Dynamically imports and executes module API handlers using a registry pattern.
  * Proxies requests to module API routes in /modules/[module]/api/
  *
  * URL Pattern: /api/modules/[module]/[...path]
  * Example: /api/modules/hello-world/data → /modules/hello-world/api/data/route.ts
+ *
+ * IMPORTANT: This uses a registry-based approach since Next.js/Turbopack cannot
+ * resolve dynamic imports with runtime-constructed paths. When adding a new module
+ * API route, you must register it in the MODULE_API_ROUTES object below.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getEnabledModule } from '@/lib/modules/module-registry'
 
 /**
- * Handle API requests by dynamically importing module handlers
+ * Module API Routes Registry
+ *
+ * Maps module IDs and API paths to their corresponding route handlers.
+ * This registry uses static import paths that can be analyzed at build time.
+ *
+ * Pattern: { 'module-id': { 'api-path': () => import('@/modules/module-id/api/api-path/route') } }
+ *
+ * When adding a new module with API routes:
+ * 1. Add the module ID as a key
+ * 2. For each API route in /modules/[module]/api/[route]/, add an entry
+ * 3. Use the folder name as the key (e.g., 'data' for /api/data/)
+ * 4. Use static import path: () => import('@/modules/[module]/api/[route]/route')
+ */
+const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
+  'hello-world': {
+    'data': () => import('@/modules/hello-world/api/data/route'),
+    'settings': () => import('@/modules/hello-world/api/settings/route')
+  },
+  'shipments': {
+    'items': () => import('@/modules/shipments/api/items/route')
+  }
+}
+
+/**
+ * Handle API requests using the MODULE_API_ROUTES registry
  */
 async function handleRequest(
   request: NextRequest,
@@ -31,14 +59,31 @@ async function handleRequest(
       )
     }
 
-    // Build relative path to module API handler
-    // IMPORTANT: Must use relative paths, not @/ alias
-    // Dynamic imports require actual filesystem paths
+    // Build API path from segments (e.g., ['items'] -> 'items')
     const apiPath = path.join('/')
-    const handlerPath = `../../../../../../modules/${module}/api/${apiPath}/route`
 
-    // Dynamically import the module's API handler
-    const handler = await import(/* @vite-ignore */ handlerPath)
+    // Look up module in registry
+    const moduleRoutes = MODULE_API_ROUTES[module]
+    if (!moduleRoutes) {
+      console.error(`[Module API] Module '${module}' not found in registry`)
+      return NextResponse.json(
+        { error: `API routes not registered for module: ${module}` },
+        { status: 404 }
+      )
+    }
+
+    // Look up specific route in module
+    const routeLoader = moduleRoutes[apiPath]
+    if (!routeLoader) {
+      console.error(`[Module API] Route '${apiPath}' not found in module '${module}' registry`)
+      return NextResponse.json(
+        { error: `API route not found: /api/modules/${module}/${apiPath}` },
+        { status: 404 }
+      )
+    }
+
+    // Load the route handler using the static import
+    const handler = await routeLoader()
 
     // Check if the HTTP method is supported by this handler
     if (!handler[method]) {
@@ -55,14 +100,6 @@ async function handleRequest(
   } catch (error: any) {
     // Log error for debugging
     console.error(`[Module API ${module}/${path.join('/')}] Error:`, error)
-
-    // Check if it's a module not found error (import failed)
-    if (error.code === 'MODULE_NOT_FOUND' || error.message?.includes('Cannot find module')) {
-      return NextResponse.json(
-        { error: `API route not found: /api/modules/${module}/${path.join('/')}` },
-        { status: 404 }
-      )
-    }
 
     // Generic error response
     return NextResponse.json(

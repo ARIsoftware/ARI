@@ -146,18 +146,6 @@ export const menuConfig: MenuGroup[] = [
     ],
   },
   {
-    title: "Shipments",
-    url: "/shipments",
-    icon: Package,
-    items: [
-      {
-        title: "All Shipments",
-        url: "/shipments",
-        icon: Package,
-      },
-    ],
-  },
-  {
     title: "Settings",
     url: "#",
     icon: Settings,
@@ -256,7 +244,6 @@ function getFeatureDescription(title: string, url: string): string {
     '/add-task': 'Create new tasks',
     '/radar': 'Visualize task priorities',
     '/contacts': 'People and contacts management',
-    '/shipments': 'Track shipments and deliveries',
     '/settings': 'Application settings and preferences',
   }
 
