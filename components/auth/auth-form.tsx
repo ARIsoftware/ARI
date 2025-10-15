@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createSupabaseClient } from '@/lib/supabase-auth'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -23,6 +23,20 @@ export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter()
   const supabase = createSupabaseClient()
 
+  // Listen for auth state changes and redirect when signed in
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[AuthForm] Auth state change:', event, session ? 'Session exists' : 'No session')
+
+      if (event === 'SIGNED_IN' && session) {
+        console.log('[AuthForm] User signed in, redirecting to dashboard...')
+        window.location.href = '/dashboard'
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [supabase])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -30,7 +44,10 @@ export function AuthForm({ mode }: AuthFormProps) {
     setMessage(null)
 
     try {
+      console.log('[Auth] Starting sign-in process...')
+
       if (mode === 'sign-up') {
+        console.log('[Auth] Sign-up mode')
         const { error } = await supabase.auth.signUp({
           email,
           password,
@@ -42,20 +59,35 @@ export function AuthForm({ mode }: AuthFormProps) {
         if (error) throw error
 
         setMessage('Check your email for the confirmation link!')
+        setLoading(false)
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        console.log('[Auth] Sign-in mode - calling signInWithPassword...')
+
+        // Call signInWithPassword but don't await - let the auth state change handle redirect
+        supabase.auth.signInWithPassword({
           email,
           password,
+        }).then(({ error, data }) => {
+          if (error) {
+            console.error('[Auth] Sign-in error:', error)
+            setError(error.message)
+            setLoading(false)
+          } else {
+            console.log('[Auth] Sign-in call completed:', data.session ? 'Session created' : 'No session')
+            // Don't redirect here - the useEffect auth listener will handle it
+          }
+        }).catch((error) => {
+          console.error('[Auth] Sign-in exception:', error)
+          setError(error.message)
+          setLoading(false)
         })
 
-        if (error) throw error
-
-        router.push('/dashboard')
-        router.refresh()
+        // Return early - the auth state change listener will redirect
+        return
       }
     } catch (error: any) {
+      console.error('[Auth] Error:', error)
       setError(error.message)
-    } finally {
       setLoading(false)
     }
   }
