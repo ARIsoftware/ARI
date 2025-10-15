@@ -23,10 +23,8 @@ export const RESERVED_MODULE_IDS = [
 
   // Core features
   'daily-fitness',
-  'hyrox',
   'northstar',
   'radar',
-  'assist',
   'fitness',
   'motivation',
   'winter-arc',

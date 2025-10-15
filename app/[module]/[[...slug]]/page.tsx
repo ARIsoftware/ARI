@@ -33,7 +33,9 @@ import { TaskAnnouncement } from '@/components/task-announcement'
 // This is the only way to make dynamic routing work with Next.js App Router
 const MODULE_PAGES: Record<string, any> = {
   'hello-world': () => import('@/modules/hello-world/app/page'),
-  'shipments': () => import('@/modules/shipments/app/page')
+  'shipments': () => import('@/modules/shipments/app/page'),
+  'hyrox': () => import('@/modules/hyrox/app/page'),
+  'assist': () => import('@/modules/assist/app/page')
 }
 
 /**
