@@ -418,10 +418,15 @@ export default function DatabaseTestPage() {
     try {
       console.log('🔑 Checking session status...')
 
-      // Get session first (fast, from cookies)
-      const { data: { session } } = await supabase.auth.getSession()
+      // Get session with timeout (fast, from cookies)
+      const sessionPromise = supabase.auth.getSession()
+      const timeoutPromise = new Promise<any>((_, reject) =>
+        setTimeout(() => reject(new Error('Session check timed out after 5 seconds')), 5000)
+      )
 
-      if (!session) {
+      const { data: { session: sessionData } } = await Promise.race([sessionPromise, timeoutPromise])
+
+      if (!sessionData) {
         updateTestResult('Session Status', {
           status: 'warning',
           message: 'No active session',
@@ -433,13 +438,13 @@ export default function DatabaseTestPage() {
           status: 'success',
           message: 'Active session found',
           data: {
-            access_token: session.access_token ? 'Present' : 'Missing',
-            refresh_token: session.refresh_token ? 'Present' : 'Missing',
-            expires_at: session.expires_at ? new Date(session.expires_at * 1000).toISOString() : 'Unknown',
-            user_id: session.user?.id || 'Unknown'
+            access_token: sessionData.access_token ? 'Present' : 'Missing',
+            refresh_token: sessionData.refresh_token ? 'Present' : 'Missing',
+            expires_at: sessionData.expires_at ? new Date(sessionData.expires_at * 1000).toISOString() : 'Unknown',
+            user_id: sessionData.user?.id || 'Unknown'
           }
         })
-        console.log('✅ Session found for user:', session.user?.email)
+        console.log('✅ Session found for user:', sessionData.user?.email)
       }
     } catch (error: any) {
       updateTestResult('Session Status', {
