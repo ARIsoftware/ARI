@@ -32,7 +32,6 @@ export const RESERVED_MODULE_IDS = [
   'winter-arc',
   'hd-dashboard',
   'logs',
-  'shipments',
 
   // Core add/edit pages
   'add-fitness',
