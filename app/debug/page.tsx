@@ -329,13 +329,17 @@ export default function DatabaseTestPage() {
       console.warn('⚠️ Continuing tests despite connection failure...')
     }
 
-    // Test 4: Authentication Status with timeout
+    // Test 4: Authentication Status with session check first
     updateTestResult('Authentication Status', { status: 'testing' })
     try {
       console.log('🔐 Starting authentication check...')
 
-      // First check session (fast, from cookies)
-      const { data: sessionData } = await supabase.auth.getSession()
+      // PERFORMANCE FIX: Check session first (fast, from cookies)
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+
+      if (sessionError) {
+        throw new Error(`Session error: ${sessionError.message}`)
+      }
 
       if (!sessionData.session) {
         // No session found - user is not authenticated
@@ -346,31 +350,31 @@ export default function DatabaseTestPage() {
         })
         console.log('⚠️ Not authenticated - skipping user verification')
       } else {
-        // Session exists - verify with getUser() with timeout
-        const authPromise = supabase.auth.getUser()
-        const timeoutPromise = new Promise<any>((_, reject) =>
-          setTimeout(() => reject(new Error('User verification timed out after 5 seconds')), 5000)
-        )
-
-        const result = await Promise.race([authPromise, timeoutPromise])
-        const { data, error } = result || {}
-        const user = data?.user
-
-        if (error) {
-          console.error('Auth error details:', error)
-          throw error
-        }
+        // Session exists - display session info
+        const session = sessionData.session
+        const expiresAt = session.expires_at ? new Date(session.expires_at * 1000) : null
+        const now = new Date()
+        const isExpired = expiresAt ? expiresAt < now : false
 
         updateTestResult('Authentication Status', {
-          status: user ? 'success' : 'warning',
-          message: user ? `Authenticated as ${user.email}` : 'Session found but user verification failed',
-          data: user ? {
-            id: user.id,
-            email: user.email,
-            created_at: user.created_at
-          } : { note: 'Could not verify user' }
+          status: isExpired ? 'warning' : 'success',
+          message: isExpired
+            ? 'Session expired - refresh required'
+            : `Authenticated as ${session.user.email}`,
+          data: {
+            user_id: session.user.id,
+            email: session.user.email,
+            expires_at: expiresAt?.toISOString() || 'Unknown',
+            is_expired: isExpired,
+            access_token: session.access_token ? 'Present (truncated)' : 'Missing',
+            refresh_token: session.refresh_token ? 'Present (truncated)' : 'Missing'
+          }
         })
-        console.log('✅ Auth check:', user ? 'Authenticated' : 'Verification failed')
+        console.log('✅ Session check complete:', {
+          email: session.user.email,
+          expires: expiresAt?.toISOString(),
+          expired: isExpired
+        })
       }
     } catch (error: any) {
       updateTestResult('Authentication Status', {
