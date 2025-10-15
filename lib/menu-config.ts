@@ -33,18 +33,6 @@ export const menuConfig: MenuGroup[] = [
     ],
   },
   {
-    title: "Assist",
-    url: "/assist",
-    icon: Bot,
-    items: [
-      {
-        title: "Assist",
-        url: "/assist",
-        icon: Bot,
-      },
-    ],
-  },
-  {
     title: "Northstar",
     url: "/northstar",
     icon: Compass,
@@ -78,11 +66,6 @@ export const menuConfig: MenuGroup[] = [
     url: "#",
     icon: Dumbbell,
     items: [
-      {
-        title: "Hyrox",
-        url: "/hyrox",
-        icon: Target,
-      },
       {
         title: "Daily Fitness",
         url: "/daily-fitness",
@@ -234,11 +217,9 @@ function getFeatureDescription(title: string, url: string): string {
   const descriptions: Record<string, string> = {
     '/dashboard': 'Overview of your tasks, fitness, and goals',
     '/hd-dashboard': 'High-density dashboard view',
-    '/assist': 'AI-powered assistant',
     '/northstar': 'Track your goals and milestones',
     '/winter-arc': 'Winter Arc 2026 transformation journal',
     '/motivation': 'Inspirational content and quotes',
-    '/hyrox': 'HYROX training workouts',
     '/daily-fitness': 'Daily fitness tracking',
     '/tasks': 'Manage your todo list',
     '/add-task': 'Create new tasks',

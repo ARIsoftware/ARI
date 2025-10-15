@@ -36,6 +36,14 @@ const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
   },
   'shipments': {
     'items': () => import('@/modules/shipments/api/items/route')
+  },
+  'hyrox': {
+    'workouts': () => import('@/modules/hyrox/api/workouts/route'),
+    'workout-stations': () => import('@/modules/hyrox/api/workout-stations/route'),
+    'station-records': () => import('@/modules/hyrox/api/station-records/route'),
+    'setup': () => import('@/modules/hyrox/api/setup/route'),
+    'reset': () => import('@/modules/hyrox/api/reset/route'),
+    'test-database': () => import('@/modules/hyrox/api/test-database/route')
   }
 }
 
