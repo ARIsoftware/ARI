@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createSupabaseClient } from '@/lib/supabase-auth'
+import { useSupabase } from '@/components/providers'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -31,6 +31,9 @@ interface SecurityTestResult {
 }
 
 export default function DatabaseTestPage() {
+  // Use the global Supabase client from context (already authenticated)
+  const { supabase, user, session } = useSupabase()
+
   const [testResults, setTestResults] = useState<TestResult[]>([
     { name: 'Supabase Client Initialization', status: 'pending' },
     { name: 'Environment Variables', status: 'pending' },
@@ -219,17 +222,15 @@ export default function DatabaseTestPage() {
 
     // Test 2: Supabase Client
     updateTestResult('Supabase Client Initialization', { status: 'testing' })
-    let supabase: any
     try {
-      supabase = createSupabaseClient()
       if (!supabase) {
-        throw new Error('Failed to create Supabase client')
+        throw new Error('Supabase client not available from context')
       }
       updateTestResult('Supabase Client Initialization', {
         status: 'success',
-        message: 'Client created successfully'
+        message: 'Client retrieved from global context'
       })
-      console.log('✅ Supabase client initialized')
+      console.log('✅ Supabase client from context')
     } catch (error: any) {
       updateTestResult('Supabase Client Initialization', {
         status: 'error',
@@ -329,29 +330,26 @@ export default function DatabaseTestPage() {
       console.warn('⚠️ Continuing tests despite connection failure...')
     }
 
-    // Test 4: Authentication Status with session check first
+    // Test 4: Authentication Status - use session from global context
     updateTestResult('Authentication Status', { status: 'testing' })
     try {
       console.log('🔐 Starting authentication check...')
 
-      // PERFORMANCE FIX: Check session first (fast, from cookies)
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-
-      if (sessionError) {
-        throw new Error(`Session error: ${sessionError.message}`)
-      }
-
-      if (!sessionData.session) {
+      // Use session from global context (already loaded, no network call needed)
+      if (!session) {
         // No session found - user is not authenticated
         updateTestResult('Authentication Status', {
           status: 'warning',
           message: 'Not authenticated - please sign in',
-          data: { note: 'No user session found', hint: 'Visit /sign-in to authenticate' }
+          data: {
+            note: 'No user session found in global context',
+            hint: 'Visit /sign-in to authenticate',
+            user_from_context: user ? 'Present' : 'Missing'
+          }
         })
-        console.log('⚠️ Not authenticated - skipping user verification')
+        console.log('⚠️ Not authenticated - no session in context')
       } else {
-        // Session exists - display session info
-        const session = sessionData.session
+        // Session exists - display session info from context
         const expiresAt = session.expires_at ? new Date(session.expires_at * 1000) : null
         const now = new Date()
         const isExpired = expiresAt ? expiresAt < now : false
@@ -367,10 +365,12 @@ export default function DatabaseTestPage() {
             expires_at: expiresAt?.toISOString() || 'Unknown',
             is_expired: isExpired,
             access_token: session.access_token ? 'Present (truncated)' : 'Missing',
-            refresh_token: session.refresh_token ? 'Present (truncated)' : 'Missing'
+            refresh_token: session.refresh_token ? 'Present (truncated)' : 'Missing',
+            note: 'Session retrieved from global context (instant, no network call)',
+            user_from_context: user ? `Present (${user.email})` : 'Missing'
           }
         })
-        console.log('✅ Session check complete:', {
+        console.log('✅ Session check complete (from context):', {
           email: session.user.email,
           expires: expiresAt?.toISOString(),
           expired: isExpired
@@ -381,7 +381,7 @@ export default function DatabaseTestPage() {
         status: 'error',
         error: error.message,
         data: {
-          hint: 'This might be a network or configuration issue'
+          hint: 'Error accessing session from global context'
         }
       })
       console.error('❌ Auth check failed:', error)

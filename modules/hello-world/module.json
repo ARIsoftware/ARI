@@ -6,7 +6,7 @@
   "author": "ARI Development Team <dev@ari.example.com>",
   "icon": "Package",
   "enabled": true,
-  "sidebar": true,
+  "fullscreen": false,
   "menuPriority": 2,
   "permissions": {
     "database": true,
