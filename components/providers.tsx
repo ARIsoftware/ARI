@@ -27,15 +27,19 @@ export function Providers({ children }: { children: React.ReactNode }) {
       const { data: { session } } = await supabase.auth.getSession()
       setSession(session)
 
-      // Verify user authenticity with getUser()
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
+      // Verify user authenticity with getUser() only if session exists
+      if (session) {
+        const { data: { user } } = await supabase.auth.getUser()
+        setUser(user)
+      }
     }
 
     initAuth()
 
+    // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('[Auth] State change event:', event)
         setSession(session)
 
         // Verify user on auth state changes
@@ -48,7 +52,30 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }
     )
 
-    return () => subscription.unsubscribe()
+    // Set up periodic session refresh (every 30 minutes)
+    // This prevents sessions from expiring while user is active
+    const refreshInterval = setInterval(async () => {
+      console.log('[Auth] Refreshing session...')
+      const { data: { session }, error } = await supabase.auth.refreshSession()
+
+      if (error) {
+        console.error('[Auth] Session refresh failed:', error.message)
+        // If refresh fails, clear the session and user
+        setSession(null)
+        setUser(null)
+      } else if (session) {
+        console.log('[Auth] Session refreshed successfully')
+        setSession(session)
+        // Optionally verify user after refresh
+        const { data: { user } } = await supabase.auth.getUser()
+        setUser(user)
+      }
+    }, 30 * 60 * 1000) // 30 minutes
+
+    return () => {
+      subscription.unsubscribe()
+      clearInterval(refreshInterval)
+    }
   }, [supabase])
 
   return (
