@@ -103,12 +103,9 @@ export async function middleware(req: NextRequest) {
     }
   )
 
-  // Verify user authentication - use getUser() for security
-  const { data: { user }, error } = await supabase.auth.getUser()
-
   const { pathname } = req.nextUrl
 
-  // Allow public routes
+  // Allow public routes without any auth checks
   if (publicRoutes.some(route => pathname.startsWith(route))) {
     return supabaseResponse
   }
@@ -116,8 +113,28 @@ export async function middleware(req: NextRequest) {
   // Check authentication for protected routes
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
 
-  if (isProtectedRoute && !user) {
-    return NextResponse.redirect(new URL('/sign-in', req.url))
+  let user = null
+
+  if (isProtectedRoute) {
+    // PERFORMANCE FIX: Check session first (fast, from cookies)
+    // This avoids expensive network calls to Supabase on every request
+    const { data: { session } } = await supabase.auth.getSession()
+
+    if (!session) {
+      // No session - redirect to sign-in
+      return NextResponse.redirect(new URL('/sign-in', req.url))
+    }
+
+    // Session exists - for extra security on protected routes, verify it's valid
+    // Note: This still makes a network call, but only for authenticated users
+    const { data: { user: verifiedUser }, error } = await supabase.auth.getUser()
+
+    if (error || !verifiedUser) {
+      // Session is invalid or expired - redirect to sign-in
+      return NextResponse.redirect(new URL('/sign-in', req.url))
+    }
+
+    user = verifiedUser
   }
 
   // Check if feature is disabled for authenticated users
