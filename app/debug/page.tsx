@@ -33,6 +33,16 @@ interface SecurityTestResult {
 export default function DatabaseTestPage() {
   // Use the global Supabase client from context (already authenticated)
   const { supabase, user, session } = useSupabase()
+  const [sessionLoading, setSessionLoading] = useState(true)
+
+  // Wait for session to initialize from Providers
+  useEffect(() => {
+    // Give Providers context time to initialize
+    const timer = setTimeout(() => {
+      setSessionLoading(false)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [])
 
   const [testResults, setTestResults] = useState<TestResult[]>([
     { name: 'Supabase Client Initialization', status: 'pending' },
@@ -334,6 +344,21 @@ export default function DatabaseTestPage() {
     updateTestResult('Authentication Status', { status: 'testing' })
     try {
       console.log('🔐 Starting authentication check...')
+
+      // Check if session is still loading from Providers
+      if (sessionLoading) {
+        updateTestResult('Authentication Status', {
+          status: 'testing',
+          message: 'Waiting for session to initialize...',
+          data: {
+            note: 'Session is loading from Providers context'
+          }
+        })
+        console.log('⏳ Waiting for session to initialize...')
+
+        // Wait a bit longer for session to load
+        await new Promise(resolve => setTimeout(resolve, 1000))
+      }
 
       // Use session from global context (already loaded, no network call needed)
       if (!session) {
