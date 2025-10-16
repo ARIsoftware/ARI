@@ -35,7 +35,7 @@ export async function GET(request: Request) {
 
     // Get fitness task completion data
     const { data: completions, error: completionsError } = await supabase
-      .from('ari-fitness-database')
+      .from('fitness_database')
       .select('*')
       .eq('user_id', user.id)
 

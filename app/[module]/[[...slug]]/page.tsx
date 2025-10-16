@@ -35,7 +35,8 @@ const MODULE_PAGES: Record<string, any> = {
   'hello-world': () => import('@/modules/hello-world/app/page'),
   'shipments': () => import('@/modules/shipments/app/page'),
   'hyrox': () => import('@/modules/hyrox/app/page'),
-  'assist': () => import('@/modules/assist/app/page')
+  'assist': () => import('@/modules/assist/app/page'),
+  'daily-fitness': () => import('@/modules/daily-fitness/app/page')
 }
 
 /**
