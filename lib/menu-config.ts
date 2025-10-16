@@ -62,28 +62,6 @@ export const menuConfig: MenuGroup[] = [
     ],
   },
   {
-    title: "Fitness First",
-    url: "#",
-    icon: Dumbbell,
-    items: [
-      {
-        title: "Daily Fitness",
-        url: "/daily-fitness",
-        icon: Dumbbell,
-      },
-      {
-        title: "Goals",
-        url: "#",
-        icon: Target,
-      },
-      {
-        title: "Progress",
-        url: "#",
-        icon: TrendingUp,
-      },
-    ],
-  },
-  {
     title: "Todo",
     url: "#",
     icon: CheckSquare,
@@ -220,7 +198,6 @@ function getFeatureDescription(title: string, url: string): string {
     '/northstar': 'Track your goals and milestones',
     '/winter-arc': 'Winter Arc 2026 transformation journal',
     '/motivation': 'Inspirational content and quotes',
-    '/daily-fitness': 'Daily fitness tracking',
     '/tasks': 'Manage your todo list',
     '/add-task': 'Create new tasks',
     '/radar': 'Visualize task priorities',
