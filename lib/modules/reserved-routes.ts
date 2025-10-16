@@ -22,7 +22,6 @@ export const RESERVED_MODULE_IDS = [
   'sign-up',
 
   // Core features
-  'daily-fitness',
   'northstar',
   'radar',
   'fitness',

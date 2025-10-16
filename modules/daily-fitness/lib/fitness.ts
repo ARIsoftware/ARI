@@ -1,5 +1,5 @@
-import { type FitnessTask } from "./supabase"
-import { incrementFitnessTaskCompletion } from "./fitness-stats"
+import { type FitnessTask } from "@/lib/supabase"
+import { incrementFitnessTaskCompletion } from "@/lib/fitness-stats"
 
 export type { FitnessTask }
 
