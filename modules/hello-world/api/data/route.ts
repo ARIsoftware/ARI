@@ -19,7 +19,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase-auth'
+import { createSupabaseClient } from '@/lib/supabase-auth'
 import { z } from 'zod'
 
 /**
@@ -42,7 +42,7 @@ const CreateEntrySchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     // Create Supabase client for this request
-    const supabase = createClient()
+    const supabase = createSupabaseClient()
 
     // Validate authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Create Supabase client for this request
-    const supabase = createClient()
+    const supabase = createSupabaseClient()
 
     // Validate authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     // Create Supabase client for this request
-    const supabase = createClient()
+    const supabase = createSupabaseClient()
 
     // Validate authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -221,7 +221,7 @@ export async function DELETE(request: NextRequest) {
  *
  * 1. Authentication:
  *    - ALWAYS validate authentication in module API routes
- *    - Use createClient() from @/lib/supabase-auth
+ *    - Use createSupabaseClient() from @/lib/supabase-auth
  *    - Check for user with getUser()
  *    - Return 401 if authentication fails
  *

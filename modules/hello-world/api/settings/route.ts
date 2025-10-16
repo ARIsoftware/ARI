@@ -13,7 +13,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase-auth'
+import { createSupabaseClient } from '@/lib/supabase-auth'
 import { z } from 'zod'
 
 /**
@@ -37,7 +37,7 @@ const SettingsSchema = z.object({
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = createSupabaseClient()
 
     // Authenticate
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = createClient()
+    const supabase = createSupabaseClient()
 
     // Authenticate
     const { data: { user }, error: authError } = await supabase.auth.getUser()
