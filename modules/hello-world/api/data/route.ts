@@ -19,7 +19,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseClient } from '@/lib/supabase-auth'
+import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { z } from 'zod'
 
 /**
@@ -41,13 +41,9 @@ const CreateEntrySchema = z.object({
  */
 export async function GET(request: NextRequest) {
   try {
-    // Create Supabase client for this request
-    const supabase = createSupabaseClient()
+    const { user, supabase } = await getAuthenticatedUser()
 
-    // Validate authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
@@ -92,13 +88,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    // Create Supabase client for this request
-    const supabase = createSupabaseClient()
+    const { user, supabase } = await getAuthenticatedUser()
 
-    // Validate authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
@@ -163,13 +155,9 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    // Create Supabase client for this request
-    const supabase = createSupabaseClient()
+    const { user, supabase } = await getAuthenticatedUser()
 
-    // Validate authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
@@ -221,8 +209,8 @@ export async function DELETE(request: NextRequest) {
  *
  * 1. Authentication:
  *    - ALWAYS validate authentication in module API routes
- *    - Use createSupabaseClient() from @/lib/supabase-auth
- *    - Check for user with getUser()
+ *    - Use getAuthenticatedUser() from @/lib/auth-helpers
+ *    - This returns a server-side Supabase client with cookies
  *    - Return 401 if authentication fails
  *
  * 2. Input Validation:

@@ -58,8 +58,10 @@ export default function DatabaseTestPage() {
     { name: 'Test RLS Policies', status: 'pending' },
   ])
   const [securityResults, setSecurityResults] = useState<SecurityTestResult[]>([])
+  const [moduleResults, setModuleResults] = useState<TestResult[]>([])
   const [isRunning, setIsRunning] = useState(false)
   const [isRunningSecurityTests, setIsRunningSecurityTests] = useState(false)
+  const [isRunningModuleTests, setIsRunningModuleTests] = useState(false)
 
   // Define all API endpoints for testing
   const apiEndpoints: ApiEndpoint[] = [
@@ -197,6 +199,174 @@ export default function DatabaseTestPage() {
 
     setIsRunningSecurityTests(false)
     console.log('🔒 API security tests complete!')
+  }
+
+  const updateModuleResult = (name: string, update: Partial<TestResult>) => {
+    setModuleResults(prev => {
+      const existing = prev.find(r => r.name === name)
+      if (existing) {
+        return prev.map(r => r.name === name ? { ...r, ...update } : r)
+      } else {
+        return [...prev, { name, status: 'pending', ...update }]
+      }
+    })
+  }
+
+  const runModuleTests = async () => {
+    setIsRunningModuleTests(true)
+    setModuleResults([])
+    console.log('📦 Starting module diagnostics...')
+
+    // Test 1: Discover modules via API
+    updateModuleResult('Module Discovery', { status: 'testing' })
+    try {
+      const response = await fetch('/api/modules/all')
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      const data = await response.json()
+      const modules = data.modules || []
+
+      updateModuleResult('Module Discovery', {
+        status: 'success',
+        message: `Found ${modules.length} module(s)`,
+        data: {
+          count: modules.length,
+          modules: modules.map((m: any) => ({
+            id: m.id,
+            name: m.name,
+            enabled: m.isEnabled,
+            version: m.version
+          }))
+        }
+      })
+      console.log('✅ Module discovery passed:', modules.length, 'modules found')
+
+      // Test 2: Check MODULE_PAGES registry completeness
+      updateModuleResult('Registry Completeness', { status: 'testing' })
+      const registeredModules = ['hello-world', 'shipments', 'hyrox', 'assist', 'daily-fitness']
+      const discoveredModuleIds = modules.map((m: any) => m.id)
+      const missingFromRegistry = discoveredModuleIds.filter((id: string) => !registeredModules.includes(id))
+      const extraInRegistry = registeredModules.filter(id => !discoveredModuleIds.includes(id))
+
+      if (missingFromRegistry.length === 0 && extraInRegistry.length === 0) {
+        updateModuleResult('Registry Completeness', {
+          status: 'success',
+          message: 'All modules properly registered in MODULE_PAGES',
+          data: {
+            registered: registeredModules,
+            discovered: discoveredModuleIds
+          }
+        })
+        console.log('✅ Registry completeness check passed')
+      } else if (missingFromRegistry.length > 0) {
+        updateModuleResult('Registry Completeness', {
+          status: 'error',
+          message: `${missingFromRegistry.length} module(s) missing from MODULE_PAGES registry`,
+          data: {
+            missingFromRegistry,
+            extraInRegistry,
+            hint: 'Add missing modules to MODULE_PAGES in /app/[module]/[[...slug]]/page.tsx'
+          }
+        })
+        console.error('❌ Registry check failed - missing modules:', missingFromRegistry)
+      } else {
+        updateModuleResult('Registry Completeness', {
+          status: 'warning',
+          message: 'Registry has extra modules not found in filesystem',
+          data: { extraInRegistry }
+        })
+        console.warn('⚠️ Registry has extra modules:', extraInRegistry)
+      }
+
+      // Test 3: Validate module manifests
+      updateModuleResult('Manifest Validation', { status: 'testing' })
+      const invalidModules = []
+      for (const module of modules) {
+        const required = ['id', 'name', 'description', 'version', 'author', 'icon', 'enabled']
+        const missing = required.filter((field: any) => !(field in module))
+        if (missing.length > 0) {
+          invalidModules.push({ id: module.id, missing })
+        }
+      }
+
+      if (invalidModules.length === 0) {
+        updateModuleResult('Manifest Validation', {
+          status: 'success',
+          message: 'All module manifests have required fields',
+          data: { validatedModules: modules.length }
+        })
+        console.log('✅ Manifest validation passed')
+      } else {
+        updateModuleResult('Manifest Validation', {
+          status: 'error',
+          message: `${invalidModules.length} module(s) have invalid manifests`,
+          data: { invalidModules }
+        })
+        console.error('❌ Manifest validation failed:', invalidModules)
+      }
+
+      // Test 4: Check module route accessibility
+      updateModuleResult('Route Accessibility', { status: 'testing' })
+      const enabledModules = modules.filter((m: any) => m.isEnabled)
+      const routeTests: Array<{ module: string; accessible: boolean; status?: number }> = []
+
+      for (const module of enabledModules) {
+        try {
+          const response = await fetch(`/${module.id}`, {
+            method: 'HEAD',
+            redirect: 'manual'
+          })
+          // 200 = accessible, 401/302/307 = requires auth (expected), 404 = not found
+          const accessible = response.status === 200 || response.status === 401 ||
+                           response.status === 302 || response.status === 307 ||
+                           response.type === 'opaqueredirect'
+          routeTests.push({
+            module: module.id,
+            accessible,
+            status: response.status
+          })
+        } catch (error) {
+          routeTests.push({
+            module: module.id,
+            accessible: false
+          })
+        }
+      }
+
+      const inaccessibleRoutes = routeTests.filter(t => !t.accessible)
+      if (inaccessibleRoutes.length === 0) {
+        updateModuleResult('Route Accessibility', {
+          status: 'success',
+          message: `All ${enabledModules.length} enabled module routes are accessible`,
+          data: { routeTests }
+        })
+        console.log('✅ Route accessibility check passed')
+      } else {
+        updateModuleResult('Route Accessibility', {
+          status: 'warning',
+          message: `${inaccessibleRoutes.length} module route(s) may not be accessible`,
+          data: {
+            inaccessibleRoutes,
+            allTests: routeTests
+          }
+        })
+        console.warn('⚠️ Some routes inaccessible:', inaccessibleRoutes)
+      }
+
+    } catch (error: any) {
+      updateModuleResult('Module Discovery', {
+        status: 'error',
+        error: error.message,
+        data: {
+          hint: 'Check if /api/modules/all endpoint is working'
+        }
+      })
+      console.error('❌ Module discovery failed:', error)
+    }
+
+    setIsRunningModuleTests(false)
+    console.log('📦 Module diagnostics complete!')
   }
 
   const runTests = async () => {
@@ -734,9 +904,17 @@ export default function DatabaseTestPage() {
     errors: securityResults.filter(r => r.status === 'error').length,
   }
 
+  // Calculate module summary
+  const moduleSummary = {
+    total: moduleResults.length,
+    success: moduleResults.filter(r => r.status === 'success').length,
+    errors: moduleResults.filter(r => r.status === 'error').length,
+    warnings: moduleResults.filter(r => r.status === 'warning').length,
+  }
+
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
-      <div className="grid gap-6 lg:grid-cols-2">
+    <div className="container mx-auto p-6" style={{ maxWidth: '95vw' }}>
+      <div className="grid gap-6 lg:grid-cols-3">
         {/* Database Tests */}
         <Card>
           <CardHeader>
@@ -922,6 +1100,131 @@ export default function DatabaseTestPage() {
                                 <p className="text-red-600 dark:text-red-400">
                                   {result.error}
                                 </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Module System Tests */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl flex items-center gap-2">
+              📦 Module System Tests
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-2">
+              Diagnose module discovery, registry completeness, and route accessibility
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center mb-6">
+                <Button
+                  onClick={runModuleTests}
+                  disabled={isRunningModuleTests}
+                  size="lg"
+                  variant="outline"
+                >
+                  {isRunningModuleTests ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Testing Modules...
+                    </>
+                  ) : (
+                    <>
+                      📦 Run Module Tests
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Module Summary */}
+              {moduleResults.length > 0 && (
+                <Card className="border-2">
+                  <CardContent className="p-4">
+                    <h3 className="font-medium mb-3">Module Summary</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="flex justify-between">
+                        <span>Total:</span>
+                        <Badge variant="outline">{moduleSummary.total}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Passed:</span>
+                        <Badge variant="default">{moduleSummary.success}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Warnings:</span>
+                        <Badge variant="secondary">{moduleSummary.warnings}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Errors:</span>
+                        <Badge variant="destructive">{moduleSummary.errors}</Badge>
+                      </div>
+                    </div>
+                    {moduleSummary.errors > 0 && (
+                      <div className="mt-3 p-2 bg-red-50 dark:bg-red-950 rounded text-sm">
+                        <p className="text-red-600 dark:text-red-400 font-medium">
+                          ⚠️ {moduleSummary.errors} test(s) failed
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Module Test Results */}
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {moduleResults.map((test) => (
+                  <Card key={test.name} className="border">
+                    <CardContent className="p-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3 flex-1">
+                          {getStatusIcon(test.status)}
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="text-sm font-medium">{test.name}</h3>
+                              {getStatusBadge(test.status)}
+                            </div>
+
+                            {test.message && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {test.message}
+                              </p>
+                            )}
+
+                            {test.error && (
+                              <div className="mt-2 p-2 bg-red-50 dark:bg-red-950 rounded text-xs">
+                                <p className="text-red-600 dark:text-red-400 font-medium">
+                                  Error: {test.error}
+                                </p>
+                                {test.data && (
+                                  <pre className="text-xs mt-1 text-red-500 dark:text-red-300 overflow-auto max-h-32">
+                                    {JSON.stringify(test.data, null, 2)}
+                                  </pre>
+                                )}
+                              </div>
+                            )}
+
+                            {test.data && test.status === 'success' && (
+                              <div className="mt-2 p-2 bg-green-50 dark:bg-green-950 rounded">
+                                <pre className="text-xs text-green-600 dark:text-green-400 overflow-auto max-h-32">
+                                  {JSON.stringify(test.data, null, 2)}
+                                </pre>
+                              </div>
+                            )}
+
+                            {test.data && test.status === 'warning' && (
+                              <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-950 rounded">
+                                <pre className="text-xs text-yellow-600 dark:text-yellow-400 overflow-auto max-h-32">
+                                  {JSON.stringify(test.data, null, 2)}
+                                </pre>
                               </div>
                             )}
                           </div>

@@ -105,21 +105,55 @@ export const updateContactSchema = z.object({
 
 // Fitness-related schemas
 export const createFitnessTaskSchema = z.object({
-  fitnessTask: z.object({
+  task: z.object({
     title: nonEmptyString.max(255, 'Title too long'),
-    description: z.string().max(2000, 'Description too long').optional(),
+    status: TaskStatus.default('Pending'),
+    priority: TaskPriority.default('Medium'),
+    assignees: z.array(z.string().max(100)).max(10, 'Too many assignees').default([]),
+    due_date: z.union([
+      z.string().datetime(),
+      z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
+      z.null()
+    ]).optional(),
+    starred: z.boolean().default(false),
     completed: z.boolean().default(false),
-    order_index: nonNegativeNumber.optional()
+    subtasks_total: nonNegativeNumber.max(100, 'Too many subtasks').default(0),
+    subtasks_completed: nonNegativeNumber.default(0),
+    youtube_url: z.union([z.string().url('Invalid YouTube URL'), z.null()]).optional()
   })
-})
+}).refine(
+  (data) => data.task.subtasks_completed <= data.task.subtasks_total,
+  {
+    message: 'Completed subtasks cannot exceed total subtasks',
+    path: ['task', 'subtasks_completed']
+  }
+)
 
 export const updateFitnessTaskSchema = z.object({
-  fitnessTask: z.object({
+  id: uuidSchema,
+  updates: z.object({
     title: nonEmptyString.max(255, 'Title too long').optional(),
-    description: z.string().max(2000, 'Description too long').optional(),
+    status: TaskStatus.optional(),
+    priority: TaskPriority.optional(),
+    assignees: z.array(z.string().max(100)).max(10, 'Too many assignees').optional(),
+    due_date: z.union([
+      z.string().datetime(),
+      z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
+      z.null()
+    ]).optional(),
+    starred: z.boolean().optional(),
     completed: z.boolean().optional(),
+    subtasks_total: nonNegativeNumber.max(100, 'Too many subtasks').optional(),
+    subtasks_completed: nonNegativeNumber.optional(),
+    youtube_url: z.union([z.string().url('Invalid YouTube URL'), z.null()]).optional(),
     order_index: nonNegativeNumber.optional()
-  })
+  }).refine(
+    (data) => !data.subtasks_completed || !data.subtasks_total || data.subtasks_completed <= data.subtasks_total,
+    {
+      message: 'Completed subtasks cannot exceed total subtasks',
+      path: ['subtasks_completed']
+    }
+  )
 })
 
 // Goal-related schemas
