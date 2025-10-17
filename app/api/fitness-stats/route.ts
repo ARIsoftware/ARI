@@ -1,39 +1,16 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+import { getAuthenticatedUser } from '@/lib/auth-helpers'
 
 export async function GET(request: Request) {
   try {
-    // Get the authorization header
-    const authHeader = request.headers.get("authorization")
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Missing or invalid authorization header" }, { status: 401 })
+    const { user, supabase } = await getAuthenticatedUser()
+
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 
-    const token = authHeader.replace("Bearer ", "")
-    
-    // Create Supabase client with the user's token
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-      global: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    })
-
-    // Get user from token
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token)
-    if (userError || !user) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 })
-    }
-
-    // Get fitness task completion data
+    // Get fitness task completion data with explicit user filtering
+    // Note: RLS policies also enforce this, but explicit filtering provides defense-in-depth
     const { data: completions, error: completionsError } = await supabase
       .from('fitness_database')
       .select('*')

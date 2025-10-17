@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
+import { createFitnessTaskSchema, updateFitnessTaskSchema } from '@/lib/validation'
+import { z } from 'zod'
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,9 +12,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
     
+    // Explicit user filtering for defense-in-depth (RLS also enforces this)
     const { data, error } = await supabase
       .from('fitness_database')
       .select('*')
+      .eq('user_id', user.id)
       .order('order_index', { ascending: true })
 
     if (error) {
@@ -28,17 +33,24 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { task } = await request.json()
-    const { user, supabase } = await getAuthenticatedUser()
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    // Validate request body
+    const validation = await validateRequestBody(request, createFitnessTaskSchema)
+    if (!validation.success) {
+      return validation.response
     }
 
-    // Get the highest order_index
+    const { task } = validation.data
+    const { user, supabase } = await getAuthenticatedUser()
+
+    if (!user) {
+      return createErrorResponse('Authentication required', 401)
+    }
+
+    // Get the highest order_index for this user
     const { data: maxOrderData } = await supabase
       .from('fitness_database')
       .select('order_index')
+      .eq('user_id', user.id)
       .order('order_index', { ascending: false })
       .limit(1)
 
@@ -73,22 +85,25 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { id, updates } = await request.json()
-    
-    if (!id) {
-      return NextResponse.json({ error: 'Task ID is required' }, { status: 400 })
+    // Validate request body
+    const validation = await validateRequestBody(request, updateFitnessTaskSchema)
+    if (!validation.success) {
+      return validation.response
     }
 
+    const { id, updates } = validation.data
     const { user, supabase } = await getAuthenticatedUser()
-    
+
     if (!user) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      return createErrorResponse('Authentication required', 401)
     }
 
+    // Explicit user filtering - only update user's own tasks
     const { data, error } = await supabase
       .from('fitness_database')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id)
+      .eq('user_id', user.id)
       .select()
       .single()
 
@@ -107,31 +122,41 @@ export async function PUT(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
+
+    // Validate query parameters
+    const deleteQuerySchema = z.object({
+      id: z.string().uuid('Invalid task ID format')
+    })
+
     const id = searchParams.get('id')
-    
-    if (!id) {
-      return NextResponse.json({ error: 'Task ID is required' }, { status: 400 })
+    const queryValidation = deleteQuerySchema.safeParse({ id })
+
+    if (!queryValidation.success) {
+      return createErrorResponse('Task ID is required and must be a valid UUID', 400)
     }
 
+    const validatedId = queryValidation.data.id
     const { user, supabase } = await getAuthenticatedUser()
-    
+
     if (!user) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      return createErrorResponse('Authentication required', 401)
     }
 
+    // Explicit user filtering - only delete user's own tasks
     const { error } = await supabase
       .from('fitness_database')
       .delete()
-      .eq('id', id)
+      .eq('id', validatedId)
+      .eq('user_id', user.id)
 
     if (error) {
       console.error('Error deleting fitness task:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return createErrorResponse(error.message, 500)
     }
 
     return NextResponse.json({ success: true })
   } catch (err) {
     console.error('API error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return createErrorResponse('Internal server error', 500)
   }
 }

@@ -11,9 +11,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
+    // Explicit user filtering for defense-in-depth
     const { data, error } = await supabase
       .from("northstar")
       .select("*")
+      .eq('user_id', user.id)
       .order("created_at", { ascending: false })
 
     if (error) {
