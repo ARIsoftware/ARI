@@ -13,7 +13,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseClient } from '@/lib/supabase-auth'
+import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { z } from 'zod'
 
 /**
@@ -37,12 +37,9 @@ const SettingsSchema = z.object({
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createSupabaseClient()
+    const { user, supabase } = await getAuthenticatedUser()
 
-    // Authenticate
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -90,12 +87,9 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = createSupabaseClient()
+    const { user, supabase } = await getAuthenticatedUser()
 
-    // Authenticate
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
