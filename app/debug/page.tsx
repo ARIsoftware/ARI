@@ -188,13 +188,24 @@ export default function DatabaseTestPage() {
     // Clear previous results
     setSecurityResults([])
 
-    // Test each endpoint with each method
+    // Parallelize security tests - test multiple endpoints concurrently
+    // Process in batches of 5 to avoid overwhelming the server
+    const BATCH_SIZE = 5
+    const allTests: Array<{ endpoint: string; method: string }> = []
+
+    // Build list of all endpoint/method combinations
     for (const endpoint of apiEndpoints) {
       for (const method of endpoint.methods) {
-        await testApiEndpointSecurity(endpoint.path, method)
-        // Small delay to avoid overwhelming the server
-        await new Promise(resolve => setTimeout(resolve, 100))
+        allTests.push({ endpoint: endpoint.path, method })
       }
+    }
+
+    // Process tests in parallel batches
+    for (let i = 0; i < allTests.length; i += BATCH_SIZE) {
+      const batch = allTests.slice(i, i + BATCH_SIZE)
+      await Promise.all(
+        batch.map(({ endpoint, method }) => testApiEndpointSecurity(endpoint, method))
+      )
     }
 
     setIsRunningSecurityTests(false)
@@ -373,142 +384,159 @@ export default function DatabaseTestPage() {
     setIsRunning(true)
     console.log('🔍 Starting database tests...')
 
-    // Test 1: Environment Variables
-    updateTestResult('Environment Variables', { status: 'testing' })
-    try {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    // PHASE 1: Fast synchronous checks (run in parallel)
+    const phase1Tests = [
+      // Test 1: Environment Variables
+      (async () => {
+        updateTestResult('Environment Variables', { status: 'testing' })
+        try {
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+          const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-      if (!supabaseUrl || !supabaseAnonKey) {
-        throw new Error('Missing environment variables')
-      }
+          if (!supabaseUrl || !supabaseAnonKey) {
+            throw new Error('Missing environment variables')
+          }
 
-      updateTestResult('Environment Variables', {
-        status: 'success',
-        message: 'Environment variables are set',
-        data: {
-          url: supabaseUrl?.substring(0, 30) + '...',
-          hasAnonKey: !!supabaseAnonKey
+          updateTestResult('Environment Variables', {
+            status: 'success',
+            message: 'Environment variables are set',
+            data: {
+              url: supabaseUrl?.substring(0, 30) + '...',
+              hasAnonKey: !!supabaseAnonKey
+            }
+          })
+          console.log('✅ Environment variables check passed')
+        } catch (error: any) {
+          updateTestResult('Environment Variables', {
+            status: 'error',
+            error: error.message
+          })
+          console.error('❌ Environment variables check failed:', error)
         }
-      })
-      console.log('✅ Environment variables check passed')
-    } catch (error: any) {
-      updateTestResult('Environment Variables', {
-        status: 'error',
-        error: error.message
-      })
-      console.error('❌ Environment variables check failed:', error)
-    }
+      })(),
 
-    // Test 2: Supabase Client
-    updateTestResult('Supabase Client Initialization', { status: 'testing' })
-    try {
-      if (!supabase) {
-        throw new Error('Supabase client not available from context')
-      }
-      updateTestResult('Supabase Client Initialization', {
-        status: 'success',
-        message: 'Client retrieved from global context'
-      })
-      console.log('✅ Supabase client from context')
-    } catch (error: any) {
-      updateTestResult('Supabase Client Initialization', {
-        status: 'error',
-        error: error.message
-      })
-      console.error('❌ Supabase client initialization failed:', error)
+      // Test 2: Supabase Client
+      (async () => {
+        updateTestResult('Supabase Client Initialization', { status: 'testing' })
+        try {
+          if (!supabase) {
+            throw new Error('Supabase client not available from context')
+          }
+          updateTestResult('Supabase Client Initialization', {
+            status: 'success',
+            message: 'Client retrieved from global context'
+          })
+          console.log('✅ Supabase client from context')
+        } catch (error: any) {
+          updateTestResult('Supabase Client Initialization', {
+            status: 'error',
+            error: error.message
+          })
+          console.error('❌ Supabase client initialization failed:', error)
+        }
+      })()
+    ]
+
+    await Promise.all(phase1Tests)
+
+    // Stop if client is not available
+    if (!supabase) {
       setIsRunning(false)
       return
     }
 
-    // Test 3: Network Connectivity
-    updateTestResult('Network Connectivity', { status: 'testing' })
-    try {
-      console.log('🌐 Testing network connectivity to Supabase...')
+    // PHASE 2: Network connectivity tests (run in parallel)
+    const phase2Tests = [
+      // Test 3: Network Connectivity
+      (async () => {
+        updateTestResult('Network Connectivity', { status: 'testing' })
+        try {
+          console.log('🌐 Testing network connectivity to Supabase...')
 
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 5000)
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 5000)
 
-      const response = await fetch('/api/test-connection', {
-        signal: controller.signal
-      })
+          const response = await fetch('/api/test-connection', {
+            signal: controller.signal
+          })
 
-      clearTimeout(timeoutId)
+          clearTimeout(timeoutId)
 
-      const result = await response.json()
+          const result = await response.json()
 
-      if (result.success) {
-        updateTestResult('Network Connectivity', {
-          status: 'success',
-          message: 'Can reach Supabase server',
-          data: result
-        })
-        console.log('✅ Network connectivity test passed')
-      } else {
-        throw new Error(result.error || 'Network test failed')
-      }
-    } catch (error: any) {
-      updateTestResult('Network Connectivity', {
-        status: 'error',
-        error: error.message,
-        data: {
-          hint: 'Check if Supabase URL is correct and accessible'
-        }
-      })
-      console.error('❌ Network connectivity test failed:', error)
-    }
-
-    // Test 4: Connection Test - Direct fetch without Supabase client
-    updateTestResult('Connection Test', { status: 'testing' })
-    try {
-      console.log('🔌 Testing basic connection to Supabase...')
-
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 3000)
-
-      // Direct REST API call to test connectivity
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/tasks?select=id&limit=1`, {
-        method: 'GET',
-        headers: {
-          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-        },
-        signal: controller.signal
-      })
-
-      clearTimeout(timeoutId)
-
-      if (response.ok || response.status === 401) {
-        // 401 means connection works but not authenticated - that's fine for this test
-        updateTestResult('Connection Test', {
-          status: 'success',
-          message: 'Successfully connected to Supabase database',
-          data: {
-            connected: true,
-            status: response.status,
-            statusText: response.statusText
+          if (result.success) {
+            updateTestResult('Network Connectivity', {
+              status: 'success',
+              message: 'Can reach Supabase server',
+              data: result
+            })
+            console.log('✅ Network connectivity test passed')
+          } else {
+            throw new Error(result.error || 'Network test failed')
           }
-        })
-        console.log('✅ Connection test passed')
-      } else {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-    } catch (error: any) {
-      updateTestResult('Connection Test', {
-        status: 'error',
-        error: error.message,
-        data: {
-          hint: error.name === 'AbortError'
-            ? 'Connection timed out - check your network and Supabase URL'
-            : 'Check your network connection and Supabase configuration',
-          url: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + '...'
+        } catch (error: any) {
+          updateTestResult('Network Connectivity', {
+            status: 'error',
+            error: error.message,
+            data: {
+              hint: 'Check if Supabase URL is correct and accessible'
+            }
+          })
+          console.error('❌ Network connectivity test failed:', error)
         }
-      })
-      console.error('❌ Connection test failed:', error)
+      })(),
 
-      // Continue with other tests even if connection fails
-      console.warn('⚠️ Continuing tests despite connection failure...')
-    }
+      // Test 4: Connection Test
+      (async () => {
+        updateTestResult('Connection Test', { status: 'testing' })
+        try {
+          console.log('🔌 Testing basic connection to Supabase...')
+
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 3000)
+
+          const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/tasks?select=id&limit=1`, {
+            method: 'GET',
+            headers: {
+              'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+              'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+            },
+            signal: controller.signal
+          })
+
+          clearTimeout(timeoutId)
+
+          if (response.ok || response.status === 401) {
+            updateTestResult('Connection Test', {
+              status: 'success',
+              message: 'Successfully connected to Supabase database',
+              data: {
+                connected: true,
+                status: response.status,
+                statusText: response.statusText
+              }
+            })
+            console.log('✅ Connection test passed')
+          } else {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+          }
+        } catch (error: any) {
+          updateTestResult('Connection Test', {
+            status: 'error',
+            error: error.message,
+            data: {
+              hint: error.name === 'AbortError'
+                ? 'Connection timed out - check your network and Supabase URL'
+                : 'Check your network connection and Supabase configuration',
+              url: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + '...'
+            }
+          })
+          console.error('❌ Connection test failed:', error)
+        }
+      })()
+    ]
+
+    await Promise.all(phase2Tests)
 
     // Test 4: Authentication Status - use session from global context
     updateTestResult('Authentication Status', { status: 'testing' })
@@ -624,142 +652,155 @@ export default function DatabaseTestPage() {
       console.error('❌ Session check failed:', error)
     }
 
-    // Test 6: Fetch Tasks
-    updateTestResult('Fetch Tasks', { status: 'testing' })
-    try {
-      console.log('📊 Attempting to fetch tasks...')
+    // PHASE 3: Data fetching tests (run in parallel)
+    const phase3Tests = [
+      // Test 6: Fetch Tasks
+      (async () => {
+        updateTestResult('Fetch Tasks', { status: 'testing' })
+        try {
+          console.log('📊 Attempting to fetch tasks...')
 
-      // Check if user is authenticated first
-      const { data: authData } = await supabase.auth.getSession()
-      if (!authData.session) {
-        throw new Error('Not authenticated - please sign in to test data fetching')
-      }
+          // Check if user is authenticated first
+          const { data: authData } = await supabase.auth.getSession()
+          if (!authData.session) {
+            throw new Error('Not authenticated - please sign in to test data fetching')
+          }
 
-      const queryPromise = supabase
-        .from('tasks')
-        .select('*')
-        .limit(5)
+          const queryPromise = supabase
+            .from('tasks')
+            .select('*')
+            .limit(5)
 
-      const timeoutPromise = new Promise<any>((_, reject) =>
-        setTimeout(() => reject(new Error('Tasks fetch timed out after 5 seconds')), 5000)
-      )
+          const timeoutPromise = new Promise<any>((_, reject) =>
+            setTimeout(() => reject(new Error('Tasks fetch timed out after 5 seconds')), 5000)
+          )
 
-      const result = await Promise.race([queryPromise, timeoutPromise])
-      const { data, error } = result
+          const result = await Promise.race([queryPromise, timeoutPromise])
+          const { data, error } = result
 
-      console.log('Tasks query response:', { data, error })
+          console.log('Tasks query response:', { data, error })
 
-      if (error) throw error
+          if (error) throw error
 
-      updateTestResult('Fetch Tasks', {
-        status: 'success',
-        message: `Found ${data?.length || 0} tasks`,
-        data: {
-          count: data?.length || 0
+          updateTestResult('Fetch Tasks', {
+            status: 'success',
+            message: `Found ${data?.length || 0} tasks`,
+            data: {
+              count: data?.length || 0
+            }
+          })
+          console.log('✅ Tasks fetched:', data?.length || 0)
+        } catch (error: any) {
+          updateTestResult('Fetch Tasks', {
+            status: 'warning',
+            error: error.message,
+            data: { hint: error.message.includes('authenticated') ? 'Sign in at /sign-in to test data queries' : 'Check RLS policies' }
+          })
+          console.error('❌ Tasks fetch failed:', error)
         }
-      })
-      console.log('✅ Tasks fetched:', data?.length || 0)
-    } catch (error: any) {
-      updateTestResult('Fetch Tasks', {
-        status: 'warning',
-        error: error.message,
-        data: { hint: error.message.includes('authenticated') ? 'Sign in at /sign-in to test data queries' : 'Check RLS policies' }
-      })
-      console.error('❌ Tasks fetch failed:', error)
-    }
+      })(),
 
-    // Test 5: Fetch Contacts
-    updateTestResult('Fetch Contacts', { status: 'testing' })
-    try {
-      console.log('📊 Attempting to fetch contacts...')
-      const { data, error, status } = await supabase
-        .from('contacts')
-        .select('*')
-        .limit(5)
+      // Test: Fetch Contacts
+      (async () => {
+        updateTestResult('Fetch Contacts', { status: 'testing' })
+        try {
+          console.log('📊 Attempting to fetch contacts...')
+          const { data, error, status } = await supabase
+            .from('contacts')
+            .select('*')
+            .limit(5)
 
-      console.log('Contacts query response:', { data, error, status })
+          console.log('Contacts query response:', { data, error, status })
 
-      if (error) throw error
+          if (error) throw error
 
-      updateTestResult('Fetch Contacts', {
-        status: 'success',
-        message: `Found ${data?.length || 0} contacts`,
-        data: {
-          count: data?.length || 0,
-          sample: data?.[0] || null
+          updateTestResult('Fetch Contacts', {
+            status: 'success',
+            message: `Found ${data?.length || 0} contacts`,
+            data: {
+              count: data?.length || 0,
+              sample: data?.[0] || null
+            }
+          })
+          console.log('✅ Contacts fetched:', data?.length || 0)
+        } catch (error: any) {
+          updateTestResult('Fetch Contacts', {
+            status: 'error',
+            error: error.message,
+            data: { code: error.code, details: error.details }
+          })
+          console.error('❌ Contacts fetch failed:', error)
         }
-      })
-      console.log('✅ Contacts fetched:', data?.length || 0)
-    } catch (error: any) {
-      updateTestResult('Fetch Contacts', {
-        status: 'error',
-        error: error.message,
-        data: { code: error.code, details: error.details }
-      })
-      console.error('❌ Contacts fetch failed:', error)
-    }
+      })(),
 
-    // Test 6: Fetch Northstar Entries
-    updateTestResult('Fetch Northstar Entries', { status: 'testing' })
-    try {
-      console.log('📊 Attempting to fetch northstar entries...')
-      const { data, error, status } = await supabase
-        .from('northstar')
-        .select('*')
-        .limit(5)
+      // Test: Fetch Northstar Entries
+      (async () => {
+        updateTestResult('Fetch Northstar Entries', { status: 'testing' })
+        try {
+          console.log('📊 Attempting to fetch northstar entries...')
+          const { data, error, status } = await supabase
+            .from('northstar')
+            .select('*')
+            .limit(5)
 
-      console.log('Northstar query response:', { data, error, status })
+          console.log('Northstar query response:', { data, error, status })
 
-      if (error) throw error
+          if (error) throw error
 
-      updateTestResult('Fetch Northstar Entries', {
-        status: 'success',
-        message: `Found ${data?.length || 0} entries`,
-        data: {
-          count: data?.length || 0,
-          sample: data?.[0] || null
+          updateTestResult('Fetch Northstar Entries', {
+            status: 'success',
+            message: `Found ${data?.length || 0} entries`,
+            data: {
+              count: data?.length || 0,
+              sample: data?.[0] || null
+            }
+          })
+          console.log('✅ Northstar entries fetched:', data?.length || 0)
+        } catch (error: any) {
+          updateTestResult('Fetch Northstar Entries', {
+            status: 'error',
+            error: error.message,
+            data: { code: error.code, details: error.details }
+          })
+          console.error('❌ Northstar fetch failed:', error)
         }
-      })
-      console.log('✅ Northstar entries fetched:', data?.length || 0)
-    } catch (error: any) {
-      updateTestResult('Fetch Northstar Entries', {
-        status: 'error',
-        error: error.message,
-        data: { code: error.code, details: error.details }
-      })
-      console.error('❌ Northstar fetch failed:', error)
-    }
+      })(),
 
-    // Test 7: Fetch Fitness Data
-    updateTestResult('Fetch Fitness Data', { status: 'testing' })
-    try {
-      console.log('📊 Attempting to fetch fitness data...')
-      const { data, error, status } = await supabase
-        .from('fitness_database')
-        .select('*')
-        .limit(5)
+      // Test: Fetch Fitness Data
+      (async () => {
+        updateTestResult('Fetch Fitness Data', { status: 'testing' })
+        try {
+          console.log('📊 Attempting to fetch fitness data...')
+          const { data, error, status } = await supabase
+            .from('fitness_database')
+            .select('*')
+            .limit(5)
 
-      console.log('Fitness query response:', { data, error, status })
+          console.log('Fitness query response:', { data, error, status })
 
-      if (error) throw error
+          if (error) throw error
 
-      updateTestResult('Fetch Fitness Data', {
-        status: 'success',
-        message: `Found ${data?.length || 0} fitness records`,
-        data: {
-          count: data?.length || 0,
-          sample: data?.[0] || null
+          updateTestResult('Fetch Fitness Data', {
+            status: 'success',
+            message: `Found ${data?.length || 0} fitness records`,
+            data: {
+              count: data?.length || 0,
+              sample: data?.[0] || null
+            }
+          })
+          console.log('✅ Fitness data fetched:', data?.length || 0)
+        } catch (error: any) {
+          updateTestResult('Fetch Fitness Data', {
+            status: 'error',
+            error: error.message,
+            data: { code: error.code, details: error.details }
+          })
+          console.error('❌ Fitness data fetch failed:', error)
         }
-      })
-      console.log('✅ Fitness data fetched:', data?.length || 0)
-    } catch (error: any) {
-      updateTestResult('Fetch Fitness Data', {
-        status: 'error',
-        error: error.message,
-        data: { code: error.code, details: error.details }
-      })
-      console.error('❌ Fitness data fetch failed:', error)
-    }
+      })()
+    ]
+
+    await Promise.all(phase3Tests)
 
     // Test 10: RLS Policies Test
     updateTestResult('Test RLS Policies', { status: 'testing' })
