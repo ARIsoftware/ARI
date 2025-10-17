@@ -13,10 +13,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // With RLS enabled, this will automatically filter by auth.uid()
+    // Explicit user filtering for defense-in-depth (RLS also enforces this)
     const { data, error } = await supabase
       .from('tasks')
       .select('*')
+      .eq('user_id', user.id)
       .order('order_index', { ascending: true })
     
     if (error) {
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
     const { data: maxOrderData } = await supabase
       .from('tasks')
       .select('order_index')
+      .eq('user_id', user.id)
       .order('order_index', { ascending: false })
       .limit(1)
 
@@ -117,11 +119,12 @@ export async function PUT(request: NextRequest) {
         updates.timeliness !== undefined || updates.effort !== undefined || 
         updates.strategic_fit !== undefined) {
       
-      // Fetch current task to get existing axes values
+      // Fetch current task to get existing axes values (explicit user filter)
       const { data: currentTask } = await supabase
         .from('tasks')
         .select('impact, severity, timeliness, effort, strategic_fit')
         .eq('id', id)
+        .eq('user_id', user.id)
         .single()
       
       if (currentTask) {
@@ -136,15 +139,16 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // RLS will ensure user can only update their own tasks
+    // Explicit user filtering - only update user's own tasks
     const { data, error } = await supabase
       .from('tasks')
-      .update({ 
-        ...updates, 
+      .update({
+        ...updates,
         priority_score: priorityScore,
-        updated_at: new Date().toISOString() 
+        updated_at: new Date().toISOString()
       })
       .eq('id', id)
+      .eq('user_id', user.id)
       .select()
       .single()
 
@@ -181,11 +185,12 @@ export async function DELETE(request: NextRequest) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // RLS will ensure user can only delete their own tasks
+    // Explicit user filtering - only delete user's own tasks
     const { error } = await supabase
       .from('tasks')
       .delete()
       .eq('id', id)
+      .eq('user_id', user.id)
 
     if (error) {
       console.error('Error deleting task:', error)

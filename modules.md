@@ -372,7 +372,7 @@ modules/my-module/
 ```typescript
 // modules/my-module/api/data/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase-auth'
+import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { z } from 'zod'
 
 // Validation schema
@@ -382,42 +382,49 @@ const CreateDataSchema = z.object({
 })
 
 export async function GET(request: NextRequest) {
-  const supabase = createClient()
+  try {
+    // Get authenticated user and server-side Supabase client
+    const { user, supabase } = await getAuthenticatedUser()
 
-  // ALWAYS validate authentication
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
 
-  if (authError || !user) {
+    // Query database with explicit user filtering (defense-in-depth)
+    const { data, error } = await supabase
+      .from('my_module_data')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Database error:', error)
+      return NextResponse.json(
+        { error: 'Failed to fetch data' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({ data })
+  } catch (error) {
+    console.error('API error:', error)
     return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    )
-  }
-
-  // Query database (RLS policies auto-filter by user_id)
-  const { data, error } = await supabase
-    .from('my_module_data')
-    .select('*')
-    .order('created_at', { ascending: false })
-
-  if (error) {
-    return NextResponse.json(
-      { error: 'Failed to fetch data' },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }
-
-  return NextResponse.json({ data })
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = createClient()
+  try {
+    const { user, supabase } = await getAuthenticatedUser()
 
-  // Validate auth
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
   // Parse and validate body
   const body = await request.json()
@@ -796,8 +803,18 @@ Use cases: Games, dashboards, visualization tools, focused tools
 
 1. **Always validate authentication** in API routes
    ```typescript
-   const { data: { user }, error } = await supabase.auth.getUser()
-   if (error || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+   // Use getAuthenticatedUser() from @/lib/auth-helpers
+   const { user, supabase } = await getAuthenticatedUser()
+   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+   ```
+
+2. **Add explicit user filtering** for defense-in-depth
+   ```typescript
+   // Even with RLS enabled, explicitly filter by user_id
+   const { data } = await supabase
+     .from('my_table')
+     .select('*')
+     .eq('user_id', user.id)  // Defense-in-depth
    ```
 
 2. **Use RLS policies** on all database tables
