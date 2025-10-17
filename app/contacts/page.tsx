@@ -18,7 +18,8 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, Filter, Plus, Phone, Mail, MoreVertical, Grid3X3, List, Edit, Loader2 } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Search, Filter, Plus, Phone, Mail, MoreVertical, Grid3X3, List, Edit } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
@@ -133,25 +134,6 @@ export default function ContactsPage() {
 
     return matchesSearch && matchesCategory
   })
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50/50">
-        <TaskAnnouncement />
-        <SidebarProvider>
-          <AppSidebar />
-          <SidebarInset>
-            <div className="flex items-center justify-center h-96">
-              <div className="flex items-center gap-2">
-                <Loader2 className="w-6 h-6 animate-spin" />
-                <span>Loading contacts...</span>
-              </div>
-            </div>
-          </SidebarInset>
-        </SidebarProvider>
-      </div>
-    )
-  }
 
   return (
     <div className="min-h-screen bg-gray-50/50">

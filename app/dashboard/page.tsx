@@ -18,7 +18,7 @@ import { TaskAnnouncement } from "@/components/task-announcement"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { CalendarDays, TrendingUp, Trophy, Target, Users, CheckSquare, Loader2, Plus, Eye, BarChart3, Activity } from "lucide-react"
+import { CalendarDays, TrendingUp, Trophy, Target, Users, CheckSquare, Plus, Eye, BarChart3, Activity } from "lucide-react"
 import { getFitnessStats } from "@/lib/fitness-stats"
 import { getContacts } from "@/lib/contacts"
 import { getTasks } from "@/lib/tasks"
@@ -79,25 +79,6 @@ export default function DashboardPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50/50">
-        <TaskAnnouncement />
-        <SidebarProvider>
-          <AppSidebar />
-          <SidebarInset>
-            <div className="flex items-center justify-center h-96">
-              <div className="flex items-center gap-2">
-                <Loader2 className="w-6 h-6 animate-spin" />
-                <span>Loading dashboard...</span>
-              </div>
-            </div>
-          </SidebarInset>
-        </SidebarProvider>
-      </div>
-    )
   }
 
   return (
