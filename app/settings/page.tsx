@@ -641,12 +641,7 @@ export default function SettingsPage() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {loadingFeatures ? (
-                        <div className="flex items-center justify-center py-8">
-                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                        </div>
-                      ) : (
-                        menuFeatures.map((feature) => {
+                      {menuFeatures.map((feature) => {
                           const isEnabled = featurePreferences[feature.name] ?? true
                           return (
                             <div key={feature.name} className="flex items-start justify-between rounded-lg border p-4">
@@ -679,8 +674,7 @@ export default function SettingsPage() {
                               </div>
                             </div>
                           )
-                        })
-                      )}
+                        })}
                     </CardContent>
                     <CardFooter className="border-t bg-muted/60">
                       <div className="flex w-full items-center text-sm text-muted-foreground">
@@ -702,11 +696,7 @@ export default function SettingsPage() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {modulesLoading ? (
-                        <div className="flex items-center justify-center py-8">
-                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                        </div>
-                      ) : allModules.length === 0 ? (
+                      {allModules.length === 0 ? (
                         <div className="text-center py-8">
                           <Package className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
                           <p className="text-sm text-muted-foreground">
