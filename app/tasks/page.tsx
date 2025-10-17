@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2, Trash2, Pencil, Columns, StickyNote } from "lucide-react"
+import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Trash2, Pencil, Columns, StickyNote } from "lucide-react"
 import { FocusTimer } from "@/components/focus-timer"
 import { useState, useEffect } from "react"
 import { getTasks, toggleTaskCompletion, toggleTaskStar, reorderTasks, deleteTask, updateTask, type Task } from "@/lib/tasks"
@@ -442,27 +442,6 @@ export default function TasksPage() {
       setDeleteDialogOpen(false)
       setTaskToDelete(null)
     }
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50/50">
-        <div className="topbar h-[35px] bg-black w-full relative z-50 flex items-center justify-center">
-          <span className={`text-white font-medium ${dmSans.className}`}>ARI</span>
-        </div>
-        <SidebarProvider>
-          <AppSidebar />
-          <SidebarInset>
-            <div className="flex items-center justify-center h-96">
-              <div className="flex items-center gap-2">
-                <Loader2 className="w-6 h-6 animate-spin" />
-                <span>Loading tasks...</span>
-              </div>
-            </div>
-          </SidebarInset>
-        </SidebarProvider>
-      </div>
-    )
   }
 
   return (
