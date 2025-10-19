@@ -116,6 +116,11 @@ export const menuConfig: MenuGroup[] = [
         url: "/settings",
         icon: Settings,
       },
+      {
+        title: "Modules",
+        url: "/modules",
+        icon: Package,
+      },
     ],
   },
 ]
@@ -203,6 +208,7 @@ function getFeatureDescription(title: string, url: string): string {
     '/radar': 'Visualize task priorities',
     '/contacts': 'People and contacts management',
     '/settings': 'Application settings and preferences',
+    '/modules': 'Enable or disable installed modules to extend your app functionality',
   }
 
   return descriptions[url] || `Access ${title} features`

@@ -23,6 +23,7 @@ const protectedRoutes = [
   "/backups.old",
   "/tests",
   "/settings",
+  "/modules",
   "/profile",
   "/logs",
   "/radar",
