@@ -24,10 +24,10 @@ import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Carousel, CarouselContent, CarouselItem, CarouselApi } from "@/components/ui/carousel"
-import { CheckCircle2, TrendingUp, Target, Plus, X, Calendar } from "lucide-react"
+import { CheckCircle2, TrendingUp, Target, Plus, X, Calendar, Pencil } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
-import { getGoals, createGoal, updateGoalProgress, type Goal } from "@/lib/goals"
+import { getGoals, createGoal, updateGoalProgress, updateGoal, type Goal } from "@/lib/goals"
 import { cn } from "@/lib/utils"
 
 const dmSans = DM_Sans({
@@ -49,9 +49,18 @@ export default function NorthstarPage() {
   const [goals, setGoals] = useState<Goal[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [editingGoal, setEditingGoal] = useState<Goal | null>(null)
   const [api, setApi] = useState<CarouselApi>()
   const [current, setCurrent] = useState(0)
   const [newGoal, setNewGoal] = useState({
+    title: "",
+    description: "",
+    category: "",
+    priority: "medium" as "low" | "medium" | "high",
+    deadline: "",
+  })
+  const [editGoalData, setEditGoalData] = useState({
     title: "",
     description: "",
     category: "",
@@ -130,13 +139,13 @@ export default function NorthstarPage() {
     const goal = goals.find(g => g.id === goalId)
     if (!goal) return
 
-    const newProgress = action === "increment" 
+    const newProgress = action === "increment"
       ? Math.min(goal.progress + 10, 100)
       : Math.max(goal.progress - 10, 0)
 
     try {
       const updatedGoal = await updateGoalProgress(goalId, newProgress)
-      setGoals(goals.map(g => 
+      setGoals(goals.map(g =>
         g.id === goalId ? updatedGoal : g
       ))
       toast({
@@ -148,6 +157,53 @@ export default function NorthstarPage() {
       toast({
         title: "Error",
         description: "Failed to update goal progress",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const openEditModal = (goal: Goal) => {
+    setEditingGoal(goal)
+    setEditGoalData({
+      title: goal.title,
+      description: goal.description,
+      category: goal.category,
+      priority: goal.priority,
+      deadline: goal.deadline || "",
+    })
+    setIsEditModalOpen(true)
+  }
+
+  const handleEditGoal = async () => {
+    if (!editingGoal || !editGoalData.title || !editGoalData.description) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const updatedGoal = await updateGoal(editingGoal.id, {
+        title: editGoalData.title,
+        description: editGoalData.description,
+        category: editGoalData.category,
+        priority: editGoalData.priority,
+        deadline: editGoalData.deadline || null,
+      })
+      setGoals(goals.map(g => g.id === editingGoal.id ? updatedGoal : g))
+      setIsEditModalOpen(false)
+      setEditingGoal(null)
+      toast({
+        title: "Success",
+        description: "Goal updated successfully",
+      })
+    } catch (error) {
+      console.error("Error updating goal:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update goal",
         variant: "destructive",
       })
     }
@@ -268,6 +324,14 @@ export default function NorthstarPage() {
                                     >
                                       {goal.priority}
                                     </Badge>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-8 w-8 p-0"
+                                      onClick={() => openEditModal(goal)}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
                                   </div>
                                   <p className="text-muted-foreground text-sm md:text-base lg:text-lg">{goal.description}</p>
                                 </div>
@@ -427,6 +491,94 @@ export default function NorthstarPage() {
               </Button>
               <Button onClick={handleAddGoal}>
                 Add Goal
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Goal Modal */}
+        <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle className="text-xl">Edit Goal</DialogTitle>
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </button>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Goal Title</label>
+                <Input
+                  placeholder="Enter your goal title"
+                  value={editGoalData.title}
+                  onChange={(e) => setEditGoalData({ ...editGoalData, title: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Description</label>
+                <Textarea
+                  placeholder="Describe your goal in detail"
+                  value={editGoalData.description}
+                  onChange={(e) => setEditGoalData({ ...editGoalData, description: e.target.value })}
+                  className="min-h-[100px]"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Category</label>
+                  <Select
+                    value={editGoalData.category}
+                    onValueChange={(value) => setEditGoalData({ ...editGoalData, category: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Personal Growth">Personal Growth</SelectItem>
+                      <SelectItem value="Health & Fitness">Health & Fitness</SelectItem>
+                      <SelectItem value="Financial">Financial</SelectItem>
+                      <SelectItem value="Learning">Learning</SelectItem>
+                      <SelectItem value="Career">Career</SelectItem>
+                      <SelectItem value="Relationships">Relationships</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Priority</label>
+                  <Select
+                    value={editGoalData.priority}
+                    onValueChange={(value) => setEditGoalData({ ...editGoalData, priority: value as "low" | "medium" | "high" })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Medium" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Deadline</label>
+                <Input
+                  type="date"
+                  value={editGoalData.deadline}
+                  onChange={(e) => setEditGoalData({ ...editGoalData, deadline: e.target.value })}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleEditGoal}>
+                Save Changes
               </Button>
             </DialogFooter>
           </DialogContent>
