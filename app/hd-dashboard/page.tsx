@@ -187,25 +187,33 @@ export default function HDDashboardPage() {
             {winterArcGoals.length > 0 && (
               <div className="mb-2">
                 <div className="grid grid-cols-4 gap-2">
-                  {winterArcGoals.map((goal) => (
-                    <button
-                      key={goal.id}
-                      onClick={() => handleToggleWinterArcGoal(goal)}
-                      className="relative bg-white dark:bg-gray-800 blue:bg-white/10 clean:bg-white hover:bg-gray-50 dark:hover:bg-gray-700 blue:hover:bg-white/20 clean:hover:bg-gray-50 border-2 dark:border-gray-700 blue:border-white clean:border-gray-200 rounded-lg p-4 text-center transition-all"
-                      style={{
-                        opacity: goal.completed ? 0.3 : 1,
-                      }}
-                    >
-                      <div className="text-sm font-semibold uppercase tracking-wide break-words dark:text-white blue:text-white clean:text-gray-900">
-                        {goal.title}
-                      </div>
-                      {goal.completed && (
-                        <div className="absolute top-2 right-2 bg-green-500 rounded-full p-2">
-                          <Check className="h-6 w-6 text-white" />
+                  {winterArcGoals.map((goal, index) => {
+                    const pastelColors = [
+                      'bg-blue-50 dark:bg-blue-900/20 blue:bg-transparent clean:bg-blue-50 hover:bg-blue-100 dark:hover:bg-blue-900/30 blue:hover:bg-white/10 clean:hover:bg-blue-100',
+                      'bg-purple-50 dark:bg-purple-900/20 blue:bg-transparent clean:bg-purple-50 hover:bg-purple-100 dark:hover:bg-purple-900/30 blue:hover:bg-white/10 clean:hover:bg-purple-100',
+                      'bg-green-50 dark:bg-green-900/20 blue:bg-transparent clean:bg-green-50 hover:bg-green-100 dark:hover:bg-green-900/30 blue:hover:bg-white/10 clean:hover:bg-green-100',
+                      'bg-orange-50 dark:bg-orange-900/20 blue:bg-transparent clean:bg-orange-50 hover:bg-orange-100 dark:hover:bg-orange-900/30 blue:hover:bg-white/10 clean:hover:bg-orange-100'
+                    ];
+                    return (
+                      <button
+                        key={goal.id}
+                        onClick={() => handleToggleWinterArcGoal(goal)}
+                        className={`relative border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-4 text-center transition-all ${pastelColors[index % 4]}`}
+                        style={{
+                          opacity: goal.completed ? 0.3 : 1,
+                        }}
+                      >
+                        <div className="text-sm font-semibold uppercase tracking-wide break-words dark:text-white blue:text-white clean:text-gray-900">
+                          {goal.title}
                         </div>
-                      )}
-                    </button>
-                  ))}
+                        {goal.completed && (
+                          <div className="absolute top-2 right-2 bg-green-500 rounded-full p-2">
+                            <Check className="h-6 w-6 text-white" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
