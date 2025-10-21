@@ -4,15 +4,17 @@ import { useState, useEffect } from 'react';
 import { useSupabase } from '@/components/providers';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AppSidebar } from '@/components/app-sidebar';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { Separator } from '@/components/ui/separator';
 import { TaskAnnouncement } from '@/components/task-announcement';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Plus, Check } from 'lucide-react';
 import { getJournalEntry, saveJournalEntry } from '@/lib/journal';
 import { useToast } from '@/hooks/use-toast';
+import { getWinterArcGoals, createWinterArcGoal, toggleWinterArcGoal, type WinterArcGoal } from '@/lib/winter-arc-goals';
 
 const QUESTIONS = [
   {
@@ -60,6 +62,8 @@ export default function WinterArcPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  const [goals, setGoals] = useState<WinterArcGoal[]>([]);
+  const [newGoalTitle, setNewGoalTitle] = useState('');
 
   // Calculate countdown to Dec 31st 2025
   useEffect(() => {
@@ -84,9 +88,9 @@ export default function WinterArcPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Load existing journal entry
+  // Load existing journal entry and goals
   useEffect(() => {
-    async function loadEntry() {
+    async function loadData() {
       if (!session?.user?.id) {
         setLoading(false);
         return;
@@ -94,8 +98,9 @@ export default function WinterArcPage() {
 
       try {
         const tokenFn = async () => session?.access_token || null;
-        const data = await getJournalEntry('winter_arc', tokenFn);
 
+        // Load journal entry
+        const data = await getJournalEntry('winter_arc', tokenFn);
         if (data) {
           const loadedAnswers: Record<string, string> = {};
           QUESTIONS.forEach(q => {
@@ -105,17 +110,63 @@ export default function WinterArcPage() {
           });
           setAnswers(loadedAnswers);
         }
+
+        // Load goals
+        const goalsData = await getWinterArcGoals();
+        setGoals(goalsData);
       } catch (error) {
-        console.error('Error loading journal entry:', error);
+        console.error('Error loading data:', error);
       } finally {
         setLoading(false);
       }
     }
 
     if (session) {
-      loadEntry();
+      loadData();
     }
   }, [session]);
+
+  const handleAddGoal = async () => {
+    if (!newGoalTitle.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a goal title",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const newGoal = await createWinterArcGoal(newGoalTitle.trim());
+      setGoals([...goals, newGoal]);
+      setNewGoalTitle('');
+      toast({
+        title: "Success",
+        description: "Goal added successfully",
+      });
+    } catch (error: any) {
+      console.error('Error adding goal:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add goal",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleToggleGoal = async (goal: WinterArcGoal) => {
+    try {
+      const updatedGoal = await toggleWinterArcGoal(goal.id, !goal.completed);
+      setGoals(goals.map(g => g.id === goal.id ? updatedGoal : g));
+    } catch (error: any) {
+      console.error('Error toggling goal:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to toggle goal",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleSave = async () => {
     if (!session?.user?.id) {
@@ -198,35 +249,63 @@ export default function WinterArcPage() {
 
           <div className="flex flex-1 flex-col gap-6 p-6">
             <div className="max-w-4xl mx-auto w-full">
+              {/* Header with countdown */}
               <div className="mb-8">
-                <h1 className="text-4xl font-bold mb-4">Winter Arc 2026</h1>
-                <p className="text-muted-foreground mb-6">
-                  Transform yourself through conscious rewiring. Answer these questions to align your thoughts, behaviors, and emotions with your desired future.
-                </p>
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <h1 className="text-4xl font-bold mb-2">Winter Arc 2026</h1>
+                    <p className="text-muted-foreground">
+                      Transform yourself through conscious rewiring. Answer these questions to align your thoughts, behaviors, and emotions with your desired future.
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-green-600">{countdown.days} Days Until Dec 31st, 2025</div>
+                  </div>
+                </div>
 
-                {/* Countdown Timer */}
+                {/* Winter Arc Goals */}
                 <Card className="mb-8">
                   <CardHeader>
-                    <CardTitle className="text-center text-2xl">Time Until Dec 31st, 2025</CardTitle>
+                    <CardTitle>Winter Arc Goals</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-4 gap-4 text-center">
-                      <div className="bg-gray-50 rounded-lg p-4 border">
-                        <div className="text-4xl font-bold">{countdown.days}</div>
-                        <div className="text-sm uppercase text-muted-foreground">Days</div>
-                      </div>
-                      <div className="bg-gray-50 rounded-lg p-4 border">
-                        <div className="text-4xl font-bold">{countdown.hours}</div>
-                        <div className="text-sm uppercase text-muted-foreground">Hours</div>
-                      </div>
-                      <div className="bg-gray-50 rounded-lg p-4 border">
-                        <div className="text-4xl font-bold">{countdown.minutes}</div>
-                        <div className="text-sm uppercase text-muted-foreground">Minutes</div>
-                      </div>
-                      <div className="bg-gray-50 rounded-lg p-4 border">
-                        <div className="text-4xl font-bold">{countdown.seconds}</div>
-                        <div className="text-sm uppercase text-muted-foreground">Seconds</div>
-                      </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                      {goals.map((goal) => (
+                        <button
+                          key={goal.id}
+                          onClick={() => handleToggleGoal(goal)}
+                          className="relative bg-gray-50 hover:bg-gray-100 border-2 rounded-lg p-6 text-center transition-all"
+                          style={{
+                            opacity: goal.completed ? 0.3 : 1,
+                          }}
+                        >
+                          <div className="text-sm font-semibold uppercase tracking-wide break-words">
+                            {goal.title}
+                          </div>
+                          {goal.completed && (
+                            <div className="absolute top-2 right-2 bg-green-500 rounded-full p-2">
+                              <Check className="h-6 w-6 text-white" />
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Add Goal Input */}
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Add a new goal..."
+                        value={newGoalTitle}
+                        onChange={(e) => setNewGoalTitle(e.target.value)}
+                        onKeyPress={(e) => {
+                          if (e.key === 'Enter') {
+                            handleAddGoal();
+                          }
+                        }}
+                      />
+                      <Button onClick={handleAddGoal} size="icon">
+                        <Plus className="h-4 w-4" />
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>

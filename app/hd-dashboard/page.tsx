@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { TaskAnnouncement } from "@/components/task-announcement"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, CheckSquare, Circle, AlertCircle, Clock, TrendingUp, Users, Target, Dumbbell, Trophy, Compass, Package } from "lucide-react"
+import { Loader2, CheckSquare, Circle, AlertCircle, Clock, TrendingUp, Users, Target, Dumbbell, Trophy, Compass, Package, Check } from "lucide-react"
 import { getFitnessStats } from "@/lib/fitness-stats"
 import { getContacts } from "@/lib/contacts"
 import { getTasks } from "@/lib/tasks"
@@ -21,6 +21,8 @@ import { getNotepad } from "@/lib/notepad"
 import { useSupabase } from "@/components/providers"
 import { DarkModeProvider } from "@/lib/dark-mode-context"
 import { DarkModeToggle } from "@/components/dark-mode-toggle"
+import { getWinterArcGoals, toggleWinterArcGoal, type WinterArcGoal } from "@/lib/winter-arc-goals"
+import { useToast } from "@/hooks/use-toast"
 
 interface Task {
   id: string
@@ -52,6 +54,7 @@ interface FitnessStats {
 
 export default function HDDashboardPage() {
   const { session } = useSupabase()
+  const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [tasks, setTasks] = useState<Task[]>([])
   const [contacts, setContacts] = useState<Contact[]>([])
@@ -62,6 +65,7 @@ export default function HDDashboardPage() {
     totalCompletions: 0
   })
   const [notepadContent, setNotepadContent] = useState("")
+  const [winterArcGoals, setWinterArcGoals] = useState<WinterArcGoal[]>([])
 
   useEffect(() => {
     if (session) {
@@ -74,21 +78,37 @@ export default function HDDashboardPage() {
       setLoading(true)
       const tokenFn = async () => session?.access_token || null
 
-      const [tasksData, contactsData, statsData, notepadData] = await Promise.all([
+      const [tasksData, contactsData, statsData, notepadData, goalsData] = await Promise.all([
         getTasks(tokenFn),
         getContacts(tokenFn),
         getFitnessStats(tokenFn),
-        getNotepad()
+        getNotepad(),
+        getWinterArcGoals()
       ])
 
       setTasks(tasksData)
       setContacts(contactsData)
       setFitnessStats(statsData)
       setNotepadContent(notepadData.content || "")
+      setWinterArcGoals(goalsData)
     } catch (error) {
       console.error("Failed to load dashboard data:", error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleToggleWinterArcGoal = async (goal: WinterArcGoal) => {
+    try {
+      const updatedGoal = await toggleWinterArcGoal(goal.id, !goal.completed)
+      setWinterArcGoals(winterArcGoals.map(g => g.id === goal.id ? updatedGoal : g))
+    } catch (error: any) {
+      console.error('Error toggling goal:', error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to toggle goal",
+        variant: "destructive",
+      })
     }
   }
 
@@ -163,6 +183,33 @@ export default function HDDashboardPage() {
             </header>
 
           <div className="p-2 dark:bg-gray-900 blue:bg-[#056baa] min-h-screen">
+            {/* Winter Arc Goals */}
+            {winterArcGoals.length > 0 && (
+              <div className="mb-2">
+                <div className="grid grid-cols-4 gap-2">
+                  {winterArcGoals.map((goal) => (
+                    <button
+                      key={goal.id}
+                      onClick={() => handleToggleWinterArcGoal(goal)}
+                      className="relative bg-white dark:bg-gray-800 blue:bg-white/10 clean:bg-white hover:bg-gray-50 dark:hover:bg-gray-700 blue:hover:bg-white/20 clean:hover:bg-gray-50 border-2 dark:border-gray-700 blue:border-white clean:border-gray-200 rounded-lg p-4 text-center transition-all"
+                      style={{
+                        opacity: goal.completed ? 0.3 : 1,
+                      }}
+                    >
+                      <div className="text-sm font-semibold uppercase tracking-wide break-words dark:text-white blue:text-white clean:text-gray-900">
+                        {goal.title}
+                      </div>
+                      {goal.completed && (
+                        <div className="absolute top-2 right-2 bg-green-500 rounded-full p-2">
+                          <Check className="h-6 w-6 text-white" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Top Stats Row - Ultra Compact */}
             <div className="grid grid-cols-8 gap-1 mb-2">
               <div className="border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-1.5 bg-blue-50 dark:bg-blue-900/20 blue:bg-transparent clean:bg-transparent">
