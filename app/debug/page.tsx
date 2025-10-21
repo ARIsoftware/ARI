@@ -70,6 +70,7 @@ export default function DatabaseTestPage() {
     { path: '/api/tasks/priorities', methods: ['GET', 'PUT'], description: 'Task priorities' },
     { path: '/api/contacts', methods: ['GET', 'POST'], description: 'Contacts management' },
     { path: '/api/goals', methods: ['GET', 'POST'], description: 'Goals/NorthStar management' },
+    { path: '/api/winter-arc-goals', methods: ['GET', 'POST'], description: 'Winter Arc Goals management' },
     { path: '/api/fitness-stats', methods: ['GET'], description: 'Fitness statistics' },
     { path: '/api/fitness-tasks', methods: ['GET', 'POST'], description: 'Fitness tasks' },
     { path: '/api/hyrox/workouts', methods: ['GET', 'POST'], description: 'HYROX workouts' },
