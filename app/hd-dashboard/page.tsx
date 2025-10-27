@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { TaskAnnouncement } from "@/components/task-announcement"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, CheckSquare, Circle, AlertCircle, Clock, TrendingUp, Users, Target, Dumbbell, Trophy, Compass, Package, Check } from "lucide-react"
+import { Loader2, CheckSquare, Circle, AlertCircle, Clock, TrendingUp, Users, Target, Dumbbell, Trophy, Compass, Check } from "lucide-react"
 import { getFitnessStats } from "@/lib/fitness-stats"
 import { getContacts } from "@/lib/contacts"
 import { getTasks } from "@/lib/tasks"
@@ -23,6 +23,7 @@ import { DarkModeProvider } from "@/lib/dark-mode-context"
 import { DarkModeToggle } from "@/components/dark-mode-toggle"
 import { getWinterArcGoals, toggleWinterArcGoal, type WinterArcGoal } from "@/lib/winter-arc-goals"
 import { useToast } from "@/hooks/use-toast"
+import { HDContributionGraph } from "@/components/hd-contribution-graph"
 
 interface Task {
   id: string
@@ -215,6 +216,13 @@ export default function HDDashboardPage() {
                     );
                   })}
                 </div>
+              </div>
+            )}
+
+            {/* Contribution Graphs - One per Winter Arc Goal */}
+            {winterArcGoals.length > 0 && (
+              <div className="mb-2">
+                <HDContributionGraph goals={winterArcGoals} />
               </div>
             )}
 
