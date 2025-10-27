@@ -85,7 +85,6 @@ export default function HyroxPage() {
   useEffect(() => {
     if (user?.id) {
       loadStationRecords()
-      setupRealtimeSubscription()
     }
   }, [user])
 
@@ -121,30 +120,6 @@ export default function HyroxPage() {
     }
   }
 
-  const setupRealtimeSubscription = () => {
-    if (!user?.id) return
-
-    const channel = supabase
-      .channel('hyrox-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'hyrox_station_records',
-          filter: `user_id=eq.${user.id}`,
-        },
-        (payload) => {
-          console.log('Station record update:', payload)
-          loadStationRecords()
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }
 
   // Calculate metrics from station records
   const calculateMetrics = () => {
