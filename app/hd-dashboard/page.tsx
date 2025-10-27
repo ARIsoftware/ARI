@@ -286,7 +286,7 @@ export default function HDDashboardPage() {
             </div>
 
             {/* Main Content Grid - 3 Columns */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2 items-start" style={{ minHeight: 'calc(100vh - 400px)' }}>
               {/* Column 1: All Active Tasks */}
               <div className="border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-2 dark:bg-gray-800 blue:bg-transparent clean:bg-transparent">
                 <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 dark:text-white blue:text-white clean:text-gray-900">
@@ -378,14 +378,14 @@ export default function HDDashboardPage() {
               </div>
 
               {/* Column 3: Notepad */}
-              <div>
+              <div className="min-w-[500px] flex flex-col h-full">
                 {/* Notepad */}
-                <div className="border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-2 bg-yellow-50 dark:bg-yellow-900/20 blue:bg-transparent clean:bg-transparent">
+                <div className="border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-2 bg-yellow-50 dark:bg-yellow-900/20 blue:bg-transparent clean:bg-transparent flex flex-col flex-1 h-full">
                   <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 text-yellow-900 dark:text-yellow-300 blue:text-white clean:text-yellow-900">
                     <Compass className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400 blue:text-white clean:text-yellow-600" />
                     Notepad
                   </h3>
-                  <div className="bg-white dark:bg-gray-800 blue:bg-transparent clean:bg-white rounded p-2 text-[10px] text-gray-700 dark:text-gray-300 blue:text-white clean:text-gray-700 max-h-[600px] overflow-y-auto whitespace-pre-wrap font-mono leading-tight">
+                  <div className="bg-white dark:bg-gray-800 blue:bg-transparent clean:bg-white rounded p-2 text-[10px] text-gray-700 dark:text-gray-300 blue:text-white clean:text-gray-700 overflow-y-auto whitespace-pre-wrap font-mono leading-tight flex-1">
                     {notepadContent || "No notes yet"}
                   </div>
                 </div>
