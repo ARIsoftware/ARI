@@ -287,4 +287,11 @@ Added comprehensive task priority visualization system:
 - Prefetching enabled for navigation
 - Edge middleware for auth checks
 
+
+## Project Specific Claude Code Rules
+
+- Never start a server. I will start them, usually on port 3000.
+- Never edit a database directly, instead provide .sql files which I can manually run.
+- Please always ensure eny new page or API or feature alwats follows all the patterns from the existing codebase including authentication, RLS, and theming support!
+
 ---
