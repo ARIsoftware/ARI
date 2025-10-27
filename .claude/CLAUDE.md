@@ -1,2 +1,0 @@
-- Never start a server. I will start them, usually on port 3000.
-- Never edit a database directly - provide .sql files which I can then run.
