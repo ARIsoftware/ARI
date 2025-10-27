@@ -118,6 +118,13 @@ async function initializeHyroxStationRecords(client: any, userId: string) {
   // Default station records data
   const defaultStationRecords = [
     {
+      station_name: "Running",
+      station_type: "exercise",
+      distance: "8000m",
+      best_time: 0,
+      goal_time: 2400000, // 40:00 (40 minutes)
+    },
+    {
       station_name: "SkiErg",
       station_type: "exercise",
       distance: "1000m",

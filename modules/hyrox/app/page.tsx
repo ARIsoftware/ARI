@@ -42,22 +42,23 @@ const dmSans = DM_Sans({
 
 // Hyrox workout structure
 const workoutStations = [
-  { type: "run", name: "1km Run", target: "1000m", order: 1 },
-  { type: "exercise", name: "SkiErg", target: "1000m", order: 2 },
-  { type: "run", name: "1km Run", target: "1000m", order: 3 },
-  { type: "exercise", name: "Sled Push", target: "50m", order: 4 },
-  { type: "run", name: "1km Run", target: "1000m", order: 5 },
-  { type: "exercise", name: "Sled Pull", target: "50m", order: 6 },
-  { type: "run", name: "1km Run", target: "1000m", order: 7 },
-  { type: "exercise", name: "Burpee Broad Jump", target: "80m", order: 8 },
-  { type: "run", name: "1km Run", target: "1000m", order: 9 },
-  { type: "exercise", name: "Rowing", target: "1000m", order: 10 },
-  { type: "run", name: "1km Run", target: "1000m", order: 11 },
-  { type: "exercise", name: "Farmers Carry", target: "200m", order: 12 },
-  { type: "run", name: "1km Run", target: "1000m", order: 13 },
-  { type: "exercise", name: "Sandbag Lunges", target: "100m", order: 14 },
-  { type: "run", name: "1km Run", target: "1000m", order: 15 },
-  { type: "exercise", name: "Wall Balls", target: "100 reps", order: 16 },
+  { type: "exercise", name: "Running", target: "8000m", order: 1 },
+  { type: "run", name: "1km Run", target: "1000m", order: 2 },
+  { type: "exercise", name: "SkiErg", target: "1000m", order: 3 },
+  { type: "run", name: "1km Run", target: "1000m", order: 4 },
+  { type: "exercise", name: "Sled Push", target: "50m", order: 5 },
+  { type: "run", name: "1km Run", target: "1000m", order: 6 },
+  { type: "exercise", name: "Sled Pull", target: "50m", order: 7 },
+  { type: "run", name: "1km Run", target: "1000m", order: 8 },
+  { type: "exercise", name: "Burpee Broad Jump", target: "80m", order: 9 },
+  { type: "run", name: "1km Run", target: "1000m", order: 10 },
+  { type: "exercise", name: "Rowing", target: "1000m", order: 11 },
+  { type: "run", name: "1km Run", target: "1000m", order: 12 },
+  { type: "exercise", name: "Farmers Carry", target: "200m", order: 13 },
+  { type: "run", name: "1km Run", target: "1000m", order: 14 },
+  { type: "exercise", name: "Sandbag Lunges", target: "100m", order: 15 },
+  { type: "run", name: "1km Run", target: "1000m", order: 16 },
+  { type: "exercise", name: "Wall Balls", target: "100 reps", order: 17 },
 ]
 
 export default function HyroxPage() {
@@ -177,7 +178,7 @@ export default function HyroxPage() {
     }, exerciseRecords[0])
 
     const orderedRecords = exerciseRecords.sort((a, b) => {
-      const order = ['SkiErg', 'Sled Push', 'Sled Pull', 'Burpee Broad Jump', 'Rowing', 'Farmers Carry', 'Sandbag Lunges', 'Wall Balls']
+      const order = ['Running', 'SkiErg', 'Sled Push', 'Sled Pull', 'Burpee Broad Jump', 'Rowing', 'Farmers Carry', 'Sandbag Lunges', 'Wall Balls']
       return order.indexOf(a.station_name) - order.indexOf(b.station_name)
     })
 
@@ -485,6 +486,21 @@ export default function HyroxPage() {
                                   <CardTitle className="text-lg font-semibold">{station.station_name}</CardTitle>
                                   <CardDescription className="text-xs mt-1">{station.distance}</CardDescription>
                                 </div>
+                                {station.station_name === "Running" && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-gray-400 hover:text-green-600 hover:bg-green-50"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setSelectedVideoUrl("https://www.youtube.com/watch?v=9fWTShnmWV0")
+                                      setSelectedVideoTitle("Running Tutorial")
+                                      setVideoModalOpen(true)
+                                    }}
+                                  >
+                                    <Play className="w-4 h-4" />
+                                  </Button>
+                                )}
                                 {station.station_name === "SkiErg" && (
                                   <Button
                                     variant="ghost"
