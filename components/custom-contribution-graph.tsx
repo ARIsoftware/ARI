@@ -83,7 +83,7 @@ export function CustomContributionGraph({
           <button
             key={box.index}
             onClick={() => handleBoxClick(box.index)}
-            className={`aspect-square rounded transition-all hover:opacity-80 ${getColorClasses(box.color)}`}
+            className={`h-[25px] rounded transition-all hover:opacity-80 ${getColorClasses(box.color)}`}
             aria-label={`Box ${box.index + 1}, current color: ${box.color}`}
           />
         ))}

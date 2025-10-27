@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { TaskAnnouncement } from "@/components/task-announcement"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, CheckSquare, Circle, AlertCircle, Clock, TrendingUp, Users, Target, Dumbbell, Trophy, Compass, Check } from "lucide-react"
+import { Loader2, CheckSquare, Circle, AlertCircle, Clock, Target, Dumbbell, Trophy, Compass, Check } from "lucide-react"
 import { getFitnessStats } from "@/lib/fitness-stats"
 import { getContacts } from "@/lib/contacts"
 import { getTasks } from "@/lib/tasks"
@@ -187,19 +187,20 @@ export default function HDDashboardPage() {
             {/* Winter Arc Goals */}
             {winterArcGoals.length > 0 && (
               <div className="mb-2">
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-5 gap-2">
                   {winterArcGoals.map((goal, index) => {
                     const pastelColors = [
                       'bg-blue-50 dark:bg-blue-900/20 blue:bg-transparent clean:bg-blue-50 hover:bg-blue-100 dark:hover:bg-blue-900/30 blue:hover:bg-white/10 clean:hover:bg-blue-100',
                       'bg-purple-50 dark:bg-purple-900/20 blue:bg-transparent clean:bg-purple-50 hover:bg-purple-100 dark:hover:bg-purple-900/30 blue:hover:bg-white/10 clean:hover:bg-purple-100',
                       'bg-green-50 dark:bg-green-900/20 blue:bg-transparent clean:bg-green-50 hover:bg-green-100 dark:hover:bg-green-900/30 blue:hover:bg-white/10 clean:hover:bg-green-100',
-                      'bg-orange-50 dark:bg-orange-900/20 blue:bg-transparent clean:bg-orange-50 hover:bg-orange-100 dark:hover:bg-orange-900/30 blue:hover:bg-white/10 clean:hover:bg-orange-100'
+                      'bg-orange-50 dark:bg-orange-900/20 blue:bg-transparent clean:bg-orange-50 hover:bg-orange-100 dark:hover:bg-orange-900/30 blue:hover:bg-white/10 clean:hover:bg-orange-100',
+                      'bg-pink-50 dark:bg-pink-900/20 blue:bg-transparent clean:bg-pink-50 hover:bg-pink-100 dark:hover:bg-pink-900/30 blue:hover:bg-white/10 clean:hover:bg-pink-100'
                     ];
                     return (
                       <button
                         key={goal.id}
                         onClick={() => handleToggleWinterArcGoal(goal)}
-                        className={`relative border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-4 text-center transition-all ${pastelColors[index % 4]}`}
+                        className={`relative border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-4 text-center transition-all ${pastelColors[index % 5]}`}
                         style={{
                           opacity: goal.completed ? 0.3 : 1,
                         }}
@@ -227,7 +228,7 @@ export default function HDDashboardPage() {
             )}
 
             {/* Top Stats Row - Ultra Compact */}
-            <div className="grid grid-cols-8 gap-1 mb-2">
+            <div className="grid grid-cols-6 gap-1 mb-2">
               <div className="border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-1.5 bg-blue-50 dark:bg-blue-900/20 blue:bg-transparent clean:bg-transparent">
                 <div className="flex items-center gap-1">
                   <CheckSquare className="w-3 h-3 text-blue-600 dark:text-blue-400 blue:text-white clean:text-blue-600" />
@@ -253,15 +254,6 @@ export default function HDDashboardPage() {
                 </div>
                 <div className="text-lg font-bold text-orange-900 dark:text-orange-300 blue:text-white clean:text-orange-900">{todayTasks.length}</div>
                 <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-white clean:text-gray-500">due today</div>
-              </div>
-
-              <div className="border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-1.5 bg-purple-50 dark:bg-purple-900/20 blue:bg-transparent clean:bg-transparent">
-                <div className="flex items-center gap-1">
-                  <Users className="w-3 h-3 text-purple-600 dark:text-purple-400 blue:text-white clean:text-purple-600" />
-                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300 blue:text-white clean:text-gray-600">Contacts</span>
-                </div>
-                <div className="text-lg font-bold text-purple-900 dark:text-purple-300 blue:text-white clean:text-purple-900">{contacts.length}</div>
-                <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-white clean:text-gray-500">in network</div>
               </div>
 
               <div className="border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-1.5 bg-green-50 dark:bg-green-900/20 blue:bg-transparent clean:bg-transparent">
@@ -291,64 +283,32 @@ export default function HDDashboardPage() {
                 <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-white clean:text-gray-500">incomplete</div>
               </div>
 
-              <div className="border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-1.5 bg-emerald-50 dark:bg-emerald-900/20 blue:bg-transparent clean:bg-transparent">
-                <div className="flex items-center gap-1">
-                  <TrendingUp className="w-3 h-3 text-emerald-600 dark:text-emerald-400 blue:text-white clean:text-emerald-600" />
-                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300 blue:text-white clean:text-gray-600">Rate</span>
-                </div>
-                <div className="text-lg font-bold text-emerald-900 dark:text-emerald-300 blue:text-white clean:text-emerald-900">
-                  {tasks.length > 0 ? Math.round((completedTasks.length / tasks.length) * 100) : 0}%
-                </div>
-                <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-white clean:text-gray-500">completion</div>
-              </div>
             </div>
 
             {/* Main Content Grid - 3 Columns */}
             <div className="grid grid-cols-3 gap-2">
-              {/* Column 1: High Priority Tasks */}
+              {/* Column 1: All Active Tasks */}
               <div className="border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-2 dark:bg-gray-800 blue:bg-transparent clean:bg-transparent">
                 <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 dark:text-white blue:text-white clean:text-gray-900">
-                  <Target className="w-3.5 h-3.5 text-red-600 dark:text-red-400 blue:text-white clean:text-red-600" />
-                  Top Priority Tasks ({highPriorityTasks.length})
+                  <CheckSquare className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 blue:text-white clean:text-blue-600" />
+                  Active Tasks ({incompleteTasks.length})
                 </h3>
-                <div className="space-y-0.5">
-                  {highPriorityTasks.map((task, idx) => (
-                    <div key={task.id} className="flex items-start gap-1.5 py-0.5 px-1 hover:bg-gray-50 dark:hover:bg-gray-700 blue:hover:bg-white/10 clean:hover:bg-gray-50 rounded text-[11px] border-b border-gray-100 dark:border-gray-700 blue:border-white/20 clean:border-gray-100">
-                      <span className="text-[9px] text-gray-400 dark:text-gray-500 blue:text-white clean:text-gray-400 font-mono mt-0.5">{idx + 1}</span>
-                      <Circle className="w-2.5 h-2.5 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500 blue:text-white clean:text-gray-400" />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-900 dark:text-gray-100 blue:text-white clean:text-gray-900 truncate">{task.title}</div>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          {task.due_date && (
-                            <Badge className={`text-[8px] px-1 py-0 h-3.5 ${getUrgencyColor(task)}`}>
-                              {formatDate(task.due_date)}
-                            </Badge>
-                          )}
-                          {task.priority_score && (
-                            <span className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-white clean:text-gray-500 font-mono">
-                              P:{task.priority_score.toFixed(1)}
-                            </span>
-                          )}
-                          {task.impact && (
-                            <span className="text-[9px] text-blue-600 dark:text-blue-400 blue:text-white clean:text-blue-600">I:{task.impact}</span>
-                          )}
-                          {task.severity && (
-                            <span className="text-[9px] text-red-600 dark:text-red-400 blue:text-white clean:text-red-600">S:{task.severity}</span>
-                          )}
-                          {task.effort && (
-                            <span className="text-[9px] text-purple-600 dark:text-purple-400 blue:text-white clean:text-purple-600">E:{task.effort}</span>
-                          )}
-                        </div>
-                      </div>
+                <div className="space-y-0.5 max-h-[600px] overflow-y-auto">
+                  {incompleteTasks.map((task) => (
+                    <div key={task.id} className="flex items-center gap-1.5 py-0.5 px-1 hover:bg-gray-50 dark:hover:bg-gray-700 blue:hover:bg-white/10 clean:hover:bg-gray-50 rounded text-[11px]">
+                      <Circle className="w-2.5 h-2.5 flex-shrink-0 text-blue-600 dark:text-blue-400 blue:text-white clean:text-blue-600" />
+                      <div className="flex-1 min-w-0 truncate dark:text-gray-100 blue:text-white clean:text-gray-900">{task.title}</div>
+                      {task.due_date && (
+                        <Badge className={`text-[8px] px-1 py-0 h-3.5 ${getUrgencyColor(task)}`}>
+                          {formatDate(task.due_date)}
+                        </Badge>
+                      )}
                     </div>
                   ))}
-                  {highPriorityTasks.length === 0 && (
-                    <div className="text-[10px] text-gray-400 dark:text-gray-500 blue:text-white clean:text-gray-400 text-center py-4">No priority tasks</div>
-                  )}
                 </div>
               </div>
 
-              {/* Column 2: All Tasks Overview + Fitness */}
+              {/* Column 2: Overdue + Priority Tasks */}
               <div className="space-y-2">
                 {/* Overdue Tasks */}
                 {overdueTasks.length > 0 && (
@@ -373,142 +333,60 @@ export default function HDDashboardPage() {
                   </div>
                 )}
 
-                {/* Today's Tasks */}
-                {todayTasks.length > 0 && (
-                  <div className="border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-2 bg-orange-50 dark:bg-orange-900/20 blue:bg-transparent clean:bg-transparent">
-                    <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 text-orange-900 dark:text-orange-300 blue:text-white clean:text-orange-900">
-                      <Clock className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400 blue:text-white clean:text-orange-600" />
-                      Due Today ({todayTasks.length})
-                    </h3>
-                    <div className="space-y-0.5">
-                      {todayTasks.slice(0, 6).map((task) => (
-                        <div key={task.id} className="flex items-center gap-1.5 py-0.5 px-1 bg-white dark:bg-gray-800 blue:bg-transparent clean:bg-white rounded text-[11px]">
-                          <Circle className="w-2.5 h-2.5 flex-shrink-0 text-orange-600 dark:text-orange-400 blue:text-white clean:text-orange-600" />
-                          <div className="flex-1 min-w-0 truncate font-medium dark:text-gray-100 blue:text-white clean:text-gray-900">{task.title}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* All Incomplete Tasks */}
+                {/* Priority Tasks */}
                 <div className="border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-2 dark:bg-gray-800 blue:bg-transparent clean:bg-transparent">
                   <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 dark:text-white blue:text-white clean:text-gray-900">
-                    <CheckSquare className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 blue:text-white clean:text-blue-600" />
-                    Active Tasks ({incompleteTasks.length})
+                    <Target className="w-3.5 h-3.5 text-red-600 dark:text-red-400 blue:text-white clean:text-red-600" />
+                    Top Priority Tasks ({highPriorityTasks.length})
                   </h3>
-                  <div className="space-y-0.5 max-h-[300px] overflow-y-auto">
-                    {incompleteTasks.slice(0, 20).map((task) => (
-                      <div key={task.id} className="flex items-center gap-1.5 py-0.5 px-1 hover:bg-gray-50 dark:hover:bg-gray-700 blue:hover:bg-white/10 clean:hover:bg-gray-50 rounded text-[11px]">
-                        <Circle className="w-2.5 h-2.5 flex-shrink-0 text-blue-600 dark:text-blue-400 blue:text-white clean:text-blue-600" />
-                        <div className="flex-1 min-w-0 truncate dark:text-gray-100 blue:text-white clean:text-gray-900">{task.title}</div>
-                        {task.due_date && (
-                          <Badge className={`text-[8px] px-1 py-0 h-3.5 ${getUrgencyColor(task)}`}>
-                            {formatDate(task.due_date)}
-                          </Badge>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Fitness Stats */}
-                <div className="border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-2 bg-green-50 dark:bg-green-900/20 blue:bg-transparent clean:bg-transparent">
-                  <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 text-green-900 dark:text-green-300 blue:text-white clean:text-green-900">
-                    <Dumbbell className="w-3.5 h-3.5 text-green-600 dark:text-green-400 blue:text-white clean:text-green-600" />
-                    Fitness Performance
-                  </h3>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <div className="bg-white dark:bg-gray-800 blue:bg-transparent clean:bg-white rounded p-1.5">
-                      <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-white clean:text-gray-500">Total</div>
-                      <div className="text-sm font-bold text-green-900 dark:text-green-300 blue:text-white clean:text-green-900">{fitnessStats.totalCompletions}</div>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 blue:bg-transparent clean:bg-white rounded p-1.5">
-                      <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-white clean:text-gray-500">Daily Avg</div>
-                      <div className="text-sm font-bold text-green-900 dark:text-green-300 blue:text-white clean:text-green-900">{fitnessStats.averageCompletionsPerDay.toFixed(1)}</div>
-                    </div>
-                  </div>
-                  {fitnessStats.mostCompletedTask && (
-                    <div className="mt-1.5 bg-white dark:bg-gray-800 blue:bg-transparent clean:bg-white rounded p-1.5">
-                      <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-white clean:text-gray-500 mb-0.5">Top Exercise</div>
-                      <div className="text-[11px] font-medium text-gray-900 dark:text-gray-100 blue:text-white clean:text-gray-900 truncate">
-                        {fitnessStats.mostCompletedTask.title}
-                      </div>
-                      <div className="text-[9px] text-green-600 dark:text-green-400 blue:text-white clean:text-green-600">
-                        {fitnessStats.mostCompletedTask.count} completions
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Column 3: Contacts + Notepad */}
-              <div className="space-y-2">
-                {/* Contacts List */}
-                <div className="border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-2 dark:bg-gray-800 blue:bg-transparent clean:bg-transparent">
-                  <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 dark:text-white blue:text-white clean:text-gray-900">
-                    <Users className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 blue:text-white clean:text-purple-600" />
-                    Contacts ({contacts.length})
-                  </h3>
-                  <div className="space-y-0.5 max-h-[250px] overflow-y-auto">
-                    {contacts.map((contact) => (
-                      <div key={contact.id} className="py-1 px-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 blue:hover:bg-white/10 clean:hover:bg-gray-50 rounded border-b border-gray-100 dark:border-gray-700 blue:border-white/20 clean:border-gray-100">
-                        <div className="text-[11px] font-medium text-gray-900 dark:text-gray-100 blue:text-white clean:text-gray-900">{contact.name}</div>
-                        {contact.company && (
-                          <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-white clean:text-gray-500">{contact.company}</div>
-                        )}
-                        <div className="flex gap-2 mt-0.5">
-                          {contact.email && (
-                            <div className="text-[9px] text-blue-600 dark:text-blue-400 blue:text-white clean:text-blue-600 truncate">{contact.email}</div>
-                          )}
-                          {contact.phone && (
-                            <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-white clean:text-gray-500">{contact.phone}</div>
-                          )}
+                  <div className="space-y-0.5 max-h-[500px] overflow-y-auto">
+                    {highPriorityTasks.map((task, idx) => (
+                      <div key={task.id} className="flex items-start gap-1.5 py-0.5 px-1 hover:bg-gray-50 dark:hover:bg-gray-700 blue:hover:bg-white/10 clean:hover:bg-gray-50 rounded text-[11px] border-b border-gray-100 dark:border-gray-700 blue:border-white/20 clean:border-gray-100">
+                        <span className="text-[9px] text-gray-400 dark:text-gray-500 blue:text-white clean:text-gray-400 font-mono mt-0.5">{idx + 1}</span>
+                        <Circle className="w-2.5 h-2.5 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500 blue:text-white clean:text-gray-400" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-gray-900 dark:text-gray-100 blue:text-white clean:text-gray-900 truncate">{task.title}</div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {task.due_date && (
+                              <Badge className={`text-[8px] px-1 py-0 h-3.5 ${getUrgencyColor(task)}`}>
+                                {formatDate(task.due_date)}
+                              </Badge>
+                            )}
+                            {task.priority_score && (
+                              <span className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-white clean:text-gray-500 font-mono">
+                                P:{task.priority_score.toFixed(1)}
+                              </span>
+                            )}
+                            {task.impact && (
+                              <span className="text-[9px] text-blue-600 dark:text-blue-400 blue:text-white clean:text-blue-600">I:{task.impact}</span>
+                            )}
+                            {task.severity && (
+                              <span className="text-[9px] text-red-600 dark:text-red-400 blue:text-white clean:text-red-600">S:{task.severity}</span>
+                            )}
+                            {task.effort && (
+                              <span className="text-[9px] text-purple-600 dark:text-purple-400 blue:text-white clean:text-purple-600">E:{task.effort}</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
-                    {contacts.length === 0 && (
-                      <div className="text-[10px] text-gray-400 dark:text-gray-500 blue:text-white clean:text-gray-400 text-center py-4">No contacts</div>
+                    {highPriorityTasks.length === 0 && (
+                      <div className="text-[10px] text-gray-400 dark:text-gray-500 blue:text-white clean:text-gray-400 text-center py-4">No priority tasks</div>
                     )}
                   </div>
                 </div>
+              </div>
 
-                {/* Notepad Preview */}
+              {/* Column 3: Notepad */}
+              <div>
+                {/* Notepad */}
                 <div className="border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-2 bg-yellow-50 dark:bg-yellow-900/20 blue:bg-transparent clean:bg-transparent">
                   <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 text-yellow-900 dark:text-yellow-300 blue:text-white clean:text-yellow-900">
                     <Compass className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400 blue:text-white clean:text-yellow-600" />
                     Notepad
                   </h3>
-                  <div className="bg-white dark:bg-gray-800 blue:bg-transparent clean:bg-white rounded p-2 text-[10px] text-gray-700 dark:text-gray-300 blue:text-white clean:text-gray-700 max-h-[200px] overflow-y-auto whitespace-pre-wrap font-mono leading-tight">
+                  <div className="bg-white dark:bg-gray-800 blue:bg-transparent clean:bg-white rounded p-2 text-[10px] text-gray-700 dark:text-gray-300 blue:text-white clean:text-gray-700 max-h-[600px] overflow-y-auto whitespace-pre-wrap font-mono leading-tight">
                     {notepadContent || "No notes yet"}
-                  </div>
-                </div>
-
-                {/* Task Completion Rate */}
-                <div className="border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-2 bg-blue-50 dark:bg-blue-900/20 blue:bg-transparent clean:bg-transparent">
-                  <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 text-blue-900 dark:text-blue-300 blue:text-white clean:text-blue-900">
-                    <TrendingUp className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 blue:text-white clean:text-blue-600" />
-                    Completion Rate
-                  </h3>
-                  <div className="bg-white dark:bg-gray-800 blue:bg-transparent clean:bg-white rounded p-2">
-                    <div className="flex justify-between items-baseline mb-1">
-                      <span className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-white clean:text-gray-500">Progress</span>
-                      <span className="text-lg font-bold text-blue-900 dark:text-blue-300 blue:text-white clean:text-blue-900">
-                        {tasks.length > 0 ? Math.round((completedTasks.length / tasks.length) * 100) : 0}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 blue:bg-white/20 clean:bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 dark:bg-blue-500 blue:bg-white clean:bg-blue-600 h-2 rounded-full transition-all"
-                        style={{
-                          width: `${tasks.length > 0 ? (completedTasks.length / tasks.length) * 100 : 0}%`
-                        }}
-                      />
-                    </div>
-                    <div className="flex justify-between mt-1 text-[9px] text-gray-500 dark:text-gray-400 blue:text-white clean:text-gray-500">
-                      <span>{completedTasks.length} completed</span>
-                      <span>{incompleteTasks.length} remaining</span>
-                    </div>
                   </div>
                 </div>
               </div>
