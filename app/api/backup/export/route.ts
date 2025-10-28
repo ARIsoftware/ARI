@@ -44,6 +44,10 @@ async function discoverTables(client: any): Promise<string[]> {
       'notepad_revisions',
       'user_feature_preferences',
       'winter_arc_goals',
+      'contribution_graph',
+      'hello_world_entries',
+      'module_migrations',
+      'module_settings',
     ];
 
     const existingTables: string[] = [];
@@ -69,21 +73,29 @@ async function discoverTables(client: any): Promise<string[]> {
       return existingTables;
     }
 
-    // Method 2: Fallback to information_schema query
-    const { data, error } = await client
-      .from('information_schema.tables')
-      .select('table_name')
-      .eq('table_schema', 'public')
-      .not('table_name', 'in', '(spatial_ref_sys,schema_migrations)')
-      .order('table_name');
+    // Method 2: Fallback to information_schema query using raw SQL
+    try {
+      const query = `
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_type = 'BASE TABLE'
+          AND table_name NOT IN ('spatial_ref_sys', 'schema_migrations')
+        ORDER BY table_name;
+      `;
 
-    if (!error && data && data.length > 0) {
-      const tables = data.map((row: any) => row.table_name).filter(Boolean);
-      logger.info('Discovered tables via information_schema:', tables);
-      return tables;
+      const { data, error } = await client.rpc('exec_sql', { query });
+
+      if (!error && data && Array.isArray(data) && data.length > 0) {
+        const tables = data.map((row: any) => row.table_name).filter(Boolean);
+        logger.info('Discovered tables via information_schema (raw SQL):', tables);
+        return tables;
+      }
+
+      logger.warn('Information schema query via RPC failed or returned no results:', error);
+    } catch (rpcError) {
+      logger.warn('RPC exec_sql not available, using fallback:', rpcError);
     }
-
-    logger.warn('Information schema query failed or returned no results:', error);
   } catch (error) {
     logger.error('Error discovering tables:', error)
     // Fallback to known tables
@@ -103,6 +115,10 @@ async function discoverTables(client: any): Promise<string[]> {
       'notepad_revisions',
       'user_feature_preferences',
       'winter_arc_goals',
+      'contribution_graph',
+      'hello_world_entries',
+      'module_migrations',
+      'module_settings',
     ]
   }
 }
