@@ -32,6 +32,7 @@ import {
   CheckCircle2,
   Database,
   Download,
+  Eye,
   Grid3x3,
   Loader2,
   Lock,
@@ -73,9 +74,11 @@ export default function SettingsPage() {
   // Backup state
   const [exportLoading, setExportLoading] = useState(false)
   const [importLoading, setImportLoading] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [verifyLoading, setVerifyLoading] = useState(false)
+  const [message, setMessage] = useState<{ type: 'success' | 'error' | 'warning', text: string } | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [backupStats, setBackupStats] = useState<{ tables: number, totalRows: number } | null>(null)
+  const [backupStats, setBackupStats] = useState<{ tables: number, totalRows: number, discoveryMethod?: string, warnings?: number } | null>(null)
+  const [verificationResult, setVerificationResult] = useState<any | null>(null)
   const [importProgress, setImportProgress] = useState<{ current: number, total: number } | null>(null)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [validationResult, setValidationResult] = useState<{ valid: boolean; errors: string[]; warnings: string[]; metadata?: any } | null>(null)
@@ -187,6 +190,48 @@ export default function SettingsPage() {
   }
 
   // Backup functions
+  const handleVerify = async () => {
+    try {
+      setVerifyLoading(true)
+      setMessage(null)
+      setVerificationResult(null)
+
+      const response = await fetch('/api/backup/verify')
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Verification failed')
+      }
+
+      const result = await response.json()
+      setVerificationResult(result)
+
+      // Set friendly message based on status
+      if (result.status === 'ok') {
+        setMessage({
+          type: 'success',
+          text: `Backup system is working correctly! Found ${result.tablesFound} tables with ${result.totalRows.toLocaleString()} total rows. Using discovery method: ${result.discoveryMethod}.`
+        })
+      } else if (result.status === 'warning') {
+        setMessage({
+          type: 'warning',
+          text: `Backup system is functional but has warnings. Found ${result.tablesFound} tables. Please review warnings below.`
+        })
+      } else {
+        setMessage({
+          type: 'error',
+          text: `Backup system has critical issues. Please review the details below and consider running the database migration.`
+        })
+      }
+
+    } catch (error: any) {
+      console.error('Verify error:', error)
+      setMessage({ type: 'error', text: error.message || 'Failed to verify backup system' })
+    } finally {
+      setVerifyLoading(false)
+    }
+  }
+
   const handleExport = async () => {
     try {
       setExportLoading(true)
@@ -236,13 +281,39 @@ export default function SettingsPage() {
       URL.revokeObjectURL(url)
 
       if (metadata.tables && metadata.rows) {
-        setBackupStats({ tables: metadata.tables, totalRows: metadata.rows })
+        setBackupStats({
+          tables: metadata.tables,
+          totalRows: metadata.rows,
+          discoveryMethod: metadata.discoveryMethod,
+          warnings: metadata.warnings
+        })
 
-        let message = `Database exported successfully! ${metadata.rows} rows from ${metadata.tables} tables.`
-        if (metadata.errors > 0) {
-          message += ` Warning: ${metadata.errors} errors occurred during export.`
+        let messageText = `Database exported successfully! ${metadata.rows.toLocaleString()} rows from ${metadata.tables} tables.`
+
+        // Add discovery method info
+        if (metadata.discoveryMethod) {
+          const methodLabels: Record<string, string> = {
+            'rpc_function': 'RPC function (optimal)',
+            'raw_sql': 'Raw SQL',
+            'individual_validation': 'Individual validation',
+            'hardcoded_fallback': 'Hardcoded list (needs migration)'
+          }
+          messageText += ` Discovery: ${methodLabels[metadata.discoveryMethod] || metadata.discoveryMethod}.`
         }
-        setMessage({ type: 'success', text: message })
+
+        // Determine message type based on warnings/errors
+        let messageType: 'success' | 'warning' | 'error' = 'success'
+
+        if (metadata.warnings > 0) {
+          messageText += ` ${metadata.warnings} warning(s) detected.`
+          messageType = 'warning'
+        }
+        if (metadata.errors > 0) {
+          messageText += ` ${metadata.errors} error(s) occurred during export.`
+          messageType = 'error'
+        }
+
+        setMessage({ type: messageType, text: messageText })
       } else {
         setMessage({ type: 'success', text: 'Database exported successfully!' })
       }
@@ -979,15 +1050,92 @@ export default function SettingsPage() {
                 <TabsContent value="backups" className="space-y-6">
                   {/* Alert Messages */}
                   {message && (
-                    <Alert variant={message.type === 'error' ? 'destructive' : 'default'}>
+                    <Alert variant={message.type === 'error' ? 'destructive' : message.type === 'warning' ? 'default' : 'default'}>
                       {message.type === 'error' ? (
-                        <AlertCircle className="h-4 w-4" />
+                        <AlertCircle className="h-4 w-4 text-red-500" />
+                      ) : message.type === 'warning' ? (
+                        <AlertCircle className="h-4 w-4 text-yellow-500" />
                       ) : (
-                        <CheckCircle2 className="h-4 w-4" />
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
                       )}
-                      <AlertTitle>{message.type === 'error' ? 'Error' : 'Success'}</AlertTitle>
+                      <AlertTitle>
+                        {message.type === 'error' ? 'Error' : message.type === 'warning' ? 'Warning' : 'Success'}
+                      </AlertTitle>
                       <AlertDescription>{message.text}</AlertDescription>
                     </Alert>
+                  )}
+
+                  {/* Verification Result */}
+                  {verificationResult && (
+                    <Card className={verificationResult.status === 'critical' ? 'border-red-500' : verificationResult.status === 'warning' ? 'border-yellow-500' : 'border-green-500'}>
+                      <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          {verificationResult.status === 'ok' ? (
+                            <CheckCircle2 className="h-5 w-5 text-green-500" />
+                          ) : verificationResult.status === 'warning' ? (
+                            <AlertCircle className="h-5 w-5 text-yellow-500" />
+                          ) : (
+                            <AlertCircle className="h-5 w-5 text-red-500" />
+                          )}
+                          Backup System Status
+                        </CardTitle>
+                        <CardDescription>
+                          Last verified: {new Date(verificationResult.timestamp).toLocaleString()}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div>
+                            <span className="font-medium">Discovery Method:</span>
+                            <div className="text-muted-foreground mt-1">{verificationResult.discoveryMethod.replace(/_/g, ' ')}</div>
+                          </div>
+                          <div>
+                            <span className="font-medium">Tables Found:</span>
+                            <div className="text-muted-foreground mt-1">{verificationResult.tablesFound} / {verificationResult.expectedTables}</div>
+                          </div>
+                          <div>
+                            <span className="font-medium">Total Rows:</span>
+                            <div className="text-muted-foreground mt-1">{verificationResult.totalRows.toLocaleString()}</div>
+                          </div>
+                          <div>
+                            <span className="font-medium">Status:</span>
+                            <Badge variant={verificationResult.status === 'ok' ? 'default' : verificationResult.status === 'warning' ? 'secondary' : 'destructive'} className="mt-1">
+                              {verificationResult.status.toUpperCase()}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        {/* Warnings */}
+                        {verificationResult.warnings && verificationResult.warnings.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="font-medium text-sm">Warnings:</p>
+                            <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                              {verificationResult.warnings.map((warning: string, idx: number) => (
+                                <li key={idx}>{warning}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {/* Missing/Extra Tables */}
+                        {(verificationResult.missingTables.length > 0 || verificationResult.extraTables.length > 0) && (
+                          <div className="grid md:grid-cols-2 gap-4">
+                            {verificationResult.missingTables.length > 0 && (
+                              <div>
+                                <p className="font-medium text-sm text-red-600">Missing Tables:</p>
+                                <p className="text-xs text-muted-foreground mt-1">{verificationResult.missingTables.join(', ')}</p>
+                              </div>
+                            )}
+                            {verificationResult.extraTables.length > 0 && (
+                              <div>
+                                <p className="font-medium text-sm text-blue-600">New Tables Found:</p>
+                                <p className="text-xs text-muted-foreground mt-1">{verificationResult.extraTables.join(', ')}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
                   )}
 
                   {/* Backup Statistics */}
@@ -997,15 +1145,21 @@ export default function SettingsPage() {
                         <CardTitle className="text-lg">Last Export Statistics</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                           <div>
                             <span className="font-medium">Tables Exported:</span>
                             <span className="ml-2">{backupStats.tables}</span>
                           </div>
                           <div>
                             <span className="font-medium">Total Records:</span>
-                            <span className="ml-2">{backupStats.totalRows}</span>
+                            <span className="ml-2">{backupStats.totalRows.toLocaleString()}</span>
                           </div>
+                          {backupStats.discoveryMethod && (
+                            <div>
+                              <span className="font-medium">Discovery Method:</span>
+                              <span className="ml-2">{backupStats.discoveryMethod.replace(/_/g, ' ')}</span>
+                            </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -1117,10 +1271,28 @@ export default function SettingsPage() {
                           Automatically discovers and exports ALL tables in your database as an SQL file
                         </CardDescription>
                       </CardHeader>
-                      <CardContent>
+                      <CardContent className="space-y-4">
+                        <Button
+                          onClick={handleVerify}
+                          disabled={verifyLoading}
+                          variant="outline"
+                          className="w-full"
+                        >
+                          {verifyLoading ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Checking...
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Preview Backup
+                            </>
+                          )}
+                        </Button>
                         <Button
                           onClick={handleExport}
-                          disabled={exportLoading}
+                          disabled={exportLoading || verifyLoading}
                           className="w-full"
                         >
                           {exportLoading ? (
@@ -1135,8 +1307,8 @@ export default function SettingsPage() {
                             </>
                           )}
                         </Button>
-                        <p className="text-xs text-muted-foreground mt-3">
-                          This will automatically discover and export ALL tables in your database
+                        <p className="text-xs text-muted-foreground">
+                          Click "Preview Backup" to verify what will be exported before downloading
                         </p>
                       </CardContent>
                     </Card>

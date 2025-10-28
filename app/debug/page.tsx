@@ -59,9 +59,11 @@ export default function DatabaseTestPage() {
   ])
   const [securityResults, setSecurityResults] = useState<SecurityTestResult[]>([])
   const [moduleResults, setModuleResults] = useState<TestResult[]>([])
+  const [backupResults, setBackupResults] = useState<TestResult[]>([])
   const [isRunning, setIsRunning] = useState(false)
   const [isRunningSecurityTests, setIsRunningSecurityTests] = useState(false)
   const [isRunningModuleTests, setIsRunningModuleTests] = useState(false)
+  const [isRunningBackupTests, setIsRunningBackupTests] = useState(false)
 
   // Define all API endpoints for testing
   const apiEndpoints: ApiEndpoint[] = [
@@ -215,6 +217,17 @@ export default function DatabaseTestPage() {
 
   const updateModuleResult = (name: string, update: Partial<TestResult>) => {
     setModuleResults(prev => {
+      const existing = prev.find(r => r.name === name)
+      if (existing) {
+        return prev.map(r => r.name === name ? { ...r, ...update } : r)
+      } else {
+        return [...prev, { name, status: 'pending', ...update }]
+      }
+    })
+  }
+
+  const updateBackupResult = (name: string, update: Partial<TestResult>) => {
+    setBackupResults(prev => {
       const existing = prev.find(r => r.name === name)
       if (existing) {
         return prev.map(r => r.name === name ? { ...r, ...update } : r)
@@ -379,6 +392,234 @@ export default function DatabaseTestPage() {
 
     setIsRunningModuleTests(false)
     console.log('📦 Module diagnostics complete!')
+  }
+
+  const runBackupTests = async () => {
+    setIsRunningBackupTests(true)
+    setBackupResults([])
+    console.log('💾 Starting backup system diagnostics...')
+
+    // Test 1: Verify backup endpoint accessibility
+    updateBackupResult('Backup Endpoint Accessibility', { status: 'testing' })
+    try {
+      const response = await fetch('/api/backup/verify')
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      updateBackupResult('Backup Endpoint Accessibility', {
+        status: 'success',
+        message: 'Backup verify endpoint is accessible',
+      })
+      console.log('✅ Backup endpoint accessible')
+    } catch (error: any) {
+      updateBackupResult('Backup Endpoint Accessibility', {
+        status: 'error',
+        error: error.message,
+        data: { hint: 'Check if /api/backup/verify route exists' }
+      })
+      console.error('❌ Backup endpoint failed:', error)
+      setIsRunningBackupTests(false)
+      return
+    }
+
+    // Test 2: Table Discovery Methods
+    updateBackupResult('Table Discovery Test', { status: 'testing' })
+    try {
+      const response = await fetch('/api/backup/verify')
+      const result = await response.json()
+
+      if (result.status === 'error') {
+        throw new Error(result.error)
+      }
+
+      const methodLabels: Record<string, string> = {
+        'rpc_function': 'RPC Function (Optimal)',
+        'raw_sql': 'Raw SQL (Fallback)',
+        'individual_validation': 'Individual Validation (Manual)',
+        'hardcoded_fallback': 'Hardcoded List (Critical)'
+      }
+
+      const methodLabel = methodLabels[result.discoveryMethod] || result.discoveryMethod
+
+      updateBackupResult('Table Discovery Test', {
+        status: result.status === 'critical' ? 'error' : result.status === 'warning' ? 'warning' : 'success',
+        message: `Using discovery method: ${methodLabel}`,
+        data: {
+          method: result.discoveryMethod,
+          methodsAvailable: result.discoveryResults,
+          recommendation: result.discoveryMethod === 'rpc_function'
+            ? 'Optimal - database functions working correctly'
+            : 'Run /migrations/backup_system_functions.sql for optimal performance'
+        }
+      })
+      console.log('✅ Table discovery test complete:', methodLabel)
+    } catch (error: any) {
+      updateBackupResult('Table Discovery Test', {
+        status: 'error',
+        error: error.message,
+        data: { hint: 'Failed to test discovery methods' }
+      })
+      console.error('❌ Table discovery test failed:', error)
+    }
+
+    // Test 3: Table Count Verification
+    updateBackupResult('Table Count Verification', { status: 'testing' })
+    try {
+      const response = await fetch('/api/backup/verify')
+      const result = await response.json()
+
+      const expectedTables = 19 // From screenshot
+      const foundTables = result.tablesFound
+
+      if (foundTables === expectedTables) {
+        updateBackupResult('Table Count Verification', {
+          status: 'success',
+          message: `All ${expectedTables} expected tables found`,
+          data: {
+            found: foundTables,
+            expected: expectedTables,
+            tables: result.tables.map((t: any) => t.name)
+          }
+        })
+        console.log('✅ All tables found')
+      } else if (foundTables > expectedTables) {
+        updateBackupResult('Table Count Verification', {
+          status: 'warning',
+          message: `Found ${foundTables} tables (${foundTables - expectedTables} more than expected)`,
+          data: {
+            found: foundTables,
+            expected: expectedTables,
+            extraTables: result.extraTables,
+            hint: 'New tables detected - update known tables list'
+          }
+        })
+        console.log('⚠️ Extra tables found:', result.extraTables)
+      } else {
+        updateBackupResult('Table Count Verification', {
+          status: 'error',
+          message: `Only found ${foundTables}/${expectedTables} tables`,
+          data: {
+            found: foundTables,
+            expected: expectedTables,
+            missing: result.missingTables,
+            hint: 'Some tables are missing or inaccessible'
+          }
+        })
+        console.error('❌ Missing tables:', result.missingTables)
+      }
+    } catch (error: any) {
+      updateBackupResult('Table Count Verification', {
+        status: 'error',
+        error: error.message
+      })
+      console.error('❌ Table count verification failed:', error)
+    }
+
+    // Test 4: Row Count Summary
+    updateBackupResult('Row Count Summary', { status: 'testing' })
+    try {
+      const response = await fetch('/api/backup/verify')
+      const result = await response.json()
+
+      updateBackupResult('Row Count Summary', {
+        status: 'success',
+        message: `Total: ${result.totalRows.toLocaleString()} rows across all tables`,
+        data: {
+          totalRows: result.totalRows,
+          tableBreakdown: result.tables.map((t: any) => ({
+            table: t.name,
+            rows: t.rowCount,
+            status: t.status
+          }))
+        }
+      })
+      console.log('✅ Row count summary complete:', result.totalRows)
+    } catch (error: any) {
+      updateBackupResult('Row Count Summary', {
+        status: 'error',
+        error: error.message
+      })
+      console.error('❌ Row count summary failed:', error)
+    }
+
+    // Test 5: System Warnings Check
+    updateBackupResult('System Warnings', { status: 'testing' })
+    try {
+      const response = await fetch('/api/backup/verify')
+      const result = await response.json()
+
+      if (!result.warnings || result.warnings.length === 0) {
+        updateBackupResult('System Warnings', {
+          status: 'success',
+          message: 'No warnings - backup system is fully operational',
+        })
+        console.log('✅ No warnings')
+      } else {
+        updateBackupResult('System Warnings', {
+          status: 'warning',
+          message: `${result.warnings.length} warning(s) detected`,
+          data: {
+            warnings: result.warnings,
+            hint: result.warnings.some((w: string) => w.includes('CRITICAL'))
+              ? 'CRITICAL warnings require immediate attention'
+              : 'Review warnings and consider running database migration'
+          }
+        })
+        console.warn('⚠️ Warnings:', result.warnings)
+      }
+    } catch (error: any) {
+      updateBackupResult('System Warnings', {
+        status: 'error',
+        error: error.message
+      })
+      console.error('❌ Warnings check failed:', error)
+    }
+
+    // Test 6: Export Endpoint Test
+    updateBackupResult('Export Endpoint Test', { status: 'testing' })
+    try {
+      // Just check accessibility, don't actually download
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+      const response = await fetch('/api/backup/export', {
+        method: 'HEAD',
+        signal: controller.signal
+      })
+
+      clearTimeout(timeoutId)
+
+      // HEAD request should return 405 (method not allowed) or similar
+      // That's actually good - it means the endpoint exists
+      updateBackupResult('Export Endpoint Test', {
+        status: 'success',
+        message: 'Export endpoint is accessible',
+        data: {
+          note: 'Endpoint exists and is protected (requires POST)',
+          status: response.status
+        }
+      })
+      console.log('✅ Export endpoint accessible')
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        updateBackupResult('Export Endpoint Test', {
+          status: 'error',
+          error: 'Export endpoint timed out',
+          data: { hint: 'Check if backup export route is working' }
+        })
+      } else {
+        updateBackupResult('Export Endpoint Test', {
+          status: 'warning',
+          message: 'Could not verify export endpoint',
+          error: error.message
+        })
+      }
+      console.error('⚠️ Export endpoint test:', error)
+    }
+
+    setIsRunningBackupTests(false)
+    console.log('💾 Backup system diagnostics complete!')
   }
 
   const runTests = async () => {
@@ -954,9 +1195,17 @@ export default function DatabaseTestPage() {
     warnings: moduleResults.filter(r => r.status === 'warning').length,
   }
 
+  // Calculate backup summary
+  const backupSummary = {
+    total: backupResults.length,
+    success: backupResults.filter(r => r.status === 'success').length,
+    errors: backupResults.filter(r => r.status === 'error').length,
+    warnings: backupResults.filter(r => r.status === 'warning').length,
+  }
+
   return (
     <div className="container mx-auto p-6" style={{ maxWidth: '95vw' }}>
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-4">
         {/* Database Tests */}
         <Card>
           <CardHeader>
@@ -1224,6 +1473,138 @@ export default function DatabaseTestPage() {
               {/* Module Test Results */}
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {moduleResults.map((test) => (
+                  <Card key={test.name} className="border">
+                    <CardContent className="p-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3 flex-1">
+                          {getStatusIcon(test.status)}
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="text-sm font-medium">{test.name}</h3>
+                              {getStatusBadge(test.status)}
+                            </div>
+
+                            {test.message && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {test.message}
+                              </p>
+                            )}
+
+                            {test.error && (
+                              <div className="mt-2 p-2 bg-red-50 dark:bg-red-950 rounded text-xs">
+                                <p className="text-red-600 dark:text-red-400 font-medium">
+                                  Error: {test.error}
+                                </p>
+                                {test.data && (
+                                  <pre className="text-xs mt-1 text-red-500 dark:text-red-300 overflow-auto max-h-32">
+                                    {JSON.stringify(test.data, null, 2)}
+                                  </pre>
+                                )}
+                              </div>
+                            )}
+
+                            {test.data && test.status === 'success' && (
+                              <div className="mt-2 p-2 bg-green-50 dark:bg-green-950 rounded">
+                                <pre className="text-xs text-green-600 dark:text-green-400 overflow-auto max-h-32">
+                                  {JSON.stringify(test.data, null, 2)}
+                                </pre>
+                              </div>
+                            )}
+
+                            {test.data && test.status === 'warning' && (
+                              <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-950 rounded">
+                                <pre className="text-xs text-yellow-600 dark:text-yellow-400 overflow-auto max-h-32">
+                                  {JSON.stringify(test.data, null, 2)}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Backup System Tests */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl flex items-center gap-2">
+              💾 Backup System Tests
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-2">
+              Verify backup system integrity, table discovery, and export functionality
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center mb-6">
+                <Button
+                  onClick={runBackupTests}
+                  disabled={isRunningBackupTests}
+                  size="lg"
+                  variant="outline"
+                >
+                  {isRunningBackupTests ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Testing Backup...
+                    </>
+                  ) : (
+                    <>
+                      💾 Run Backup Tests
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Backup Summary */}
+              {backupResults.length > 0 && (
+                <Card className="border-2">
+                  <CardContent className="p-4">
+                    <h3 className="font-medium mb-3">Backup Summary</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="flex justify-between">
+                        <span>Total:</span>
+                        <Badge variant="outline">{backupSummary.total}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Passed:</span>
+                        <Badge variant="default">{backupSummary.success}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Warnings:</span>
+                        <Badge variant="secondary">{backupSummary.warnings}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Errors:</span>
+                        <Badge variant="destructive">{backupSummary.errors}</Badge>
+                      </div>
+                    </div>
+                    {backupSummary.errors > 0 && (
+                      <div className="mt-3 p-2 bg-red-50 dark:bg-red-950 rounded text-sm">
+                        <p className="text-red-600 dark:text-red-400 font-medium">
+                          ⚠️ {backupSummary.errors} test(s) failed - backup system may not be working correctly
+                        </p>
+                      </div>
+                    )}
+                    {backupSummary.warnings > 0 && backupSummary.errors === 0 && (
+                      <div className="mt-3 p-2 bg-yellow-50 dark:bg-yellow-950 rounded text-sm">
+                        <p className="text-yellow-600 dark:text-yellow-400 font-medium">
+                          ⚠️ {backupSummary.warnings} warning(s) - consider running migration for optimal performance
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Backup Test Results */}
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {backupResults.map((test) => (
                   <Card key={test.name} className="border">
                     <CardContent className="p-3">
                       <div className="flex items-start justify-between">

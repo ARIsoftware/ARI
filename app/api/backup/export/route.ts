@@ -22,65 +22,71 @@ const getServiceSupabase = () => {
   })
 }
 
-// Dynamic table discovery
-async function discoverTables(client: any): Promise<string[]> {
+// Dynamic table discovery with 3-tier approach
+async function discoverTables(client: any): Promise<{ tables: string[], method: string, warnings: string[] }> {
+  const warnings: string[] = []
+  const COMPLETE_TABLE_LIST = [
+    'tasks',
+    'fitness_database',
+    'contacts',
+    'fitness_completion_history',
+    'hyrox_station_records',
+    'hyrox_workouts',
+    'hyrox_workout_stations',
+    'northstar',
+    'motivation_content',
+    'shipments',
+    'journal',
+    'notepad',
+    'notepad_revisions',
+    'user_feature_preferences',
+    'winter_arc_goals',
+    'contribution_graph',
+    'hello_world_entries',
+    'module_migrations',
+    'module_settings',
+  ];
+
   try {
-    logger.info('Starting table discovery...');
+    logger.info('Starting table discovery (3-tier approach)...');
 
-    // Method 1: Try querying each known table to see if it exists
-    const knownTables = [
-      'tasks',
-      'fitness_database',
-      'contacts',
-      'fitness_completion_history',
-      'hyrox_station_records',
-      'hyrox_workouts',
-      'hyrox_workout_stations',
-      'northstar',
-      'motivation_content',
-      'shipments',
-      'journal',
-      'notepad',
-      'notepad_revisions',
-      'user_feature_preferences',
-      'winter_arc_goals',
-      'contribution_graph',
-      'hello_world_entries',
-      'module_migrations',
-      'module_settings',
-    ];
-
-    const existingTables: string[] = [];
-
-    for (const table of knownTables) {
-      try {
-        const { error } = await client
-          .from(table)
-          .select('*')
-          .limit(1);
-
-        if (!error) {
-          existingTables.push(table);
-          logger.info(`Found table: ${table}`);
-        }
-      } catch (tableError) {
-        logger.info(`Table ${table} does not exist or is not accessible`);
-      }
-    }
-
-    if (existingTables.length > 0) {
-      logger.info('Discovered existing tables:', existingTables);
-      return existingTables;
-    }
-
-    // Method 2: Fallback to information_schema query using raw SQL
+    // METHOD 1: Try RPC function get_all_user_tables() (most reliable)
     try {
+      logger.info('Attempting Method 1: RPC function get_all_user_tables()');
+      const { data, error } = await client.rpc('get_all_user_tables');
+
+      if (!error && data && Array.isArray(data) && data.length > 0) {
+        const tables = data.map((row: any) => row.table_name).filter(Boolean);
+        logger.info(`✅ Method 1 succeeded: Found ${tables.length} tables via RPC function`);
+
+        // Validate against known list
+        const missing = COMPLETE_TABLE_LIST.filter(t => !tables.includes(t));
+        const extra = tables.filter(t => !COMPLETE_TABLE_LIST.includes(t));
+
+        if (missing.length > 0) {
+          warnings.push(`Missing expected tables: ${missing.join(', ')}`);
+        }
+        if (extra.length > 0) {
+          warnings.push(`Found new tables not in known list: ${extra.join(', ')}`);
+        }
+
+        return { tables, method: 'rpc_function', warnings };
+      }
+
+      logger.warn('Method 1 failed or returned no results:', error);
+    } catch (rpcError: any) {
+      logger.warn('Method 1 (RPC) failed:', rpcError.message);
+    }
+
+    // METHOD 2: Try raw SQL via exec_sql RPC function
+    try {
+      logger.info('Attempting Method 2: Raw SQL via exec_sql()');
       const query = `
         SELECT table_name
         FROM information_schema.tables
         WHERE table_schema = 'public'
           AND table_type = 'BASE TABLE'
-          AND table_name NOT IN ('spatial_ref_sys', 'schema_migrations')
+          AND table_name NOT IN ('spatial_ref_sys', 'schema_migrations', 'pg_stat_statements')
         ORDER BY table_name;
       `;
 
@@ -88,38 +94,65 @@ async function discoverTables(client: any): Promise<string[]> {
 
       if (!error && data && Array.isArray(data) && data.length > 0) {
         const tables = data.map((row: any) => row.table_name).filter(Boolean);
-        logger.info('Discovered tables via information_schema (raw SQL):', tables);
-        return tables;
+        logger.info(`✅ Method 2 succeeded: Found ${tables.length} tables via raw SQL`);
+
+        warnings.push('Using Method 2 (raw SQL) - consider running migration for RPC functions');
+
+        // Validate against known list
+        const missing = COMPLETE_TABLE_LIST.filter(t => !tables.includes(t));
+        if (missing.length > 0) {
+          warnings.push(`Missing expected tables: ${missing.join(', ')}`);
+        }
+
+        return { tables, method: 'raw_sql', warnings };
       }
 
-      logger.warn('Information schema query via RPC failed or returned no results:', error);
-    } catch (rpcError) {
-      logger.warn('RPC exec_sql not available, using fallback:', rpcError);
+      logger.warn('Method 2 failed or returned no results:', error);
+    } catch (sqlError: any) {
+      logger.warn('Method 2 (raw SQL) failed:', sqlError.message);
     }
-  } catch (error) {
-    logger.error('Error discovering tables:', error)
-    // Fallback to known tables
-    return [
-      'tasks',
-      'fitness_database',
-      'contacts',
-      'fitness_completion_history',
-      'hyrox_station_records',
-      'hyrox_workouts',
-      'hyrox_workout_stations',
-      'northstar',
-      'motivation_content',
-      'shipments',
-      'journal',
-      'notepad',
-      'notepad_revisions',
-      'user_feature_preferences',
-      'winter_arc_goals',
-      'contribution_graph',
-      'hello_world_entries',
-      'module_migrations',
-      'module_settings',
-    ]
+
+    // METHOD 3: Validate each known table individually (fallback)
+    logger.info('Attempting Method 3: Validating each known table individually');
+    const existingTables: string[] = [];
+
+    for (const table of COMPLETE_TABLE_LIST) {
+      try {
+        const { error } = await client
+          .from(table)
+          .select('id')
+          .limit(1);
+
+        if (!error) {
+          existingTables.push(table);
+        }
+      } catch (tableError) {
+        // Table doesn't exist or not accessible
+      }
+    }
+
+    if (existingTables.length > 0) {
+      logger.info(`✅ Method 3 succeeded: Found ${existingTables.length} tables via individual validation`);
+      warnings.push('Using Method 3 (fallback) - RPC functions not available. Run /migrations/backup_system_functions.sql');
+
+      const missing = COMPLETE_TABLE_LIST.filter(t => !existingTables.includes(t));
+      if (missing.length > 0) {
+        warnings.push(`Could not access tables: ${missing.join(', ')}`);
+      }
+
+      return { tables: existingTables, method: 'individual_validation', warnings };
+    }
+
+    // All methods failed - return complete hardcoded list with critical warning
+    logger.error('❌ All discovery methods failed! Using complete hardcoded list.');
+    warnings.push('CRITICAL: All discovery methods failed. Using hardcoded table list. Some tables may be missing from backup!');
+
+    return { tables: COMPLETE_TABLE_LIST, method: 'hardcoded_fallback', warnings };
+
+  } catch (error: any) {
+    logger.error('Critical error in table discovery:', error)
+    warnings.push(`Critical error during discovery: ${error.message}`);
+    return { tables: COMPLETE_TABLE_LIST, method: 'hardcoded_fallback', warnings };
   }
 }
 
@@ -384,17 +417,21 @@ export async function POST(req: NextRequest) {
 
     // Get service client
     const client = getServiceSupabase()
-    
-    // Discover all tables
-    const tables = await discoverTables(client)
-    logger.info('Exporting tables:', tables)
-    
+
+    // Discover all tables with method tracking
+    const { tables, method, warnings } = await discoverTables(client)
+    logger.info(`Exporting ${tables.length} tables using discovery method: ${method}`)
+
+    if (warnings.length > 0) {
+      logger.warn('Discovery warnings:', warnings)
+    }
+
     const backupData: any = {}
     const tableSchemas: any = {}
     const tableConstraints: any = {}
     const checksums: any = {}
     let totalRows = 0
-    let errors: string[] = []
+    let errors: string[] = [...warnings]
 
     // Use chunked fetching for large tables
     for (const table of tables) {
@@ -457,28 +494,34 @@ export async function POST(req: NextRequest) {
       }
     }
     
-    // Create metadata with checksums
+    // Create metadata with checksums and discovery method
     const metadata = {
-      version: '2.0',
+      version: '2.1',
       timestamp: new Date().toISOString(),
       exportedBy: user.id,
+      discoveryMethod: method,
       tables: Object.keys(backupData),
       rowCounts: Object.fromEntries(
         Object.entries(backupData).map(([k, v]) => [k, (v as any[]).length])
       ),
       totalRows,
       checksums,
+      warnings: warnings.length > 0 ? warnings : undefined,
       errors: errors.length > 0 ? errors : undefined,
-      exportedFrom: 'ARI Backup System v2.0'
+      exportedFrom: 'ARI Backup System v2.1'
     }
     
     // Generate SQL content
     let sqlContent = `-- ================================================================\n`
-    sqlContent += `-- ARI Database Backup v2.0\n`
+    sqlContent += `-- ARI Database Backup v2.1\n`
     sqlContent += `-- Generated: ${metadata.timestamp}\n`
     sqlContent += `-- Exported by: ${metadata.exportedBy}\n`
+    sqlContent += `-- Discovery Method: ${metadata.discoveryMethod}\n`
     sqlContent += `-- Total Tables: ${metadata.tables.length}\n`
     sqlContent += `-- Total Rows: ${metadata.totalRows}\n`
+    if (warnings.length > 0) {
+      sqlContent += `-- Warnings: ${warnings.length}\n`
+    }
     sqlContent += `-- ================================================================\n\n`
     
     sqlContent += `-- Backup Metadata (DO NOT MODIFY)\n`
@@ -676,6 +719,8 @@ export async function POST(req: NextRequest) {
           tables: metadata.tables.length,
           rows: metadata.totalRows,
           timestamp: metadata.timestamp,
+          discoveryMethod: method,
+          warnings: warnings.length,
           errors: errors.length
         })
       }

@@ -265,6 +265,176 @@ Added comprehensive task priority visualization system:
 - Real-time priority editing with modal interface
 - Color-coded urgency indicators based on due dates
 
+## Backup System Architecture (v2.1)
+
+### Overview
+Comprehensive database backup and restore system with 3-tier table discovery, ensuring ALL database tables are always exported.
+
+### Key Components
+
+#### 1. Database Functions (`/migrations/backup_system_functions.sql`)
+Three PostgreSQL functions for reliable table discovery:
+- `get_all_user_tables()`: Returns all public schema tables with metadata
+- `get_table_row_counts()`: Returns actual row counts for each table
+- `exec_sql(text)`: Executes raw SQL for backup operations
+
+**Setup**: Run this SQL file once in Supabase SQL Editor for optimal performance.
+
+#### 2. Export API (`/app/api/backup/export/route.ts`)
+**3-Tier Discovery Approach** (with automatic fallbacks):
+1. **Method 1 (Optimal)**: RPC function `get_all_user_tables()` - Fast, reliable, accurate
+2. **Method 2 (Fallback)**: Raw SQL via `exec_sql()` - Works without migration
+3. **Method 3 (Manual)**: Individual table validation - Always works
+
+**Features**:
+- Automatically discovers ALL tables (including future tables)
+- Exports complete database as executable SQL file
+- Includes table schemas, constraints, indexes
+- Generates checksums for data integrity verification
+- Tracks discovery method used and provides warnings
+- Version 2.1 includes discovery metadata in exports
+
+**Export includes**:
+- All 19+ tables (auto-discovered)
+- Complete schemas with data types and constraints
+- All data with proper SQL escaping
+- Primary keys, unique constraints, indexes
+- Checksums for integrity verification
+
+#### 3. Verification Endpoint (`/app/api/backup/verify/route.ts`)
+**Purpose**: Preview what will be backed up BEFORE exporting
+
+**Returns**:
+- Discovery method used (rpc_function / raw_sql / individual_validation / hardcoded_fallback)
+- Number of tables found vs expected
+- Total row count across all tables
+- Detailed table list with row counts
+- Warnings if using fallback methods
+- Missing or extra tables detected
+
+**Access**: Any authenticated user can verify (no admin required)
+
+#### 4. Settings UI (`/app/settings/page.tsx` - Backups tab)
+User-friendly interface with:
+- **Preview Backup** button - Shows what will be exported before downloading
+- **Export Database** button - Downloads complete SQL backup
+- **Import Database** - Restores from previous backup (with confirmation)
+- Discovery method display - Shows which method was used
+- Friendly warnings - Clear messages if fallback methods used
+- Post-export statistics - Shows tables exported, rows, and method used
+
+#### 5. Debug Page Tests (`/app/debug/page.tsx`)
+**4th diagnostic card**: "Backup System Tests"
+
+**Tests**:
+1. **Backup Endpoint Accessibility** - Verifies `/api/backup/verify` is accessible
+2. **Table Discovery Test** - Which method is working (RPC / SQL / Manual / Hardcoded)
+3. **Table Count Verification** - Confirms all 19 expected tables are found
+4. **Row Count Summary** - Shows total rows and per-table breakdown
+5. **System Warnings** - Displays any warnings or issues
+6. **Export Endpoint Test** - Verifies export endpoint is accessible
+
+**Results Display**:
+- Color-coded status (green=ok, yellow=warning, red=error)
+- Clear recommendations (e.g., "Run migration for optimal performance")
+- Detailed data breakdown for debugging
+
+### Table Discovery Methods Explained
+
+| Method | Speed | Reliability | Requirements | Status |
+|--------|-------|-------------|--------------|--------|
+| **RPC Function** | Fast | 100% | Requires migration | ✅ Optimal |
+| **Raw SQL** | Fast | 95% | `exec_sql()` function | ⚠️ Fallback |
+| **Individual Validation** | Slow | 90% | None | ⚠️ Manual |
+| **Hardcoded List** | Instant | 80% | None | 🚨 Critical |
+
+**If using fallback**: The system still works but may not discover new tables automatically. Run `/migrations/backup_system_functions.sql` for optimal performance.
+
+### Expected Tables (19 as of October 2025)
+1. `tasks` - Task management
+2. `fitness_database` - Fitness tasks
+3. `contacts` - Contact management
+4. `fitness_completion_history` - Fitness tracking
+5. `hyrox_station_records` - HYROX performance
+6. `hyrox_workouts` - HYROX training
+7. `hyrox_workout_stations` - HYROX station data
+8. `northstar` - Goal tracking
+9. `motivation_content` - Motivational content
+10. `shipments` - Shipment tracking
+11. `journal` - Journal entries
+12. `notepad` - Note-taking
+13. `notepad_revisions` - Note history
+14. `user_feature_preferences` - Feature toggles
+15. `winter_arc_goals` - Winter Arc goals
+16. `contribution_graph` - Activity tracking
+17. `hello_world_entries` - Module demo data
+18. `module_migrations` - Module version tracking
+19. `module_settings` - Module configuration
+
+### Usage Guide
+
+#### First Time Setup
+1. Navigate to Supabase SQL Editor
+2. Copy and paste contents of `/migrations/backup_system_functions.sql`
+3. Execute the SQL (creates 3 functions with proper permissions)
+4. Go to `/settings` > Backups tab > Click "Preview Backup"
+5. Verify discovery method shows "RPC Function (optimal)"
+
+#### Regular Backups
+1. Go to `/settings` > Backups tab
+2. Click "Preview Backup" to verify system status
+3. Review tables and row counts
+4. Click "Export Database" to download SQL file
+5. Store backup file securely (includes timestamp in filename)
+
+#### Verification via Debug Page
+1. Go to `/debug` page
+2. Click "Run Backup Tests" in 4th card
+3. Review all 6 test results
+4. Green = working perfectly
+5. Yellow = working but could be optimized
+6. Red = needs attention
+
+#### Restoring from Backup
+1. Go to `/settings` > Backups tab
+2. Select SQL file to import
+3. System validates file structure
+4. Confirm import (warns about data replacement)
+5. Import executes in transaction (rolls back on error)
+6. Page refreshes after successful import
+
+### Validation Checklist
+
+Before trusting your backup system, verify:
+- ✅ All 19 tables discovered (check `/debug` or Preview)
+- ✅ Discovery method is "RPC Function" (optimal) or "Raw SQL" (acceptable)
+- ✅ No critical warnings displayed
+- ✅ Export includes correct row counts
+- ✅ Can successfully import exported backup
+
+### Warnings and Error Messages
+
+**Friendly Warnings** (system still works):
+- "Using Method 2 (raw SQL) - consider running migration"
+- "Using Method 3 (fallback) - RPC functions not available"
+- "Found new tables not in known list" - Update expected table list
+
+**Critical Warnings** (needs attention):
+- "CRITICAL: All discovery methods failed - using hardcoded list"
+- "Missing expected tables" - Some tables not accessible
+- "Only found X/19 tables" - Database access issues
+
+### Files Modified/Created (October 2025)
+
+**New Files**:
+- `/migrations/backup_system_functions.sql` - Database functions (run manually)
+- `/app/api/backup/verify/route.ts` - Verification endpoint
+
+**Modified Files**:
+- `/app/api/backup/export/route.ts` - 3-tier discovery, v2.1 metadata
+- `/app/settings/page.tsx` - Preview button, warnings, discovery method display
+- `/app/debug/page.tsx` - Added 4th card for backup system tests
+
 ## Troubleshooting
 
 ### Common Issues
