@@ -95,13 +95,14 @@ export function HDContributionGraph({ goals }: HDContributionGraphProps) {
 
   return (
     <div className="grid grid-cols-5 gap-2">
-      {goals.map((goal) => (
+      {goals.map((goal, index) => (
         <CustomContributionGraph
           key={goal.id}
           goalId={goal.id}
           initialColors={goalColors[goal.id] || []}
           onColorChange={handleColorChange}
           opacity={goal.completed ? 0.3 : 1}
+          shimmerIndex={index}
         />
       ))}
     </div>

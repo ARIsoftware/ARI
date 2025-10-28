@@ -59,12 +59,15 @@ export function ExerciseReminder() {
       }
       setOpen(newOpen)
     }}>
-      <DialogContent 
-        className="sm:max-w-2xl border-0" 
+      <DialogContent
+        className="sm:max-w-2xl border-0"
         style={{ backgroundColor: '#091a32', borderRadius: '15px' }}
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
+        <DialogHeader className="sr-only">
+          <DialogTitle>Exercise Reminder</DialogTitle>
+        </DialogHeader>
         <div className="flex flex-col items-center justify-center py-12 px-8">
           <h2 className="text-white text-4xl font-semibold mb-6">
             💪 Get Moving 💪
@@ -72,8 +75,8 @@ export function ExerciseReminder() {
           <p className="text-white text-2xl mb-10">
             Time for your 10 minute exercise break!
           </p>
-          <Button 
-            onClick={() => setOpen(false)} 
+          <Button
+            onClick={() => setOpen(false)}
             className="bg-white text-black hover:bg-gray-100 text-xl font-semibold px-12 py-6 rounded-lg"
           >
             DONE
