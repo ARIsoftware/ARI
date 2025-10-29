@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { ExerciseReminder } from "@/components/exercise-reminder"
 import { YouTubeMusicPlayer } from "@/components/youtube-music-player"
 import { FeaturesProvider } from "@/lib/features-context"
+import { ModulesProvider } from "@/lib/modules/context"
 import { User, Session } from '@supabase/supabase-js'
 
 type SupabaseContext = {
@@ -16,7 +17,13 @@ type SupabaseContext = {
 
 const Context = createContext<SupabaseContext | undefined>(undefined)
 
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({
+  children,
+  modules = []
+}: {
+  children: React.ReactNode
+  modules?: string[]
+}) {
   const [supabase] = useState(() => createSupabaseClient())
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
@@ -79,15 +86,17 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <Context.Provider value={{ supabase, user, session }}>
-      <FeaturesProvider>
-        {children}
-        <Toaster />
-        {/* Only show exercise reminder when user is authenticated */}
-        {user && <ExerciseReminder />}
-        <div className="fixed top-[53px] right-6 z-50">
-          <YouTubeMusicPlayer />
-        </div>
-      </FeaturesProvider>
+      <ModulesProvider modules={modules}>
+        <FeaturesProvider>
+          {children}
+          <Toaster />
+          {/* Only show exercise reminder when user is authenticated */}
+          {user && <ExerciseReminder />}
+          <div className="fixed top-[53px] right-6 z-50">
+            <YouTubeMusicPlayer />
+          </div>
+        </FeaturesProvider>
+      </ModulesProvider>
     </Context.Provider>
   )
 }

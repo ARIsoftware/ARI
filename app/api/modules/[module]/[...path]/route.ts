@@ -44,6 +44,10 @@ const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
     'setup': () => import('@/modules/hyrox/api/setup/route'),
     'reset': () => import('@/modules/hyrox/api/reset/route'),
     'test-database': () => import('@/modules/hyrox/api/test-database/route')
+  },
+  'quotes': {
+    'quotes': () => import('@/modules/quotes/api/quotes/route'),
+    'settings': () => import('@/modules/quotes/api/settings/route')
   }
 }
 

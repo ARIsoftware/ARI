@@ -1,6 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Providers } from "@/components/providers"
+import { getInstalledModules } from "@/lib/modules"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -22,6 +23,9 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  // Scan installed modules on server side and pass to client providers
+  const installedModules = getInstalledModules()
+
   return (
     <html lang="en">
       <head>
@@ -45,7 +49,7 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <Providers>{children}</Providers>
+        <Providers modules={installedModules}>{children}</Providers>
       </body>
     </html>
   )

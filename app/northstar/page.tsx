@@ -42,6 +42,12 @@ const priorityColors = {
   low: "bg-green-100 text-green-700 border-green-300",
 }
 
+interface Quote {
+  id: string
+  quote: string
+  author?: string | null
+}
+
 export default function NorthstarPage() {
   const { session, supabase } = useSupabase()
   const user = session?.user
@@ -53,6 +59,7 @@ export default function NorthstarPage() {
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null)
   const [api, setApi] = useState<CarouselApi>()
   const [current, setCurrent] = useState(0)
+  const [inspirationalQuote, setInspirationalQuote] = useState<Quote | null>(null)
   const [newGoal, setNewGoal] = useState({
     title: "",
     description: "",
@@ -71,6 +78,12 @@ export default function NorthstarPage() {
   useEffect(() => {
     fetchGoals()
   }, [])
+
+  useEffect(() => {
+    if (session?.access_token) {
+      fetchRandomQuote()
+    }
+  }, [session])
 
   useEffect(() => {
     if (!api) {
@@ -97,6 +110,43 @@ export default function NorthstarPage() {
       })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const fetchRandomQuote = async () => {
+    try {
+      console.log('[Northstar] Fetching random quote...')
+      console.log('[Northstar] Session token available:', !!session?.access_token)
+
+      // Try to fetch quotes from the quotes module
+      const response = await fetch("/api/modules/quotes/quotes", {
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+      })
+
+      console.log('[Northstar] API response status:', response.status, response.statusText)
+
+      if (response.ok) {
+        const quotes: Quote[] = await response.json()
+        console.log('[Northstar] Quotes fetched:', quotes.length, 'quotes')
+
+        // Check if there's at least 1 quote
+        if (quotes && quotes.length > 0) {
+          // Pick a random quote
+          const randomQuote = quotes[Math.floor(Math.random() * quotes.length)]
+          console.log('[Northstar] Selected random quote:', randomQuote.quote)
+          setInspirationalQuote(randomQuote)
+        } else {
+          console.log('[Northstar] No quotes available in database')
+        }
+      } else {
+        console.log('[Northstar] API request failed:', response.status)
+      }
+      // If module is disabled or no quotes, inspirationalQuote stays null and we show default
+    } catch (error) {
+      // Silently fail - we'll show the default quote
+      console.error('[Northstar] Error fetching quotes:', error)
     }
   }
 
@@ -239,7 +289,14 @@ export default function NorthstarPage() {
               <div>
                 <h1 className="text-3xl font-medium">Northstar</h1>
                 <p className="text-sm text-[#aa2020] mt-1">
-                  "Success is not final, failure is not fatal: It is the courage to continue that counts."
+                  {inspirationalQuote ? (
+                    <>
+                      {inspirationalQuote.quote}
+                      {inspirationalQuote.author && ` - ${inspirationalQuote.author}`}
+                    </>
+                  ) : (
+                    "Success is not final, failure is not fatal: It is the courage to continue that counts."
+                  )}
                 </p>
               </div>
               <Button onClick={() => setIsAddModalOpen(true)} className="bg-black hover:bg-gray-800">
