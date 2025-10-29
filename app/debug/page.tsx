@@ -1244,11 +1244,12 @@ export default function DatabaseTestPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex justify-between items-center mb-6">
+              <div className="space-y-3 mb-6">
                 <Button
                   onClick={runTests}
                   disabled={isRunning}
                   size="lg"
+                  className="w-full"
                 >
                   {isRunning ? (
                     <>
@@ -1329,12 +1330,13 @@ export default function DatabaseTestPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex justify-between items-center mb-6">
+              <div className="space-y-3 mb-6">
                 <Button
                   onClick={runSecurityTests}
                   disabled={isRunningSecurityTests}
                   size="lg"
                   variant="outline"
+                  className="w-full"
                 >
                   {isRunningSecurityTests ? (
                     <>
@@ -1348,9 +1350,9 @@ export default function DatabaseTestPage() {
                     </>
                   )}
                 </Button>
-                <div className="text-sm text-muted-foreground text-right">
-                  <p>Tests unauthorized access to API endpoints</p>
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  Tests unauthorized access to API endpoints
+                </p>
               </div>
 
               {/* Security Summary */}
@@ -1448,12 +1450,13 @@ export default function DatabaseTestPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex justify-between items-center mb-6">
+              <div className="space-y-3 mb-6">
                 <Button
                   onClick={runModuleTests}
                   disabled={isRunningModuleTests}
                   size="lg"
                   variant="outline"
+                  className="w-full"
                 >
                   {isRunningModuleTests ? (
                     <>
@@ -1575,12 +1578,13 @@ export default function DatabaseTestPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex justify-between items-center mb-6">
+              <div className="space-y-3 mb-6">
                 <Button
                   onClick={runBackupTests}
                   disabled={isRunningBackupTests}
                   size="lg"
                   variant="outline"
+                  className="w-full"
                 >
                   {isRunningBackupTests ? (
                     <>
