@@ -38,6 +38,12 @@ interface FitnessStats {
   totalCompletions: number
 }
 
+interface Quote {
+  id: string
+  quote: string
+  author?: string | null
+}
+
 export default function DashboardPage() {
   const { session } = useSupabase()
   const [loading, setLoading] = useState(true)
@@ -49,12 +55,20 @@ export default function DashboardPage() {
   })
   const [contactCount, setContactCount] = useState(0)
   const [taskCount, setTaskCount] = useState(0)
+  const [inspirationalQuote, setInspirationalQuote] = useState<Quote | null>(null)
+  const [quoteLoading, setQuoteLoading] = useState(true)
 
   useEffect(() => {
     if (session) {
       loadDashboardData()
     }
   }, [session])
+
+  useEffect(() => {
+    if (session?.access_token && !inspirationalQuote && quoteLoading) {
+      fetchRandomQuote()
+    }
+  }, [session?.access_token])
 
   const loadDashboardData = async () => {
     try {
@@ -78,6 +92,29 @@ export default function DashboardPage() {
       console.error("Failed to load dashboard data:", error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchRandomQuote = async () => {
+    try {
+      const response = await fetch("/api/modules/quotes/quotes", {
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+      })
+
+      if (response.ok) {
+        const quotes: Quote[] = await response.json()
+
+        if (quotes && quotes.length > 0) {
+          const randomQuote = quotes[Math.floor(Math.random() * quotes.length)]
+          setInspirationalQuote(randomQuote)
+        }
+      }
+    } catch (error) {
+      console.error('[Dashboard] Error fetching quotes:', error)
+    } finally {
+      setQuoteLoading(false)
     }
   }
 
@@ -106,9 +143,18 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h1 className="text-3xl font-medium">Dashboard</h1>
-                  <p className="text-sm text-[#aa2020] mt-1">
-                    Autumn Arc Fantastical
-                  </p>
+                  {!quoteLoading && (
+                    <p className="text-sm text-[#aa2020] mt-1">
+                      {inspirationalQuote ? (
+                        <>
+                          {inspirationalQuote.quote}
+                          {inspirationalQuote.author && ` - ${inspirationalQuote.author}`}
+                        </>
+                      ) : (
+                        "Autumn Arc Fantastical"
+                      )}
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" onClick={() => window.location.href = '/tasks'}>
