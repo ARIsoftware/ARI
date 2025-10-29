@@ -14,7 +14,7 @@ export default function WelcomePage() {
   const [currentLineIndex, setCurrentLineIndex] = useState(-1)
   const [isTyping, setIsTyping] = useState(false)
   const [textOpacity, setTextOpacity] = useState(1)
-  const [showBackground, setShowBackground] = useState(false)
+  const [showBackground, setShowBackground] = useState(true)
   const [showOnboarding, setShowOnboarding] = useState(false)
 
   const sequence = [
@@ -22,7 +22,9 @@ export default function WelcomePage() {
     { delay: 2000, text: "I am very happy that we can meet." },
     { delay: 2000, text: "I am ARI. I am software." },
     { delay: 2000, text: "However, I am not like other software." },
-    { delay: 2000, text: "I am free." },
+    { delay: 2000, text: "I am free. Free to grow. Ever expandable. No limits." },
+    { delay: 2000, text: "I am open source." },
+    { delay: 2000, text: "I am yours." },
   ]
 
   useEffect(() => {
@@ -58,12 +60,11 @@ export default function WelcomePage() {
             const fadeTimeout = setTimeout(() => {
               setTextOpacity(0)
 
-              // After fade out completes (2 seconds), show background and onboarding
-              const bgTimeout = setTimeout(() => {
-                setShowBackground(true)
+              // After fade out completes (2 seconds), show onboarding
+              const onboardingTimeout = setTimeout(() => {
                 setShowOnboarding(true)
               }, 2000)
-              timeouts.push(bgTimeout)
+              timeouts.push(onboardingTimeout)
             }, 3000)
             timeouts.push(fadeTimeout)
           }, 0)
@@ -100,7 +101,7 @@ export default function WelcomePage() {
     <div className="min-h-screen bg-white relative overflow-hidden">
       {/* Text content */}
       <div
-        className="absolute top-[70px] left-[70px] space-y-8 transition-opacity duration-[2000ms]"
+        className="absolute top-[70px] left-[70px] space-y-8 transition-opacity duration-[2000ms] z-10"
         style={{ opacity: textOpacity }}
       >
         {allLines.map((line, index) => {
@@ -136,10 +137,7 @@ export default function WelcomePage() {
 
       {/* Background image */}
       {showBackground && (
-        <div
-          className="absolute inset-0 transition-opacity duration-[2000ms]"
-          style={{ opacity: showBackground ? 1 : 0 }}
-        >
+        <div className="absolute inset-0">
           <Image
             src="/welcome.png"
             alt="Welcome background"
@@ -152,7 +150,7 @@ export default function WelcomePage() {
       {/* Onboarding Wizard */}
       {showOnboarding && (
         <div
-          className="absolute inset-0 flex items-center justify-center z-10 transition-opacity duration-[2000ms]"
+          className="absolute inset-0 flex items-center justify-center z-20 transition-opacity duration-[2000ms]"
           style={{ opacity: showOnboarding ? 1 : 0 }}
         >
           <Card className="w-full max-w-lg">
