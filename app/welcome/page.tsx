@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from "react"
 import Image from "next/image"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function WelcomePage() {
   const [completedLines, setCompletedLines] = useState<string[]>([])
@@ -10,6 +15,7 @@ export default function WelcomePage() {
   const [isTyping, setIsTyping] = useState(false)
   const [textOpacity, setTextOpacity] = useState(1)
   const [showBackground, setShowBackground] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
   const sequence = [
     { delay: 2000, text: "HELLO." },
@@ -52,9 +58,10 @@ export default function WelcomePage() {
             const fadeTimeout = setTimeout(() => {
               setTextOpacity(0)
 
-              // After fade out completes (2 seconds), show background
+              // After fade out completes (2 seconds), show background and onboarding
               const bgTimeout = setTimeout(() => {
                 setShowBackground(true)
+                setShowOnboarding(true)
               }, 2000)
               timeouts.push(bgTimeout)
             }, 3000)
@@ -130,16 +137,74 @@ export default function WelcomePage() {
       {/* Background image */}
       {showBackground && (
         <div
-          className="absolute inset-0 flex items-center justify-center transition-opacity duration-[2000ms]"
+          className="absolute inset-0 transition-opacity duration-[2000ms]"
           style={{ opacity: showBackground ? 1 : 0 }}
         >
           <Image
             src="/welcome.png"
             alt="Welcome background"
-            width={1200}
-            height={800}
-            className="object-contain"
+            fill
+            className="object-cover"
           />
+        </div>
+      )}
+
+      {/* Onboarding Wizard */}
+      {showOnboarding && (
+        <div
+          className="absolute inset-0 flex items-center justify-center z-10 transition-opacity duration-[2000ms]"
+          style={{ opacity: showOnboarding ? 1 : 0 }}
+        >
+          <Card className="w-full max-w-lg">
+            <CardHeader>
+              <CardTitle className="text-2xl">Welcome! Let's get you set up</CardTitle>
+              <CardDescription>
+                Complete your profile and invite your team to get started
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="company" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="company">Company Details</TabsTrigger>
+                  <TabsTrigger value="share">Share</TabsTrigger>
+                </TabsList>
+                <TabsContent value="company" className="space-y-4 mt-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Name</Label>
+                      <Input id="name" placeholder="Your full name" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input id="email" type="email" placeholder="your@email.com" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="title">Title</Label>
+                    <Input id="title" placeholder="Your job title" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="company">Company Name</Label>
+                    <Input id="company" placeholder="Your company name" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="domain">Domain Name</Label>
+                    <Input id="domain" placeholder="yourcompany.com" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="linkedin">LinkedIn URL</Label>
+                    <Input id="linkedin" placeholder="https://linkedin.com/in/yourprofile" />
+                  </div>
+                  <Button className="w-full bg-black hover:bg-black/90 text-white">
+                    Continue
+                  </Button>
+                </TabsContent>
+                <TabsContent value="share" className="mt-4">
+                  <p className="text-sm text-muted-foreground">Share content will go here</p>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
