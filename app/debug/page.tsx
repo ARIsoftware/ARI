@@ -5,7 +5,8 @@ import { useSupabase } from '@/components/providers'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { AlertCircle, CheckCircle2, XCircle, Loader2, Shield, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { AlertCircle, CheckCircle2, XCircle, Loader2, Shield, ShieldAlert, ShieldCheck, Database as DatabaseIcon, Package, Save } from 'lucide-react'
 
 interface TestResult {
   name: string
@@ -1204,10 +1205,37 @@ export default function DatabaseTestPage() {
   }
 
   return (
-    <div className="container mx-auto p-6" style={{ maxWidth: '95vw' }}>
-      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-4">
-        {/* Database Tests */}
-        <Card>
+    <div className="container mx-auto p-6 max-w-7xl">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold tracking-tight">Test Dashboard</h1>
+        <p className="text-muted-foreground mt-2">Comprehensive system testing and diagnostics</p>
+      </div>
+
+      {/* Tabs */}
+      <Tabs defaultValue="database" className="w-full">
+        <TabsList className="grid w-full grid-cols-4 mb-8">
+          <TabsTrigger value="database" className="flex items-center gap-2">
+            <DatabaseIcon className="h-4 w-4" />
+            Database
+          </TabsTrigger>
+          <TabsTrigger value="security" className="flex items-center gap-2">
+            <Shield className="h-4 w-4" />
+            Security
+          </TabsTrigger>
+          <TabsTrigger value="modules" className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            Modules
+          </TabsTrigger>
+          <TabsTrigger value="backup" className="flex items-center gap-2">
+            <Save className="h-4 w-4" />
+            Backup
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Database Tests Tab */}
+        <TabsContent value="database" className="space-y-6">
+          <Card>
           <CardHeader>
             <CardTitle className="text-2xl">Database Connection Test</CardTitle>
             <p className="text-sm text-muted-foreground mt-2">
@@ -1285,8 +1313,10 @@ export default function DatabaseTestPage() {
             </div>
           </CardContent>
         </Card>
+        </TabsContent>
 
-        {/* API Security Tests */}
+        {/* Security Tests Tab */}
+        <TabsContent value="security" className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl flex items-center gap-2">
@@ -1403,8 +1433,10 @@ export default function DatabaseTestPage() {
             </div>
           </CardContent>
         </Card>
+        </TabsContent>
 
-        {/* Module System Tests */}
+        {/* Modules Tests Tab */}
+        <TabsContent value="modules" className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl flex items-center gap-2">
@@ -1528,8 +1560,10 @@ export default function DatabaseTestPage() {
             </div>
           </CardContent>
         </Card>
+        </TabsContent>
 
-        {/* Backup System Tests */}
+        {/* Backup Tests Tab */}
+        <TabsContent value="backup" className="space-y-6">
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl flex items-center gap-2">
@@ -1660,7 +1694,8 @@ export default function DatabaseTestPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
