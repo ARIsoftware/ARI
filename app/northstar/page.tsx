@@ -60,6 +60,7 @@ export default function NorthstarPage() {
   const [api, setApi] = useState<CarouselApi>()
   const [current, setCurrent] = useState(0)
   const [inspirationalQuote, setInspirationalQuote] = useState<Quote | null>(null)
+  const [quoteLoading, setQuoteLoading] = useState(true)
   const [newGoal, setNewGoal] = useState({
     title: "",
     description: "",
@@ -80,10 +81,10 @@ export default function NorthstarPage() {
   }, [])
 
   useEffect(() => {
-    if (session?.access_token) {
+    if (session?.access_token && !inspirationalQuote && quoteLoading) {
       fetchRandomQuote()
     }
-  }, [session])
+  }, [session?.access_token])
 
   useEffect(() => {
     if (!api) {
@@ -147,6 +148,8 @@ export default function NorthstarPage() {
     } catch (error) {
       // Silently fail - we'll show the default quote
       console.error('[Northstar] Error fetching quotes:', error)
+    } finally {
+      setQuoteLoading(false)
     }
   }
 
@@ -288,16 +291,18 @@ export default function NorthstarPage() {
             <div className="flex justify-between items-center">
               <div>
                 <h1 className="text-3xl font-medium">Northstar</h1>
-                <p className="text-sm text-[#aa2020] mt-1">
-                  {inspirationalQuote ? (
-                    <>
-                      {inspirationalQuote.quote}
-                      {inspirationalQuote.author && ` - ${inspirationalQuote.author}`}
-                    </>
-                  ) : (
-                    "Success is not final, failure is not fatal: It is the courage to continue that counts."
-                  )}
-                </p>
+                {!quoteLoading && (
+                  <p className="text-sm text-[#aa2020] mt-1">
+                    {inspirationalQuote ? (
+                      <>
+                        {inspirationalQuote.quote}
+                        {inspirationalQuote.author && ` - ${inspirationalQuote.author}`}
+                      </>
+                    ) : (
+                      "Success is not final, failure is not fatal: It is the courage to continue that counts."
+                    )}
+                  </p>
+                )}
               </div>
               <Button onClick={() => setIsAddModalOpen(true)} className="bg-black hover:bg-gray-800">
                 <Plus className="w-4 h-4 mr-2" />
