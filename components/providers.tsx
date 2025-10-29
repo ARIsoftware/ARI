@@ -2,6 +2,7 @@
 
 import { createSupabaseClient } from "@/lib/supabase-auth"
 import { createContext, useContext, useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { Toaster } from "@/components/ui/toaster"
 import { ExerciseReminder } from "@/components/exercise-reminder"
 import { YouTubeMusicPlayer } from "@/components/youtube-music-player"
@@ -24,6 +25,7 @@ export function Providers({
   children: React.ReactNode
   modules?: string[]
 }) {
+  const pathname = usePathname()
   const [supabase] = useState(() => createSupabaseClient())
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
@@ -92,9 +94,12 @@ export function Providers({
           <Toaster />
           {/* Only show exercise reminder when user is authenticated */}
           {user && <ExerciseReminder />}
-          <div className="fixed top-[53px] right-6 z-50">
-            <YouTubeMusicPlayer />
-          </div>
+          {/* Hide music player on welcome page */}
+          {pathname !== '/welcome' && (
+            <div className="fixed top-[53px] right-6 z-50">
+              <YouTubeMusicPlayer />
+            </div>
+          )}
         </FeaturesProvider>
       </ModulesProvider>
     </Context.Provider>
