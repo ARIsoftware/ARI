@@ -265,7 +265,7 @@ export default function QuotesPage() {
               </div>
               <QuoteIcon className="h-8 w-8 text-gray-300 mb-3" />
               <p className="text-gray-800 text-lg mb-3 italic">
-                "{quote.quote}"
+                {quote.quote}
               </p>
               {quote.author && (
                 <p className="text-gray-500 text-sm">
