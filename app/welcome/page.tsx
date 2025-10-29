@@ -35,7 +35,7 @@ export default function WelcomePage() {
         setCurrentLineText(text.slice(0, charIndex + 1))
         const timeout = setTimeout(() => {
           typeCharacter(text, charIndex + 1, lineIndex)
-        }, 42) // Type each character with 42ms delay (15% faster than 50ms)
+        }, 34) // Type each character with 34ms delay (20% faster than 42ms)
         timeouts.push(timeout)
       } else {
         // Line complete, wait before next line
