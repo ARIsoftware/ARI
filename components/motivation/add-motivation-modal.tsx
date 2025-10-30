@@ -297,13 +297,40 @@ export function AddMotivationModal({
 
     setLoading(true);
     try {
+      // Try to fetch Twitter metadata for thumbnail
+      let thumbnailUrl = null;
+      let fetchedTitle = null;
+
+      try {
+        const metadataResponse = await fetch("/api/twitter/metadata", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ url: twitterUrl }),
+        });
+
+        if (metadataResponse.ok) {
+          const metadata = await metadataResponse.json();
+          if (metadata.thumbnail && !metadata.thumbnail.includes('placeholder')) {
+            thumbnailUrl = metadata.thumbnail;
+          }
+          if (!twitterTitle && metadata.title) {
+            fetchedTitle = metadata.title.substring(0, 100);
+          }
+        }
+      } catch (metadataError) {
+        console.log("Could not fetch Twitter metadata, continuing without thumbnail");
+      }
+
       const position = await getNextPosition();
 
       const { error } = await supabase.from("motivation_content").insert({
         user_id: session.user.id,
         type: "twitter",
-        title: twitterTitle || "Twitter Post",
+        title: twitterTitle || fetchedTitle || "Twitter Post",
         url: twitterUrl,
+        thumbnail_url: thumbnailUrl,
         position: position,
       });
 

@@ -109,6 +109,28 @@ export function EditMotivationModal({
             console.log("Could not fetch new Instagram metadata");
           }
         }
+
+        // Update thumbnail for Twitter if URL changed
+        if (item.type === "twitter" && url !== item.url) {
+          try {
+            const metadataResponse = await fetch("/api/twitter/metadata", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ url }),
+            });
+
+            if (metadataResponse.ok) {
+              const metadata = await metadataResponse.json();
+              if (metadata.thumbnail && !metadata.thumbnail.includes('placeholder')) {
+                updateData.thumbnail_url = metadata.thumbnail;
+              }
+            }
+          } catch (metadataError) {
+            console.log("Could not fetch new Twitter metadata");
+          }
+        }
       }
 
       const { error } = await supabase
