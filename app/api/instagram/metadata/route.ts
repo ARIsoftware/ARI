@@ -23,49 +23,68 @@ export async function POST(req: NextRequest) {
     };
 
     try {
-      // Method 1: Try to fetch with different user agents
-      const userAgents = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "facebookexternalhit/1.1"
-      ];
+      // Method 1: Try Instagram's oEmbed API (most reliable)
+      try {
+        const oembedUrl = `https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(url)}&access_token=&fields=thumbnail_url,title,author_name`;
 
-      for (const userAgent of userAgents) {
-        try {
-          const response = await fetch(url, {
-            headers: {
-              "User-Agent": userAgent,
-              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-              "Accept-Language": "en-US,en;q=0.5",
-              "Accept-Encoding": "gzip, deflate",
-              "Connection": "keep-alive",
-              "Upgrade-Insecure-Requests": "1",
-            },
-            redirect: "follow",
-          });
+        // Try without access token first (sometimes works for public posts)
+        const oembedResponse = await fetch(oembedUrl);
 
-          if (response.ok) {
-            const html = await response.text();
-
-            // Extract Open Graph data
-            const ogImageMatch = html.match(/<meta property="og:image" content="([^"]+)"/);
-            const titleMatch = html.match(/<meta property="og:title" content="([^"]+)"/);
-            const descriptionMatch = html.match(/<meta property="og:description" content="([^"]+)"/);
-
-            if (ogImageMatch) {
-              metadata.thumbnail = ogImageMatch[1];
-              metadata.title = titleMatch ? titleMatch[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&') : null;
-              metadata.description = descriptionMatch ? descriptionMatch[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&') : null;
-              break; // Success, exit loop
-            }
+        if (oembedResponse.ok) {
+          const oembedData = await oembedResponse.json();
+          if (oembedData.thumbnail_url) {
+            metadata.thumbnail = oembedData.thumbnail_url;
+            metadata.title = oembedData.title || (oembedData.author_name ? `Post by ${oembedData.author_name}` : null);
+            console.log("Successfully fetched via oEmbed API");
           }
-        } catch (e) {
-          console.log(`Failed with user agent ${userAgent}:`, e.message);
-          continue;
+        }
+      } catch (e) {
+        console.log("oEmbed API failed:", e.message);
+      }
+
+      // Method 2: Try to fetch with different user agents
+      if (!metadata.thumbnail) {
+        const userAgents = [
+          "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+          "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        ];
+
+        for (const userAgent of userAgents) {
+          try {
+            const response = await fetch(url, {
+              headers: {
+                "User-Agent": userAgent,
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.5",
+              },
+              redirect: "follow",
+            });
+
+            if (response.ok) {
+              const html = await response.text();
+
+              // Extract Open Graph data
+              const ogImageMatch = html.match(/<meta property="og:image" content="([^"]+)"/);
+              const titleMatch = html.match(/<meta property="og:title" content="([^"]+)"/);
+              const descriptionMatch = html.match(/<meta property="og:description" content="([^"]+)"/);
+
+              if (ogImageMatch) {
+                metadata.thumbnail = ogImageMatch[1];
+                metadata.title = titleMatch ? titleMatch[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&') : null;
+                metadata.description = descriptionMatch ? descriptionMatch[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&') : null;
+                console.log(`Successfully fetched with user agent: ${userAgent.substring(0, 30)}...`);
+                break;
+              }
+            }
+          } catch (e) {
+            console.log(`Failed with user agent ${userAgent.substring(0, 30)}:`, e.message);
+            continue;
+          }
         }
       }
 
-      // Method 2: Try Instagram embed URL
+      // Method 3: Try Instagram embed URL
       if (!metadata.thumbnail) {
         const embedUrl = url.replace(/\/$/, "") + "/embed/captioned/";
         try {
@@ -80,6 +99,7 @@ export async function POST(req: NextRequest) {
             const embedImageMatch = embedHtml.match(/"display_url":"([^"]+)"/);
             if (embedImageMatch) {
               metadata.thumbnail = embedImageMatch[1].replace(/\\u0026/g, '&');
+              console.log("Successfully fetched via embed URL");
             }
           }
         } catch (e) {
@@ -91,13 +111,14 @@ export async function POST(req: NextRequest) {
       console.error("All fetch methods failed:", fetchError);
     }
 
-    // Method 3: Generate a placeholder thumbnail based on post ID
+    // Method 4: Generate a placeholder thumbnail based on post ID
     if (!metadata.thumbnail) {
       const postIdMatch = url.match(/\/p\/([A-Za-z0-9_-]+)/);
       if (postIdMatch) {
         // Create a consistent placeholder based on the post ID
         metadata.thumbnail = `https://via.placeholder.com/400x400/E4405F/FFFFFF?text=IG+Post`;
         metadata.title = metadata.title || "Instagram Post";
+        console.log("Using placeholder thumbnail");
       }
     }
 

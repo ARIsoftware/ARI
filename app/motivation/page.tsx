@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Play, AlertCircle, Sparkles, Instagram, Twitter, GripVertical, Edit } from "lucide-react";
+import { Plus, Trash2, Play, AlertCircle, Sparkles, Instagram, Twitter, GripVertical, Edit, RefreshCw } from "lucide-react";
 import { useSupabase } from "@/components/providers";
 import { AddMotivationModal } from "@/components/motivation/add-motivation-modal";
 import { EditMotivationModal } from "@/components/motivation/edit-motivation-modal";
@@ -52,11 +52,12 @@ interface MotivationItem {
 }
 
 // Sortable Item Component
-function SortableItem({ item, onDelete, onPlay, onEdit }: {
+function SortableItem({ item, onDelete, onPlay, onEdit, onRefresh }: {
   item: MotivationItem;
   onDelete: (id: string) => void;
   onPlay: (item: MotivationItem) => void;
   onEdit: (item: MotivationItem) => void;
+  onRefresh: (id: string) => void;
 }) {
   const {
     attributes,
@@ -188,15 +189,26 @@ function SortableItem({ item, onDelete, onPlay, onEdit }: {
       <div
         {...attributes}
         {...listeners}
-        className="absolute top-2 right-20 bg-gray-800 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-move z-10"
+        className="absolute top-2 right-[120px] bg-gray-800 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-move z-10"
       >
         <GripVertical className="h-4 w-4" />
       </div>
 
+      {/* Refresh button - only show for Instagram, Twitter, and YouTube */}
+      {(item.type === 'instagram' || item.type === 'twitter' || item.type === 'youtube') && (
+        <button
+          onClick={() => onRefresh(item.id)}
+          className="absolute top-2 right-[86px] bg-green-500 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-10"
+          title="Refresh thumbnail"
+        >
+          <RefreshCw className="h-4 w-4" />
+        </button>
+      )}
+
       {/* Edit button */}
       <button
         onClick={() => onEdit(item)}
-        className="absolute top-2 right-11 bg-blue-500 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-10"
+        className="absolute top-2 right-[52px] bg-blue-500 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-10"
       >
         <Edit className="h-4 w-4" />
       </button>
@@ -325,6 +337,30 @@ export default function MotivationPage() {
   const handleEdit = (item: MotivationItem) => {
     setEditingItem(item);
     setIsEditModalOpen(true);
+  };
+
+  const handleRefresh = async (itemId: string) => {
+    try {
+      const response = await fetch("/api/motivation/refresh-thumbnail", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ itemId }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        // Reload items to show updated thumbnail
+        await loadMotivationItems();
+      } else {
+        alert(data.error || "Failed to refresh thumbnail. Instagram/Twitter may be blocking requests.");
+      }
+    } catch (error) {
+      console.error("Error refreshing thumbnail:", error);
+      alert("Failed to refresh thumbnail. Please try again.");
+    }
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -463,6 +499,7 @@ export default function MotivationPage() {
                         onDelete={handleDelete}
                         onPlay={handlePlayItem}
                         onEdit={handleEdit}
+                        onRefresh={handleRefresh}
                       />
                     ))}
                   </div>
