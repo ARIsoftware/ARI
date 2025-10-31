@@ -1,4 +1,4 @@
-import { CheckSquare, Plus, Archive, Dumbbell, Target, TrendingUp, Users, UserPlus, Settings, BarChart3, Compass, Bot, Package, Sparkles, Grid3x3, Radar, Snowflake, Quote, Briefcase } from "lucide-react"
+import { CheckSquare, Plus, Archive, Dumbbell, Target, TrendingUp, Settings, BarChart3, Compass, Bot, Package, Grid3x3, Radar, Snowflake, Briefcase } from "lucide-react"
 
 export interface MenuItem {
   title: string
@@ -62,23 +62,6 @@ export const menuConfig: MenuGroup[] = [
     ],
   },
   {
-    title: "Motivation",
-    url: "/motivation",
-    icon: Sparkles,
-    items: [
-      {
-        title: "Motivation",
-        url: "/motivation",
-        icon: Sparkles,
-      },
-      {
-        title: "Quotes",
-        url: "/quotes",
-        icon: Quote,
-      },
-    ],
-  },
-  {
     title: "Todo",
     url: "#",
     icon: CheckSquare,
@@ -103,23 +86,6 @@ export const menuConfig: MenuGroup[] = [
         url: "#",
         icon: Archive,
         isActive: false,
-      },
-    ],
-  },
-  {
-    title: "People",
-    url: "#",
-    icon: Users,
-    items: [
-      {
-        title: "All Contacts",
-        url: "/contacts",
-        icon: Users,
-      },
-      {
-        title: "Add Contact",
-        url: "#",
-        icon: UserPlus,
       },
     ],
   },
@@ -220,12 +186,9 @@ function getFeatureDescription(title: string, url: string): string {
     '/northstar': 'Track your goals and milestones',
     '/winter-arc': 'Winter Arc 2026 transformation journal',
     '/major-projects': 'Track and manage your most important projects',
-    '/motivation': 'Inspirational content and quotes',
-    '/quotes': 'Manage your collection of inspirational quotes',
     '/tasks': 'Manage your todo list',
     '/add-task': 'Create new tasks',
     '/radar': 'Visualize task priorities',
-    '/contacts': 'People and contacts management',
     '/settings': 'Application settings and preferences',
     '/modules': 'Enable or disable installed modules to extend your app functionality',
   }

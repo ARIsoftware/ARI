@@ -1,0 +1,37 @@
+{
+  "id": "contacts",
+  "title": "People",
+  "name": "Contacts",
+  "description": "People and contacts management - organize and manage your professional and personal connections",
+  "version": "1.0.0",
+  "author": "ARI Team <ari@ari.software>",
+  "icon": "Users",
+  "enabled": true,
+  "fullscreen": false,
+  "menuPriority": 20,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": false
+  },
+  "routes": [
+    {
+      "path": "/contacts",
+      "label": "All Contacts",
+      "icon": "Users",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": ["contacts"],
+    "migrations": "./database/migrations"
+  },
+  "dashboard": {
+    "widgets": false,
+    "widgetComponents": []
+  }
+}

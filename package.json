@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "generate-module-registry": "node scripts/generate-module-registry.js",
+    "prebuild": "npm run generate-module-registry",
     "build": "next build",
+    "predev": "npm run generate-module-registry",
     "dev": "next dev",
     "lint": "next lint",
     "start": "next start"

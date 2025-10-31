@@ -27,11 +27,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { CalendarIcon, Save, X, Star, ArrowLeft, Loader2, Pencil, Info, Compass } from "lucide-react"
+import { CalendarIcon, Save, X, Star, ArrowLeft, Loader2, Pencil, Info, Compass, Briefcase } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useState, useEffect } from "react"
 import { getTasks, updateTask, type Task } from "@/lib/tasks"
 import { getGoals, type Goal } from "@/lib/goals"
+import { getMajorProjects, type MajorProject } from "@/lib/major-projects"
+import { useFeatures } from "@/lib/features-context"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
@@ -69,12 +71,14 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
   const user = session?.user
   const { toast } = useToast()
   const router = useRouter()
+  const { isFeatureEnabled } = useFeatures()
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
   const [date, setDate] = useState<Date>()
   const [task, setTask] = useState<Task | null>(null)
   const [northStars, setNorthStars] = useState<Goal[]>([])
   const [selectedNorthStars, setSelectedNorthStars] = useState<string[]>([])
+  const [projects, setProjects] = useState<MajorProject[]>([])
 
   // Form state
   const [formData, setFormData] = useState({
@@ -89,6 +93,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
     timeliness: 3,
     effort: 3,
     strategic_fit: 3,
+    project_id: null as string | null,
   })
 
   const [newAssignee, setNewAssignee] = useState("")
@@ -127,6 +132,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
           timeliness: foundTask.timeliness || 3,
           effort: foundTask.effort || 3,
           strategic_fit: foundTask.strategic_fit || 3,
+          project_id: foundTask.project_id || null,
         })
 
         if (foundTask.due_date) {
@@ -136,6 +142,16 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
         // Load northstars/goals
         const goals = await getGoals()
         setNorthStars(goals)
+
+        // Load projects if major-projects module is enabled
+        if (isFeatureEnabled('major-projects')) {
+          try {
+            const projectsData = await getMajorProjects()
+            setProjects(projectsData)
+          } catch (error) {
+            console.error('Failed to load projects:', error)
+          }
+        }
 
         // If task has northstar_ids stored (you'll need to add this field to the database)
         // For now, we'll initialize as empty
@@ -155,7 +171,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
     }
 
     loadData()
-  }, [id, router, toast, user?.id])
+  }, [id, router, toast, user?.id, isFeatureEnabled])
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({
@@ -209,6 +225,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
         timeliness: formData.timeliness,
         effort: formData.effort,
         strategic_fit: formData.strategic_fit,
+        project_id: formData.project_id,
         // Note: northstar_ids would need to be added to the database schema
         // northstar_ids: selectedNorthStars,
       }
@@ -366,6 +383,34 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
                       </PopoverContent>
                     </Popover>
                   </div>
+
+                  {/* Project Selection - Only show if major-projects module is enabled */}
+                  {isFeatureEnabled('major-projects') && projects.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium flex items-center gap-2">
+                        <Briefcase className="w-4 h-4" />
+                        Project
+                      </Label>
+                      <Select
+                        value={formData.project_id || "none"}
+                        onValueChange={(value) => handleInputChange("project_id", value === "none" ? null : value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a project..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">
+                            <span className="text-muted-foreground">No project</span>
+                          </SelectItem>
+                          {projects.map((project) => (
+                            <SelectItem key={project.id} value={project.id}>
+                              {project.project_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
                   {/* Status and Priority */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

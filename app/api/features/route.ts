@@ -12,8 +12,10 @@ export async function GET(request: NextRequest) {
   try {
     const { user, supabase } = await getAuthenticatedUser()
 
+    // Return empty array for unauthenticated users (e.g., on sign-in page)
+    // Features will default to enabled per features-context.tsx
     if (!user) {
-      return createErrorResponse('Authentication required', 401)
+      return NextResponse.json([])
     }
 
     // Fetch user's feature preferences with RLS
