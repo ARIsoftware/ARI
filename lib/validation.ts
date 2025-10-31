@@ -242,6 +242,32 @@ export const paginationSchema = z.object({
   ).default('0')
 })
 
+// Major Projects-related schemas
+export const createMajorProjectSchema = z.object({
+  project_name: nonEmptyString.max(255, 'Project name too long'),
+  project_description: z.string().max(2000, 'Description too long').nullable().optional(),
+  project_due_date: z.union([
+    z.string().datetime(),
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
+    z.null()
+  ]).optional()
+})
+
+export const updateMajorProjectSchema = z.object({
+  project_name: nonEmptyString.max(255, 'Project name too long').optional(),
+  project_description: z.string().max(2000, 'Description too long').nullable().optional(),
+  project_due_date: z.union([
+    z.string().datetime(),
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
+    z.null()
+  ]).optional()
+}).refine(
+  (data) => Object.keys(data).length > 0,
+  {
+    message: 'At least one field must be provided for update'
+  }
+)
+
 // Shipment-related schemas
 export const ShipmentStatus = z.enum(['pending', 'in_transit', 'out_for_delivery', 'delivered', 'delayed', 'returned'], {
   errorMap: () => ({ message: 'Invalid shipment status' })
