@@ -14,6 +14,7 @@ const protectedRoutes = [
   "/edit-fitness",
   "/northstar",
   "/winter-arc",
+  "/major-projects",
   "/contacts",
   "/hyrox",
   "/shipments",

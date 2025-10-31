@@ -1,4 +1,4 @@
-import { CheckSquare, Plus, Archive, Dumbbell, Target, TrendingUp, Users, UserPlus, Settings, BarChart3, Compass, Bot, Package, Sparkles, Grid3x3, Radar, Snowflake, Quote } from "lucide-react"
+import { CheckSquare, Plus, Archive, Dumbbell, Target, TrendingUp, Users, UserPlus, Settings, BarChart3, Compass, Bot, Package, Sparkles, Grid3x3, Radar, Snowflake, Quote, Briefcase } from "lucide-react"
 
 export interface MenuItem {
   title: string
@@ -46,6 +46,18 @@ export const menuConfig: MenuGroup[] = [
         title: "Winter Arc",
         url: "/winter-arc",
         icon: Snowflake,
+      },
+    ],
+  },
+  {
+    title: "Major Projects",
+    url: "/major-projects",
+    icon: Briefcase,
+    items: [
+      {
+        title: "Major Projects",
+        url: "/major-projects",
+        icon: Briefcase,
       },
     ],
   },
@@ -207,6 +219,7 @@ function getFeatureDescription(title: string, url: string): string {
     '/hd-dashboard': 'High-density dashboard view',
     '/northstar': 'Track your goals and milestones',
     '/winter-arc': 'Winter Arc 2026 transformation journal',
+    '/major-projects': 'Track and manage your most important projects',
     '/motivation': 'Inspirational content and quotes',
     '/quotes': 'Manage your collection of inspirational quotes',
     '/tasks': 'Manage your todo list',

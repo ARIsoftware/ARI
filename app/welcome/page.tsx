@@ -101,7 +101,7 @@ export default function WelcomePage() {
     <div className="min-h-screen bg-white relative overflow-hidden">
       {/* Text content */}
       <div
-        className="absolute top-[70px] left-[70px] space-y-8 transition-opacity duration-[2000ms] z-10"
+        className="absolute top-[70px] left-[70px] space-y-8 transition-opacity transition-duration-[2000ms] z-10"
         style={{ opacity: textOpacity }}
       >
         {allLines.map((line, index) => {
@@ -150,7 +150,7 @@ export default function WelcomePage() {
       {/* Onboarding Wizard */}
       {showOnboarding && (
         <div
-          className="absolute inset-0 flex items-center justify-center z-20 transition-opacity duration-[2000ms]"
+          className="absolute inset-0 flex items-center justify-center z-20 transition-opacity transition-duration-[2000ms]"
           style={{ opacity: showOnboarding ? 1 : 0 }}
         >
           <Card className="w-full max-w-lg">
