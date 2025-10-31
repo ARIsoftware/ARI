@@ -1,0 +1,37 @@
+{
+  "id": "motivation",
+  "title": "Motivation",
+  "name": "Motivation",
+  "description": "Inspirational content and motivational resources to keep you focused and driven",
+  "version": "1.0.0",
+  "author": "ARI Team <ari@ari.software>",
+  "icon": "Sparkles",
+  "enabled": true,
+  "fullscreen": false,
+  "menuPriority": 14,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": true
+  },
+  "routes": [
+    {
+      "path": "/motivation",
+      "label": "Motivation",
+      "icon": "Sparkles",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": ["motivation_content"],
+    "migrations": "./database/migrations"
+  },
+  "dashboard": {
+    "widgets": false,
+    "widgetComponents": []
+  }
+}

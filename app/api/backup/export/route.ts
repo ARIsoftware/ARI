@@ -45,6 +45,8 @@ async function discoverTables(client: any): Promise<{ tables: string[], method: 
     'hello_world_entries',
     'module_migrations',
     'module_settings',
+    'major_projects',
+    'quotes',
   ];
 
   try {

@@ -44,6 +44,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# auto-generated module registry
+/lib/generated/
+
 # clerk configuration (can include secrets)
 /.clerk/
 
