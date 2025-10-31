@@ -40,6 +40,7 @@ export type Task = {
   effort?: number
   strategic_fit?: number
   priority_score?: number
+  project_id?: string | null
 }
 
 export type FitnessTask = {

@@ -15,7 +15,6 @@ export const RESERVED_MODULE_IDS = [
   // Core pages
   'dashboard',
   'tasks',
-  'contacts',
   'settings',
   'profile',
   'sign-in',
@@ -25,7 +24,6 @@ export const RESERVED_MODULE_IDS = [
   'northstar',
   'radar',
   'fitness',
-  'motivation',
   'winter-arc',
   'hd-dashboard',
   'logs',
