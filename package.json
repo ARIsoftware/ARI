@@ -61,6 +61,7 @@
     "react-dom": "^19.1.1",
     "react-hook-form": "latest",
     "react-resizable-panels": "latest",
+    "react-tetris": "^0.4.0",
     "recharts": "2.15.4",
     "sonner": "latest",
     "tailwind-merge": "^2.6.0",
