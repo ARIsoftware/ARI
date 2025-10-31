@@ -1,0 +1,112 @@
+/* Tetris game blocks */
+.game-block {
+  margin: 0;
+  padding: 0;
+  width: 1.5em;
+  height: 1.5em;
+  border: 1px solid #ddd;
+}
+
+/* Tetris piece colors - Pastel palette */
+.piece-i {
+  background-color: #a8e6cf;  /* Pastel mint green */
+}
+
+.piece-j {
+  background-color: #b4d4ff;  /* Pastel blue */
+}
+
+.piece-l {
+  background-color: #ffd89b;  /* Pastel orange */
+}
+
+.piece-o {
+  background-color: #fff5ba;  /* Pastel yellow */
+}
+
+.piece-s {
+  background-color: #b8e0d2;  /* Pastel teal */
+}
+
+.piece-t {
+  background-color: #d4a5f9;  /* Pastel purple */
+}
+
+.piece-z {
+  background-color: #ffb3d9;  /* Pastel pink */
+}
+
+.piece-preview {
+  background-color: #eee;
+}
+
+/* Side panels (held piece and queue) */
+.tetris-side-panel {
+  min-width: 100px;
+  padding: 1rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  background-color: #f9fafb;
+}
+
+/* Control buttons */
+.tetris-button {
+  width: 100%;
+  height: 100%;
+  background-color: #e5e7eb;
+  border: 2px solid #d1d5db;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.tetris-button:hover {
+  background-color: #d1d5db;
+  transform: scale(1.05);
+}
+
+.tetris-button:active {
+  background-color: #9ca3af;
+  transform: scale(0.95);
+}
+
+/* Action buttons */
+.tetris-action-button {
+  width: 3rem;
+  height: 3rem;
+  background-color: #e5e7eb;
+  border: 2px solid #d1d5db;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.tetris-action-button:hover {
+  background-color: #d1d5db;
+  transform: scale(1.1);
+}
+
+.tetris-action-button:active {
+  background-color: #9ca3af;
+  transform: scale(0.95);
+}
+
+/* Hide sidebars and controls */
+.tetris-sidebar-hidden {
+  display: none !important;
+}
+
+.tetris-controls-hidden {
+  display: none !important;
+}
