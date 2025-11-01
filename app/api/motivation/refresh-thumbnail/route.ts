@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
       }
     } else if (item.type === "youtube" && item.url) {
       const videoId = item.url.match(
-        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\s]+)/
+        /(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([^&\s?]+)/
       )?.[1];
 
       if (videoId) {

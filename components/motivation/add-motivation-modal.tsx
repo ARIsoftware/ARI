@@ -98,7 +98,7 @@ export function AddMotivationModal({
     setLoading(true);
     try {
       const videoId = youtubeUrl.match(
-        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\s]+)/
+        /(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([^&\s?]+)/
       )?.[1];
 
       if (!videoId) {
@@ -389,7 +389,7 @@ export function AddMotivationModal({
               <Label htmlFor="youtube-url">YouTube URL</Label>
               <Input
                 id="youtube-url"
-                placeholder="https://www.youtube.com/watch?v=..."
+                placeholder="https://www.youtube.com/watch?v=... or /shorts/..."
                 value={youtubeUrl}
                 onChange={(e) => setYoutubeUrl(e.target.value)}
               />
