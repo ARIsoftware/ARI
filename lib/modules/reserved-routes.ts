@@ -21,10 +21,8 @@ export const RESERVED_MODULE_IDS = [
   'sign-up',
 
   // Core features
-  'northstar',
   'radar',
   'fitness',
-  'winter-arc',
   'hd-dashboard',
   'logs',
 
