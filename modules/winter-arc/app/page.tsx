@@ -6,11 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AppSidebar } from '@/components/app-sidebar';
-import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from '@/components/ui/breadcrumb';
-import { Separator } from '@/components/ui/separator';
-import { TaskAnnouncement } from '@/components/task-announcement';
 import { Loader2, Plus, Check } from 'lucide-react';
 import { getJournalEntry, saveJournalEntry } from '@/lib/journal';
 import { useToast } from '@/hooks/use-toast';
@@ -215,39 +210,14 @@ export default function WinterArcPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50/50">
-        <TaskAnnouncement />
-        <SidebarProvider>
-          <AppSidebar />
-          <SidebarInset>
-            <div className="flex items-center justify-center h-96">
-              <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-          </SidebarInset>
-        </SidebarProvider>
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      <TaskAnnouncement />
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-white px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbPage>Winter Arc</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </header>
-
-          <div className="flex flex-1 flex-col gap-6 p-6">
+    <div className="p-6 space-y-6">
             <div className="max-w-4xl mx-auto w-full">
               {/* Header with countdown */}
               <div className="mb-8">
@@ -348,11 +318,8 @@ export default function WinterArcPage() {
                     'Save Journal Entry'
                   )}
                 </Button>
-              </div>
             </div>
           </div>
-        </SidebarInset>
-      </SidebarProvider>
     </div>
   );
 }

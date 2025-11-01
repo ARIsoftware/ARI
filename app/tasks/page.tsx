@@ -633,6 +633,9 @@ export default function TasksPage() {
                           Priority
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                          Project
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                           Progress
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -709,26 +712,26 @@ export default function TasksPage() {
                             </Badge>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center gap-2">
+                            <Badge
+                              variant="secondary"
+                              className={`font-medium text-xs ${getPriorityColor(task.priority)}`}
+                            >
+                              {task.priority}
+                            </Badge>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {isFeatureEnabled('major-projects') && task.project_id && getProjectName(task.project_id, projects) && (
                               <Badge
                                 variant="secondary"
-                                className={`font-medium text-xs ${getPriorityColor(task.priority)}`}
+                                className="font-medium text-xs cursor-pointer bg-blue-100 text-blue-700 hover:bg-blue-200"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  router.push(`/tasks?filter=${task.project_id}`)
+                                }}
                               >
-                                {task.priority}
+                                {getProjectName(task.project_id, projects)}
                               </Badge>
-                              {isFeatureEnabled('major-projects') && task.project_id && getProjectName(task.project_id, projects) && (
-                                <Badge
-                                  variant="secondary"
-                                  className="font-medium text-xs cursor-pointer bg-blue-100 text-blue-700 hover:bg-blue-200"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    router.push(`/tasks?filter=${task.project_id}`)
-                                  }}
-                                >
-                                  {getProjectName(task.project_id, projects)}
-                                </Badge>
-                              )}
-                            </div>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-2">

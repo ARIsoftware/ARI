@@ -8,16 +8,6 @@ import { AddMotivationModal } from "@/components/motivation/add-motivation-modal
 import { EditMotivationModal } from "@/components/motivation/edit-motivation-modal";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Image from "next/image";
-import { AppSidebar } from "@/components/app-sidebar";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-} from "@/components/ui/breadcrumb";
-import { Separator } from "@/components/ui/separator";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { TaskAnnouncement } from "@/components/task-announcement";
 import { YouTubeModal } from "@/components/youtube-modal";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -85,93 +75,128 @@ function SortableItem({ item, onDelete, onPlay, onEdit, onRefresh }: {
     switch (item.type) {
       case "youtube":
         const thumbnail = item.thumbnail_url || getYouTubeThumbnail(item.url || "");
+
         return (
-          <>
+          <div className="relative aspect-video bg-gradient-to-br from-red-600 to-red-800 rounded-lg overflow-hidden w-full max-w-full">
+            {/* Fallback background with icon - always rendered */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Play className="w-16 h-16 text-white" fill="white" />
+            </div>
+
+            {/* Image overlay - only shows if valid */}
             {thumbnail && (
               <img
                 src={thumbnail}
                 alt={item.title || "YouTube video"}
-                className="w-full h-auto rounded-lg object-cover"
+                className="absolute inset-0 w-full h-full object-cover z-10"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
               />
             )}
-            <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-40 transition-all rounded-lg flex items-center justify-center">
-              <div className="bg-black bg-opacity-75 rounded-full p-4 opacity-0 hover:opacity-100 transition-opacity">
+
+            {/* Hover overlay */}
+            <div className="absolute inset-0 bg-black/0 hover:bg-black/40 transition-all flex items-center justify-center z-20">
+              <div className="bg-black/75 rounded-full p-4 opacity-0 hover:opacity-100 transition-opacity">
                 <Play className="text-white h-8 w-8 ml-1" fill="white" />
               </div>
             </div>
-          </>
+          </div>
         );
 
       case "twitter":
         return (
-          <>
-            {item.thumbnail_url ? (
+          <div className="relative aspect-square bg-gradient-to-br from-gray-800 to-black rounded-lg overflow-hidden w-full max-w-full">
+            {/* Fallback background with icon - always rendered */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Twitter className="w-16 h-16 text-white" fill="white" />
+            </div>
+
+            {/* Image overlay - only shows if valid */}
+            {item.thumbnail_url && (
               <img
                 src={item.thumbnail_url}
                 alt={item.title || "Twitter post"}
-                className="w-full h-auto rounded-lg object-cover"
+                className="absolute inset-0 w-full h-full object-cover z-10"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
               />
-            ) : (
-              <div className="bg-black rounded-lg p-8">
-                <div className="flex items-center justify-center h-32">
-                  <Twitter className="w-16 h-16 text-white" fill="white" />
-                </div>
-              </div>
             )}
-            <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-40 transition-all rounded-lg flex items-center justify-center">
-              <div className="bg-black bg-opacity-75 rounded-full p-4 opacity-0 hover:opacity-100 transition-opacity">
+
+            {/* Hover overlay */}
+            <div className="absolute inset-0 bg-black/0 hover:bg-black/40 transition-all flex items-center justify-center z-20">
+              <div className="bg-black/75 rounded-full p-4 opacity-0 hover:opacity-100 transition-opacity">
                 <Play className="text-white h-8 w-8 ml-1" fill="white" />
               </div>
             </div>
-            <div className="absolute top-2 left-2 bg-black rounded-full p-2">
+
+            {/* Twitter badge icon */}
+            <div className="absolute top-2 left-2 bg-black rounded-full p-2 z-30">
               <Twitter className="h-4 w-4 text-white" fill="white" />
             </div>
-          </>
+          </div>
         );
 
       case "instagram":
+        // Check if base64 image is corrupted/truncated (all bad ones end with same pattern)
+        const isCorruptedBase64 = item.thumbnail_url?.startsWith('data:image') && item.thumbnail_url.length < 100;
+
         return (
-          <>
-            {item.thumbnail_url ? (
-              <div className="relative">
+          <div className="relative aspect-square bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 p-0.5 rounded-lg overflow-hidden w-full max-w-full">
+            <div className="bg-white dark:bg-gray-900 rounded-lg h-full overflow-hidden relative">
+              {/* Fallback background with icon - always rendered */}
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+                <Instagram className="w-16 h-16 text-gray-400" />
+              </div>
+
+              {/* Image overlay - only shows if valid and not corrupted */}
+              {item.thumbnail_url && !isCorruptedBase64 && (
                 <img
                   src={item.thumbnail_url}
                   alt={item.title || "Instagram post"}
-                  className="w-full h-auto rounded-lg object-cover"
+                  className="absolute inset-0 w-full h-full object-cover z-10"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
                 />
-                <div className="absolute inset-0 rounded-lg border-2 border-transparent bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 opacity-20"></div>
-              </div>
-            ) : (
-              <div className="bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 p-0.5 rounded-lg">
-                <div className="bg-white dark:bg-gray-900 rounded-lg p-8">
-                  <div className="flex items-center justify-center h-32">
-                    <Instagram className="w-16 h-16 text-gray-400" />
-                  </div>
-                </div>
-              </div>
-            )}
-            <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-all rounded-lg flex items-center justify-center">
+              )}
+            </div>
+
+            {/* Hover overlay */}
+            <div className="absolute inset-0 bg-black/0 hover:bg-black/30 transition-all flex items-center justify-center z-20">
               <div className="bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 rounded-full p-4 opacity-0 hover:opacity-100 transition-opacity">
                 <Play className="text-white h-8 w-8 ml-1" fill="white" />
               </div>
             </div>
-            <div className="absolute top-2 left-2 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 rounded-full p-2">
+
+            {/* Instagram badge icon */}
+            <div className="absolute top-2 left-2 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 rounded-full p-2 z-30">
               <Instagram className="h-4 w-4 text-white" />
             </div>
-          </>
+          </div>
         );
 
       case "photo":
         return (
-          <>
+          <div className="relative bg-gray-200 rounded-lg overflow-hidden w-full max-w-full min-h-[200px] flex items-center justify-center">
+            {/* Fallback background */}
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
+              <Sparkles className="w-16 h-16 text-gray-400" />
+            </div>
+
+            {/* Image overlay */}
             {item.image_url && (
               <img
                 src={item.image_url}
                 alt={item.title || "Uploaded photo"}
-                className="w-full h-auto rounded-lg object-cover"
+                className="relative w-full h-auto rounded-lg object-cover z-10"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
               />
             )}
-          </>
+          </div>
         );
 
       default:
@@ -223,7 +248,7 @@ function SortableItem({ item, onDelete, onPlay, onEdit, onRefresh }: {
 
       {/* Content */}
       <div
-        className="cursor-pointer block relative"
+        className="cursor-pointer"
         onClick={() => onPlay(item)}
       >
         {renderContent()}
@@ -239,6 +264,8 @@ function SortableItem({ item, onDelete, onPlay, onEdit, onRefresh }: {
 }
 
 export default function MotivationPage() {
+  console.log('[MotivationPage] Module version loading - with aspect ratio fixes');
+
   const [items, setItems] = useState<MotivationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -415,24 +442,8 @@ export default function MotivationPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      <TaskAnnouncement />
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-white px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbPage>Motivation</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </header>
-
-          <div className="flex flex-1 flex-col gap-4 p-6">
+    <>
+      <div className="p-6 space-y-6">
             <div className="flex justify-between items-center">
               <div>
                 <h1 className="text-3xl font-medium">Motivation</h1>
@@ -491,7 +502,7 @@ export default function MotivationPage() {
                   items={items.map(item => item.id)}
                   strategy={rectSortingStrategy}
                 >
-                  <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 space-y-4">
+                  <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
                     {items.map((item) => (
                       <SortableItem
                         key={item.id}
@@ -536,9 +547,7 @@ export default function MotivationPage() {
               }}
               item={editingItem}
             />
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
+      </div>
 
       {/* YouTube Video Modal */}
       <YouTubeModal
@@ -547,7 +556,6 @@ export default function MotivationPage() {
         videoUrl={selectedVideoUrl}
         title={selectedVideoTitle}
       />
-
-    </div>
+    </>
   );
 }

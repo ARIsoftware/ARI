@@ -1,4 +1,4 @@
-import { CheckSquare, Plus, Archive, Dumbbell, Target, TrendingUp, Settings, BarChart3, Compass, Bot, Package, Grid3x3, Radar, Snowflake, Briefcase } from "lucide-react"
+import { CheckSquare, Plus, Archive, Dumbbell, Target, TrendingUp, Settings, BarChart3, Bot, Package, Grid3x3, Radar, Briefcase } from "lucide-react"
 
 export interface MenuItem {
   title: string
@@ -29,23 +29,6 @@ export const menuConfig: MenuGroup[] = [
         title: "HD Dashboard",
         url: "/hd-dashboard",
         icon: Grid3x3,
-      },
-    ],
-  },
-  {
-    title: "Northstar",
-    url: "/northstar",
-    icon: Compass,
-    items: [
-      {
-        title: "Northstar",
-        url: "/northstar",
-        icon: Compass,
-      },
-      {
-        title: "Winter Arc",
-        url: "/winter-arc",
-        icon: Snowflake,
       },
     ],
   },
@@ -183,8 +166,6 @@ function getFeatureDescription(title: string, url: string): string {
   const descriptions: Record<string, string> = {
     '/dashboard': 'Overview of your tasks, fitness, and goals',
     '/hd-dashboard': 'High-density dashboard view',
-    '/northstar': 'Track your goals and milestones',
-    '/winter-arc': 'Winter Arc 2026 transformation journal',
     '/major-projects': 'Track and manage your most important projects',
     '/tasks': 'Manage your todo list',
     '/add-task': 'Create new tasks',
