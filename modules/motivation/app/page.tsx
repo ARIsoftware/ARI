@@ -66,7 +66,7 @@ function SortableItem({ item, onDelete, onPlay, onEdit, onRefresh }: {
 
   const getYouTubeThumbnail = (url: string) => {
     const videoId = url.match(
-      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\s]+)/
+      /(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([^&\s?]+)/
     )?.[1];
     return videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : null;
   };
