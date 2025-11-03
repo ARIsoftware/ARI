@@ -50,7 +50,7 @@ export function RecentActivityFeed({ token }: RecentActivityFeedProps) {
           fetch('/api/tasks', {
             headers: { 'Authorization': `Bearer ${token}` }
           }),
-          fetch('/api/contacts', {
+          fetch('/api/modules/contacts', {
             headers: { 'Authorization': `Bearer ${token}` }
           }).catch(() => ({ ok: false })), // Gracefully handle if contacts API doesn't exist
           // We could add fitness API call here if available
