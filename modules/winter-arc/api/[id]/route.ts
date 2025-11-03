@@ -4,9 +4,12 @@ import { createErrorResponse } from '@/lib/api-helpers'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Await params (Next.js 15 requirement)
+    const { id } = await params
+
     const { user, supabase } = await getAuthenticatedUser()
 
     if (!user) {
@@ -23,7 +26,7 @@ export async function PATCH(
     const { data, error } = await supabase
       .from('winter_arc_goals')
       .update({ completed })
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('user_id', user.id)
       .select()
       .single()
@@ -42,9 +45,12 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Await params (Next.js 15 requirement)
+    const { id } = await params
+
     const { user, supabase } = await getAuthenticatedUser()
 
     if (!user) {
@@ -54,7 +60,7 @@ export async function DELETE(
     const { error } = await supabase
       .from('winter_arc_goals')
       .delete()
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('user_id', user.id)
 
     if (error) {

@@ -6,10 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Plus, Check } from 'lucide-react';
+import { Loader2, Plus, Check, Trash2 } from 'lucide-react';
 import { getJournalEntry, saveJournalEntry } from '@/lib/journal';
 import { useToast } from '@/hooks/use-toast';
-import { getWinterArcGoals, createWinterArcGoal, toggleWinterArcGoal, type WinterArcGoal } from '@/modules/winter-arc/lib/winter-arc-goals';
+import { getWinterArcGoals, createWinterArcGoal, toggleWinterArcGoal, deleteWinterArcGoal, type WinterArcGoal } from '@/modules/winter-arc/lib/winter-arc-goals';
 
 const QUESTIONS = [
   {
@@ -163,6 +163,30 @@ export default function WinterArcPage() {
     }
   };
 
+  const handleDeleteGoal = async (goalId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent toggle when clicking delete
+
+    if (!confirm('Are you sure you want to delete this goal?')) {
+      return;
+    }
+
+    try {
+      await deleteWinterArcGoal(goalId);
+      setGoals(goals.filter(g => g.id !== goalId));
+      toast({
+        title: "Success",
+        description: "Goal deleted successfully",
+      });
+    } catch (error: any) {
+      console.error('Error deleting goal:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete goal",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSave = async () => {
     if (!session?.user?.id) {
       toast({
@@ -244,7 +268,7 @@ export default function WinterArcPage() {
                         <button
                           key={goal.id}
                           onClick={() => handleToggleGoal(goal)}
-                          className="relative bg-gray-50 hover:bg-gray-100 border-2 rounded-lg p-6 text-center transition-all"
+                          className="relative bg-gray-50 hover:bg-gray-100 border-2 rounded-lg p-6 text-center transition-all group"
                           style={{
                             opacity: goal.completed ? 0.3 : 1,
                           }}
@@ -252,11 +276,20 @@ export default function WinterArcPage() {
                           <div className="text-sm font-semibold uppercase tracking-wide break-words">
                             {goal.title}
                           </div>
+                          {/* Checkmark - shows when completed and not hovering */}
                           {goal.completed && (
-                            <div className="absolute top-2 right-2 bg-green-500 rounded-full p-2">
+                            <div className="absolute top-2 right-2 bg-green-500 rounded-full p-2 group-hover:opacity-0 transition-opacity">
                               <Check className="h-6 w-6 text-white" />
                             </div>
                           )}
+                          {/* Delete button - shows on hover for all goals */}
+                          <button
+                            onClick={(e) => handleDeleteGoal(goal.id, e)}
+                            className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                            aria-label="Delete goal"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-white" />
+                          </button>
                         </button>
                       ))}
                     </div>

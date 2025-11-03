@@ -42,9 +42,9 @@ export function CustomContributionGraph({
   shimmerIndex = 0
 }: CustomContributionGraphProps) {
   const [boxes, setBoxes] = useState<BoxData[]>(() => {
-    // Initialize 18 boxes (2 rows x 9 columns)
+    // Initialize 28 boxes (4 rows x 7 columns)
     const initialBoxes: BoxData[] = []
-    for (let i = 0; i < 18; i++) {
+    for (let i = 0; i < 28; i++) {
       const existingBox = initialColors.find(b => b.index === i)
       initialBoxes.push({
         index: i,
@@ -111,7 +111,7 @@ export function CustomContributionGraph({
         }
       `}</style> */}
       <div className="w-full relative" style={{ opacity }}>
-        <div className="grid grid-cols-9 gap-1 w-full">
+        <div className="grid grid-cols-7 gap-1 w-full">
           {boxes.map((box) => (
             <button
               key={box.index}
