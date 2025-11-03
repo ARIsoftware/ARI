@@ -350,7 +350,7 @@ User-friendly interface with:
 
 **If using fallback**: The system still works but may not discover new tables automatically. Run `/migrations/backup_system_functions.sql` for optimal performance.
 
-### Expected Tables (19 as of October 2025)
+### Expected Tables (21 as of November 2025)
 1. `tasks` - Task management
 2. `fitness_database` - Fitness tasks
 3. `contacts` - Contact management
@@ -370,6 +370,8 @@ User-friendly interface with:
 17. `hello_world_entries` - Module demo data
 18. `module_migrations` - Module version tracking
 19. `module_settings` - Module configuration
+20. `major_projects` - Major Projects / Delulu Projects management
+21. `quotes` - Quotes module data
 
 ### Usage Guide
 

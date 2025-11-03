@@ -67,30 +67,67 @@ export default function HDDashboardPage() {
   })
   const [notepadContent, setNotepadContent] = useState("")
   const [winterArcGoals, setWinterArcGoals] = useState<WinterArcGoal[]>([])
+  const [enabledModules, setEnabledModules] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (session) {
-      loadAllData()
+      loadEnabledModules()
     }
   }, [session])
 
-  const loadAllData = async () => {
+  const loadEnabledModules = async () => {
+    try {
+      // Fetch enabled modules from API
+      const response = await fetch('/api/modules/enabled')
+      if (response.ok) {
+        const data = await response.json()
+        const enabledIds = new Set(data.modules.map((m: any) => m.id))
+        setEnabledModules(enabledIds)
+
+        // Load data after we know which modules are enabled
+        await loadAllData(enabledIds)
+      } else {
+        // If we can't fetch module status, load all data anyway
+        await loadAllData(new Set())
+      }
+    } catch (error) {
+      console.error("Failed to load enabled modules:", error)
+      // If module check fails, load all data anyway
+      await loadAllData(new Set())
+    }
+  }
+
+  const loadAllData = async (enabledModulesSet: Set<string>) => {
     try {
       setLoading(true)
       const tokenFn = async () => session?.access_token || null
 
-      const [tasksData, contactsData, statsData, notepadData, goalsData] = await Promise.all([
+      // Build promises array based on enabled modules
+      const promises: Promise<any>[] = [
         getTasks(tokenFn),
-        getContacts(tokenFn),
         getFitnessStats(tokenFn),
-        getNotepad(),
-        getWinterArcGoals()
+        getNotepad()
+      ]
+
+      // Only fetch from enabled modules
+      const contactsPromise = enabledModulesSet.has('contacts')
+        ? getContacts(tokenFn)
+        : Promise.resolve([])
+
+      const goalsPromise = enabledModulesSet.has('winter-arc')
+        ? getWinterArcGoals()
+        : Promise.resolve([])
+
+      const [tasksData, statsData, notepadData, contactsData, goalsData] = await Promise.all([
+        ...promises,
+        contactsPromise,
+        goalsPromise
       ])
 
       setTasks(tasksData)
-      setContacts(contactsData)
       setFitnessStats(statsData)
       setNotepadContent(notepadData.content || "")
+      setContacts(contactsData)
       setWinterArcGoals(goalsData)
     } catch (error) {
       console.error("Failed to load dashboard data:", error)
@@ -184,8 +221,8 @@ export default function HDDashboardPage() {
             </header>
 
           <div className="p-2 dark:bg-gray-900 blue:bg-[#056baa] min-h-screen">
-            {/* Winter Arc Goals */}
-            {winterArcGoals.length > 0 && (
+            {/* Winter Arc Goals - Only show if module is enabled */}
+            {enabledModules.has('winter-arc') && winterArcGoals.length > 0 && (
               <div className="mb-2">
                 <div className="grid grid-cols-5 gap-2">
                   {winterArcGoals.map((goal, index) => {
@@ -220,8 +257,8 @@ export default function HDDashboardPage() {
               </div>
             )}
 
-            {/* Contribution Graphs - One per Winter Arc Goal */}
-            {winterArcGoals.length > 0 && (
+            {/* Contribution Graphs - Only show if winter-arc module is enabled */}
+            {enabledModules.has('winter-arc') && winterArcGoals.length > 0 && (
               <div className="mb-2">
                 <HDContributionGraph goals={winterArcGoals} />
               </div>
