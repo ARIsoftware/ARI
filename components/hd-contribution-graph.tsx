@@ -94,7 +94,7 @@ export function HDContributionGraph({ goals }: HDContributionGraphProps) {
   }
 
   return (
-    <div className="grid grid-cols-5 gap-2">
+    <div className="grid grid-cols-6 gap-2">
       {goals.map((goal, index) => (
         <CustomContributionGraph
           key={goal.id}
