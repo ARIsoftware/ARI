@@ -71,9 +71,9 @@ export default function DatabaseTestPage() {
     { path: '/api/tasks', methods: ['GET', 'POST'], description: 'Tasks management' },
     { path: '/api/tasks/increment-completion', methods: ['POST'], description: 'Increment task completion' },
     { path: '/api/tasks/priorities', methods: ['GET', 'PUT'], description: 'Task priorities' },
-    { path: '/api/contacts', methods: ['GET', 'POST'], description: 'Contacts management' },
+    { path: '/api/modules/contacts', methods: ['GET', 'POST'], description: 'Contacts management (NEW MODULE API)' },
     { path: '/api/goals', methods: ['GET', 'POST'], description: 'Goals/NorthStar management' },
-    { path: '/api/winter-arc-goals', methods: ['GET', 'POST'], description: 'Winter Arc Goals management' },
+    { path: '/api/modules/winter-arc', methods: ['GET', 'POST'], description: 'Winter Arc Goals (NEW MODULE API)' },
     { path: '/api/fitness-stats', methods: ['GET'], description: 'Fitness statistics' },
     { path: '/api/fitness-tasks', methods: ['GET', 'POST'], description: 'Fitness tasks' },
     { path: '/api/hyrox/workouts', methods: ['GET', 'POST'], description: 'HYROX workouts' },
@@ -87,8 +87,9 @@ export default function DatabaseTestPage() {
     { path: '/api/last-completed-task', methods: ['GET'], description: 'Last completed task' },
     { path: '/api/sample-fitness-tasks', methods: ['GET'], description: 'Sample fitness tasks' },
     { path: '/api/shipments', methods: ['GET', 'POST'], description: 'Shipments management' },
-    { path: '/api/motivation/setup', methods: ['POST'], description: 'Motivation setup' },
-    { path: '/api/motivation/reorder', methods: ['POST'], description: 'Motivation reorder' },
+    { path: '/api/modules/motivation/setup', methods: ['GET'], description: 'Motivation setup (NEW MODULE API)' },
+    { path: '/api/modules/motivation/reorder', methods: ['POST'], description: 'Motivation reorder (NEW MODULE API)' },
+    { path: '/api/modules/motivation/refresh-thumbnail', methods: ['POST'], description: 'Motivation refresh (NEW MODULE API)' },
     { path: '/api/instagram/metadata', methods: ['GET'], description: 'Instagram metadata' },
   ]
 
@@ -270,7 +271,7 @@ export default function DatabaseTestPage() {
 
       // Test 2: Check MODULE_PAGES registry completeness
       updateModuleResult('Registry Completeness', { status: 'testing' })
-      const registeredModules = ['hello-world', 'shipments', 'hyrox', 'assist', 'daily-fitness', 'quotes', 'motivation', 'contacts']
+      const registeredModules = ['hello-world', 'shipments', 'hyrox', 'assist', 'daily-fitness', 'quotes', 'motivation', 'contacts', 'northstar', 'winter-arc']
       const discoveredModuleIds = modules.map((m: any) => m.id)
       const missingFromRegistry = discoveredModuleIds.filter((id: string) => !registeredModules.includes(id))
       const extraInRegistry = registeredModules.filter(id => !discoveredModuleIds.includes(id))
@@ -378,6 +379,72 @@ export default function DatabaseTestPage() {
           }
         })
         console.warn('⚠️ Some routes inaccessible:', inaccessibleRoutes)
+      }
+
+      // Test 5: Module API Routes Registry (NEW - Post-Migration)
+      updateModuleResult('Module API Routes', { status: 'testing' })
+      const migratedModules = ['contacts', 'motivation', 'winter-arc']
+      const apiRouteTests: Array<{ module: string; route: string; status: string; message?: string }> = []
+
+      // Test migrated module API endpoints
+      for (const moduleId of migratedModules) {
+        const testRoutes = moduleId === 'motivation'
+          ? ['setup', 'reorder', 'refresh-thumbnail']
+          : [''] // Base route for contacts and winter-arc
+
+        for (const route of testRoutes) {
+          const endpoint = route
+            ? `/api/modules/${moduleId}/${route}`
+            : `/api/modules/${moduleId}`
+
+          try {
+            const response = await fetch(endpoint, {
+              method: 'HEAD',
+              headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}
+            })
+
+            const success = response.status === 200 || response.status === 401 // 401 means auth is working
+            apiRouteTests.push({
+              module: moduleId,
+              route: endpoint,
+              status: success ? 'accessible' : 'error',
+              message: `HTTP ${response.status}`
+            })
+          } catch (error) {
+            apiRouteTests.push({
+              module: moduleId,
+              route: endpoint,
+              status: 'error',
+              message: 'Request failed'
+            })
+          }
+        }
+      }
+
+      const failedApiRoutes = apiRouteTests.filter(t => t.status === 'error')
+      if (failedApiRoutes.length === 0) {
+        updateModuleResult('Module API Routes', {
+          status: 'success',
+          message: `All ${apiRouteTests.length} migrated module API routes accessible`,
+          data: {
+            tested: apiRouteTests.length,
+            routes: apiRouteTests,
+            migratedModules,
+            info: 'Tests contacts, motivation, and winter-arc module API endpoints'
+          }
+        })
+        console.log('✅ Module API routes check passed')
+      } else {
+        updateModuleResult('Module API Routes', {
+          status: 'warning',
+          message: `${failedApiRoutes.length} module API route(s) may have issues`,
+          data: {
+            failedApiRoutes,
+            allTests: apiRouteTests,
+            hint: 'Check MODULE_API_ROUTES registry in /app/api/modules/[module]/[[...path]]/route.ts'
+          }
+        })
+        console.warn('⚠️ Some module API routes have issues:', failedApiRoutes)
       }
 
     } catch (error: any) {

@@ -17,14 +17,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { 
-  getContacts, 
-  getCategoryColor, 
-  getAvatarColor, 
-  getInitials, 
+import {
+  getContacts,
+  getCategoryColor,
+  getAvatarColor,
+  getInitials,
   formatNextContactDate,
-  type Contact 
-} from "@/lib/contacts"
+  type Contact
+} from "@/modules/contacts/lib/contacts"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 
