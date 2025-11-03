@@ -102,7 +102,7 @@ export function MajorProjectsWidget() {
               <div className="h-10 w-10 rounded-xl bg-black flex items-center justify-center">
                 <Briefcase className="h-5 w-5 text-white" />
               </div>
-              <CardTitle className="text-lg font-bold">Major Projects</CardTitle>
+              <CardTitle className="text-lg font-bold">Delulu Projects</CardTitle>
             </div>
           </div>
         </CardHeader>
