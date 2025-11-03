@@ -271,7 +271,7 @@ export default function DatabaseTestPage() {
 
       // Test 2: Check MODULE_PAGES registry completeness
       updateModuleResult('Registry Completeness', { status: 'testing' })
-      const registeredModules = ['hello-world', 'shipments', 'hyrox', 'assist', 'daily-fitness', 'quotes', 'motivation', 'contacts', 'northstar', 'winter-arc']
+      const registeredModules = ['hello-world', 'shipments', 'hyrox', 'assist', 'daily-fitness', 'quotes', 'motivation', 'contacts', 'northstar', 'winter-arc', 'major-projects']
       const discoveredModuleIds = modules.map((m: any) => m.id)
       const missingFromRegistry = discoveredModuleIds.filter((id: string) => !registeredModules.includes(id))
       const extraInRegistry = registeredModules.filter(id => !discoveredModuleIds.includes(id))
@@ -447,6 +447,61 @@ export default function DatabaseTestPage() {
         console.warn('⚠️ Some module API routes have issues:', failedApiRoutes)
       }
 
+      // Test 6: Module Enabled/Disabled Status
+      updateModuleResult('Module Status Check', { status: 'testing' })
+      try {
+        const response = await fetch('/api/debug/module-status')
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+        const statusData = await response.json()
+
+        if (!statusData.authenticated) {
+          updateModuleResult('Module Status Check', {
+            status: 'error',
+            message: 'Not authenticated',
+            error: 'User must be logged in to check module status'
+          })
+        } else {
+          const disabledModules = statusData.userSettings?.filter((s: any) => !s.enabled) || []
+          const moduleChecks = statusData.moduleChecks || {}
+
+          if (disabledModules.length === 0) {
+            updateModuleResult('Module Status Check', {
+              status: 'success',
+              message: 'All modules are enabled',
+              data: {
+                userId: statusData.userId,
+                allModules: statusData.allModules,
+                moduleChecks
+              }
+            })
+            console.log('✅ All modules enabled')
+          } else {
+            updateModuleResult('Module Status Check', {
+              status: 'warning',
+              message: `${disabledModules.length} module(s) are disabled in user settings`,
+              data: {
+                userId: statusData.userId,
+                disabledModules: disabledModules.map((m: any) => m.module_id),
+                moduleChecks,
+                hint: 'Go to /modules or /settings to enable these modules'
+              }
+            })
+            console.warn('⚠️ Disabled modules:', disabledModules.map((m: any) => m.module_id))
+          }
+        }
+      } catch (error: any) {
+        updateModuleResult('Module Status Check', {
+          status: 'error',
+          error: error.message,
+          data: {
+            hint: 'Check if /api/debug/module-status endpoint exists'
+          }
+        })
+        console.error('❌ Module status check failed:', error)
+      }
+
     } catch (error: any) {
       updateModuleResult('Module Discovery', {
         status: 'error',
@@ -537,7 +592,7 @@ export default function DatabaseTestPage() {
       const response = await fetch('/api/backup/verify')
       const result = await response.json()
 
-      const expectedTables = 19 // From screenshot
+      const expectedTables = 21 // Updated: added major_projects and quotes tables
       const foundTables = result.tablesFound
 
       if (foundTables === expectedTables) {

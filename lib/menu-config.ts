@@ -1,4 +1,4 @@
-import { CheckSquare, Plus, Archive, Dumbbell, Target, TrendingUp, Settings, BarChart3, Bot, Package, Grid3x3, Radar, Briefcase } from "lucide-react"
+import { CheckSquare, Plus, Archive, Dumbbell, Target, TrendingUp, Settings, BarChart3, Bot, Package, Grid3x3, Radar } from "lucide-react"
 
 export interface MenuItem {
   title: string
@@ -29,18 +29,6 @@ export const menuConfig: MenuGroup[] = [
         title: "HD Dashboard",
         url: "/hd-dashboard",
         icon: Grid3x3,
-      },
-    ],
-  },
-  {
-    title: "Major Projects",
-    url: "/major-projects",
-    icon: Briefcase,
-    items: [
-      {
-        title: "Major Projects",
-        url: "/major-projects",
-        icon: Briefcase,
       },
     ],
   },
@@ -166,7 +154,6 @@ function getFeatureDescription(title: string, url: string): string {
   const descriptions: Record<string, string> = {
     '/dashboard': 'Overview of your tasks, fitness, and goals',
     '/hd-dashboard': 'High-density dashboard view',
-    '/major-projects': 'Track and manage your most important projects',
     '/tasks': 'Manage your todo list',
     '/add-task': 'Create new tasks',
     '/radar': 'Visualize task priorities',

@@ -64,6 +64,11 @@ const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
   'winter-arc': {
     '': () => import('@/modules/winter-arc/api/route'), // Base route for list/create
     '[id]': () => import('@/modules/winter-arc/api/[id]/route') // Dynamic ID route
+  },
+  'major-projects': {
+    'data': () => import('@/modules/major-projects/api/data/route'), // GET/POST for list/create
+    'data/[id]': () => import('@/modules/major-projects/api/data/[id]/route'), // PATCH/DELETE for update/delete
+    'settings': () => import('@/modules/major-projects/api/settings/route') // Settings GET/PUT
   }
 }
 
@@ -108,6 +113,16 @@ async function handleRequest(
     // If not found and path has single segment, try [id] route for dynamic IDs
     if (!routeLoader && pathArray.length === 1 && moduleRoutes['[id]']) {
       routeLoader = moduleRoutes['[id]']
+    }
+
+    // If not found and path has multiple segments, try nested dynamic routes
+    // Example: ['data', '123'] -> try 'data/[id]'
+    if (!routeLoader && pathArray.length > 1) {
+      // Replace last segment with [id] and try that pattern
+      const patternPath = [...pathArray.slice(0, -1), '[id]'].join('/')
+      if (moduleRoutes[patternPath]) {
+        routeLoader = moduleRoutes[patternPath]
+      }
     }
 
     // If still not found and path is empty, try empty string route

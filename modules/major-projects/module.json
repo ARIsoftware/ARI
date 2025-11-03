@@ -1,7 +1,7 @@
 {
   "id": "major-projects",
-  "name": "Major Projects",
-  "description": "Track and manage your most important projects with task integration and deadline tracking",
+  "name": "Delulu Projects",
+  "description": "Track and manage your most delulu projects with task integration and deadline tracking",
   "version": "1.0.0",
   "author": "ARI Team <ari@ari.software>",
   "icon": "Briefcase",
@@ -16,7 +16,7 @@
   "routes": [
     {
       "path": "/major-projects",
-      "label": "Major Projects",
+      "label": "Delulu Projects",
       "icon": "Briefcase",
       "sidebarPosition": "main"
     }
