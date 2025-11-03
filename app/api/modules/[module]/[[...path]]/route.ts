@@ -4,8 +4,11 @@
  * Dynamically imports and executes module API handlers using a registry pattern.
  * Proxies requests to module API routes in /modules/[module]/api/
  *
- * URL Pattern: /api/modules/[module]/[...path]
- * Example: /api/modules/hello-world/data → /modules/hello-world/api/data/route.ts
+ * URL Pattern: /api/modules/[module]/[[...path]]
+ * Examples:
+ *   /api/modules/contacts → /modules/contacts/api/route.ts
+ *   /api/modules/contacts/123 → /modules/contacts/api/[id]/route.ts
+ *   /api/modules/hello-world/data → /modules/hello-world/api/data/route.ts
  *
  * IMPORTANT: This uses a registry-based approach since Next.js/Turbopack cannot
  * resolve dynamic imports with runtime-constructed paths. When adding a new module
@@ -48,6 +51,19 @@ const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
   'quotes': {
     'quotes': () => import('@/modules/quotes/api/quotes/route'),
     'settings': () => import('@/modules/quotes/api/settings/route')
+  },
+  'contacts': {
+    '': () => import('@/modules/contacts/api/route'), // Base route for list/create
+    '[id]': () => import('@/modules/contacts/api/[id]/route') // Dynamic ID route
+  },
+  'motivation': {
+    'refresh-thumbnail': () => import('@/modules/motivation/api/refresh-thumbnail/route'),
+    'reorder': () => import('@/modules/motivation/api/reorder/route'),
+    'setup': () => import('@/modules/motivation/api/setup/route')
+  },
+  'winter-arc': {
+    '': () => import('@/modules/winter-arc/api/route'), // Base route for list/create
+    '[id]': () => import('@/modules/winter-arc/api/[id]/route') // Dynamic ID route
   }
 }
 
@@ -57,7 +73,7 @@ const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
 async function handleRequest(
   request: NextRequest,
   method: string,
-  params: Promise<{ module: string; path: string[] }>
+  params: Promise<{ module: string; path?: string[] }>
 ) {
   const { module, path } = await params
 
@@ -71,8 +87,9 @@ async function handleRequest(
       )
     }
 
-    // Build API path from segments (e.g., ['items'] -> 'items')
-    const apiPath = path.join('/')
+    // Build API path from segments (e.g., ['items'] -> 'items', undefined -> '')
+    const pathArray = path || []
+    const apiPath = pathArray.join('/')
 
     // Look up module in registry
     const moduleRoutes = MODULE_API_ROUTES[module]
@@ -85,7 +102,19 @@ async function handleRequest(
     }
 
     // Look up specific route in module
-    const routeLoader = moduleRoutes[apiPath]
+    // Handle empty path (base route), named routes, and dynamic [id] routes
+    let routeLoader = moduleRoutes[apiPath]
+
+    // If not found and path has single segment, try [id] route for dynamic IDs
+    if (!routeLoader && pathArray.length === 1 && moduleRoutes['[id]']) {
+      routeLoader = moduleRoutes['[id]']
+    }
+
+    // If still not found and path is empty, try empty string route
+    if (!routeLoader && pathArray.length === 0 && moduleRoutes['']) {
+      routeLoader = moduleRoutes['']
+    }
+
     if (!routeLoader) {
       console.error(`[Module API] Route '${apiPath}' not found in module '${module}' registry`)
       return NextResponse.json(
@@ -126,7 +155,7 @@ async function handleRequest(
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ module: string; path: string[] }> }
+  { params }: { params: Promise<{ module: string; path?: string[] }> }
 ) {
   return handleRequest(request, 'GET', params)
 }
@@ -136,7 +165,7 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ module: string; path: string[] }> }
+  { params }: { params: Promise<{ module: string; path?: string[] }> }
 ) {
   return handleRequest(request, 'POST', params)
 }
@@ -146,7 +175,7 @@ export async function POST(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ module: string; path: string[] }> }
+  { params }: { params: Promise<{ module: string; path?: string[] }> }
 ) {
   return handleRequest(request, 'PUT', params)
 }
@@ -156,7 +185,7 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ module: string; path: string[] }> }
+  { params }: { params: Promise<{ module: string; path?: string[] }> }
 ) {
   return handleRequest(request, 'DELETE', params)
 }
@@ -166,7 +195,7 @@ export async function DELETE(
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ module: string; path: string[] }> }
+  { params }: { params: Promise<{ module: string; path?: string[] }> }
 ) {
   return handleRequest(request, 'PATCH', params)
 }

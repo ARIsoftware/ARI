@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2, Play, AlertCircle, Sparkles, Instagram, Twitter, GripVertical, Edit, RefreshCw } from "lucide-react";
 import { useSupabase } from "@/components/providers";
-import { AddMotivationModal } from "@/components/motivation/add-motivation-modal";
-import { EditMotivationModal } from "@/components/motivation/edit-motivation-modal";
+import { AddMotivationModal } from "@/modules/motivation/components/add-motivation-modal";
+import { EditMotivationModal } from "@/modules/motivation/components/edit-motivation-modal";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Image from "next/image";
 import { YouTubeModal } from "@/components/youtube-modal";
@@ -292,7 +292,7 @@ export default function MotivationPage() {
 
   const initializeAndLoad = async () => {
     try {
-      const setupResponse = await fetch("/api/motivation/setup");
+      const setupResponse = await fetch("/api/modules/motivation/setup");
       const setupData = await setupResponse.json();
 
       if (setupData.success && setupData.tableReady) {
@@ -368,7 +368,7 @@ export default function MotivationPage() {
 
   const handleRefresh = async (itemId: string) => {
     try {
-      const response = await fetch("/api/motivation/refresh-thumbnail", {
+      const response = await fetch("/api/modules/motivation/refresh-thumbnail", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -406,7 +406,7 @@ export default function MotivationPage() {
 
       // Update positions in database
       try {
-        await fetch("/api/motivation/reorder", {
+        await fetch("/api/modules/motivation/reorder", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
