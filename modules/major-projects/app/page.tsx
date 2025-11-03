@@ -1,3 +1,17 @@
+/**
+ * Major Projects Module - Main Page Component
+ *
+ * This is the primary user interface for the Major Projects module.
+ * It provides a complete CRUD interface for managing major projects with:
+ * - Project list with status indicators
+ * - Create/Edit/Delete operations
+ * - Statistics cards showing project counts
+ * - Task integration via "View Tasks" button
+ *
+ * @module major-projects/app/page
+ * @version 1.0.0
+ */
+
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -11,20 +25,67 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from '@/co
 import { Separator } from '@/components/ui/separator'
 import { TaskAnnouncement } from '@/components/task-announcement'
 import { Loader2, Plus, Pencil, Trash2, Calendar, TrendingUp, Briefcase, Clock, Sparkles } from 'lucide-react'
-import { getMajorProjects, createMajorProject, updateMajorProject, deleteMajorProject, type MajorProject } from '@/lib/major-projects'
-import { useToast } from '@/hooks/use-toast'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { useToast } from '@/hooks/use-toast'
 
+// Module imports
+import type { MajorProject } from '../types'
+import {
+  getMajorProjects,
+  createMajorProject,
+  updateMajorProject,
+  deleteMajorProject,
+  formatDueDate,
+  calculateDaysUntilDue,
+  getStatusIcon,
+  getProjectStatistics
+} from '../lib/utils'
+
+/**
+ * Main Page Component for Major Projects Module
+ *
+ * Features:
+ * - Authentication-aware (redirects if not logged in)
+ * - Loading states for all async operations
+ * - Error handling with toast notifications
+ * - Responsive layout (1-3 column grid)
+ * - Statistics cards showing project counts
+ * - Status badges with color coding
+ * - Create/Edit/Delete operations via dialog
+ * - Integration with Tasks module
+ *
+ * State Management:
+ * - projects: Array of all user projects
+ * - loading: Initial load state
+ * - dialogOpen: Controls add/edit dialog visibility
+ * - editingProject: Currently editing project (null for create)
+ * - submitting: Form submission state
+ * - Form fields: projectName, projectDescription, projectDueDate
+ *
+ * @returns JSX.Element - The major projects page
+ */
 export default function MajorProjectsPage() {
+  // ============================================================================
+  // HOOKS & CONTEXT
+  // ============================================================================
+
   const { session } = useSupabase()
   const { toast } = useToast()
   const router = useRouter()
+
+  // ============================================================================
+  // STATE MANAGEMENT
+  // ============================================================================
+
+  // Data state
   const [projects, setProjects] = useState<MajorProject[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<MajorProject | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -34,9 +95,17 @@ export default function MajorProjectsPage() {
   const [projectDescription, setProjectDescription] = useState('')
   const [projectDueDate, setProjectDueDate] = useState('')
 
-  // Load projects
+  // ============================================================================
+  // DATA LOADING
+  // ============================================================================
+
+  /**
+   * Load projects from API
+   * Runs on mount and when session changes
+   */
   useEffect(() => {
     async function loadProjects() {
+      // Skip if no session
       if (!session?.user?.id) {
         setLoading(false)
         return
@@ -46,7 +115,7 @@ export default function MajorProjectsPage() {
         const data = await getMajorProjects()
         setProjects(data)
       } catch (error: any) {
-        console.error('Error loading projects:', error)
+        console.error('[MajorProjects] Error loading projects:', error)
         toast({
           title: 'Error',
           description: error.message || 'Failed to load projects',
@@ -62,13 +131,23 @@ export default function MajorProjectsPage() {
     }
   }, [session, toast])
 
+  // ============================================================================
+  // DIALOG HANDLERS
+  // ============================================================================
+
+  /**
+   * Open dialog for creating or editing a project
+   * @param project - Project to edit (undefined for create new)
+   */
   const handleOpenDialog = (project?: MajorProject) => {
     if (project) {
+      // Edit mode: Pre-fill form with existing data
       setEditingProject(project)
       setProjectName(project.project_name)
       setProjectDescription(project.project_description || '')
       setProjectDueDate(project.project_due_date || '')
     } else {
+      // Create mode: Clear form
       setEditingProject(null)
       setProjectName('')
       setProjectDescription('')
@@ -77,6 +156,9 @@ export default function MajorProjectsPage() {
     setDialogOpen(true)
   }
 
+  /**
+   * Close dialog and reset form state
+   */
   const handleCloseDialog = () => {
     setDialogOpen(false)
     setEditingProject(null)
@@ -85,7 +167,16 @@ export default function MajorProjectsPage() {
     setProjectDueDate('')
   }
 
+  // ============================================================================
+  // CRUD OPERATIONS
+  // ============================================================================
+
+  /**
+   * Handle form submission (create or update)
+   * Validates input, calls API, updates state, shows toast
+   */
   const handleSubmit = async () => {
+    // Validation
     if (!projectName.trim()) {
       toast({
         title: 'Error',
@@ -96,36 +187,44 @@ export default function MajorProjectsPage() {
     }
 
     setSubmitting(true)
+
     try {
       if (editingProject) {
-        // Update existing project
+        // UPDATE: Modify existing project
         const updated = await updateMajorProject(
           editingProject.id,
           projectName.trim(),
           projectDescription.trim() || null,
           projectDueDate || null
         )
+
+        // Update local state
         setProjects(projects.map(p => (p.id === updated.id ? updated : p)))
+
         toast({
           title: 'Success',
           description: 'Project updated successfully',
         })
       } else {
-        // Create new project
+        // CREATE: Add new project
         const newProject = await createMajorProject(
           projectName.trim(),
           projectDescription.trim() || null,
           projectDueDate || null
         )
+
+        // Add to local state
         setProjects([...projects, newProject])
+
         toast({
           title: 'Success',
           description: 'Project created successfully',
         })
       }
+
       handleCloseDialog()
     } catch (error: any) {
-      console.error('Error saving project:', error)
+      console.error('[MajorProjects] Error saving project:', error)
       toast({
         title: 'Error',
         description: error.message || 'Failed to save project',
@@ -136,20 +235,30 @@ export default function MajorProjectsPage() {
     }
   }
 
+  /**
+   * Handle project deletion
+   * Shows confirmation, calls API, updates state, shows toast
+   *
+   * @param id - UUID of project to delete
+   */
   const handleDelete = async (id: string) => {
+    // Confirmation dialog
     if (!confirm('Are you sure you want to delete this project?')) {
       return
     }
 
     try {
       await deleteMajorProject(id)
+
+      // Remove from local state (optimistic update)
       setProjects(projects.filter(p => p.id !== id))
+
       toast({
         title: 'Success',
         description: 'Project deleted successfully',
       })
     } catch (error: any) {
-      console.error('Error deleting project:', error)
+      console.error('[MajorProjects] Error deleting project:', error)
       toast({
         title: 'Error',
         description: error.message || 'Failed to delete project',
@@ -158,23 +267,17 @@ export default function MajorProjectsPage() {
     }
   }
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'No due date'
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  }
+  // ============================================================================
+  // HELPER FUNCTIONS (UI-specific)
+  // ============================================================================
 
-  const getDaysUntilDue = (dateString: string | null) => {
-    if (!dateString) return null
-    const now = new Date()
-    const due = new Date(dateString)
-    const diffTime = due.getTime() - now.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays
-  }
-
+  /**
+   * Get status-based text color class
+   * @param dateString - Due date ISO string
+   * @returns Tailwind text color class
+   */
   const getStatusColor = (dateString: string | null) => {
-    const days = getDaysUntilDue(dateString)
+    const days = calculateDaysUntilDue(dateString)
     if (days === null) return 'text-gray-500'
     if (days < 0) return 'text-red-500'
     if (days <= 7) return 'text-orange-500'
@@ -182,14 +285,14 @@ export default function MajorProjectsPage() {
     return 'text-green-600'
   }
 
-  const getStatusIcon = (dateString: string | null) => {
-    const days = getDaysUntilDue(dateString)
-    if (days === null) return null
-    if (days < 0) return '⚠️'
-    if (days <= 7) return '🔥'
-    if (days <= 30) return '⏰'
-    return '✨'
-  }
+  /**
+   * Calculate statistics for statistics cards
+   */
+  const stats = getProjectStatistics(projects)
+
+  // ============================================================================
+  // LOADING STATE
+  // ============================================================================
 
   if (loading) {
     return (
@@ -207,12 +310,19 @@ export default function MajorProjectsPage() {
     )
   }
 
+  // ============================================================================
+  // MAIN RENDER
+  // ============================================================================
+
   return (
     <div className="min-h-screen bg-gray-50/50">
       <TaskAnnouncement />
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset>
+          {/* ================================================================
+              HEADER WITH BREADCRUMB
+              ================================================================ */}
           <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-white px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 h-4" />
@@ -225,9 +335,14 @@ export default function MajorProjectsPage() {
             </Breadcrumb>
           </header>
 
+          {/* ================================================================
+              MAIN CONTENT AREA
+              ================================================================ */}
           <div className="flex flex-1 flex-col gap-8 p-8">
             <div className="max-w-7xl mx-auto w-full">
-              {/* Header */}
+              {/* ==============================================================
+                  PAGE HEADER WITH TITLE AND NEW PROJECT BUTTON
+                  ============================================================== */}
               <div className="flex justify-between items-start mb-12">
                 <div className="space-y-3">
                   <div className="flex items-center gap-4">
@@ -238,7 +353,9 @@ export default function MajorProjectsPage() {
                       <h1 className="text-4xl font-bold tracking-tight text-black mb-1">
                         Major Projects
                       </h1>
-                      <p className="text-base text-muted-foreground font-medium">Track and deliver on your most important initiatives</p>
+                      <p className="text-base text-muted-foreground font-medium">
+                        Track and deliver on your most important initiatives
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -252,16 +369,21 @@ export default function MajorProjectsPage() {
                 </Button>
               </div>
 
-              {/* Stats Row */}
+              {/* ==============================================================
+                  STATISTICS CARDS (Only shown when projects exist)
+                  ============================================================== */}
               {projects.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                  {/* Total Projects Card */}
                   <Card className="relative overflow-hidden shadow-md hover:shadow-xl transition-all duration-300">
                     <div className="absolute top-0 left-0 w-1 h-full bg-black" />
                     <CardContent className="pt-6 pb-6">
                       <div className="flex items-start justify-between">
                         <div className="space-y-1">
-                          <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Total Projects</p>
-                          <p className="text-4xl font-bold tracking-tight">{projects.length}</p>
+                          <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                            Total Projects
+                          </p>
+                          <p className="text-4xl font-bold tracking-tight">{stats.total}</p>
                         </div>
                         <div className="h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
                           <Briefcase className="h-6 w-6 text-gray-700" />
@@ -269,18 +391,17 @@ export default function MajorProjectsPage() {
                       </div>
                     </CardContent>
                   </Card>
+
+                  {/* Due Soon Card */}
                   <Card className="relative overflow-hidden shadow-md hover:shadow-xl transition-all duration-300">
                     <div className="absolute top-0 left-0 w-1 h-full bg-gray-700" />
                     <CardContent className="pt-6 pb-6">
                       <div className="flex items-start justify-between">
                         <div className="space-y-1">
-                          <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Due Soon</p>
-                          <p className="text-4xl font-bold tracking-tight">
-                            {projects.filter(p => {
-                              const days = getDaysUntilDue(p.project_due_date)
-                              return days !== null && days >= 0 && days <= 7
-                            }).length}
+                          <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                            Due Soon
                           </p>
+                          <p className="text-4xl font-bold tracking-tight">{stats.dueSoon}</p>
                         </div>
                         <div className="h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
                           <Clock className="h-6 w-6 text-gray-700" />
@@ -288,18 +409,17 @@ export default function MajorProjectsPage() {
                       </div>
                     </CardContent>
                   </Card>
+
+                  {/* On Track Card */}
                   <Card className="relative overflow-hidden shadow-md hover:shadow-xl transition-all duration-300">
                     <div className="absolute top-0 left-0 w-1 h-full bg-gray-400" />
                     <CardContent className="pt-6 pb-6">
                       <div className="flex items-start justify-between">
                         <div className="space-y-1">
-                          <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">On Track</p>
-                          <p className="text-4xl font-bold tracking-tight">
-                            {projects.filter(p => {
-                              const days = getDaysUntilDue(p.project_due_date)
-                              return days !== null && days > 7
-                            }).length}
+                          <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                            On Track
                           </p>
+                          <p className="text-4xl font-bold tracking-tight">{stats.onTrack}</p>
                         </div>
                         <div className="h-12 w-12 rounded-xl bg-gray-100 flex items-center justify-center">
                           <Sparkles className="h-6 w-6 text-gray-700" />
@@ -310,14 +430,19 @@ export default function MajorProjectsPage() {
                 </div>
               )}
 
-              {/* Projects Grid */}
+              {/* ==============================================================
+                  PROJECTS GRID OR EMPTY STATE
+                  ============================================================== */}
               {projects.length === 0 ? (
+                // EMPTY STATE: No projects yet
                 <Card className="border-2 border-dashed border-gray-300 shadow-sm hover:shadow-md transition-all duration-300">
                   <CardContent className="flex flex-col items-center justify-center py-20 px-6">
                     <div className="h-24 w-24 rounded-3xl bg-gray-100 flex items-center justify-center mb-8">
                       <Briefcase className="h-12 w-12 text-gray-600" />
                     </div>
-                    <h3 className="text-3xl font-bold mb-3 text-gray-900 tracking-tight">No projects yet</h3>
+                    <h3 className="text-3xl font-bold mb-3 text-gray-900 tracking-tight">
+                      No projects yet
+                    </h3>
                     <p className="text-muted-foreground mb-8 text-center max-w-md text-lg leading-relaxed">
                       Start tracking your major initiatives and keep your most important work organized in one place
                     </p>
@@ -332,30 +457,35 @@ export default function MajorProjectsPage() {
                   </CardContent>
                 </Card>
               ) : (
+                // PROJECTS GRID: Display all projects
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {projects.map(project => {
-                    const days = getDaysUntilDue(project.project_due_date)
+                    const days = calculateDaysUntilDue(project.project_due_date)
                     const statusIcon = getStatusIcon(project.project_due_date)
 
-                    // Determine border weight and badge
+                    // Determine visual styling based on urgency
                     let borderWeight = 'h-0.5'
                     let badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline' = 'outline'
                     let badgeText = 'Active'
 
                     if (days !== null) {
                       if (days < 0) {
+                        // Overdue: Thick border, destructive badge
                         borderWeight = 'h-1'
                         badgeVariant = 'default'
                         badgeText = 'Overdue'
                       } else if (days <= 7) {
+                        // Due soon: Thick border, secondary badge
                         borderWeight = 'h-1'
                         badgeVariant = 'secondary'
                         badgeText = 'Due Soon'
                       } else if (days <= 30) {
+                        // Upcoming: Normal border, secondary badge
                         borderWeight = 'h-0.5'
                         badgeVariant = 'secondary'
                         badgeText = 'Upcoming'
                       } else {
+                        // Active: Normal border, outline badge
                         borderWeight = 'h-0.5'
                         badgeVariant = 'outline'
                         badgeText = 'Active'
@@ -367,19 +497,22 @@ export default function MajorProjectsPage() {
                         key={project.id}
                         className="relative shadow-md hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 group overflow-hidden"
                       >
-                        {/* Top border */}
+                        {/* Top border indicator */}
                         <div className={`absolute top-0 left-0 right-0 ${borderWeight} bg-black`} />
 
-                        {/* Background on hover */}
+                        {/* Hover background effect */}
                         <div className="absolute inset-0 bg-gray-50 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
+                        {/* Card Header */}
                         <CardHeader className="pb-4 relative z-10 space-y-3">
                           <div className="flex items-start justify-between gap-3">
                             <Badge variant={badgeVariant} className="font-semibold text-xs px-3 py-1">
                               {badgeText}
                             </Badge>
                             {statusIcon && (
-                              <span className="text-2xl group-hover:scale-110 transition-transform duration-300">{statusIcon}</span>
+                              <span className="text-2xl group-hover:scale-110 transition-transform duration-300">
+                                {statusIcon}
+                              </span>
                             )}
                           </div>
                           <CardTitle className="text-xl font-bold line-clamp-2 leading-tight transition-colors duration-300">
@@ -387,7 +520,9 @@ export default function MajorProjectsPage() {
                           </CardTitle>
                         </CardHeader>
 
+                        {/* Card Content */}
                         <CardContent className="relative z-10 space-y-5">
+                          {/* Description */}
                           {project.project_description ? (
                             <CardDescription className="line-clamp-3 min-h-[4.5rem] text-sm leading-relaxed">
                               {project.project_description}
@@ -398,12 +533,13 @@ export default function MajorProjectsPage() {
                             </div>
                           )}
 
+                          {/* Due Date & View Tasks */}
                           <div className="space-y-3 pt-2">
                             <div className="flex items-center gap-3 text-sm font-semibold bg-gray-50 rounded-xl p-3 group-hover:bg-white transition-colors">
                               <div className="h-8 w-8 rounded-lg bg-white shadow-sm flex items-center justify-center border">
                                 <Calendar className="h-4 w-4" />
                               </div>
-                              <span>{formatDate(project.project_due_date)}</span>
+                              <span>{formatDueDate(project.project_due_date)}</span>
                             </div>
 
                             <Button
@@ -415,6 +551,7 @@ export default function MajorProjectsPage() {
                             </Button>
                           </div>
 
+                          {/* Action Buttons */}
                           <div className="flex gap-3 pt-5 border-t">
                             <Button
                               variant="outline"
@@ -445,10 +582,12 @@ export default function MajorProjectsPage() {
         </SidebarInset>
       </SidebarProvider>
 
-      {/* Add/Edit Dialog */}
+      {/* ====================================================================
+          ADD/EDIT PROJECT DIALOG
+          ==================================================================== */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-[560px] p-0 gap-0 overflow-hidden">
-          {/* Header */}
+          {/* Dialog Header */}
           <div className="p-6 border-b bg-gray-50">
             <div className="flex items-center gap-4">
               <div className="h-12 w-12 rounded-2xl bg-black flex items-center justify-center shadow-lg">
@@ -467,8 +606,9 @@ export default function MajorProjectsPage() {
             </div>
           </div>
 
-          {/* Form content */}
+          {/* Dialog Form Content */}
           <div className="p-6 space-y-6">
+            {/* Project Name Field */}
             <div className="space-y-2.5">
               <Label htmlFor="name" className="text-sm font-bold flex items-center gap-2">
                 Project Name <span className="text-gray-500 text-xs">*</span>
@@ -482,6 +622,7 @@ export default function MajorProjectsPage() {
               />
             </div>
 
+            {/* Description Field */}
             <div className="space-y-2.5">
               <Label htmlFor="description" className="text-sm font-bold">
                 Description
@@ -504,6 +645,7 @@ export default function MajorProjectsPage() {
               </div>
             </div>
 
+            {/* Due Date Field */}
             <div className="space-y-2.5">
               <Label htmlFor="dueDate" className="text-sm font-bold flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
@@ -522,7 +664,7 @@ export default function MajorProjectsPage() {
             </div>
           </div>
 
-          {/* Footer */}
+          {/* Dialog Footer */}
           <div className="flex gap-3 p-6 bg-gray-50 border-t">
             <Button
               variant="outline"
@@ -560,3 +702,70 @@ export default function MajorProjectsPage() {
     </div>
   )
 }
+
+// ============================================================================
+// DEVELOPER NOTES
+// ============================================================================
+
+/**
+ * Module Integration Notes:
+ *
+ * This page is dynamically loaded by the module system via:
+ * - Module registry: /lib/generated/module-pages-registry.ts
+ * - Catch-all route: /app/[module]/[[...slug]]/page.tsx
+ * - Module manifest: /modules/major-projects/module.json
+ *
+ * The page must be exported as default export for dynamic import to work.
+ */
+
+/**
+ * Tasks Integration:
+ *
+ * The "View Tasks" button links to /tasks?filter={project.id}
+ * This requires the Tasks page to:
+ * 1. Read the filter query parameter
+ * 2. Filter tasks where task.project_id === filter
+ * 3. Display filtered results
+ *
+ * See /app/tasks/page.tsx for implementation details.
+ */
+
+/**
+ * State Management Notes:
+ *
+ * - No global state library needed (useState is sufficient)
+ * - Projects are fetched once on mount
+ * - CRUD operations update local state immediately (optimistic)
+ * - Toast notifications provide user feedback
+ * - No caching or refetching needed for this use case
+ */
+
+/**
+ * Performance Considerations:
+ *
+ * - Projects are loaded once per session
+ * - No pagination needed (users typically have < 50 projects)
+ * - Cards use CSS transforms for hover (GPU-accelerated)
+ * - Images are not used (icons only), so no lazy loading needed
+ * - Statistics are calculated in-memory (fast for typical project counts)
+ */
+
+/**
+ * Accessibility Notes:
+ *
+ * - All interactive elements are keyboard accessible
+ * - Form labels are properly associated with inputs
+ * - Loading states announced via spinner
+ * - Error messages displayed via toast (screen reader accessible)
+ * - Confirmation dialog for destructive actions (delete)
+ */
+
+/**
+ * Related Files:
+ * - ../types/index.ts - TypeScript types
+ * - ../lib/utils.ts - Utility functions
+ * - ../api/data/route.ts - GET/POST endpoints
+ * - ../api/data/[id]/route.ts - PATCH/DELETE endpoints
+ * - ../components/widget.tsx - Dashboard widget
+ * - ../components/settings-panel.tsx - Settings UI
+ */
