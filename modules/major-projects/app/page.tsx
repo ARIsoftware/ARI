@@ -329,7 +329,7 @@ export default function MajorProjectsPage() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Major Projects</BreadcrumbPage>
+                  <BreadcrumbPage>Delulu Projects</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
@@ -351,10 +351,10 @@ export default function MajorProjectsPage() {
                     </div>
                     <div>
                       <h1 className="text-4xl font-bold tracking-tight text-black mb-1">
-                        Major Projects
+                        Delulu Projects
                       </h1>
                       <p className="text-base text-muted-foreground font-medium">
-                        Track and deliver on your most important initiatives
+                        Track and deliver on your most delulu initiatives
                       </p>
                     </div>
                   </div>

@@ -143,7 +143,7 @@ export function MajorProjectsSettingsPanel() {
               <Briefcase className="h-5 w-5 text-white" />
             </div>
             <div>
-              <CardTitle>Major Projects Settings</CardTitle>
+              <CardTitle>Delulu Projects Settings</CardTitle>
               <CardDescription>Loading settings...</CardDescription>
             </div>
           </div>
@@ -170,9 +170,9 @@ export function MajorProjectsSettingsPanel() {
             <Briefcase className="h-5 w-5 text-white" />
           </div>
           <div>
-            <CardTitle>Major Projects Settings</CardTitle>
+            <CardTitle>Delulu Projects Settings</CardTitle>
             <CardDescription>
-              Configure how Major Projects behaves and displays
+              Configure how Delulu Projects behaves and displays
             </CardDescription>
           </div>
         </div>
@@ -198,7 +198,7 @@ export function MajorProjectsSettingsPanel() {
                 Show in Dashboard
               </Label>
               <p className="text-sm text-muted-foreground">
-                Display the Major Projects widget on your dashboard
+                Display the Delulu Projects widget on your dashboard
               </p>
             </div>
             <Switch
