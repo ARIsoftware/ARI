@@ -109,10 +109,13 @@ async function handleRequest(
     // Look up specific route in module
     // Handle empty path (base route), named routes, and dynamic [id] routes
     let routeLoader = moduleRoutes[apiPath]
+    let dynamicParams: any = null // Track if we need to transform params
 
     // If not found and path has single segment, try [id] route for dynamic IDs
     if (!routeLoader && pathArray.length === 1 && moduleRoutes['[id]']) {
       routeLoader = moduleRoutes['[id]']
+      // Transform params: { module, path: ['uuid'] } -> { id: 'uuid' }
+      dynamicParams = Promise.resolve({ id: pathArray[0] })
     }
 
     // If not found and path has multiple segments, try nested dynamic routes
@@ -122,6 +125,8 @@ async function handleRequest(
       const patternPath = [...pathArray.slice(0, -1), '[id]'].join('/')
       if (moduleRoutes[patternPath]) {
         routeLoader = moduleRoutes[patternPath]
+        // Transform params: { module, path: ['data', 'uuid'] } -> { id: 'uuid' }
+        dynamicParams = Promise.resolve({ id: pathArray[pathArray.length - 1] })
       }
     }
 
@@ -152,7 +157,8 @@ async function handleRequest(
     // Execute the appropriate HTTP method handler
     // Pass both request and context (context contains params for module handler to use)
     // Module handlers receive: (request: NextRequest, context: { params: Promise<RouteParams> })
-    return await handler[method](request, { params })
+    // If we detected a dynamic route, pass transformed params, otherwise pass original
+    return await handler[method](request, { params: dynamicParams || params })
   } catch (error: any) {
     // Log error for debugging
     console.error(`[Module API ${module}/${path.join('/')}] Error:`, error)

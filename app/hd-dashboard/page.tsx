@@ -233,7 +233,7 @@ export default function HDDashboardPage() {
                     <p className="text-sm text-gray-600 dark:text-gray-400">No Winter Arc goals yet. Create some at <a href="/winter-arc" className="underline">/winter-arc</a></p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-5 gap-2">
+                  <div className="grid grid-cols-6 gap-2">
                     {winterArcGoals.map((goal, index) => {
                     const pastelColors = [
                       'bg-blue-50 dark:bg-blue-900/20 blue:bg-transparent clean:bg-blue-50 hover:bg-blue-100 dark:hover:bg-blue-900/30 blue:hover:bg-white/10 clean:hover:bg-blue-100',

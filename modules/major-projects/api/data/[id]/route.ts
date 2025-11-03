@@ -110,11 +110,14 @@ export const uuidParamSchema = z.object({
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Await params (Next.js 15 requirement)
+    const { id } = await params
+
     // Step 1: Validate path parameter (UUID format)
-    const paramValidation = uuidParamSchema.safeParse({ id: params.id })
+    const paramValidation = uuidParamSchema.safeParse({ id })
     if (!paramValidation.success) {
       return createErrorResponse('Invalid project ID format', 400)
     }
@@ -155,7 +158,7 @@ export async function PATCH(
     const { data, error } = await supabase
       .from('major_projects')
       .update(cleanedData)
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('user_id', user.id)
       .select()
       .single()
@@ -222,11 +225,14 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Await params (Next.js 15 requirement)
+    const { id } = await params
+
     // Step 1: Validate path parameter (UUID format)
-    const paramValidation = uuidParamSchema.safeParse({ id: params.id })
+    const paramValidation = uuidParamSchema.safeParse({ id })
     if (!paramValidation.success) {
       return createErrorResponse('Invalid project ID format', 400)
     }
@@ -243,7 +249,7 @@ export async function DELETE(
     const { error } = await supabase
       .from('major_projects')
       .delete()
-      .eq('id', params.id)
+      .eq('id', id)
       .eq('user_id', user.id)
 
     // Step 4: Handle database errors
