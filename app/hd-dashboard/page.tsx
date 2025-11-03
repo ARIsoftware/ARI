@@ -102,14 +102,17 @@ export default function HDDashboardPage() {
       setLoading(true)
       const tokenFn = async () => session?.access_token || null
 
-      // Build promises array based on enabled modules
+      // Core data - always fetch
       const promises: Promise<any>[] = [
         getTasks(tokenFn),
-        getFitnessStats(tokenFn),
         getNotepad()
       ]
 
       // Only fetch from enabled modules
+      const fitnessPromise = enabledModulesSet.has('daily-fitness')
+        ? getFitnessStats(tokenFn)
+        : Promise.resolve({ averageCompletionsPerDay: 0, mostCompletedTask: null, leastCompletedTask: null, totalCompletions: 0 })
+
       const contactsPromise = enabledModulesSet.has('contacts')
         ? getContacts(tokenFn)
         : Promise.resolve([])
@@ -118,15 +121,16 @@ export default function HDDashboardPage() {
         ? getWinterArcGoals()
         : Promise.resolve([])
 
-      const [tasksData, statsData, notepadData, contactsData, goalsData] = await Promise.all([
+      const [tasksData, notepadData, statsData, contactsData, goalsData] = await Promise.all([
         ...promises,
+        fitnessPromise,
         contactsPromise,
         goalsPromise
       ])
 
       setTasks(tasksData)
-      setFitnessStats(statsData)
       setNotepadContent(notepadData.content || "")
+      setFitnessStats(statsData)
       setContacts(contactsData)
       setWinterArcGoals(goalsData)
     } catch (error) {
@@ -222,10 +226,15 @@ export default function HDDashboardPage() {
 
           <div className="p-2 dark:bg-gray-900 blue:bg-[#056baa] min-h-screen">
             {/* Winter Arc Goals - Only show if module is enabled */}
-            {enabledModules.has('winter-arc') && winterArcGoals.length > 0 && (
+            {enabledModules.has('winter-arc') && (
               <div className="mb-2">
-                <div className="grid grid-cols-5 gap-2">
-                  {winterArcGoals.map((goal, index) => {
+                {winterArcGoals.length === 0 ? (
+                  <div className="border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-4 bg-gray-50 dark:bg-gray-800 text-center">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">No Winter Arc goals yet. Create some at <a href="/winter-arc" className="underline">/winter-arc</a></p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-5 gap-2">
+                    {winterArcGoals.map((goal, index) => {
                     const pastelColors = [
                       'bg-blue-50 dark:bg-blue-900/20 blue:bg-transparent clean:bg-blue-50 hover:bg-blue-100 dark:hover:bg-blue-900/30 blue:hover:bg-white/10 clean:hover:bg-blue-100',
                       'bg-purple-50 dark:bg-purple-900/20 blue:bg-transparent clean:bg-purple-50 hover:bg-purple-100 dark:hover:bg-purple-900/30 blue:hover:bg-white/10 clean:hover:bg-purple-100',
@@ -254,6 +263,7 @@ export default function HDDashboardPage() {
                     );
                   })}
                 </div>
+                )}
               </div>
             )}
 
@@ -293,23 +303,29 @@ export default function HDDashboardPage() {
                 <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-white clean:text-gray-500">due today</div>
               </div>
 
-              <div className="border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-1.5 bg-green-50 dark:bg-green-900/20 blue:bg-transparent clean:bg-transparent">
-                <div className="flex items-center gap-1">
-                  <Trophy className="w-3 h-3 text-green-600 dark:text-green-400 blue:text-white clean:text-green-600" />
-                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300 blue:text-white clean:text-gray-600">Fitness</span>
+              {/* Fitness card - Only show if daily-fitness module is enabled */}
+              {enabledModules.has('daily-fitness') && (
+                <div className="border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-1.5 bg-green-50 dark:bg-green-900/20 blue:bg-transparent clean:bg-transparent">
+                  <div className="flex items-center gap-1">
+                    <Trophy className="w-3 h-3 text-green-600 dark:text-green-400 blue:text-white clean:text-green-600" />
+                    <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300 blue:text-white clean:text-gray-600">Fitness</span>
+                  </div>
+                  <div className="text-lg font-bold text-green-900 dark:text-green-300 blue:text-white clean:text-green-900">{fitnessStats.totalCompletions}</div>
+                  <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-white clean:text-gray-500">completions</div>
                 </div>
-                <div className="text-lg font-bold text-green-900 dark:text-green-300 blue:text-white clean:text-green-900">{fitnessStats.totalCompletions}</div>
-                <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-white clean:text-gray-500">completions</div>
-              </div>
+              )}
 
-              <div className="border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-1.5 bg-yellow-50 dark:bg-yellow-900/20 blue:bg-transparent clean:bg-transparent">
-                <div className="flex items-center gap-1">
-                  <Dumbbell className="w-3 h-3 text-yellow-600 dark:text-yellow-400 blue:text-white clean:text-yellow-600" />
-                  <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300 blue:text-white clean:text-gray-600">Avg/Day</span>
+              {/* Avg/Day card - Only show if daily-fitness module is enabled */}
+              {enabledModules.has('daily-fitness') && (
+                <div className="border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-1.5 bg-yellow-50 dark:bg-yellow-900/20 blue:bg-transparent clean:bg-transparent">
+                  <div className="flex items-center gap-1">
+                    <Dumbbell className="w-3 h-3 text-yellow-600 dark:text-yellow-400 blue:text-white clean:text-yellow-600" />
+                    <span className="text-[10px] font-medium text-gray-600 dark:text-gray-300 blue:text-white clean:text-gray-600">Avg/Day</span>
+                  </div>
+                  <div className="text-lg font-bold text-yellow-900 dark:text-yellow-300 blue:text-white clean:text-yellow-900">{fitnessStats.averageCompletionsPerDay.toFixed(1)}</div>
+                  <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-white clean:text-gray-500">fitness avg</div>
                 </div>
-                <div className="text-lg font-bold text-yellow-900 dark:text-yellow-300 blue:text-white clean:text-yellow-900">{fitnessStats.averageCompletionsPerDay.toFixed(1)}</div>
-                <div className="text-[9px] text-gray-500 dark:text-gray-400 blue:text-white clean:text-gray-500">fitness avg</div>
-              </div>
+              )}
 
               <div className="border dark:border-gray-700 blue:border-white clean:border-gray-200 rounded p-1.5 bg-indigo-50 dark:bg-indigo-900/20 blue:bg-transparent clean:bg-transparent">
                 <div className="flex items-center gap-1">
