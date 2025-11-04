@@ -27,7 +27,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { CalendarIcon, Save, X, Star, ArrowLeft, Loader2, Pencil, Info, Compass, Briefcase } from "lucide-react"
+import { CalendarIcon, Save, X, Pin, ArrowLeft, Loader2, Pencil, Info, Compass, Briefcase } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useState, useEffect } from "react"
 import { getTasks, updateTask, type Task } from "@/lib/tasks"
@@ -87,7 +87,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
     assignees: [] as string[],
     status: "Pending" as const,
     priority: "Medium" as const,
-    starred: false,
+    pinned: false,
     completed: false,
     impact: 3,
     severity: 3,
@@ -126,7 +126,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
           assignees: foundTask.assignees,
           status: foundTask.status,
           priority: foundTask.priority,
-          starred: foundTask.starred,
+          pinned: foundTask.pinned,
           completed: foundTask.completed,
           impact: foundTask.impact || 3,
           severity: foundTask.severity || 3,
@@ -219,7 +219,7 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
         due_date: date ? date.toISOString().split("T")[0] : null,
         status: formData.status,
         priority: formData.priority,
-        starred: formData.starred,
+        pinned: formData.pinned,
         completed: formData.completed,
         impact: formData.impact,
         severity: formData.severity,
@@ -460,19 +460,24 @@ export default function EditTaskPage({ params }: { params: Promise<{ id: string 
                     </div>
                   </div>
 
-                  {/* Mark for Today */}
+                  {/* Pin this task */}
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label className="text-sm font-medium flex items-center gap-2">
-                        <Star className="w-4 h-4" />
-                        Mark for Today
-                      </Label>
-                      <p className="text-xs text-muted-foreground">Marked tasks will appear in the "Today" filter</p>
+                      <Label className="text-sm font-medium">Pin this task</Label>
+                      <p className="text-xs text-muted-foreground">Pinned tasks will appear in the "Pinned" filter</p>
                     </div>
-                    <Switch
-                      checked={formData.starred}
-                      onCheckedChange={(checked) => handleInputChange("starred", checked)}
-                    />
+                    <button
+                      type="button"
+                      onClick={() => handleInputChange("pinned", !formData.pinned)}
+                      className="transition-colors"
+                    >
+                      <Pin
+                        className={`w-5 h-5 ${
+                          formData.pinned ? "text-[hsl(var(--primary))]" : "text-gray-300"
+                        }`}
+                        fill={formData.pinned ? "hsl(var(--primary))" : "none"}
+                      />
+                    </button>
                   </div>
 
                   {/* Completed */}

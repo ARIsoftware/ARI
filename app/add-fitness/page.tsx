@@ -18,7 +18,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Calendar, Plus, X, Star, Loader2 } from "lucide-react"
+import { ArrowLeft, Calendar, Plus, X, Pin, Loader2 } from "lucide-react"
 import { useState } from "react"
 import { createFitnessTask } from "@/lib/fitness"
 import { useToast } from "@/hooks/use-toast"
@@ -41,7 +41,7 @@ export default function AddFitnessPage() {
   const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0])
   const [status, setStatus] = useState<"Pending" | "In Progress" | "Completed">("Pending")
   const [priority, setPriority] = useState<"Low" | "Medium" | "High">("Medium")
-  const [starred, setStarred] = useState(false)
+  const [pinned, setPinned] = useState(false)
   const [subtasksTotal, setSubtasksTotal] = useState(0)
   const [youtubeUrl, setYoutubeUrl] = useState("")
   const [loading, setLoading] = useState(false)
@@ -90,7 +90,7 @@ export default function AddFitnessPage() {
         subtasks_total: subtasksTotal,
         status,
         priority,
-        starred,
+        pinned,
         completed: status === "Completed",
         youtube_url: youtubeUrl.trim() || null,
       }, tokenFn)
@@ -307,19 +307,18 @@ export default function AddFitnessPage() {
                     </div>
                   </div>
 
-                  {/* Star Toggle */}
+                  {/* Pin Toggle */}
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setStarred(!starred)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-md border transition-colors ${
-                        starred
-                          ? "bg-yellow-50 border-yellow-200 text-yellow-700"
-                          : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
-                      }`}
+                      onClick={() => setPinned(!pinned)}
+                      className="flex items-center gap-2 px-3 py-2 rounded-md border transition-colors hover:bg-gray-50"
                     >
-                      <Star className={`w-4 h-4 ${starred ? "fill-yellow-400 text-yellow-500" : ""}`} />
-                      {starred ? "Remove from Today" : "Add to Today"}
+                      <Pin
+                        className={`w-4 h-4 ${pinned ? "text-[hsl(var(--primary))]" : "text-gray-400"}`}
+                        fill={pinned ? "hsl(var(--primary))" : "none"}
+                      />
+                      {pinned ? "Unpin Task" : "Pin Task"}
                     </button>
                   </div>
 

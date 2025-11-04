@@ -121,7 +121,7 @@ export default function RadarPage() {
       filtered = filtered.filter(task => {
         if (filterStatus === "completed") return task.completed
         if (filterStatus === "pending") return !task.completed
-        if (filterStatus === "starred") return task.starred
+        if (filterStatus === "pinned") return task.pinned
         return true
       })
     }
@@ -227,11 +227,11 @@ export default function RadarPage() {
                   Completed
                 </Button>
                 <Button
-                  variant={filterStatus === "starred" ? "default" : "outline"}
+                  variant={filterStatus === "pinned" ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setFilterStatus("starred")}
+                  onClick={() => setFilterStatus("pinned")}
                 >
-                  Starred
+                  Pinned
                 </Button>
               </div>
             </div>

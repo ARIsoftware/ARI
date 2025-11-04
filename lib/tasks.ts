@@ -123,10 +123,10 @@ export async function toggleTaskCompletion(id: string, getToken: () => Promise<s
   return updatedTask
 }
 
-export async function toggleTaskStar(id: string, getToken: () => Promise<string | null>): Promise<Task> {
+export async function toggleTaskPin(id: string, getToken: () => Promise<string | null>): Promise<Task> {
   // First get the current task state
   const response = await authenticatedFetch('/api/tasks', {}, getToken)
-  
+
   if (!response.ok) {
     const error = await response.json()
     console.error("Error fetching tasks:", error)
@@ -135,13 +135,13 @@ export async function toggleTaskStar(id: string, getToken: () => Promise<string 
 
   const tasks = await response.json()
   const currentTask = tasks.find((t: Task) => t.id === id)
-  
+
   if (!currentTask) {
     throw new Error('Task not found')
   }
 
   return updateTask(id, {
-    starred: !currentTask.starred,
+    pinned: !currentTask.pinned,
   }, getToken)
 }
 
