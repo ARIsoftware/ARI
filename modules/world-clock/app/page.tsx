@@ -105,7 +105,7 @@ function DigitalClock({ name, timezone, flag }: TimeZoneInfo) {
 }
 
 function TimeConverter() {
-  const [inputTime, setInputTime] = useState('12:15 PM')
+  const [inputTime, setInputTime] = useState('12:00 PM')
   const [torontoTime, setTorontoTime] = useState('')
   const [nashvilleTime, setNashvilleTime] = useState('')
 
@@ -183,14 +183,14 @@ function TimeConverter() {
             value={inputTime}
             onChange={(e) => setInputTime(e.target.value)}
             className={`w-32 text-center font-mono border-b-2 border-t-0 border-l-0 border-r-0 rounded-none px-2 py-1 focus:ring-0 focus:border-blue-500 ${overpassMono.className}`}
-            placeholder="12:15 PM"
+            placeholder="12:00 PM"
           />
           <span>in South Africa is</span>
-          <span className="font-semibold border-b-2 border-gray-800 px-2 py-1 min-w-[120px] text-center">
+          <span className="px-2 py-1 min-w-[120px] text-center">
             {torontoTime}
           </span>
           <span>in Toronto and</span>
-          <span className="font-semibold border-b-2 border-gray-800 px-2 py-1 min-w-[120px] text-center">
+          <span className="px-2 py-1 min-w-[120px] text-center">
             {nashvilleTime}
           </span>
           <span>in Nashville.</span>
