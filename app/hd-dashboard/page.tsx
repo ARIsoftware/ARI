@@ -236,11 +236,11 @@ export default function HDDashboardPage() {
                   <div className="grid grid-cols-6 gap-2">
                     {winterArcGoals.map((goal, index) => {
                     const pastelColors = [
-                      'bg-blue-50 dark:bg-blue-900/20 blue:bg-transparent clean:bg-blue-50 hover:bg-blue-100 dark:hover:bg-blue-900/30 blue:hover:bg-white/10 clean:hover:bg-blue-100',
-                      'bg-purple-50 dark:bg-purple-900/20 blue:bg-transparent clean:bg-purple-50 hover:bg-purple-100 dark:hover:bg-purple-900/30 blue:hover:bg-white/10 clean:hover:bg-purple-100',
-                      'bg-green-50 dark:bg-green-900/20 blue:bg-transparent clean:bg-green-50 hover:bg-green-100 dark:hover:bg-green-900/30 blue:hover:bg-white/10 clean:hover:bg-green-100',
-                      'bg-orange-50 dark:bg-orange-900/20 blue:bg-transparent clean:bg-orange-50 hover:bg-orange-100 dark:hover:bg-orange-900/30 blue:hover:bg-white/10 clean:hover:bg-orange-100',
-                      'bg-pink-50 dark:bg-pink-900/20 blue:bg-transparent clean:bg-pink-50 hover:bg-pink-100 dark:hover:bg-pink-900/30 blue:hover:bg-white/10 clean:hover:bg-pink-100'
+                      'bg-blue-50 dark:bg-blue-900/20 blue:bg-transparent clean:bg-transparent hover:bg-blue-100 dark:hover:bg-blue-900/30 blue:hover:bg-white/10 clean:hover:bg-gray-50',
+                      'bg-purple-50 dark:bg-purple-900/20 blue:bg-transparent clean:bg-transparent hover:bg-purple-100 dark:hover:bg-purple-900/30 blue:hover:bg-white/10 clean:hover:bg-gray-50',
+                      'bg-green-50 dark:bg-green-900/20 blue:bg-transparent clean:bg-transparent hover:bg-green-100 dark:hover:bg-green-900/30 blue:hover:bg-white/10 clean:hover:bg-gray-50',
+                      'bg-orange-50 dark:bg-orange-900/20 blue:bg-transparent clean:bg-transparent hover:bg-orange-100 dark:hover:bg-orange-900/30 blue:hover:bg-white/10 clean:hover:bg-gray-50',
+                      'bg-pink-50 dark:bg-pink-900/20 blue:bg-transparent clean:bg-transparent hover:bg-pink-100 dark:hover:bg-pink-900/30 blue:hover:bg-white/10 clean:hover:bg-pink-50'
                     ];
                     return (
                       <button
