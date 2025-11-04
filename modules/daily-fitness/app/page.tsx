@@ -815,10 +815,10 @@ export default function DailyFitnessPage() {
           return (
             <>
               {needsSpacing && viewMode === "list" && (
-                <div key={`spacer-${task.id}`} className="h-10" />
+                <div key={`spacer-${task.id}`} className="h-[30px]" />
               )}
               {needsSpacing && viewMode === "card" && (
-                <div key={`spacer-${task.id}`} className="col-span-full h-10" />
+                <div key={`spacer-${task.id}`} className="col-span-full h-[30px]" />
               )}
               <div
                 key={task.id}

@@ -661,7 +661,7 @@ export default function TasksPage() {
                         return (
                           <>
                             {needsSpacing && (
-                              <tr key={`spacer-${task.id}`} className="h-10">
+                              <tr key={`spacer-${task.id}`} className="h-[30px]">
                                 <td colSpan={7} className="bg-gray-50/30" />
                               </tr>
                             )}
@@ -1151,10 +1151,10 @@ export default function TasksPage() {
                 return (
                   <>
                     {needsSpacing && viewMode === "list" && (
-                      <div key={`spacer-${task.id}`} className="h-10" />
+                      <div key={`spacer-${task.id}`} className="h-[30px]" />
                     )}
                     {needsSpacing && viewMode === "card" && (
-                      <div key={`spacer-${task.id}`} className="col-span-full h-10" />
+                      <div key={`spacer-${task.id}`} className="col-span-full h-[30px]" />
                     )}
                     <div
                       key={task.id}
