@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { TaskAnnouncement } from "@/components/task-announcement"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, CheckSquare, Circle, AlertCircle, Clock, Target, Dumbbell, Trophy, Compass, Check } from "lucide-react"
+import { Loader2, CheckSquare, Circle, AlertCircle, Clock, Target, Dumbbell, Trophy, Compass, Check, Pin } from "lucide-react"
 import { getFitnessStats } from "@/lib/fitness-stats"
 import { getContacts } from "@/modules/contacts/lib/contacts"
 import { getTasks } from "@/lib/tasks"
@@ -36,6 +36,8 @@ interface Task {
   timeliness?: number
   effort?: number
   strategic_fit?: number
+  pinned?: boolean
+  completed: boolean
 }
 
 interface Contact {
@@ -176,8 +178,8 @@ export default function HDDashboardPage() {
   }
 
   // Calculate task statistics
-  const incompleteTasks = tasks.filter(t => t.status !== 'completed')
-  const completedTasks = tasks.filter(t => t.status === 'completed')
+  const incompleteTasks = tasks.filter(t => !t.completed)
+  const completedTasks = tasks.filter(t => t.completed)
   const overdueTasks = incompleteTasks.filter(t => t.due_date && new Date(t.due_date) < new Date())
   const todayTasks = incompleteTasks.filter(t => {
     if (!t.due_date) return false
@@ -188,6 +190,7 @@ export default function HDDashboardPage() {
     .filter(t => t.priority_score && t.priority_score > 0)
     .sort((a, b) => (a.priority_score || 0) - (b.priority_score || 0))
     .slice(0, 15)
+  const pinnedTasks = incompleteTasks.filter(t => t.pinned)
 
   const getUrgencyColor = (task: Task) => {
     if (!task.due_date) return 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 blueprint:bg-[#093daf] blueprint:text-white light:bg-gray-100 light:text-gray-600'
@@ -340,24 +343,50 @@ export default function HDDashboardPage() {
 
             {/* Main Content Grid - 3 Columns */}
             <div className="grid grid-cols-3 gap-2 items-start" style={{ minHeight: 'calc(100vh - 400px)' }}>
-              {/* Column 1: All Active Tasks */}
-              <div className="border dark:border-gray-700 blueprint:border-white light:border-gray-200 rounded p-2 dark:bg-gray-800 blueprint:bg-transparent light:bg-transparent">
-                <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 dark:text-white blueprint:text-white light:text-gray-900">
-                  <CheckSquare className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 blueprint:text-white light:text-blue-600" />
-                  Active Tasks ({incompleteTasks.length})
-                </h3>
-                <div className="space-y-0.5 max-h-[600px] overflow-y-auto">
-                  {incompleteTasks.map((task) => (
-                    <div key={task.id} className="flex items-center gap-1.5 py-0.5 px-1 hover:bg-gray-50 dark:hover:bg-gray-700 blueprint:hover:bg-white/10 light:hover:bg-gray-50 rounded text-[11px]">
-                      <Circle className="w-2.5 h-2.5 flex-shrink-0 text-blue-600 dark:text-blue-400 blueprint:text-white light:text-blue-600" />
-                      <div className="flex-1 min-w-0 truncate dark:text-gray-100 blueprint:text-white light:text-gray-900">{task.title}</div>
-                      {task.due_date && (
-                        <Badge className={`text-[8px] px-1 py-0 h-3.5 ${getUrgencyColor(task)}`}>
-                          {formatDate(task.due_date)}
-                        </Badge>
-                      )}
+              {/* Column 1: Pinned Tasks + All Active Tasks */}
+              <div className="space-y-2">
+                {/* Pinned Tasks Card */}
+                {pinnedTasks.length > 0 && (
+                  <div className="border dark:border-gray-700 blueprint:border-white light:border-gray-200 rounded p-2 bg-blue-50 dark:bg-blue-900/20 blueprint:bg-transparent light:bg-transparent">
+                    <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 text-blue-900 dark:text-blue-300 blueprint:text-white light:text-blue-900">
+                      <Pin className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 blueprint:text-white light:text-blue-600" />
+                      Pinned Tasks ({pinnedTasks.length})
+                    </h3>
+                    <div className="space-y-0.5 max-h-[300px] overflow-y-auto">
+                      {pinnedTasks.map((task) => (
+                        <div key={task.id} className="flex items-center gap-1.5 py-0.5 px-1 bg-white dark:bg-gray-800 blueprint:bg-transparent light:bg-white rounded text-[11px]">
+                          <Pin className="w-2.5 h-2.5 flex-shrink-0 text-blue-600 dark:text-blue-400 blueprint:text-white light:text-blue-600" />
+                          <div className="flex-1 min-w-0 truncate dark:text-gray-100 blueprint:text-white light:text-gray-900">{task.title}</div>
+                          {task.due_date && (
+                            <Badge className={`text-[8px] px-1 py-0 h-3.5 ${getUrgencyColor(task)}`}>
+                              {formatDate(task.due_date)}
+                            </Badge>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
+                )}
+
+                {/* Active Tasks Card */}
+                <div className="border dark:border-gray-700 blueprint:border-white light:border-gray-200 rounded p-2 bg-gray-50 dark:bg-gray-800/50 blueprint:bg-transparent light:bg-transparent">
+                  <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 text-gray-900 dark:text-gray-100 blueprint:text-white light:text-gray-900">
+                    <CheckSquare className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 blueprint:text-white light:text-blue-600" />
+                    Active Tasks ({incompleteTasks.length})
+                  </h3>
+                  <div className="space-y-0.5 max-h-[600px] overflow-y-auto">
+                    {incompleteTasks.map((task) => (
+                      <div key={task.id} className="flex items-center gap-1.5 py-0.5 px-1 bg-white dark:bg-gray-800 blueprint:bg-transparent light:bg-white rounded text-[11px]">
+                        <Circle className="w-2.5 h-2.5 flex-shrink-0 text-blue-600 dark:text-blue-400 blueprint:text-white light:text-blue-600" />
+                        <div className="flex-1 min-w-0 truncate dark:text-gray-100 blueprint:text-white light:text-gray-900">{task.title}</div>
+                        {task.due_date && (
+                          <Badge className={`text-[8px] px-1 py-0 h-3.5 ${getUrgencyColor(task)}`}>
+                            {formatDate(task.due_date)}
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -387,14 +416,14 @@ export default function HDDashboardPage() {
                 )}
 
                 {/* Priority Tasks */}
-                <div className="border dark:border-gray-700 blueprint:border-white light:border-gray-200 rounded p-2 dark:bg-gray-800 blueprint:bg-transparent light:bg-transparent">
-                  <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 dark:text-white blueprint:text-white light:text-gray-900">
+                <div className="border dark:border-gray-700 blueprint:border-white light:border-gray-200 rounded p-2 bg-orange-50 dark:bg-orange-900/20 blueprint:bg-transparent light:bg-transparent">
+                  <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 text-orange-900 dark:text-orange-300 blueprint:text-white light:text-orange-900">
                     <Target className="w-3.5 h-3.5 text-red-600 dark:text-red-400 blueprint:text-white light:text-red-600" />
                     Top Priority Tasks ({highPriorityTasks.length})
                   </h3>
                   <div className="space-y-0.5 max-h-[500px] overflow-y-auto">
                     {highPriorityTasks.map((task, idx) => (
-                      <div key={task.id} className="flex items-start gap-1.5 py-0.5 px-1 hover:bg-gray-50 dark:hover:bg-gray-700 blueprint:hover:bg-white/10 light:hover:bg-gray-50 rounded text-[11px] border-b border-gray-100 dark:border-gray-700 blueprint:border-white/20 light:border-gray-100">
+                      <div key={task.id} className="flex items-start gap-1.5 py-0.5 px-1 bg-white dark:bg-gray-800 blueprint:bg-transparent light:bg-white rounded text-[11px]">
                         <span className="text-[9px] text-gray-400 dark:text-gray-500 blueprint:text-white light:text-gray-400 font-mono mt-0.5">{idx + 1}</span>
                         <Circle className="w-2.5 h-2.5 mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500 blueprint:text-white light:text-gray-400" />
                         <div className="flex-1 min-w-0">
