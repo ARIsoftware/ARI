@@ -24,6 +24,7 @@ import { DarkModeToggle } from "@/components/dark-mode-toggle"
 import { getWinterArcGoals, toggleWinterArcGoal, type WinterArcGoal } from "@/modules/winter-arc/lib/winter-arc-goals"
 import { useToast } from "@/hooks/use-toast"
 import { HDContributionGraph } from "@/components/hd-contribution-graph"
+import { HDCardZoomModal } from "@/components/hd-card-zoom-modal"
 
 interface Task {
   id: string
@@ -70,6 +71,7 @@ export default function HDDashboardPage() {
   const [notepadContent, setNotepadContent] = useState("")
   const [winterArcGoals, setWinterArcGoals] = useState<WinterArcGoal[]>([])
   const [enabledModules, setEnabledModules] = useState<Set<string>>(new Set())
+  const [zoomedCard, setZoomedCard] = useState<string | null>(null)
 
   useEffect(() => {
     if (session) {
@@ -347,7 +349,10 @@ export default function HDDashboardPage() {
               <div className="space-y-2">
                 {/* Pinned Tasks Card */}
                 {pinnedTasks.length > 0 && (
-                  <div className="border dark:border-gray-700 blueprint:border-white light:border-gray-200 rounded p-2 bg-blue-50 dark:bg-blue-900/20 blueprint:bg-transparent light:bg-transparent">
+                  <div
+                    onClick={() => setZoomedCard('pinned')}
+                    className="border dark:border-gray-700 blueprint:border-white light:border-gray-200 rounded p-2 bg-blue-50 dark:bg-blue-900/20 blueprint:bg-transparent light:bg-transparent cursor-pointer hover:shadow-lg transition-shadow"
+                  >
                     <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 text-blue-900 dark:text-blue-300 blueprint:text-white light:text-blue-900">
                       <Pin className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 blueprint:text-white light:text-blue-600" />
                       Pinned Tasks ({pinnedTasks.length})
@@ -369,7 +374,10 @@ export default function HDDashboardPage() {
                 )}
 
                 {/* Active Tasks Card */}
-                <div className="border dark:border-gray-700 blueprint:border-white light:border-gray-200 rounded p-2 bg-gray-50 dark:bg-gray-800/50 blueprint:bg-transparent light:bg-transparent">
+                <div
+                  onClick={() => setZoomedCard('active')}
+                  className="border dark:border-gray-700 blueprint:border-white light:border-gray-200 rounded p-2 bg-gray-50 dark:bg-gray-800/50 blueprint:bg-transparent light:bg-transparent cursor-pointer hover:shadow-lg transition-shadow"
+                >
                   <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 text-gray-900 dark:text-gray-100 blueprint:text-white light:text-gray-900">
                     <CheckSquare className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 blueprint:text-white light:text-blue-600" />
                     Active Tasks ({incompleteTasks.length})
@@ -394,7 +402,10 @@ export default function HDDashboardPage() {
               <div className="space-y-2">
                 {/* Overdue Tasks */}
                 {overdueTasks.length > 0 && (
-                  <div className="border dark:border-gray-700 blueprint:border-white light:border-gray-200 rounded p-2 bg-red-50 dark:bg-red-900/20 blueprint:bg-transparent light:bg-transparent">
+                  <div
+                    onClick={() => setZoomedCard('overdue')}
+                    className="border dark:border-gray-700 blueprint:border-white light:border-gray-200 rounded p-2 bg-red-50 dark:bg-red-900/20 blueprint:bg-transparent light:bg-transparent cursor-pointer hover:shadow-lg transition-shadow"
+                  >
                     <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 text-red-900 dark:text-red-300 blueprint:text-white light:text-red-900">
                       <AlertCircle className="w-3.5 h-3.5 text-red-600 dark:text-red-400 blueprint:text-white light:text-red-600" />
                       Overdue ({overdueTasks.length})
@@ -416,7 +427,10 @@ export default function HDDashboardPage() {
                 )}
 
                 {/* Priority Tasks */}
-                <div className="border dark:border-gray-700 blueprint:border-white light:border-gray-200 rounded p-2 bg-orange-50 dark:bg-orange-900/20 blueprint:bg-transparent light:bg-transparent">
+                <div
+                  onClick={() => setZoomedCard('priority')}
+                  className="border dark:border-gray-700 blueprint:border-white light:border-gray-200 rounded p-2 bg-orange-50 dark:bg-orange-900/20 blueprint:bg-transparent light:bg-transparent cursor-pointer hover:shadow-lg transition-shadow"
+                >
                   <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 text-orange-900 dark:text-orange-300 blueprint:text-white light:text-orange-900">
                     <Target className="w-3.5 h-3.5 text-red-600 dark:text-red-400 blueprint:text-white light:text-red-600" />
                     Top Priority Tasks ({highPriorityTasks.length})
@@ -462,7 +476,10 @@ export default function HDDashboardPage() {
               {/* Column 3: Notepad */}
               <div className="min-w-[500px] flex flex-col h-full">
                 {/* Notepad */}
-                <div className="border dark:border-gray-700 blueprint:border-white light:border-gray-200 rounded p-2 bg-yellow-50 dark:bg-yellow-900/20 blueprint:bg-transparent light:bg-transparent flex flex-col flex-1 h-full">
+                <div
+                  onClick={() => setZoomedCard('notepad')}
+                  className="border dark:border-gray-700 blueprint:border-white light:border-gray-200 rounded p-2 bg-yellow-50 dark:bg-yellow-900/20 blueprint:bg-transparent light:bg-transparent flex flex-col flex-1 h-full cursor-pointer hover:shadow-lg transition-shadow"
+                >
                   <h3 className="text-xs font-bold mb-1.5 flex items-center gap-1 text-yellow-900 dark:text-yellow-300 blueprint:text-white light:text-yellow-900">
                     <Compass className="w-3.5 h-3.5 text-yellow-600 dark:text-yellow-400 blueprint:text-white light:text-yellow-600" />
                     Notepad
@@ -494,6 +511,27 @@ export default function HDDashboardPage() {
           </div>
         </SidebarInset>
       </SidebarProvider>
+
+      {/* Zoom Modal */}
+      <HDCardZoomModal
+        isOpen={zoomedCard !== null}
+        onClose={() => setZoomedCard(null)}
+        title={
+          zoomedCard === 'pinned' ? `Pinned Tasks (${pinnedTasks.length})` :
+          zoomedCard === 'active' ? `Active Tasks (${incompleteTasks.length})` :
+          zoomedCard === 'overdue' ? `Overdue Tasks (${overdueTasks.length})` :
+          zoomedCard === 'priority' ? `Top Priority Tasks (${highPriorityTasks.length})` :
+          zoomedCard === 'notepad' ? 'Notepad' : ''
+        }
+        cardType={zoomedCard as 'pinned' | 'active' | 'overdue' | 'priority' | 'notepad'}
+        tasks={
+          zoomedCard === 'pinned' ? pinnedTasks :
+          zoomedCard === 'active' ? incompleteTasks :
+          zoomedCard === 'overdue' ? overdueTasks :
+          zoomedCard === 'priority' ? highPriorityTasks : []
+        }
+        notepadContent={zoomedCard === 'notepad' ? notepadContent : ''}
+      />
     </div>
     </DarkModeProvider>
   )
