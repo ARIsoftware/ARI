@@ -137,6 +137,6 @@ export function transformTaskForRadar(task: Task) {
     priorityLevel: getTaskPriorityLevel(score),
     dueDate: task.due_date,
     status: task.status,
-    starred: task.starred
+    pinned: task.pinned
   }
 }

@@ -10,7 +10,7 @@ export interface TaskContext {
   highPriorityTasks: number
   mediumPriorityTasks: number
   lowPriorityTasks: number
-  starredTasks: number
+  pinnedTasks: number
   tasksWithDueDates: number
   overdueTasks: number
   recentCompletions: Task[]
@@ -73,7 +73,7 @@ export async function getTaskContext(): Promise<TaskContext> {
     const mediumPriorityTasks = tasks.filter(t => t.priority === 'Medium').length
     const lowPriorityTasks = tasks.filter(t => t.priority === 'Low').length
     
-    const starredTasks = tasks.filter(t => t.starred).length
+    const pinnedTasks = tasks.filter(t => t.pinned).length
     const tasksWithDueDates = tasks.filter(t => t.due_date).length
     
     // Calculate overdue tasks
@@ -116,7 +116,7 @@ export async function getTaskContext(): Promise<TaskContext> {
       highPriorityTasks,
       mediumPriorityTasks,
       lowPriorityTasks,
-      starredTasks,
+      pinnedTasks,
       tasksWithDueDates,
       overdueTasks,
       recentCompletions,
@@ -146,7 +146,7 @@ function createEmptyContext(): TaskContext {
     highPriorityTasks: 0,
     mediumPriorityTasks: 0,
     lowPriorityTasks: 0,
-    starredTasks: 0,
+    pinnedTasks: 0,
     tasksWithDueDates: 0,
     overdueTasks: 0,
     recentCompletions: [],
@@ -228,11 +228,11 @@ export function formatTaskContextForAI(context: TaskContext): string {
   context.allTasks.forEach(task => {
     const status = task.completed ? '✅' : (task.status === 'In Progress' ? '🔄' : '⏳')
     const priority = task.priority === 'High' ? '🔴' : (task.priority === 'Medium' ? '🟡' : '🟢')
-    const starred = task.starred ? '⭐' : ''
+    const pinned = task.pinned ? '📌' : ''
     const dueInfo = task.due_date ? ` (due: ${new Date(task.due_date).toLocaleDateString()})` : ''
     const createdDate = new Date(task.created_at).toLocaleDateString()
     
-    contextText += `${status} ${priority} ${starred} ${task.title}${dueInfo}\n`
+    contextText += `${status} ${priority} ${pinned} ${task.title}${dueInfo}\n`
     contextText += `  Created: ${createdDate}, Order: ${task.order_index}, Completed: ${task.completion_count || 0} times\n`
     
     if (task.assignees && task.assignees.length > 0) {

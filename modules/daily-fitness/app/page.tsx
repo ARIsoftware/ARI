@@ -7,9 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Search, Filter, List, Grid3X3, Calendar, Star, Bell, Plus, Loader2, Trash2, Pencil, Columns, Play, Activity } from "lucide-react"
+import { Search, Filter, List, Grid3X3, Calendar, Pin, Bell, Plus, Loader2, Trash2, Pencil, Columns, Play, Activity } from "lucide-react"
 import { useState, useEffect } from "react"
-import { getFitnessTasks, toggleFitnessTaskCompletion, toggleFitnessTaskStar, reorderFitnessTasks, deleteFitnessTask, updateFitnessTask, type FitnessTask, addSampleFitnessTasks } from "@/modules/daily-fitness/lib/fitness"
+import { getFitnessTasks, toggleFitnessTaskCompletion, toggleFitnessTaskPin, reorderFitnessTasks, deleteFitnessTask, updateFitnessTask, type FitnessTask, addSampleFitnessTasks } from "@/modules/daily-fitness/lib/fitness"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
@@ -74,7 +74,7 @@ export default function DailyFitnessPage() {
   const [selectedVideoTitle, setSelectedVideoTitle] = useState<string>("")
   const router = useRouter()
 
-  const filters = ["All", "Today", "In Progress", "Completed"]
+  const filters = ["All", "Pinned", "In Progress", "Completed"]
 
   // Load tasks from Supabase and set up real-time subscription
   useEffect(() => {
@@ -153,8 +153,8 @@ export default function DailyFitnessPage() {
 
       const matchesFilter =
         activeFilter === "All" ||
-        (activeFilter === "Today" && task.starred) ||
-        (activeFilter !== "Today" && task.status === activeFilter)
+        (activeFilter === "Pinned" && task.pinned) ||
+        (activeFilter !== "Pinned" && task.status === activeFilter)
       const matchesSearch =
         task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         task.assignees.some((assignee: string) => assignee.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -165,7 +165,12 @@ export default function DailyFitnessPage() {
       if (activeFilter === "Completed") {
         return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
       }
-      // For other filters, maintain order_index
+
+      // Always show pinned tasks at the top
+      if (a.pinned && !b.pinned) return -1
+      if (!a.pinned && b.pinned) return 1
+
+      // Within same pinned status, maintain order_index
       return a.order_index - b.order_index
     })
 
@@ -235,10 +240,10 @@ export default function DailyFitnessPage() {
 
     let updates: Partial<FitnessTask> = {}
 
-    if (columnType === "today") {
-      updates.starred = true
+    if (columnType === "pinned") {
+      updates.pinned = true
     } else {
-      updates.starred = false
+      updates.pinned = false
       updates.priority = columnType.charAt(0).toUpperCase() + columnType.slice(1) as "High" | "Medium" | "Low"
     }
 
@@ -250,7 +255,7 @@ export default function DailyFitnessPage() {
       }
       toast({
         title: "Success",
-        description: `Exercise moved to ${columnType === "today" ? "Today" : columnType + " priority"} column.`,
+        description: `Exercise moved to ${columnType === "pinned" ? "Pinned" : columnType + " priority"} column.`,
       })
     } catch (error) {
       console.error("Failed to update fitness task:", error)
@@ -325,7 +330,7 @@ export default function DailyFitnessPage() {
     }
   }
 
-  const handleToggleStar = async (taskId: string) => {
+  const handleTogglePin = async (taskId: string) => {
     if (!user?.id) return
 
     try {
@@ -333,10 +338,10 @@ export default function DailyFitnessPage() {
       if (!task) return
 
       const tokenFn = async () => session?.access_token || null
-      const updatedTask = await toggleFitnessTaskStar(taskId, task.starred, tokenFn)
+      const updatedTask = await toggleFitnessTaskPin(taskId, task.pinned, tokenFn)
       setTasks(tasks.map((task) => (task.id === taskId ? updatedTask : task)))
     } catch (error) {
-      console.error("Failed to toggle fitness task star:", error)
+      console.error("Failed to toggle fitness task pin:", error)
       toast({
         title: "Error",
         description: "Failed to update fitness task. Please try again.",
@@ -488,18 +493,18 @@ export default function DailyFitnessPage() {
       {/* Task List/Grid/Kanban */}
       {viewMode === "kanban" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Today Column */}
+          {/* Pinned Column */}
           <div
             className="bg-gray-50 rounded-lg p-4"
             onDragOver={handleDragOver}
-            onDrop={(e) => handleKanbanDrop(e, "today")}
+            onDrop={(e) => handleKanbanDrop(e, "pinned")}
           >
             <h3 className="font-medium mb-3 flex items-center gap-2">
-              <Star className="w-4 h-4 text-yellow-500" />
-              Today
+              <Pin className="w-4 h-4 text-[hsl(var(--primary))]" />
+              Pinned
             </h3>
             <div className="space-y-2">
-              {filteredTasks.filter(task => task.starred && !task.completed).map((task) => (
+              {filteredTasks.filter(task => task.pinned && !task.completed).map((task) => (
                 <div
                   key={task.id}
                   draggable
@@ -577,7 +582,7 @@ export default function DailyFitnessPage() {
               High Priority
             </h3>
             <div className="space-y-2">
-              {filteredTasks.filter(task => !task.starred && task.priority === "High" && !task.completed).map((task) => (
+              {filteredTasks.filter(task => !task.pinned && task.priority === "High" && !task.completed).map((task) => (
                 <div
                   key={task.id}
                   draggable
@@ -655,7 +660,7 @@ export default function DailyFitnessPage() {
               Medium Priority
             </h3>
             <div className="space-y-2">
-              {filteredTasks.filter(task => !task.starred && task.priority === "Medium" && !task.completed).map((task) => (
+              {filteredTasks.filter(task => !task.pinned && task.priority === "Medium" && !task.completed).map((task) => (
                 <div
                   key={task.id}
                   draggable
@@ -733,7 +738,7 @@ export default function DailyFitnessPage() {
               Low Priority
             </h3>
             <div className="space-y-2">
-              {filteredTasks.filter(task => !task.starred && task.priority === "Low" && !task.completed).map((task) => (
+              {filteredTasks.filter(task => !task.pinned && task.priority === "Low" && !task.completed).map((task) => (
                 <div
                   key={task.id}
                   draggable
@@ -802,22 +807,34 @@ export default function DailyFitnessPage() {
         </div>
       ) : (
         <div className={viewMode === "card" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" : "space-y-3"}>
-        {filteredTasks.map((task) => (
-          <div
-            key={task.id}
-            draggable
-            onDragStart={(e) => handleDragStart(e, task.id)}
-            onDragOver={handleDragOver}
-            onDrop={(e) => handleDrop(e, task.id)}
-            onDragEnd={handleDragEnd}
-            className={`${
-              viewMode === "card"
-                ? "flex flex-col gap-3 p-4 border rounded-lg hover:shadow-md transition-all cursor-move h-full"
-                : "flex items-start gap-4 p-4 border rounded-lg hover:shadow-sm transition-all cursor-move"
-            } ${
-              task.starred ? "bg-[#214b88] text-white shadow-lg" : "bg-white border-gray-200"
-            } ${draggedTask === task.id ? "opacity-50" : ""} ${task.completed ? "taskdone" : ""} ${fadingTasks.has(task.id) ? "task-fade-out" : ""}`}
-          >
+        {filteredTasks.map((task, index) => {
+          // Check if we need to add spacing (transition from pinned to non-pinned)
+          const prevTask = index > 0 ? filteredTasks[index - 1] : null
+          const needsSpacing = prevTask && prevTask.pinned && !task.pinned
+
+          return (
+            <>
+              {needsSpacing && viewMode === "list" && (
+                <div key={`spacer-${task.id}`} className="h-10" />
+              )}
+              {needsSpacing && viewMode === "card" && (
+                <div key={`spacer-${task.id}`} className="col-span-full h-10" />
+              )}
+              <div
+                key={task.id}
+                draggable
+                onDragStart={(e) => handleDragStart(e, task.id)}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, task.id)}
+                onDragEnd={handleDragEnd}
+                className={`${
+                  viewMode === "card"
+                    ? "flex flex-col gap-3 p-4 border rounded-lg hover:shadow-md transition-all cursor-move h-full"
+                    : "flex items-start gap-4 p-4 border rounded-lg hover:shadow-sm transition-all cursor-move"
+                } ${
+                  task.pinned ? "bg-[#214b88] text-white shadow-lg" : "bg-white border-gray-200"
+                } ${draggedTask === task.id ? "opacity-50" : ""} ${task.completed ? "taskdone" : ""} ${fadingTasks.has(task.id) ? "task-fade-out" : ""}`}
+              >
             {viewMode === "list" ? (
               <>
                 {/* List View */}
@@ -831,28 +848,29 @@ export default function DailyFitnessPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-2">
                     <h3
-                      className={`font-medium ${task.completed ? "line-through text-gray-500" : task.starred ? "text-white" : "text-gray-800"}`}
+                      className={`font-medium ${task.completed ? "line-through text-gray-500" : task.pinned ? "text-white" : "text-gray-800"}`}
                     >
                       {task.title}
                     </h3>
                     <button
-                      onClick={() => handleToggleStar(task.id)}
-                      className={`transition-colors ${task.starred ? "text-white hover:text-yellow-400" : "text-gray-400 hover:text-yellow-500"}`}
+                      onClick={() => handleTogglePin(task.id)}
+                      className="transition-colors"
                     >
-                      <Star
-                        className={`w-5 h-5 transition-colors ${task.starred ? "fill-yellow-400 text-yellow-500" : ""}`}
+                      <Pin
+                        className={`w-5 h-5 ${task.pinned ? "text-white" : "text-gray-400 hover:text-[hsl(var(--primary))]"}`}
+                        fill={task.pinned ? "white" : "none"}
                       />
                     </button>
                   </div>
 
                   <div
-                    className={`flex items-center flex-wrap gap-x-4 gap-y-2 text-sm ${task.starred ? "text-gray-300" : "text-gray-600"}`}
+                    className={`flex items-center flex-wrap gap-x-4 gap-y-2 text-sm ${task.pinned ? "text-gray-300" : "text-gray-600"}`}
                   >
                     <div className="flex items-center gap-2">
                       {task.assignees.map((name: string) => (
                         <span
                           key={name}
-                          className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.starred ? "bg-white/10 text-gray-200" : "bg-gray-100 text-gray-700"}`}
+                          className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.pinned ? "bg-white/10 text-gray-200" : "bg-gray-100 text-gray-700"}`}
                         >
                           {name}
                         </span>
@@ -876,13 +894,13 @@ export default function DailyFitnessPage() {
                 <div className="flex items-center gap-2 mt-1">
                   <Badge
                     variant="secondary"
-                    className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getStatusColor(task.status)}`}
+                    className={`font-medium text-xs ${task.pinned ? "bg-white/10 text-gray-200" : getStatusColor(task.status)}`}
                   >
                     {task.status}
                   </Badge>
                   <Badge
                     variant="secondary"
-                    className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getPriorityColor(task.priority)}`}
+                    className={`font-medium text-xs ${task.pinned ? "bg-white/10 text-gray-200" : getPriorityColor(task.priority)}`}
                   >
                     {task.priority}
                   </Badge>
@@ -890,7 +908,7 @@ export default function DailyFitnessPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className={`h-8 w-8 ${task.starred ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-green-600 hover:bg-green-50"}`}
+                      className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-green-600 hover:bg-green-50"}`}
                       onClick={(e) => {
                         e.stopPropagation()
                         setSelectedVideoUrl(task.youtube_url || "")
@@ -904,7 +922,7 @@ export default function DailyFitnessPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={`h-8 w-8 ${task.starred ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-blue-600 hover:bg-blue-50"}`}
+                    className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-blue-600 hover:bg-blue-50"}`}
                     onClick={(e) => {
                       e.stopPropagation()
                       router.push(`/edit-fitness/${task.id}`)
@@ -915,7 +933,7 @@ export default function DailyFitnessPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={`h-8 w-8 ${task.starred ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-red-600 hover:bg-red-50"}`}
+                    className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-red-600 hover:bg-red-50"}`}
                     onClick={(e) => {
                       e.stopPropagation()
                       handleDeleteFitnessTask(task.id)
@@ -936,29 +954,30 @@ export default function DailyFitnessPage() {
                     className="w-5 h-5 rounded border-gray-300"
                   />
                   <button
-                    onClick={() => handleToggleStar(task.id)}
-                    className={`transition-colors ${task.starred ? "text-white hover:text-yellow-400" : "text-gray-400 hover:text-yellow-500"}`}
+                    onClick={() => handleTogglePin(task.id)}
+                    className="transition-colors"
                   >
-                    <Star
-                      className={`w-5 h-5 transition-colors ${task.starred ? "fill-yellow-400 text-yellow-500" : ""}`}
+                    <Pin
+                      className={`w-5 h-5 ${task.pinned ? "text-white" : "text-gray-400 hover:text-[hsl(var(--primary))]"}`}
+                      fill={task.pinned ? "white" : "none"}
                     />
                   </button>
                 </div>
 
                 <div className="flex-1">
                   <h3
-                    className={`font-medium text-base mb-3 line-clamp-2 ${task.completed ? "line-through text-gray-500" : task.starred ? "text-white" : "text-gray-800"}`}
+                    className={`font-medium text-base mb-3 line-clamp-2 ${task.completed ? "line-through text-gray-500" : task.pinned ? "text-white" : "text-gray-800"}`}
                   >
                     {task.title}
                   </h3>
 
-                  <div className={`space-y-2 text-sm ${task.starred ? "text-gray-300" : "text-gray-600"}`}>
+                  <div className={`space-y-2 text-sm ${task.pinned ? "text-gray-300" : "text-gray-600"}`}>
                     {task.assignees.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {task.assignees.map((name: string) => (
                           <span
                             key={name}
-                            className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.starred ? "bg-white/10 text-gray-200" : "bg-gray-100 text-gray-700"}`}
+                            className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.pinned ? "bg-white/10 text-gray-200" : "bg-gray-100 text-gray-700"}`}
                           >
                             {name}
                           </span>
@@ -984,13 +1003,13 @@ export default function DailyFitnessPage() {
                   <div className="flex items-center gap-2">
                     <Badge
                       variant="secondary"
-                      className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getStatusColor(task.status)}`}
+                      className={`font-medium text-xs ${task.pinned ? "bg-white/10 text-gray-200" : getStatusColor(task.status)}`}
                     >
                       {task.status}
                     </Badge>
                     <Badge
                       variant="secondary"
-                      className={`font-medium text-xs ${task.starred ? "bg-white/10 text-gray-200" : getPriorityColor(task.priority)}`}
+                      className={`font-medium text-xs ${task.pinned ? "bg-white/10 text-gray-200" : getPriorityColor(task.priority)}`}
                     >
                       {task.priority}
                     </Badge>
@@ -1000,7 +1019,7 @@ export default function DailyFitnessPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className={`h-8 w-8 ${task.starred ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-green-600 hover:bg-green-50"}`}
+                        className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-green-600 hover:bg-green-50"}`}
                         onClick={(e) => {
                           e.stopPropagation()
                           setSelectedVideoUrl(task.youtube_url || "")
@@ -1014,7 +1033,7 @@ export default function DailyFitnessPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className={`h-8 w-8 ${task.starred ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-blue-600 hover:bg-blue-50"}`}
+                      className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-blue-600 hover:bg-blue-50"}`}
                       onClick={(e) => {
                         e.stopPropagation()
                         router.push(`/edit-fitness/${task.id}`)
@@ -1025,7 +1044,7 @@ export default function DailyFitnessPage() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className={`h-8 w-8 ${task.starred ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-red-600 hover:bg-red-50"}`}
+                      className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-red-600 hover:bg-red-50"}`}
                       onClick={(e) => {
                         e.stopPropagation()
                         handleDeleteFitnessTask(task.id)
@@ -1038,7 +1057,9 @@ export default function DailyFitnessPage() {
               </>
             )}
           </div>
-        ))}
+            </>
+          )
+        })}
         </div>
       )}
 
