@@ -108,7 +108,7 @@ export function TaskAnalyticsChart({ token }: TaskAnalyticsChartProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-blue-600" />
-            Task Activity Timeline
+            Task Activity
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -129,7 +129,7 @@ export function TaskAnalyticsChart({ token }: TaskAnalyticsChartProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-blue-600" />
-            Task Activity Timeline
+            Task Activity
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -151,7 +151,7 @@ export function TaskAnalyticsChart({ token }: TaskAnalyticsChartProps) {
           <div>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-blue-600" />
-              Task Activity Timeline
+              Task Activity
             </CardTitle>
           </div>
           {summary && (
