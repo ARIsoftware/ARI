@@ -29,7 +29,7 @@ export type Task = {
   subtasks_total: number
   status: "Pending" | "In Progress" | "Completed"
   priority: "Low" | "Medium" | "High"
-  starred: boolean
+  pinned: boolean
   completed: boolean
   created_at: string
   updated_at: string
@@ -52,7 +52,7 @@ export type FitnessTask = {
   subtasks_total: number
   status: "Pending" | "In Progress" | "Completed"
   priority: "Low" | "Medium" | "High"
-  starred: boolean
+  pinned: boolean
   completed: boolean
   created_at: string
   updated_at: string

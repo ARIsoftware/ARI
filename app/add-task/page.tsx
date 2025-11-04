@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/badge"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Switch } from "@/components/ui/switch"
-import { CalendarIcon, Plus, X, Star, ArrowLeft, Loader2, Compass, Info } from "lucide-react"
+import { CalendarIcon, Plus, X, Pin, ArrowLeft, Loader2, Compass, Info } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Slider } from "@/components/ui/slider"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -71,7 +71,7 @@ export default function AddTaskPage() {
     subtasks_total: 0,
     status: "Pending" as const,
     priority: "Medium" as const,
-    starred: false,
+    pinned: false,
     completed: false,
     impact: 3,
     severity: 3,
@@ -151,7 +151,7 @@ export default function AddTaskPage() {
         subtasks_completed: 0,
         status: formData.status,
         priority: formData.priority,
-        starred: formData.starred,
+        pinned: formData.pinned,
         completed: formData.completed,
         impact: formData.impact,
         severity: formData.severity,
@@ -202,7 +202,7 @@ export default function AddTaskPage() {
       subtasks_total: 0,
       status: "Pending",
       priority: "Medium",
-      starred: false,
+      pinned: false,
       completed: false,
       impact: 3,
       severity: 3,
@@ -390,19 +390,24 @@ export default function AddTaskPage() {
                     </div>
                   </div>
 
-                  {/* Mark for Today */}
+                  {/* Pin this task */}
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label className="text-sm font-medium flex items-center gap-2">
-                        <Star className="w-4 h-4" />
-                        Mark for Today
-                      </Label>
-                      <p className="text-xs text-muted-foreground">Marked tasks will appear in the "Today" filter</p>
+                      <Label className="text-sm font-medium">Pin this task</Label>
+                      <p className="text-xs text-muted-foreground">Pinned tasks will appear in the "Pinned" filter</p>
                     </div>
-                    <Switch
-                      checked={formData.starred}
-                      onCheckedChange={(checked) => handleInputChange("starred", checked)}
-                    />
+                    <button
+                      type="button"
+                      onClick={() => handleInputChange("pinned", !formData.pinned)}
+                      className="transition-colors"
+                    >
+                      <Pin
+                        className={`w-5 h-5 ${
+                          formData.pinned ? "text-[hsl(var(--primary))]" : "text-gray-300"
+                        }`}
+                        fill={formData.pinned ? "hsl(var(--primary))" : "none"}
+                      />
+                    </button>
                   </div>
                 </CardContent>
               </Card>
