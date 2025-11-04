@@ -127,9 +127,9 @@ export async function toggleFitnessTaskCompletion(id: string, currentCompleted: 
   return updatedTask
 }
 
-export async function toggleFitnessTaskStar(id: string, currentStarred: boolean, getToken: () => Promise<string | null>): Promise<FitnessTask> {
+export async function toggleFitnessTaskPin(id: string, currentPinned: boolean, getToken: () => Promise<string | null>): Promise<FitnessTask> {
   return updateFitnessTask(id, {
-    starred: !currentStarred,
+    pinned: !currentPinned,
   }, getToken)
 }
 

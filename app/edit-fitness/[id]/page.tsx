@@ -25,7 +25,7 @@ import { Badge } from "@/components/ui/badge"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Switch } from "@/components/ui/switch"
-import { CalendarIcon, Save, X, Star, ArrowLeft, Loader2, Pencil } from "lucide-react"
+import { CalendarIcon, Save, X, Pin, ArrowLeft, Loader2, Pencil } from "lucide-react"
 import { useState, useEffect } from "react"
 import { getFitnessTasks, updateFitnessTask, type FitnessTask } from "@/lib/fitness"
 import { useToast } from "@/hooks/use-toast"
@@ -69,7 +69,7 @@ export default function EditFitnessPage({ params }: { params: Promise<{ id: stri
     subtasks_completed: 0,
     status: "Pending" as const,
     priority: "Medium" as const,
-    starred: false,
+    pinned: false,
     completed: false,
     youtube_url: "",
   })
@@ -103,7 +103,7 @@ export default function EditFitnessPage({ params }: { params: Promise<{ id: stri
           subtasks_completed: foundTask.subtasks_completed,
           status: foundTask.status,
           priority: foundTask.priority,
-          starred: foundTask.starred,
+          pinned: foundTask.pinned,
           completed: foundTask.completed,
           youtube_url: foundTask.youtube_url || "",
         })
@@ -174,7 +174,7 @@ export default function EditFitnessPage({ params }: { params: Promise<{ id: stri
         subtasks_completed: formData.subtasks_completed,
         status: formData.status,
         priority: formData.priority,
-        starred: formData.starred,
+        pinned: formData.pinned,
         completed: formData.completed,
         youtube_url: formData.youtube_url.trim() || null,
       }
@@ -429,16 +429,21 @@ export default function EditFitnessPage({ params }: { params: Promise<{ id: stri
                   {/* Starred */}
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
-                      <Label className="text-sm font-medium flex items-center gap-2">
-                        <Star className="w-4 h-4" />
-                        Mark as Important
-                      </Label>
-                      <p className="text-xs text-muted-foreground">Starred exercises will appear in the "Today" filter</p>
+                      <Label className="text-sm font-medium">Pin this exercise</Label>
+                      <p className="text-xs text-muted-foreground">Pinned exercises will appear in the "Pinned" filter</p>
                     </div>
-                    <Switch
-                      checked={formData.starred}
-                      onCheckedChange={(checked) => handleInputChange("starred", checked)}
-                    />
+                    <button
+                      type="button"
+                      onClick={() => handleInputChange("pinned", !formData.pinned)}
+                      className="transition-colors"
+                    >
+                      <Pin
+                        className={`w-5 h-5 ${
+                          formData.pinned ? "text-[hsl(var(--primary))]" : "text-gray-300"
+                        }`}
+                        fill={formData.pinned ? "hsl(var(--primary))" : "none"}
+                      />
+                    </button>
                   </div>
 
                   {/* Completed */}

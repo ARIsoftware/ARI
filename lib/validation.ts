@@ -29,7 +29,7 @@ export const createTaskSchema = z.object({
       z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
       z.null()
     ]).optional(),
-    starred: z.boolean().default(false),
+    pinned: z.boolean().default(false),
     completed: z.boolean().default(false),
     subtasks_total: nonNegativeNumber.max(100, 'Too many subtasks').default(0),
     subtasks_completed: nonNegativeNumber.default(0),
@@ -60,7 +60,7 @@ export const updateTaskSchema = z.object({
       z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
       z.null()
     ]).optional(),
-    starred: z.boolean().optional(),
+    pinned: z.boolean().optional(),
     completed: z.boolean().optional(),
     subtasks_total: nonNegativeNumber.max(100, 'Too many subtasks').optional(),
     subtasks_completed: nonNegativeNumber.optional(),
@@ -117,7 +117,7 @@ export const createFitnessTaskSchema = z.object({
       z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
       z.null()
     ]).optional(),
-    starred: z.boolean().default(false),
+    pinned: z.boolean().default(false),
     completed: z.boolean().default(false),
     subtasks_total: nonNegativeNumber.max(100, 'Too many subtasks').default(0),
     subtasks_completed: nonNegativeNumber.default(0),
@@ -143,7 +143,7 @@ export const updateFitnessTaskSchema = z.object({
       z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
       z.null()
     ]).optional(),
-    starred: z.boolean().optional(),
+    pinned: z.boolean().optional(),
     completed: z.boolean().optional(),
     subtasks_total: nonNegativeNumber.max(100, 'Too many subtasks').optional(),
     subtasks_completed: nonNegativeNumber.optional(),
