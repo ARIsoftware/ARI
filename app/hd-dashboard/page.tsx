@@ -178,8 +178,8 @@ export default function HDDashboardPage() {
   }
 
   // Calculate task statistics
-  const incompleteTasks = tasks.filter(t => !t.completed)
-  const completedTasks = tasks.filter(t => t.completed)
+  const incompleteTasks = tasks.filter(t => !t.completed && t.status !== 'Completed')
+  const completedTasks = tasks.filter(t => t.completed || t.status === 'Completed')
   const overdueTasks = incompleteTasks.filter(t => t.due_date && new Date(t.due_date) < new Date())
   const todayTasks = incompleteTasks.filter(t => {
     if (!t.due_date) return false
