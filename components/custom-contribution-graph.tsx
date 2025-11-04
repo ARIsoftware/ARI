@@ -22,15 +22,15 @@ const COLOR_CYCLE: BoxColor[] = ['light-grey', 'dark-grey', 'black', 'green', 'r
 const getColorClasses = (color: BoxColor): string => {
   switch (color) {
     case 'light-grey':
-      return 'bg-gray-200 dark:bg-gray-600 blue:bg-white/30 clean:bg-gray-200'
+      return 'bg-gray-200 dark:bg-gray-600 blueprint:bg-white/30 light:bg-gray-200'
     case 'dark-grey':
-      return 'bg-gray-400 dark:bg-gray-500 blue:bg-white/50 clean:bg-gray-400'
+      return 'bg-gray-400 dark:bg-gray-500 blueprint:bg-white/50 light:bg-gray-400'
     case 'black':
-      return 'bg-black dark:bg-gray-900 blue:bg-white/80 clean:bg-black'
+      return 'bg-black dark:bg-gray-900 blueprint:bg-white/80 light:bg-black'
     case 'green':
-      return 'bg-green-500 dark:bg-green-600 blue:bg-green-400 clean:bg-green-500'
+      return 'bg-green-500 dark:bg-green-600 blueprint:bg-green-400 light:bg-green-500'
     case 'red':
-      return 'bg-red-500 dark:bg-red-600 blue:bg-red-400 clean:bg-red-500'
+      return 'bg-red-500 dark:bg-red-600 blueprint:bg-red-400 light:bg-red-500'
   }
 }
 

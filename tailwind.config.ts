@@ -107,8 +107,8 @@ const config: Config = {
   plugins: [
     require("tailwindcss-animate"),
     plugin(function({ addVariant }) {
-      addVariant('blue', '.blue &')
-      addVariant('clean', '.clean &')
+      addVariant('blueprint', '.blueprint &')
+      addVariant('light', '.light &')
     })
   ],
 };

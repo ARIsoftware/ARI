@@ -9,13 +9,13 @@ export function DarkModeToggle() {
 
   const getIcon = () => {
     switch (theme) {
-      case 'light':
+      case 'pastel':
         return <Moon className="h-4 w-4" />
       case 'dark':
         return <Building2 className="h-4 w-4" />
-      case 'blue':
+      case 'blueprint':
         return <Sparkles className="h-4 w-4" />
-      case 'clean':
+      case 'light':
         return <Sun className="h-4 w-4" />
       default:
         return <Moon className="h-4 w-4" />
