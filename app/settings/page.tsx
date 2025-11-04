@@ -504,7 +504,7 @@ export default function SettingsPage() {
                           Appearance
                         </CardTitle>
                         <CardDescription>
-                          Switch between light, dark, and system-aware palettes.
+                          Choose from four distinct themes to match your workflow and preference.
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-5">
@@ -515,24 +515,31 @@ export default function SettingsPage() {
                         >
                           <div className="flex items-center justify-between rounded-lg border p-4">
                             <div>
-                              <Label htmlFor="theme-light" className="text-base">Light mode</Label>
-                              <p className="text-sm text-muted-foreground">Bright and clear, perfect for daylight work.</p>
+                              <Label htmlFor="theme-pastel" className="text-base">Pastel Theme</Label>
+                              <p className="text-sm text-muted-foreground">Soft pastel backgrounds for a gentle interface.</p>
+                            </div>
+                            <RadioGroupItem id="theme-pastel" value="pastel" />
+                          </div>
+                          <div className="flex items-center justify-between rounded-lg border p-4">
+                            <div>
+                              <Label htmlFor="theme-light" className="text-base">Light Theme</Label>
+                              <p className="text-sm text-muted-foreground">Clean white/transparent backgrounds for minimal look.</p>
                             </div>
                             <RadioGroupItem id="theme-light" value="light" />
                           </div>
                           <div className="flex items-center justify-between rounded-lg border p-4">
                             <div>
-                              <Label htmlFor="theme-dark" className="text-base">Dark mode</Label>
-                              <p className="text-sm text-muted-foreground">Reduce glare and stay focused during late sessions.</p>
+                              <Label htmlFor="theme-blueprint" className="text-base">Blueprint Theme</Label>
+                              <p className="text-sm text-muted-foreground">Professional blue theme for focused work.</p>
                             </div>
-                            <RadioGroupItem id="theme-dark" value="dark" />
+                            <RadioGroupItem id="theme-blueprint" value="blueprint" />
                           </div>
                           <div className="flex items-center justify-between rounded-lg border p-4">
                             <div>
-                              <Label htmlFor="theme-system" className="text-base">Match system</Label>
-                              <p className="text-sm text-muted-foreground">Automatically adapts to your device setting.</p>
+                              <Label htmlFor="theme-dark" className="text-base">Dark Theme</Label>
+                              <p className="text-sm text-muted-foreground">Reduce glare during late sessions.</p>
                             </div>
-                            <RadioGroupItem id="theme-system" value="system" />
+                            <RadioGroupItem id="theme-dark" value="dark" />
                           </div>
                         </RadioGroup>
                         <div className="rounded-lg bg-muted p-4">
