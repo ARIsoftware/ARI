@@ -86,7 +86,7 @@ export function HDContributionGraph({ goals }: HDContributionGraphProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center p-4">
-        <div className="text-[10px] text-gray-400 dark:text-gray-500 blue:text-white clean:text-gray-400">
+        <div className="text-[10px] text-gray-400 dark:text-gray-500 blueprint:text-white light:text-gray-400">
           Loading...
         </div>
       </div>
