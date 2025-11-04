@@ -10,7 +10,14 @@
 
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 import { Clock } from 'lucide-react'
+import { Overpass_Mono } from 'next/font/google'
+
+const overpassMono = Overpass_Mono({
+  subsets: ['latin'],
+  weight: ['400', '600'],
+})
 
 interface TimeZoneInfo {
   name: string
@@ -97,6 +104,102 @@ function DigitalClock({ name, timezone, flag }: TimeZoneInfo) {
   )
 }
 
+function TimeConverter() {
+  const [inputTime, setInputTime] = useState('12:15 PM')
+  const [torontoTime, setTorontoTime] = useState('')
+  const [nashvilleTime, setNashvilleTime] = useState('')
+
+  useEffect(() => {
+    convertTime(inputTime)
+  }, [inputTime])
+
+  const convertTime = (timeStr: string) => {
+    try {
+      // Parse the input time (format: "HH:MM AM/PM")
+      const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i)
+
+      if (!timeMatch) {
+        setTorontoTime('--:-- --')
+        setNashvilleTime('--:-- --')
+        return
+      }
+
+      let hours = parseInt(timeMatch[1])
+      const minutes = parseInt(timeMatch[2])
+      const period = timeMatch[3].toUpperCase()
+
+      // Convert to 24-hour format
+      if (period === 'PM' && hours !== 12) {
+        hours += 12
+      } else if (period === 'AM' && hours === 12) {
+        hours = 0
+      }
+
+      // Create a base date for today
+      const now = new Date()
+      const year = now.getFullYear()
+      const month = now.getMonth()
+      const day = now.getDate()
+
+      // Create ISO string for South Africa time
+      // South Africa doesn't observe DST, always UTC+2
+      const saTimeString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00+02:00`
+      const saDate = new Date(saTimeString)
+
+      // Format times for Toronto and Nashville
+      const torontoTimeStr = saDate.toLocaleTimeString('en-US', {
+        timeZone: 'America/Toronto',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      })
+
+      const nashvilleTimeStr = saDate.toLocaleTimeString('en-US', {
+        timeZone: 'America/Chicago',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      })
+
+      setTorontoTime(torontoTimeStr)
+      setNashvilleTime(nashvilleTimeStr)
+    } catch (error) {
+      console.error('Error converting time:', error)
+      setTorontoTime('--:-- --')
+      setNashvilleTime('--:-- --')
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className={overpassMono.className}>Time Converter</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className={`text-lg ${overpassMono.className} flex flex-wrap items-center gap-2`}>
+          <span>The time</span>
+          <Input
+            type="text"
+            value={inputTime}
+            onChange={(e) => setInputTime(e.target.value)}
+            className={`w-32 text-center font-mono border-b-2 border-t-0 border-l-0 border-r-0 rounded-none px-2 py-1 focus:ring-0 focus:border-blue-500 ${overpassMono.className}`}
+            placeholder="12:15 PM"
+          />
+          <span>in South Africa is</span>
+          <span className="font-semibold border-b-2 border-gray-800 px-2 py-1 min-w-[120px] text-center">
+            {torontoTime}
+          </span>
+          <span>in Toronto and</span>
+          <span className="font-semibold border-b-2 border-gray-800 px-2 py-1 min-w-[120px] text-center">
+            {nashvilleTime}
+          </span>
+          <span>in Nashville.</span>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function WorldClockPage() {
   return (
     <div className="p-6 space-y-6">
@@ -117,6 +220,9 @@ export default function WorldClockPage() {
           <DigitalClock key={tz.timezone} {...tz} />
         ))}
       </div>
+
+      {/* Time Converter */}
+      <TimeConverter />
     </div>
   )
 }
