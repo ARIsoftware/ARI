@@ -1,0 +1,25 @@
+name: Gitleaks
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 6 * * *"   # optional nightly scan
+
+permissions:
+  contents: read
+  security-events: write   # only needed if you upload SARIF (step 5)
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2.3.9
+        with:
+          args: --verbose --redact
