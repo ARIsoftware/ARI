@@ -173,8 +173,10 @@ All tables use Row Level Security with policies based on `auth.uid()`:
 ### Required
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_publishable_key  # Use new publishable key (sb_publishable_...) format
 ```
+
+**Note**: As of November 2025, Supabase is deprecating legacy anon keys (JWT format starting with `eyJhbGci...`). Use the new publishable key format (`sb_publishable_...`) instead. Both key formats work with the same environment variable name. See `/docs/SUPABASE_KEY_MIGRATION.md` for migration details.
 
 ### Optional
 ```env
@@ -247,6 +249,14 @@ npm start
 - Monitor error logs
 
 ## Recent Updates
+
+### Supabase API Key Migration (November 2025)
+Migrated from legacy anon keys to new publishable keys:
+- Updated environment variable to use new `sb_publishable_...` format
+- No code changes required (full backward compatibility with existing Supabase client libraries)
+- Improved security with independent key rotation
+- Aligned with Supabase's timeline (legacy keys removed October 1, 2025)
+- See `/docs/SUPABASE_KEY_MIGRATION.md` for complete migration guide
 
 ### Authentication Migration (August 2025)
 Successfully migrated from Clerk to Supabase Auth:
