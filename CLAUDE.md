@@ -207,6 +207,14 @@ npm start
 3. Test RLS policies with different users
 4. Monitor auth state in browser DevTools
 
+### JWT Signing Key Rotation
+The application **does not require code changes** for JWT signing key rotation:
+- All JWT verification is handled by Supabase client libraries (`@supabase/ssr`, `@supabase/supabase-js`)
+- JWKS is automatically fetched from `/.well-known/jwks.json` endpoint
+- No custom JWT verification code exists in the codebase
+- Rotation can be performed safely in Supabase dashboard without downtime
+- See `/docs/SUPABASE_KEY_MIGRATION.md` for detailed rotation guidance
+
 ### Database Management
 - Use Supabase dashboard for schema changes
 - Test RLS policies before deploying
