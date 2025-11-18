@@ -69,6 +69,9 @@ const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
     'data': () => import('@/modules/major-projects/api/data/route'), // GET/POST for list/create
     'data/[id]': () => import('@/modules/major-projects/api/data/[id]/route'), // PATCH/DELETE for update/delete
     'settings': () => import('@/modules/major-projects/api/settings/route') // Settings GET/PUT
+  },
+  'ohtani': {
+    'data': () => import('@/modules/ohtani/api/data/route') // GET/PUT for grid cells
   }
 }
 
