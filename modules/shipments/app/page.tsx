@@ -5,7 +5,7 @@ import { useSupabase } from "@/components/providers"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, Plus, Package, Truck, Clock, CheckCircle, AlertCircle, Loader2, ExternalLink, Edit2, Trash2 } from "lucide-react"
+import { Search, Plus, Package, Truck, Clock, CheckCircle, AlertCircle, Loader2, ExternalLink, Edit2, Trash2, TruckIcon } from "lucide-react"
 import { useState, useEffect } from "react"
 import {
   Select,
@@ -54,6 +54,7 @@ export default function ShipmentsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null)
   const [saving, setSaving] = useState(false)
+  const [showDeliveryAnimation, setShowDeliveryAnimation] = useState(false)
 
   // Form states
   const [formData, setFormData] = useState({
@@ -249,6 +250,43 @@ export default function ShipmentsPage() {
       toast({
         title: "Error",
         description: "Failed to delete shipment. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleMarkDelivered = async (shipment: Shipment) => {
+    try {
+      // Trigger the animation first
+      setShowDeliveryAnimation(true)
+
+      // Update the shipment status to delivered
+      const tokenFn = async () => session?.access_token || null
+      await updateShipment(shipment.id, { ...shipment, status: 'delivered' }, tokenFn)
+
+      // Update local state immediately
+      setShipments((prev) =>
+        prev.map((s) =>
+          s.id === shipment.id ? { ...s, status: 'delivered' as Shipment['status'] } : s
+        )
+      )
+
+      // Show success message
+      toast({
+        title: "Success",
+        description: "Shipment marked as delivered!",
+      })
+
+      // Hide animation after longest truck completes (3.5 seconds)
+      setTimeout(() => {
+        setShowDeliveryAnimation(false)
+      }, 3500)
+    } catch (error) {
+      console.error("Failed to mark shipment as delivered:", error)
+      setShowDeliveryAnimation(false)
+      toast({
+        title: "Error",
+        description: "Failed to update shipment. Please try again.",
         variant: "destructive",
       })
     }
@@ -511,6 +549,10 @@ export default function ShipmentsPage() {
                     <Edit2 className="w-4 h-4 mr-2" />
                     Edit
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleMarkDelivered(shipment)}>
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Delivered
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => handleDelete(shipment.id)}
                     className="text-red-600"
@@ -592,6 +634,46 @@ export default function ShipmentsPage() {
           )}
         </div>
       )}
+
+      {/* Delivery Animation */}
+      {showDeliveryAnimation && (
+        <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 9000 }}>
+          {[...Array(8)].map((_, i) => {
+            // Different durations for each truck (in seconds)
+            const durations = [2.0, 3.0, 2.3, 2.7, 1.8, 2.5, 3.2, 2.2]
+            return (
+              <div
+                key={i}
+                className="absolute text-6xl"
+                style={{
+                  left: `${10 + i * 11}%`,
+                  bottom: '-150px',
+                  animation: `truck-slide ${durations[i]}s ease-in forwards`,
+                  animationDelay: `${i * 0.1}s`,
+                }}
+              >
+                📦
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <style jsx global>{`
+        @keyframes truck-slide {
+          0% {
+            bottom: -150px;
+            opacity: 1;
+          }
+          90% {
+            opacity: 1;
+          }
+          100% {
+            bottom: calc(100vh + 150px);
+            opacity: 0;
+          }
+        }
+      `}</style>
     </div>
   )
 }
