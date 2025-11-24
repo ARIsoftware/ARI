@@ -216,7 +216,7 @@ export default function OhtaniPage() {
 
       {/* 9x9 Grid */}
       <div className="flex justify-center w-full">
-        <div className="grid grid-cols-9 border-4 border-black w-[80vw] max-w-[900px]">
+        <div className="grid grid-cols-9 border-4 border-black w-[95%]">
           {Array.from({ length: 9 }).map((_, rowIndex) => (
             Array.from({ length: 9 }).map((_, colIndex) => {
               const isEditing = editingCell?.row === rowIndex && editingCell?.col === colIndex
