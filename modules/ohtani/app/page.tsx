@@ -16,6 +16,7 @@
 
 import { useEffect, useState } from 'react'
 import { useSupabase } from '@/components/providers'
+import { useModuleEnabled } from '@/lib/modules/module-hooks'
 import { Loader2, Pencil } from 'lucide-react'
 import type { OhtaniGridCell } from '../types'
 
@@ -45,11 +46,16 @@ function getBoundCells(row: number, col: number): Array<[number, number]> {
 
 export default function OhtaniPage() {
   const { session } = useSupabase()
+
+  // Check if quotes module is enabled
+  const { enabled: quotesEnabled, loading: quotesLoading } = useModuleEnabled('quotes')
+
   const [cells, setCells] = useState<Map<string, string>>(new Map())
   const [loading, setLoading] = useState(true)
   const [editingCell, setEditingCell] = useState<{ row: number; col: number } | null>(null)
   const [editValue, setEditValue] = useState('')
   const [hoveredCell, setHoveredCell] = useState<{ row: number; col: number } | null>(null)
+  const [randomQuote, setRandomQuote] = useState<{ quote: string; author?: string } | null>(null)
 
   // Load grid data on mount
   useEffect(() => {
@@ -57,6 +63,36 @@ export default function OhtaniPage() {
       loadGrid()
     }
   }, [session])
+
+  // Load random quote when quotes module is confirmed enabled
+  useEffect(() => {
+    if (session?.access_token && quotesEnabled && !quotesLoading) {
+      loadRandomQuote()
+    }
+  }, [session, quotesEnabled, quotesLoading])
+
+  /**
+   * Fetch a random quote from the quotes module
+   */
+  const loadRandomQuote = async () => {
+    try {
+      const response = await fetch('/api/modules/quotes/quotes', {
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`
+        }
+      })
+
+      if (!response.ok) return
+
+      const quotes = await response.json()
+      if (quotes && quotes.length > 0) {
+        const randomIndex = Math.floor(Math.random() * quotes.length)
+        setRandomQuote(quotes[randomIndex])
+      }
+    } catch (err) {
+      console.error('Error loading quote:', err)
+    }
+  }
 
   /**
    * Fetch all grid cells from the API
@@ -207,11 +243,13 @@ export default function OhtaniPage() {
   return (
     <div className="p-6 space-y-6 w-full mx-auto">
       {/* Page Header */}
-      <div className="text-center">
-        <h1 className="text-4xl font-medium mb-2">Ohtani</h1>
-        <p className="text-red-600 italic">
-          I am not a product of my circumstances. I am a product of my decisions.
-        </p>
+      <div>
+        <h1 className="text-4xl font-medium">Ohtani</h1>
+        {quotesEnabled && randomQuote && (
+          <p className="text-sm text-[#aa2020] mt-1">
+            {randomQuote.quote}
+          </p>
+        )}
       </div>
 
       {/* 9x9 Grid */}
