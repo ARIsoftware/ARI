@@ -40,6 +40,11 @@ const timeZones: TimeZoneInfo[] = [
     name: 'Nashville',
     timezone: 'America/Chicago',
     flag: '🇺🇸'
+  },
+  {
+    name: 'New Delhi',
+    timezone: 'Asia/Kolkata',
+    flag: '🇮🇳'
   }
 ]
 
@@ -92,7 +97,7 @@ function DigitalClock({ name, timezone, flag }: TimeZoneInfo) {
       </CardHeader>
       <CardContent>
         <div className="flex flex-col items-center justify-center py-8">
-          <div className="text-6xl font-mono font-bold tracking-wider mb-4">
+          <div className="text-4xl font-mono font-bold tracking-wider mb-4">
             {time || '--:--:--'}
           </div>
           <div className="text-lg text-muted-foreground">
@@ -108,6 +113,7 @@ function TimeConverter() {
   const [inputTime, setInputTime] = useState('12:00 PM')
   const [torontoTime, setTorontoTime] = useState('')
   const [nashvilleTime, setNashvilleTime] = useState('')
+  const [newDelhiTime, setNewDelhiTime] = useState('')
 
   useEffect(() => {
     convertTime(inputTime)
@@ -121,6 +127,7 @@ function TimeConverter() {
       if (!timeMatch) {
         setTorontoTime('--:-- --')
         setNashvilleTime('--:-- --')
+        setNewDelhiTime('--:-- --')
         return
       }
 
@@ -146,7 +153,7 @@ function TimeConverter() {
       const saTimeString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00+02:00`
       const saDate = new Date(saTimeString)
 
-      // Format times for Toronto and Nashville
+      // Format times for Toronto, Nashville, and New Delhi
       const torontoTimeStr = saDate.toLocaleTimeString('en-US', {
         timeZone: 'America/Toronto',
         hour: '2-digit',
@@ -161,12 +168,21 @@ function TimeConverter() {
         hour12: true
       })
 
+      const newDelhiTimeStr = saDate.toLocaleTimeString('en-US', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      })
+
       setTorontoTime(torontoTimeStr)
       setNashvilleTime(nashvilleTimeStr)
+      setNewDelhiTime(newDelhiTimeStr)
     } catch (error) {
       console.error('Error converting time:', error)
       setTorontoTime('--:-- --')
       setNashvilleTime('--:-- --')
+      setNewDelhiTime('--:-- --')
     }
   }
 
@@ -186,14 +202,18 @@ function TimeConverter() {
             placeholder="12:00 PM"
           />
           <span>in South Africa is</span>
-          <span className="px-2 py-1 min-w-[120px] text-center">
+          <span className="px-2 py-1 min-w-[100px] text-center">
             {torontoTime}
           </span>
-          <span>in Toronto and</span>
-          <span className="px-2 py-1 min-w-[120px] text-center">
+          <span>in Toronto,</span>
+          <span className="px-2 py-1 min-w-[100px] text-center">
             {nashvilleTime}
           </span>
-          <span>in Nashville.</span>
+          <span>in Nashville, and</span>
+          <span className="px-2 py-1 min-w-[100px] text-center">
+            {newDelhiTime}
+          </span>
+          <span>in New Delhi.</span>
         </div>
       </CardContent>
     </Card>
@@ -215,7 +235,7 @@ export default function WorldClockPage() {
       </div>
 
       {/* Clocks Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {timeZones.map((tz) => (
           <DigitalClock key={tz.timezone} {...tz} />
         ))}
