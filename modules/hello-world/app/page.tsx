@@ -19,10 +19,11 @@
 
 import { useEffect, useState } from 'react'
 import { useSupabase } from '@/components/providers'
+import { useModuleEnabled } from '@/lib/modules/module-hooks'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Loader2, Package, Plus, Trash2 } from 'lucide-react'
+import { Loader2, Package, Plus, Trash2, BarChart3 } from 'lucide-react'
 import type { HelloWorldEntry } from '../types'
 
 export default function HelloWorldPage() {
@@ -30,12 +31,16 @@ export default function HelloWorldPage() {
   // This hook is provided by the core app at /components/providers.tsx
   const { session } = useSupabase()
 
+  // Check if quotes module is enabled
+  const { enabled: quotesEnabled, loading: quotesLoading } = useModuleEnabled('quotes')
+
   // State management for entries
   const [entries, setEntries] = useState<HelloWorldEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [newMessage, setNewMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [randomQuote, setRandomQuote] = useState<{ quote: string; author?: string } | null>(null)
 
   // Load entries on mount
   useEffect(() => {
@@ -43,6 +48,36 @@ export default function HelloWorldPage() {
       loadEntries()
     }
   }, [session])
+
+  // Load random quote when quotes module is confirmed enabled
+  useEffect(() => {
+    if (session?.access_token && quotesEnabled && !quotesLoading) {
+      loadRandomQuote()
+    }
+  }, [session, quotesEnabled, quotesLoading])
+
+  /**
+   * Fetch a random quote from the quotes module
+   */
+  const loadRandomQuote = async () => {
+    try {
+      const response = await fetch('/api/modules/quotes/quotes', {
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`
+        }
+      })
+
+      if (!response.ok) return
+
+      const quotes = await response.json()
+      if (quotes && quotes.length > 0) {
+        const randomIndex = Math.floor(Math.random() * quotes.length)
+        setRandomQuote(quotes[randomIndex])
+      }
+    } catch (err) {
+      console.error('Error loading quote:', err)
+    }
+  }
 
   /**
    * Fetch all entries from the module API
@@ -155,14 +190,25 @@ export default function HelloWorldPage() {
   return (
     <div className="p-6 space-y-6">
       {/* Page Header */}
-      <div>
-        <div className="flex items-center gap-2">
-          <Package className="w-8 h-8 text-blue-600" />
-          <h1 className="text-3xl font-medium">Hello World Module</h1>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-4xl font-medium">Hello World</h1>
+          {quotesEnabled && randomQuote && (
+            <p className="text-sm text-[#aa2020] mt-1">
+              {randomQuote.quote}
+            </p>
+          )}
         </div>
-        <p className="text-muted-foreground mt-1">
-          Welcome, {session.user.email}! This is a template module demonstrating core features.
-        </p>
+        <div className="flex items-center gap-2">
+          <Button>
+            <Plus className="w-4 h-4 mr-2" />
+            Button A
+          </Button>
+          <Button variant="outline">
+            <BarChart3 className="w-4 h-4 mr-2" />
+            Button B
+          </Button>
+        </div>
       </div>
 
       {/* Error Display */}

@@ -4,7 +4,7 @@
   "name": "Hello World",
   "description": "A template module demonstrating all core features of the ARI module system",
   "version": "1.0.0",
-  "author": "ARI Team <ari@ari.software>",
+  "author": "Noam Eppel",
   "icon": "Package",
   "enabled": true,
   "fullscreen": false,

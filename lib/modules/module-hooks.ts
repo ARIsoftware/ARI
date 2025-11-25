@@ -105,19 +105,16 @@ export function useModule(moduleId: string | null) {
         setLoading(true)
         setError(null)
 
-        const response = await fetch(`/api/modules/${moduleId}`)
-
-        if (response.status === 404) {
-          setModule(null)
-          return
-        }
+        // Fetch all enabled modules and filter by ID
+        const response = await fetch('/api/modules')
 
         if (!response.ok) {
-          throw new Error('Failed to fetch module')
+          throw new Error('Failed to fetch modules')
         }
 
         const data = await response.json()
-        setModule(data.module || null)
+        const foundModule = data.modules?.find((m: ModuleMetadata) => m.id === moduleId) || null
+        setModule(foundModule)
       } catch (err: any) {
         console.error(`[useModule] Error fetching ${moduleId}:`, err)
         setError(err.message || 'Failed to load module')
@@ -155,7 +152,8 @@ export function useModuleEnabled(moduleId: string | null) {
   const { module, loading, error } = useModule(moduleId)
 
   return {
-    enabled: module !== null && module.isEnabled,
+    // If module is found in the enabled modules list, it's enabled
+    enabled: module !== null,
     loading,
     error
   }
