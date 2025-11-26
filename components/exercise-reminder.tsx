@@ -15,30 +15,26 @@ const COUNTDOWN_DURATION = 120 // 2 minutes in seconds
 
 export function ExerciseReminder() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  const countdownRef = useRef<NodeJS.Timeout | null>(null)
   const lastNotificationRef = useRef<string>("")
   const [open, setOpen] = useState(false)
   const [countdown, setCountdown] = useState(COUNTDOWN_DURATION)
 
   const startCountdown = useCallback(() => {
     setCountdown(COUNTDOWN_DURATION)
+  }, [])
 
-    if (countdownRef.current) {
-      clearInterval(countdownRef.current)
+  // Separate effect to handle the countdown timer
+  useEffect(() => {
+    if (!open || countdown <= 0) {
+      return
     }
 
-    countdownRef.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          if (countdownRef.current) {
-            clearInterval(countdownRef.current)
-          }
-          return 0
-        }
-        return prev - 1
-      })
+    const timer = setTimeout(() => {
+      setCountdown((prev) => prev - 1)
     }, 1000)
-  }, [])
+
+    return () => clearTimeout(timer)
+  }, [open, countdown])
 
   useEffect(() => {
     const checkTime = () => {
@@ -64,9 +60,6 @@ export function ExerciseReminder() {
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
-      }
-      if (countdownRef.current) {
-        clearInterval(countdownRef.current)
       }
     }
   }, [startCountdown])
