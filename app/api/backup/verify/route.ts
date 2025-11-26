@@ -41,6 +41,10 @@ const COMPLETE_TABLE_LIST = [
   'hello_world_entries',
   'module_migrations',
   'module_settings',
+  'major_projects',
+  'quotes',
+  'cape_town',
+  'ohtani_grid_cells',
 ]
 
 interface TableInfo {
