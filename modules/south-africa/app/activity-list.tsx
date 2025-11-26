@@ -40,15 +40,15 @@ export default function ActivityList({ activities, onEdit, onDelete }: ActivityL
   const eventColor = '#22c55e' // Green for events
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       <div className="flex items-center gap-2">
-        <Calendar className="w-5 h-5" style={{ color: stayColor }} />
-        <h2 className="text-xl font-medium">Activities</h2>
+        <Calendar className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: stayColor }} />
+        <h2 className="text-lg sm:text-xl font-medium">Activities</h2>
       </div>
 
       <div className="relative">
         {sortedActivities.length === 0 ? (
-          <p className="text-center text-muted-foreground py-4">
+          <p className="text-center text-muted-foreground py-4 text-sm">
             No activities yet. Click "Add" to create one.
           </p>
         ) : (
@@ -58,18 +58,18 @@ export default function ActivityList({ activities, onEdit, onDelete }: ActivityL
             const Icon = isStay ? Home : MapPin
 
             return (
-              <div key={activity.id} className="flex gap-4 pb-8 last:pb-0 group">
+              <div key={activity.id} className="flex gap-3 sm:gap-4 pb-6 sm:pb-8 last:pb-0 group">
                 {/* Timeline line and dot */}
-                <div className="flex flex-col items-center">
+                <div className="flex flex-col items-center shrink-0">
                   <button
                     onClick={() => openInGoogleMaps(activity.address)}
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-white transition-colors cursor-pointer z-10"
+                    className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white transition-colors cursor-pointer z-10"
                     style={{ backgroundColor: color }}
                     onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
                     onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
                     title="Open in Google Maps"
                   >
-                    <Icon className="w-5 h-5" />
+                    <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
                   {index < sortedActivities.length - 1 && (
                     <div className="w-0.5 flex-1 bg-gray-300 mt-2" />
@@ -77,18 +77,18 @@ export default function ActivityList({ activities, onEdit, onDelete }: ActivityL
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 pt-1">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">
+                <div className="flex-1 pt-0.5 sm:pt-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs sm:text-sm text-muted-foreground mb-0.5 sm:mb-1">
                         {formatDateRange(activity.start_date, activity.end_date)}
                       </p>
-                      <h3 className="font-medium text-base">{activity.title}</h3>
-                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                      <h3 className="font-medium text-sm sm:text-base truncate">{activity.title}</h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 line-clamp-2">
                         {activity.address}
                       </p>
                       <span
-                        className="inline-block mt-2 text-xs px-2 py-0.5 rounded-full"
+                        className="inline-block mt-1.5 sm:mt-2 text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full"
                         style={{
                           backgroundColor: isStay ? '#e0f2fe' : '#dcfce7',
                           color: isStay ? '#0369a1' : '#15803d'
@@ -97,22 +97,22 @@ export default function ActivityList({ activities, onEdit, onDelete }: ActivityL
                         {isStay ? 'Stay' : 'Event'}
                       </span>
                     </div>
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex gap-0.5 sm:gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => onEdit(activity)}
-                        className="shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted"
+                        className="shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted h-7 w-7 sm:h-9 sm:w-9"
                       >
-                        <Pencil className="w-4 h-4" />
+                        <Pencil className="w-3 h-3 sm:w-4 sm:h-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => onDelete(activity.id)}
-                        className="shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        className="shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-7 w-7 sm:h-9 sm:w-9"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
                       </Button>
                     </div>
                   </div>
@@ -125,13 +125,13 @@ export default function ActivityList({ activities, onEdit, onDelete }: ActivityL
 
       {/* Legend */}
       {sortedActivities.length > 0 && (
-        <div className="flex items-center gap-4 pt-4 border-t text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: stayColor }} />
+        <div className="flex items-center gap-3 sm:gap-4 pt-3 sm:pt-4 border-t text-xs sm:text-sm text-muted-foreground">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full" style={{ backgroundColor: stayColor }} />
             <span>Stay</span>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: eventColor }} />
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full" style={{ backgroundColor: eventColor }} />
             <span>Event</span>
           </div>
         </div>
