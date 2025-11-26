@@ -31,6 +31,7 @@ import {
 import type { TravelTask, Activity } from '../types'
 import SouthAfricaMap from './south-africa-map'
 import ActivityList from './activity-list'
+import FlightCards from './flight-cards'
 
 type Category = 'todo' | 'packing_list'
 
@@ -400,6 +401,9 @@ export default function SouthAfricaClient({ initialTasks, initialActivities }: S
 
         {/* Map */}
         <SouthAfricaMap activities={activities} />
+
+        {/* Flight Cards */}
+        <FlightCards />
 
         {/* Error Display */}
         {error && (
