@@ -43,7 +43,7 @@ const COMPLETE_TABLE_LIST = [
   'module_settings',
   'major_projects',
   'quotes',
-  'cape_town',
+  'travel',
   'ohtani_grid_cells',
 ]
 
