@@ -384,18 +384,18 @@ export default function SouthAfricaClient({ initialTasks, initialActivities }: S
   }
 
   return (
-    <div className="flex flex-1">
+    <div className="flex flex-col lg:flex-row flex-1">
       {/* Main Content */}
-      <div className="flex-1 p-6 pr-3 space-y-6">
+      <div className="flex-1 p-4 md:p-6 lg:pr-3 space-y-4 md:space-y-6">
         {/* Page Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-4xl font-medium">South Africa</h1>
-            <p className="text-muted-foreground mt-1">2025 Family Adventure</p>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-medium">South Africa</h1>
+            <p className="text-muted-foreground mt-1 text-sm sm:text-base">2025 Family Adventure</p>
           </div>
-          <Button onClick={openAddModal}>
+          <Button onClick={openAddModal} className="w-full sm:w-auto">
             <Plus className="w-4 h-4 mr-2" />
-            Add
+            Add Activity
           </Button>
         </div>
 
@@ -415,7 +415,7 @@ export default function SouthAfricaClient({ initialTasks, initialActivities }: S
         )}
 
         {/* Task Sections */}
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-4 md:gap-6 md:grid-cols-2">
           <TaskSection
             title="Todo"
             category="todo"
@@ -449,71 +449,75 @@ export default function SouthAfricaClient({ initialTasks, initialActivities }: S
       </div>
 
       {/* Right Sidebar - Activity List */}
-      <div className="w-80 bg-white dark:bg-background p-6 pl-3 border-l">
+      <div className="w-full lg:w-80 bg-white dark:bg-background p-4 md:p-6 lg:pl-3 border-t lg:border-t-0 lg:border-l">
         <ActivityList activities={activities} onEdit={openEditModal} onDelete={handleDeleteActivity} />
       </div>
 
       {/* Activity Modal (Add/Edit) */}
       <Dialog open={isActivityModalOpen} onOpenChange={setIsActivityModalOpen}>
-        <DialogContent className="sm:max-w-[425px] z-[9999]">
+        <DialogContent className="w-[calc(100%-2rem)] max-w-[425px] z-[9999] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingActivity ? 'Edit Activity' : 'Add Activity'}</DialogTitle>
+            <DialogTitle className="text-lg">{editingActivity ? 'Edit Activity' : 'Add Activity'}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmitActivity} className="space-y-4 pt-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">Title</Label>
+          <form onSubmit={handleSubmitActivity} className="space-y-3 sm:space-y-4 pt-2 sm:pt-4">
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label htmlFor="title" className="text-sm">Title</Label>
               <Input
                 id="title"
                 value={activityForm.title}
                 onChange={(e) => setActivityForm({ ...activityForm, title: e.target.value })}
                 placeholder="e.g., Hout Bay Airbnb"
                 required
+                className="h-9 sm:h-10"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="start_date">Start Date</Label>
+            <div className="grid grid-cols-2 gap-2 sm:gap-4">
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label htmlFor="start_date" className="text-sm">Start Date</Label>
                 <Input
                   id="start_date"
                   type="date"
                   value={activityForm.start_date}
                   onChange={(e) => setActivityForm({ ...activityForm, start_date: e.target.value })}
                   required
+                  className="h-9 sm:h-10 text-sm"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="end_date">End Date</Label>
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label htmlFor="end_date" className="text-sm">End Date</Label>
                 <Input
                   id="end_date"
                   type="date"
                   value={activityForm.end_date}
                   onChange={(e) => setActivityForm({ ...activityForm, end_date: e.target.value })}
                   required
+                  className="h-9 sm:h-10 text-sm"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label htmlFor="address" className="text-sm">Address</Label>
               <Input
                 id="address"
                 value={activityForm.address}
                 onChange={(e) => setActivityForm({ ...activityForm, address: e.target.value })}
                 placeholder="Full address"
                 required
+                className="h-9 sm:h-10"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="type">Type</Label>
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label htmlFor="type" className="text-sm">Type</Label>
               <Select
                 value={activityForm.activity_type}
                 onValueChange={(value: 'stay' | 'event') =>
                   setActivityForm({ ...activityForm, activity_type: value })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-9 sm:h-10">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent className="z-[10000]">
@@ -523,9 +527,9 @@ export default function SouthAfricaClient({ initialTasks, initialActivities }: S
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="lat">Latitude (optional)</Label>
+            <div className="grid grid-cols-2 gap-2 sm:gap-4">
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label htmlFor="lat" className="text-sm">Latitude (optional)</Label>
                 <Input
                   id="lat"
                   type="number"
@@ -535,10 +539,11 @@ export default function SouthAfricaClient({ initialTasks, initialActivities }: S
                   value={activityForm.lat}
                   onChange={(e) => setActivityForm({ ...activityForm, lat: e.target.value })}
                   placeholder="-33.9"
+                  className="h-9 sm:h-10"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="lng">Longitude (optional)</Label>
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label htmlFor="lng" className="text-sm">Longitude (optional)</Label>
                 <Input
                   id="lng"
                   type="number"
@@ -548,19 +553,21 @@ export default function SouthAfricaClient({ initialTasks, initialActivities }: S
                   value={activityForm.lng}
                   onChange={(e) => setActivityForm({ ...activityForm, lng: e.target.value })}
                   placeholder="18.4"
+                  className="h-9 sm:h-10"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-4">
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2 sm:pt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setIsActivityModalOpen(false)}
+                className="w-full sm:w-auto"
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={submittingActivity}>
+              <Button type="submit" disabled={submittingActivity} className="w-full sm:w-auto">
                 {submittingActivity ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : (
