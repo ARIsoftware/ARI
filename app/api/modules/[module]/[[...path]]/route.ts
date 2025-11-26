@@ -34,7 +34,8 @@ import { getEnabledModule } from '@/lib/modules/module-registry'
  */
 const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
   'south-africa': {
-    'tasks': () => import('@/modules/south-africa/api/tasks/route')
+    'tasks': () => import('@/modules/south-africa/api/tasks/route'),
+    'activities': () => import('@/modules/south-africa/api/activities/route')
   },
   'hello-world': {
     'data': () => import('@/modules/hello-world/api/data/route'),

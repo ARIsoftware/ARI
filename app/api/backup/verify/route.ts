@@ -44,6 +44,7 @@ const COMPLETE_TABLE_LIST = [
   'major_projects',
   'quotes',
   'travel',
+  'travel_activities',
   'ohtani_grid_cells',
 ]
 

@@ -391,7 +391,8 @@ User-friendly interface with:
 20. `major_projects` - Major Projects / Delulu Projects management
 21. `quotes` - Quotes module data
 22. `travel` - South Africa trip tasks and packing list
-23. `ohtani_grid_cells` - Ohtani module grid data
+23. `travel_activities` - South Africa trip activities (stays and events)
+24. `ohtani_grid_cells` - Ohtani module grid data
 
 ### Usage Guide
 
