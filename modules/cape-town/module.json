@@ -1,0 +1,36 @@
+{
+  "id": "cape-town",
+  "title": "Cape Town",
+  "name": "Cape Town",
+  "description": "Task and packing list tracker for Cape Town trip",
+  "version": "1.0.0",
+  "author": "ARI Team",
+  "icon": "Plane",
+  "enabled": true,
+  "fullscreen": false,
+  "menuPriority": 3,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": false
+  },
+  "routes": [
+    {
+      "path": "/cape-town",
+      "label": "Cape Town",
+      "icon": "Plane",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": ["cape_town"],
+    "migrations": "./database/migrations"
+  },
+  "dashboard": {
+    "widgets": false
+  }
+}
