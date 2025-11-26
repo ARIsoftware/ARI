@@ -51,7 +51,7 @@ export default function AirbnbTimeline() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <Home className="w-5 h-5 text-emerald-600" />
+        <Home className="w-5 h-5" style={{ color: '#3382cd' }} />
         <h2 className="text-xl font-medium">Stays</h2>
       </div>
 
@@ -62,7 +62,10 @@ export default function AirbnbTimeline() {
             <div className="flex flex-col items-center">
               <button
                 onClick={() => openInGoogleMaps(airbnb.address)}
-                className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white hover:bg-emerald-600 transition-colors cursor-pointer z-10"
+                className="w-10 h-10 rounded-full flex items-center justify-center text-white transition-colors cursor-pointer z-10"
+                style={{ backgroundColor: '#3382cd' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2a6ba8'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#3382cd'}
                 title="Open in Google Maps"
               >
                 <MapPin className="w-5 h-5" />
