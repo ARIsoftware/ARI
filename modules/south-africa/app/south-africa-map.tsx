@@ -36,36 +36,53 @@ export default function SouthAfricaMap({ activities }: SouthAfricaMapProps) {
     )
   }
 
+  // Sort activities by start_date (chronological order)
+  const sortedActivities = [...activities].sort((a, b) =>
+    new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
+  )
+
+  // Create a map of activity ID to its order number
+  const activityOrder = new Map<string, number>()
+  sortedActivities.forEach((activity, index) => {
+    activityOrder.set(activity.id, index + 1)
+  })
+
   // Filter activities that have coordinates
-  const activitiesWithCoords = activities.filter(a => a.lat && a.lng)
+  const activitiesWithCoords = sortedActivities.filter(a => a.lat && a.lng)
 
   // Dynamic import components
   const MapContent = () => {
     const L = require('leaflet')
     const { MapContainer, TileLayer, Marker, Popup } = require('react-leaflet')
 
-    // Create custom colored markers
-    const createColoredIcon = (color: string) => {
+    // Create custom numbered markers
+    const createNumberedIcon = (number: number, color: string) => {
       return L.divIcon({
         className: 'custom-marker',
         html: `
           <div style="
             background-color: ${color};
-            width: 24px;
-            height: 24px;
+            width: 28px;
+            height: 28px;
             border-radius: 50%;
             border: 3px solid white;
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-          "></div>
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+          ">${number}</div>
         `,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-        popupAnchor: [0, -12]
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+        popupAnchor: [0, -14]
       })
     }
 
-    const stayIcon = createColoredIcon('#3382cd') // Blue
-    const eventIcon = createColoredIcon('#22c55e') // Green
+    const stayColor = '#3382cd' // Blue
+    const eventColor = '#22c55e' // Green
 
     return (
       <MapContainer
@@ -79,23 +96,27 @@ export default function SouthAfricaMap({ activities }: SouthAfricaMapProps) {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
           url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
         />
-        {activitiesWithCoords.map((activity) => (
-          <Marker
-            key={activity.id}
-            position={[activity.lat!, activity.lng!]}
-            icon={activity.activity_type === 'stay' ? stayIcon : eventIcon}
-          >
-            <Popup>
-              <strong>{activity.title}</strong>
-              <br />
-              <span style={{ fontSize: '11px', color: activity.activity_type === 'stay' ? '#3382cd' : '#22c55e' }}>
-                {activity.activity_type === 'stay' ? 'Stay' : 'Event'}
-              </span>
-              <br />
-              <span style={{ fontSize: '12px' }}>{activity.address}</span>
-            </Popup>
-          </Marker>
-        ))}
+        {activitiesWithCoords.map((activity) => {
+          const orderNum = activityOrder.get(activity.id) || 0
+          const color = activity.activity_type === 'stay' ? stayColor : eventColor
+          return (
+            <Marker
+              key={activity.id}
+              position={[activity.lat!, activity.lng!]}
+              icon={createNumberedIcon(orderNum, color)}
+            >
+              <Popup>
+                <strong>{orderNum}. {activity.title}</strong>
+                <br />
+                <span style={{ fontSize: '11px', color }}>
+                  {activity.activity_type === 'stay' ? 'Stay' : 'Event'}
+                </span>
+                <br />
+                <span style={{ fontSize: '12px' }}>{activity.address}</span>
+              </Popup>
+            </Marker>
+          )
+        })}
       </MapContainer>
     )
   }
