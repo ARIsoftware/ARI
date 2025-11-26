@@ -368,7 +368,7 @@ User-friendly interface with:
 
 **If using fallback**: The system still works but may not discover new tables automatically. Run `/migrations/backup_system_functions.sql` for optimal performance.
 
-### Expected Tables (21 as of November 2025)
+### Expected Tables (23 as of November 2025)
 1. `tasks` - Task management
 2. `fitness_database` - Fitness tasks
 3. `contacts` - Contact management
@@ -390,6 +390,8 @@ User-friendly interface with:
 19. `module_settings` - Module configuration
 20. `major_projects` - Major Projects / Delulu Projects management
 21. `quotes` - Quotes module data
+22. `cape_town` - Cape Town trip tasks and packing list
+23. `ohtani_grid_cells` - Ohtani module grid data
 
 ### Usage Guide
 
