@@ -390,7 +390,7 @@ User-friendly interface with:
 19. `module_settings` - Module configuration
 20. `major_projects` - Major Projects / Delulu Projects management
 21. `quotes` - Quotes module data
-22. `cape_town` - Cape Town trip tasks and packing list
+22. `travel` - South Africa trip tasks and packing list
 23. `ohtani_grid_cells` - Ohtani module grid data
 
 ### Usage Guide

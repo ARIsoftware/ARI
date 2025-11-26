@@ -1,8 +1,8 @@
 {
-  "id": "cape-town",
-  "title": "Cape Town",
-  "name": "Cape Town",
-  "description": "Task and packing list tracker for Cape Town trip",
+  "id": "south-africa",
+  "title": "South Africa",
+  "name": "South Africa",
+  "description": "Task and packing list tracker for South Africa trip",
   "version": "1.0.0",
   "author": "ARI Team",
   "icon": "Plane",
@@ -16,8 +16,8 @@
   },
   "routes": [
     {
-      "path": "/cape-town",
-      "label": "Cape Town",
+      "path": "/south-africa",
+      "label": "South Africa",
       "icon": "Plane",
       "sidebarPosition": "main"
     }
@@ -27,7 +27,7 @@
     "coreFeatures": []
   },
   "database": {
-    "tables": ["cape_town"],
+    "tables": ["travel"],
     "migrations": "./database/migrations"
   },
   "dashboard": {
