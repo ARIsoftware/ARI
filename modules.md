@@ -323,18 +323,51 @@ export default function MyModulePage() {
 }
 ```
 
-### Step 4: Register Module in Catch-All
+### Step 4: Register Module
 
-**IMPORTANT**: You must manually register your module's page loader.
+**IMPORTANT**: You must manually register your module in several places.
 
-Edit `/app/[module]/[[...slug]]/page.tsx`:
+#### 4a. Register Page Loader
+
+Edit `/lib/generated/module-pages-registry.ts`:
 
 ```typescript
-const MODULE_PAGES: Record<string, any> = {
-  'hello-world': () => import('@/modules/hello-world/app/page'),
+export const MODULE_PAGES: Record<string, any> = {
+  // ... existing modules
   'my-module': () => import('@/modules/my-module/app/page'), // Add this line
 }
+
+export const REGISTERED_MODULE_IDS = [
+  // ... existing modules
+  'my-module', // Add this line
+]
 ```
+
+#### 4b. Register API Routes (if module has API)
+
+Edit `/app/api/modules/[module]/[[...path]]/route.ts`:
+
+```typescript
+const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
+  // ... existing modules
+  'my-module': {
+    'data': () => import('@/modules/my-module/api/data/route')
+  },
+}
+```
+
+#### 4c. Update Debug Page
+
+Edit `/app/debug/page.tsx`:
+
+1. Add module ID to `registeredModules` array (~line 274)
+2. Increment `expectedTables` count (~line 595) if module has a database table
+
+#### 4d. Update Backup System (if module has database table)
+
+1. Add table name to `COMPLETE_TABLE_LIST` in `/app/api/backup/export/route.ts`
+2. Add table name to `COMPLETE_TABLE_LIST` in `/app/api/backup/verify/route.ts`
+3. Update `CLAUDE.md` Expected Tables section (count and list)
 
 ### Step 5: Test Your Module
 

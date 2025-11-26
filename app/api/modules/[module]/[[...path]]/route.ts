@@ -33,6 +33,9 @@ import { getEnabledModule } from '@/lib/modules/module-registry'
  * 4. Use static import path: () => import('@/modules/[module]/api/[route]/route')
  */
 const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
+  'cape-town': {
+    'tasks': () => import('@/modules/cape-town/api/tasks/route')
+  },
   'hello-world': {
     'data': () => import('@/modules/hello-world/api/data/route'),
     'settings': () => import('@/modules/hello-world/api/settings/route')
