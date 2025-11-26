@@ -271,7 +271,7 @@ export default function DatabaseTestPage() {
 
       // Test 2: Check MODULE_PAGES registry completeness
       updateModuleResult('Registry Completeness', { status: 'testing' })
-      const registeredModules = ['hello-world', 'shipments', 'hyrox', 'assist', 'daily-fitness', 'quotes', 'motivation', 'contacts', 'northstar', 'winter-arc', 'major-projects', 'ohtani', 'world-clock']
+      const registeredModules = ['hello-world', 'shipments', 'hyrox', 'assist', 'daily-fitness', 'quotes', 'motivation', 'contacts', 'northstar', 'winter-arc', 'major-projects', 'ohtani', 'world-clock', 'cape-town']
       const discoveredModuleIds = modules.map((m: any) => m.id)
       const missingFromRegistry = discoveredModuleIds.filter((id: string) => !registeredModules.includes(id))
       const extraInRegistry = registeredModules.filter(id => !discoveredModuleIds.includes(id))
@@ -592,7 +592,7 @@ export default function DatabaseTestPage() {
       const response = await fetch('/api/backup/verify')
       const result = await response.json()
 
-      const expectedTables = 21 // Updated: added major_projects and quotes tables
+      const expectedTables = 23 // Updated: added ohtani_grid_cells table
       const foundTables = result.tablesFound
 
       if (foundTables === expectedTables) {
