@@ -19,6 +19,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Loader2, Plus, Trash2 } from 'lucide-react'
 import type { CapeTownTask } from '../types'
 import SouthAfricaMap from './south-africa-map'
+import AirbnbTimeline from './airbnb-timeline'
 
 type Category = 'todo' | 'packing_list'
 
@@ -268,56 +269,64 @@ export default function CapeTownPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-4xl font-medium">Cape Town</h1>
-        <p className="text-muted-foreground mt-1">Trip planning and packing list</p>
+    <div className="flex flex-1">
+      {/* Main Content */}
+      <div className="flex-1 p-6 pr-3 space-y-6">
+        {/* Page Header */}
+        <div>
+          <h1 className="text-4xl font-medium">Cape Town</h1>
+          <p className="text-muted-foreground mt-1">2025 Family Adventure</p>
+        </div>
+
+        {/* Map */}
+        <SouthAfricaMap />
+
+        {/* Error Display */}
+        {error && (
+          <Card className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
+            <CardContent className="pt-6">
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Task Sections */}
+        <div className="grid gap-6 md:grid-cols-2">
+          <TaskSection
+            title="Todo"
+            category="todo"
+            tasks={tasks}
+            newTaskValue={newTodoTask}
+            onNewTaskChange={setNewTodoTask}
+            onAddTask={(e) => {
+              e.preventDefault()
+              handleAddTask('todo', newTodoTask)
+            }}
+            onToggleTask={handleToggleTask}
+            onDeleteTask={handleDeleteTask}
+            submitting={submittingTodo}
+          />
+
+          <TaskSection
+            title="Packing List"
+            category="packing_list"
+            tasks={tasks}
+            newTaskValue={newPackingTask}
+            onNewTaskChange={setNewPackingTask}
+            onAddTask={(e) => {
+              e.preventDefault()
+              handleAddTask('packing_list', newPackingTask)
+            }}
+            onToggleTask={handleToggleTask}
+            onDeleteTask={handleDeleteTask}
+            submitting={submittingPacking}
+          />
+        </div>
       </div>
 
-      {/* Map */}
-      <SouthAfricaMap />
-
-      {/* Error Display */}
-      {error && (
-        <Card className="border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-800">
-          <CardContent className="pt-6">
-            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Task Sections */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <TaskSection
-          title="Todo"
-          category="todo"
-          tasks={tasks}
-          newTaskValue={newTodoTask}
-          onNewTaskChange={setNewTodoTask}
-          onAddTask={(e) => {
-            e.preventDefault()
-            handleAddTask('todo', newTodoTask)
-          }}
-          onToggleTask={handleToggleTask}
-          onDeleteTask={handleDeleteTask}
-          submitting={submittingTodo}
-        />
-
-        <TaskSection
-          title="Packing List"
-          category="packing_list"
-          tasks={tasks}
-          newTaskValue={newPackingTask}
-          onNewTaskChange={setNewPackingTask}
-          onAddTask={(e) => {
-            e.preventDefault()
-            handleAddTask('packing_list', newPackingTask)
-          }}
-          onToggleTask={handleToggleTask}
-          onDeleteTask={handleDeleteTask}
-          submitting={submittingPacking}
-        />
+      {/* Right Sidebar - Airbnb Timeline */}
+      <div className="w-80 bg-white p-6 pl-3 border-l">
+        <AirbnbTimeline />
       </div>
     </div>
   )

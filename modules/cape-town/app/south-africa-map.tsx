@@ -5,13 +5,15 @@ import { Card } from '@/components/ui/card'
 
 // Locations to pin
 const locations = [
-  { name: 'Mossel Bay', lat: -34.1833, lng: 22.1333 },
-  { name: 'Sedgefield', lat: -34.0167, lng: 22.8000 },
+  { name: 'Hout Bay', lat: -34.0443, lng: 18.3539 },
   { name: 'George', lat: -33.9631, lng: 22.4617 },
+  { name: 'Brenton', lat: -34.0756, lng: 23.0264 },
+  { name: 'Gondwana', lat: -33.9167, lng: 21.4833 },
+  { name: 'Glencairn', lat: -34.1556, lng: 18.4306 },
 ]
 
-// Center the map on the Garden Route area
-const mapCenter: [number, number] = [-34.05, 22.4]
+// Center the map on the Western Cape area
+const mapCenter: [number, number] = [-33.9, 20.5]
 
 export default function SouthAfricaMap() {
   const [isClient, setIsClient] = useState(false)
@@ -54,7 +56,7 @@ export default function SouthAfricaMap() {
     return (
       <MapContainer
         center={mapCenter}
-        zoom={9}
+        zoom={7}
         scrollWheelZoom={false}
         style={{ height: '300px', width: '100%' }}
         ref={mapRef}
