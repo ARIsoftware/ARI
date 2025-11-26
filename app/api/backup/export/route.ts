@@ -47,6 +47,8 @@ async function discoverTables(client: any): Promise<{ tables: string[], method: 
     'module_settings',
     'major_projects',
     'quotes',
+    'cape_town',
+    'ohtani_grid_cells',
   ];
 
   try {
