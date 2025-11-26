@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Loader2, Plus, Trash2 } from 'lucide-react'
 import type { CapeTownTask } from '../types'
+import SouthAfricaMap from './south-africa-map'
 
 type Category = 'todo' | 'packing_list'
 
@@ -273,6 +274,9 @@ export default function CapeTownPage() {
         <h1 className="text-4xl font-medium">Cape Town</h1>
         <p className="text-muted-foreground mt-1">Trip planning and packing list</p>
       </div>
+
+      {/* Map */}
+      <SouthAfricaMap />
 
       {/* Error Display */}
       {error && (
