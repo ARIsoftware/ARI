@@ -30,8 +30,8 @@ export default function SouthAfricaMap({ activities }: SouthAfricaMapProps) {
 
   if (!isClient) {
     return (
-      <Card className="w-full h-[300px] flex items-center justify-center bg-muted/50 relative z-0">
-        <span className="text-muted-foreground">Loading map...</span>
+      <Card className="w-full h-[200px] sm:h-[250px] md:h-[300px] flex items-center justify-center bg-muted/50 relative z-0">
+        <span className="text-muted-foreground text-sm">Loading map...</span>
       </Card>
     )
   }
@@ -55,29 +55,34 @@ export default function SouthAfricaMap({ activities }: SouthAfricaMapProps) {
     const L = require('leaflet')
     const { MapContainer, TileLayer, Marker, Popup } = require('react-leaflet')
 
-    // Create custom numbered markers
+    // Create custom numbered markers (responsive size)
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
+    const markerSize = isMobile ? 24 : 28
+    const fontSize = isMobile ? 10 : 12
+    const borderWidth = isMobile ? 2 : 3
+
     const createNumberedIcon = (number: number, color: string) => {
       return L.divIcon({
         className: 'custom-marker',
         html: `
           <div style="
             background-color: ${color};
-            width: 28px;
-            height: 28px;
+            width: ${markerSize}px;
+            height: ${markerSize}px;
             border-radius: 50%;
-            border: 3px solid white;
+            border: ${borderWidth}px solid white;
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 12px;
+            font-size: ${fontSize}px;
             font-weight: 600;
           ">${number}</div>
         `,
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
-        popupAnchor: [0, -14]
+        iconSize: [markerSize, markerSize],
+        iconAnchor: [markerSize / 2, markerSize / 2],
+        popupAnchor: [0, -markerSize / 2]
       })
     }
 
@@ -85,39 +90,41 @@ export default function SouthAfricaMap({ activities }: SouthAfricaMapProps) {
     const eventColor = '#22c55e' // Green
 
     return (
-      <MapContainer
-        center={mapCenter}
-        zoom={8}
-        scrollWheelZoom={false}
-        style={{ height: '300px', width: '100%' }}
-        ref={mapRef}
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-        />
-        {activitiesWithCoords.map((activity) => {
-          const orderNum = activityOrder.get(activity.id) || 0
-          const color = activity.activity_type === 'stay' ? stayColor : eventColor
-          return (
-            <Marker
-              key={activity.id}
-              position={[activity.lat!, activity.lng!]}
-              icon={createNumberedIcon(orderNum, color)}
-            >
-              <Popup>
-                <strong>{orderNum}. {activity.title}</strong>
-                <br />
-                <span style={{ fontSize: '11px', color }}>
-                  {activity.activity_type === 'stay' ? 'Stay' : 'Event'}
-                </span>
-                <br />
-                <span style={{ fontSize: '12px' }}>{activity.address}</span>
-              </Popup>
-            </Marker>
-          )
-        })}
-      </MapContainer>
+      <div className="h-[200px] sm:h-[250px] md:h-[300px]">
+        <MapContainer
+          center={mapCenter}
+          zoom={8}
+          scrollWheelZoom={false}
+          style={{ height: '100%', width: '100%' }}
+          ref={mapRef}
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          />
+          {activitiesWithCoords.map((activity) => {
+            const orderNum = activityOrder.get(activity.id) || 0
+            const color = activity.activity_type === 'stay' ? stayColor : eventColor
+            return (
+              <Marker
+                key={activity.id}
+                position={[activity.lat!, activity.lng!]}
+                icon={createNumberedIcon(orderNum, color)}
+              >
+                <Popup>
+                  <strong>{orderNum}. {activity.title}</strong>
+                  <br />
+                  <span style={{ fontSize: '11px', color }}>
+                    {activity.activity_type === 'stay' ? 'Stay' : 'Event'}
+                  </span>
+                  <br />
+                  <span style={{ fontSize: '12px' }}>{activity.address}</span>
+                </Popup>
+              </Marker>
+            )
+          })}
+        </MapContainer>
+      </div>
     )
   }
 
