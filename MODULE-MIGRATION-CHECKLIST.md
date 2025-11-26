@@ -376,11 +376,19 @@ import type { Item } from '@/modules/module-id/types'
 - [ ] Ensure route is in `protectedRoutes` array
 - [ ] Test that unauthenticated users are redirected
 
-### Step 6.4: Verify Backup System
+### Step 6.4: Update Debug Page
 
-- [ ] Check module tables are in backup system
-- [ ] If not, module tables will be auto-discovered
-- [ ] Test export includes module data
+- [ ] Add module ID to `registeredModules` array in `/app/debug/page.tsx` (line ~274)
+- [ ] Increment `expectedTables` count in `/app/debug/page.tsx` (line ~595)
+- [ ] Run debug tests to verify module is recognized
+
+### Step 6.5: Update Backup System
+
+- [ ] Add table name to `COMPLETE_TABLE_LIST` in `/app/api/backup/export/route.ts`
+- [ ] Add table name to `COMPLETE_TABLE_LIST` in `/app/api/backup/verify/route.ts`
+- [ ] Update expected table count in `CLAUDE.md` (Expected Tables section)
+- [ ] Add table to the numbered list in `CLAUDE.md`
+- [ ] Test backup export includes module data
 
 ---
 
@@ -574,6 +582,10 @@ Quick verification checklist:
 - [ ] Settings panel in components/settings-panel.tsx (named + default export)
 - [ ] README.md created
 - [ ] Module registry regenerated
+- [ ] API routes registered in `/app/api/modules/[module]/[[...path]]/route.ts`
+- [ ] Debug page updated (`registeredModules` array + `expectedTables` count)
+- [ ] Backup system updated (both export and verify `COMPLETE_TABLE_LIST`)
+- [ ] CLAUDE.md updated (Expected Tables count and list)
 - [ ] Old imports updated in other files
 - [ ] Static menu entry removed
 - [ ] Old files deleted
