@@ -1,11 +1,11 @@
 /**
- * Cape Town Module - Main Page
+ * South Africa Module - Main Page
  *
  * Task and packing list tracker with two sections:
  * - Todo: General tasks
  * - Packing List: Items to pack
  *
- * Route: /cape-town
+ * Route: /south-africa
  */
 
 'use client'
@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Loader2, Plus, Trash2 } from 'lucide-react'
-import type { CapeTownTask } from '../types'
+import type { TravelTask } from '../types'
 import SouthAfricaMap from './south-africa-map'
 import AirbnbTimeline from './airbnb-timeline'
 
@@ -26,7 +26,7 @@ type Category = 'todo' | 'packing_list'
 interface TaskSectionProps {
   title: string
   category: Category
-  tasks: CapeTownTask[]
+  tasks: TravelTask[]
   newTaskValue: string
   onNewTaskChange: (value: string) => void
   onAddTask: (e: React.FormEvent) => void
@@ -126,10 +126,10 @@ function TaskSection({
   )
 }
 
-export default function CapeTownPage() {
+export default function SouthAfricaPage() {
   const { session } = useSupabase()
 
-  const [tasks, setTasks] = useState<CapeTownTask[]>([])
+  const [tasks, setTasks] = useState<TravelTask[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -150,7 +150,7 @@ export default function CapeTownPage() {
       setLoading(true)
       setError(null)
 
-      const response = await fetch('/api/modules/cape-town/tasks', {
+      const response = await fetch('/api/modules/south-africa/tasks', {
         headers: {
           'Authorization': `Bearer ${session?.access_token}`
         }
@@ -180,7 +180,7 @@ export default function CapeTownPage() {
       setSubmitting(true)
       setError(null)
 
-      const response = await fetch('/api/modules/cape-town/tasks', {
+      const response = await fetch('/api/modules/south-africa/tasks', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session?.access_token}`,
@@ -214,7 +214,7 @@ export default function CapeTownPage() {
       // Optimistic update
       setTasks(tasks.map(t => t.id === id ? { ...t, completed } : t))
 
-      const response = await fetch(`/api/modules/cape-town/tasks?id=${id}`, {
+      const response = await fetch(`/api/modules/south-africa/tasks?id=${id}`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${session?.access_token}`,
@@ -240,7 +240,7 @@ export default function CapeTownPage() {
       // Optimistic update
       setTasks(tasks.filter(t => t.id !== id))
 
-      const response = await fetch(`/api/modules/cape-town/tasks?id=${id}`, {
+      const response = await fetch(`/api/modules/south-africa/tasks?id=${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${session?.access_token}`
@@ -274,7 +274,7 @@ export default function CapeTownPage() {
       <div className="flex-1 p-6 pr-3 space-y-6">
         {/* Page Header */}
         <div>
-          <h1 className="text-4xl font-medium">Cape Town</h1>
+          <h1 className="text-4xl font-medium">South Africa</h1>
           <p className="text-muted-foreground mt-1">2025 Family Adventure</p>
         </div>
 

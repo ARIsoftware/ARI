@@ -1,11 +1,11 @@
 /**
- * Cape Town Module - Tasks API Routes
+ * South Africa Module - Tasks API Routes
  *
  * Endpoints:
- * - GET    /api/modules/cape-town/tasks       - List all tasks
- * - POST   /api/modules/cape-town/tasks       - Create new task
- * - PATCH  /api/modules/cape-town/tasks?id=x  - Update task (toggle completed)
- * - DELETE /api/modules/cape-town/tasks?id=x  - Delete task
+ * - GET    /api/modules/south-africa/tasks       - List all tasks
+ * - POST   /api/modules/south-africa/tasks       - Create new task
+ * - PATCH  /api/modules/south-africa/tasks?id=x  - Update task (toggle completed)
+ * - DELETE /api/modules/south-africa/tasks?id=x  - Delete task
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { data: tasks, error: dbError } = await supabase
-      .from('cape_town')
+      .from('travel')
       .select('*')
       .order('created_at', { ascending: true })
 
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('GET /api/modules/cape-town/tasks error:', error)
+    console.error('GET /api/modules/south-africa/tasks error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     const { title, category } = parseResult.data
 
     const { data: task, error: dbError } = await supabase
-      .from('cape_town')
+      .from('travel')
       .insert({
         user_id: user.id,
         title,
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
     )
 
   } catch (error) {
-    console.error('POST /api/modules/cape-town/tasks error:', error)
+    console.error('POST /api/modules/south-africa/tasks error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -173,7 +173,7 @@ export async function PATCH(request: NextRequest) {
     const updates = parseResult.data
 
     const { data: task, error: dbError } = await supabase
-      .from('cape_town')
+      .from('travel')
       .update(updates)
       .eq('id', id)
       .select()
@@ -190,7 +190,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ task })
 
   } catch (error) {
-    console.error('PATCH /api/modules/cape-town/tasks error:', error)
+    console.error('PATCH /api/modules/south-africa/tasks error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -223,7 +223,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { error: dbError } = await supabase
-      .from('cape_town')
+      .from('travel')
       .delete()
       .eq('id', id)
 
@@ -241,7 +241,7 @@ export async function DELETE(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('DELETE /api/modules/cape-town/tasks error:', error)
+    console.error('DELETE /api/modules/south-africa/tasks error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

@@ -1,13 +1,13 @@
 /**
- * Cape Town Module - Type Definitions
+ * South Africa Module - Type Definitions
  */
 
 /**
- * CapeTownTask
+ * TravelTask
  *
- * Represents a row in the cape_town table
+ * Represents a row in the travel table
  */
-export interface CapeTownTask {
+export interface TravelTask {
   id: string
   user_id: string
   title: string
@@ -20,7 +20,7 @@ export interface CapeTownTask {
 /**
  * CreateTaskRequest
  *
- * Request body for POST /api/modules/cape-town/tasks
+ * Request body for POST /api/modules/south-africa/tasks
  */
 export interface CreateTaskRequest {
   title: string
@@ -30,7 +30,7 @@ export interface CreateTaskRequest {
 /**
  * UpdateTaskRequest
  *
- * Request body for PATCH /api/modules/cape-town/tasks
+ * Request body for PATCH /api/modules/south-africa/tasks
  */
 export interface UpdateTaskRequest {
   completed?: boolean
@@ -40,10 +40,10 @@ export interface UpdateTaskRequest {
 /**
  * GetTasksResponse
  *
- * Response from GET /api/modules/cape-town/tasks
+ * Response from GET /api/modules/south-africa/tasks
  */
 export interface GetTasksResponse {
-  tasks: CapeTownTask[]
+  tasks: TravelTask[]
   count: number
 }
 
