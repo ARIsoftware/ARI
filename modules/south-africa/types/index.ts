@@ -54,3 +54,48 @@ export interface ApiErrorResponse {
   error: string
   details?: any
 }
+
+/**
+ * Activity
+ *
+ * Represents a row in the travel_activities table
+ * Can be either a Stay (accommodation) or Event
+ */
+export interface Activity {
+  id: string
+  user_id: string
+  title: string
+  start_date: string
+  end_date: string
+  address: string
+  activity_type: 'stay' | 'event'
+  lat?: number
+  lng?: number
+  created_at: string
+  updated_at?: string
+}
+
+/**
+ * CreateActivityRequest
+ *
+ * Request body for POST /api/modules/south-africa/activities
+ */
+export interface CreateActivityRequest {
+  title: string
+  start_date: string
+  end_date: string
+  address: string
+  activity_type: 'stay' | 'event'
+  lat?: number
+  lng?: number
+}
+
+/**
+ * GetActivitiesResponse
+ *
+ * Response from GET /api/modules/south-africa/activities
+ */
+export interface GetActivitiesResponse {
+  activities: Activity[]
+  count: number
+}

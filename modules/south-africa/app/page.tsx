@@ -16,10 +16,24 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Loader2, Plus, Trash2 } from 'lucide-react'
-import type { TravelTask } from '../types'
+import { Label } from '@/components/ui/label'
+import { Loader2, Plus, Trash2, X } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import type { TravelTask, Activity } from '../types'
 import SouthAfricaMap from './south-africa-map'
-import AirbnbTimeline from './airbnb-timeline'
+import ActivityList from './activity-list'
 
 type Category = 'todo' | 'packing_list'
 
@@ -130,6 +144,7 @@ export default function SouthAfricaPage() {
   const { session } = useSupabase()
 
   const [tasks, setTasks] = useState<TravelTask[]>([])
+  const [activities, setActivities] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -139,9 +154,24 @@ export default function SouthAfricaPage() {
   const [submittingTodo, setSubmittingTodo] = useState(false)
   const [submittingPacking, setSubmittingPacking] = useState(false)
 
+  // Activity Modal State (for add and edit)
+  const [isActivityModalOpen, setIsActivityModalOpen] = useState(false)
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null)
+  const [activityForm, setActivityForm] = useState({
+    title: '',
+    start_date: '',
+    end_date: '',
+    address: '',
+    activity_type: 'stay' as 'stay' | 'event',
+    lat: '',
+    lng: ''
+  })
+  const [submittingActivity, setSubmittingActivity] = useState(false)
+
   useEffect(() => {
     if (session?.access_token) {
       loadTasks()
+      loadActivities()
     }
   }, [session])
 
@@ -167,6 +197,25 @@ export default function SouthAfricaPage() {
       setError('Failed to load tasks. Please try again.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadActivities = async () => {
+    try {
+      const response = await fetch('/api/modules/south-africa/activities', {
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to load activities')
+      }
+
+      const data = await response.json()
+      setActivities(data.activities || [])
+    } catch (err) {
+      console.error('Error loading activities:', err)
     }
   }
 
@@ -257,6 +306,143 @@ export default function SouthAfricaPage() {
     }
   }
 
+  const openAddModal = () => {
+    setEditingActivity(null)
+    setActivityForm({
+      title: '',
+      start_date: '',
+      end_date: '',
+      address: '',
+      activity_type: 'stay',
+      lat: '',
+      lng: ''
+    })
+    setIsActivityModalOpen(true)
+  }
+
+  const openEditModal = (activity: Activity) => {
+    setEditingActivity(activity)
+    setActivityForm({
+      title: activity.title,
+      start_date: activity.start_date,
+      end_date: activity.end_date,
+      address: activity.address,
+      activity_type: activity.activity_type,
+      lat: activity.lat?.toString() || '',
+      lng: activity.lng?.toString() || ''
+    })
+    setIsActivityModalOpen(true)
+  }
+
+  const handleSubmitActivity = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!activityForm.title.trim() || !activityForm.start_date || !activityForm.end_date || !activityForm.address.trim()) {
+      return
+    }
+
+    try {
+      setSubmittingActivity(true)
+      setError(null)
+
+      const activityData: any = {
+        title: activityForm.title,
+        start_date: activityForm.start_date,
+        end_date: activityForm.end_date,
+        address: activityForm.address,
+        activity_type: activityForm.activity_type
+      }
+
+      // Add lat/lng if provided
+      if (activityForm.lat && activityForm.lng) {
+        activityData.lat = parseFloat(activityForm.lat)
+        activityData.lng = parseFloat(activityForm.lng)
+      }
+
+      if (editingActivity) {
+        // Update existing activity
+        const response = await fetch(`/api/modules/south-africa/activities?id=${editingActivity.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${session?.access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(activityData)
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to update activity')
+        }
+
+        const data = await response.json()
+        if (data.activity) {
+          setActivities(prevActivities =>
+            prevActivities.map(a => a.id === editingActivity.id ? data.activity : a)
+          )
+        }
+      } else {
+        // Create new activity
+        const response = await fetch('/api/modules/south-africa/activities', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session?.access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(activityData)
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to create activity')
+        }
+
+        const data = await response.json()
+        if (data.activity) {
+          setActivities(prevActivities => [...prevActivities, data.activity])
+        }
+      }
+
+      // Reset form and close modal
+      setActivityForm({
+        title: '',
+        start_date: '',
+        end_date: '',
+        address: '',
+        activity_type: 'stay',
+        lat: '',
+        lng: ''
+      })
+      setEditingActivity(null)
+      setIsActivityModalOpen(false)
+    } catch (err) {
+      console.error('Error saving activity:', err)
+      setError(editingActivity ? 'Failed to update activity. Please try again.' : 'Failed to create activity. Please try again.')
+    } finally {
+      setSubmittingActivity(false)
+    }
+  }
+
+  const handleDeleteActivity = async (id: string) => {
+    try {
+      // Optimistic update
+      setActivities(activities.filter(a => a.id !== id))
+
+      const response = await fetch(`/api/modules/south-africa/activities?id=${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session?.access_token}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete activity')
+        await loadActivities()
+      }
+    } catch (err) {
+      console.error('Error deleting activity:', err)
+      await loadActivities()
+    }
+  }
+
   if (!session || loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -273,13 +459,19 @@ export default function SouthAfricaPage() {
       {/* Main Content */}
       <div className="flex-1 p-6 pr-3 space-y-6">
         {/* Page Header */}
-        <div>
-          <h1 className="text-4xl font-medium">South Africa</h1>
-          <p className="text-muted-foreground mt-1">2025 Family Adventure</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-medium">South Africa</h1>
+            <p className="text-muted-foreground mt-1">2025 Family Adventure</p>
+          </div>
+          <Button onClick={openAddModal}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add
+          </Button>
         </div>
 
         {/* Map */}
-        <SouthAfricaMap />
+        <SouthAfricaMap activities={activities} />
 
         {/* Error Display */}
         {error && (
@@ -324,10 +516,130 @@ export default function SouthAfricaPage() {
         </div>
       </div>
 
-      {/* Right Sidebar - Airbnb Timeline */}
-      <div className="w-80 bg-white p-6 pl-3 border-l">
-        <AirbnbTimeline />
+      {/* Right Sidebar - Activity List */}
+      <div className="w-80 bg-white dark:bg-background p-6 pl-3 border-l">
+        <ActivityList activities={activities} onEdit={openEditModal} onDelete={handleDeleteActivity} />
       </div>
+
+      {/* Activity Modal (Add/Edit) */}
+      <Dialog open={isActivityModalOpen} onOpenChange={setIsActivityModalOpen}>
+        <DialogContent className="sm:max-w-[425px] z-[9999]">
+          <DialogHeader>
+            <DialogTitle>{editingActivity ? 'Edit Activity' : 'Add Activity'}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmitActivity} className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                value={activityForm.title}
+                onChange={(e) => setActivityForm({ ...activityForm, title: e.target.value })}
+                placeholder="e.g., Hout Bay Airbnb"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="start_date">Start Date</Label>
+                <Input
+                  id="start_date"
+                  type="date"
+                  value={activityForm.start_date}
+                  onChange={(e) => setActivityForm({ ...activityForm, start_date: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="end_date">End Date</Label>
+                <Input
+                  id="end_date"
+                  type="date"
+                  value={activityForm.end_date}
+                  onChange={(e) => setActivityForm({ ...activityForm, end_date: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="address">Address</Label>
+              <Input
+                id="address"
+                value={activityForm.address}
+                onChange={(e) => setActivityForm({ ...activityForm, address: e.target.value })}
+                placeholder="Full address"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="type">Type</Label>
+              <Select
+                value={activityForm.activity_type}
+                onValueChange={(value: 'stay' | 'event') =>
+                  setActivityForm({ ...activityForm, activity_type: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent className="z-[10000]">
+                  <SelectItem value="stay">Stay (Accommodation)</SelectItem>
+                  <SelectItem value="event">Event</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="lat">Latitude (optional)</Label>
+                <Input
+                  id="lat"
+                  type="number"
+                  step="0.000001"
+                  min="-90"
+                  max="90"
+                  value={activityForm.lat}
+                  onChange={(e) => setActivityForm({ ...activityForm, lat: e.target.value })}
+                  placeholder="-33.9"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lng">Longitude (optional)</Label>
+                <Input
+                  id="lng"
+                  type="number"
+                  step="0.000001"
+                  min="-180"
+                  max="180"
+                  value={activityForm.lng}
+                  onChange={(e) => setActivityForm({ ...activityForm, lng: e.target.value })}
+                  placeholder="18.4"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsActivityModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={submittingActivity}>
+                {submittingActivity ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <Plus className="w-4 h-4 mr-2" />
+                )}
+                {editingActivity ? 'Save Changes' : 'Add Activity'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

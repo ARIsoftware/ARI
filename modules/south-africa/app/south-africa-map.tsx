@@ -2,20 +2,16 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { Card } from '@/components/ui/card'
+import type { Activity } from '../types'
 
-// Locations to pin (coordinates for exact addresses)
-const locations = [
-  { name: 'Hout Bay', lat: -34.0350, lng: 18.3650, address: '20 Bokkemanskloof Road, Cape Town, Western Cape 7806' },
-  { name: 'George', lat: -33.9631, lng: 22.4617, address: 'George, Western Cape, South Africa' },
-  { name: 'Brenton', lat: -34.0706, lng: 23.0178, address: '1 Captain W.A. Duthie Avenue, Lake Brenton Eco Estate, Brenton' },
-  { name: 'Gondwana', lat: -33.7167, lng: 21.4333, address: 'Gondwana Game Reserve, Garden Route' },
-  { name: 'Glencairn', lat: -34.1533, lng: 18.4283, address: '40 Hopkirk Way, Cape Town, Western Cape 7975' },
-]
+interface SouthAfricaMapProps {
+  activities: Activity[]
+}
 
 // Center the map on the Western Cape area
 const mapCenter: [number, number] = [-33.9, 20.5]
 
-export default function SouthAfricaMap() {
+export default function SouthAfricaMap({ activities }: SouthAfricaMapProps) {
   const [isClient, setIsClient] = useState(false)
   const mapRef = useRef<any>(null)
 
@@ -30,28 +26,46 @@ export default function SouthAfricaMap() {
         mapRef.current.invalidateSize()
       }, 100)
     }
-  }, [isClient])
+  }, [isClient, activities])
 
   if (!isClient) {
     return (
-      <Card className="w-full h-[300px] flex items-center justify-center bg-muted/50">
+      <Card className="w-full h-[300px] flex items-center justify-center bg-muted/50 relative z-0">
         <span className="text-muted-foreground">Loading map...</span>
       </Card>
     )
   }
+
+  // Filter activities that have coordinates
+  const activitiesWithCoords = activities.filter(a => a.lat && a.lng)
 
   // Dynamic import components
   const MapContent = () => {
     const L = require('leaflet')
     const { MapContainer, TileLayer, Marker, Popup } = require('react-leaflet')
 
-    // Fix for default marker icons in Leaflet with webpack/Next.js
-    delete (L.Icon.Default.prototype as any)._getIconUrl
-    L.Icon.Default.mergeOptions({
-      iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-    })
+    // Create custom colored markers
+    const createColoredIcon = (color: string) => {
+      return L.divIcon({
+        className: 'custom-marker',
+        html: `
+          <div style="
+            background-color: ${color};
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          "></div>
+        `,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+        popupAnchor: [0, -12]
+      })
+    }
+
+    const stayIcon = createColoredIcon('#3382cd') // Blue
+    const eventIcon = createColoredIcon('#22c55e') // Green
 
     return (
       <MapContainer
@@ -65,12 +79,20 @@ export default function SouthAfricaMap() {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
           url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
         />
-        {locations.map((location) => (
-          <Marker key={location.name} position={[location.lat, location.lng]}>
+        {activitiesWithCoords.map((activity) => (
+          <Marker
+            key={activity.id}
+            position={[activity.lat!, activity.lng!]}
+            icon={activity.activity_type === 'stay' ? stayIcon : eventIcon}
+          >
             <Popup>
-              <strong>{location.name}</strong>
+              <strong>{activity.title}</strong>
               <br />
-              <span style={{ fontSize: '12px' }}>{location.address}</span>
+              <span style={{ fontSize: '11px', color: activity.activity_type === 'stay' ? '#3382cd' : '#22c55e' }}>
+                {activity.activity_type === 'stay' ? 'Stay' : 'Event'}
+              </span>
+              <br />
+              <span style={{ fontSize: '12px' }}>{activity.address}</span>
             </Popup>
           </Marker>
         ))}
@@ -79,7 +101,7 @@ export default function SouthAfricaMap() {
   }
 
   return (
-    <Card className="w-full overflow-hidden">
+    <Card className="w-full overflow-hidden relative z-0">
       <MapContent />
     </Card>
   )
