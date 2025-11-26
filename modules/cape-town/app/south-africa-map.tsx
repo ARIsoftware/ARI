@@ -3,13 +3,13 @@
 import { useEffect, useState, useRef } from 'react'
 import { Card } from '@/components/ui/card'
 
-// Locations to pin
+// Locations to pin (coordinates for exact addresses)
 const locations = [
-  { name: 'Hout Bay', lat: -34.0443, lng: 18.3539 },
-  { name: 'George', lat: -33.9631, lng: 22.4617 },
-  { name: 'Brenton', lat: -34.0756, lng: 23.0264 },
-  { name: 'Gondwana', lat: -33.9167, lng: 21.4833 },
-  { name: 'Glencairn', lat: -34.1556, lng: 18.4306 },
+  { name: 'Hout Bay', lat: -34.0350, lng: 18.3650, address: '20 Bokkemanskloof Road, Cape Town, Western Cape 7806' },
+  { name: 'George', lat: -33.9631, lng: 22.4617, address: 'George, Western Cape, South Africa' },
+  { name: 'Brenton', lat: -34.0706, lng: 23.0178, address: '1 Captain W.A. Duthie Avenue, Lake Brenton Eco Estate, Brenton' },
+  { name: 'Gondwana', lat: -33.7167, lng: 21.4333, address: 'Gondwana Game Reserve, Garden Route' },
+  { name: 'Glencairn', lat: -34.1533, lng: 18.4283, address: '40 Hopkirk Way, Cape Town, Western Cape 7975' },
 ]
 
 // Center the map on the Western Cape area
@@ -56,18 +56,22 @@ export default function SouthAfricaMap() {
     return (
       <MapContainer
         center={mapCenter}
-        zoom={7}
+        zoom={8}
         scrollWheelZoom={false}
         style={{ height: '300px', width: '100%' }}
         ref={mapRef}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
         />
         {locations.map((location) => (
           <Marker key={location.name} position={[location.lat, location.lng]}>
-            <Popup>{location.name}</Popup>
+            <Popup>
+              <strong>{location.name}</strong>
+              <br />
+              <span style={{ fontSize: '12px' }}>{location.address}</span>
+            </Popup>
           </Marker>
         ))}
       </MapContainer>
