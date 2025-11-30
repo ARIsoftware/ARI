@@ -94,9 +94,12 @@ export default function TaskMonsterPopup({ task, onClose }: TaskMonsterPopupProp
           style={{ backgroundColor: `${task.monster_colors.primary}20` }}
         >
           <div
-            className={`relative w-32 h-32 mb-4 transition-all duration-[3000ms] ease-out ${
-              isDestroying ? "opacity-0 scale-50 translate-y-[-20px]" : "opacity-100 scale-100 translate-y-0"
-            }`}
+            className="relative w-32 h-32 mb-4"
+            style={{
+              transition: "all 3s ease-out",
+              opacity: isDestroying ? 0 : 1,
+              transform: isDestroying ? "scale(0.5) translateY(-20px)" : "scale(1) translateY(0)",
+            }}
           >
             <MonsterIllustration
               type={task.monster_type as MonsterType}
@@ -105,10 +108,12 @@ export default function TaskMonsterPopup({ task, onClose }: TaskMonsterPopupProp
             />
           </div>
           <div
-            className={`px-3 py-1 rounded-full text-xs font-medium text-white transition-opacity duration-[3000ms] ${
-              isDestroying ? "opacity-0" : "opacity-100"
-            }`}
-            style={{ backgroundColor: task.monster_colors.primary }}
+            className="px-3 py-1 rounded-full text-xs font-medium text-white"
+            style={{
+              backgroundColor: task.monster_colors.primary,
+              transition: "opacity 3s ease-out",
+              opacity: isDestroying ? 0 : 1,
+            }}
           >
             {task.monster_type.toUpperCase()}
           </div>
@@ -124,16 +129,24 @@ export default function TaskMonsterPopup({ task, onClose }: TaskMonsterPopupProp
         <div className="w-3/5 p-8 flex flex-col justify-between">
           <div>
             {/* Task Title */}
-            <h2 className={`text-2xl font-bold text-foreground mb-2 transition-opacity duration-[3000ms] ${
-              isDestroying ? "opacity-50" : "opacity-100"
-            }`}>
+            <h2
+              className="text-2xl font-bold text-foreground mb-2"
+              style={{
+                transition: "opacity 3s ease-out",
+                opacity: isDestroying ? 0.5 : 1,
+              }}
+            >
               {task.title}
             </h2>
 
             {/* Task metadata */}
-            <div className={`flex flex-wrap gap-2 mb-4 transition-opacity duration-[3000ms] ${
-              isDestroying ? "opacity-50" : "opacity-100"
-            }`}>
+            <div
+              className="flex flex-wrap gap-2 mb-4"
+              style={{
+                transition: "opacity 3s ease-out",
+                opacity: isDestroying ? 0.5 : 1,
+              }}
+            >
               {task.due_date && (
                 <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                   <Calendar className="w-3 h-3" />
@@ -147,9 +160,13 @@ export default function TaskMonsterPopup({ task, onClose }: TaskMonsterPopupProp
             </div>
 
             {/* Monster lore */}
-            <div className={`border-t border-border pt-4 transition-opacity duration-[3000ms] ${
-              isDestroying ? "opacity-50" : "opacity-100"
-            }`}>
+            <div
+              className="border-t border-border pt-4"
+              style={{
+                transition: "opacity 3s ease-out",
+                opacity: isDestroying ? 0.5 : 1,
+              }}
+            >
               <h3 className="text-sm font-medium text-muted-foreground mb-2">About this {monsterInfo?.name}</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">{monsterInfo?.description}</p>
             </div>
@@ -172,9 +189,13 @@ export default function TaskMonsterPopup({ task, onClose }: TaskMonsterPopupProp
           </div>
 
           {/* Color indicators */}
-          <div className={`mt-4 flex gap-4 transition-opacity duration-[3000ms] ${
-            isDestroying ? "opacity-50" : "opacity-100"
-          }`}>
+          <div
+            className="mt-4 flex gap-4"
+            style={{
+              transition: "opacity 3s ease-out",
+              opacity: isDestroying ? 0.5 : 1,
+            }}
+          >
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full" style={{ backgroundColor: task.monster_colors.primary }} />
               <span className="text-xs text-muted-foreground">Primary</span>
