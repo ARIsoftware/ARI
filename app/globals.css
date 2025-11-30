@@ -102,7 +102,7 @@
 }
 
 .taskdone {
-  opacity: 0.2;
+  opacity: 0.6;
   transition: opacity 0.3s ease-in-out;
 }
 
