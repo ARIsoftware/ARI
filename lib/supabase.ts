@@ -41,6 +41,9 @@ export type Task = {
   strategic_fit?: number
   priority_score?: number
   project_id?: string | null
+  // Task Monsters fields
+  monster_type?: string | null
+  monster_colors?: { primary: string; secondary: string } | null
 }
 
 export type FitnessTask = {
