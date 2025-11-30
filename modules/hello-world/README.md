@@ -311,7 +311,8 @@ When ready to share:
 ## Support
 
 For module development questions:
-- See `/modules.md` for complete specification
+- See `/docs/MODULES.md` for complete technical specification
+- See `/docs/MODULES-GUIDE.md` for high-level overview
 - Check ARI documentation
 - Open issue in ARI repository
 
