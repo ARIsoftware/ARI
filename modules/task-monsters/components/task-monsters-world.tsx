@@ -17,7 +17,7 @@ interface TaskWithMonster extends Task {
 export default function TaskMonstersWorld() {
   const { session } = useSupabase()
   const [tasks, setTasks] = useState<TaskWithMonster[]>([])
-  const [selectedTask, setSelectedTask] = useState<TaskWithMonster | null>(null)
+  const [selectedTaskIndex, setSelectedTaskIndex] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -72,8 +72,15 @@ export default function TaskMonstersWorld() {
   }, [fetchTasks])
 
   const handleMonsterClick = (task: TaskWithMonster) => {
-    setSelectedTask(task)
+    const index = tasks.findIndex(t => t.id === task.id)
+    setSelectedTaskIndex(index >= 0 ? index : null)
   }
+
+  const handleNavigate = (index: number) => {
+    setSelectedTaskIndex(index)
+  }
+
+  const selectedTask = selectedTaskIndex !== null ? tasks[selectedTaskIndex] : null
 
   const monsterCount = tasks.length
 
@@ -146,7 +153,10 @@ export default function TaskMonstersWorld() {
 
       <TaskMonsterPopup
         task={selectedTask}
-        onClose={() => setSelectedTask(null)}
+        tasks={tasks}
+        currentIndex={selectedTaskIndex ?? 0}
+        onClose={() => setSelectedTaskIndex(null)}
+        onNavigate={handleNavigate}
       />
     </div>
   )

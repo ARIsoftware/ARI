@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
-import { X, Calendar, Flag, Skull } from "lucide-react"
+import { useState, useEffect } from "react"
+import { X, Calendar, Flag, Skull, ChevronLeft, ChevronRight } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
 import type { Task } from "@/lib/supabase"
 import { MONSTER_INFO, type MonsterType } from "../lib/monster-utils"
 import { useSupabase } from "@/components/providers"
@@ -13,12 +14,36 @@ interface TaskWithMonster extends Task {
 
 interface TaskMonsterPopupProps {
   task: TaskWithMonster | null
+  tasks: TaskWithMonster[]
+  currentIndex: number
   onClose: () => void
+  onNavigate: (index: number) => void
 }
 
-export default function TaskMonsterPopup({ task, onClose }: TaskMonsterPopupProps) {
+export default function TaskMonsterPopup({ task, tasks, currentIndex, onClose, onNavigate }: TaskMonsterPopupProps) {
   const { session } = useSupabase()
   const [isDestroying, setIsDestroying] = useState(false)
+
+  const canGoPrev = currentIndex > 0
+  const canGoNext = currentIndex < tasks.length - 1
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (!task || isDestroying) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft" && canGoPrev) {
+        onNavigate(currentIndex - 1)
+      } else if (e.key === "ArrowRight" && canGoNext) {
+        onNavigate(currentIndex + 1)
+      } else if (e.key === "Escape") {
+        onClose()
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [task, isDestroying, canGoPrev, canGoNext, currentIndex, onNavigate, onClose])
 
   if (!task) return null
 
@@ -65,15 +90,53 @@ export default function TaskMonsterPopup({ task, onClose }: TaskMonsterPopupProp
       console.error('Failed to complete task:', err)
     }
 
-    // After 3 second animation, reload the page
+    // After 1 second animation, reload the page
     setTimeout(() => {
       window.location.reload()
-    }, 3000)
+    }, 1000)
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={isDestroying ? undefined : onClose}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+
+      {/* Navigation arrows - outside the card */}
+      {!isDestroying && tasks.length > 1 && (
+        <>
+          {/* Left arrow */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              if (canGoPrev) onNavigate(currentIndex - 1)
+            }}
+            disabled={!canGoPrev}
+            className={`absolute left-4 md:left-8 z-20 p-3 rounded-full bg-card/90 backdrop-blur-sm border border-border shadow-lg transition-all ${
+              canGoPrev
+                ? "hover:bg-card hover:scale-110 cursor-pointer"
+                : "opacity-30 cursor-not-allowed"
+            }`}
+          >
+            <ChevronLeft className="w-6 h-6 text-foreground" />
+          </button>
+
+          {/* Right arrow */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              if (canGoNext) onNavigate(currentIndex + 1)
+            }}
+            disabled={!canGoNext}
+            className={`absolute right-4 md:right-8 z-20 p-3 rounded-full bg-card/90 backdrop-blur-sm border border-border shadow-lg transition-all ${
+              canGoNext
+                ? "hover:bg-card hover:scale-110 cursor-pointer"
+                : "opacity-30 cursor-not-allowed"
+            }`}
+          >
+            <ChevronRight className="w-6 h-6 text-foreground" />
+          </button>
+        </>
+      )}
+
       <div
         className="relative bg-card rounded-2xl shadow-2xl max-w-2xl w-full flex overflow-hidden border border-border"
         onClick={(e) => e.stopPropagation()}
@@ -93,60 +156,59 @@ export default function TaskMonsterPopup({ task, onClose }: TaskMonsterPopupProp
           className="w-2/5 p-8 flex flex-col items-center justify-center"
           style={{ backgroundColor: `${task.monster_colors.primary}20` }}
         >
-          <div
-            className="relative w-32 h-32 mb-4"
-            style={{
-              transition: "all 3s ease-out",
-              opacity: isDestroying ? 0 : 1,
-              transform: isDestroying ? "scale(0.5) translateY(-20px)" : "scale(1) translateY(0)",
-            }}
-          >
-            <MonsterIllustration
-              type={task.monster_type as MonsterType}
-              primary={task.monster_colors.primary}
-              secondary={task.monster_colors.secondary}
-            />
+          {/* Stable container to prevent layout shift */}
+          <div className="relative w-32 h-32 mb-4">
+            <AnimatePresence>
+              {!isDestroying && (
+                <motion.div
+                  key="monster"
+                  className="absolute inset-0 flex items-center justify-center"
+                  initial={{ rotate: 0, scale: 1 }}
+                  exit={{
+                    rotate: 720,
+                    scale: 0,
+                    transition: { duration: 1, ease: "easeInOut" }
+                  }}
+                >
+                  <MonsterIllustration
+                    type={task.monster_type as MonsterType}
+                    primary={task.monster_colors.primary}
+                    secondary={task.monster_colors.secondary}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-          <div
-            className="px-3 py-1 rounded-full text-xs font-medium text-white"
-            style={{
-              backgroundColor: task.monster_colors.primary,
-              transition: "opacity 3s ease-out",
-              opacity: isDestroying ? 0 : 1,
-            }}
-          >
-            {task.monster_type.toUpperCase()}
-          </div>
-          {/* Destroying text */}
-          {isDestroying && (
-            <p className="text-sm font-medium text-muted-foreground mt-4 animate-pulse">
-              Destroying...
-            </p>
-          )}
+          <AnimatePresence>
+            {!isDestroying && (
+              <motion.div
+                key="badge"
+                className="px-3 py-1 rounded-full text-xs font-medium text-white"
+                style={{ backgroundColor: task.monster_colors.primary }}
+                exit={{
+                  opacity: 0,
+                  transition: { duration: 0.3, ease: "easeOut" }
+                }}
+              >
+                {task.monster_type.toUpperCase()}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Right side - Task info */}
         <div className="w-3/5 p-8 flex flex-col justify-between">
-          <div>
+          <motion.div
+            animate={{ opacity: isDestroying ? 0.5 : 1 }}
+            transition={{ duration: 0.5 }}
+          >
             {/* Task Title */}
-            <h2
-              className="text-2xl font-bold text-foreground mb-2"
-              style={{
-                transition: "opacity 3s ease-out",
-                opacity: isDestroying ? 0.5 : 1,
-              }}
-            >
+            <h2 className="text-2xl font-bold text-foreground mb-2">
               {task.title}
             </h2>
 
             {/* Task metadata */}
-            <div
-              className="flex flex-wrap gap-2 mb-4"
-              style={{
-                transition: "opacity 3s ease-out",
-                opacity: isDestroying ? 0.5 : 1,
-              }}
-            >
+            <div className="flex flex-wrap gap-2 mb-4">
               {task.due_date && (
                 <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                   <Calendar className="w-3 h-3" />
@@ -160,17 +222,11 @@ export default function TaskMonsterPopup({ task, onClose }: TaskMonsterPopupProp
             </div>
 
             {/* Monster lore */}
-            <div
-              className="border-t border-border pt-4"
-              style={{
-                transition: "opacity 3s ease-out",
-                opacity: isDestroying ? 0.5 : 1,
-              }}
-            >
+            <div className="border-t border-border pt-4">
               <h3 className="text-sm font-medium text-muted-foreground mb-2">About this {monsterInfo?.name}</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">{monsterInfo?.description}</p>
             </div>
-          </div>
+          </motion.div>
 
           {/* Destroy button */}
           <div className="mt-6">
@@ -184,27 +240,32 @@ export default function TaskMonsterPopup({ task, onClose }: TaskMonsterPopupProp
               }`}
             >
               <Skull className="w-5 h-5" />
-              {isDestroying ? "Task Complete!" : "Destroy"}
+              {isDestroying ? "Task Complete" : "Destroy"}
             </button>
           </div>
 
-          {/* Color indicators */}
-          <div
-            className="mt-4 flex gap-4"
-            style={{
-              transition: "opacity 3s ease-out",
-              opacity: isDestroying ? 0.5 : 1,
-            }}
+          {/* Color indicators and page counter */}
+          <motion.div
+            className="mt-4 flex items-center justify-between"
+            animate={{ opacity: isDestroying ? 0.5 : 1 }}
+            transition={{ duration: 0.5 }}
           >
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: task.monster_colors.primary }} />
-              <span className="text-xs text-muted-foreground">Primary</span>
+            <div className="flex gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: task.monster_colors.primary }} />
+                <span className="text-xs text-muted-foreground">Primary</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: task.monster_colors.secondary }} />
+                <span className="text-xs text-muted-foreground">Secondary</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: task.monster_colors.secondary }} />
-              <span className="text-xs text-muted-foreground">Secondary</span>
-            </div>
-          </div>
+            {tasks.length > 1 && (
+              <span className="text-xs text-muted-foreground">
+                {currentIndex + 1} / {tasks.length}
+              </span>
+            )}
+          </motion.div>
         </div>
       </div>
     </div>
