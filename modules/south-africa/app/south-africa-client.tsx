@@ -68,8 +68,14 @@ function TaskSection({
     .filter(t => t.category === category)
     .sort((a, b) => {
       // Active tasks first, completed tasks at bottom
-      if (a.completed === b.completed) return 0
-      return a.completed ? 1 : -1
+      if (a.completed !== b.completed) {
+        return a.completed ? 1 : -1
+      }
+      // Within completed tasks, sort by completed_at (most recent at bottom)
+      if (a.completed && b.completed && a.completed_at && b.completed_at) {
+        return new Date(a.completed_at).getTime() - new Date(b.completed_at).getTime()
+      }
+      return 0
     })
   const completedCount = categoryTasks.filter(t => t.completed).length
   const totalCount = categoryTasks.length
@@ -245,17 +251,11 @@ export default function SouthAfricaClient({ initialTasks, initialActivities }: S
 
   const handleToggleTask = async (id: string, completed: boolean) => {
     const previousTasks = tasks
+    const completedAt = completed ? new Date().toISOString() : null
+
     try {
-      if (completed) {
-        // Move to end of array when completing (most recently checked = very bottom)
-        const task = tasks.find(t => t.id === id)
-        if (task) {
-          setTasks([...tasks.filter(t => t.id !== id), { ...task, completed: true }])
-        }
-      } else {
-        // When unchecking, just update in place
-        setTasks(tasks.map(t => t.id === id ? { ...t, completed } : t))
-      }
+      // Update local state optimistically
+      setTasks(tasks.map(t => t.id === id ? { ...t, completed, completed_at: completedAt } : t))
 
       const response = await fetch(`/api/modules/south-africa/tasks?id=${id}`, {
         method: 'PATCH',
@@ -263,7 +263,7 @@ export default function SouthAfricaClient({ initialTasks, initialActivities }: S
           'Authorization': `Bearer ${session?.access_token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ completed })
+        body: JSON.stringify({ completed, completed_at: completedAt })
       })
 
       if (!response.ok) {
