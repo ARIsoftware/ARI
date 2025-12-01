@@ -64,7 +64,13 @@ function TaskSection({
   onDeleteTask,
   submitting
 }: TaskSectionProps) {
-  const categoryTasks = tasks.filter(t => t.category === category)
+  const categoryTasks = tasks
+    .filter(t => t.category === category)
+    .sort((a, b) => {
+      // Active tasks first, completed tasks at bottom
+      if (a.completed === b.completed) return 0
+      return a.completed ? 1 : -1
+    })
   const completedCount = categoryTasks.filter(t => t.completed).length
   const totalCount = categoryTasks.length
 
