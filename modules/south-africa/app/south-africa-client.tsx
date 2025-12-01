@@ -244,8 +244,18 @@ export default function SouthAfricaClient({ initialTasks, initialActivities }: S
   }
 
   const handleToggleTask = async (id: string, completed: boolean) => {
+    const previousTasks = tasks
     try {
-      setTasks(tasks.map(t => t.id === id ? { ...t, completed } : t))
+      if (completed) {
+        // Move to end of array when completing (most recently checked = very bottom)
+        const task = tasks.find(t => t.id === id)
+        if (task) {
+          setTasks([...tasks.filter(t => t.id !== id), { ...task, completed: true }])
+        }
+      } else {
+        // When unchecking, just update in place
+        setTasks(tasks.map(t => t.id === id ? { ...t, completed } : t))
+      }
 
       const response = await fetch(`/api/modules/south-africa/tasks?id=${id}`, {
         method: 'PATCH',
@@ -257,7 +267,7 @@ export default function SouthAfricaClient({ initialTasks, initialActivities }: S
       })
 
       if (!response.ok) {
-        setTasks(tasks.map(t => t.id === id ? { ...t, completed: !completed } : t))
+        setTasks(previousTasks)
         throw new Error('Failed to update task')
       }
     } catch (err) {
