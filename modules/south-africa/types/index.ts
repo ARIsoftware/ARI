@@ -13,6 +13,7 @@ export interface TravelTask {
   title: string
   category: 'todo' | 'packing_list' | 'morning_routine'
   completed: boolean
+  completed_at?: string | null
   created_at: string
   updated_at?: string
 }

@@ -27,7 +27,8 @@ const CreateTaskSchema = z.object({
  */
 const UpdateTaskSchema = z.object({
   completed: z.boolean().optional(),
-  title: z.string().max(500).optional()
+  title: z.string().max(500).optional(),
+  completed_at: z.string().nullable().optional()
 })
 
 /**
