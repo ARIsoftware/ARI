@@ -46,6 +46,7 @@ const COMPLETE_TABLE_LIST = [
   'travel',
   'travel_activities',
   'ohtani_grid_cells',
+  'gratitude_entries',
 ]
 
 interface TableInfo {
