@@ -6,9 +6,17 @@
 
 import { NextResponse } from 'next/server'
 import { getEnabledModules } from '@/lib/modules/module-registry'
+import { getAuthenticatedUser } from '@/lib/auth-helpers'
 
 export async function GET() {
   try {
+    // Require authentication
+    const { user } = await getAuthenticatedUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
+
     // Get enabled modules for current user
     const modules = await getEnabledModules()
 
