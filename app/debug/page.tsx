@@ -403,7 +403,7 @@ export default function DatabaseTestPage() {
               headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}
             })
 
-            const success = response.status === 200 || response.status === 401 // 401 means auth is working
+            const success = response.status === 200 || response.status === 401 || response.status === 405 // 401 = auth working, 405 = POST-only endpoint
             apiRouteTests.push({
               module: moduleId,
               route: endpoint,
