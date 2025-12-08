@@ -798,7 +798,7 @@ The card will automatically appear on HD Dashboard when:
 **Tasks:**
 1. Create HD card component template (`/templates/hd-card-template.tsx`)
 2. Write developer guide section in this document
-3. Update `MODULE-MIGRATION-CHECKLIST.md` with HD card steps
+3. Update `/docs/MODULE-MIGRATION-CHECKLIST.md` with HD card steps
 4. Add to `CLAUDE.md` as a system pattern
 5. Create validation script for registry consistency
 6. Add code snippets to documentation

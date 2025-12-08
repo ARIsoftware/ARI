@@ -94,7 +94,7 @@ Your PR will be reviewed for:
 ## Questions?
 
 - Check the main ARI documentation
-- Review modules.md specification
+- Review `/docs/modules.md` specification
 - Open a GitHub issue for clarification
 
 ## License
