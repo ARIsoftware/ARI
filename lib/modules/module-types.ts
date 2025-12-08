@@ -166,7 +166,9 @@ export interface ModuleLoadError {
   moduleId: string
   modulePath: string
   error: string
-  errorType: 'MANIFEST_MISSING' | 'MANIFEST_INVALID' | 'DEPENDENCY_MISSING' | 'RESERVED_ID' | 'VALIDATION_FAILED'
+  errorType: 'MANIFEST_MISSING' | 'MANIFEST_INVALID' | 'DEPENDENCY_MISSING' | 'RESERVED_ID' | 'VALIDATION_FAILED' | 'DUPLICATE_ID'
+  /** For DUPLICATE_ID errors, list of all directories using this ID */
+  duplicateDirectories?: string[]
 }
 
 /**
