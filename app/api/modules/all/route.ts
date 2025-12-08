@@ -3,14 +3,11 @@
  *
  * GET /api/modules/all - List ALL discovered modules (regardless of enabled state)
  * This is used by the Settings page to show all modules for management
- *
- * This endpoint also regenerates the module registry to ensure it's always up-to-date.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { getModules } from '@/lib/modules/module-registry'
-import { regenerateModuleRegistry } from '@/lib/modules/regenerate-registry'
 
 /**
  * GET /api/modules/all
@@ -29,10 +26,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Regenerate the module registry to ensure it's up-to-date
-    await regenerateModuleRegistry()
-
     // Get ALL discovered modules (regardless of enabled state)
+    // Registry is generated at build time via npm run generate-module-registry
     const allModules = await getModules()
 
     // Get user's module settings from database to populate isEnabled
