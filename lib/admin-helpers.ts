@@ -1,14 +1,14 @@
 // Admin access control for sensitive operations
 export function isAdminUser(userId: string): boolean {
-  // Admin user IDs - hardcoded for single admin user
-  const adminUserIds = [
-    '01dbcb0e-6d5c-4612-baa0-376cb1a97783'
-  ]
-  
-  // Also check environment variable for additional admin IDs
-  const envAdmins = process.env.ADMIN_USER_IDS?.split(',').map(id => id.trim()) || []
-  
-  return adminUserIds.includes(userId) || envAdmins.includes(userId)
+  // Get admin user IDs from environment variable only (no hardcoded IDs for security)
+  const envAdmins = process.env.ADMIN_USER_IDS?.split(',').map(id => id.trim()).filter(Boolean) || []
+
+  if (envAdmins.length === 0) {
+    console.warn('[Admin] No ADMIN_USER_IDS configured in environment variables')
+    return false
+  }
+
+  return envAdmins.includes(userId)
 }
 
 export function requireAdmin(userId: string): void {

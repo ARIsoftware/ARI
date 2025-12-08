@@ -368,7 +368,7 @@ User-friendly interface with:
 
 **If using fallback**: The system still works but may not discover new tables automatically. Run `/migrations/backup_system_functions.sql` for optimal performance.
 
-### Expected Tables (23 as of November 2025)
+### Expected Tables (25 as of December 2025)
 1. `tasks` - Task management
 2. `fitness_database` - Fitness tasks
 3. `contacts` - Contact management
@@ -393,6 +393,7 @@ User-friendly interface with:
 22. `travel` - South Africa trip tasks and packing list
 23. `travel_activities` - South Africa trip activities (stays and events)
 24. `ohtani_grid_cells` - Ohtani module grid data
+25. `gratitude_entries` - Daily gratitude journal entries
 
 ### Usage Guide
 

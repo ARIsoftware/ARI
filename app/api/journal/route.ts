@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase
       .from('journal')
       .select('*')
+      .eq('user_id', user.id)  // Defense-in-depth: explicit user filtering
       .eq('entry_type', entryType)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -43,10 +44,11 @@ export async function POST(request: NextRequest) {
 
     const entryType = entry.entry_type || 'winter_arc'
 
-    // Check if entry already exists
+    // Check if entry already exists for this user
     const { data: existingEntry } = await supabase
       .from('journal')
       .select('id')
+      .eq('user_id', user.id)  // Defense-in-depth: explicit user filtering
       .eq('entry_type', entryType)
       .maybeSingle()
 
