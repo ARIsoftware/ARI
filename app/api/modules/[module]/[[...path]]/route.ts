@@ -76,6 +76,9 @@ const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
   },
   'ohtani': {
     'data': () => import('@/modules-core/ohtani/api/data/route') // GET/PUT for grid cells
+  },
+  'gratitude': {
+    'entries': () => import('@/modules-core/gratitude/api/entries/route') // GET/POST for daily entries
   }
 }
 

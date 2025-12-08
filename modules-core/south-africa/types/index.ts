@@ -11,8 +11,9 @@ export interface TravelTask {
   id: string
   user_id: string
   title: string
-  category: 'todo' | 'packing_list'
+  category: 'todo' | 'packing_list' | 'morning_routine'
   completed: boolean
+  completed_at?: string | null
   created_at: string
   updated_at?: string
 }
@@ -24,7 +25,7 @@ export interface TravelTask {
  */
 export interface CreateTaskRequest {
   title: string
-  category: 'todo' | 'packing_list'
+  category: 'todo' | 'packing_list' | 'morning_routine'
 }
 
 /**
