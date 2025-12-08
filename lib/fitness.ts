@@ -15,4 +15,4 @@ export {
   reorderFitnessTasks,
   addSampleFitnessTasks,
   type FitnessTask
-} from '@/modules/daily-fitness/lib/fitness'
+} from '@/modules-core/daily-fitness/lib/fitness'

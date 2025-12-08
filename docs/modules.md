@@ -10,14 +10,86 @@
 
 ## Table of Contents
 
-1. [Quick Start](#quick-start)
-2. [Module Architecture](#module-architecture)
-3. [Module Manifest Reference](#module-manifest-reference)
-4. [Creating Your First Module](#creating-your-first-module)
-5. [Module Features](#module-features)
-6. [Advanced Topics](#advanced-topics)
-7. [Best Practices](#best-practices)
-8. [Troubleshooting](#troubleshooting)
+1. [Module Directories](#module-directories)
+2. [Quick Start](#quick-start)
+3. [Module Architecture](#module-architecture)
+4. [Module Manifest Reference](#module-manifest-reference)
+5. [Creating Your First Module](#creating-your-first-module)
+6. [Module Features](#module-features)
+7. [Advanced Topics](#advanced-topics)
+8. [Best Practices](#best-practices)
+9. [Troubleshooting](#troubleshooting)
+
+---
+
+## Module Directories
+
+ARI uses two module directories with different purposes. Understanding these directories is **critical** to avoid losing your work during software updates.
+
+### `/modules-core` - Built-in Modules (DO NOT EDIT)
+
+This directory contains modules that ship with ARI. These are maintained by the ARI development team.
+
+> ⚠️ **CRITICAL WARNING**: Never edit modules in `/modules-core` directly!
+>
+> When you download and install a new version of ARI, the entire `/modules-core` directory will be **replaced**. Any changes you made to files in this directory will be **permanently lost**.
+>
+> If you want to customize a core module, use the override system described below.
+
+### `/modules-custom` - Your Custom Modules (SAFE)
+
+This is where you should place **all** your own modules. Modules in this directory are **never touched** during ARI updates.
+
+**First-time setup** - Create this folder in the root directory if it doesn't already exist:
+
+```bash
+mkdir modules-custom
+```
+
+**Why use `/modules-custom`**:
+
+| Benefit | Description |
+|---------|-------------|
+| ✅ **Update Safe** | Your modules are never overwritten during ARI updates |
+| ✅ **Clean Separation** | Clear distinction between core and custom functionality |
+| ✅ **Easy Backup** | Simply copy the `/modules-custom` folder to back up all your modules |
+| ✅ **Override Capability** | Can override core modules by using the same ID |
+| ✅ **Version Control** | Can use git submodules for individual module repos |
+
+### Overriding Core Modules
+
+If you want to customize a core module, you can **override** it by creating a module in `/modules-custom` with the **same ID** as the core module.
+
+**Example**: To override the `hello-world` module:
+
+1. Copy the module from `/modules-core/hello-world` to `/modules-custom/my-hello-world` (folder name can be anything)
+2. Ensure the `id` field in `module.json` is `"hello-world"` (must match the core module's ID)
+3. Make your customizations
+4. The system will load your version instead of the core version
+5. The core module will appear as "OVERRIDDEN" on the Modules settings page
+
+**How it works**:
+- Modules in `/modules-custom` are loaded **first**
+- If a module in `/modules-custom` has the same ID as one in `/modules-core`, the custom module takes precedence
+- The overridden core module is marked as "OVERRIDDEN" and disabled in the UI
+- Your custom module appears with a "USER MODULE" badge
+
+**Duplicate ID Rules**:
+
+| Scenario | Result |
+|----------|--------|
+| Two modules in `/modules-custom` with the same ID | ❌ **Error** - blocks app until fixed |
+| Two modules in `/modules-core` with the same ID | ❌ **Error** - blocks app until fixed |
+| One module in `/modules-custom` + one in `/modules-core` with same ID | ✅ **Custom wins** - core is overridden |
+
+### Summary: Where Should I Put My Module?
+
+| Situation | Location |
+|-----------|----------|
+| Creating a brand new module | `/modules-custom/` |
+| Customizing a core module | `/modules-custom/` (use same ID to override) |
+| Testing modifications to a core module | `/modules-custom/` (copy and override) |
+| Contributing to ARI core | `/modules-core/` (for development only) |
 
 ---
 
@@ -35,7 +107,7 @@ Modules are self-contained features that extend ARI's functionality. They can ad
 
 ### Module System Benefits
 
-✅ **Plug-and-Play**: Drop a module folder into `/modules` and it's auto-discovered
+✅ **Plug-and-Play**: Drop a module folder into `/modules-custom` and it's auto-discovered
 ✅ **Isolated**: Modules don't affect each other or the core app
 ✅ **User Control**: Users can enable/disable modules individually
 ✅ **Secure**: Built-in authentication, RLS policies, and error boundaries
@@ -43,18 +115,21 @@ Modules are self-contained features that extend ARI's functionality. They can ad
 
 ### Installation
 
-Modules are automatically discovered from the `/modules` directory:
+Modules are automatically discovered from `/modules-custom` (your modules) and `/modules-core` (built-in modules):
 
 ```bash
+# First, ensure modules-custom directory exists
+mkdir -p modules-custom
+
 # Method 1: Git clone
-cd modules/
+cd modules-custom/
 git clone https://github.com/user/ari-amazing-module.git amazing-module
 
 # Method 2: Copy folder
-cp -r ~/Downloads/my-module modules/
+cp -r ~/Downloads/my-module modules-custom/
 
 # Method 3: Git submodule
-git submodule add https://github.com/user/ari-module.git modules/my-module
+git submodule add https://github.com/user/ari-module.git modules-custom/my-module
 
 # Restart dev server (or refresh page)
 npm run dev
@@ -85,7 +160,7 @@ That's it! The module will appear in the sidebar and settings automatically.
 │                      ↓                                        │
 │  ┌──────────────────────────────────────┐                   │
 │  │ Module Registry                       │                   │
-│  │ /lib/modules/module-registry.ts      │                   │
+│  │ /lib/modules-core/module-registry.ts      │                   │
 │  │                                        │                   │
 │  │ • Scans /modules directory            │                   │
 │  │ • Validates module.json files         │                   │
@@ -95,7 +170,7 @@ That's it! The module will appear in the sidebar and settings automatically.
 └─────────────────────────────────────────────────────────────┘
                       ↓
 ┌─────────────────────────────────────────────────────────────┐
-│  Your Module (/modules/your-module)                          │
+│  Your Module (/modules-core/your-module)                          │
 │                                                               │
 │  module.json         ← Required manifest file               │
 │  /app/page.tsx       ← Your module's main page              │
@@ -116,8 +191,8 @@ That's it! The module will appear in the sidebar and settings automatically.
 ```typescript
 // /app/[module]/[[...slug]]/page.tsx
 const MODULE_PAGES: Record<string, any> = {
-  'hello-world': () => import('@/modules/hello-world/app/page'),
-  'analytics': () => import('@/modules/analytics/app/page'),
+  'hello-world': () => import('@/modules-core/hello-world/app/page'),
+  'analytics': () => import('@/modules-core/analytics/app/page'),
   // Add your module here
 }
 ```
@@ -236,10 +311,12 @@ Welcome!
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `path` | `string` | **Must start with `/{module-id}`** |
+| `path` | `string` | URL path for this route (e.g., `/my-module`) |
 | `label` | `string` | Display text in sidebar |
 | `icon` | `string` | Lucide icon name (optional, inherits from module icon) |
 | `sidebarPosition` | `string` | Where to show: `"main"`, `"bottom"`, or `"secondary"` |
+
+> **Note**: Route paths are flexible - they don't need to match the module ID. This allows override modules to serve different routes than the original.
 
 ---
 
@@ -248,8 +325,9 @@ Welcome!
 ### Step 1: Create Module Structure
 
 ```bash
-mkdir -p modules/my-module/{app,components,api,database,types}
-cd modules/my-module
+# Always create modules in modules-custom (not modules-core!)
+mkdir -p modules-custom/my-module/{app,components,api,database,types}
+cd modules-custom/my-module
 ```
 
 ### Step 2: Create `module.json`
@@ -334,7 +412,7 @@ Edit `/lib/generated/module-pages-registry.ts`:
 ```typescript
 export const MODULE_PAGES: Record<string, any> = {
   // ... existing modules
-  'my-module': () => import('@/modules/my-module/app/page'), // Add this line
+  'my-module': () => import('@/modules-core/my-module/app/page'), // Add this line
 }
 
 export const REGISTERED_MODULE_IDS = [
@@ -345,13 +423,13 @@ export const REGISTERED_MODULE_IDS = [
 
 #### 4b. Register API Routes (if module has API)
 
-Edit `/app/api/modules/[module]/[[...path]]/route.ts`:
+Edit `/app/api/modules-core/[module]/[[...path]]/route.ts`:
 
 ```typescript
 const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
   // ... existing modules
   'my-module': {
-    'data': () => import('@/modules/my-module/api/data/route')
+    'data': () => import('@/modules-core/my-module/api/data/route')
   },
 }
 ```
@@ -395,9 +473,9 @@ Create API endpoints for your module.
 modules/my-module/
   api/
     data/
-      route.ts      # /api/modules/my-module/data
+      route.ts      # /api/modules-core/my-module/data
     stats/
-      route.ts      # /api/modules/my-module/stats
+      route.ts      # /api/modules-core/my-module/stats
 ```
 
 #### Example API Route
@@ -490,7 +568,7 @@ export async function POST(request: NextRequest) {
 }
 ```
 
-**API URL**: `http://localhost:3000/api/modules/my-module/data`
+**API URL**: `http://localhost:3000/api/modules-core/my-module/data`
 
 **Security Checklist**:
 - ✅ Always validate authentication
@@ -588,7 +666,7 @@ export function MyModuleWidget() {
   useEffect(() => {
     if (!session?.access_token) return
 
-    fetch('/api/modules/my-module/data', {
+    fetch('/api/modules-core/my-module/data', {
       headers: { 'Authorization': `Bearer ${session.access_token}` }
     })
       .then(res => res.json())
@@ -1003,7 +1081,7 @@ AND tablename = 'my_module_data';
 Use this as a starting point for new modules:
 
 ```bash
-modules/my-module/
+modules-custom/my-module/
 ├── module.json              # ← Required
 ├── README.md
 ├── app/
@@ -1029,7 +1107,7 @@ modules/my-module/
 Check out the `hello-world` module for a complete working example:
 
 ```
-/modules/hello-world/
+/modules-core/hello-world/
 ```
 
 This module demonstrates:
@@ -1073,7 +1151,7 @@ EOF
 ### 2. Create Git Repository
 
 ```bash
-cd modules/my-module
+cd modules-custom/my-module
 git init
 git add .
 git commit -m "Initial commit"
@@ -1093,7 +1171,7 @@ git push origin v1.0.0
 Users can install your module with:
 
 ```bash
-cd modules/
+cd modules-custom/
 git clone https://github.com/yourname/ari-my-module.git my-module
 ```
 
@@ -1101,9 +1179,9 @@ git clone https://github.com/yourname/ari-my-module.git my-module
 
 ## Additional Resources
 
-- **Module Types**: See `/lib/modules/module-types.ts` for full TypeScript definitions
-- **Module Registry**: See `/lib/modules/module-registry.ts` for how modules are loaded
-- **Hello World Module**: See `/modules/hello-world/` for complete example
+- **Module Types**: See `/lib/modules-core/module-types.ts` for full TypeScript definitions
+- **Module Registry**: See `/lib/modules-core/module-registry.ts` for how modules are loaded
+- **Hello World Module**: See `/modules-core/hello-world/` for complete example
 - **Lucide Icons**: https://lucide.dev for available icon names
 - **Shadcn/ui**: https://ui.shadcn.com for UI components
 
