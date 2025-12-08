@@ -2,13 +2,13 @@
  * Module API Catch-All Route
  *
  * Dynamically imports and executes module API handlers using a registry pattern.
- * Proxies requests to module API routes in /modules/[module]/api/
+ * Proxies requests to module API routes in /modules-core/[module]/api/
  *
  * URL Pattern: /api/modules/[module]/[[...path]]
  * Examples:
- *   /api/modules/contacts → /modules/contacts/api/route.ts
- *   /api/modules/contacts/123 → /modules/contacts/api/[id]/route.ts
- *   /api/modules/hello-world/data → /modules/hello-world/api/data/route.ts
+ *   /api/modules/contacts → /modules-core/contacts/api/route.ts
+ *   /api/modules/contacts/123 → /modules-core/contacts/api/[id]/route.ts
+ *   /api/modules/hello-world/data → /modules-core/hello-world/api/data/route.ts
  *
  * IMPORTANT: This uses a registry-based approach since Next.js/Turbopack cannot
  * resolve dynamic imports with runtime-constructed paths. When adding a new module
@@ -24,58 +24,58 @@ import { getEnabledModule } from '@/lib/modules/module-registry'
  * Maps module IDs and API paths to their corresponding route handlers.
  * This registry uses static import paths that can be analyzed at build time.
  *
- * Pattern: { 'module-id': { 'api-path': () => import('@/modules/module-id/api/api-path/route') } }
+ * Pattern: { 'module-id': { 'api-path': () => import('@/modules-core/module-id/api/api-path/route') } }
  *
  * When adding a new module with API routes:
  * 1. Add the module ID as a key
- * 2. For each API route in /modules/[module]/api/[route]/, add an entry
+ * 2. For each API route in /modules-core/[module]/api/[route]/, add an entry
  * 3. Use the folder name as the key (e.g., 'data' for /api/data/)
- * 4. Use static import path: () => import('@/modules/[module]/api/[route]/route')
+ * 4. Use static import path: () => import('@/modules-core/[module]/api/[route]/route')
  */
 const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
   'south-africa': {
-    'tasks': () => import('@/modules/south-africa/api/tasks/route'),
-    'activities': () => import('@/modules/south-africa/api/activities/route')
+    'tasks': () => import('@/modules-core/south-africa/api/tasks/route'),
+    'activities': () => import('@/modules-core/south-africa/api/activities/route')
   },
   'hello-world': {
-    'data': () => import('@/modules/hello-world/api/data/route'),
-    'settings': () => import('@/modules/hello-world/api/settings/route')
+    'data': () => import('@/modules-core/hello-world/api/data/route'),
+    'settings': () => import('@/modules-core/hello-world/api/settings/route')
   },
   'shipments': {
-    'items': () => import('@/modules/shipments/api/items/route')
+    'items': () => import('@/modules-core/shipments/api/items/route')
   },
   'hyrox': {
-    'workouts': () => import('@/modules/hyrox/api/workouts/route'),
-    'workout-stations': () => import('@/modules/hyrox/api/workout-stations/route'),
-    'station-records': () => import('@/modules/hyrox/api/station-records/route'),
-    'setup': () => import('@/modules/hyrox/api/setup/route'),
-    'reset': () => import('@/modules/hyrox/api/reset/route'),
-    'test-database': () => import('@/modules/hyrox/api/test-database/route')
+    'workouts': () => import('@/modules-core/hyrox/api/workouts/route'),
+    'workout-stations': () => import('@/modules-core/hyrox/api/workout-stations/route'),
+    'station-records': () => import('@/modules-core/hyrox/api/station-records/route'),
+    'setup': () => import('@/modules-core/hyrox/api/setup/route'),
+    'reset': () => import('@/modules-core/hyrox/api/reset/route'),
+    'test-database': () => import('@/modules-core/hyrox/api/test-database/route')
   },
   'quotes': {
-    'quotes': () => import('@/modules/quotes/api/quotes/route'),
-    'settings': () => import('@/modules/quotes/api/settings/route')
+    'quotes': () => import('@/modules-core/quotes/api/quotes/route'),
+    'settings': () => import('@/modules-core/quotes/api/settings/route')
   },
   'contacts': {
-    '': () => import('@/modules/contacts/api/route'), // Base route for list/create
-    '[id]': () => import('@/modules/contacts/api/[id]/route') // Dynamic ID route
+    '': () => import('@/modules-core/contacts/api/route'), // Base route for list/create
+    '[id]': () => import('@/modules-core/contacts/api/[id]/route') // Dynamic ID route
   },
   'motivation': {
-    'refresh-thumbnail': () => import('@/modules/motivation/api/refresh-thumbnail/route'),
-    'reorder': () => import('@/modules/motivation/api/reorder/route'),
-    'setup': () => import('@/modules/motivation/api/setup/route')
+    'refresh-thumbnail': () => import('@/modules-core/motivation/api/refresh-thumbnail/route'),
+    'reorder': () => import('@/modules-core/motivation/api/reorder/route'),
+    'setup': () => import('@/modules-core/motivation/api/setup/route')
   },
   'winter-arc': {
-    '': () => import('@/modules/winter-arc/api/route'), // Base route for list/create
-    '[id]': () => import('@/modules/winter-arc/api/[id]/route') // Dynamic ID route
+    '': () => import('@/modules-core/winter-arc/api/route'), // Base route for list/create
+    '[id]': () => import('@/modules-core/winter-arc/api/[id]/route') // Dynamic ID route
   },
   'major-projects': {
-    'data': () => import('@/modules/major-projects/api/data/route'), // GET/POST for list/create
-    'data/[id]': () => import('@/modules/major-projects/api/data/[id]/route'), // PATCH/DELETE for update/delete
-    'settings': () => import('@/modules/major-projects/api/settings/route') // Settings GET/PUT
+    'data': () => import('@/modules-core/major-projects/api/data/route'), // GET/POST for list/create
+    'data/[id]': () => import('@/modules-core/major-projects/api/data/[id]/route'), // PATCH/DELETE for update/delete
+    'settings': () => import('@/modules-core/major-projects/api/settings/route') // Settings GET/PUT
   },
   'ohtani': {
-    'data': () => import('@/modules/ohtani/api/data/route') // GET/PUT for grid cells
+    'data': () => import('@/modules-core/ohtani/api/data/route') // GET/PUT for grid cells
   }
 }
 

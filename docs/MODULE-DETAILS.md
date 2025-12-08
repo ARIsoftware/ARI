@@ -7,23 +7,23 @@ This document describes a proven module architecture for Next.js applications. Y
 First, read and understand this `/docs/MODULE-DETAILS.md` file thoroughly. Pay special attention to:
 
 1. **Core Concepts**
-   - How modules are self-contained in `/modules/{module-id}/` directories
+   - How modules are self-contained in `/modules-core/{module-id}/` directories
    - The `module.json` manifest format and required fields
    - How catch-all routes (`/app/[module]/[[...slug]]/page.tsx`) dynamically serve module pages
    - The registry-based approach for dynamic imports (required because Next.js/Turbopack can't resolve fully dynamic imports)
 
 2. **Infrastructure Components**
-   - `/lib/modules/module-types.ts` - TypeScript interfaces
-   - `/lib/modules/module-loader.ts` - Server-side discovery
-   - `/lib/modules/module-registry.ts` - Module state management
-   - `/lib/modules/module-hooks.ts` - Client-side React hooks
-   - `/lib/modules/reserved-routes.ts` - Protected route names
+   - `/lib/modules-core/module-types.ts` - TypeScript interfaces
+   - `/lib/modules-core/module-loader.ts` - Server-side discovery
+   - `/lib/modules-core/module-registry.ts` - Module state management
+   - `/lib/modules-core/module-hooks.ts` - Client-side React hooks
+   - `/lib/modules-core/reserved-routes.ts` - Protected route names
    - `/lib/generated/module-pages-registry.ts` - Auto-generated before build
 
 3. **Key Patterns**
    - Build-time registry generation via `scripts/generate-module-registry.js`
    - Per-user module enable/disable via `module_settings` database table
-   - API routes proxied through `/api/modules/[module]/[[...path]]/route.ts`
+   - API routes proxied through `/api/modules-core/[module]/[[...path]]/route.ts`
    - Dashboard widgets and settings panels registered in module.json
 
 ## Phase 2: Analyze This Codebase
@@ -51,7 +51,7 @@ Now explore this codebase to understand:
 Based on your analysis, create a detailed migration plan that includes:
 
 1. **Infrastructure Setup**
-   - List of files to create in `/lib/modules/`
+   - List of files to create in `/lib/modules-core/`
    - Catch-all route files needed
    - Registry generation script
    - Database schema for module settings (adapt to this app's database)
@@ -147,8 +147,8 @@ The ARI module system allows features to be:
 ├─────────────────────────────────────────────────────────────────┤
 │  /app                                                            │
 │  ├── /[module]/[[...slug]]/page.tsx   ← Catch-all for pages     │
-│  ├── /api/modules/[module]/[[...path]]/route.ts ← Catch-all API │
-│  └── /modules/page.tsx                ← Module management UI     │
+│  ├── /api/modules-core/[module]/[[...path]]/route.ts ← Catch-all API │
+│  └── /modules-core/page.tsx                ← Module management UI     │
 ├─────────────────────────────────────────────────────────────────┤
 │  /lib/modules                                                    │
 │  ├── module-types.ts      ← TypeScript interfaces                │
@@ -173,7 +173,7 @@ The ARI module system allows features to be:
 
 ## Module Structure
 
-Each module lives in `/modules/{module-id}/` and follows this structure:
+Each module lives in `/modules-core/{module-id}/` and follows this structure:
 
 ```
 modules/{module-id}/
@@ -186,11 +186,11 @@ modules/{module-id}/
 │       └── page.tsx        # Sub-page at /{module-id}/settings
 │
 ├── api/                     # Module API routes
-│   ├── route.ts            # Base route: /api/modules/{module-id}
+│   ├── route.ts            # Base route: /api/modules-core/{module-id}
 │   ├── data/
-│   │   └── route.ts        # /api/modules/{module-id}/data
+│   │   └── route.ts        # /api/modules-core/{module-id}/data
 │   └── [id]/
-│       └── route.ts        # /api/modules/{module-id}/{id}
+│       └── route.ts        # /api/modules-core/{module-id}/{id}
 │
 ├── components/              # Module-specific components
 │   ├── widget.tsx          # Dashboard widget
@@ -212,7 +212,7 @@ modules/{module-id}/
 
 ## Core Infrastructure Files
 
-### 1. Module Types (`/lib/modules/module-types.ts`)
+### 1. Module Types (`/lib/modules-core/module-types.ts`)
 
 Defines all TypeScript interfaces:
 
@@ -260,7 +260,7 @@ export interface ModuleMetadata extends ModuleManifest {
 }
 ```
 
-### 2. Module Loader (`/lib/modules/module-loader.ts`)
+### 2. Module Loader (`/lib/modules-core/module-loader.ts`)
 
 Server-side module discovery:
 
@@ -313,7 +313,7 @@ export async function loadModules(): Promise<{
 }
 ```
 
-### 3. Module Registry (`/lib/modules/module-registry.ts`)
+### 3. Module Registry (`/lib/modules-core/module-registry.ts`)
 
 Server-side functions for module state management:
 
@@ -366,7 +366,7 @@ export async function setModuleEnabled(
 }
 ```
 
-### 4. Reserved Routes (`/lib/modules/reserved-routes.ts`)
+### 4. Reserved Routes (`/lib/modules-core/reserved-routes.ts`)
 
 Prevents module IDs from conflicting with core routes:
 
@@ -400,7 +400,7 @@ export function validateModuleId(id: string): { valid: boolean; error?: string }
 }
 ```
 
-### 5. Client Hooks (`/lib/modules/module-hooks.ts`)
+### 5. Client Hooks (`/lib/modules-core/module-hooks.ts`)
 
 React hooks for client components:
 
@@ -518,7 +518,7 @@ Module pages are served via a catch-all route at `/app/[module]/[[...slug]]/page
 ```typescript
 // /app/[module]/[[...slug]]/page.tsx
 import { notFound } from 'next/navigation'
-import { getEnabledModule } from '@/lib/modules/module-registry'
+import { getEnabledModule } from '@/lib/modules-core/module-registry'
 import { MODULE_PAGES } from '@/lib/generated/module-pages-registry'
 
 export default async function ModuleCatchAllPage({
@@ -566,9 +566,9 @@ Because Next.js/Turbopack cannot resolve fully dynamic imports at build time, we
 ```typescript
 // /lib/generated/module-pages-registry.ts (auto-generated)
 export const MODULE_PAGES: Record<string, any> = {
-  'hello-world': () => import('@/modules/hello-world/app/page'),
-  'contacts': () => import('@/modules/contacts/app/page'),
-  'shipments': () => import('@/modules/shipments/app/page'),
+  'hello-world': () => import('@/modules-core/hello-world/app/page'),
+  'contacts': () => import('@/modules-core/contacts/app/page'),
+  'shipments': () => import('@/modules-core/shipments/app/page'),
   // ... auto-generated for all modules
 }
 ```
@@ -603,7 +603,7 @@ function scanModules() {
 
 function generateRegistry(modules) {
   const imports = modules.map(id =>
-    `  '${id}': () => import('@/modules/${id}/app/page'),`
+    `  '${id}': () => import('@/modules-core/${id}/app/page'),`
   ).join('\n')
 
   return `export const MODULE_PAGES: Record<string, any> = {\n${imports}\n}`
@@ -629,23 +629,23 @@ fs.writeFileSync(OUTPUT_FILE, registry)
 
 ## API Route Handling
 
-Module APIs are served via a catch-all route at `/app/api/modules/[module]/[[...path]]/route.ts`:
+Module APIs are served via a catch-all route at `/app/api/modules-core/[module]/[[...path]]/route.ts`:
 
 ```typescript
-// /app/api/modules/[module]/[[...path]]/route.ts
+// /app/api/modules-core/[module]/[[...path]]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { getEnabledModule } from '@/lib/modules/module-registry'
+import { getEnabledModule } from '@/lib/modules-core/module-registry'
 
 // Static registry of module API routes
 // IMPORTANT: Must be manually updated when adding new module APIs
 const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
   'hello-world': {
-    'data': () => import('@/modules/hello-world/api/data/route'),
-    'settings': () => import('@/modules/hello-world/api/settings/route')
+    'data': () => import('@/modules-core/hello-world/api/data/route'),
+    'settings': () => import('@/modules-core/hello-world/api/settings/route')
   },
   'contacts': {
-    '': () => import('@/modules/contacts/api/route'),
-    '[id]': () => import('@/modules/contacts/api/[id]/route')
+    '': () => import('@/modules-core/contacts/api/route'),
+    '[id]': () => import('@/modules-core/contacts/api/[id]/route')
   }
 }
 
@@ -695,7 +695,7 @@ export async function PATCH(req, ctx) { return handleRequest(req, 'PATCH', ctx.p
 ### Example Module API Route
 
 ```typescript
-// /modules/hello-world/api/data/route.ts
+// /modules-core/hello-world/api/data/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { z } from 'zod'
@@ -788,7 +788,7 @@ CREATE POLICY "Users can update own settings"
 Each module can define its own tables with RLS:
 
 ```sql
--- /modules/hello-world/database/schema.sql
+-- /modules-core/hello-world/database/schema.sql
 CREATE TABLE hello_world_entries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
@@ -812,7 +812,7 @@ Modules can store per-user settings in the `module_settings.settings` JSONB colu
 ### Settings API Route
 
 ```typescript
-// /modules/hello-world/api/settings/route.ts
+// /modules-core/hello-world/api/settings/route.ts
 export async function GET(request: NextRequest) {
   const { user, supabase } = await getAuthenticatedUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -855,7 +855,7 @@ Modules can provide dashboard widgets that appear on the main dashboard:
 ### Widget Component
 
 ```typescript
-// /modules/hello-world/components/widget.tsx
+// /modules-core/hello-world/components/widget.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -870,7 +870,7 @@ export function HelloWorldWidget() {
   useEffect(() => {
     if (!session?.access_token) return
 
-    fetch('/api/modules/hello-world/data', {
+    fetch('/api/modules-core/hello-world/data', {
       headers: { 'Authorization': `Bearer ${session.access_token}` }
     })
       .then(res => res.json())
@@ -912,7 +912,7 @@ Modules can provide settings panels for the Settings page:
 ### Settings Panel Component
 
 ```typescript
-// /modules/hello-world/components/settings-panel.tsx
+// /modules-core/hello-world/components/settings-panel.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -934,7 +934,7 @@ export function HelloWorldSettingsPanel() {
 
   useEffect(() => {
     // Load settings from API
-    fetch('/api/modules/hello-world/settings', {
+    fetch('/api/modules-core/hello-world/settings', {
       headers: { 'Authorization': `Bearer ${session?.access_token}` }
     })
       .then(res => res.json())
@@ -942,7 +942,7 @@ export function HelloWorldSettingsPanel() {
   }, [session])
 
   const handleSave = async () => {
-    await fetch('/api/modules/hello-world/settings', {
+    await fetch('/api/modules-core/hello-world/settings', {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${session?.access_token}`,
@@ -1011,7 +1011,7 @@ The app sidebar reads enabled modules and renders their routes:
 
 ```typescript
 // In your AppSidebar component
-import { getEnabledModules } from '@/lib/modules/module-registry'
+import { getEnabledModules } from '@/lib/modules-core/module-registry'
 
 export async function AppSidebar() {
   const modules = await getEnabledModules()
@@ -1068,7 +1068,7 @@ Ensure your `tsconfig.json` includes the modules path:
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
-      "@/modules/*": ["./modules/*"]
+      "@/modules-core/*": ["./modules-core/*"]
     }
   }
 }
@@ -1128,13 +1128,13 @@ export default function MyModulePage() {
 
 ### Step 4: Register API Routes (if needed)
 
-Add to the `MODULE_API_ROUTES` in `/app/api/modules/[module]/[[...path]]/route.ts`:
+Add to the `MODULE_API_ROUTES` in `/app/api/modules-core/[module]/[[...path]]/route.ts`:
 
 ```typescript
 const MODULE_API_ROUTES = {
   // ... existing modules
   'my-module': {
-    'data': () => import('@/modules/my-module/api/data/route')
+    'data': () => import('@/modules-core/my-module/api/data/route')
   }
 }
 ```

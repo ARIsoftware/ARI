@@ -23,7 +23,7 @@ This document provides a step-by-step checklist for migrating existing features 
 
 Before starting migration, ensure:
 
-- ✅ Module system is working (`/modules/hello-world` loads successfully)
+- ✅ Module system is working (`/modules-core/hello-world` loads successfully)
 - ✅ You have access to Supabase dashboard
 - ✅ Development server can be restarted
 - ✅ Git working directory is clean (recommended)
@@ -81,10 +81,10 @@ grep -r "table_name" migrations/ database/
 
 ### Step 2.1: Create Directory Structure
 
-- [ ] Create `/modules/[module-id]/` directory
+- [ ] Create `/modules-core/[module-id]/` directory
 - [ ] Create subdirectories:
   ```
-  /modules/[module-id]/
+  /modules-core/[module-id]/
   ├── app/
   ├── api/
   │   ├── data/
@@ -98,7 +98,7 @@ grep -r "table_name" migrations/ database/
 
 **Command:**
 ```bash
-mkdir -p /modules/[module-id]/{app,api/data,api/settings,components,lib,types,database/migrations}
+mkdir -p /modules-core/[module-id]/{app,api/data,api/settings,components,lib,types,database/migrations}
 ```
 
 ### Step 2.2: Create module.json
@@ -348,8 +348,8 @@ export default ModuleWidget
 ### Step 6.1: Update Imports in Other Files
 
 - [ ] Search for old imports: `grep -r "@/lib/old-file" app/`
-- [ ] Update to module paths: `@/modules/[module-id]/lib/utils`
-- [ ] Update type imports: `@/modules/[module-id]/types`
+- [ ] Update to module paths: `@/modules-core/[module-id]/lib/utils`
+- [ ] Update type imports: `@/modules-core/[module-id]/types`
 - [ ] Test that imports resolve correctly
 
 **Example:**
@@ -358,8 +358,8 @@ export default ModuleWidget
 import { getItems, type Item } from '@/lib/old-file'
 
 // NEW
-import { getItems } from '@/modules/module-id/lib/utils'
-import type { Item } from '@/modules/module-id/types'
+import { getItems } from '@/modules-core/module-id/lib/utils'
+import type { Item } from '@/modules-core/module-id/types'
 ```
 
 ### Step 6.2: Remove Static Menu Entry
@@ -500,7 +500,7 @@ rm /lib/old-feature.ts
 ```
 Migrate [Feature Name] to module architecture
 
-- Created /modules/[module-id]/ with complete structure
+- Created /modules-core/[module-id]/ with complete structure
 - Migrated database schema with RLS policies
 - Created comprehensive TypeScript types
 - Migrated API routes to modular structure
@@ -582,7 +582,7 @@ Quick verification checklist:
 - [ ] Settings panel in components/settings-panel.tsx (named + default export)
 - [ ] README.md created
 - [ ] Module registry regenerated
-- [ ] API routes registered in `/app/api/modules/[module]/[[...path]]/route.ts`
+- [ ] API routes registered in `/app/api/modules-core/[module]/[[...path]]/route.ts`
 - [ ] Debug page updated (`registeredModules` array + `expectedTables` count)
 - [ ] Backup system updated (both export and verify `COMPLETE_TABLE_LIST`)
 - [ ] CLAUDE.md updated (Expected Tables count and list)
@@ -604,9 +604,9 @@ Quick verification checklist:
 
 ## Reference Implementation
 
-See `/modules/hello-world/` for a complete reference implementation demonstrating all patterns and best practices.
+See `/modules-core/hello-world/` for a complete reference implementation demonstrating all patterns and best practices.
 
-See `/modules/major-projects/` (formerly "Delulu Projects") for a real-world migration example.
+See `/modules-core/major-projects/` (formerly "Delulu Projects") for a real-world migration example.
 
 ---
 

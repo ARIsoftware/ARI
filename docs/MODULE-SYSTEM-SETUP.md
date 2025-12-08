@@ -2,7 +2,28 @@
 
 ## ✅ Implementation Complete!
 
-The module system infrastructure has been successfully implemented. Follow these steps to get the hello-world module running.
+The module system infrastructure has been successfully implemented. Follow these steps to get started.
+
+---
+
+## 📁 Module Directories
+
+ARI uses two module directories:
+
+| Directory | Purpose | Updates |
+|-----------|---------|---------|
+| `/modules-core` | Built-in modules that ship with ARI | ⚠️ **Overwritten during updates** |
+| `/modules-custom` | Your custom modules | ✅ **Never touched during updates** |
+
+> **IMPORTANT**: Always place your modules in `/modules-custom`. Any changes to `/modules-core` will be lost when you update ARI.
+
+Create the custom modules directory if it doesn't exist:
+
+```bash
+mkdir modules-custom
+```
+
+See `/docs/modules.md` for full documentation on creating modules and overriding core modules.
 
 ---
 
@@ -30,7 +51,7 @@ The hello-world module requires its own database table: `hello_world_entries`.
 
 ### Instructions:
 
-1. Open the file: `/modules/hello-world/database/schema.sql`
+1. Open the file: `/modules-core/hello-world/database/schema.sql`
 2. Copy **the entire contents**
 3. Go to Supabase Dashboard → **SQL Editor**
 4. Create a new query
@@ -96,8 +117,8 @@ npm run dev
 1. Open browser DevTools (F12) → Network tab
 2. Create a new entry on the `/hello-world` page
 3. You should see:
-   - POST request to `/api/modules/hello-world/data` (status 200)
-   - GET request to `/api/modules/hello-world/data` (status 200)
+   - POST request to `/api/modules-core/hello-world/data` (status 200)
+   - GET request to `/api/modules-core/hello-world/data` (status 200)
    - No errors in the console
 
 ---
@@ -135,7 +156,7 @@ You should now have:
 
 **Solutions**:
 1. Verify `/app/[module]/[[...slug]]/page.tsx` exists
-2. Check that `/modules/hello-world/module.json` has `"enabled": true`
+2. Check that `/modules-core/hello-world/module.json` has `"enabled": true`
 3. Clear `.next` folder: `rm -rf .next && npm run dev`
 4. Check server logs for module loading errors
 
@@ -177,8 +198,8 @@ Here's a complete list of files created for the module system:
 
 ### API Routes
 
-7. `/app/api/modules/route.ts` - List/manage modules API
-8. `/app/api/modules/[module]/[...path]/route.ts` - Catch-all API proxy
+7. `/app/api/modules-core/route.ts` - List/manage modules API
+8. `/app/api/modules-core/[module]/[...path]/route.ts` - Catch-all API proxy
 
 ### Page Routes
 
@@ -215,15 +236,16 @@ Now that the module system is working, you can:
 
 ### How Module Loading Works
 
-1. **Discovery**: `/lib/modules/module-loader.ts` scans `/modules` directory
+1. **Discovery**: `/lib/modules/module-loader.ts` scans `/modules-custom` then `/modules-core`
 2. **Validation**: Checks `module.json` files for required fields
-3. **Registration**: `/lib/modules/module-registry.ts` maintains enabled state
-4. **Routing**: Catch-all routes proxy to module files
+3. **Override**: Custom modules with same ID as core modules take precedence
+4. **Registration**: `/lib/modules/module-registry.ts` maintains enabled state
+5. **Routing**: Catch-all routes proxy to module files
 
 ### URL Structure
 
-- **Module Page**: `/hello-world` → `/modules/hello-world/app/page.tsx`
-- **Module API**: `/api/modules/hello-world/data` → `/modules/hello-world/api/data/route.ts`
+- **Module Page**: `/hello-world` → `/modules-core/hello-world/app/page.tsx`
+- **Module API**: `/api/modules-core/hello-world/data` → `/modules-core/hello-world/api/data/route.ts`
 
 ### Database Architecture
 
@@ -272,6 +294,6 @@ Now that the module system is working, you can:
 
 ---
 
-**Need Help?** Check `/modules/hello-world/README.md` for detailed documentation.
+**Need Help?** Check `/modules-core/hello-world/README.md` for detailed documentation.
 
 **Want to Build a Module?** Use hello-world as a template and reference!
