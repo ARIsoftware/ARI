@@ -12,6 +12,7 @@ import { useSupabase } from '@/components/providers'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Loader2, Plus, Trash2 } from 'lucide-react'
@@ -33,7 +34,7 @@ import SouthAfricaMap from './south-africa-map'
 import ActivityList from './activity-list'
 import FlightCards from './flight-cards'
 
-type Category = 'todo' | 'packing_list'
+type Category = 'todo' | 'packing_list' | 'morning_routine'
 
 interface SouthAfricaClientProps {
   initialTasks: TravelTask[]
@@ -63,7 +64,19 @@ function TaskSection({
   onDeleteTask,
   submitting
 }: TaskSectionProps) {
-  const categoryTasks = tasks.filter(t => t.category === category)
+  const categoryTasks = tasks
+    .filter(t => t.category === category)
+    .sort((a, b) => {
+      // Active tasks first, completed tasks at bottom
+      if (a.completed !== b.completed) {
+        return a.completed ? 1 : -1
+      }
+      // Within completed tasks, sort by completed_at (most recent at bottom)
+      if (a.completed && b.completed && a.completed_at && b.completed_at) {
+        return new Date(a.completed_at).getTime() - new Date(b.completed_at).getTime()
+      }
+      return 0
+    })
   const completedCount = categoryTasks.filter(t => t.completed).length
   const totalCount = categoryTasks.length
 
@@ -80,18 +93,23 @@ function TaskSection({
       <CardContent className="space-y-4">
         {/* Add task form */}
         <form onSubmit={onAddTask} className="flex gap-2">
-          <Input
+          <Textarea
             value={newTaskValue}
             onChange={(e) => onNewTaskChange(e.target.value)}
-            placeholder={category === 'todo' ? 'Add a new task...' : 'Add a packing item...'}
+            placeholder={category === 'todo'
+              ? 'Add a new task... (or paste comma-separated: task 1, task 2, task 3)'
+              : category === 'packing_list'
+                ? 'Add packing items... (or paste comma-separated: shirts, pants, shoes)'
+                : 'Add routine items... (or paste comma-separated: brush teeth, shower, sunscreen)'}
             disabled={submitting}
-            className="flex-1"
+            className="flex-1 resize-none"
+            rows={4}
           />
           <Button
             type="submit"
             disabled={submitting || !newTaskValue.trim()}
             size="icon"
-            className="shrink-0"
+            className="shrink-0 h-auto"
           >
             {submitting ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -153,8 +171,10 @@ export default function SouthAfricaClient({ initialTasks, initialActivities }: S
   // Separate state for each section's input
   const [newTodoTask, setNewTodoTask] = useState('')
   const [newPackingTask, setNewPackingTask] = useState('')
+  const [newMorningRoutineTask, setNewMorningRoutineTask] = useState('')
   const [submittingTodo, setSubmittingTodo] = useState(false)
   const [submittingPacking, setSubmittingPacking] = useState(false)
+  const [submittingMorningRoutine, setSubmittingMorningRoutine] = useState(false)
 
   // Activity Modal State (for add and edit)
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false)
@@ -170,35 +190,56 @@ export default function SouthAfricaClient({ initialTasks, initialActivities }: S
   })
   const [submittingActivity, setSubmittingActivity] = useState(false)
 
-  const handleAddTask = async (category: Category, title: string) => {
-    if (!title.trim()) return
+  const handleAddTask = async (category: Category, input: string) => {
+    if (!input.trim()) return
 
-    const setSubmitting = category === 'todo' ? setSubmittingTodo : setSubmittingPacking
-    const setNewTask = category === 'todo' ? setNewTodoTask : setNewPackingTask
+    const setSubmitting = category === 'todo'
+      ? setSubmittingTodo
+      : category === 'packing_list'
+        ? setSubmittingPacking
+        : setSubmittingMorningRoutine
+    const setNewTask = category === 'todo'
+      ? setNewTodoTask
+      : category === 'packing_list'
+        ? setNewPackingTask
+        : setNewMorningRoutineTask
+
+    // Parse comma-separated items (supports "item1, item2, item3" format)
+    const items = input
+      .split(/,\s*/)
+      .map(item => item.trim())
+      .filter(item => item.length > 0)
+
+    if (items.length === 0) return
 
     try {
       setSubmitting(true)
       setError(null)
 
-      const response = await fetch('/api/modules/south-africa/tasks', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ title, category })
-      })
+      const newTasks: TravelTask[] = []
 
-      if (!response.ok) {
-        throw new Error('Failed to create task')
+      for (const title of items) {
+        const response = await fetch('/api/modules/south-africa/tasks', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session?.access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ title, category })
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to create task')
+        }
+
+        const data = await response.json()
+
+        if (data.task) {
+          newTasks.push(data.task)
+        }
       }
 
-      const data = await response.json()
-
-      if (data.task) {
-        setTasks(prevTasks => [...prevTasks, data.task])
-      }
-
+      setTasks(prevTasks => [...prevTasks, ...newTasks])
       setNewTask('')
     } catch (err) {
       console.error('Error creating task:', err)
@@ -209,8 +250,12 @@ export default function SouthAfricaClient({ initialTasks, initialActivities }: S
   }
 
   const handleToggleTask = async (id: string, completed: boolean) => {
+    const previousTasks = tasks
+    const completedAt = completed ? new Date().toISOString() : null
+
     try {
-      setTasks(tasks.map(t => t.id === id ? { ...t, completed } : t))
+      // Update local state optimistically
+      setTasks(tasks.map(t => t.id === id ? { ...t, completed, completed_at: completedAt } : t))
 
       const response = await fetch(`/api/modules/south-africa/tasks?id=${id}`, {
         method: 'PATCH',
@@ -218,11 +263,11 @@ export default function SouthAfricaClient({ initialTasks, initialActivities }: S
           'Authorization': `Bearer ${session?.access_token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ completed })
+        body: JSON.stringify({ completed, completed_at: completedAt })
       })
 
       if (!response.ok) {
-        setTasks(tasks.map(t => t.id === id ? { ...t, completed: !completed } : t))
+        setTasks(previousTasks)
         throw new Error('Failed to update task')
       }
     } catch (err) {
@@ -415,7 +460,7 @@ export default function SouthAfricaClient({ initialTasks, initialActivities }: S
         )}
 
         {/* Task Sections */}
-        <div className="grid gap-4 md:gap-6 md:grid-cols-2">
+        <div className="grid gap-4 md:gap-6 md:grid-cols-2 lg:grid-cols-3">
           <TaskSection
             title="Todo"
             category="todo"
@@ -444,6 +489,21 @@ export default function SouthAfricaClient({ initialTasks, initialActivities }: S
             onToggleTask={handleToggleTask}
             onDeleteTask={handleDeleteTask}
             submitting={submittingPacking}
+          />
+
+          <TaskSection
+            title="Morning Routine"
+            category="morning_routine"
+            tasks={tasks}
+            newTaskValue={newMorningRoutineTask}
+            onNewTaskChange={setNewMorningRoutineTask}
+            onAddTask={(e) => {
+              e.preventDefault()
+              handleAddTask('morning_routine', newMorningRoutineTask)
+            }}
+            onToggleTask={handleToggleTask}
+            onDeleteTask={handleDeleteTask}
+            submitting={submittingMorningRoutine}
           />
         </div>
       </div>

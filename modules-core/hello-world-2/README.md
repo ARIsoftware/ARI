@@ -184,7 +184,7 @@ Update `module.json` routes:
 
 ### Adding More API Endpoints
 
-Create new route handlers in `/api`:
+1. Create new route handlers in `/api`:
 ```
 api/
 ├── data/
@@ -192,6 +192,21 @@ api/
 └── stats/
     └── route.ts               # /api/modules-core/hello-world/stats
 ```
+
+2. **CRITICAL: Register routes in the API router**
+
+   Edit `/app/api/modules/[module]/[[...path]]/route.ts` and add your routes to `MODULE_API_ROUTES`:
+   ```typescript
+   const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
+     // ... existing modules
+     'hello-world': {
+       'data': () => import('@/modules/hello-world/api/data/route'),
+       'stats': () => import('@/modules/hello-world/api/stats/route')  // Add new route
+     },
+   }
+   ```
+
+   **Without this step, your API will return 404!**
 
 ### Adding Database Tables
 
@@ -265,6 +280,7 @@ Check terminal for:
 - Check browser console for errors
 
 ### API Routes Returning 404
+- **Most common:** Route not registered in `MODULE_API_ROUTES` (see "Adding More API Endpoints" above)
 - Verify file path: `api/[route]/route.ts`
 - Check `permissions.api: true` in manifest
 - Clear `.next` folder: `rm -rf .next && npm run dev`
@@ -288,6 +304,7 @@ Before publishing your module, test:
 - [ ] Module appears in sidebar
 - [ ] Main page loads without errors
 - [ ] Authentication redirects work
+- [ ] API routes registered in `MODULE_API_ROUTES`
 - [ ] API endpoints require auth
 - [ ] API endpoints validate input
 - [ ] Database tables created successfully
@@ -312,6 +329,8 @@ When ready to share:
 
 For module development questions:
 - See `/docs/modules.md` for complete specification
+- See `/docs/MODULES.md` for complete technical specification
+- See `/docs/MODULES-GUIDE.md` for high-level overview
 - Check ARI documentation
 - Open issue in ARI repository
 

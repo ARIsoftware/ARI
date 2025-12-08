@@ -19,7 +19,7 @@ const CreateTaskSchema = z.object({
   title: z.string()
     .min(1, 'Title is required')
     .max(500, 'Title must be less than 500 characters'),
-  category: z.enum(['todo', 'packing_list'])
+  category: z.enum(['todo', 'packing_list', 'morning_routine'])
 })
 
 /**
@@ -27,7 +27,8 @@ const CreateTaskSchema = z.object({
  */
 const UpdateTaskSchema = z.object({
   completed: z.boolean().optional(),
-  title: z.string().max(500).optional()
+  title: z.string().max(500).optional(),
+  completed_at: z.string().nullable().optional()
 })
 
 /**
