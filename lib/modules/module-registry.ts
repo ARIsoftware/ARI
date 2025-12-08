@@ -59,7 +59,10 @@ export async function getEnabledModules(userId?: string): Promise<ModuleMetadata
 
   // Filter modules based on enabled state
   // Default to enabled if no setting exists
+  // Exclude overridden modules - they should never appear in enabled list
   return allModules.filter(module => {
+    if (module.isOverridden) return false
+
     const isEnabledInDb = settingsMap.get(module.id)
     return isEnabledInDb !== undefined ? isEnabledInDb : (module.enabled ?? true)
   })

@@ -3,8 +3,10 @@
 /**
  * Generate Module Registry Script
  *
- * Scans /modules directory and auto-generates the MODULE_PAGES registry
- * for /app/[module]/[[...slug]]/page.tsx
+ * Scans /modules-custom and /modules-core directories and auto-generates
+ * the MODULE_PAGES registry for /app/[module]/[[...slug]]/page.tsx
+ *
+ * Modules in modules-custom take precedence over modules-core with the same ID.
  *
  * Run this before build: node scripts/generate-module-registry.js
  */
@@ -12,7 +14,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const MODULES_DIR = path.join(process.cwd(), 'modules');
+// Module directories in priority order (first = highest priority)
+const MODULE_DIRECTORIES = ['modules-custom', 'modules-core'];
 const OUTPUT_FILE = path.join(process.cwd(), 'lib/generated/module-pages-registry.ts');
 
 // Ensure output directory exists
@@ -21,49 +24,96 @@ if (!fs.existsSync(outputDir)) {
   fs.mkdirSync(outputDir, { recursive: true });
 }
 
-// Scan modules directory
-function scanModules() {
+/**
+ * Scan a single modules directory
+ * Returns array of { id: moduleId, dirName: 'modules-custom' | 'modules-core' }
+ */
+function scanModulesDirectory(dirName) {
   const modules = [];
+  const modulesDir = path.join(process.cwd(), dirName);
 
-  if (!fs.existsSync(MODULES_DIR)) {
-    console.warn('⚠️  Modules directory not found:', MODULES_DIR);
+  if (!fs.existsSync(modulesDir)) {
     return modules;
   }
 
-  const entries = fs.readdirSync(MODULES_DIR, { withFileTypes: true });
+  const entries = fs.readdirSync(modulesDir, { withFileTypes: true });
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
 
-    const moduleId = entry.name;
-    const modulePath = path.join(MODULES_DIR, moduleId);
+    const moduleFolder = entry.name;
+    const modulePath = path.join(modulesDir, moduleFolder);
     const manifestPath = path.join(modulePath, 'module.json');
     const pagePathTsx = path.join(modulePath, 'app', 'page.tsx');
     const pagePathJsx = path.join(modulePath, 'app', 'page.jsx');
 
     // Check if module.json exists
     if (!fs.existsSync(manifestPath)) {
-      console.warn(`⚠️  Skipping ${moduleId}: No module.json found`);
+      console.warn(`⚠️  Skipping ${dirName}/${moduleFolder}: No module.json found`);
+      continue;
+    }
+
+    // Read module ID from manifest
+    let moduleId;
+    try {
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+      moduleId = manifest.id;
+      if (!moduleId) {
+        console.warn(`⚠️  Skipping ${dirName}/${moduleFolder}: No id in module.json`);
+        continue;
+      }
+    } catch (e) {
+      console.warn(`⚠️  Skipping ${dirName}/${moduleFolder}: Invalid module.json`);
       continue;
     }
 
     // Check if app/page.tsx or app/page.jsx exists
     if (!fs.existsSync(pagePathTsx) && !fs.existsSync(pagePathJsx)) {
-      console.warn(`⚠️  Skipping ${moduleId}: No app/page.tsx found`);
+      console.warn(`⚠️  Skipping ${dirName}/${moduleFolder}: No app/page.tsx found`);
       continue;
     }
 
-    modules.push(moduleId);
+    modules.push({ id: moduleId, dirName, folder: moduleFolder });
   }
 
-  return modules.sort();
+  return modules;
+}
+
+/**
+ * Scan all module directories with override precedence
+ * Returns Map of moduleId -> { dirName, folder }
+ */
+function scanAllModules() {
+  // Map moduleId -> { dirName, folder }
+  const moduleMap = new Map();
+
+  for (const dirName of MODULE_DIRECTORIES) {
+    console.log(`🔍 Scanning ${dirName}...`);
+    const modules = scanModulesDirectory(dirName);
+
+    for (const mod of modules) {
+      // Only add if not already present (override takes precedence)
+      if (!moduleMap.has(mod.id)) {
+        moduleMap.set(mod.id, { dirName: mod.dirName, folder: mod.folder });
+      } else {
+        console.log(`  ↳ Skipping ${mod.id} from ${dirName} (overridden by ${moduleMap.get(mod.id).dirName})`);
+      }
+    }
+  }
+
+  return moduleMap;
 }
 
 // Generate TypeScript registry file
-function generateRegistry(modules) {
-  const imports = modules.map(id =>
-    `  '${id}': () => import('@/modules/${id}/app/page'),`
+function generateRegistry(moduleMap) {
+  // Convert Map to sorted array of [id, { dirName, folder }]
+  const entries = Array.from(moduleMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+
+  const imports = entries.map(([id, { dirName, folder }]) =>
+    `  '${id}': () => import('@/${dirName}/${folder}/app/page'),`
   ).join('\n');
+
+  const moduleIds = entries.map(([id]) => id);
 
   const content = `/**
  * Auto-Generated Module Pages Registry
@@ -73,7 +123,8 @@ function generateRegistry(modules) {
  * Generated at: ${new Date().toISOString()}
  *
  * This file is auto-generated before each build to ensure
- * all modules in /modules are registered for dynamic routing.
+ * all modules in /modules-custom and /modules-core are registered for dynamic routing.
+ * Modules in modules-custom take precedence over modules-core with the same ID.
  *
  * To regenerate: npm run generate-module-registry
  */
@@ -86,7 +137,7 @@ ${imports}
  * List of all registered module IDs
  */
 export const REGISTERED_MODULE_IDS = [
-  ${modules.map(id => `'${id}'`).join(',\n  ')}
+  ${moduleIds.map(id => `'${id}'`).join(',\n  ')}
 ] as const
 
 /**
@@ -102,20 +153,22 @@ export function isModuleRegistered(moduleId: string): boolean {
 
 // Main execution
 function main() {
-  console.log('🔍 Scanning modules directory...');
-  const modules = scanModules();
+  console.log('');
+  const moduleMap = scanAllModules();
 
-  console.log(`✅ Found ${modules.length} valid modules:`, modules);
+  console.log(`✅ Found ${moduleMap.size} valid modules`);
 
   console.log('📝 Generating registry file...');
-  const registry = generateRegistry(modules);
+  const registry = generateRegistry(moduleMap);
 
   fs.writeFileSync(OUTPUT_FILE, registry, 'utf-8');
 
   console.log('✅ Registry generated at:', OUTPUT_FILE);
   console.log('');
   console.log('Registered modules:');
-  modules.forEach(id => console.log(`  - ${id}`));
+  for (const [id, { dirName, folder }] of moduleMap) {
+    console.log(`  - ${id} (from ${dirName}/${folder})`);
+  }
   console.log('');
 }
 

@@ -7,7 +7,7 @@
 ### Problem
 Next.js App Router requires static imports at build time. We can't dynamically import modules based on filesystem paths like:
 ```typescript
-import(`@/modules/${dynamicModuleId}/app/page`)  // ❌ Doesn't work
+import(`@/modules-core/${dynamicModuleId}/app/page`)  // ❌ Doesn't work
 ```
 
 ### Solution
@@ -44,7 +44,7 @@ npm run generate-module-registry
 
 Just create the module directory structure:
 ```
-/modules/my-new-module/
+/modules-core/my-new-module/
   ├── module.json          # Required
   ├── app/
   │   └── page.tsx        # Required
@@ -63,9 +63,9 @@ The script will automatically detect and register your new module!
 ```typescript
 // lib/generated/module-pages-registry.ts
 export const MODULE_PAGES: Record<string, any> = {
-  'assist': () => import('@/modules/assist/app/page'),
-  'contacts': () => import('@/modules/contacts/app/page'),
-  'daily-fitness': () => import('@/modules/daily-fitness/app/page'),
+  'assist': () => import('@/modules-core/assist/app/page'),
+  'contacts': () => import('@/modules-core/contacts/app/page'),
+  'daily-fitness': () => import('@/modules-core/daily-fitness/app/page'),
   // ... automatically discovered modules
 }
 ```

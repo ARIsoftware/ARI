@@ -115,9 +115,9 @@ The module system **already has infrastructure** for widgets, but HD Dashboard d
 - `useModulesWithWidgets()` - React hook for widget modules
 
 **Existing Widget Examples:**
-- `/modules/hello-world/components/widget.tsx`
-- `/modules/major-projects/components/widget.tsx`
-- `/modules/quotes/components/widget.tsx`
+- `/modules-core/hello-world/components/widget.tsx`
+- `/modules-core/major-projects/components/widget.tsx`
+- `/modules-core/quotes/components/widget.tsx`
 
 **Why HD Dashboard Doesn't Use Widgets:**
 
@@ -174,7 +174,7 @@ The module system **already has infrastructure** for widgets, but HD Dashboard d
 │                                                              │
 │ const HD_DASHBOARD_CARDS = {                                │
 │   'winter-arc': {                                           │
-│     'goals': () => import('@/modules/winter-arc/...')       │
+│     'goals': () => import('@/modules-core/winter-arc/...')       │
 │   },                                                         │
 │   'major-projects': { /* ... */ }                           │
 │ }                                                            │
@@ -213,14 +213,14 @@ The module system **already has infrastructure** for widgets, but HD Dashboard d
  */
 export const HD_DASHBOARD_CARDS: Record<string, Record<string, any>> = {
   'winter-arc': {
-    'goals': () => import('@/modules/winter-arc/components/hd-goals-card'),
-    'stats': () => import('@/modules/winter-arc/components/hd-stats-card')
+    'goals': () => import('@/modules-core/winter-arc/components/hd-goals-card'),
+    'stats': () => import('@/modules-core/winter-arc/components/hd-stats-card')
   },
   'major-projects': {
-    'summary': () => import('@/modules/major-projects/components/hd-card')
+    'summary': () => import('@/modules-core/major-projects/components/hd-card')
   },
   'fitness': {
-    'stats': () => import('@/modules/daily-fitness/components/hd-stats-card')
+    'stats': () => import('@/modules-core/daily-fitness/components/hd-stats-card')
   }
 }
 
@@ -238,7 +238,7 @@ export async function loadHDCard(moduleId: string, cardId: string) {
 
 #### 2. Module Type Extensions
 
-**File:** `/lib/modules/module-types.ts`
+**File:** `/lib/modules-core/module-types.ts`
 
 ```typescript
 /**
@@ -297,7 +297,7 @@ export interface ModuleDashboardConfig {
 
 #### 3. Module Registry Functions
 
-**File:** `/lib/modules/module-registry.ts`
+**File:** `/lib/modules-core/module-registry.ts`
 
 ```typescript
 /**
@@ -358,7 +358,7 @@ const POSITION_ORDER: Record<HDCardPosition, number> = {
 
 #### 4. React Hooks
 
-**File:** `/lib/modules/module-hooks.ts`
+**File:** `/lib/modules-core/module-hooks.ts`
 
 ```typescript
 /**
@@ -421,7 +421,7 @@ export function useHDDashboardCards() {
 import { lazy, Suspense } from 'react'
 import { HDCardSkeleton } from './hd-card-skeleton'
 import { HDCardWrapper } from './hd-card-wrapper'
-import type { HDCardConfig } from '@/lib/modules/module-types'
+import type { HDCardConfig } from '@/lib/modules-core/module-types'
 import { HD_DASHBOARD_CARDS } from '../hd-card-registry'
 
 interface DynamicHDCardProps {
@@ -458,7 +458,7 @@ export function DynamicHDCard({ moduleId, cardId, config }: DynamicHDCardProps) 
 'use client'
 
 import { cn } from '@/lib/utils'
-import type { HDCardConfig } from '@/lib/modules/module-types'
+import type { HDCardConfig } from '@/lib/modules-core/module-types'
 
 interface HDCardWrapperProps {
   config: HDCardConfig
@@ -536,14 +536,14 @@ function getSizeClasses(size?: string): string {
 
 #### Step 1: Create HD Card Component
 
-**File:** `/modules/my-module/components/hd-card.tsx`
+**File:** `/modules-core/my-module/components/hd-card.tsx`
 
 ```typescript
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useSupabase } from '@/components/providers'
-import type { HDCardConfig } from '@/lib/modules/module-types'
+import type { HDCardConfig } from '@/lib/modules-core/module-types'
 
 interface MyModuleHDCardProps {
   config: HDCardConfig
@@ -566,7 +566,7 @@ export function MyModuleHDCard({ config }: MyModuleHDCardProps) {
   useEffect(() => {
     async function loadData() {
       // Fetch data from your module's API
-      const response = await fetch('/api/modules/my-module/stats')
+      const response = await fetch('/api/modules-core/my-module/stats')
       const result = await response.json()
       setData(result)
       setLoading(false)
@@ -610,7 +610,7 @@ export default MyModuleHDCard
 
 #### Step 2: Update module.json
 
-**File:** `/modules/my-module/module.json`
+**File:** `/modules-core/my-module/module.json`
 
 ```json
 {
@@ -647,7 +647,7 @@ export const HD_DASHBOARD_CARDS: Record<string, Record<string, any>> = {
   // ... existing registrations
 
   'my-module': {
-    'stats': () => import('@/modules/my-module/components/hd-card')
+    'stats': () => import('@/modules-core/my-module/components/hd-card')
   }
 }
 ```
@@ -750,15 +750,15 @@ The card will automatically appear on HD Dashboard when:
 
 **Tasks:**
 1. Create HD card registry file (`/app/hd-dashboard/hd-card-registry.ts`)
-2. Extend module type definitions (`/lib/modules/module-types.ts`)
+2. Extend module type definitions (`/lib/modules-core/module-types.ts`)
    - Add `HDCardConfig` interface
    - Add `HDCardPosition` type
    - Add `HDCardColor` type
    - Extend `ModuleDashboardConfig`
-3. Add registry functions (`/lib/modules/module-registry.ts`)
+3. Add registry functions (`/lib/modules-core/module-registry.ts`)
    - `getModulesWithHDCards()`
    - `getHDDashboardCards()`
-4. Create React hooks (`/lib/modules/module-hooks.ts`)
+4. Create React hooks (`/lib/modules-core/module-hooks.ts`)
    - `useModulesWithHDCards()`
    - `useHDDashboardCards()`
 5. Create card wrapper component (`/app/hd-dashboard/components/hd-card-wrapper.tsx`)
@@ -857,7 +857,7 @@ The card will automatically appear on HD Dashboard when:
 }
 ```
 
-**Component** (`/modules/winter-arc/components/hd-goals-card.tsx`):
+**Component** (`/modules-core/winter-arc/components/hd-goals-card.tsx`):
 ```typescript
 'use client'
 
@@ -915,7 +915,7 @@ export default WinterArcGoalsHDCard
 ```typescript
 const HD_DASHBOARD_CARDS = {
   'winter-arc': {
-    'goals': () => import('@/modules/winter-arc/components/hd-goals-card')
+    'goals': () => import('@/modules-core/winter-arc/components/hd-goals-card')
   }
 }
 ```
@@ -1042,7 +1042,7 @@ This shows how one module can contribute multiple cards to different positions.
 **Why:** Next.js/Turbopack cannot resolve dynamic imports with runtime-constructed paths like:
 ```typescript
 // This DOES NOT WORK in production builds:
-const path = `/modules/${moduleId}/components/${cardId}.tsx`
+const path = `/modules-core/${moduleId}/components/${cardId}.tsx`
 const component = await import(path)
 ```
 

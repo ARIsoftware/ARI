@@ -129,6 +129,10 @@ export interface ModuleMetadata extends ModuleManifest {
   errors?: string[]
   /** Whether module passed validation */
   isValid: boolean
+  /** Whether this module has been overridden by a custom module */
+  isOverridden?: boolean
+  /** The ID of the module that overrides this one (if overridden) */
+  overriddenBy?: string
 }
 
 /**

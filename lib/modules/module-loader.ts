@@ -1,23 +1,40 @@
 /**
  * Module Loader
  *
- * Scans the /modules directory and discovers all installed modules.
+ * Scans the /modules-custom and /modules-core directories and discovers all installed modules.
+ * Modules in modules-custom take precedence over modules-core with the same ID.
  * Validates module manifests and returns metadata for each module.
  *
  * This runs server-side only (never in browser).
  */
 
-import { readdir, readFile } from 'fs/promises'
+import { readdir, readFile, access } from 'fs/promises'
 import { join } from 'path'
 import type { ModuleManifest, ModuleMetadata, ModuleLoadError } from './module-types'
 import { validateModuleId } from './reserved-routes'
 
 /**
- * Get the absolute path to the modules directory
+ * Module directories in priority order (first = highest priority)
  */
-function getModulesDirectory(): string {
-  // In production and development, modules are in project root
-  return join(process.cwd(), 'modules')
+const MODULE_DIRECTORIES = ['modules-custom', 'modules-core'] as const;
+
+/**
+ * Check if a directory exists
+ */
+async function directoryExists(path: string): Promise<boolean> {
+  try {
+    await access(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Get the absolute path to a modules directory
+ */
+function getModulesDirectory(dirName: string): string {
+  return join(process.cwd(), dirName)
 }
 
 /**
@@ -117,10 +134,6 @@ function validateManifest(manifest: ModuleManifest): string[] {
       manifest.routes.forEach((route, index) => {
         if (!route.path || typeof route.path !== 'string') {
           errors.push(`Route ${index}: missing or invalid "path" field`)
-        } else if (!route.path.startsWith(`/${manifest.id}`)) {
-          errors.push(
-            `Route ${index}: path "${route.path}" must start with "/${manifest.id}" (module ID)`
-          )
         }
 
         if (!route.label || typeof route.label !== 'string') {
@@ -180,7 +193,8 @@ function validateManifest(manifest: ModuleManifest): string[] {
 }
 
 /**
- * Load all modules from the /modules directory
+ * Load all modules from modules-custom and modules-core directories
+ * Modules in modules-custom take precedence over modules-core with the same ID
  *
  * @returns Object containing discovered modules and any errors
  */
@@ -191,78 +205,118 @@ export async function loadModules(): Promise<{
   const modules: ModuleMetadata[] = []
   const errors: ModuleLoadError[] = []
 
-  try {
-    const modulesDir = getModulesDirectory()
+  // Track module IDs that have been loaded from custom (these take precedence)
+  // Maps moduleId -> customModuleId that overrides it
+  const loadedIds = new Map<string, string>()
 
-    // Read all directories in /modules
-    const entries = await readdir(modulesDir, { withFileTypes: true })
-    const moduleDirs = entries.filter(entry => entry.isDirectory()).map(entry => entry.name)
+  for (const moduleDirName of MODULE_DIRECTORIES) {
+    const modulesDir = getModulesDirectory(moduleDirName)
 
-    // Process each potential module directory
-    for (const moduleId of moduleDirs) {
-      const modulePath = join(modulesDir, moduleId)
-
-      // Read and parse manifest
-      const { manifest, error } = await readModuleManifest(modulePath, moduleId)
-
-      if (error) {
-        errors.push(error)
-        continue
-      }
-
-      if (!manifest) {
-        errors.push({
-          moduleId,
-          modulePath,
-          error: 'Unknown error reading manifest',
-          errorType: 'MANIFEST_INVALID'
-        })
-        continue
-      }
-
-      // Validate manifest
-      const validationErrors = validateManifest(manifest)
-
-      if (validationErrors.length > 0) {
-        errors.push({
-          moduleId,
-          modulePath,
-          error: `Manifest validation failed: ${validationErrors.join(', ')}`,
-          errorType: 'VALIDATION_FAILED'
-        })
-        continue
-      }
-
-      // Create module metadata
-      const metadata: ModuleMetadata = {
-        ...manifest,
-        path: modulePath,
-        isEnabled: manifest.enabled ?? true, // Default to enabled
-        isValid: true,
-        errors: []
-      }
-
-      modules.push(metadata)
+    // Skip if directory doesn't exist
+    if (!(await directoryExists(modulesDir))) {
+      continue
     }
 
-    // Log summary (development only)
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[Modules] Discovered ${modules.length} modules`)
-      if (errors.length > 0) {
-        console.warn(`[Modules] ${errors.length} modules failed to load:`)
-        errors.forEach(err => {
-          console.warn(`  - ${err.moduleId}: ${err.error}`)
-        })
+    // Track IDs within this folder for duplicate detection
+    const folderSeenIds = new Map<string, string[]>()
+
+    try {
+      // Read all directories in this modules folder
+      const entries = await readdir(modulesDir, { withFileTypes: true })
+      const moduleDirs = entries.filter(entry => entry.isDirectory()).map(entry => entry.name)
+
+      // Process each potential module directory
+      for (const dirName of moduleDirs) {
+        const modulePath = join(modulesDir, dirName)
+
+        // Read and parse manifest
+        const { manifest, error } = await readModuleManifest(modulePath, dirName)
+
+        if (error) {
+          errors.push(error)
+          continue
+        }
+
+        if (!manifest) {
+          errors.push({
+            moduleId: dirName,
+            modulePath,
+            error: 'Unknown error reading manifest',
+            errorType: 'MANIFEST_INVALID'
+          })
+          continue
+        }
+
+        // Validate manifest
+        const validationErrors = validateManifest(manifest)
+
+        if (validationErrors.length > 0) {
+          errors.push({
+            moduleId: dirName,
+            modulePath,
+            error: `Manifest validation failed: ${validationErrors.join(', ')}`,
+            errorType: 'VALIDATION_FAILED'
+          })
+          continue
+        }
+
+        // For modules-core, check if ID was already loaded from custom
+        const isOverriddenByCustom = moduleDirName === 'modules-core' && loadedIds.has(manifest.id)
+
+        // Track for duplicate detection within this folder
+        const existingPaths = folderSeenIds.get(manifest.id) || []
+        existingPaths.push(modulePath)
+        folderSeenIds.set(manifest.id, existingPaths)
+
+        // Create module metadata
+        const metadata: ModuleMetadata = {
+          ...manifest,
+          path: modulePath,
+          isEnabled: manifest.enabled ?? true, // Default to enabled
+          isValid: true,
+          errors: [],
+          isOverridden: isOverriddenByCustom,
+          overriddenBy: isOverriddenByCustom ? loadedIds.get(manifest.id) : undefined
+        }
+
+        modules.push(metadata)
+
+        // Track this ID as loaded (for override precedence)
+        // Store the module ID that does the overriding
+        if (!loadedIds.has(manifest.id)) {
+          loadedIds.set(manifest.id, manifest.id)
+        }
       }
+
+      // Check for duplicate IDs within this folder and add errors
+      for (const [moduleId, paths] of folderSeenIds) {
+        if (paths.length > 1) {
+          errors.push({
+            moduleId,
+            modulePath: paths[0], // Primary path
+            error: `Duplicate module ID "${moduleId}" found in multiple directories within ${moduleDirName}`,
+            errorType: 'DUPLICATE_ID',
+            duplicateDirectories: paths
+          })
+        }
+      }
+    } catch (error: any) {
+      console.error(`[Modules] Failed to scan ${moduleDirName} directory:`, error)
     }
-
-    return { modules, errors }
-  } catch (error: any) {
-    console.error('[Modules] Failed to scan modules directory:', error)
-
-    // Return empty results if directory doesn't exist or other critical error
-    return { modules: [], errors: [] }
   }
+
+  // Log summary (development only)
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[Modules] Discovered ${modules.length} modules`)
+    if (errors.length > 0) {
+      console.warn(`[Modules] ${errors.length} modules failed to load:`)
+      errors.forEach(err => {
+        console.warn(`  - ${err.moduleId}: ${err.error}`)
+      })
+    }
+  }
+
+  return { modules, errors }
 }
 
 /**
