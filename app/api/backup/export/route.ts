@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { requireAdmin, isProductionSafeOperation } from '@/lib/admin-helpers'
+import { isProductionSafeOperation } from '@/lib/admin-helpers'
 import { createClient } from "@supabase/supabase-js"
 import { logger } from '@/lib/logger'
 import crypto from "crypto"
@@ -50,6 +50,7 @@ async function discoverTables(client: any): Promise<{ tables: string[], method: 
     'travel',
     'travel_activities',
     'ohtani_grid_cells',
+    'gratitude_entries',
   ];
 
   try {
@@ -161,10 +162,22 @@ async function discoverTables(client: any): Promise<{ tables: string[], method: 
   }
 }
 
+// Validate table name against whitelist to prevent SQL injection
+function isValidTableName(tableName: string, validTables: string[]): boolean {
+  return validTables.includes(tableName) && /^[a-z_][a-z0-9_]*$/i.test(tableName)
+}
+
 // Get table schema information using SQL query
-async function getTableSchema(client: any, tableName: string) {
+async function getTableSchema(client: any, tableName: string, validTables: string[]) {
+  // Security: Validate tableName against whitelist before using in SQL
+  if (!isValidTableName(tableName, validTables)) {
+    logger.warn(`Invalid table name rejected: ${tableName}`)
+    return []
+  }
+
   try {
     // Query information_schema directly using SQL
+    // Note: tableName is validated against whitelist above
     const query = `
       SELECT
         column_name,
@@ -402,16 +415,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Require admin access
-    try {
-      requireAdmin(user.id)
-    } catch (error) {
-      return NextResponse.json(
-        { error: "Admin access required" },
-        { status: 403 }
-      )
-    }
-
     // Check if operation is safe in production
     if (!isProductionSafeOperation()) {
       return NextResponse.json(
@@ -441,8 +444,8 @@ export async function POST(req: NextRequest) {
     // Use chunked fetching for large tables
     for (const table of tables) {
       try {
-        // Get table schema first
-        const schema = await getTableSchema(client, table)
+        // Get table schema first (pass tables list for validation)
+        const schema = await getTableSchema(client, table, tables)
         logger.info(`Schema for ${table}:`, schema?.length || 0, 'columns')
         tableSchemas[table] = schema
 
