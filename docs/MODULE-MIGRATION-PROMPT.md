@@ -7,23 +7,23 @@ You have access to a reference document called `/docs/MODULE-DETAILS.md` that de
 First, read and understand the `/docs/MODULE-DETAILS.md` file thoroughly. Pay special attention to:
 
 1. **Core Concepts**
-   - How modules are self-contained in `/modules/{module-id}/` directories
+   - How modules are self-contained in `/modules-core/{module-id}/` directories
    - The `module.json` manifest format and required fields
    - How catch-all routes (`/app/[module]/[[...slug]]/page.tsx`) dynamically serve module pages
    - The registry-based approach for dynamic imports (required because Next.js/Turbopack can't resolve fully dynamic imports)
 
 2. **Infrastructure Components**
-   - `/lib/modules/module-types.ts` - TypeScript interfaces
-   - `/lib/modules/module-loader.ts` - Server-side discovery
-   - `/lib/modules/module-registry.ts` - Module state management
-   - `/lib/modules/module-hooks.ts` - Client-side React hooks
-   - `/lib/modules/reserved-routes.ts` - Protected route names
+   - `/lib/modules-core/module-types.ts` - TypeScript interfaces
+   - `/lib/modules-core/module-loader.ts` - Server-side discovery
+   - `/lib/modules-core/module-registry.ts` - Module state management
+   - `/lib/modules-core/module-hooks.ts` - Client-side React hooks
+   - `/lib/modules-core/reserved-routes.ts` - Protected route names
    - `/lib/generated/module-pages-registry.ts` - Auto-generated before build
 
 3. **Key Patterns**
    - Build-time registry generation via `scripts/generate-module-registry.js`
    - Per-user module enable/disable via `module_settings` database table
-   - API routes proxied through `/api/modules/[module]/[[...path]]/route.ts`
+   - API routes proxied through `/api/modules-core/[module]/[[...path]]/route.ts`
    - Dashboard widgets and settings panels registered in module.json
 
 ## Phase 2: Analyze This Codebase
@@ -51,7 +51,7 @@ Now explore this codebase to understand:
 Based on your analysis, create a detailed migration plan that includes:
 
 1. **Infrastructure Setup**
-   - List of files to create in `/lib/modules/`
+   - List of files to create in `/lib/modules-core/`
    - Catch-all route files needed
    - Registry generation script
    - Database schema for module settings (adapt to this app's database)

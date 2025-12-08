@@ -1,7 +1,8 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Providers } from "@/components/providers"
-import { getInstalledModules } from "@/lib/modules"
+import { getInstalledModules, getDuplicateModuleErrors } from "@/lib/modules"
+import { ModuleErrorOverlay } from "@/components/module-error-overlay"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -26,6 +27,9 @@ export default function RootLayout({
   // Scan installed modules on server side and pass to client providers
   const installedModules = getInstalledModules()
 
+  // Check for duplicate module IDs (critical error that blocks the app)
+  const duplicateErrors = getDuplicateModuleErrors()
+
   return (
     <html lang="en">
       <head>
@@ -49,7 +53,11 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <Providers modules={installedModules}>{children}</Providers>
+        {duplicateErrors.length > 0 ? (
+          <ModuleErrorOverlay errors={duplicateErrors} />
+        ) : (
+          <Providers modules={installedModules}>{children}</Providers>
+        )}
       </body>
     </html>
   )
