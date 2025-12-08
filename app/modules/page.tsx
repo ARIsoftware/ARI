@@ -35,7 +35,11 @@ export default function ModulesPage() {
         const response = await fetch('/api/modules/all')
         if (response.ok) {
           const data = await response.json()
-          setAllModules(data.modules || [])
+          // Sort modules alphabetically by name
+          const sortedModules = (data.modules || []).sort((a: any, b: any) =>
+            a.name.localeCompare(b.name)
+          )
+          setAllModules(sortedModules)
         }
       } catch (error) {
         console.error('Error loading all modules:', error)
@@ -129,38 +133,62 @@ export default function ModulesPage() {
                     <div className="text-center py-8">
                       <Package className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
                       <p className="text-sm text-muted-foreground">
-                        No modules installed. Place modules in the <code className="px-1 py-0.5 bg-muted rounded text-xs">/modules</code> directory.
+                        No modules installed. Place custom modules in the <code className="px-1 py-0.5 bg-muted rounded text-xs">/modules-custom</code> directory.
                       </p>
                     </div>
                   ) : (
                     allModules.map((module) => {
                       const Icon = getLucideIcon(module.icon)
                       const isEnabled = module.isEnabled
+                      const isCustomModule = module.path?.includes('/modules-custom/')
+                      const isOverridden = module.isOverridden === true
+
+                      // Determine badge color and text
+                      let badgeColor = '#000000' // CORE MODULE (black)
+                      let badgeText = 'CORE MODULE'
+                      if (isOverridden) {
+                        badgeColor = '#dc2626' // OVERRIDDEN (red)
+                        badgeText = 'OVERRIDDEN'
+                      } else if (isCustomModule) {
+                        badgeColor = '#07be07' // USER MODULE (green)
+                        badgeText = 'USER MODULE'
+                      }
 
                       return (
-                        <div key={module.id} className="flex items-start justify-between rounded-lg border p-4">
+                        <div key={`${module.id}-${module.path}`} className="flex items-start justify-between rounded-lg border p-4">
                           <div className="pr-4 flex-1">
                             <div className="flex items-center gap-3 mb-2">
                               <Icon className="h-5 w-5 text-blue-600" />
                               <div>
-                                <p className="text-sm font-medium">{module.name}</p>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-medium">{module.name}</p>
+                                  <Badge
+                                    className="text-[10px] px-1.5 py-0 text-white"
+                                    style={{ backgroundColor: badgeColor }}
+                                  >
+                                    {badgeText}
+                                  </Badge>
+                                </div>
                                 <p className="text-xs text-muted-foreground">v{module.version} by {module.author}</p>
+                                <p className="text-xs text-muted-foreground">ID: {module.id}</p>
+                                {module.routes && module.routes.length > 0 && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Routes: {module.routes.map((r: any) => r.path).join(', ')}
+                                  </p>
+                                )}
+                                <p className="text-xs text-muted-foreground">Path: /{isCustomModule ? 'modules-custom' : 'modules-core'}/{module.path?.split('/').pop()}</p>
                               </div>
                             </div>
                             <p className="text-sm text-muted-foreground">{module.description}</p>
-                            {module.routes && module.routes.length > 0 && (
-                              <p className="text-xs text-muted-foreground mt-2">
-                                Routes: {module.routes.map(r => r.path).join(', ')}
-                              </p>
-                            )}
                           </div>
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3" style={{ opacity: isOverridden ? 0.3 : 1 }}>
                             <span className="text-sm font-medium text-muted-foreground">
                               {isEnabled ? 'On' : 'Off'}
                             </span>
                             <Switch
                               checked={isEnabled}
                               onCheckedChange={() => toggleModule(module.id, isEnabled)}
+                              disabled={isOverridden}
                             />
                           </div>
                         </div>
