@@ -17,6 +17,7 @@ const path = require('path');
 // Module directories in priority order (first = highest priority)
 const MODULE_DIRECTORIES = ['modules-custom', 'modules-core'];
 const OUTPUT_FILE = path.join(process.cwd(), 'lib/generated/module-pages-registry.ts');
+const MANIFEST_FILE = path.join(process.cwd(), 'lib/generated/module-manifest.json');
 
 // Ensure output directory exists
 const outputDir = path.dirname(OUTPUT_FILE);
@@ -104,6 +105,70 @@ function scanAllModules() {
   return moduleMap;
 }
 
+/**
+ * Generate JSON manifest with full module metadata
+ * This is used by module-loader.ts at runtime to avoid filesystem scanning
+ */
+function generateManifest(moduleMap) {
+  const modules = [];
+
+  // Track which module IDs have been added (for override detection)
+  const addedIds = new Set();
+
+  // First pass: collect all modules from custom directory
+  for (const [id, { dirName, folder }] of moduleMap) {
+    const modulePath = path.join(process.cwd(), dirName, folder);
+    const manifestPath = path.join(modulePath, 'module.json');
+
+    try {
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+      modules.push({
+        ...manifest,
+        path: modulePath,
+        sourceDir: dirName,
+        isOverridden: false
+      });
+      addedIds.add(id);
+    } catch (e) {
+      console.warn(`⚠️  Failed to read manifest for ${id}:`, e.message);
+    }
+  }
+
+  // Second pass: find overridden modules in modules-core that were replaced by modules-custom
+  const coreDir = path.join(process.cwd(), 'modules-core');
+  if (fs.existsSync(coreDir)) {
+    const coreEntries = fs.readdirSync(coreDir, { withFileTypes: true });
+    for (const entry of coreEntries) {
+      if (!entry.isDirectory()) continue;
+
+      const manifestPath = path.join(coreDir, entry.name, 'module.json');
+      if (!fs.existsSync(manifestPath)) continue;
+
+      try {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+        // Check if this module was overridden by modules-custom
+        const existingModule = modules.find(m => m.id === manifest.id);
+        if (existingModule && existingModule.sourceDir === 'modules-custom') {
+          // This core module was overridden - add it as overridden
+          modules.push({
+            ...manifest,
+            path: path.join(coreDir, entry.name),
+            sourceDir: 'modules-core',
+            isOverridden: true
+          });
+        }
+      } catch (e) {
+        // Skip invalid manifests
+      }
+    }
+  }
+
+  return {
+    generatedAt: new Date().toISOString(),
+    modules
+  };
+}
+
 // Generate TypeScript registry file
 function generateRegistry(moduleMap) {
   // Convert Map to sorted array of [id, { dirName, folder }]
@@ -158,12 +223,18 @@ function main() {
 
   console.log(`✅ Found ${moduleMap.size} valid modules`);
 
+  // Generate TypeScript registry
   console.log('📝 Generating registry file...');
   const registry = generateRegistry(moduleMap);
-
   fs.writeFileSync(OUTPUT_FILE, registry, 'utf-8');
-
   console.log('✅ Registry generated at:', OUTPUT_FILE);
+
+  // Generate JSON manifest (for runtime use without filesystem scanning)
+  console.log('📝 Generating module manifest...');
+  const manifest = generateManifest(moduleMap);
+  fs.writeFileSync(MANIFEST_FILE, JSON.stringify(manifest, null, 2), 'utf-8');
+  console.log('✅ Manifest generated at:', MANIFEST_FILE);
+
   console.log('');
   console.log('Registered modules:');
   for (const [id, { dirName, folder }] of moduleMap) {
