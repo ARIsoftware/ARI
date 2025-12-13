@@ -1,8 +1,7 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
-import { Play, Pause } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import * as React from "react"
+import { useEffect, useRef, useState, createContext, useContext } from "react"
 
 interface YT {
   Player: any
@@ -22,20 +21,43 @@ declare global {
   }
 }
 
-export function YouTubeMusicPlayer() {
+// Context for music player state
+interface MusicPlayerContextType {
+  isPlaying: boolean
+  isReady: boolean
+  togglePlayPause: () => void
+}
+
+const MusicPlayerContext = createContext<MusicPlayerContextType | null>(null)
+
+export function useMusicPlayer() {
+  const context = useContext(MusicPlayerContext)
+  if (!context) {
+    throw new Error("useMusicPlayer must be used within a MusicPlayerProvider")
+  }
+  return context
+}
+
+// Provider component that manages the hidden YouTube player
+export function MusicPlayerProvider({ children }: { children: React.ReactNode }) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isReady, setIsReady] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const playerRef = useRef<HTMLDivElement>(null)
 
+  // Only render after mounting to avoid hydration issues
   useEffect(() => {
-    if (typeof window === "undefined") return
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!mounted || typeof window === "undefined") return
 
     // Load YouTube IFrame API script
     if (!window.YT && !document.querySelector('script[src*="youtube.com/iframe_api"]')) {
       const tag = document.createElement("script")
       tag.src = "https://www.youtube.com/iframe_api"
-      const firstScriptTag = document.getElementsByTagName("script")[0]
-      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag)
+      document.head.appendChild(tag)
     }
 
     // Initialize player when API is ready
@@ -55,7 +77,7 @@ export function YouTubeMusicPlayer() {
         window.youtubePlayer.destroy()
       }
     }
-  }, [])
+  }, [mounted])
 
   const initializePlayer = () => {
     if (!playerRef.current || !window.YT) return
@@ -105,21 +127,15 @@ export function YouTubeMusicPlayer() {
   }
 
   return (
-    <>
-      <div ref={playerRef} className="hidden" />
-      <Button
-        onClick={togglePlayPause}
-        size="icon"
-        variant="outline"
-        className="h-8 w-8"
-        disabled={!isReady}
-      >
-        {isPlaying ? (
-          <Pause className="h-4 w-4" />
-        ) : (
-          <Play className="h-4 w-4" />
-        )}
-      </Button>
-    </>
+    <MusicPlayerContext.Provider value={{ isPlaying, isReady, togglePlayPause }}>
+      {children}
+      {/* Hidden YouTube player iframe container - only render after mounting */}
+      {mounted && <div ref={playerRef} className="hidden" />}
+    </MusicPlayerContext.Provider>
   )
+}
+
+// Legacy component for backwards compatibility (if needed elsewhere)
+export function YouTubeMusicPlayer() {
+  return null // No longer renders anything - use useMusicPlayer hook instead
 }
