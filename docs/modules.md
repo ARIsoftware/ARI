@@ -462,139 +462,480 @@ Welcome!
 
 ## 5. Checklist: Migrating Existing Feature
 
-Use this when converting an existing ARI feature into a module.
+Use this comprehensive checklist when converting an existing ARI feature into a module.
+
+### Prerequisites
+
+Before starting migration, ensure:
+
+- ✅ Module system is working (`/modules-core/hello-world` loads successfully)
+- ✅ You have access to Supabase dashboard
+- ✅ Development server can be restarted
+- ✅ Git working directory is clean (recommended)
 
 ### Phase 1: Planning & Analysis
 
-- [ ] **5.1.1 Identify all feature files**
-  ```bash
-  # Find all files related to feature
-  grep -r "feature-name" app/ lib/ --files-with-matches
-  ```
-  - [ ] List all pages in `/app/[feature-name]/`
-  - [ ] List all API routes in `/app/api/[feature-name]/`
-  - [ ] List all lib files (e.g., `/lib/[feature-name].ts`)
-  - [ ] Identify validation schemas
-  - [ ] Identify database tables used
+**Objective:** Understand the existing feature completely before migration.
 
-- [ ] **5.1.2 Document dependencies**
-  - [ ] List external imports
-  - [ ] Note integration points (Tasks, Dashboard, Settings)
-  - [ ] Document database relationships
-  - [ ] Check middleware for protected routes
-  - [ ] Review menu configuration entries
+#### Step 5.1.1: Identify Feature Files
 
-- [ ] **5.1.3 Test current functionality**
-  - [ ] Test all CRUD operations
-  - [ ] Verify RLS policies work
-  - [ ] Check error handling
-  - [ ] Take screenshots for comparison
+- [ ] List all pages in `/app/[feature-name]/`
+- [ ] List all API routes in `/app/api/[feature-name]/`
+- [ ] List all lib files (e.g., `/lib/[feature-name].ts`)
+- [ ] Search for feature-related validation schemas
+- [ ] Identify database tables used
+
+**Commands:**
+```bash
+# Find all files related to feature
+grep -r "feature-name" app/ lib/ --files-with-matches
+
+# Find database references
+grep -r "table_name" migrations/ database/
+```
+
+#### Step 5.1.2: Document Dependencies
+
+- [ ] List all external imports (other modules, libs)
+- [ ] Note integration points (Tasks, Dashboard, Settings)
+- [ ] Document database relationships (foreign keys)
+- [ ] Check middleware for protected routes
+- [ ] Review menu configuration entries
+
+**Questions to answer:**
+- Does it integrate with other features?
+- Are there any shared utilities?
+- What routes need protection?
+- Is it in the menu already?
+
+#### Step 5.1.3: Test Current Functionality
+
+- [ ] Test all CRUD operations
+- [ ] Verify RLS policies work
+- [ ] Check error handling
+- [ ] Test with multiple users (if possible)
+- [ ] Take screenshots for comparison
 
 ### Phase 2: Module Structure
 
-- [ ] **5.2.1 Create directory structure** (see Step 4.1)
-- [ ] **5.2.2 Create module.json** (see Step 4.2)
+**Objective:** Create the module directory and configuration.
+
+#### Step 5.2.1: Create Directory Structure
+
+- [ ] Create `/modules-core/[module-id]/` directory
+- [ ] Create subdirectories:
+  ```
+  /modules-core/[module-id]/
+  ├── app/
+  ├── api/
+  │   ├── data/
+  │   └── settings/
+  ├── components/
+  ├── lib/
+  ├── types/
+  └── database/
+      └── migrations/
+  ```
+
+**Command:**
+```bash
+mkdir -p modules-core/[module-id]/{app,api/data,api/settings,components,lib,types,database/migrations}
+```
+
+#### Step 5.2.2: Create module.json
+
+- [ ] Create `module.json` in module root
+- [ ] Set `id` (kebab-case, matches directory name)
+- [ ] Set `name` (display name for UI)
+- [ ] Write `description`
+- [ ] Choose Lucide `icon` name
+- [ ] Set `enabled: true`
+- [ ] Set `fullscreen: false` (unless special case)
+- [ ] Set `menuPriority` (lower = higher in list)
+- [ ] Configure `permissions` (database, api, dashboard)
+- [ ] Configure `routes` array with path, label, icon, position
+- [ ] Configure `database.tables` array
+- [ ] Add `dashboard.widgets` if needed
+- [ ] Add `settings.panel` path if needed
 
 ### Phase 3: Core Files
 
-- [ ] **5.3.1 Create TypeScript types** (`types/index.ts`)
-  - [ ] Define database model interfaces
-  - [ ] Define API request/response types
-  - [ ] Add JSDoc comments
+**Objective:** Create foundational files with comprehensive documentation.
 
-- [ ] **5.3.2 Create database schema** (`database/schema.sql`)
-  - [ ] Copy existing table creation SQL
-  - [ ] Ensure RLS is enabled
-  - [ ] Include all 4 RLS policies
-  - [ ] Add indexes
+#### Step 5.3.1: TypeScript Types (`types/index.ts`)
 
-- [ ] **5.3.3 Create utility functions** (`lib/utils.ts`)
-  - [ ] Migrate API call functions
-  - [ ] Add helper functions
-  - [ ] Add JSDoc comments
+- [ ] Define database model interfaces
+- [ ] Define API request/response types
+- [ ] Add settings interface if applicable
+- [ ] Add JSDoc comments to all types
+- [ ] Include usage examples in comments
+- [ ] Create type guards for runtime validation
+
+**Key types to include:**
+- Database model (matches table schema)
+- CreateRequest, UpdateRequest
+- API response types
+- Settings interface
+- Utility types (Partial, Display, etc.)
+
+#### Step 5.3.2: Database Schema (`database/schema.sql`)
+
+- [ ] Copy existing table creation SQL
+- [ ] Add comprehensive header comment
+- [ ] Document each column with inline comments
+- [ ] Ensure RLS is enabled
+- [ ] Include all 4 RLS policies (SELECT, INSERT, UPDATE, DELETE)
+- [ ] Add indexes for common queries
+- [ ] Add triggers (e.g., updated_at auto-update)
+- [ ] Include verification queries at bottom
+
+**RLS Policy Pattern:**
+```sql
+-- Users can view their own records
+CREATE POLICY "Users can view their own records"
+  ON table_name FOR SELECT
+  USING (auth.uid() = user_id);
+```
+
+#### Step 5.3.3: Utility Functions (`lib/utils.ts`)
+
+- [ ] Migrate API call functions (get, create, update, delete)
+- [ ] Add helper functions for calculations
+- [ ] Add formatting functions
+- [ ] Add validation functions
+- [ ] Add JSDoc comments to all exports
+- [ ] Include developer notes section
+- [ ] Make all functions pure (no side effects) where possible
+
+**Minimum required utilities:**
+- `getItems()` - Fetch all
+- `createItem()` - Create new
+- `updateItem()` - Update existing
+- `deleteItem()` - Delete by ID
 
 ### Phase 4: API Migration
 
-- [ ] **5.4.1 Create data endpoints** (`api/data/route.ts`)
-  - [ ] Implement GET handler
-  - [ ] Implement POST handler
-  - [ ] Add Zod validation
-  - [ ] Add authentication checks
+**Objective:** Create modular API routes with proper validation and security.
 
-- [ ] **5.4.2 Create individual resource endpoints** (`api/data/[id]/route.ts`)
-  - [ ] Implement PATCH handler
-  - [ ] Implement DELETE handler
-  - [ ] Add UUID validation
+#### Step 5.4.1: Data Endpoints (`api/data/route.ts`)
+
+- [ ] Implement GET handler (list all for user)
+- [ ] Implement POST handler (create new)
+- [ ] Add Zod validation schemas
+- [ ] Add authentication checks
+- [ ] Add explicit user_id filtering (defense-in-depth)
+- [ ] Add comprehensive JSDoc comments
+- [ ] Include developer notes section
+- [ ] Add error handling with descriptive messages
+
+**Pattern:**
+```typescript
+export async function GET(request: NextRequest) {
+  const { user, supabase } = await getAuthenticatedUser()
+  if (!user) return createErrorResponse('Unauthorized', 401)
+
+  const { data, error } = await supabase
+    .from('table')
+    .select('*')
+    .eq('user_id', user.id)
+
+  if (error) return createErrorResponse(error.message, 500)
+  return NextResponse.json(data)
+}
+```
+
+#### Step 5.4.2: Individual Resource Endpoints (`api/data/[id]/route.ts`)
+
+- [ ] Implement PATCH handler (update by ID)
+- [ ] Implement DELETE handler (delete by ID)
+- [ ] Add UUID validation for path parameters
+- [ ] Add Zod validation for update data
+- [ ] Add authentication checks
+- [ ] Add explicit user_id filtering
+- [ ] Handle not found cases (404)
+- [ ] Add comprehensive comments
+
+#### Step 5.4.3: Settings Endpoints (Optional)
+
+- [ ] Create `/api/settings/route.ts`
+- [ ] Implement GET handler (fetch user settings)
+- [ ] Implement PUT handler (upsert settings)
+- [ ] Return defaults if no settings exist
+- [ ] Merge with defaults on GET
+- [ ] Use upsert pattern for PUT
+- [ ] Store in `module_settings` table
 
 ### Phase 5: Components
 
-- [ ] **5.5.1 Create main page** (`app/page.tsx`)
-  - [ ] Add `'use client'` directive
-  - [ ] Set up authentication context
-  - [ ] Implement data fetching
-  - [ ] Add CRUD operation handlers
-  - [ ] Add loading/error/empty states
+**Objective:** Create UI components with proper documentation and error handling.
 
-- [ ] **5.5.2 Create dashboard widget** (`components/widget.tsx`) - if applicable
-- [ ] **5.5.3 Create settings panel** (`components/settings-panel.tsx`) - if applicable
+#### Step 5.5.1: Main Page Component (`app/page.tsx`)
+
+- [ ] Add `'use client'` directive (required for React hooks)
+- [ ] Import all necessary dependencies
+- [ ] Set up authentication context (`useSupabase`)
+- [ ] Add state management (useState for data, loading, errors)
+- [ ] Implement data fetching (useEffect with session dependency)
+- [ ] Add CRUD operation handlers
+- [ ] Add loading state UI
+- [ ] Add error state UI
+- [ ] Add empty state UI
+- [ ] Add main content UI
+- [ ] Add form dialogs/modals
+- [ ] Add toast notifications
+- [ ] Export as default export (required by module system)
+- [ ] Add comprehensive comments throughout
+
+**Required exports:**
+```typescript
+export default function ModulePage() {
+  // Component implementation
+}
+```
+
+#### Step 5.5.2: Dashboard Widget (`components/widget.tsx`)
+
+- [ ] Add `'use client'` directive
+- [ ] Fetch data independently (don't rely on main page state)
+- [ ] Show loading state
+- [ ] Show error state with retry
+- [ ] Show statistics/summary
+- [ ] Add link to main module page
+- [ ] Export both named and default exports
+- [ ] Add comprehensive comments
+
+**Required exports:**
+```typescript
+export function ModuleWidget() { /* ... */ }
+export default ModuleWidget
+```
+
+#### Step 5.5.3: Settings Panel (`components/settings-panel.tsx`)
+
+- [ ] Add `'use client'` directive
+- [ ] Load settings on mount
+- [ ] Create form with all settings options
+- [ ] Add save/reset buttons
+- [ ] Show loading/saving/saved states
+- [ ] Add developer info section (collapsible)
+- [ ] Export both named and default exports
+- [ ] Add comprehensive comments
+
+**Common settings to include:**
+- Show in Dashboard (toggle)
+- Enable Notifications (toggle)
+- Sort preferences (dropdown)
+- Threshold values (dropdown/input)
 
 ### Phase 6: Integration
 
-- [ ] **5.6.1 Update imports in other files**
-  ```bash
-  grep -r "@/lib/old-file" app/
-  ```
-  Update to: `@/modules/module-id/lib/utils`
+**Objective:** Update integration points to use the new module.
 
-- [ ] **5.6.2 Remove static menu entry**
-  - [ ] Check `/lib/menu-config.ts`
-  - [ ] Remove hardcoded entry
+#### Step 5.6.1: Update Imports in Other Files
 
-- [ ] **5.6.3 Register module** (Steps 4.6 - 4.10)
+- [ ] Search for old imports: `grep -r "@/lib/old-file" app/`
+- [ ] Update to module paths: `@/modules-core/[module-id]/lib/utils`
+- [ ] Update type imports: `@/modules-core/[module-id]/types`
+- [ ] Test that imports resolve correctly
+
+**Example:**
+```typescript
+// OLD
+import { getItems, type Item } from '@/lib/old-file'
+
+// NEW
+import { getItems } from '@/modules-core/module-id/lib/utils'
+import type { Item } from '@/modules-core/module-id/types'
+```
+
+#### Step 5.6.2: Remove Static Menu Entry
+
+- [ ] Check `/lib/menu-config.ts` for hardcoded entry
+- [ ] Remove module entry from `menuConfig` array
+- [ ] Remove unused icon imports
+- [ ] Remove from feature descriptions
+- [ ] Module system will handle menu entry dynamically
+
+#### Step 5.6.3: Verify Middleware
+
+- [ ] Check `/middleware.ts` includes module route
+- [ ] Ensure route is in `protectedRoutes` array
+- [ ] Test that unauthenticated users are redirected
+
+#### Step 5.6.4: Update Debug Page
+
+- [ ] Add module ID to `registeredModules` array in `/app/debug/page.tsx` (~line 274)
+- [ ] Increment `expectedTables` count in `/app/debug/page.tsx` (~line 595)
+- [ ] Run debug tests to verify module is recognized
+
+#### Step 5.6.5: Update Backup System
+
+- [ ] Add table name to `COMPLETE_TABLE_LIST` in `/app/api/backup/export/route.ts`
+- [ ] Add table name to `COMPLETE_TABLE_LIST` in `/app/api/backup/verify/route.ts`
+- [ ] Update expected table count in `CLAUDE.md` (Expected Tables section)
+- [ ] Add table to the numbered list in `CLAUDE.md`
+- [ ] Test backup export includes module data
+
+#### Step 5.6.6: Register Module (Steps 4.6 - 4.10)
+
+- [ ] Register page in MODULE_PAGES
+- [ ] Register API routes (if applicable)
+- [ ] Update debug page
+- [ ] Update backup system (if DB table)
+- [ ] Update CLAUDE.md (if DB table)
 
 ### Phase 7: Cleanup
 
+**Objective:** Remove old files safely after verifying new module works.
+
 **IMPORTANT: Only delete after confirming new module works!**
 
-- [ ] **5.7.1 Verify module loads**
-  - [ ] Navigate to module URL
-  - [ ] Check for errors
+#### Step 5.7.1: Verify Module Loads
 
-- [ ] **5.7.2 Test all functionality**
-  - [ ] Test CRUD operations
-  - [ ] Test widget
-  - [ ] Test settings panel
-  - [ ] Test enable/disable toggle
+- [ ] Run `npm run generate-module-registry`
+- [ ] Verify module appears in registry file
+- [ ] Start dev server
+- [ ] Navigate to module URL
+- [ ] Verify module loads without errors
 
-- [ ] **5.7.3 Delete old files**
-  ```bash
-  # Verify no remaining references first
-  grep -r "old-feature-name" app/ lib/ components/
+#### Step 5.7.2: Test All Functionality
 
-  # Then delete
-  rm -rf app/old-feature
-  rm -rf app/api/old-feature
-  rm lib/old-feature.ts
-  ```
+- [ ] Test create operation
+- [ ] Test read/list operation
+- [ ] Test update operation
+- [ ] Test delete operation
+- [ ] Test dashboard widget
+- [ ] Test settings panel
+- [ ] Test module enable/disable toggle
+
+#### Step 5.7.3: Delete Old Files
+
+- [ ] Delete `/app/[old-feature]/` directory
+- [ ] Delete `/app/api/[old-feature]/` directory
+- [ ] Delete `/lib/[old-feature].ts` file
+- [ ] Delete any other old feature files
+- [ ] Remove from validation schemas if extracted to module
+
+**Command:**
+```bash
+# Verify no remaining references first
+grep -r "old-feature-name" app/ lib/ components/
+
+# Then delete
+rm -rf app/old-feature
+rm -rf app/api/old-feature
+rm lib/old-feature.ts
+```
 
 ### Phase 8: Testing
 
-- [ ] **5.8.1 Functional testing**
-  - [ ] Create, Read, Update, Delete operations
-  - [ ] Form validation
-  - [ ] Error handling
-  - [ ] Loading states
+**Objective:** Comprehensively test the migrated module.
 
-- [ ] **5.8.2 Integration testing**
-  - [ ] Dashboard widget
-  - [ ] Settings panel
-  - [ ] Menu entry
-  - [ ] Module toggle
+#### Step 5.8.1: Functional Testing
 
-- [ ] **5.8.3 Security testing**
-  - [ ] RLS policies enforce user isolation
-  - [ ] API endpoints require auth
-  - [ ] Invalid inputs rejected
+- [ ] **Create**: Add new items successfully
+- [ ] **Read**: List displays all user items
+- [ ] **Update**: Edit items and see changes
+- [ ] **Delete**: Remove items successfully
+- [ ] **Validation**: Form validation works
+- [ ] **Error Handling**: Errors display properly
+- [ ] **Loading States**: Spinners show during async operations
+- [ ] **Empty States**: Shows when no data
+
+#### Step 5.8.2: Integration Testing
+
+- [ ] **Tasks Integration**: If applicable, test task linking
+- [ ] **Dashboard Widget**: Appears on dashboard
+- [ ] **Settings Panel**: Appears in settings
+- [ ] **Menu Entry**: Shows in sidebar
+- [ ] **Module Toggle**: Enable/disable works
+- [ ] **Route Protection**: Unauthenticated users redirected
+
+#### Step 5.8.3: Security Testing
+
+- [ ] **RLS Policies**: Users only see their own data
+- [ ] **API Authentication**: Endpoints require auth
+- [ ] **User Isolation**: No data leakage between users
+- [ ] **Validation**: Invalid inputs rejected
+- [ ] **UUID Validation**: Malformed IDs rejected
+
+#### Step 5.8.4: Cross-Browser Testing
+
+- [ ] Test in Chrome/Edge
+- [ ] Test in Firefox
+- [ ] Test in Safari (if Mac)
+- [ ] Test responsive design (mobile/tablet/desktop)
+
+### Phase 9: Post-Migration
+
+**Objective:** Document and finalize the migration.
+
+#### Step 5.9.1: Documentation
+
+- [ ] Update main project README if needed
+- [ ] Verify module README is complete
+- [ ] Document any breaking changes
+- [ ] Update CHANGELOG if applicable
+- [ ] Add migration notes
+
+#### Step 5.9.2: Git Commit
+
+- [ ] Stage all changes: `git add .`
+- [ ] Create descriptive commit message
+- [ ] Reference issue/ticket if applicable
+
+**Commit message template:**
+```
+Migrate [Feature Name] to module architecture
+
+- Created /modules-core/[module-id]/ with complete structure
+- Migrated database schema with RLS policies
+- Created comprehensive TypeScript types
+- Migrated API routes to modular structure
+- Created dashboard widget and settings panel
+- Updated integration points (Tasks, Menu)
+- Removed old files from /app and /lib
+- Tested all CRUD operations and integrations
+
+Closes #[issue-number]
+```
+
+#### Step 5.9.3: Deployment Considerations
+
+- [ ] Ensure database schema is deployed to production
+- [ ] Verify environment variables are set
+- [ ] Test in staging environment first
+- [ ] Monitor for errors after deployment
+- [ ] Have rollback plan ready
+
+### Migration Quick Reference
+
+**Estimated Time:**
+- **Simple module** (no integrations): 2-3 hours
+- **Medium module** (some integrations): 4-6 hours
+- **Complex module** (heavy integrations): 8-12 hours
+
+**Summary Checklist:**
+- [ ] Module directory created with proper structure
+- [ ] module.json configured correctly
+- [ ] Types defined in types/index.ts
+- [ ] Database schema in database/schema.sql
+- [ ] Utilities in lib/utils.ts
+- [ ] API routes in api/data/ and api/data/[id]/
+- [ ] Settings API in api/settings/route.ts (if needed)
+- [ ] Main page in app/page.tsx (default export)
+- [ ] Widget in components/widget.tsx (named + default export)
+- [ ] Settings panel in components/settings-panel.tsx (named + default export)
+- [ ] README.md created
+- [ ] Module registry regenerated
+- [ ] Debug page updated
+- [ ] Backup system updated
+- [ ] CLAUDE.md updated
+- [ ] Old imports updated
+- [ ] Static menu entry removed
+- [ ] Old files deleted
+- [ ] All tests passing
+- [ ] Git commit created
 
 ---
 

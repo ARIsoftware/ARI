@@ -1,4 +1,4 @@
-import { CheckSquare, Plus, Archive, Dumbbell, Target, TrendingUp, Settings, BarChart3, Bot, Package, Grid3x3, Radar } from "lucide-react"
+import { CheckSquare, Plus, Archive, BarChart3, Grid3x3, Radar } from "lucide-react"
 
 export interface MenuItem {
   title: string
@@ -57,23 +57,6 @@ export const menuConfig: MenuGroup[] = [
         url: "#",
         icon: Archive,
         isActive: false,
-      },
-    ],
-  },
-  {
-    title: "Settings",
-    url: "#",
-    icon: Settings,
-    items: [
-      {
-        title: "Preferences",
-        url: "/settings",
-        icon: Settings,
-      },
-      {
-        title: "Modules",
-        url: "/modules",
-        icon: Package,
       },
     ],
   },
