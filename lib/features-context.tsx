@@ -10,11 +10,24 @@ interface FeaturesContextType {
 
 const FeaturesContext = createContext<FeaturesContextType | undefined>(undefined)
 
-export function FeaturesProvider({ children }: { children: ReactNode }) {
-  const [features, setFeatures] = useState<Record<string, boolean>>({})
-  const [loading, setLoading] = useState(true)
+interface FeaturesProviderProps {
+  children: ReactNode
+  /** Pre-fetched features from server-side */
+  initialFeatures?: Record<string, boolean>
+}
+
+export function FeaturesProvider({ children, initialFeatures }: FeaturesProviderProps) {
+  // Use initial features if provided (server-side), otherwise start empty
+  const [features, setFeatures] = useState<Record<string, boolean>>(initialFeatures || {})
+  // If we have initial features, no loading needed
+  const [loading, setLoading] = useState(!initialFeatures)
 
   useEffect(() => {
+    // Skip client-side fetch if we already have server-side features
+    if (initialFeatures) {
+      return
+    }
+
     const loadFeatures = async () => {
       try {
         const response = await fetch('/api/features')
@@ -34,7 +47,7 @@ export function FeaturesProvider({ children }: { children: ReactNode }) {
     }
 
     loadFeatures()
-  }, [])
+  }, [initialFeatures])
 
   const isFeatureEnabled = (featureName: string): boolean => {
     // Default to true if no preference is set

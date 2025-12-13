@@ -3,7 +3,7 @@
 import type * as React from "react"
 import { useFeatures } from "@/lib/features-context"
 import { menuConfig, getUrlToFeatureMap } from "@/lib/menu-config"
-import { useModulesByPosition } from "@/lib/modules/module-hooks"
+import { useEnabledModulesFromContext } from "@/lib/modules/context"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
 import {
   Sidebar,
@@ -24,12 +24,11 @@ const URL_TO_FEATURE_MAP = getUrlToFeatureMap()
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { isFeatureEnabled, loading } = useFeatures()
 
-  // Load modules for sidebar positions
-  const { modules: mainModulesUnsorted, loading: modulesLoading } = useModulesByPosition('main')
-  const { modules: bottomModulesUnsorted } = useModulesByPosition('bottom')
+  // Get enabled modules from context (pre-fetched server-side)
+  const enabledModules = useEnabledModulesFromContext()
 
   // Sort modules by menuPriority (lower first), then alphabetically
-  const sortModules = (modules: typeof mainModulesUnsorted) => {
+  const sortModules = (modules: typeof enabledModules) => {
     return [...modules].sort((a, b) => {
       const priorityA = a.menuPriority ?? 50
       const priorityB = b.menuPriority ?? 50
@@ -42,6 +41,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       return a.name.localeCompare(b.name)
     })
   }
+
+  // Filter modules by sidebar position
+  const mainModulesUnsorted = enabledModules.filter(module =>
+    module.routes?.some(route => route.sidebarPosition === 'main')
+  )
+  const bottomModulesUnsorted = enabledModules.filter(module =>
+    module.routes?.some(route => route.sidebarPosition === 'bottom')
+  )
 
   const mainModules = sortModules(mainModulesUnsorted)
   const bottomModules = sortModules(bottomModulesUnsorted)
@@ -65,7 +72,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }))
     .filter(group => group.items.length > 0)
 
-  if (loading || modulesLoading) {
+  // Only show loading for features context (which is also fast)
+  // Modules are pre-fetched server-side, so no loading state needed
+  if (loading) {
     return (
       <Sidebar {...props}>
         <SidebarContent>

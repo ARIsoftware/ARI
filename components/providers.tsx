@@ -10,6 +10,7 @@ import { FeaturesProvider } from "@/lib/features-context"
 import { ModulesProvider } from "@/lib/modules/context"
 import { CommandPaletteProvider } from "@/components/command-palette"
 import { User, Session } from '@supabase/supabase-js'
+import type { ModuleMetadata } from '@/lib/modules/module-types'
 
 type SupabaseContext = {
   supabase: ReturnType<typeof createSupabaseClient>
@@ -21,10 +22,14 @@ const Context = createContext<SupabaseContext | undefined>(undefined)
 
 export function Providers({
   children,
-  modules = []
+  modules = [],
+  enabledModules = [],
+  initialFeatures
 }: {
   children: React.ReactNode
   modules?: string[]
+  enabledModules?: ModuleMetadata[]
+  initialFeatures?: Record<string, boolean>
 }) {
   const pathname = usePathname()
   const [supabase] = useState(() => createSupabaseClient())
@@ -85,8 +90,8 @@ export function Providers({
 
   return (
     <Context.Provider value={{ supabase, user, session }}>
-      <ModulesProvider modules={modules}>
-        <FeaturesProvider>
+      <ModulesProvider modules={modules} enabledModules={enabledModules}>
+        <FeaturesProvider initialFeatures={initialFeatures}>
           <MusicPlayerProvider>
             <CommandPaletteProvider>
               {children}
