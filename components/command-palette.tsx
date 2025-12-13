@@ -22,22 +22,7 @@ import {
   Plus,
 } from "lucide-react"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
-import moduleManifest from "@/lib/generated/module-manifest.json"
-
-// Type for module from manifest
-interface ModuleRoute {
-  path: string
-  label: string
-  icon: string
-}
-
-interface ModuleInfo {
-  id: string
-  name: string
-  icon: string
-  enabled: boolean
-  routes: ModuleRoute[]
-}
+import { useModules } from "@/lib/modules/module-hooks"
 
 interface CommandPaletteProps {
   open?: boolean
@@ -48,6 +33,7 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
   const [internalOpen, setInternalOpen] = React.useState(false)
   const router = useRouter()
   const { supabase } = useSupabase()
+  const { modules, loading: modulesLoading } = useModules()
 
   // Use controlled state if provided, otherwise use internal state
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen
@@ -98,25 +84,27 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
 
         <CommandSeparator />
 
-        <CommandGroup heading="Modules">
-          {(moduleManifest.modules as ModuleInfo[])
-            .filter(m => m.enabled && m.routes && m.routes.length > 0)
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map((module) => {
-              const Icon = getLucideIcon(module.icon)
-              const route = module.routes[0]
-              return (
-                <CommandItem
-                  key={module.id}
-                  onSelect={() => runCommand(() => router.push(route.path))}
-                >
-                  <Icon className="mr-2 h-4 w-4" />
-                  <span>{module.name}</span>
-                </CommandItem>
-              )
-            })
-          }
-        </CommandGroup>
+        {modules.length > 0 && (
+          <CommandGroup heading="Modules">
+            {modules
+              .filter(m => m.routes && m.routes.length > 0)
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((module) => {
+                const Icon = getLucideIcon(module.icon)
+                const route = module.routes![0]
+                return (
+                  <CommandItem
+                    key={module.id}
+                    onSelect={() => runCommand(() => router.push(route.path))}
+                  >
+                    <Icon className="mr-2 h-4 w-4" />
+                    <span>{module.name}</span>
+                  </CommandItem>
+                )
+              })
+            }
+          </CommandGroup>
+        )}
 
         <CommandSeparator />
 
