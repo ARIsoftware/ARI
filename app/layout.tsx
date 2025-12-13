@@ -2,6 +2,8 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Providers } from "@/components/providers"
 import { getInstalledModules, getDuplicateModuleErrors } from "@/lib/modules"
+import { getEnabledModules } from "@/lib/modules/module-registry"
+import { getAuthenticatedUser } from "@/lib/auth-helpers"
 import { ModuleErrorOverlay } from "@/components/module-error-overlay"
 import "./globals.css"
 
@@ -19,7 +21,7 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
@@ -29,6 +31,35 @@ export default function RootLayout({
 
   // Check for duplicate module IDs (critical error that blocks the app)
   const duplicateErrors = getDuplicateModuleErrors()
+
+  // Fetch enabled modules and features server-side for authenticated users
+  // This eliminates the "Loading..." flash in the sidebar
+  let enabledModules: Awaited<ReturnType<typeof getEnabledModules>> = []
+  let initialFeatures: Record<string, boolean> | undefined = undefined
+
+  try {
+    const { user, supabase } = await getAuthenticatedUser()
+    if (user) {
+      // Fetch modules and features in parallel
+      const [modules, featuresResult] = await Promise.all([
+        getEnabledModules(user.id),
+        supabase.from('user_feature_preferences').select('feature_name, enabled')
+      ])
+
+      enabledModules = modules
+
+      // Convert features array to map
+      if (featuresResult.data) {
+        initialFeatures = {}
+        featuresResult.data.forEach((pref: { feature_name: string; enabled: boolean }) => {
+          initialFeatures![pref.feature_name] = pref.enabled
+        })
+      }
+    }
+  } catch (error) {
+    // User not authenticated or error fetching - sidebar will load without modules
+    console.log('[Layout] No authenticated user for server-side loading')
+  }
 
   return (
     <html lang="en">
@@ -56,7 +87,7 @@ export default function RootLayout({
         {duplicateErrors.length > 0 ? (
           <ModuleErrorOverlay errors={duplicateErrors} />
         ) : (
-          <Providers modules={installedModules}>{children}</Providers>
+          <Providers modules={installedModules} enabledModules={enabledModules} initialFeatures={initialFeatures}>{children}</Providers>
         )}
       </body>
     </html>
