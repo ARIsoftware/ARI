@@ -17,8 +17,8 @@ import { notFound } from 'next/navigation'
 import { getEnabledModule } from '@/lib/modules/module-registry'
 import { ErrorBoundary, ModuleErrorFallback } from '@/components/error-boundary'
 import { AppSidebar } from '@/components/app-sidebar'
-import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar'
-import { Separator } from '@/components/ui/separator'
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
+import { TopBar } from '@/components/top-bar'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -106,9 +106,7 @@ export default async function ModuleCatchAllPage({
           <SidebarProvider>
             <AppSidebar />
             <SidebarInset>
-              <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-white px-4">
-                <SidebarTrigger className="-ml-1" />
-                <Separator orientation="vertical" className="mr-2 h-4" />
+              <TopBar>
                 <Breadcrumb>
                   <BreadcrumbList>
                     <BreadcrumbItem>
@@ -120,7 +118,7 @@ export default async function ModuleCatchAllPage({
                     </BreadcrumbItem>
                   </BreadcrumbList>
                 </Breadcrumb>
-              </header>
+              </TopBar>
               {pageContent}
             </SidebarInset>
           </SidebarProvider>
