@@ -1,7 +1,6 @@
 "use client"
 
 import type * as React from "react"
-import { UserProfileDropdown } from "./user-profile-dropdown"
 import { useFeatures } from "@/lib/features-context"
 import { menuConfig, getUrlToFeatureMap } from "@/lib/menu-config"
 import { useModulesByPosition } from "@/lib/modules/module-hooks"
@@ -151,9 +150,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           })
         )}
       </SidebarContent>
-      <div className="mt-auto mb-16 flex items-center justify-center p-4">
-        <UserProfileDropdown />
-      </div>
       <SidebarRail />
     </Sidebar>
   )
