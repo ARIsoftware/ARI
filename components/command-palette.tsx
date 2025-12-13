@@ -17,6 +17,7 @@ import {
   LayoutDashboard,
   CheckSquare,
   Settings,
+  Package,
   LogOut,
   Radar,
   Plus,
@@ -80,6 +81,14 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
             <Radar className="mr-2 h-4 w-4" />
             <span>Priority Radar</span>
           </CommandItem>
+          <CommandItem onSelect={() => runCommand(() => router.push("/settings"))}>
+            <Settings className="mr-2 h-4 w-4" />
+            <span>Settings</span>
+          </CommandItem>
+          <CommandItem onSelect={() => runCommand(() => router.push("/modules"))}>
+            <Package className="mr-2 h-4 w-4" />
+            <span>Modules</span>
+          </CommandItem>
         </CommandGroup>
 
         <CommandSeparator />
@@ -122,11 +131,7 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
 
         <CommandSeparator />
 
-        <CommandGroup heading="Settings">
-          <CommandItem onSelect={() => runCommand(() => router.push("/settings"))}>
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Settings</span>
-          </CommandItem>
+        <CommandGroup heading="Account">
           <CommandItem onSelect={() => runCommand(handleSignOut)}>
             <LogOut className="mr-2 h-4 w-4" />
             <span>Sign Out</span>
