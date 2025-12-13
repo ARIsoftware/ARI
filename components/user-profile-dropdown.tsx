@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { User, Settings, LogOut, Shield } from "lucide-react"
+import { Settings, LogOut, Shield } from "lucide-react"
 
 export function UserProfileDropdown() {
   const { session, supabase } = useSupabase()
@@ -60,10 +60,6 @@ export function UserProfileDropdown() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => router.push('/profile')}>
-          <User className="mr-2 h-4 w-4" />
-          <span>Profile</span>
-        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => router.push('/settings')}>
           <Settings className="mr-2 h-4 w-4" />
           <span>Settings</span>
