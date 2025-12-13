@@ -45,6 +45,7 @@
     "@radix-ui/react-toggle": "latest",
     "@radix-ui/react-toggle-group": "latest",
     "@radix-ui/react-tooltip": "latest",
+    "@radix-ui/react-visually-hidden": "^1.2.4",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.4.2",
     "@supabase/ssr": "latest",

@@ -18,6 +18,12 @@ export function ExerciseReminder() {
   const lastNotificationRef = useRef<string>("")
   const [open, setOpen] = useState(false)
   const [countdown, setCountdown] = useState(COUNTDOWN_DURATION)
+  const [mounted, setMounted] = useState(false)
+
+  // Only render after mounting to avoid hydration issues with Dialog portal
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const startCountdown = useCallback(() => {
     setCountdown(COUNTDOWN_DURATION)
@@ -79,6 +85,11 @@ export function ExerciseReminder() {
 
   if (typeof window !== 'undefined' && (window as any).testExerciseReminder === undefined) {
     (window as any).testExerciseReminder = testReminder
+  }
+
+  // Don't render Dialog until mounted to avoid hydration issues
+  if (!mounted) {
+    return null
   }
 
   return (
