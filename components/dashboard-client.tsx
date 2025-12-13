@@ -8,8 +8,8 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
 } from "@/components/ui/breadcrumb"
-import { Separator } from "@/components/ui/separator"
-import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
+import { SidebarInset } from "@/components/ui/sidebar"
+import { TopBar } from "@/components/top-bar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -83,9 +83,7 @@ export default function DashboardClient({ initialQuote }: DashboardClientProps) 
 
   return (
     <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-white px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
+        <TopBar>
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
@@ -93,7 +91,7 @@ export default function DashboardClient({ initialQuote }: DashboardClientProps) 
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-        </header>
+        </TopBar>
 
         <div className="flex flex-1">
           {/* Main Content */}

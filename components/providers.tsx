@@ -5,9 +5,10 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { Toaster } from "@/components/ui/toaster"
 import { ExerciseReminder } from "@/components/exercise-reminder"
-import { YouTubeMusicPlayer } from "@/components/youtube-music-player"
+import { MusicPlayerProvider } from "@/components/youtube-music-player"
 import { FeaturesProvider } from "@/lib/features-context"
 import { ModulesProvider } from "@/lib/modules/context"
+import { CommandPaletteProvider } from "@/components/command-palette"
 import { User, Session } from '@supabase/supabase-js'
 
 type SupabaseContext = {
@@ -86,16 +87,14 @@ export function Providers({
     <Context.Provider value={{ supabase, user, session }}>
       <ModulesProvider modules={modules}>
         <FeaturesProvider>
-          {children}
-          <Toaster />
-          {/* Only show exercise reminder when user is authenticated */}
-          {user && <ExerciseReminder />}
-          {/* Hide music player on welcome page */}
-          {pathname !== '/welcome' && (
-            <div className="fixed top-[53px] right-6 z-50">
-              <YouTubeMusicPlayer />
-            </div>
-          )}
+          <MusicPlayerProvider>
+            <CommandPaletteProvider>
+              {children}
+              <Toaster />
+              {/* Only show exercise reminder when user is authenticated */}
+              {user && <ExerciseReminder />}
+            </CommandPaletteProvider>
+          </MusicPlayerProvider>
         </FeaturesProvider>
       </ModulesProvider>
     </Context.Provider>

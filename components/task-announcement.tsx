@@ -1,13 +1,32 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { ArrowUpRight } from "lucide-react"
+import { useRouter } from "next/navigation"
+import {
+  ArrowUpRight,
+  Command,
+  Settings,
+  Package,
+  LogOut,
+  User,
+  Play,
+  Pause
+} from "lucide-react"
 import { DM_Sans } from "next/font/google"
 import { Announcement, AnnouncementTag, AnnouncementTitle } from "@/components/ui/kibo-ui/announcement"
 import { getLastCompletedTask, truncateTaskName } from "@/lib/get-last-completed-task"
 import { getAuthenticatedSupabase } from "@/lib/supabase"
 import { useIsMobile } from "@/components/ui/use-mobile"
 import { useSupabase } from "@/components/providers"
+import { useCommandPalette } from "@/components/command-palette"
+import { useMusicPlayer } from "@/components/youtube-music-player"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 // Import focus timer state
 let globalTimerState = {
@@ -27,6 +46,131 @@ const dmSans = DM_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
 })
+
+// Icons component for the top bar
+function TopBarIcons() {
+  const router = useRouter()
+  const { session, supabase } = useSupabase()
+  const { setOpen: setCommandPaletteOpen } = useCommandPalette()
+  const { isPlaying, isReady, togglePlayPause } = useMusicPlayer()
+  const [mounted, setMounted] = useState(false)
+  const user = session?.user
+
+  // Only render portals after mounting to avoid hydration issues
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push("/sign-in")
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      {/* Command - opens command palette */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"
+        onClick={() => setCommandPaletteOpen(true)}
+      >
+        <Command className="h-5 w-5" />
+      </Button>
+
+      {/* Settings */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"
+        onClick={() => router.push("/settings")}
+      >
+        <Settings className="h-5 w-5" />
+      </Button>
+
+      {/* Modules */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"
+        onClick={() => router.push("/modules")}
+      >
+        <Package className="h-5 w-5" />
+      </Button>
+
+      {/* Music Player */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"
+        onClick={togglePlayPause}
+        disabled={!isReady}
+      >
+        {isPlaying ? (
+          <Pause className="h-5 w-5" />
+        ) : (
+          <Play className="h-5 w-5" />
+        )}
+      </Button>
+
+      {/* Logout */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"
+        onClick={handleSignOut}
+      >
+        <LogOut className="h-5 w-5" />
+      </Button>
+
+      {/* User Avatar - only render DropdownMenu after mounting to avoid portal hydration issues */}
+      {mounted ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full overflow-hidden p-0 hover:ring-2 hover:ring-white/20"
+            >
+              {user?.user_metadata?.avatar_url ? (
+                <img
+                  src={user.user_metadata.avatar_url}
+                  alt="Profile"
+                  className="h-8 w-8 rounded-full object-cover"
+                />
+              ) : (
+                <div className="h-8 w-8 rounded-full bg-gray-600 flex items-center justify-center">
+                  <User className="h-4 w-4 text-white" />
+                </div>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onClick={() => router.push("/profile")}>
+              Profile
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push("/settings")}>
+              Settings
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSignOut}>
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-full overflow-hidden p-0"
+        >
+          <div className="h-8 w-8 rounded-full bg-gray-600 flex items-center justify-center">
+            <User className="h-4 w-4 text-white" />
+          </div>
+        </Button>
+      )}
+    </div>
+  )
+}
 
 export function TaskAnnouncement() {
   const [lastTask, setLastTask] = useState<{ title: string } | null>(null)
@@ -157,12 +301,16 @@ export function TaskAnnouncement() {
   if (customMessage) {
     return (
       <div
-        className={`topbar h-[45px] w-full relative z-50 flex items-center justify-center ${getBgClass()}`}
+        className={`topbar h-[45px] w-full relative z-50 flex items-center justify-between px-4 ${getBgClass()}`}
         style={getBgStyle()}
       >
+        <div className="flex-1" />
         <span className={`text-white font-medium ${dmSans.className}`}>
           {customMessage}
         </span>
+        <div className="flex-1 flex justify-end">
+          <TopBarIcons />
+        </div>
       </div>
     )
   }
@@ -170,19 +318,24 @@ export function TaskAnnouncement() {
   if (loading || !lastTask) {
     return (
       <div
-        className={`topbar h-[45px] w-full relative z-50 flex items-center justify-center ${getBgClass()}`}
+        className={`topbar h-[45px] w-full relative z-50 flex items-center justify-between px-4 ${getBgClass()}`}
         style={getBgStyle()}
       >
+        <div className="flex-1" />
         <span className={`text-white font-medium ${dmSans.className}`}>ARI</span>
+        <div className="flex-1 flex justify-end">
+          <TopBarIcons />
+        </div>
       </div>
     )
   }
 
   return (
     <div
-      className={`topbar h-[45px] w-full relative z-50 flex items-center justify-center ${getBgClass()}`}
+      className={`topbar h-[45px] w-full relative z-50 flex items-center justify-between px-4 ${getBgClass()}`}
       style={getBgStyle()}
     >
+      <div className="flex-1" />
       <Announcement className="bg-white border-gray-200 hover:bg-gray-50 shadow-sm">
         <AnnouncementTag className="bg-gray-100 text-gray-700 font-medium">
           Task Complete
@@ -192,6 +345,9 @@ export function TaskAnnouncement() {
           <ArrowUpRight className="ml-1 h-3 w-3 text-gray-500" />
         </AnnouncementTitle>
       </Announcement>
+      <div className="flex-1 flex justify-end">
+        <TopBarIcons />
+      </div>
     </div>
   )
 }

@@ -13,8 +13,8 @@ import {
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { Separator } from "@/components/ui/separator"
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { TopBar } from "@/components/top-bar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   AlertCircle,
@@ -85,9 +85,7 @@ export default function ModulesPage() {
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-white px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
+          <TopBar>
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
@@ -95,7 +93,7 @@ export default function ModulesPage() {
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-          </header>
+          </TopBar>
 
           <main className="flex-1 bg-slate-50">
             <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8 lg:px-8">
