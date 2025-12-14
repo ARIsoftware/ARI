@@ -65,6 +65,19 @@ export interface ModuleSettingsConfig {
 }
 
 /**
+ * Module Top Bar Icon Configuration
+ * Defines an icon shortcut that appears in the top navigation bar
+ */
+export interface ModuleTopBarIcon {
+  /** Lucide icon name (e.g., "Zap", "Bell", "CheckSquare") */
+  icon: string
+  /** Route to navigate to when clicked (e.g., "/tasks") */
+  route: string
+  /** Optional tooltip text displayed on hover */
+  tooltip?: string
+}
+
+/**
  * Module Permissions (metadata only, not enforced)
  * Documents what capabilities the module uses
  */
@@ -114,6 +127,8 @@ export interface ModuleManifest {
   dashboard?: ModuleDashboardConfig
   /** Settings panel configuration */
   settings?: ModuleSettingsConfig
+  /** Top bar icon configuration for quick access shortcut */
+  topBarIcon?: ModuleTopBarIcon
 }
 
 /**

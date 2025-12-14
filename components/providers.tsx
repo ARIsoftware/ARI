@@ -36,6 +36,20 @@ export function Providers({
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
 
+  // Load saved font preference on mount
+  useEffect(() => {
+    const fontMap: Record<string, string> = {
+      'Overpass Mono': '"Overpass Mono", monospace',
+      'Outfit': '"Outfit", sans-serif',
+      'Open Sans': '"Open Sans", sans-serif',
+      'Science Gothic': '"Science Gothic", sans-serif',
+    }
+    const savedFont = localStorage.getItem('ari-font-preference')
+    if (savedFont && fontMap[savedFont]) {
+      document.documentElement.style.setProperty('--font-family', fontMap[savedFont])
+    }
+  }, [])
+
   useEffect(() => {
     const initAuth = async () => {
       // Get session for tokens

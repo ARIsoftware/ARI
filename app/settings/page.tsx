@@ -42,6 +42,7 @@ import {
   ShieldCheck,
   Sparkles,
   TimerReset,
+  Type,
   Upload,
 } from "lucide-react"
 
@@ -104,6 +105,18 @@ export default function SettingsPage() {
   const [featurePreferences, setFeaturePreferences] = useState<Record<string, boolean>>({})
   const [loadingFeatures, setLoadingFeatures] = useState(true)
 
+  // Font settings
+  const [selectedFont, setSelectedFont] = useState("Overpass Mono")
+  const [savedFont, setSavedFont] = useState("Overpass Mono")
+  const [fontSaving, setFontSaving] = useState(false)
+
+  const fontOptions = [
+    { value: "Overpass Mono", label: "Overpass Mono", css: '"Overpass Mono", monospace' },
+    { value: "Outfit", label: "Outfit", css: '"Outfit", sans-serif' },
+    { value: "Open Sans", label: "Open Sans", css: '"Open Sans", sans-serif' },
+    { value: "Science Gothic", label: "Science Gothic", css: '"Science Gothic", sans-serif' },
+  ]
+
   // Get all menu features dynamically from menu config
   const menuFeatures = getAllFeatures()
 
@@ -157,6 +170,39 @@ export default function SettingsPage() {
     }
   }
 
+
+  // Load saved font on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('ari-font-preference')
+    if (saved) {
+      const fontOption = fontOptions.find(f => f.value === saved)
+      if (fontOption) {
+        setSelectedFont(saved)
+        setSavedFont(saved)
+        document.documentElement.style.setProperty('--font-family', fontOption.css)
+      }
+    }
+  }, [])
+
+  // Apply font dynamically when selection changes
+  const handleFontChange = (fontValue: string) => {
+    setSelectedFont(fontValue)
+    const fontOption = fontOptions.find(f => f.value === fontValue)
+    if (fontOption) {
+      document.documentElement.style.setProperty('--font-family', fontOption.css)
+    }
+  }
+
+  // Save font preference
+  const handleSaveFont = () => {
+    setFontSaving(true)
+    localStorage.setItem('ari-font-preference', selectedFont)
+    setSavedFont(selectedFont)
+    setTimeout(() => {
+      setFontSaving(false)
+      setSavedMessage("Font preference saved successfully.")
+    }, 500)
+  }
 
   // Load feature preferences on mount
   useEffect(() => {
@@ -467,6 +513,7 @@ export default function SettingsPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
                   <TabsList>
                     <TabsTrigger value="general">General</TabsTrigger>
+                    <TabsTrigger value="fonts">Fonts</TabsTrigger>
                     <TabsTrigger value="features">Features</TabsTrigger>
                     <TabsTrigger value="notifications">Notifications</TabsTrigger>
                     <TabsTrigger value="security">Security</TabsTrigger>
@@ -648,6 +695,71 @@ export default function SettingsPage() {
                         />
                       </div>
                     </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="fonts" className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <Type className="h-5 w-5 text-indigo-500" />
+                        Font Selection
+                      </CardTitle>
+                      <CardDescription>
+                        Choose the font family used throughout the application. Changes are previewed immediately.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="space-y-3">
+                        <Label htmlFor="font-select">Application Font</Label>
+                        <Select value={selectedFont} onValueChange={handleFontChange}>
+                          <SelectTrigger id="font-select" className="w-full max-w-xs">
+                            <SelectValue placeholder="Select a font" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {fontOptions.map((font) => (
+                              <SelectItem
+                                key={font.value}
+                                value={font.value}
+                                style={{ fontFamily: font.css }}
+                              >
+                                {font.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-sm text-muted-foreground">
+                          Select a font to preview it immediately. Click "Save Font" to make it permanent.
+                        </p>
+                      </div>
+
+                      {selectedFont !== savedFont && (
+                        <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800">
+                          You have unsaved font changes. Click "Save Font" to apply permanently.
+                        </div>
+                      )}
+                    </CardContent>
+                    <CardFooter className="border-t bg-muted/60 flex justify-between items-center pt-4">
+                      <div className="text-sm text-muted-foreground">
+                        Current saved font: <span className="font-medium">{savedFont}</span>
+                      </div>
+                      <Button
+                        onClick={handleSaveFont}
+                        disabled={fontSaving || selectedFont === savedFont}
+                      >
+                        {fontSaving ? (
+                          <span className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Saving...
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-2">
+                            <Check className="h-4 w-4" />
+                            Save Font
+                          </span>
+                        )}
+                      </Button>
+                    </CardFooter>
                   </Card>
                 </TabsContent>
 

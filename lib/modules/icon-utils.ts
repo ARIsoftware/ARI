@@ -2,10 +2,353 @@
  * Icon Utilities for Modules
  *
  * Provides helper functions to get Lucide icons by name for module nav items.
+ *
+ * IMPORTANT: Due to tree-shaking in Next.js, we must explicitly import icons
+ * rather than using dynamic access via `import * as LucideIcons`.
  */
 
-import * as LucideIcons from 'lucide-react'
+import {
+  Package,
+  Bot,
+  Briefcase,
+  Clock,
+  Compass,
+  Dumbbell,
+  Ghost,
+  Grid3x3,
+  Hand,
+  Heart,
+  Plane,
+  Quote,
+  Snowflake,
+  Sparkles,
+  Trophy,
+  Users,
+  Zap,
+  Home,
+  Settings,
+  Bell,
+  CheckSquare,
+  Star,
+  Folder,
+  File,
+  Search,
+  Plus,
+  Minus,
+  Edit,
+  Trash,
+  Save,
+  Download,
+  Upload,
+  Share,
+  Link,
+  ExternalLink,
+  Mail,
+  MessageSquare,
+  Calendar,
+  MapPin,
+  Globe,
+  Sun,
+  Moon,
+  Cloud,
+  Camera,
+  Image,
+  Video,
+  Music,
+  Play,
+  Pause,
+  Volume2,
+  Mic,
+  Phone,
+  Smartphone,
+  Laptop,
+  Monitor,
+  Tv,
+  Wifi,
+  Bluetooth,
+  Battery,
+  Power,
+  Cpu,
+  HardDrive,
+  Database,
+  Server,
+  Code,
+  Terminal,
+  GitBranch,
+  Github,
+  Gitlab,
+  Chrome,
+  Apple,
+  Figma,
+  Framer,
+  Slack,
+  Twitter,
+  Facebook,
+  Instagram,
+  Linkedin,
+  Youtube,
+  Twitch,
+  ShoppingCart,
+  CreditCard,
+  DollarSign,
+  Euro,
+  Bitcoin,
+  TrendingUp,
+  TrendingDown,
+  BarChart,
+  PieChart,
+  LineChart,
+  Activity,
+  Target,
+  Award,
+  Gift,
+  Rocket,
+  Lightbulb,
+  Flag,
+  Bookmark,
+  Tag,
+  Hash,
+  AtSign,
+  Lock,
+  Unlock,
+  Key,
+  Shield,
+  Eye,
+  EyeOff,
+  AlertTriangle,
+  AlertCircle,
+  Info,
+  HelpCircle,
+  CheckCircle,
+  XCircle,
+  ArrowUp,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
+  MoreVertical,
+  Menu,
+  X,
+  Check,
+  RefreshCw,
+  RotateCw,
+  Maximize,
+  Minimize,
+  Copy,
+  Clipboard,
+  Scissors,
+  Filter,
+  SortAsc,
+  SortDesc,
+  Layers,
+  Layout,
+  Grid,
+  List,
+  Table,
+  Columns,
+  Sidebar,
+  PanelLeft,
+  PanelRight,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Bold,
+  Italic,
+  Underline,
+  Type,
+  Heading,
+  ListOrdered,
+  ListTodo,
+  Quote as QuoteIcon,
+  Smile,
+  Frown,
+  Meh,
+  ThumbsUp,
+  ThumbsDown,
+  Heart as HeartIcon,
+  Loader,
+  Loader2,
+} from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+
+/**
+ * Icon registry - explicitly imported icons to avoid tree-shaking issues
+ *
+ * To add a new icon:
+ * 1. Import it from 'lucide-react' above
+ * 2. Add it to this ICON_REGISTRY object
+ */
+const ICON_REGISTRY: Record<string, LucideIcon> = {
+  // Module icons (used in module.json)
+  Package,
+  Bot,
+  Briefcase,
+  Clock,
+  Compass,
+  Dumbbell,
+  Ghost,
+  Grid3x3,
+  Hand,
+  Heart,
+  Plane,
+  Quote,
+  Snowflake,
+  Sparkles,
+  Trophy,
+  Users,
+
+  // Common icons
+  Zap,
+  Home,
+  Settings,
+  Bell,
+  CheckSquare,
+  Star,
+  Folder,
+  File,
+  Search,
+  Plus,
+  Minus,
+  Edit,
+  Trash,
+  Save,
+  Download,
+  Upload,
+  Share,
+  Link,
+  ExternalLink,
+  Mail,
+  MessageSquare,
+  Calendar,
+  MapPin,
+  Globe,
+  Sun,
+  Moon,
+  Cloud,
+  Camera,
+  Image,
+  Video,
+  Music,
+  Play,
+  Pause,
+  Volume2,
+  Mic,
+  Phone,
+  Smartphone,
+  Laptop,
+  Monitor,
+  Tv,
+  Wifi,
+  Bluetooth,
+  Battery,
+  Power,
+  Cpu,
+  HardDrive,
+  Database,
+  Server,
+  Code,
+  Terminal,
+  GitBranch,
+  Github,
+  Gitlab,
+  Chrome,
+  Apple,
+  Figma,
+  Framer,
+  Slack,
+  Twitter,
+  Facebook,
+  Instagram,
+  Linkedin,
+  Youtube,
+  Twitch,
+  ShoppingCart,
+  CreditCard,
+  DollarSign,
+  Euro,
+  Bitcoin,
+  TrendingUp,
+  TrendingDown,
+  BarChart,
+  PieChart,
+  LineChart,
+  Activity,
+  Target,
+  Award,
+  Gift,
+  Rocket,
+  Lightbulb,
+  Flag,
+  Bookmark,
+  Tag,
+  Hash,
+  AtSign,
+  Lock,
+  Unlock,
+  Key,
+  Shield,
+  Eye,
+  EyeOff,
+  AlertTriangle,
+  AlertCircle,
+  Info,
+  HelpCircle,
+  CheckCircle,
+  XCircle,
+  ArrowUp,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
+  MoreVertical,
+  Menu,
+  X,
+  Check,
+  RefreshCw,
+  RotateCw,
+  Maximize,
+  Minimize,
+  Copy,
+  Clipboard,
+  Scissors,
+  Filter,
+  SortAsc,
+  SortDesc,
+  Layers,
+  Layout,
+  Grid,
+  List,
+  Table,
+  Columns,
+  Sidebar,
+  PanelLeft,
+  PanelRight,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Bold,
+  Italic,
+  Underline,
+  Type,
+  Heading,
+  ListOrdered,
+  ListTodo,
+  Smile,
+  Frown,
+  Meh,
+  ThumbsUp,
+  ThumbsDown,
+  Loader,
+  Loader2,
+}
 
 /**
  * Get a Lucide icon component by name
@@ -21,41 +364,34 @@ import type { LucideIcon } from 'lucide-react'
  */
 export function getLucideIcon(iconName?: string): LucideIcon {
   if (!iconName) {
-    return LucideIcons.Package // Default icon
+    return Package // Default icon
   }
 
-  // Get the icon from lucide-react by name
-  const Icon = (LucideIcons as any)[iconName]
+  const Icon = ICON_REGISTRY[iconName]
 
-  // If icon doesn't exist, return default Package icon
-  if (!Icon || typeof Icon !== 'function') {
-    console.warn(`[Icon Utils] Icon "${iconName}" not found in lucide-react, using default Package icon`)
-    return LucideIcons.Package
+  if (!Icon) {
+    console.warn(`[Icon Utils] Icon "${iconName}" not in registry. Add it to ICON_REGISTRY in icon-utils.ts`)
+    return Package
   }
 
-  return Icon as LucideIcon
+  return Icon
 }
 
 /**
- * Validate if an icon name exists in Lucide
+ * Validate if an icon name exists in the registry
  *
  * @param iconName - Name to check
- * @returns true if icon exists, false otherwise
+ * @returns true if icon exists in registry, false otherwise
  */
 export function isValidLucideIcon(iconName: string): boolean {
-  return !!(LucideIcons as any)[iconName]
+  return iconName in ICON_REGISTRY
 }
 
 /**
- * Get list of all available Lucide icon names
- *
- * Useful for development/debugging
+ * Get list of all available icon names in the registry
  *
  * @returns Array of icon names
  */
 export function getAllLucideIconNames(): string[] {
-  return Object.keys(LucideIcons).filter(key => {
-    const value = (LucideIcons as any)[key]
-    return typeof value === 'function'
-  })
+  return Object.keys(ICON_REGISTRY)
 }
