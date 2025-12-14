@@ -238,6 +238,11 @@ These are the ONLY places where code/configuration must exist outside the module
   },
   "settings": {
     "panel": "./components/settings-panel.tsx"
+  },
+  "topBarIcon": {
+    "icon": "Zap",
+    "route": "/my-module",
+    "tooltip": "Quick Access"
   }
 }
 ```
@@ -252,6 +257,7 @@ These are the ONLY places where code/configuration must exist outside the module
 | `database` | `object` | Database table configuration |
 | `dashboard` | `object` | Dashboard widget configuration |
 | `settings` | `object` | Settings panel configuration |
+| `topBarIcon` | `object` | Top bar icon shortcut configuration |
 
 ### Route Configuration
 
@@ -307,6 +313,28 @@ Renders as:
 Welcome!
 📦 Hello World
 ```
+
+### Top Bar Icon
+
+Modules can add a quick access icon to the global top navigation bar:
+
+```json
+{
+  "topBarIcon": {
+    "icon": "CheckSquare",
+    "route": "/tasks",
+    "tooltip": "Open Tasks"
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `icon` | `string` | **Required.** Lucide icon name (e.g., "Zap", "Bell", "CheckSquare") |
+| `route` | `string` | **Required.** Route to navigate to when clicked (e.g., "/tasks") |
+| `tooltip` | `string` | Optional tooltip text displayed on hover |
+
+**Note**: Top bar icons appear to the left of system icons (Command, Settings, etc.) and are only shown for enabled modules. The icon uses the same [Lucide icon library](https://lucide.dev) as sidebar icons.
 
 ---
 
