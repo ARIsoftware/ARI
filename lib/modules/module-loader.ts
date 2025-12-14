@@ -57,6 +57,11 @@ interface GeneratedManifest {
     settings?: {
       panel?: string
     }
+    topBarIcon?: {
+      icon: string
+      route: string
+      tooltip?: string
+    }
     path: string
     sourceDir: string
     isOverridden: boolean

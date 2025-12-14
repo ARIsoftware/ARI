@@ -166,7 +166,32 @@ All tables use Row Level Security with policies based on `auth.uid()`:
   /api-helpers.ts    # API validation helpers
 
 /middleware.ts        # Route protection
+
+/modules-core          # Core modules (self-contained features)
+  /[module-id]/       # Each module folder
+    module.json       # Module manifest (see /docs/MODULES.md)
+    /app/page.tsx     # Module main page
+    /api/             # Module API routes
+    /components/      # Module components
+
+/lib/modules          # Module system infrastructure
 ```
+
+### Module Top Bar Icons
+
+Modules can add quick access icons to the global top navigation bar by configuring `topBarIcon` in their `module.json`:
+
+```json
+{
+  "topBarIcon": {
+    "icon": "CheckSquare",
+    "route": "/tasks",
+    "tooltip": "Open Tasks"
+  }
+}
+```
+
+For full module documentation, see `/docs/MODULES.md`.
 
 ## Environment Variables
 

@@ -36,5 +36,10 @@
   },
   "settings": {
     "panel": "./components/settings-panel.tsx"
+  },
+  "topBarIcon": {
+    "icon": "Hand",
+    "route": "/hello-world",
+    "tooltip": "Hello World"
   }
 }
