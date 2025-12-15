@@ -1,0 +1,28 @@
+{
+  "id": "task-aquarium",
+  "name": "Task Aquarium",
+  "description": "Visualize your tasks as fish swimming in an aquarium. Higher priority tasks swim higher and faster.",
+  "version": "1.0.0",
+  "author": "ARI",
+  "icon": "Fish",
+  "enabled": true,
+  "title": "Aquarium",
+  "menuPriority": 25,
+  "routes": [
+    {
+      "path": "/task-aquarium",
+      "label": "Task Aquarium",
+      "icon": "Fish",
+      "sidebarPosition": "main"
+    }
+  ],
+  "permissions": {
+    "database": false,
+    "api": false,
+    "dashboard": false
+  },
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": ["tasks"]
+  }
+}
