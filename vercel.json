@@ -1,11 +1,10 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "routes": [
     {
-      "src": "/(.*)",
-      "has": [{ "type": "header", "key": "accept", "value": "text/html" }],
-      "missing": [{ "type": "path", "value": "^/api/.*" }],
-      "waf": { "action": "challenge" },
-      "dest": "/$1"
+      "src": "/((?!api/).*)",
+      "has": [{ "type": "header", "key": "accept", "value": ".*text/html.*" }],
+      "mitigate": { "action": "challenge" }
     }
   ]
 }
