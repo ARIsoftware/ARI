@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
+import { usePathname } from "next/navigation"
 import {
   Dialog,
   DialogContent,
@@ -14,11 +15,15 @@ import { Activity } from "lucide-react"
 const COUNTDOWN_DURATION = 120 // 2 minutes in seconds
 
 export function ExerciseReminder() {
+  const pathname = usePathname()
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const lastNotificationRef = useRef<string>("")
   const [open, setOpen] = useState(false)
   const [countdown, setCountdown] = useState(COUNTDOWN_DURATION)
   const [mounted, setMounted] = useState(false)
+
+  // Don't show on welcome/onboarding page
+  const isWelcomePage = pathname === "/welcome"
 
   // Only render after mounting to avoid hydration issues with Dialog portal
   useEffect(() => {
@@ -44,6 +49,9 @@ export function ExerciseReminder() {
 
   useEffect(() => {
     const checkTime = () => {
+      // Don't show on welcome page
+      if (isWelcomePage) return
+
       const now = new Date()
       const minutes = now.getMinutes()
       const hours = now.getHours()
@@ -68,7 +76,7 @@ export function ExerciseReminder() {
         clearInterval(intervalRef.current)
       }
     }
-  }, [startCountdown])
+  }, [startCountdown, isWelcomePage])
 
   const testReminder = () => {
     setOpen(true)
@@ -88,7 +96,8 @@ export function ExerciseReminder() {
   }
 
   // Don't render Dialog until mounted to avoid hydration issues
-  if (!mounted) {
+  // Also don't render on welcome page
+  if (!mounted || isWelcomePage) {
     return null
   }
 
