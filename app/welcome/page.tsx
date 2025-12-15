@@ -226,7 +226,7 @@ export default function WelcomePage() {
       {/* Text content */}
       <div
         className="absolute top-[70px] left-[70px] space-y-8 transition-opacity transition-duration-[2000ms] z-10"
-        style={{ opacity: textOpacity, fontFamily: '"Overpass Mono", monospace' }}
+        style={{ opacity: textOpacity, fontFamily: 'Geist, sans-serif' }}
       >
         {allLines.map((line, index) => {
           const isCurrentLine = index === allLines.length - 1 && isTyping
@@ -288,7 +288,7 @@ export default function WelcomePage() {
           className="absolute inset-0 flex items-start justify-center z-20 transition-opacity duration-500 p-4 pt-12 overflow-y-auto"
           style={{ opacity: showIntro ? 1 : 0 }}
         >
-          <Card className="w-full max-w-2xl border border-gray-200" style={{ fontFamily: '"Overpass Mono", monospace' }}>
+          <Card className="w-full max-w-2xl border border-gray-200" style={{ fontFamily: 'Geist, sans-serif' }}>
             <CardHeader className="pb-2">
               <CardTitle className="text-2xl font-medium text-black">Welcome! Let&apos;s get you set up</CardTitle>
             </CardHeader>
@@ -327,204 +327,225 @@ export default function WelcomePage() {
       {/* Onboarding Wizard */}
       {showOnboarding && (
         <TooltipProvider>
-          <div
-            className="absolute inset-0 flex items-start justify-center z-20 transition-opacity transition-duration-[2000ms] p-4 pt-12 overflow-y-auto"
-            style={{ opacity: showOnboarding ? 1 : 0 }}
-          >
-            <Card className="w-full max-w-2xl">
-              <CardHeader>
-                <CardTitle className="text-2xl">Welcome! Let&apos;s get you set up</CardTitle>
-                <CardDescription>
-                  Configure your environment to get ARI running. This step is about preparing your local setup so the application can run smoothly. Nothing here is difficult, but it does require a bit of care and attention to detail. This entire setup process should take around 10 to 20 minutes, depending on your system and familiarity with the tools involved.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+          {/* Background image for onboarding */}
+          <div className="absolute inset-0">
+            <Image
+              src="/welcome.png"
+              alt="Welcome background"
+              fill
+              className="object-cover"
+            />
+          </div>
+          <div className="absolute inset-0 z-20 overflow-y-auto flex items-start justify-center p-8 pt-12" style={{ fontFamily: 'Geist, sans-serif' }}>
+            <Card className="w-full max-w-4xl shadow-lg border border-border/50">
+              <CardContent className="p-8 space-y-6">
+                {/* Header */}
+                <div>
+                  <h1 className="text-3xl font-semibold tracking-tight text-foreground mb-3">Welcome! Let&apos;s get you set up</h1>
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    Configure your environment to get ARI running. This step is about preparing your local setup so the application can run smoothly. Nothing here is difficult, but it does require a bit of care and attention to detail. This entire setup process should take around 10 to 20 minutes, depending on your system and familiarity with the tools involved.
+                  </p>
+                </div>
+
+                {/* Progress bar */}
+                <div>
+                  <div className="flex justify-between items-center mb-2 text-sm">
+                    <span className="font-medium text-foreground">Setup progress</span>
+                    <span className="tabular-nums text-muted-foreground">{getProgress()}%</span>
+                  </div>
+                  <Progress value={getProgress()} className="h-2" />
+                </div>
+
+                {/* Tabs */}
                 <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
-                  <TabsList className="h-auto p-0 bg-transparent border-b border-gray-200 rounded-none w-full justify-start gap-1">
+                  <TabsList className="mb-6 grid w-full grid-cols-6 bg-muted/50 rounded-lg p-1">
                     <TabsTrigger
                       value="supabase"
-                      className="relative rounded-md border border-transparent data-[state=active]:border-gray-300 data-[state=active]:bg-transparent bg-transparent px-4 py-2 font-medium text-sm text-muted-foreground data-[state=active]:text-foreground"
+                      className="text-sm rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm"
                     >
                       Supabase
-                      {isSupabaseComplete && <CheckCircle className="w-3 h-3 ml-1 inline text-green-500" />}
                     </TabsTrigger>
                     <TabsTrigger
                       value="openai"
-                      className="relative rounded-md border border-transparent data-[state=active]:border-gray-300 data-[state=active]:bg-transparent bg-transparent px-4 py-2 font-medium text-sm text-muted-foreground data-[state=active]:text-foreground"
+                      className="text-sm rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm"
                     >
                       OpenAI
-                      {formData.openaiApiKey && <CheckCircle className="w-3 h-3 ml-1 inline text-green-500" />}
                     </TabsTrigger>
                     <TabsTrigger
                       value="resend"
-                      className="relative rounded-md border border-transparent data-[state=active]:border-gray-300 data-[state=active]:bg-transparent bg-transparent px-4 py-2 font-medium text-sm text-muted-foreground data-[state=active]:text-foreground"
+                      className="text-sm rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm"
                     >
                       Resend
-                      {formData.resendApiKey && <CheckCircle className="w-3 h-3 ml-1 inline text-green-500" />}
                     </TabsTrigger>
                     <TabsTrigger
                       value="vercel"
-                      className="relative rounded-md border border-transparent data-[state=active]:border-gray-300 data-[state=active]:bg-transparent bg-transparent px-4 py-2 font-medium text-sm text-muted-foreground data-[state=active]:text-foreground"
+                      className="text-sm rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm"
                     >
                       Vercel
-                      {formData.vercelSetupComplete && <CheckCircle className="w-3 h-3 ml-1 inline text-green-500" />}
                     </TabsTrigger>
                     <TabsTrigger
                       value="personal"
-                      className="relative rounded-md border border-transparent data-[state=active]:border-gray-300 data-[state=active]:bg-transparent bg-transparent px-4 py-2 font-medium text-sm text-muted-foreground data-[state=active]:text-foreground"
+                      className="text-sm rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm"
                     >
                       Personal
-                      {(formData.name || formData.email) && <CheckCircle className="w-3 h-3 ml-1 inline text-green-500" />}
                     </TabsTrigger>
                     <TabsTrigger
                       value="download"
-                      className="relative rounded-md border border-transparent data-[state=active]:border-gray-300 data-[state=active]:bg-transparent bg-transparent px-4 py-2 font-medium text-sm text-muted-foreground data-[state=active]:text-foreground"
+                      className="text-sm rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm"
                     >
                       Download
                     </TabsTrigger>
                   </TabsList>
 
                   {/* Tab 1: Supabase */}
-                  <TabsContent value="supabase" className="space-y-4 mt-4">
-                    <Alert className="bg-blue-50 border-blue-200">
-                      <Database className="w-4 h-4" />
-                      <AlertTitle>Supabase Configuration</AlertTitle>
-                      <AlertDescription>
-                        Supabase provides your database, authentication, and backend services.
-                        You&apos;ll need three keys from your Supabase project.
-                      </AlertDescription>
-                    </Alert>
+                  <TabsContent value="supabase" className="space-y-6 mt-0">
+                    {/* Header section */}
+                    <div className="flex items-start gap-4 p-4 bg-muted/30 rounded-lg">
+                      <div className="rounded-lg bg-accent/10 p-3">
+                        <Database className="h-6 w-6 text-accent" />
+                      </div>
+                      <div className="flex-1">
+                        <h2 className="mb-1 text-lg font-semibold text-foreground">Supabase Configuration</h2>
+                        <p className="text-sm text-muted-foreground">
+                          Supabase provides your database, authentication, and backend services. You&apos;ll need three keys from your Supabase project.
+                        </p>
+                      </div>
+                    </div>
 
-                    <div className="space-y-3">
-                      <h3 className="font-semibold text-sm flex items-center gap-2">
-                        <Badge variant="outline">Step 1</Badge>
-                        Create a FREE Supabase account
-                      </h3>
+                    {/* Step header */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
+                        1
+                      </div>
+                      <h3 className="text-base font-semibold text-foreground">Create a FREE Supabase account</h3>
+                    </div>
 
-                      <ol className="text-sm space-y-2 ml-4 list-decimal list-inside text-muted-foreground">
-                        <li>
-                          Go to{" "}
-                          <a
-                            href="https://supabase.com"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline inline-flex items-center gap-1"
-                          >
-                            supabase.com
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                          {" "}and create a free account
+                    {/* Instructions */}
+                    <div className="p-4 bg-muted/30 rounded-lg">
+                      <ol className="space-y-3">
+                        <li className="flex items-start gap-3">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                            1
+                          </span>
+                          <div className="flex-1 pt-0.5 text-sm">
+                            <span className="text-foreground">Go to </span>
+                            <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-accent hover:underline">
+                              supabase.com
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                            <span className="text-foreground"> and create a free account</span>
+                          </div>
                         </li>
-                        <li>Create a new project (free tier)</li>
-                        <li>
-                          Go to{" "}
-                          <a
-                            href="https://supabase.com/dashboard/project/_/settings/api"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline inline-flex items-center gap-1"
-                          >
-                            Project Settings → API
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
+                        <li className="flex items-start gap-3">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                            2
+                          </span>
+                          <p className="flex-1 pt-0.5 text-sm text-foreground">Create a new project (free tier)</p>
                         </li>
-                        <li>Copy each key below</li>
+                        <li className="flex items-start gap-3">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                            3
+                          </span>
+                          <div className="flex-1 pt-0.5 text-sm">
+                            <span className="text-foreground">Go to </span>
+                            <a href="https://supabase.com/dashboard/project/_/settings/api" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-accent hover:underline">
+                              Project Settings → API
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </div>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                            4
+                          </span>
+                          <p className="flex-1 pt-0.5 text-sm text-foreground">Copy each key below</p>
+                        </li>
                       </ol>
                     </div>
 
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="supabaseUrl">Project URL</Label>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Info className="w-4 h-4 text-muted-foreground" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs max-w-xs">
-                              Your Supabase project URL (e.g., https://xxxxx.supabase.co)
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
+                    {/* Form fields */}
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="supabaseUrl" className="text-sm font-medium text-foreground">Project URL</Label>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Info className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-xs max-w-xs">Your Supabase project URL (e.g., https://xxxxx.supabase.co)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Input
+                          id="supabaseUrl"
+                          value={formData.supabaseUrl}
+                          onChange={(e) => setFormData(prev => ({ ...prev, supabaseUrl: e.target.value }))}
+                          placeholder="https://xxxxx.supabase.co"
+                          className="text-sm"
+                          style={{ fontFamily: 'Geist Mono, monospace' }}
+                        />
                       </div>
-                      <Input
-                        id="supabaseUrl"
-                        value={formData.supabaseUrl}
-                        onChange={(e) => setFormData(prev => ({ ...prev, supabaseUrl: e.target.value }))}
-                        placeholder="https://xxxxx.supabase.co"
-                        className="font-mono text-xs"
-                      />
-                    </div>
 
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="supabaseAnonKey">Anon/Public Key</Label>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Info className="w-4 h-4 text-muted-foreground" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs max-w-xs">
-                              Also called &quot;anon&quot; or &quot;publishable&quot; key. Safe to use in browser.
-                              Starts with &quot;eyJhbGci...&quot;
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="supabaseAnonKey" className="text-sm font-medium text-foreground">Anon/Public Key</Label>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Info className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-xs max-w-xs">Also called &quot;anon&quot; or &quot;publishable&quot; key. Safe to use in browser.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Input
+                          id="supabaseAnonKey"
+                          value={formData.supabaseAnonKey}
+                          onChange={(e) => setFormData(prev => ({ ...prev, supabaseAnonKey: e.target.value }))}
+                          placeholder="eyJhbGci ..."
+                          className="text-sm"
+                          style={{ fontFamily: 'Geist Mono, monospace' }}
+                        />
                       </div>
-                      <Textarea
-                        id="supabaseAnonKey"
-                        value={formData.supabaseAnonKey}
-                        onChange={(e) => setFormData(prev => ({ ...prev, supabaseAnonKey: e.target.value }))}
-                        placeholder="eyJhbGci..."
-                        className="font-mono text-xs min-h-[80px]"
-                      />
-                    </div>
 
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="supabaseSecretKey">Service Role Secret</Label>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Info className="w-4 h-4 text-muted-foreground" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs max-w-xs">
-                              Server-side only key that bypasses Row Level Security.
-                              Keep this secret! Starts with &quot;eyJhbGci...&quot;
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="supabaseSecretKey" className="text-sm font-medium text-foreground">Service Role Secret</Label>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Info className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-xs max-w-xs">Server-side only key that bypasses Row Level Security. Keep this secret!</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Input
+                          id="supabaseSecretKey"
+                          value={formData.supabaseSecretKey}
+                          onChange={(e) => setFormData(prev => ({ ...prev, supabaseSecretKey: e.target.value }))}
+                          placeholder="eyJhbGci ..."
+                          className="text-sm"
+                          style={{ fontFamily: 'Geist Mono, monospace' }}
+                        />
                       </div>
-                      <Textarea
-                        id="supabaseSecretKey"
-                        value={formData.supabaseSecretKey}
-                        onChange={(e) => setFormData(prev => ({ ...prev, supabaseSecretKey: e.target.value }))}
-                        placeholder="eyJhbGci..."
-                        className="font-mono text-xs min-h-[80px]"
-                      />
+
+                      {/* Footer */}
+                      <div className="flex items-center justify-between pt-4">
+                        <Button variant="outline" size="sm" className="gap-2 text-xs" asChild>
+                          <a href="https://supabase.com/docs/guides/api/api-keys" target="_blank" rel="noopener noreferrer">
+                            <Info className="h-3.5 w-3.5" />
+                            Read documentation
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        </Button>
+                        <Button onClick={() => setCurrentTab("openai")} className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90">
+                          Continue
+                          <CheckCircle className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-
-                    <Alert>
-                      <Info className="w-4 h-4" />
-                      <AlertDescription>
-                        Need help?{" "}
-                        <a
-                          href="https://supabase.com/docs/guides/api/api-keys"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline inline-flex items-center gap-1"
-                        >
-                          Read the Supabase API Keys documentation
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      </AlertDescription>
-                    </Alert>
-
-                    <Button
-                      onClick={() => setCurrentTab("openai")}
-                      className="w-full"
-                    >
-                      Continue to OpenAI Setup
-                    </Button>
                   </TabsContent>
 
                   {/* Tab 2: OpenAI */}
@@ -571,7 +592,8 @@ export default function WelcomePage() {
                         value={formData.openaiApiKey}
                         onChange={(e) => setFormData(prev => ({ ...prev, openaiApiKey: e.target.value }))}
                         placeholder="sk-proj-..."
-                        className="font-mono text-xs min-h-[80px]"
+                        className="text-xs min-h-[80px]"
+                        style={{ fontFamily: 'Geist Mono, monospace' }}
                       />
                       <p className="text-xs text-muted-foreground">
                         Your key should start with &quot;sk-proj-&quot; or &quot;sk-&quot;
@@ -638,7 +660,8 @@ export default function WelcomePage() {
                         value={formData.resendApiKey}
                         onChange={(e) => setFormData(prev => ({ ...prev, resendApiKey: e.target.value }))}
                         placeholder="re_..."
-                        className="font-mono text-xs min-h-[80px]"
+                        className="text-xs min-h-[80px]"
+                        style={{ fontFamily: 'Geist Mono, monospace' }}
                       />
                     </div>
 
@@ -707,16 +730,16 @@ export default function WelcomePage() {
                         </li>
                         <li>
                           Install Vercel CLI:{" "}
-                          <code className="bg-gray-100 px-1 rounded text-xs">npm install -g vercel</code>
+                          <code className="bg-gray-100 px-1 rounded text-xs" style={{ fontFamily: 'Geist Mono, monospace' }}>npm install -g vercel</code>
                         </li>
                         <li>
                           Run{" "}
-                          <code className="bg-gray-100 px-1 rounded text-xs">vercel login</code>
+                          <code className="bg-gray-100 px-1 rounded text-xs" style={{ fontFamily: 'Geist Mono, monospace' }}>vercel login</code>
                           {" "}in your terminal
                         </li>
                         <li>
                           Run{" "}
-                          <code className="bg-gray-100 px-1 rounded text-xs">vercel link</code>
+                          <code className="bg-gray-100 px-1 rounded text-xs" style={{ fontFamily: 'Geist Mono, monospace' }}>vercel link</code>
                           {" "}to connect your project
                         </li>
                         <li>Add environment variables in Vercel dashboard</li>
@@ -727,7 +750,7 @@ export default function WelcomePage() {
                       <Info className="w-4 h-4" />
                       <AlertDescription>
                         After downloading your .env.local file, you can run{" "}
-                        <code className="bg-gray-100 px-1 rounded text-xs">vercel env pull</code>
+                        <code className="bg-gray-100 px-1 rounded text-xs" style={{ fontFamily: 'Geist Mono, monospace' }}>vercel env pull</code>
                         {" "}to sync your environment variables.{" "}
                         <a
                           href="https://vercel.com/docs/cli"
@@ -1043,7 +1066,7 @@ export default function WelcomePage() {
                         .env.local
                       </h3>
                       <div className="bg-gray-900 text-gray-100 p-4 rounded-md overflow-x-auto max-h-48">
-                        <pre className="text-xs font-mono whitespace-pre-wrap">
+                        <pre className="text-xs whitespace-pre-wrap" style={{ fontFamily: 'Geist Mono, monospace' }}>
                           {generateEnvFileContent()}
                         </pre>
                       </div>
