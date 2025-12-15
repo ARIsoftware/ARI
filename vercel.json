@@ -4,7 +4,8 @@
     {
       "src": "/((?!api/).*)",
       "has": [{ "type": "header", "key": "accept", "value": ".*text/html.*" }],
-      "mitigate": { "action": "challenge" }
+      "mitigate": { "action": "challenge" },
+      "continue": true
     }
   ]
 }
