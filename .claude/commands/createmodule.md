@@ -17,7 +17,7 @@ Ask the user the following questions ONE AT A TIME, waiting for each answer befo
 4. **Navigation**: Should it appear in the sidebar? If so, what should the page name be?
 5. **Top Bar**: Should it have a quick-access icon in the top bar?
 
-Note: The user may have requested to create the module in the modules-core directory. If so, please inform them that it is highly recommended that all new modules are placed in the modules-custom directory, and confirm with them that the new module should be plaed in the modules-custom directory as recommended. If they insist on placing the new module in the modules-core directory please comply with that request.
+Note: The user may have requested to create the module in the modules-core directory. If so, please inform them that it is highly recommended that all new modules are placed in the modules-custom directory, and confirm with them that the new module should be placed in the modules-custom directory as recommended. Give the user the opportunity to confirm that the module can be placed in the the modules-custom directory. If they reply that the module should be in the modules-core directory please comply with that request.
 
 ## Validation Rules
 
@@ -48,6 +48,7 @@ When approved, create the module following this order:
 6. **Update types** in `types/index.ts`
 7. **Run `npm run generate-module-registry`** to register the new module
 8. Ask the user for permission to execute the .sql file, or ask if they want to run the .SQL statements themselves.
+9. If the user needs to take any action to complete the setup of the module (run a .sql file, restart the dev server etc), please clearly indicate the actions they need to take with clear instructions.
 
 ## Quality Assurance Checklist
 
