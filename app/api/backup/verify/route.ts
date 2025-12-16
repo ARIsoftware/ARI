@@ -47,6 +47,8 @@ const COMPLETE_TABLE_LIST = [
   'travel_activities',
   'ohtani_grid_cells',
   'gratitude_entries',
+  'knowledge_articles',
+  'knowledge_collections',
 ]
 
 interface TableInfo {
