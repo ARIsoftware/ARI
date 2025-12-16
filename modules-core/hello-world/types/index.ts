@@ -10,8 +10,8 @@
  *
  * IMPORTANT: Keep types in sync with:
  * - Database schema (database/schema.sql)
- * - API responses (api/*/route.ts)
- * - Component props (components/*.tsx)
+ * - API responses (api routes)
+ * - Component props (components)
  */
 
 /**

@@ -51,6 +51,8 @@ async function discoverTables(client: any): Promise<{ tables: string[], method: 
     'travel_activities',
     'ohtani_grid_cells',
     'gratitude_entries',
+    'knowledge_articles',
+    'knowledge_collections',
   ];
 
   try {
