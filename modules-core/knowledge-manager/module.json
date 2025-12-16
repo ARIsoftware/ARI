@@ -16,7 +16,7 @@
   "routes": [
     {
       "path": "/knowledge-manager",
-      "label": "Knowledge Base",
+      "label": "Knowledge Manager",
       "icon": "BookOpen",
       "sidebarPosition": "main"
     }
