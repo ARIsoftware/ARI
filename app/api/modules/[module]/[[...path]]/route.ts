@@ -79,6 +79,12 @@ const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
   },
   'gratitude': {
     'entries': () => import('@/modules-core/gratitude/api/entries/route') // GET/POST for daily entries
+  },
+  'knowledge-manager': {
+    'data': () => import('@/modules-core/knowledge-manager/api/data/route'), // GET/POST for list/create
+    'data/[id]': () => import('@/modules-core/knowledge-manager/api/data/[id]/route'), // GET/PATCH/DELETE for single article
+    'collections': () => import('@/modules-core/knowledge-manager/api/collections/route'), // GET/POST for collections
+    'collections/[id]': () => import('@/modules-core/knowledge-manager/api/collections/[id]/route') // PATCH/DELETE for single collection
   }
 }
 
