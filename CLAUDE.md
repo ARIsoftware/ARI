@@ -66,6 +66,42 @@ All tables use Row Level Security with policies based on `auth.uid()`:
 - Policies enforce user isolation at the database level
 - No data leakage between users
 
+### SQL Development Tips
+
+#### `auth.uid()` Only Works in Authenticated Contexts
+When running SQL directly in **Supabase SQL Editor**, there is no authenticated session:
+- `auth.uid()` returns `NULL`
+- Inserts using `auth.uid()` for `user_id` will fail or insert NULL
+- Conditions like `WHERE auth.uid() IS NOT NULL` silently skip execution
+
+#### Writing Sample Data SQL
+For sample data or seed scripts that need a `user_id`, query `auth.users` directly:
+
+```sql
+DO $$
+DECLARE
+  my_user_id UUID;
+  my_collection_id UUID;
+BEGIN
+  -- Get user ID from auth.users table
+  SELECT id INTO my_user_id FROM auth.users LIMIT 1;
+
+  -- Use RETURNING INTO to capture generated IDs for foreign keys
+  INSERT INTO collections (user_id, name)
+  VALUES (my_user_id, 'My Collection')
+  RETURNING id INTO my_collection_id;
+
+  -- Now use both IDs
+  INSERT INTO items (user_id, collection_id, title)
+  VALUES (my_user_id, my_collection_id, 'My Item');
+END $$;
+```
+
+**Key patterns:**
+- Use PL/pgSQL `DO $$ ... END $$` blocks for multi-step inserts
+- `RETURNING id INTO variable` captures auto-generated UUIDs
+- Query `auth.users` to get real user IDs for sample data
+
 ## Application Features
 
 ### Core Features
