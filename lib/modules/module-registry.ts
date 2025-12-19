@@ -7,7 +7,9 @@
  * This is server-side only.
  */
 
-import { createAuthenticatedClient } from '@/lib/auth-helpers'
+import { auth } from '@/lib/auth'
+import { headers } from 'next/headers'
+import { createDbClient } from '@/lib/db'
 import { loadModules } from './module-loader'
 import type { ModuleMetadata, ModuleSettings } from './module-types'
 
@@ -28,16 +30,18 @@ export async function getModules(): Promise<ModuleMetadata[]> {
  * @returns Array of enabled modules
  */
 export async function getEnabledModules(userId?: string): Promise<ModuleMetadata[]> {
-  const supabase = await createAuthenticatedClient()
+  const supabase = createDbClient()
 
   // Get current user if not provided
   let currentUserId = userId
   if (!currentUserId) {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    })
+    if (!session?.user) {
       return [] // No user session = no modules
     }
-    currentUserId = user.id
+    currentUserId = session.user.id
   }
 
   // Get all modules
@@ -83,18 +87,20 @@ export async function getEnabledModule(
 ): Promise<ModuleMetadata | null> {
   console.log(`[getEnabledModule] Checking module: ${moduleId}`)
 
-  const supabase = await createAuthenticatedClient()
+  const supabase = createDbClient()
 
   // Get current user if not provided
   let currentUserId = userId
   if (!currentUserId) {
-    const { data: { user } } = await supabase.auth.getUser()
-    console.log(`[getEnabledModule] User from session:`, user ? user.id : 'null')
-    if (!user) {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    })
+    console.log(`[getEnabledModule] User from session:`, session?.user ? session.user.id : 'null')
+    if (!session?.user) {
       console.log(`[getEnabledModule] No user session - returning null`)
       return null // No user session = no access
     }
-    currentUserId = user.id
+    currentUserId = session.user.id
   }
 
   // Get all modules
@@ -151,7 +157,7 @@ export async function setModuleEnabled(
   userId: string,
   enabled: boolean
 ): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createAuthenticatedClient()
+  const supabase = createDbClient()
 
   // Verify module exists
   const module = await getModules().then(modules =>
@@ -200,16 +206,18 @@ export async function getModuleSettings(
   moduleId: string,
   userId?: string
 ): Promise<Record<string, any> | null> {
-  const supabase = await createAuthenticatedClient()
+  const supabase = createDbClient()
 
   // Get current user if not provided
   let currentUserId = userId
   if (!currentUserId) {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    })
+    if (!session?.user) {
       return null
     }
-    currentUserId = user.id
+    currentUserId = session.user.id
   }
 
   const { data } = await supabase
@@ -235,7 +243,7 @@ export async function updateModuleSettings(
   userId: string,
   settings: Record<string, any>
 ): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createAuthenticatedClient()
+  const supabase = createDbClient()
 
   // Verify module exists
   const module = await getModules().then(modules =>

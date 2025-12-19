@@ -34,8 +34,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files
+# env files (but allow .env.example for documentation)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -50,5 +51,6 @@ next-env.d.ts
 # clerk configuration (can include secrets)
 /.clerk/
 
-# database dumps
+# database dumps (but allow migrations folder)
 *.sql
+!/migrations/*.sql
