@@ -1,24 +1,56 @@
 "use client"
 
-import { createSupabaseClient } from "@/lib/supabase-auth"
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo } from 'react'
 import { usePathname } from 'next/navigation'
+import { authClient } from "@/lib/auth-client"
+import { createSupabaseClient } from "@/lib/supabase-auth"
 import { Toaster } from "@/components/ui/toaster"
 import { ExerciseReminder } from "@/components/exercise-reminder"
 import { MusicPlayerProvider } from "@/components/youtube-music-player"
 import { FeaturesProvider } from "@/lib/features-context"
 import { ModulesProvider } from "@/lib/modules/context"
 import { CommandPaletteProvider } from "@/components/command-palette"
-import { User, Session } from '@supabase/supabase-js'
 import type { ModuleMetadata } from '@/lib/modules/module-types'
 
-type SupabaseContext = {
-  supabase: ReturnType<typeof createSupabaseClient>
-  user: User | null
-  session: Session | null
+// Define types matching Better Auth session structure
+type User = {
+  id: string
+  email: string
+  name: string | null
+  image: string | null
+  firstName?: string | null
+  lastName?: string | null
+  emailVerified: boolean
+  createdAt: Date
+  updatedAt: Date
+  // Compatibility shim for old code expecting user_metadata
+  user_metadata?: {
+    first_name?: string | null
+    last_name?: string | null
+    full_name?: string | null
+    avatar_url?: string | null
+  }
 }
 
-const Context = createContext<SupabaseContext | undefined>(undefined)
+// Session type with compatibility mappings
+type Session = {
+  token: string
+  userId: string
+  expiresAt: Date
+  // Compatibility shim for old code
+  access_token: string
+  user: User
+}
+
+type AuthContext = {
+  user: User | null
+  session: Session | null
+  isLoading: boolean
+  // Keep supabase client for realtime subscriptions
+  supabase: ReturnType<typeof createSupabaseClient>
+}
+
+const Context = createContext<AuthContext | undefined>(undefined)
 
 export function Providers({
   children,
@@ -32,9 +64,10 @@ export function Providers({
   initialFeatures?: Record<string, boolean>
 }) {
   const pathname = usePathname()
-  const [supabase] = useState(() => createSupabaseClient())
-  const [user, setUser] = useState<User | null>(null)
-  const [session, setSession] = useState<Session | null>(null)
+  const { data: sessionData, isPending } = authClient.useSession()
+
+  // Create supabase client for realtime subscriptions (not for auth)
+  const supabase = useMemo(() => createSupabaseClient(), [])
 
   // Load saved font preference on mount
   useEffect(() => {
@@ -50,60 +83,49 @@ export function Providers({
     }
   }, [])
 
-  useEffect(() => {
-    const initAuth = async () => {
-      // Get session for tokens
-      const { data: { session } } = await supabase.auth.getSession()
-      setSession(session)
+  // Map Better Auth user/session to compatible format
+  // Cast to include custom fields (firstName, lastName) defined in auth.ts additionalFields
+  type BetterAuthUser = {
+    id: string
+    email: string
+    name: string
+    image?: string | null
+    emailVerified: boolean
+    createdAt: Date
+    updatedAt: Date
+    firstName?: string | null
+    lastName?: string | null
+  }
+  const rawUser = sessionData?.user as BetterAuthUser | undefined
 
-      // Get user from session (no network call needed)
-      if (session?.user) {
-        setUser(session.user)
-      }
+  const user: User | null = rawUser ? {
+    id: rawUser.id,
+    email: rawUser.email,
+    name: rawUser.name,
+    image: rawUser.image ?? null,
+    firstName: rawUser.firstName,
+    lastName: rawUser.lastName,
+    emailVerified: rawUser.emailVerified,
+    createdAt: rawUser.createdAt,
+    updatedAt: rawUser.updatedAt,
+    // Add compatibility shim for old code
+    user_metadata: {
+      first_name: rawUser.firstName,
+      last_name: rawUser.lastName,
+      full_name: rawUser.name,
+      avatar_url: rawUser.image,
     }
+  } : null
 
-    initAuth()
-
-    // Set up auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session)
-
-        // Get user from session (no network call needed)
-        if (session?.user) {
-          setUser(session.user)
-        } else {
-          setUser(null)
-        }
-      }
-    )
-
-    // Set up periodic session refresh (every 30 minutes)
-    // This prevents sessions from expiring while user is active
-    const refreshInterval = setInterval(async () => {
-      const { data: { session }, error } = await supabase.auth.refreshSession()
-
-      if (error) {
-        // If refresh fails, clear the session and user
-        setSession(null)
-        setUser(null)
-      } else if (session) {
-        setSession(session)
-        // Get user from refreshed session (no network call needed)
-        if (session.user) {
-          setUser(session.user)
-        }
-      }
-    }, 30 * 60 * 1000) // 30 minutes
-
-    return () => {
-      subscription.unsubscribe()
-      clearInterval(refreshInterval)
-    }
-  }, [supabase])
+  const session: Session | null = sessionData?.session && user ? {
+    ...sessionData.session,
+    // Compatibility mappings
+    access_token: sessionData.session.token,
+    user: user,
+  } : null
 
   return (
-    <Context.Provider value={{ supabase, user, session }}>
+    <Context.Provider value={{ user, session, isLoading: isPending, supabase }}>
       <ModulesProvider modules={modules} enabledModules={enabledModules}>
         <FeaturesProvider initialFeatures={initialFeatures}>
           <MusicPlayerProvider>
@@ -120,10 +142,18 @@ export function Providers({
   )
 }
 
+/**
+ * Hook to access auth context.
+ * Includes supabase client for realtime subscriptions.
+ * For data mutations, prefer using API routes.
+ */
 export const useSupabase = () => {
   const context = useContext(Context)
   if (context === undefined) {
-    throw new Error('useSupabase must be used inside SupabaseProvider')
+    throw new Error('useSupabase must be used inside Providers')
   }
   return context
 }
+
+// Alias for new code
+export const useAuth = useSupabase

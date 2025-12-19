@@ -1,6 +1,7 @@
 "use client"
 
 import { useSupabase } from "@/components/providers"
+import { authClient } from "@/lib/auth-client"
 import { useRouter } from "next/navigation"
 import {
   DropdownMenu,
@@ -15,13 +16,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Settings, LogOut, Shield } from "lucide-react"
 
 export function UserProfileDropdown() {
-  const { session, supabase } = useSupabase()
+  const { user } = useSupabase()
   const router = useRouter()
-  const user = session?.user
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/sign-in')
+    await authClient.signOut()
+    window.location.href = '/sign-in'
   }
 
   // Fallback for when user is not authenticated
@@ -35,8 +35,9 @@ export function UserProfileDropdown() {
     )
   }
 
-  const firstName = user.user_metadata?.first_name || user.user_metadata?.full_name?.split(' ')[0]
-  const lastName = user.user_metadata?.last_name || user.user_metadata?.full_name?.split(' ')[1]
+  // Better Auth uses different property names
+  const firstName = user.firstName || user.name?.split(' ')[0]
+  const lastName = user.lastName || user.name?.split(' ')[1]
   const userInitials =
     firstName && lastName
       ? `${firstName[0]}${lastName[0]}`
@@ -47,7 +48,7 @@ export function UserProfileDropdown() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-12 w-12 rounded-full p-0">
           <Avatar className="h-12 w-12">
-            <AvatarImage src={user.user_metadata?.avatar_url || "/placeholder.svg"} alt={user.user_metadata?.full_name || "User"} />
+            <AvatarImage src={user.image || "/placeholder.svg"} alt={user.name || "User"} />
             <AvatarFallback className="text-sm font-medium">{userInitials}</AvatarFallback>
           </Avatar>
         </Button>
@@ -55,7 +56,7 @@ export function UserProfileDropdown() {
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{user.user_metadata?.full_name || "User"}</p>
+            <p className="text-sm font-medium leading-none">{user.name || "User"}</p>
             <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
           </div>
         </DropdownMenuLabel>

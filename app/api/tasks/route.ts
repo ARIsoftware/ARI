@@ -70,11 +70,12 @@ export async function POST(request: NextRequest) {
       priorityScore = calculatePriorityScore(axes)
     }
 
-    // RLS will automatically set user_id to auth.uid()
+    // Explicitly set user_id since we use service role client (bypasses RLS)
     const { data, error } = await supabase
       .from('tasks')
       .insert([{
         ...task,
+        user_id: user.id,
         order_index: nextOrderIndex,
         priority_score: priorityScore
       }])
