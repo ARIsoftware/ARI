@@ -26,6 +26,7 @@ import { getLastCompletedTask, truncateTaskName } from "@/lib/get-last-completed
 import { getAuthenticatedSupabase } from "@/lib/supabase"
 import { useIsMobile } from "@/components/ui/use-mobile"
 import { useSupabase } from "@/components/providers"
+import { authClient } from "@/lib/auth-client"
 import { useCommandPalette } from "@/components/command-palette"
 import { useMusicPlayer } from "@/components/youtube-music-player"
 import { Button } from "@/components/ui/button"
@@ -74,7 +75,7 @@ function TopBarIcons() {
   }, [])
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
+    await authClient.signOut()
     router.push("/sign-in")
   }
 

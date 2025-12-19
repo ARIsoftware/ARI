@@ -976,38 +976,32 @@ export default function DatabaseTestPage() {
       // Continue with other tests even if auth fails
     }
 
-    // Test 5: Session Status
+    // Test 5: Session Status (Better Auth)
     updateTestResult('Session Status', { status: 'testing' })
     try {
-      console.log('🔑 Checking session status...')
+      console.log('🔑 Checking session status (Better Auth)...')
 
-      // Get session with timeout (fast, from cookies)
-      const sessionPromise = supabase.auth.getSession()
-      const timeoutPromise = new Promise<any>((_, reject) =>
-        setTimeout(() => reject(new Error('Session check timed out after 5 seconds')), 5000)
-      )
-
-      const { data: { session: sessionData } } = await Promise.race([sessionPromise, timeoutPromise])
-
-      if (!sessionData) {
+      // Session comes from Better Auth context (already checked above)
+      if (!session) {
         updateTestResult('Session Status', {
           status: 'warning',
-          message: 'No active session',
+          message: 'No active Better Auth session',
           data: { hint: 'Sign in at /sign-in to create a session' }
         })
         console.log('⚠️ No session found')
       } else {
         updateTestResult('Session Status', {
           status: 'success',
-          message: 'Active session found',
+          message: 'Active Better Auth session found',
           data: {
-            access_token: sessionData.access_token ? 'Present' : 'Missing',
-            refresh_token: sessionData.refresh_token ? 'Present' : 'Missing',
-            expires_at: sessionData.expires_at ? new Date(sessionData.expires_at * 1000).toISOString() : 'Unknown',
-            user_id: sessionData.user?.id || 'Unknown'
+            access_token: session.access_token ? 'Present' : 'Missing',
+            token: session.token ? 'Present' : 'Missing',
+            expiresAt: session.expiresAt ? new Date(session.expiresAt).toISOString() : 'Unknown',
+            user_id: session.user?.id || 'Unknown',
+            note: 'Using Better Auth (not Supabase Auth)'
           }
         })
-        console.log('✅ Session found for user:', sessionData.user?.email)
+        console.log('✅ Session found for user:', session.user?.email)
       }
     } catch (error: any) {
       updateTestResult('Session Status', {
@@ -1025,9 +1019,8 @@ export default function DatabaseTestPage() {
         try {
           console.log('📊 Attempting to fetch tasks...')
 
-          // Check if user is authenticated first
-          const { data: authData } = await supabase.auth.getSession()
-          if (!authData.session) {
+          // Check if user is authenticated first (using Better Auth session from context)
+          if (!session) {
             throw new Error('Not authenticated - please sign in to test data fetching')
           }
 
@@ -1172,9 +1165,7 @@ export default function DatabaseTestPage() {
     try {
       console.log('📊 Testing RLS policies...')
 
-      // Try to fetch with explicit user filter
-      const { data: { user } } = await supabase.auth.getUser()
-
+      // Use user from Better Auth context
       if (!user) {
         updateTestResult('Test RLS Policies', {
           status: 'warning',
@@ -1200,11 +1191,12 @@ export default function DatabaseTestPage() {
 
         updateTestResult('Test RLS Policies', {
           status: 'success',
-          message: 'RLS policies are working correctly',
+          message: 'RLS policies test complete (note: using service role client now)',
           data: {
             userId: user.id,
             tasksWithUserFilter: tasksWithFilter?.length || 0,
             tasksWithoutFilter: tasksNoFilter?.length || 0,
+            note: 'API routes now use service role client which bypasses RLS',
             rlsWorking: (tasksWithFilter?.length || 0) === (tasksNoFilter?.length || 0)
           }
         })

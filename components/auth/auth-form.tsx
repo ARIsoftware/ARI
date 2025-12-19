@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from 'react'
-import { createSupabaseClient } from '@/lib/supabase-auth'
+import { useState } from 'react'
+import { authClient } from '@/lib/auth-client'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,20 +19,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
-
   const router = useRouter()
-  const supabase = createSupabaseClient()
-
-  // Listen for auth state changes and redirect when signed in
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        window.location.href = '/dashboard'
-      }
-    })
-
-    return () => subscription.unsubscribe()
-  }, [supabase])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -42,39 +29,28 @@ export function AuthForm({ mode }: AuthFormProps) {
 
     try {
       if (mode === 'sign-up') {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`
-          }
-        })
-
-        if (error) throw error
-
-        setMessage('Check your email for the confirmation link!')
+        // Sign-up is disabled for now (single user app)
+        setError('Sign-up is currently disabled')
         setLoading(false)
-      } else {
-        // Call signInWithPassword but don't await - let the auth state change handle redirect
-        supabase.auth.signInWithPassword({
-          email,
-          password,
-        }).then(({ error }) => {
-          if (error) {
-            setError(error.message)
-            setLoading(false)
-          }
-          // Don't redirect here - the useEffect auth listener will handle it
-        }).catch((error) => {
-          setError(error.message)
-          setLoading(false)
-        })
-
-        // Return early - the auth state change listener will redirect
         return
       }
-    } catch (error: any) {
-      setError(error.message)
+
+      // Sign in with Better Auth
+      const { error } = await authClient.signIn.email({
+        email,
+        password,
+      })
+
+      if (error) {
+        setError(error.message || 'Sign in failed')
+        setLoading(false)
+      } else {
+        // Redirect on success - use window.location for full page refresh
+        // to ensure session cookies are properly read
+        window.location.href = '/dashboard'
+      }
+    } catch (err: any) {
+      setError(err.message || 'An error occurred')
       setLoading(false)
     }
   }
@@ -84,8 +60,8 @@ export function AuthForm({ mode }: AuthFormProps) {
       <CardHeader className="text-center">
         <CardTitle>{mode === 'sign-in' ? 'Sign In' : 'Sign Up'}</CardTitle>
         <CardDescription>
-          {mode === 'sign-in' 
-            ? 'Enter your credentials to access your account' 
+          {mode === 'sign-in'
+            ? 'Enter your credentials to access your account'
             : 'Create a new account to get started'
           }
         </CardDescription>
@@ -103,7 +79,7 @@ export function AuthForm({ mode }: AuthFormProps) {
               disabled={loading}
             />
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
             <Input
@@ -133,17 +109,6 @@ export function AuthForm({ mode }: AuthFormProps) {
             {loading ? 'Loading...' : (mode === 'sign-in' ? 'Sign In' : 'Sign Up')}
           </Button>
         </form>
-
-        {mode === 'sign-up' && (
-          <div className="mt-4 text-center text-sm">
-            <p>
-              Already have an account?{' '}
-              <a href="/sign-in" className="text-blue-600 hover:underline">
-                Sign in
-              </a>
-            </p>
-          </div>
-        )}
       </CardContent>
     </Card>
   )

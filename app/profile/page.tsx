@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSupabase } from '@/components/providers'
+import { authClient } from '@/lib/auth-client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,29 +14,36 @@ import { Separator } from '@/components/ui/separator'
 import { ArrowLeft, User, Mail, Calendar, Shield } from 'lucide-react'
 
 export default function ProfilePage() {
-  const { session, supabase } = useSupabase()
+  const { user, isLoading } = useSupabase()
   const router = useRouter()
-  
+
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  
+
   // Form state
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
 
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+
   useEffect(() => {
-    if (!session) {
+    if (!isLoading && !user) {
       router.push('/sign-in')
       return
     }
 
-    // Populate form with current user data
-    setEmail(session.user.email || '')
-    setFirstName(session.user.user_metadata?.first_name || '')
-    setLastName(session.user.user_metadata?.last_name || '')
-  }, [session, router])
+    if (user) {
+      // Populate form with current user data
+      setEmail(user.email || '')
+      setFirstName(user.firstName || user.name?.split(' ')[0] || '')
+      setLastName(user.lastName || user.name?.split(' ')[1] || '')
+    }
+  }, [user, isLoading, router])
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,62 +52,74 @@ export default function ProfilePage() {
     setMessage(null)
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        data: {
-          first_name: firstName,
-          last_name: lastName,
-        }
+      const { error } = await authClient.updateUser({
+        name: `${firstName} ${lastName}`.trim(),
+        // Note: firstName and lastName are custom fields
+        // They may need to be updated via a separate API call if not supported directly
       })
 
       if (error) throw error
 
       setMessage('Profile updated successfully!')
     } catch (error: any) {
-      setError(error.message)
+      setError(error.message || 'Failed to update profile')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleChangePassword = async () => {
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
     setLoading(true)
     setError(null)
     setMessage(null)
 
+    if (newPassword !== confirmPassword) {
+      setError('New passwords do not match')
+      setLoading(false)
+      return
+    }
+
+    if (newPassword.length < 18) {
+      setError('Password must be at least 18 characters')
+      setLoading(false)
+      return
+    }
+
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        session?.user.email || '',
-        {
-          redirectTo: `${window.location.origin}/auth/callback?next=/profile`
-        }
-      )
+      const { error } = await authClient.changePassword({
+        currentPassword,
+        newPassword,
+      })
 
       if (error) throw error
 
-      setMessage('Password reset email sent! Check your inbox.')
+      setMessage('Password changed successfully!')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
     } catch (error: any) {
-      setError(error.message)
+      setError(error.message || 'Failed to change password')
     } finally {
       setLoading(false)
     }
   }
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push('/sign-in')
+    await authClient.signOut()
+    window.location.href = '/sign-in'
   }
 
-  if (!session) {
+  if (isLoading || !user) {
     return <div>Loading...</div>
   }
 
-  const user = session.user
   const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || user.email?.[0]?.toUpperCase()
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <div className="bg-white border-b">
+      <div className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-4">
           <Button
             variant="ghost"
@@ -121,7 +141,7 @@ export default function ProfilePage() {
             <CardHeader>
               <div className="flex items-center gap-4">
                 <Avatar className="w-20 h-20">
-                  <AvatarImage src={user.user_metadata?.avatar_url} />
+                  <AvatarImage src={user.image || undefined} />
                   <AvatarFallback className="text-lg">{initials}</AvatarFallback>
                 </Avatar>
                 <div>
@@ -135,7 +155,7 @@ export default function ProfilePage() {
                   </CardDescription>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                     <Calendar className="w-4 h-4" />
-                    Member since {new Date(user.created_at).toLocaleDateString()}
+                    Member since {new Date(user.createdAt).toLocaleDateString()}
                   </div>
                 </div>
               </div>
@@ -180,7 +200,7 @@ export default function ProfilePage() {
                     type="email"
                     value={email}
                     disabled
-                    className="bg-gray-50"
+                    className="bg-gray-50 dark:bg-gray-800"
                   />
                   <p className="text-xs text-muted-foreground">
                     Email address cannot be changed. Contact support if needed.
@@ -218,19 +238,48 @@ export default function ProfilePage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <h4 className="font-medium mb-2">Password</h4>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Change your password to keep your account secure
-                </p>
-                <Button
-                  variant="outline"
-                  onClick={handleChangePassword}
-                  disabled={loading}
-                >
-                  {loading ? 'Sending...' : 'Change Password'}
+              <form onSubmit={handleChangePassword} className="space-y-4">
+                <h4 className="font-medium">Change Password</h4>
+
+                <div className="space-y-2">
+                  <Label htmlFor="currentPassword">Current Password</Label>
+                  <Input
+                    id="currentPassword"
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Enter current password"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword">New Password</Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter new password (min 18 characters)"
+                    minLength={18}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm new password"
+                    minLength={18}
+                  />
+                </div>
+
+                <Button type="submit" variant="outline" disabled={loading}>
+                  {loading ? 'Changing...' : 'Change Password'}
                 </Button>
-              </div>
+              </form>
 
               <Separator />
 
@@ -242,7 +291,7 @@ export default function ProfilePage() {
                 <Button
                   variant="outline"
                   onClick={handleSignOut}
-                  className="border-red-200 text-red-600 hover:bg-red-50"
+                  className="border-red-200 text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
                 >
                   Sign Out
                 </Button>

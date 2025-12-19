@@ -1,66 +1,47 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
-import { NextRequest } from 'next/server'
+import { auth } from "@/lib/auth"
+import { headers } from "next/headers"
+import { createDbClient } from "@/lib/db"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-
-export async function getAuthenticatedUser(req?: NextRequest) {
-  const cookieStore = await cookies()
-
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll()
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          )
-        } catch {
-          // The `setAll` method was called from a Server Component.
-          // This can be ignored if you have middleware refreshing
-          // user sessions.
-        }
-      },
-    },
+/**
+ * Get authenticated user and database client for API routes.
+ * Returns a compatible shape with the old Supabase auth for minimal migration friction.
+ */
+export async function getAuthenticatedUser() {
+  const session = await auth.api.getSession({
+    headers: await headers(),
   })
 
-  // Use getUser() for secure user verification
-  const { data: { user }, error } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    return { user: null, session: null, supabase }
+  if (!session) {
+    return { user: null, session: null, supabase: null }
   }
 
-  // Get session for token access
-  const { data: { session } } = await supabase.auth.getSession()
+  // Create database client (service role, bypasses RLS)
+  const supabase = createDbClient()
 
   return {
-    user,
-    session,
-    supabase
+    user: {
+      id: session.user.id,
+      email: session.user.email,
+      // Map Better Auth fields to match old Supabase structure for compatibility
+      user_metadata: {
+        first_name: session.user.firstName,
+        last_name: session.user.lastName,
+        full_name: session.user.name,
+        avatar_url: session.user.image,
+      },
+    },
+    session: {
+      access_token: session.session.token, // Map to old property name
+      user: session.user,
+    },
+    supabase,
   }
 }
 
+/**
+ * @deprecated Use getAuthenticatedUser() instead.
+ * Kept for backwards compatibility during migration.
+ */
 export async function createAuthenticatedClient() {
-  const cookieStore = await cookies()
-
-  return createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll()
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          )
-        } catch {
-          // The `setAll` method was called from a Server Component.
-        }
-      },
-    },
-  })
+  return createDbClient()
 }
