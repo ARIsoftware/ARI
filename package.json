@@ -54,8 +54,6 @@
     "@types/leaflet": "^1.9.21",
     "ai": "^5.0.102",
     "autoprefixer": "^10.4.22",
-    "bcrypt": "^6.0.0",
-    "bcryptjs": "^3.0.3",
     "better-auth": "^1.4.7",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
@@ -86,8 +84,6 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@types/bcrypt": "^6.0.0",
-    "@types/bcryptjs": "^2.4.6",
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^22.19.1",
     "@types/pg": "^8.16.0",

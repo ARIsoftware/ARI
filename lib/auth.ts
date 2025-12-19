@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth"
 import { nextCookies } from "better-auth/next-js"
 import { Pool } from "pg"
-import bcrypt from "bcryptjs"
+import { hash as argon2Hash, verify as argon2Verify } from "@node-rs/argon2"
 
 // Create PostgreSQL pool with SSL for Supabase
 const pool = new Pool({
@@ -24,13 +24,16 @@ export const auth = betterAuth({
     password: {
       minLength: 18,
       hash: async (password: string) => {
-        // Hash new passwords with bcrypt
-        const salt = await bcrypt.genSalt(12)
-        return await bcrypt.hash(password, salt)
+        // Hash passwords with Argon2id (winner of Password Hashing Competition)
+        return await argon2Hash(password, {
+          memoryCost: 19456, // 19 MiB
+          timeCost: 2,
+          parallelism: 1,
+        })
       },
       verify: async ({ hash: storedHash, password }: { hash: string; password: string }) => {
-        // Verify bcrypt hash (works for both old Supabase and new passwords)
-        return await bcrypt.compare(password, storedHash)
+        // Verify with Argon2
+        return await argon2Verify(storedHash, password)
       },
     },
   },
