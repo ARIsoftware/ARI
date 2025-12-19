@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedUser, createAuthenticatedClient } from "@/lib/auth-helpers";
+import { getAuthenticatedUser } from "@/lib/auth-helpers";
 
 export async function POST(req: NextRequest) {
   try {
-    const { user } = await getAuthenticatedUser();
+    const { user, supabase } = await getAuthenticatedUser();
 
-    if (!user) {
+    if (!user || !supabase) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
@@ -14,8 +14,6 @@ export async function POST(req: NextRequest) {
     if (!itemId) {
       return NextResponse.json({ error: "Item ID is required" }, { status: 400 });
     }
-
-    const supabase = await createAuthenticatedClient();
 
     // Get the item
     const { data: item, error: fetchError } = await supabase

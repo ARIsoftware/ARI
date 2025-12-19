@@ -59,9 +59,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // Add sample tasks with proper order_index
+    // Add sample tasks with proper order_index and user_id
+    // Explicitly set user_id since we use service role client (bypasses RLS)
     const tasksToInsert = sampleFitnessTasks.map((task, index) => ({
       ...task,
+      user_id: user.id,
       order_index: index,
     }))
 

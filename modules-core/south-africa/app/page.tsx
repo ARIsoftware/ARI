@@ -5,42 +5,36 @@
  * Route: /south-africa
  */
 
-import { cookies } from 'next/headers'
-import { createServerClient } from '@supabase/ssr'
+import { headers } from 'next/headers'
+import { auth } from '@/lib/auth'
+import { createDbClient } from '@/lib/db'
 import SouthAfricaClient from './south-africa-client'
 import type { TravelTask, Activity } from '../types'
 
 async function getServerData() {
-  const cookieStore = await cookies()
+  // Get current user via Better Auth
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-      },
-    }
-  )
-
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!session?.user) {
     return { tasks: [], activities: [] }
   }
 
+  const supabase = createDbClient()
+
   // Fetch tasks and activities in parallel
+  // Filter by user_id since we're using service role client
   const [tasksResult, activitiesResult] = await Promise.all([
     supabase
       .from('travel')
       .select('*')
+      .eq('user_id', session.user.id)
       .order('created_at', { ascending: true }),
     supabase
       .from('travel_activities')
       .select('*')
+      .eq('user_id', session.user.id)
       .order('start_date', { ascending: true })
   ])
 
