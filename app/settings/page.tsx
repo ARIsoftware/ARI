@@ -1,9 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { AppSidebar } from "@/components/app-sidebar"
 import { TaskAnnouncement } from "@/components/task-announcement"
 import { getAllFeatures } from "@/lib/menu-config"
+import { authClient } from "@/lib/auth-client"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -37,14 +39,29 @@ import {
   Grid3x3,
   Loader2,
   Lock,
+  LogOut,
+  Monitor,
   Palette,
   Plug,
   ShieldCheck,
+  Smartphone,
   Sparkles,
   TimerReset,
   Type,
   Upload,
 } from "lucide-react"
+
+// Session type from Better Auth
+interface Session {
+  id: string
+  token: string
+  userId: string
+  expiresAt: Date
+  createdAt: Date
+  updatedAt: Date
+  userAgent?: string | null
+  ipAddress?: string | null
+}
 
 interface NotificationSettings {
   taskReminders: boolean
@@ -69,9 +86,17 @@ interface FeaturePreference {
 }
 
 export default function SettingsPage() {
+  const router = useRouter()
   const [isSaving, setIsSaving] = useState(false)
   const [savedMessage, setSavedMessage] = useState<string | null>(null)
   const [themePreference, setThemePreference] = useState("system")
+
+  // Session management state
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [sessionsLoading, setSessionsLoading] = useState(false)
+  const [currentSessionToken, setCurrentSessionToken] = useState<string | null>(null)
+  const [revokingSession, setRevokingSession] = useState<string | null>(null)
+  const [revokingAllSessions, setRevokingAllSessions] = useState(false)
 
   // Backup state
   const [exportLoading, setExportLoading] = useState(false)
@@ -234,6 +259,100 @@ export default function SettingsPage() {
       setIsSaving(false)
       setSavedMessage("Your preferences are synced across devices.")
     }, 800)
+  }
+
+  // Load active sessions
+  const loadSessions = async () => {
+    setSessionsLoading(true)
+    try {
+      const result = await authClient.listSessions()
+      if (result.data) {
+        setSessions(result.data)
+      }
+      // Get current session to identify which one is "this device"
+      const currentSession = await authClient.getSession()
+      if (currentSession.data?.session) {
+        setCurrentSessionToken(currentSession.data.session.token)
+      }
+    } catch (error) {
+      console.error('Failed to load sessions:', error)
+    } finally {
+      setSessionsLoading(false)
+    }
+  }
+
+  // Load sessions on mount
+  useEffect(() => {
+    loadSessions()
+  }, [])
+
+  // Revoke a specific session
+  const handleRevokeSession = async (token: string) => {
+    setRevokingSession(token)
+    try {
+      await authClient.revokeSession({ token })
+      // Reload sessions
+      await loadSessions()
+      setSavedMessage("Session revoked successfully.")
+    } catch (error) {
+      console.error('Failed to revoke session:', error)
+    } finally {
+      setRevokingSession(null)
+    }
+  }
+
+  // Revoke all other sessions
+  const handleRevokeAllSessions = async () => {
+    setRevokingAllSessions(true)
+    try {
+      await authClient.revokeSessions()
+      // Reload sessions
+      await loadSessions()
+      setSavedMessage("All other sessions have been signed out.")
+    } catch (error) {
+      console.error('Failed to revoke sessions:', error)
+    } finally {
+      setRevokingAllSessions(false)
+    }
+  }
+
+  // Helper to parse user agent
+  const parseUserAgent = (userAgent: string | null | undefined): { device: string; browser: string } => {
+    if (!userAgent) return { device: 'Unknown device', browser: 'Unknown browser' }
+
+    let device = 'Desktop'
+    let browser = 'Unknown'
+
+    // Detect device
+    if (userAgent.includes('iPhone')) device = 'iPhone'
+    else if (userAgent.includes('iPad')) device = 'iPad'
+    else if (userAgent.includes('Android')) device = 'Android'
+    else if (userAgent.includes('Macintosh')) device = 'Mac'
+    else if (userAgent.includes('Windows')) device = 'Windows'
+    else if (userAgent.includes('Linux')) device = 'Linux'
+
+    // Detect browser
+    if (userAgent.includes('Chrome') && !userAgent.includes('Edg')) browser = 'Chrome'
+    else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) browser = 'Safari'
+    else if (userAgent.includes('Firefox')) browser = 'Firefox'
+    else if (userAgent.includes('Edg')) browser = 'Edge'
+
+    return { device, browser }
+  }
+
+  // Format relative time
+  const formatRelativeTime = (date: Date): string => {
+    const now = new Date()
+    const diffMs = now.getTime() - new Date(date).getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    if (diffDays < 7) return `${diffDays}d ago`
+    return new Date(date).toLocaleDateString()
   }
 
   // Backup functions
@@ -921,137 +1040,137 @@ export default function SettingsPage() {
                 </TabsContent>
 
                 <TabsContent value="security" className="space-y-6">
+                  {/* Active Sessions */}
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="flex items-center gap-2 text-lg">
+                            <Monitor className="h-5 w-5 text-blue-500" />
+                            Active Sessions
+                          </CardTitle>
+                          <CardDescription>
+                            Manage devices where you're currently signed in.
+                          </CardDescription>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleRevokeAllSessions}
+                          disabled={revokingAllSessions || sessions.length <= 1}
+                        >
+                          {revokingAllSessions ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <LogOut className="mr-2 h-4 w-4" />
+                          )}
+                          Sign out all other devices
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {sessionsLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : sessions.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          No active sessions found
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {sessions.map((session) => {
+                            const { device, browser } = parseUserAgent(session.userAgent)
+                            const isCurrentSession = session.token === currentSessionToken
+                            const isMobile = device === 'iPhone' || device === 'iPad' || device === 'Android'
+
+                            return (
+                              <div
+                                key={session.id}
+                                className={`flex items-center justify-between rounded-lg border p-4 ${
+                                  isCurrentSession ? 'border-blue-500/50 bg-blue-50/50' : ''
+                                }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  {isMobile ? (
+                                    <Smartphone className="h-5 w-5 text-muted-foreground" />
+                                  ) : (
+                                    <Monitor className="h-5 w-5 text-muted-foreground" />
+                                  )}
+                                  <div>
+                                    <p className="text-sm font-medium">
+                                      {device} · {browser}
+                                      {isCurrentSession && (
+                                        <Badge variant="secondary" className="ml-2">
+                                          This device
+                                        </Badge>
+                                      )}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {session.ipAddress || 'Unknown IP'} · Last active {formatRelativeTime(session.updatedAt)}
+                                    </p>
+                                  </div>
+                                </div>
+                                {!isCurrentSession && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRevokeSession(session.token)}
+                                    disabled={revokingSession === session.token}
+                                  >
+                                    {revokingSession === session.token ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <LogOut className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Account Security */}
                   <div className="grid gap-6 lg:grid-cols-2">
                     <Card>
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-lg">
                           <ShieldCheck className="h-5 w-5 text-emerald-500" />
-                          Two-factor authentication
+                          Account Security
                         </CardTitle>
                         <CardDescription>
-                          Keep your account fortified with a second factor.
+                          Manage your password and security settings.
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <div className="flex items-start justify-between rounded-lg border p-4">
                           <div className="pr-4">
-                            <p className="text-sm font-medium">OTP via authenticator</p>
-                            <p className="text-sm text-muted-foreground">Use any TOTP app for rotating six-digit codes.</p>
+                            <p className="text-sm font-medium">Password</p>
+                            <p className="text-sm text-muted-foreground">
+                              Change your password to keep your account secure.
+                            </p>
                           </div>
-                          <Switch
-                            checked={twoFactorEnabled}
-                            onCheckedChange={setTwoFactorEnabled}
-                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push('/profile')}
+                          >
+                            Change
+                          </Button>
                         </div>
                         <div className="rounded-lg border border-emerald-500/40 bg-emerald-50 p-4 text-sm">
-                          <p className="font-medium text-emerald-700">Recovery codes available</p>
+                          <p className="font-medium text-emerald-700">Authentication: Better Auth</p>
                           <p className="mt-1 text-emerald-600">
-                            Store these offline. If you lose your device, they keep you signed in.
+                            Your account is secured with Better Auth using Argon2id password hashing.
                           </p>
                         </div>
                       </CardContent>
                     </Card>
 
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg">
-                          <Lock className="h-5 w-5 text-slate-500" />
-                          Session controls
-                        </CardTitle>
-                        <CardDescription>
-                          Calibrate how long sessions stay active on trusted devices.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="session-timeout">Session timeout</Label>
-                          <Select value={sessionTimeout} onValueChange={setSessionTimeout}>
-                            <SelectTrigger id="session-timeout">
-                              <SelectValue placeholder="Select duration" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="15">15 minutes</SelectItem>
-                              <SelectItem value="30">30 minutes</SelectItem>
-                              <SelectItem value="60">1 hour</SelectItem>
-                              <SelectItem value="120">2 hours</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="flex items-start justify-between rounded-lg border p-4">
-                          <div className="pr-4">
-                            <p className="text-sm font-medium">Trusted device approvals</p>
-                            <p className="text-sm text-muted-foreground">Require admin consent before new devices gain access.</p>
-                          </div>
-                          <Switch
-                            checked={deviceApprovals}
-                            onCheckedChange={setDeviceApprovals}
-                          />
-                        </div>
-                        <div className="space-y-3">
-                          <p className="text-sm font-medium">Active devices</p>
-                          <div className="space-y-3 rounded-lg border p-4 text-sm">
-                            <div className="flex items-center justify-between">
-                              <span>Macbook Pro · Safari</span>
-                              <Badge variant="secondary">Now</Badge>
-                            </div>
-                            <Separator />
-                            <div className="flex items-center justify-between text-muted-foreground">
-                              <span>iPhone 15 · Ari Mobile</span>
-                              <span>2h ago</span>
-                            </div>
-                            <div className="flex items-center justify-between text-muted-foreground">
-                              <span>iPad · Ari Mobile</span>
-                              <span>Yesterday</span>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
                   </div>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-lg">
-                        <CheckCircle2 className="h-5 w-5 text-sky-500" />
-                        Compliance pulse
-                      </CardTitle>
-                      <CardDescription>
-                        Snapshot of your workspace posture across the core security benchmarks.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="grid gap-6 md:grid-cols-3">
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-sm font-medium">
-                          <span>Role hygiene</span>
-                          <span>92%</span>
-                        </div>
-                        <Progress value={92} />
-                        <p className="text-xs text-muted-foreground">
-                          Review role drift every sprint to keep access minimal.
-                        </p>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-sm font-medium">
-                          <span>RLS coverage</span>
-                          <span>100%</span>
-                        </div>
-                        <Progress value={100} />
-                        <p className="text-xs text-muted-foreground">
-                          RLS policies verified across all customer-facing tables.
-                        </p>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-sm font-medium">
-                          <span>Secrets rotation</span>
-                          <span>35 days</span>
-                        </div>
-                        <Progress value={70} />
-                        <p className="text-xs text-muted-foreground">
-                          Schedule next rotation before hitting the 45-day window.
-                        </p>
-                      </div>
-                    </CardContent>
-                  </Card>
                 </TabsContent>
 
                 <TabsContent value="integrations" className="space-y-6">
