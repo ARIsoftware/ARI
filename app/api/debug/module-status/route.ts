@@ -6,22 +6,26 @@
  */
 
 import { NextResponse } from 'next/server'
-import { createAuthenticatedClient } from '@/lib/auth-helpers'
+import { headers } from 'next/headers'
+import { auth } from '@/lib/auth'
+import { createDbClient } from '@/lib/db'
 import { getModules, getEnabledModule } from '@/lib/modules/module-registry'
 
 export async function GET() {
   try {
-    const supabase = await createAuthenticatedClient()
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    })
 
-    // Get current user
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
+    if (!session?.user) {
       return NextResponse.json({
         error: 'No authenticated user',
         authenticated: false
       })
     }
+
+    const user = session.user
+    const supabase = createDbClient()
 
     // Get all modules
     const allModules = await getModules()

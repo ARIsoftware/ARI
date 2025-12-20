@@ -62,10 +62,12 @@ export async function POST(request: NextRequest) {
       delete taskToInsert.youtube_url
     }
 
+    // Explicitly set user_id since we use service role client (bypasses RLS)
     const { data, error } = await supabase
       .from('fitness_database')
       .insert([{
         ...taskToInsert,
+        user_id: user.id,
         order_index: nextOrderIndex,
       }])
       .select()

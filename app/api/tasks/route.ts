@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     
     if (error) {
       console.error('Error fetching tasks:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 })
     }
 
     return NextResponse.json(data)
@@ -70,11 +70,12 @@ export async function POST(request: NextRequest) {
       priorityScore = calculatePriorityScore(axes)
     }
 
-    // RLS will automatically set user_id to auth.uid()
+    // Explicitly set user_id since we use service role client (bypasses RLS)
     const { data, error } = await supabase
       .from('tasks')
       .insert([{
         ...task,
+        user_id: user.id,
         order_index: nextOrderIndex,
         priority_score: priorityScore
       }])
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error creating task:', error)
-      return createErrorResponse(error.message, 500)
+      return createErrorResponse('Failed to create task', 500)
     }
 
     return NextResponse.json(data, { status: 201 })
@@ -154,7 +155,7 @@ export async function PUT(request: NextRequest) {
 
     if (error) {
       console.error('Error updating task:', error)
-      return createErrorResponse(error.message, 500)
+      return createErrorResponse('Failed to update task', 500)
     }
 
     return NextResponse.json(data)
@@ -194,7 +195,7 @@ export async function DELETE(request: NextRequest) {
 
     if (error) {
       console.error('Error deleting task:', error)
-      return createErrorResponse(error.message, 500)
+      return createErrorResponse('Failed to delete task', 500)
     }
 
     return NextResponse.json({ success: true })
