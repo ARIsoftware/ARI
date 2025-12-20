@@ -3,6 +3,9 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { calculatePriorityScore } from '@/lib/priority-utils'
 import { z } from 'zod'
 
+// Force dynamic rendering - no caching
+export const dynamic = 'force-dynamic'
+
 const updatePrioritiesSchema = z.object({
   taskId: z.string().uuid(),
   axes: z.object({
@@ -44,22 +47,24 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
+    // Check auth FIRST before any other processing
+    const { user, supabase } = await getAuthenticatedUser()
+
+    if (!user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
+
     const body = await request.json()
     const validation = updatePrioritiesSchema.safeParse(body)
-    
+
     if (!validation.success) {
-      return NextResponse.json({ 
-        error: 'Invalid request data', 
-        details: validation.error.errors 
+      return NextResponse.json({
+        error: 'Invalid request data',
+        details: validation.error.errors
       }, { status: 400 })
     }
 
     const { taskId, axes } = validation.data
-    const { user, supabase } = await getAuthenticatedUser()
-    
-    if (!user) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
-    }
 
     // Calculate priority score
     const priorityScore = calculatePriorityScore(axes)
@@ -97,17 +102,18 @@ export async function PUT(request: NextRequest) {
 // Batch update multiple tasks
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { taskIds } = body
-    
-    if (!Array.isArray(taskIds) || taskIds.length === 0) {
-      return NextResponse.json({ error: 'Invalid task IDs' }, { status: 400 })
-    }
-
+    // Check auth FIRST before any other processing
     const { user, supabase } = await getAuthenticatedUser()
-    
+
     if (!user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { taskIds } = body
+
+    if (!Array.isArray(taskIds) || taskIds.length === 0) {
+      return NextResponse.json({ error: 'Invalid task IDs' }, { status: 400 })
     }
 
     // Recalculate priority scores for all specified tasks - only user's own tasks
