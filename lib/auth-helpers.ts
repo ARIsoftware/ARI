@@ -7,14 +7,27 @@ import { createDbClient } from "@/lib/db"
  * Returns a compatible shape with the old Supabase auth for minimal migration friction.
  */
 export async function getAuthenticatedUser() {
+  // Skip auth during build/static generation to prevent build errors
+  // NEXT_PHASE is set by Next.js during different build phases
+  if (process.env.NEXT_PHASE === 'phase-production-build') {
+    return { user: null, session: null, supabase: null }
+  }
+
+  // Also skip if critical env vars are missing (indicates build-time execution)
+  if (!process.env.DATABASE_URL || !process.env.BETTER_AUTH_SECRET) {
+    return { user: null, session: null, supabase: null }
+  }
+
   let session
   try {
     session = await auth.api.getSession({
       headers: await headers(),
     })
   } catch (error) {
-    // Log error but don't expose it - treat as unauthenticated
-    console.error('Auth session check failed:', error)
+    // Only log in development to avoid noisy production logs
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Auth session check failed:', error)
+    }
     return { user: null, session: null, supabase: null }
   }
 
