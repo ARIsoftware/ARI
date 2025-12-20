@@ -273,7 +273,7 @@ export default function DatabaseTestPage() {
 
       // Test 2: Check MODULE_PAGES registry completeness
       updateModuleResult('Registry Completeness', { status: 'testing' })
-      const registeredModules = ['assist', 'contacts', 'daily-fitness', 'gratitude', 'hello-world', 'hyrox', 'knowledge-manager', 'major-projects', 'motivation', 'northstar', 'ohtani', 'quotes', 'shipments', 'south-africa', 'task-monsters', 'winter-arc', 'world-clock']
+      const registeredModules = ['assist', 'contacts', 'daily-fitness', 'gratitude', 'hello-world', 'hyrox', 'knowledge-manager', 'major-projects', 'motivation', 'northstar', 'ohtani', 'quotes', 'shipments', 'south-africa', 'task-aquarium', 'task-monsters', 'winter-arc', 'world-clock']
       const discoveredModuleIds = modules.map((m: any) => m.id)
       const missingFromRegistry = discoveredModuleIds.filter((id: string) => !registeredModules.includes(id))
       const extraInRegistry = registeredModules.filter(id => !discoveredModuleIds.includes(id))
@@ -914,15 +914,20 @@ export default function DatabaseTestPage() {
           const response = await fetch(route.path, {
             method: route.method,
             credentials: 'omit',
+            redirect: 'manual', // Don't follow redirects - treat redirect as "secure"
             headers: { 'Content-Type': 'application/json' },
             body: route.method !== 'GET' ? JSON.stringify({}) : undefined
           })
 
+          // Redirects (302/307/308) or opaque redirects mean auth is working (redirecting to sign-in)
+          const isRedirect = response.type === 'opaqueredirect' ||
+            response.status === 302 || response.status === 307 || response.status === 308
+
           results.push({
             name: route.name,
             path: route.path,
-            secure: response.status === 401 || response.status === 404 || response.status === 400,
-            status: response.status
+            secure: response.status === 401 || response.status === 404 || response.status === 400 || isRedirect,
+            status: response.type === 'opaqueredirect' ? 'redirect' : response.status
           })
         } catch {
           results.push({
@@ -1944,6 +1949,14 @@ export default function DatabaseTestPage() {
                             {test.data && test.status === 'warning' && (
                               <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-950 rounded">
                                 <pre className="text-xs text-yellow-600 dark:text-yellow-400 overflow-auto max-h-32">
+                                  {JSON.stringify(test.data, null, 2)}
+                                </pre>
+                              </div>
+                            )}
+
+                            {test.data && test.status === 'error' && !test.error && (
+                              <div className="mt-2 p-2 bg-red-50 dark:bg-red-950 rounded">
+                                <pre className="text-xs text-red-600 dark:text-red-400 overflow-auto max-h-32">
                                   {JSON.stringify(test.data, null, 2)}
                                 </pre>
                               </div>
