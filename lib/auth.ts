@@ -26,9 +26,23 @@ function createAuth() {
 
   // Build trusted origins from environment
   const trustedOrigins: string[] = []
+
+  // Add production domain (always trusted)
+  trustedOrigins.push("https://redacted.invalid")
+
+  // Add custom domain from env if set
   if (process.env.NEXT_PUBLIC_APP_URL) {
-    trustedOrigins.push(process.env.NEXT_PUBLIC_APP_URL)
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL
+    if (!trustedOrigins.includes(appUrl)) {
+      trustedOrigins.push(appUrl)
+    }
   }
+
+  // Add Vercel preview URLs
+  if (process.env.VERCEL_URL) {
+    trustedOrigins.push(`https://${process.env.VERCEL_URL}`)
+  }
+
   // Only add localhost origins in development
   if (process.env.NODE_ENV !== 'production') {
     trustedOrigins.push(
