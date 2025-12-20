@@ -18,11 +18,13 @@ export async function GET(
       .from('contacts')
       .select('*')
       .eq('id', id)
+      .eq('user_id', user.id)
       .single()
 
     if (error) {
       console.error('Error fetching contact:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      // Don't expose database error details to client
+      return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
     }
 
     return NextResponse.json(data)
@@ -50,12 +52,14 @@ export async function PATCH(
       .from('contacts')
       .update(updates)
       .eq('id', id)
+      .eq('user_id', user.id)
       .select()
       .single()
 
     if (error) {
       console.error('Error updating contact:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      // Don't expose database error details to client
+      return NextResponse.json({ error: 'Contact not found or update failed' }, { status: 404 })
     }
 
     return NextResponse.json(data)
@@ -82,10 +86,12 @@ export async function DELETE(
       .from('contacts')
       .delete()
       .eq('id', id)
+      .eq('user_id', user.id)
 
     if (error) {
       console.error('Error deleting contact:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      // Don't expose database error details to client
+      return NextResponse.json({ error: 'Contact not found or delete failed' }, { status: 404 })
     }
 
     return NextResponse.json({ success: true })

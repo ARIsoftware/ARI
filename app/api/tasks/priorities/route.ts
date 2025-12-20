@@ -22,15 +22,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // Fetch all tasks with priority axes
+    // Fetch all tasks with priority axes - only user's own tasks
     const { data, error } = await supabase
       .from('tasks')
       .select('*')
+      .eq('user_id', user.id)
       .order('priority_score', { ascending: true }) // Lower score = higher priority
-    
+
     if (error) {
       console.error('Error fetching task priorities:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      // Don't expose database error details to client
+      return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 })
     }
 
     return NextResponse.json(data)
@@ -62,7 +64,7 @@ export async function PUT(request: NextRequest) {
     // Calculate priority score
     const priorityScore = calculatePriorityScore(axes)
 
-    // Update task with new axes and calculated score
+    // Update task with new axes and calculated score - only user's own tasks
     const { data, error } = await supabase
       .from('tasks')
       .update({
@@ -75,12 +77,14 @@ export async function PUT(request: NextRequest) {
         updated_at: new Date().toISOString()
       })
       .eq('id', taskId)
+      .eq('user_id', user.id)
       .select()
       .single()
 
     if (error) {
       console.error('Error updating task priorities:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      // Don't expose database error details to client
+      return NextResponse.json({ error: 'Task not found or update failed' }, { status: 404 })
     }
 
     return NextResponse.json(data)
@@ -106,18 +110,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // Recalculate priority scores for all specified tasks
+    // Recalculate priority scores for all specified tasks - only user's own tasks
     const updates = []
     for (const taskId of taskIds) {
-      // Fetch current task data
+      // Fetch current task data - only user's own tasks
       const { data: task, error: fetchError } = await supabase
         .from('tasks')
         .select('impact, severity, timeliness, effort, strategic_fit')
         .eq('id', taskId)
+        .eq('user_id', user.id)
         .single()
-      
+
       if (fetchError || !task) continue
-      
+
       const axes = {
         impact: task.impact || 3,
         severity: task.severity || 3,
@@ -125,10 +130,10 @@ export async function POST(request: NextRequest) {
         effort: task.effort || 3,
         strategic_fit: task.strategic_fit || 3
       }
-      
+
       const priorityScore = calculatePriorityScore(axes)
-      
-      // Update task with new score
+
+      // Update task with new score - only user's own tasks
       const { error: updateError } = await supabase
         .from('tasks')
         .update({
@@ -136,7 +141,8 @@ export async function POST(request: NextRequest) {
           updated_at: new Date().toISOString()
         })
         .eq('id', taskId)
-      
+        .eq('user_id', user.id)
+
       if (!updateError) {
         updates.push({ taskId, priorityScore })
       }
