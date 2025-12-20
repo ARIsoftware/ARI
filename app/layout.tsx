@@ -7,6 +7,9 @@ import { getAuthenticatedUser } from "@/lib/auth-helpers"
 import { ModuleErrorOverlay } from "@/components/module-error-overlay"
 import "./globals.css"
 
+// Force dynamic rendering to ensure auth state is fresh on every request
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: "ARI",
   description: "Secure task management application",
