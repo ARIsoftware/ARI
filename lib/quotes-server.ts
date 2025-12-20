@@ -1,4 +1,4 @@
-import { createAuthenticatedClient } from './auth-helpers'
+import { createDbClient } from './db'
 
 interface Quote {
   id: string
@@ -8,7 +8,7 @@ interface Quote {
 
 export async function getRandomQuote(userId: string): Promise<Quote | null> {
   try {
-    const supabase = await createAuthenticatedClient()
+    const supabase = createDbClient()
 
     // Fetch all quotes for the user
     const { data: quotes, error } = await supabase

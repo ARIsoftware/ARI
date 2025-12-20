@@ -1,7 +1,6 @@
-import { createServerClient } from '@supabase/ssr'
+import { hasSessionCookie } from "@/lib/auth-middleware"
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { getUserFeaturePreferences, isFeatureEnabled } from '@/lib/features-helpers'
 
 const protectedRoutes = [
   "/",
@@ -31,18 +30,18 @@ const protectedRoutes = [
   "/debug",
   "/api" // All API routes require authentication (defense-in-depth)
 ]
-const publicRoutes = ["/sign-in", "/auth"]
+const publicRoutes = ["/sign-in", "/auth", "/api/auth"]
 
 export async function middleware(req: NextRequest) {
-  let supabaseResponse = NextResponse.next({
+  let response = NextResponse.next({
     request: req,
   })
 
   // Add comprehensive security headers
-  supabaseResponse.headers.set("X-Robots-Tag", "noindex, nofollow")
-  
+  response.headers.set("X-Robots-Tag", "noindex, nofollow")
+
   // Content Security Policy
-  supabaseResponse.headers.set(
+  response.headers.set(
     "Content-Security-Policy",
     [
       "default-src 'self'",
@@ -60,97 +59,57 @@ export async function middleware(req: NextRequest) {
       "media-src 'self'"
     ].join("; ")
   )
-  
+
   // HTTP Strict Transport Security
-  supabaseResponse.headers.set(
+  response.headers.set(
     "Strict-Transport-Security",
     "max-age=31536000; includeSubDomains; preload"
   )
-  
+
   // X-Frame-Options
-  supabaseResponse.headers.set("X-Frame-Options", "DENY")
-  
+  response.headers.set("X-Frame-Options", "DENY")
+
   // X-Content-Type-Options
-  supabaseResponse.headers.set("X-Content-Type-Options", "nosniff")
-  
+  response.headers.set("X-Content-Type-Options", "nosniff")
+
   // X-XSS-Protection
-  supabaseResponse.headers.set("X-XSS-Protection", "1; mode=block")
-  
+  response.headers.set("X-XSS-Protection", "1; mode=block")
+
   // Referrer-Policy
-  supabaseResponse.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
-  
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
+
   // Permissions-Policy
-  supabaseResponse.headers.set(
+  response.headers.set(
     "Permissions-Policy",
     "camera=(), microphone=(), geolocation=()"
-  )
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({
-            request: req,
-          })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
-        },
-      },
-    }
   )
 
   const { pathname } = req.nextUrl
 
   // Allow public routes without any auth checks
   if (publicRoutes.some(route => pathname.startsWith(route))) {
-    return supabaseResponse
+    return response
   }
 
   // Check authentication for protected routes
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
 
-  let user = null
-
   if (isProtectedRoute) {
-    // PERFORMANCE FIX: Check session first (fast, from cookies)
-    // This avoids expensive network calls to Supabase on every request
-    const { data: { session } } = await supabase.auth.getSession()
+    // Quick check: does a session cookie exist?
+    // Full session validation happens in API routes/server components
+    const hasSession = hasSessionCookie(req.cookies)
 
-    if (!session) {
-      // No session - redirect to sign-in
+    if (!hasSession) {
+      // No session cookie - redirect to sign-in
       return NextResponse.redirect(new URL('/sign-in', req.url))
     }
 
-    // Session exists - for extra security on protected routes, verify it's valid
-    // Note: This still makes a network call, but only for authenticated users
-    const { data: { user: verifiedUser }, error } = await supabase.auth.getUser()
-
-    if (error || !verifiedUser) {
-      // Session is invalid or expired - redirect to sign-in
-      return NextResponse.redirect(new URL('/sign-in', req.url))
-    }
-
-    user = verifiedUser
+    // Session cookie exists - allow request to proceed
+    // Full validation will happen in the actual route/API
+    // Note: Feature flag checking removed for now - can be re-added via API call
   }
 
-  // Check if feature is disabled for authenticated users
-  if (user) {
-    const preferences = await getUserFeaturePreferences(req, user.id)
-
-    if (!isFeatureEnabled(pathname, preferences)) {
-      // Redirect to dashboard if trying to access a disabled feature
-      return NextResponse.redirect(new URL('/dashboard', req.url))
-    }
-  }
-
-  return supabaseResponse
+  return response
 }
 
 export const config = {

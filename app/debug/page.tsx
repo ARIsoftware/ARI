@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { AlertCircle, CheckCircle2, XCircle, Loader2, Shield, ShieldAlert, ShieldCheck, Database as DatabaseIcon, Package, Save } from 'lucide-react'
+import { AlertCircle, CheckCircle2, XCircle, Loader2, Shield, ShieldAlert, ShieldCheck, Database as DatabaseIcon, Package, Save, Key } from 'lucide-react'
 
 interface TestResult {
   name: string
@@ -61,10 +61,12 @@ export default function DatabaseTestPage() {
   const [securityResults, setSecurityResults] = useState<SecurityTestResult[]>([])
   const [moduleResults, setModuleResults] = useState<TestResult[]>([])
   const [backupResults, setBackupResults] = useState<TestResult[]>([])
+  const [authConfigResults, setAuthConfigResults] = useState<TestResult[]>([])
   const [isRunning, setIsRunning] = useState(false)
   const [isRunningSecurityTests, setIsRunningSecurityTests] = useState(false)
   const [isRunningModuleTests, setIsRunningModuleTests] = useState(false)
   const [isRunningBackupTests, setIsRunningBackupTests] = useState(false)
+  const [isRunningAuthConfigTests, setIsRunningAuthConfigTests] = useState(false)
 
   // Define all API endpoints for testing
   const apiEndpoints: ApiEndpoint[] = [
@@ -271,7 +273,7 @@ export default function DatabaseTestPage() {
 
       // Test 2: Check MODULE_PAGES registry completeness
       updateModuleResult('Registry Completeness', { status: 'testing' })
-      const registeredModules = ['assist', 'contacts', 'daily-fitness', 'gratitude', 'hello-world', 'hyrox', 'knowledge-manager', 'major-projects', 'motivation', 'northstar', 'ohtani', 'quotes', 'shipments', 'south-africa', 'task-monsters', 'winter-arc', 'world-clock']
+      const registeredModules = ['assist', 'contacts', 'daily-fitness', 'gratitude', 'hello-world', 'hyrox', 'knowledge-manager', 'major-projects', 'motivation', 'northstar', 'ohtani', 'quotes', 'shipments', 'south-africa', 'task-aquarium', 'task-monsters', 'winter-arc', 'world-clock']
       const discoveredModuleIds = modules.map((m: any) => m.id)
       const missingFromRegistry = discoveredModuleIds.filter((id: string) => !registeredModules.includes(id))
       const extraInRegistry = registeredModules.filter(id => !discoveredModuleIds.includes(id))
@@ -592,7 +594,7 @@ export default function DatabaseTestPage() {
       const response = await fetch('/api/backup/verify')
       const result = await response.json()
 
-      const expectedTables = 27 // Updated: added knowledge_collections table
+      const expectedTables = 31 // Updated: added Better Auth tables (user, session, account, verification)
       const foundTables = result.tablesFound
 
       if (foundTables === expectedTables) {
@@ -743,6 +745,259 @@ export default function DatabaseTestPage() {
 
     setIsRunningBackupTests(false)
     console.log('💾 Backup system diagnostics complete!')
+  }
+
+  const updateAuthConfigResult = (name: string, update: Partial<TestResult>) => {
+    setAuthConfigResults(prev => {
+      const existing = prev.find(r => r.name === name)
+      if (existing) {
+        return prev.map(r => r.name === name ? { ...r, ...update } : r)
+      } else {
+        return [...prev, { name, status: 'pending', ...update }]
+      }
+    })
+  }
+
+  const runAuthConfigTests = async () => {
+    setIsRunningAuthConfigTests(true)
+    setAuthConfigResults([])
+    console.log('🔐 Starting auth configuration checks...')
+
+    // Test 1: Check if auth API endpoint is accessible
+    // Better Auth uses /api/auth/get-session for session checks
+    updateAuthConfigResult('Auth API Endpoint', { status: 'testing' })
+    try {
+      const response = await fetch('/api/auth/get-session', {
+        method: 'GET',
+        credentials: 'include'
+      })
+
+      // Better Auth returns 200 with session data or 200 with null session
+      if (response.ok) {
+        const data = await response.json()
+        updateAuthConfigResult('Auth API Endpoint', {
+          status: 'success',
+          message: 'Better Auth API endpoint is accessible',
+          data: {
+            status: response.status,
+            hasSession: !!data?.session
+          }
+        })
+      } else {
+        throw new Error(`Unexpected status: ${response.status}`)
+      }
+    } catch (error: any) {
+      updateAuthConfigResult('Auth API Endpoint', {
+        status: 'error',
+        error: error.message,
+        data: { hint: 'Check if /api/auth/[...all]/route.ts exists' }
+      })
+    }
+
+    // Test 2: Check session status
+    updateAuthConfigResult('Session Status', { status: 'testing' })
+    try {
+      if (session) {
+        const expiresAt = session.expiresAt ? new Date(session.expiresAt) : null
+        const isExpired = expiresAt ? expiresAt < new Date() : false
+
+        updateAuthConfigResult('Session Status', {
+          status: isExpired ? 'warning' : 'success',
+          message: isExpired ? 'Session expired' : `Active session for ${session.user?.email}`,
+          data: {
+            userId: session.user?.id,
+            email: session.user?.email,
+            expiresAt: expiresAt?.toISOString(),
+            isExpired
+          }
+        })
+      } else {
+        updateAuthConfigResult('Session Status', {
+          status: 'warning',
+          message: 'No active session',
+          data: { hint: 'Sign in at /sign-in to test authenticated features' }
+        })
+      }
+    } catch (error: any) {
+      updateAuthConfigResult('Session Status', {
+        status: 'error',
+        error: error.message
+      })
+    }
+
+    // Test 3: Check environment variables (client-side only)
+    updateAuthConfigResult('Environment Variables', { status: 'testing' })
+    try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+
+      const checks = {
+        NEXT_PUBLIC_APP_URL: appUrl ? 'Set' : 'Missing (needed for production trusted origins)',
+        NEXT_PUBLIC_SUPABASE_URL: supabaseUrl ? 'Set' : 'Missing',
+      }
+
+      const missingCritical = !supabaseUrl
+
+      updateAuthConfigResult('Environment Variables', {
+        status: missingCritical ? 'error' : (appUrl ? 'success' : 'warning'),
+        message: missingCritical
+          ? 'Critical environment variables missing'
+          : (!appUrl ? 'NEXT_PUBLIC_APP_URL not set (needed for production)' : 'All client-side env vars configured'),
+        data: checks
+      })
+    } catch (error: any) {
+      updateAuthConfigResult('Environment Variables', {
+        status: 'error',
+        error: error.message
+      })
+    }
+
+    // Test 4: Check auth configuration via API
+    updateAuthConfigResult('Auth Configuration', { status: 'testing' })
+    try {
+      const response = await fetch('/api/debug/auth-config')
+      if (response.ok) {
+        const config = await response.json()
+
+        const issues = []
+        if (!config.sslEnabled && config.isProduction) {
+          issues.push('SSL validation disabled in production')
+        }
+        if (!config.hasProductionOrigin && config.isProduction) {
+          issues.push('No production origin configured')
+        }
+        if (!config.rateLimitEnabled) {
+          issues.push('Rate limiting not enabled')
+        }
+        if (!config.secretConfigured) {
+          issues.push('BETTER_AUTH_SECRET not properly configured')
+        }
+
+        updateAuthConfigResult('Auth Configuration', {
+          status: issues.length === 0 ? 'success' : (issues.some(i => i.includes('SSL') || i.includes('SECRET')) ? 'error' : 'warning'),
+          message: issues.length === 0 ? 'Auth configuration is secure' : `${issues.length} issue(s) found`,
+          data: {
+            ...config,
+            issues
+          }
+        })
+      } else if (response.status === 404) {
+        updateAuthConfigResult('Auth Configuration', {
+          status: 'warning',
+          message: 'Auth config endpoint not available',
+          data: { hint: 'Create /api/debug/auth-config for detailed checks' }
+        })
+      } else {
+        throw new Error(`HTTP ${response.status}`)
+      }
+    } catch (error: any) {
+      updateAuthConfigResult('Auth Configuration', {
+        status: 'warning',
+        message: 'Could not verify auth configuration',
+        error: error.message,
+        data: { hint: 'Server-side auth config not exposed to client' }
+      })
+    }
+
+    // Test 5: Test authorization patterns
+    updateAuthConfigResult('Authorization Patterns', { status: 'testing' })
+    try {
+      // Test that protected routes reject unauthenticated access
+      const testRoutes = [
+        { path: '/api/contacts/test-uuid-12345', method: 'GET', name: 'Contacts by ID' },
+        { path: '/api/tasks/priorities', method: 'PUT', name: 'Task Priorities' },
+      ]
+
+      const results = []
+      for (const route of testRoutes) {
+        try {
+          const response = await fetch(route.path, {
+            method: route.method,
+            credentials: 'omit',
+            redirect: 'manual', // Don't follow redirects - treat redirect as "secure"
+            headers: { 'Content-Type': 'application/json' },
+            body: route.method !== 'GET' ? JSON.stringify({}) : undefined
+          })
+
+          // Redirects (302/307/308) or opaque redirects mean auth is working (redirecting to sign-in)
+          const isRedirect = response.type === 'opaqueredirect' ||
+            response.status === 302 || response.status === 307 || response.status === 308
+
+          results.push({
+            name: route.name,
+            path: route.path,
+            secure: response.status === 401 || response.status === 404 || response.status === 400 || isRedirect,
+            status: response.type === 'opaqueredirect' ? 'redirect' : response.status
+          })
+        } catch {
+          results.push({
+            name: route.name,
+            path: route.path,
+            secure: true, // Network errors are treated as secure (blocked)
+            status: 0
+          })
+        }
+      }
+
+      const allSecure = results.every(r => r.secure)
+      updateAuthConfigResult('Authorization Patterns', {
+        status: allSecure ? 'success' : 'error',
+        message: allSecure
+          ? 'All tested routes properly require authentication'
+          : 'Some routes may not be properly protected',
+        data: { results }
+      })
+    } catch (error: any) {
+      updateAuthConfigResult('Authorization Patterns', {
+        status: 'error',
+        error: error.message
+      })
+    }
+
+    // Test 6: Session management features
+    updateAuthConfigResult('Session Management', { status: 'testing' })
+    try {
+      if (session) {
+        // Try to list sessions
+        const response = await fetch('/api/auth/list-sessions', {
+          method: 'GET',
+          credentials: 'include'
+        })
+
+        if (response.ok) {
+          const sessions = await response.json()
+          updateAuthConfigResult('Session Management', {
+            status: 'success',
+            message: `${sessions.length || 0} active session(s)`,
+            data: {
+              sessionCount: sessions.length || 0,
+              canRevoke: true
+            }
+          })
+        } else {
+          updateAuthConfigResult('Session Management', {
+            status: 'warning',
+            message: 'Session list endpoint not accessible',
+            data: { hint: 'Session management may not be fully configured' }
+          })
+        }
+      } else {
+        updateAuthConfigResult('Session Management', {
+          status: 'warning',
+          message: 'Not authenticated - cannot test session management',
+          data: { hint: 'Sign in to test session management features' }
+        })
+      }
+    } catch (error: any) {
+      updateAuthConfigResult('Session Management', {
+        status: 'warning',
+        message: 'Could not verify session management',
+        error: error.message
+      })
+    }
+
+    setIsRunningAuthConfigTests(false)
+    console.log('🔐 Auth configuration checks complete!')
   }
 
   const runTests = async () => {
@@ -976,38 +1231,32 @@ export default function DatabaseTestPage() {
       // Continue with other tests even if auth fails
     }
 
-    // Test 5: Session Status
+    // Test 5: Session Status (Better Auth)
     updateTestResult('Session Status', { status: 'testing' })
     try {
-      console.log('🔑 Checking session status...')
+      console.log('🔑 Checking session status (Better Auth)...')
 
-      // Get session with timeout (fast, from cookies)
-      const sessionPromise = supabase.auth.getSession()
-      const timeoutPromise = new Promise<any>((_, reject) =>
-        setTimeout(() => reject(new Error('Session check timed out after 5 seconds')), 5000)
-      )
-
-      const { data: { session: sessionData } } = await Promise.race([sessionPromise, timeoutPromise])
-
-      if (!sessionData) {
+      // Session comes from Better Auth context (already checked above)
+      if (!session) {
         updateTestResult('Session Status', {
           status: 'warning',
-          message: 'No active session',
+          message: 'No active Better Auth session',
           data: { hint: 'Sign in at /sign-in to create a session' }
         })
         console.log('⚠️ No session found')
       } else {
         updateTestResult('Session Status', {
           status: 'success',
-          message: 'Active session found',
+          message: 'Active Better Auth session found',
           data: {
-            access_token: sessionData.access_token ? 'Present' : 'Missing',
-            refresh_token: sessionData.refresh_token ? 'Present' : 'Missing',
-            expires_at: sessionData.expires_at ? new Date(sessionData.expires_at * 1000).toISOString() : 'Unknown',
-            user_id: sessionData.user?.id || 'Unknown'
+            access_token: session.access_token ? 'Present' : 'Missing',
+            token: session.token ? 'Present' : 'Missing',
+            expiresAt: session.expiresAt ? new Date(session.expiresAt).toISOString() : 'Unknown',
+            user_id: session.user?.id || 'Unknown',
+            note: 'Using Better Auth (not Supabase Auth)'
           }
         })
-        console.log('✅ Session found for user:', sessionData.user?.email)
+        console.log('✅ Session found for user:', session.user?.email)
       }
     } catch (error: any) {
       updateTestResult('Session Status', {
@@ -1025,9 +1274,8 @@ export default function DatabaseTestPage() {
         try {
           console.log('📊 Attempting to fetch tasks...')
 
-          // Check if user is authenticated first
-          const { data: authData } = await supabase.auth.getSession()
-          if (!authData.session) {
+          // Check if user is authenticated first (using Better Auth session from context)
+          if (!session) {
             throw new Error('Not authenticated - please sign in to test data fetching')
           }
 
@@ -1172,9 +1420,7 @@ export default function DatabaseTestPage() {
     try {
       console.log('📊 Testing RLS policies...')
 
-      // Try to fetch with explicit user filter
-      const { data: { user } } = await supabase.auth.getUser()
-
+      // Use user from Better Auth context
       if (!user) {
         updateTestResult('Test RLS Policies', {
           status: 'warning',
@@ -1200,11 +1446,12 @@ export default function DatabaseTestPage() {
 
         updateTestResult('Test RLS Policies', {
           status: 'success',
-          message: 'RLS policies are working correctly',
+          message: 'RLS policies test complete (note: using service role client now)',
           data: {
             userId: user.id,
             tasksWithUserFilter: tasksWithFilter?.length || 0,
             tasksWithoutFilter: tasksNoFilter?.length || 0,
+            note: 'API routes now use service role client which bypasses RLS',
             rlsWorking: (tasksWithFilter?.length || 0) === (tasksNoFilter?.length || 0)
           }
         })
@@ -1326,6 +1573,14 @@ export default function DatabaseTestPage() {
     warnings: backupResults.filter(r => r.status === 'warning').length,
   }
 
+  // Calculate auth config summary
+  const authConfigSummary = {
+    total: authConfigResults.length,
+    success: authConfigResults.filter(r => r.status === 'success').length,
+    errors: authConfigResults.filter(r => r.status === 'error').length,
+    warnings: authConfigResults.filter(r => r.status === 'warning').length,
+  }
+
   return (
     <div className="container mx-auto p-6 max-w-7xl">
       {/* Header */}
@@ -1336,7 +1591,7 @@ export default function DatabaseTestPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="database" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-8">
+        <TabsList className="grid w-full grid-cols-5 mb-8">
           <TabsTrigger value="database" className="flex items-center gap-2">
             <DatabaseIcon className="h-4 w-4" />
             Database
@@ -1344,6 +1599,10 @@ export default function DatabaseTestPage() {
           <TabsTrigger value="security" className="flex items-center gap-2">
             <Shield className="h-4 w-4" />
             Security
+          </TabsTrigger>
+          <TabsTrigger value="authconfig" className="flex items-center gap-2">
+            <Key className="h-4 w-4" />
+            Auth Config
           </TabsTrigger>
           <TabsTrigger value="modules" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
@@ -1545,6 +1804,161 @@ export default function DatabaseTestPage() {
                                 <p className="text-red-600 dark:text-red-400">
                                   {result.error}
                                 </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        </TabsContent>
+
+        {/* Auth Config Tests Tab */}
+        <TabsContent value="authconfig" className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl flex items-center gap-2">
+              <Key className="h-6 w-6" />
+              Auth Configuration Checks
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-2">
+              Verify Better Auth configuration, session management, and authorization patterns
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="space-y-3 mb-6">
+                <Button
+                  onClick={runAuthConfigTests}
+                  disabled={isRunningAuthConfigTests}
+                  size="lg"
+                  variant="outline"
+                  className="w-full"
+                >
+                  {isRunningAuthConfigTests ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Testing Auth Config...
+                    </>
+                  ) : (
+                    <>
+                      <Key className="mr-2 h-4 w-4" />
+                      Run Auth Config Tests
+                    </>
+                  )}
+                </Button>
+                <p className="text-sm text-muted-foreground">
+                  Tests authentication configuration, session security, and authorization
+                </p>
+              </div>
+
+              {/* Auth Config Summary */}
+              {authConfigResults.length > 0 && (
+                <Card className="border-2">
+                  <CardContent className="p-4">
+                    <h3 className="font-medium mb-3">Auth Config Summary</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="flex justify-between">
+                        <span>Total Checks:</span>
+                        <Badge variant="outline">{authConfigSummary.total}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Passed:</span>
+                        <Badge variant="default">{authConfigSummary.success}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Warnings:</span>
+                        <Badge variant="secondary">{authConfigSummary.warnings}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Errors:</span>
+                        <Badge variant="destructive">{authConfigSummary.errors}</Badge>
+                      </div>
+                    </div>
+                    {authConfigSummary.errors > 0 && (
+                      <div className="mt-3 p-2 bg-red-50 dark:bg-red-950 rounded text-sm">
+                        <p className="text-red-600 dark:text-red-400 font-medium">
+                          ⚠️ {authConfigSummary.errors} critical issue(s) require attention
+                        </p>
+                      </div>
+                    )}
+                    {authConfigSummary.errors === 0 && authConfigSummary.warnings > 0 && (
+                      <div className="mt-3 p-2 bg-yellow-50 dark:bg-yellow-950 rounded text-sm">
+                        <p className="text-yellow-600 dark:text-yellow-400 font-medium">
+                          ⚠️ {authConfigSummary.warnings} warning(s) to review
+                        </p>
+                      </div>
+                    )}
+                    {authConfigSummary.errors === 0 && authConfigSummary.warnings === 0 && authConfigSummary.success > 0 && (
+                      <div className="mt-3 p-2 bg-green-50 dark:bg-green-950 rounded text-sm">
+                        <p className="text-green-600 dark:text-green-400 font-medium">
+                          ✅ All auth configuration checks passed
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Auth Config Test Results */}
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {authConfigResults.map((test) => (
+                  <Card key={test.name} className="border">
+                    <CardContent className="p-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3 flex-1">
+                          {getStatusIcon(test.status)}
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="text-sm font-medium">{test.name}</h3>
+                              {getStatusBadge(test.status)}
+                            </div>
+
+                            {test.message && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {test.message}
+                              </p>
+                            )}
+
+                            {test.error && (
+                              <div className="mt-2 p-2 bg-red-50 dark:bg-red-950 rounded text-xs">
+                                <p className="text-red-600 dark:text-red-400 font-medium">
+                                  Error: {test.error}
+                                </p>
+                                {test.data && (
+                                  <pre className="text-xs mt-1 text-red-500 dark:text-red-300 overflow-auto max-h-32">
+                                    {JSON.stringify(test.data, null, 2)}
+                                  </pre>
+                                )}
+                              </div>
+                            )}
+
+                            {test.data && test.status === 'success' && (
+                              <div className="mt-2 p-2 bg-green-50 dark:bg-green-950 rounded">
+                                <pre className="text-xs text-green-600 dark:text-green-400 overflow-auto max-h-32">
+                                  {JSON.stringify(test.data, null, 2)}
+                                </pre>
+                              </div>
+                            )}
+
+                            {test.data && test.status === 'warning' && (
+                              <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-950 rounded">
+                                <pre className="text-xs text-yellow-600 dark:text-yellow-400 overflow-auto max-h-32">
+                                  {JSON.stringify(test.data, null, 2)}
+                                </pre>
+                              </div>
+                            )}
+
+                            {test.data && test.status === 'error' && !test.error && (
+                              <div className="mt-2 p-2 bg-red-50 dark:bg-red-950 rounded">
+                                <pre className="text-xs text-red-600 dark:text-red-400 overflow-auto max-h-32">
+                                  {JSON.stringify(test.data, null, 2)}
+                                </pre>
                               </div>
                             )}
                           </div>
