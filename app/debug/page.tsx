@@ -594,7 +594,7 @@ export default function DatabaseTestPage() {
       const response = await fetch('/api/backup/verify')
       const result = await response.json()
 
-      const expectedTables = 27 // Updated: added knowledge_collections table
+      const expectedTables = 31 // Updated: added Better Auth tables (user, session, account, verification)
       const foundTables = result.tablesFound
 
       if (foundTables === expectedTables) {
