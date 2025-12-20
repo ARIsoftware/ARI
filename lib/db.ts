@@ -1,16 +1,5 @@
 import { createClient } from "@supabase/supabase-js"
 
-// Validate required environment variables at startup
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-  throw new Error('NEXT_PUBLIC_SUPABASE_URL environment variable is required')
-}
-if (!process.env.SUPABASE_SERVICE_KEY) {
-  throw new Error('SUPABASE_SERVICE_KEY environment variable is required')
-}
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY
-
 /**
  * Server-side only database client using service role key.
  * This bypasses RLS - all access control is done at application level.
@@ -22,6 +11,17 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY
  * to queries to ensure user isolation.
  */
 export function createDbClient() {
+  // Validate at runtime (not build time) to avoid Vercel build failures
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY
+
+  if (!supabaseUrl) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL environment variable is required')
+  }
+  if (!supabaseServiceKey) {
+    throw new Error('SUPABASE_SERVICE_KEY environment variable is required')
+  }
+
   return createClient(supabaseUrl, supabaseServiceKey, {
     db: {
       schema: 'public',
