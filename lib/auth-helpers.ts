@@ -7,9 +7,16 @@ import { createDbClient } from "@/lib/db"
  * Returns a compatible shape with the old Supabase auth for minimal migration friction.
  */
 export async function getAuthenticatedUser() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  })
+  let session
+  try {
+    session = await auth.api.getSession({
+      headers: await headers(),
+    })
+  } catch (error) {
+    // Log error but don't expose it - treat as unauthenticated
+    console.error('Auth session check failed:', error)
+    return { user: null, session: null, supabase: null }
+  }
 
   if (!session) {
     return { user: null, session: null, supabase: null }
