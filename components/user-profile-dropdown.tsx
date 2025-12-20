@@ -21,7 +21,8 @@ export function UserProfileDropdown() {
 
   const handleLogout = async () => {
     await authClient.signOut()
-    window.location.href = '/sign-in'
+    // Use router.push for consistent navigation behavior
+    router.push('/sign-in')
   }
 
   // Fallback for when user is not authenticated
