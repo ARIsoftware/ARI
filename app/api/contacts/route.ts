@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching contacts:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to fetch contacts' }, { status: 500 })
     }
 
     return NextResponse.json(data || [])
@@ -47,15 +47,16 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Authentication required', 401)
     }
 
+    // Explicitly set user_id since we use service role client (bypasses RLS)
     const { data, error } = await supabase
       .from('contacts')
-      .insert([contact])
+      .insert([{ ...contact, user_id: user.id }])
       .select()
       .single()
 
     if (error) {
       console.error('Error creating contact:', error)
-      return createErrorResponse(error.message, 500)
+      return createErrorResponse('Failed to create contact', 500)
     }
 
     return NextResponse.json(data, { status: 201 })
