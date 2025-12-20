@@ -22,6 +22,12 @@ const getServiceSupabase = () => {
 
 // Known complete table list (should match export route)
 const COMPLETE_TABLE_LIST = [
+  // Better Auth tables
+  'user',
+  'session',
+  'account',
+  'verification',
+  // Application tables
   'tasks',
   'fitness_database',
   'contacts',

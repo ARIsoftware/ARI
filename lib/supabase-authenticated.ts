@@ -1,59 +1,22 @@
 import { createClient } from "@supabase/supabase-js"
-import { useSessionContext, useSupabaseClient } from "@supabase/auth-helpers-react"
-import { useEffect, useState } from "react"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// Create a Supabase client that works with native Supabase authentication
-export function useSupabaseAuthenticated() {
-  const { session } = useSessionContext()
-  const baseClient = useSupabaseClient()
-  const [supabaseClient, setSupabaseClient] = useState(() =>
-    createClient(supabaseUrl, supabaseAnonKey)
-  )
-
-  useEffect(() => {
-    const updateSupabaseAuth = async () => {
-      try {
-        // Get the session access token
-        const token = session?.access_token
-        
-        if (token) {
-          // Create a new Supabase client with the session token
-          const client = createClient(supabaseUrl, supabaseAnonKey, {
-            global: {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            },
-            realtime: {
-              params: {
-                eventsPerSecond: 10,
-              },
-            },
-          })
-          setSupabaseClient(client)
-        } else {
-          // If no token, use the base client from auth helpers
-          setSupabaseClient(baseClient)
-        }
-      } catch (error) {
-        console.error("Error getting session token for Supabase:", error)
-      }
-    }
-
-    updateSupabaseAuth()
-  }, [session?.access_token, baseClient])
-
-  return supabaseClient
-}
+/**
+ * @deprecated This file is deprecated after Better Auth migration.
+ * Use the supabase client from useSupabase() hook for realtime,
+ * or use API routes for data operations.
+ */
 
 // Get authenticated Supabase client (non-hook version)
+// Returns a basic client - auth is now handled by Better Auth
 export async function getAuthenticatedSupabase() {
-  const { createSupabaseClient } = await import('@/lib/supabase-auth')
-  return createSupabaseClient()
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    realtime: {
+      params: {
+        eventsPerSecond: 10,
+      },
+    },
+  })
 }
-
-// Note: Service role functions have been moved to server-only modules
-// Use /lib/hyrox-admin.ts for admin operations in API routes only

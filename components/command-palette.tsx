@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { useSupabase } from "@/components/providers"
+import { authClient } from "@/lib/auth-client"
 import {
   CommandDialog,
   CommandEmpty,
@@ -33,7 +33,6 @@ interface CommandPaletteProps {
 export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPaletteProps) {
   const [internalOpen, setInternalOpen] = React.useState(false)
   const router = useRouter()
-  const { supabase } = useSupabase()
   const { modules, loading: modulesLoading } = useModules()
 
   // Use controlled state if provided, otherwise use internal state
@@ -58,7 +57,7 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
   }, [setOpen])
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
+    await authClient.signOut()
     router.push("/sign-in")
   }
 
