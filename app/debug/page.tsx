@@ -764,18 +764,24 @@ export default function DatabaseTestPage() {
     console.log('🔐 Starting auth configuration checks...')
 
     // Test 1: Check if auth API endpoint is accessible
+    // Better Auth uses /api/auth/get-session for session checks
     updateAuthConfigResult('Auth API Endpoint', { status: 'testing' })
     try {
-      const response = await fetch('/api/auth/session', {
+      const response = await fetch('/api/auth/get-session', {
         method: 'GET',
         credentials: 'include'
       })
 
-      if (response.ok || response.status === 401) {
+      // Better Auth returns 200 with session data or 200 with null session
+      if (response.ok) {
+        const data = await response.json()
         updateAuthConfigResult('Auth API Endpoint', {
           status: 'success',
           message: 'Better Auth API endpoint is accessible',
-          data: { status: response.status }
+          data: {
+            status: response.status,
+            hasSession: !!data?.session
+          }
         })
       } else {
         throw new Error(`Unexpected status: ${response.status}`)
