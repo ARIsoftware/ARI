@@ -47,9 +47,10 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Authentication required', 401)
     }
 
+    // Explicitly set user_id since we use service role client (bypasses RLS)
     const { data, error } = await supabase
       .from('contacts')
-      .insert([contact])
+      .insert([{ ...contact, user_id: user.id }])
       .select()
       .single()
 
