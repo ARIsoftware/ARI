@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 
+// Force dynamic rendering - no caching
+export const dynamic = 'force-dynamic'
+
 // GET /api/contacts/[id] - Get a specific contact
 export async function GET(
   request: NextRequest,
