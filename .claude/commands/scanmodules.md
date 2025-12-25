@@ -339,22 +339,14 @@ For each module, output findings in this format:
 
 ## Disclaimer
 
-**IMPORTANT**: This automated security scan is a best effort analysis and may not identify all security vulnerabilities. It should NOT be considered a complete or final security audit.
+**IMPORTANT**: This automated, best effort security scan of all installed modules and may not identify all security vulnerabilities. It should NOT be considered a complete or final security audit.
 
 **Limitations:**
 - Cannot detect all logical vulnerabilities or business logic flaws  
 - May produce false positives or miss context dependent issues  
 - Does not test runtime behavior, only static code analysis  
-- Cannot verify RLS policies, Supabase configurations or infrastructure settings in the database or cloud environment  
+- Cannot verify RLS policies, database configurations or infrastructure settings in the database or cloud environment  
 - Does not scan third party dependencies exhaustively or replace dependency scanning tools  
 - Does not review deployment configuration, network security groups or WAF rules
 
-**Recommendations:**
-- Conduct regular manual security reviews and code walkthroughs  
-- Perform penetration testing before production deployment  
-- Keep all dependencies updated and use automated dependency scanning  
-- Review Supabase RLS policies and database configuration directly  
-- Review hosting and infrastructure level security settings  
-- Consider hiring professional security auditors for critical applications
-
-**It is the sole responsibility of the user or developer to thoroughly review all code and ensure the security of their application.**
+**It is the sole responsibility of the user or developer to thoroughly review all code and follow best practices to ensure the security of their application.**
