@@ -44,6 +44,12 @@ export default async function ModuleCatchAllPage({
   // Next.js 15: params is a Promise
   const { module, slug = [] } = await params
 
+  // Early filter: skip non-module paths (static files, etc.)
+  const nonModulePaths = ['favicon.ico', 'robots.txt', 'sitemap.xml', 'manifest.json', '_next', '.well-known']
+  if (nonModulePaths.includes(module) || module.startsWith('_') || module.startsWith('.')) {
+    notFound()
+  }
+
   console.log(`[Module Route] Attempting to load module: ${module}`)
 
   // Server-side validation - check if module exists and is enabled
@@ -143,6 +149,12 @@ export async function generateMetadata({
   params: Promise<{ module: string; slug?: string[] }>
 }) {
   const { module } = await params
+
+  // Early filter: skip non-module paths (static files, etc.)
+  const nonModulePaths = ['favicon.ico', 'robots.txt', 'sitemap.xml', 'manifest.json', '_next', '.well-known']
+  if (nonModulePaths.includes(module) || module.startsWith('_') || module.startsWith('.')) {
+    return { title: 'Not Found' }
+  }
 
   // Get module info
   const moduleInfo = await getEnabledModule(module)
