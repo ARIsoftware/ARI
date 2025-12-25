@@ -46,11 +46,11 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Query database
-    // Note: RLS policies automatically filter by user_id
+    // Query database with explicit user_id filter
     const { data: cells, error: dbError } = await supabase
       .from('ohtani_grid_cells')
       .select('*')
+      .eq('user_id', user.id)
       .order('row_index', { ascending: true })
       .order('col_index', { ascending: true })
 

@@ -207,11 +207,12 @@ export async function PUT(req: NextRequest) {
     if (currentRecord && (currentRecord.best_time === 0 || newTime < currentRecord.best_time)) {
       const { data, error } = await supabase
         .from('hyrox_station_records')
-        .update({ 
+        .update({
           best_time: newTime,
           updated_at: new Date().toISOString()
         })
         .eq('station_name', stationName)
+        .eq('user_id', user.id)
         .select()
         .single()
 

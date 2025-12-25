@@ -50,11 +50,11 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Query database
-    // Note: RLS policies automatically filter by user_id
+    // Query database with explicit user_id filter
     const { data: entries, error: dbError } = await supabase
       .from('hello_world_entries')
       .select('*')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
     if (dbError) {
@@ -175,12 +175,12 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Delete from database
-    // Note: RLS policies ensure user can only delete their own entries
+    // Delete from database with explicit user_id filter
     const { error: dbError } = await supabase
       .from('hello_world_entries')
       .delete()
       .eq('id', id)
+      .eq('user_id', user.id)
 
     if (dbError) {
       console.error('Database error:', dbError)

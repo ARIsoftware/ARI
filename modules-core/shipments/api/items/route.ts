@@ -27,11 +27,12 @@ export async function GET(request: NextRequest) {
     const id = searchParams.get('id')
 
     if (id) {
-      // Fetch single shipment
+      // Fetch single shipment with explicit user_id filter
       const { data, error } = await supabase
         .from('shipments')
         .select('*')
         .eq('id', id)
+        .eq('user_id', user.id)
         .single()
 
       if (error) {
@@ -124,6 +125,7 @@ export async function PATCH(request: NextRequest) {
       .from('shipments')
       .update(updates)
       .eq('id', id)
+      .eq('user_id', user.id)
       .select()
       .single()
 
@@ -162,6 +164,7 @@ export async function DELETE(request: NextRequest) {
       .from('shipments')
       .delete()
       .eq('id', id)
+      .eq('user_id', user.id)
 
     if (error) {
       if (error.code === 'PGRST116') {
