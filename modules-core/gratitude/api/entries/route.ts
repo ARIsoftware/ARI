@@ -51,10 +51,11 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Query database for entry on this date
+    // Query database for entry on this date with explicit user_id filter
     const { data: entry, error: dbError } = await supabase
       .from('gratitude_entries')
       .select('*')
+      .eq('user_id', user.id)
       .eq('entry_date', date)
       .single()
 

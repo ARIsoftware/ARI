@@ -18,6 +18,7 @@ export async function GET(
       .from('contacts')
       .select('*')
       .eq('id', id)
+      .eq('user_id', user.id)
       .single()
 
     if (error) {
@@ -50,6 +51,7 @@ export async function PATCH(
       .from('contacts')
       .update(updates)
       .eq('id', id)
+      .eq('user_id', user.id)
       .select()
       .single()
 
@@ -82,6 +84,7 @@ export async function DELETE(
       .from('contacts')
       .delete()
       .eq('id', id)
+      .eq('user_id', user.id)
 
     if (error) {
       console.error('Error deleting contact:', error)

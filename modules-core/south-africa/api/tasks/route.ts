@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
     const { data: tasks, error: dbError } = await supabase
       .from('travel')
       .select('*')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: true })
 
     if (dbError) {
@@ -177,6 +178,7 @@ export async function PATCH(request: NextRequest) {
       .from('travel')
       .update(updates)
       .eq('id', id)
+      .eq('user_id', user.id)
       .select()
       .single()
 
@@ -227,6 +229,7 @@ export async function DELETE(request: NextRequest) {
       .from('travel')
       .delete()
       .eq('id', id)
+      .eq('user_id', user.id)
 
     if (dbError) {
       console.error('Database error:', dbError)

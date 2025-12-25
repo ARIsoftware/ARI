@@ -31,7 +31,8 @@ export async function POST(req: NextRequest) {
       const { error } = await supabase
         .from("motivation_content")
         .update({ position: update.position })
-        .eq("id", update.id);
+        .eq("id", update.id)
+        .eq("user_id", user.id);
 
       if (error) {
         console.error("Error updating position:", error);
