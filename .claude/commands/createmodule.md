@@ -49,6 +49,7 @@ When approved, create the module following this order:
 7. **Run `npm run generate-module-registry`** to register the new module
 8. Ask the user for permission to execute the .sql file, or ask if they want to run the .SQL statements themselves.
 9. If the user needs to take any action to complete the setup of the module (run a .sql file, restart the dev server etc), please clearly indicate the actions they need to take with clear instructions.
+10. If database tables are created, remind the user to enable RLS on each new table. If the project is using Supabase you can tell them to enable RLS via Supabase Dashboard > Table Editor > [table] > RLS policies > Enable RLS.
 
 ## Quality Assurance Checklist
 
