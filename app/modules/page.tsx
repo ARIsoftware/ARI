@@ -101,7 +101,7 @@ export default function ModulesPage() {
                 <Badge className="w-fit text-sm font-medium">Extend your app functionality</Badge>
                 <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Modules</h1>
                 <p className="max-w-2xl text-sm text-muted-foreground">
-                  Enable or disable installed modules to extend your app functionality. <span style="color: #c00">Note: Always assess third-party modules to ensure they are are trustworthy and secure.</span>
+                  Enable or disable installed modules to extend your app functionality. <br /><span className="text-red-600">Note: Always assess third-party modules to ensure they are trustworthy and secure.</span>
                 </p>
               </div>
 
@@ -119,7 +119,7 @@ export default function ModulesPage() {
                     Modules
                   </CardTitle>
                   <CardDescription>
-                    Enable or disable installed modules to extend your app functionality. <span style="color: #c00">Note: Always assess third-party modules to ensure they are are trustworthy and secure.</span>
+                    Toggle modules on or off below. Changes take effect after page refresh.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -179,7 +179,7 @@ export default function ModulesPage() {
                             </div>
                             <p className="text-sm text-muted-foreground">{module.description}</p>
                           </div>
-                          <div className="flex items-center gap-3" style={{ opacity: isOverridden ? 0.3 : 1 }}>
+                          <div className={`flex items-center gap-3 ${isOverridden ? 'opacity-30' : ''}`}>
                             <span className="text-sm font-medium text-muted-foreground">
                               {isEnabled ? 'On' : 'Off'}
                             </span>
