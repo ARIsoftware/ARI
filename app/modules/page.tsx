@@ -101,7 +101,7 @@ export default function ModulesPage() {
                 <Badge className="w-fit text-sm font-medium">Extend your app functionality</Badge>
                 <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Modules</h1>
                 <p className="max-w-2xl text-sm text-muted-foreground">
-                  Enable or disable installed modules to extend your app functionality.
+                  Enable or disable installed modules to extend your app functionality. <span style="color: #c00">Note: Always assess third-party modules to ensure they are are trustworthy and secure.</span>
                 </p>
               </div>
 
@@ -119,7 +119,7 @@ export default function ModulesPage() {
                     Modules
                   </CardTitle>
                   <CardDescription>
-                    Enable or disable installed modules to extend your app functionality.
+                    Enable or disable installed modules to extend your app functionality. <span style="color: #c00">Note: Always assess third-party modules to ensure they are are trustworthy and secure.</span>
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
