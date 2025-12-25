@@ -9,6 +9,7 @@ This is a **static code review** checklist for modules. It does not replace pene
 ## Instructions
 
 Scan each module directory and check for the following security vulnerabilities. For each module, report findings with severity ratings.
+Important: Do not change any code or attempt to fix any issue unless explicitly instructed by the user to do so.
 
 ### Severity Levels
 - **CRITICAL**: Immediate exploitation risk, data breach potential, authentication bypass, remote code execution
