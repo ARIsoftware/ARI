@@ -1,18 +1,20 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { validateRequestBody, validateQueryParams, createErrorResponse } from '@/lib/api-helpers'
+import { validateRequestBody, validateQueryParams, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
 import { completeHyroxWorkoutSchema, paginationSchema } from '@/lib/validation'
+import { hyroxWorkouts } from '@/lib/db/schema'
+import { eq, desc, sql } from 'drizzle-orm'
 
 export async function GET(req: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
-    
-    if (!user) {
+    const { user, withRLS } = await getAuthenticatedUser()
+
+    if (!user || !withRLS) {
       return createErrorResponse("Authentication required", 401)
     }
 
     const { searchParams } = new URL(req.url)
-    
+
     // Validate query parameters
     const queryValidation = validateQueryParams(searchParams, paginationSchema)
     if (!queryValidation.success) {
@@ -21,21 +23,16 @@ export async function GET(req: NextRequest) {
 
     const { limit } = queryValidation.data
 
-    // Use user-scoped client with RLS - explicitly filter by user_id for security
-    const { data, error } = await supabase
-      .from('hyrox_workouts')
-      .select('*')
-      .eq('user_id', user.id)  // CRITICAL: Explicit user filtering
-      .eq('completed', true)
-      .order('completed_at', { ascending: false })
-      .limit(limit)
+    // RLS automatically filters by user_id
+    const data = await withRLS((db) =>
+      db.select()
+        .from(hyroxWorkouts)
+        .where(eq(hyroxWorkouts.completed, true))
+        .orderBy(desc(hyroxWorkouts.completedAt))
+        .limit(limit)
+    )
 
-    if (error) {
-      console.error('Error fetching workout history:', error)
-      return createErrorResponse('Failed to fetch workout history', 500)
-    }
-
-    return NextResponse.json(data || [])
+    return NextResponse.json(toSnakeCase(data) || [])
   } catch (error) {
     console.error('API Error:', error)
     return NextResponse.json(
@@ -47,29 +44,24 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
-    
-    if (!user) {
+    const { user, withRLS } = await getAuthenticatedUser()
+
+    if (!user || !withRLS) {
       return createErrorResponse("Authentication required", 401)
     }
 
-    // Use user-scoped client with RLS - user_id will be automatically set by RLS
-    const { data, error } = await supabase
-      .from('hyrox_workouts')
-      .insert({
-        user_id: user.id,  // CRITICAL: Explicit user association
-        total_time: 0,
-        completed: false,
-      })
-      .select()
-      .single()
+    // INSERT requires explicit user_id
+    const data = await withRLS((db) =>
+      db.insert(hyroxWorkouts)
+        .values({
+          userId: user.id,
+          totalTime: 0,
+          completed: false,
+        })
+        .returning()
+    )
 
-    if (error) {
-      console.error('Error creating workout:', error)
-      return createErrorResponse('Failed to create workout', 500)
-    }
-
-    return NextResponse.json(data, { status: 201 })
+    return NextResponse.json(toSnakeCase(data[0]), { status: 201 })
   } catch (error) {
     console.error('API Error:', error)
     return NextResponse.json(
@@ -81,9 +73,9 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
-    
-    if (!user) {
+    const { user, withRLS } = await getAuthenticatedUser()
+
+    if (!user || !withRLS) {
       return createErrorResponse("Authentication required", 401)
     }
 
@@ -95,29 +87,23 @@ export async function PUT(req: NextRequest) {
 
     const { workoutId, totalTime } = validation.data
 
-    // Use user-scoped client with RLS - explicitly filter by user_id for security
-    const { data, error } = await supabase
-      .from('hyrox_workouts')
-      .update({
-        total_time: totalTime,
-        completed: true,
-        completed_at: new Date().toISOString(),
-      })
-      .eq('id', workoutId)
-      .eq('user_id', user.id)  // CRITICAL: Only update user's own workouts
-      .select()
-      .single()
+    // RLS automatically ensures user can only update their own workouts
+    const data = await withRLS((db) =>
+      db.update(hyroxWorkouts)
+        .set({
+          totalTime: totalTime,
+          completed: true,
+          completedAt: sql`timezone('utc'::text, now())`,
+        })
+        .where(eq(hyroxWorkouts.id, workoutId))
+        .returning()
+    )
 
-    if (error) {
-      console.error('Error completing workout:', error)
-      return createErrorResponse('Failed to complete workout', 500)
-    }
-
-    if (!data) {
+    if (data.length === 0) {
       return createErrorResponse('Workout not found or access denied', 404)
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(toSnakeCase(data[0]))
   } catch (error) {
     console.error('API Error:', error)
     return NextResponse.json(

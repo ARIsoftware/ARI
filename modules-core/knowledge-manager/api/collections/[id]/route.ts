@@ -8,7 +8,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { toSnakeCase } from '@/lib/api-helpers'
 import { z } from 'zod'
+import { knowledgeCollections } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 
 /**
  * Validation Schema for PATCH requests
@@ -37,9 +40,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
@@ -68,7 +71,21 @@ export async function PATCH(
       )
     }
 
-    const updateData = parseResult.data
+    const updateData: Record<string, unknown> = {}
+
+    // Map API fields to Drizzle column names
+    if (parseResult.data.name !== undefined) {
+      updateData.name = parseResult.data.name
+    }
+    if (parseResult.data.color !== undefined) {
+      updateData.color = parseResult.data.color
+    }
+    if (parseResult.data.icon !== undefined) {
+      updateData.icon = parseResult.data.icon
+    }
+    if (parseResult.data.sort_order !== undefined) {
+      updateData.sortOrder = parseResult.data.sort_order
+    }
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
@@ -77,23 +94,22 @@ export async function PATCH(
       )
     }
 
-    const { data: collection, error: dbError } = await supabase
-      .from('knowledge_collections')
-      .update(updateData)
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .select()
-      .single()
+    // RLS automatically ensures user can only update their own collections
+    const collection = await withRLS((db) =>
+      db.update(knowledgeCollections)
+        .set(updateData)
+        .where(eq(knowledgeCollections.id, id))
+        .returning()
+    )
 
-    if (dbError || !collection) {
-      console.error('Database error:', dbError)
+    if (collection.length === 0) {
       return NextResponse.json(
         { error: 'Collection not found or update failed' },
         { status: 404 }
       )
     }
 
-    return NextResponse.json({ collection })
+    return NextResponse.json({ collection: toSnakeCase(collection[0]) })
 
   } catch (error) {
     console.error('PATCH /api/modules/knowledge-manager/collections/[id] error:', error)
@@ -114,9 +130,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
@@ -132,19 +148,11 @@ export async function DELETE(
       )
     }
 
-    const { error: dbError } = await supabase
-      .from('knowledge_collections')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', user.id)
-
-    if (dbError) {
-      console.error('Database error:', dbError)
-      return NextResponse.json(
-        { error: 'Failed to delete collection' },
-        { status: 500 }
-      )
-    }
+    // RLS automatically ensures user can only delete their own collections
+    await withRLS((db) =>
+      db.delete(knowledgeCollections)
+        .where(eq(knowledgeCollections.id, id))
+    )
 
     return NextResponse.json({
       success: true,

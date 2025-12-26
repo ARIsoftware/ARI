@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
+import { validateRequestBody, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
 import { z } from 'zod'
+import { userFeaturePreferences } from '@/lib/db/schema'
+import { eq, and, sql } from 'drizzle-orm'
 
 const featureToggleSchema = z.object({
   feature_name: z.string(),
@@ -10,25 +12,20 @@ const featureToggleSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
     // Return empty array for unauthenticated users (e.g., on sign-in page)
     // Features will default to enabled per features-context.tsx
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json([])
     }
 
-    // Fetch user's feature preferences with RLS
-    const { data, error } = await supabase
-      .from('user_feature_preferences')
-      .select('*')
+    // Fetch user's feature preferences (RLS filters automatically)
+    const data = await withRLS((db) =>
+      db.select().from(userFeaturePreferences)
+    )
 
-    if (error) {
-      console.error('Error fetching feature preferences:', error)
-      return createErrorResponse(error.message, 500)
-    }
-
-    return NextResponse.json(data || [])
+    return NextResponse.json(toSnakeCase(data) || [])
   } catch (err) {
     console.error('API error:', err)
     return createErrorResponse('Internal server error', 500)
@@ -43,31 +40,48 @@ export async function POST(request: NextRequest) {
     }
 
     const { feature_name, enabled } = validation.data
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // Upsert the feature preference
-    const { data, error } = await supabase
-      .from('user_feature_preferences')
-      .upsert({
-        user_id: user.id,
-        feature_name,
-        enabled
-      }, {
-        onConflict: 'user_id,feature_name'
-      })
-      .select()
-      .single()
+    // Check if preference exists (RLS filters automatically)
+    const existing = await withRLS((db) =>
+      db.select({ id: userFeaturePreferences.id })
+        .from(userFeaturePreferences)
+        .where(eq(userFeaturePreferences.featureName, feature_name))
+        .limit(1)
+    )
 
-    if (error) {
-      console.error('Error updating feature preference:', error)
-      return createErrorResponse(error.message, 500)
+    let data
+    if (existing.length > 0) {
+      // Update existing
+      const updated = await withRLS((db) =>
+        db.update(userFeaturePreferences)
+          .set({
+            enabled,
+            updatedAt: sql`timezone('utc'::text, now())`
+          })
+          .where(eq(userFeaturePreferences.id, existing[0].id))
+          .returning()
+      )
+      data = updated[0]
+    } else {
+      // Insert new
+      const inserted = await withRLS((db) =>
+        db.insert(userFeaturePreferences)
+          .values({
+            userId: user.id,
+            featureName: feature_name,
+            enabled
+          })
+          .returning()
+      )
+      data = inserted[0]
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(toSnakeCase(data))
   } catch (err) {
     console.error('API error:', err)
     return createErrorResponse('Internal server error', 500)

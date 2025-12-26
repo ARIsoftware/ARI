@@ -1,30 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
+import { validateRequestBody, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
 import { createFitnessTaskSchema, updateFitnessTaskSchema } from '@/lib/validation'
 import { z } from 'zod'
+import { fitnessDatabase } from '@/lib/db/schema'
+import { eq, asc, desc } from 'drizzle-orm'
 
 export async function GET(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
-    
-    if (!user) {
+    const { user, withRLS } = await getAuthenticatedUser()
+
+    if (!user || !withRLS) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
-    
-    // Explicit user filtering for defense-in-depth (RLS also enforces this)
-    const { data, error } = await supabase
-      .from('fitness_database')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('order_index', { ascending: true })
 
-    if (error) {
-      console.error('Error fetching fitness tasks:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    // RLS automatically filters by user_id
+    const data = await withRLS((db) =>
+      db.select().from(fitnessDatabase).orderBy(asc(fitnessDatabase.orderIndex))
+    )
 
-    return NextResponse.json(data || [])
+    return NextResponse.json(toSnakeCase(data) || [])
   } catch (err) {
     console.error('API error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -40,45 +35,41 @@ export async function POST(request: NextRequest) {
     }
 
     const { task } = validation.data
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // Get the highest order_index for this user
-    const { data: maxOrderData } = await supabase
-      .from('fitness_database')
-      .select('order_index')
-      .eq('user_id', user.id)
-      .order('order_index', { ascending: false })
-      .limit(1)
+    // Get the highest order_index for this user (RLS filters automatically)
+    const maxOrderData = await withRLS((db) =>
+      db.select({ orderIndex: fitnessDatabase.orderIndex })
+        .from(fitnessDatabase)
+        .orderBy(desc(fitnessDatabase.orderIndex))
+        .limit(1)
+    )
 
-    const nextOrderIndex = maxOrderData && maxOrderData.length > 0 ? (maxOrderData[0].order_index || 0) + 1 : 0
+    const nextOrderIndex = maxOrderData.length > 0 ? (maxOrderData[0].orderIndex || 0) + 1 : 0
 
-    // Remove youtube_url if it's null or undefined to avoid database errors
-    const taskToInsert = { ...task }
-    if (taskToInsert.youtube_url === null || taskToInsert.youtube_url === undefined) {
-      delete taskToInsert.youtube_url
-    }
+    // INSERT requires explicit user_id - RLS validates it
+    const data = await withRLS((db) =>
+      db.insert(fitnessDatabase).values({
+        title: task.title,
+        assignees: task.assignees,
+        dueDate: task.due_date,
+        subtasksCompleted: task.subtasks_completed,
+        subtasksTotal: task.subtasks_total,
+        status: task.status,
+        priority: task.priority,
+        pinned: task.pinned,
+        completed: task.completed,
+        orderIndex: nextOrderIndex,
+        youtubeUrl: task.youtube_url || undefined,
+        userId: user.id,
+      }).returning()
+    )
 
-    // Explicitly set user_id since we use service role client (bypasses RLS)
-    const { data, error } = await supabase
-      .from('fitness_database')
-      .insert([{
-        ...taskToInsert,
-        user_id: user.id,
-        order_index: nextOrderIndex,
-      }])
-      .select()
-      .single()
-
-    if (error) {
-      console.error('Error creating fitness task:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json(data)
+    return NextResponse.json(toSnakeCase(data[0]))
   } catch (err) {
     console.error('API error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -94,27 +85,42 @@ export async function PUT(request: NextRequest) {
     }
 
     const { id, updates } = validation.data
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // Explicit user filtering - only update user's own tasks
-    const { data, error } = await supabase
-      .from('fitness_database')
-      .update({ ...updates, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .select()
-      .single()
+    // Build update object with camelCase keys
+    const updateData: Record<string, unknown> = {
+      updatedAt: new Date().toISOString(),
+    }
+    if (updates.title !== undefined) updateData.title = updates.title
+    if (updates.assignees !== undefined) updateData.assignees = updates.assignees
+    if (updates.due_date !== undefined) updateData.dueDate = updates.due_date
+    if (updates.subtasks_completed !== undefined) updateData.subtasksCompleted = updates.subtasks_completed
+    if (updates.subtasks_total !== undefined) updateData.subtasksTotal = updates.subtasks_total
+    if (updates.status !== undefined) updateData.status = updates.status
+    if (updates.priority !== undefined) updateData.priority = updates.priority
+    if (updates.pinned !== undefined) updateData.pinned = updates.pinned
+    if (updates.completed !== undefined) updateData.completed = updates.completed
+    if (updates.order_index !== undefined) updateData.orderIndex = updates.order_index
+    if (updates.youtube_url !== undefined) updateData.youtubeUrl = updates.youtube_url
+    if (updates.completion_count !== undefined) updateData.completionCount = updates.completion_count
 
-    if (error) {
-      console.error('Error updating fitness task:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    // RLS automatically ensures user can only update their own tasks
+    const data = await withRLS((db) =>
+      db.update(fitnessDatabase)
+        .set(updateData)
+        .where(eq(fitnessDatabase.id, id))
+        .returning()
+    )
+
+    if (data.length === 0) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(toSnakeCase(data[0]))
   } catch (err) {
     console.error('API error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -138,23 +144,16 @@ export async function DELETE(request: NextRequest) {
     }
 
     const validatedId = queryValidation.data.id
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // Explicit user filtering - only delete user's own tasks
-    const { error } = await supabase
-      .from('fitness_database')
-      .delete()
-      .eq('id', validatedId)
-      .eq('user_id', user.id)
-
-    if (error) {
-      console.error('Error deleting fitness task:', error)
-      return createErrorResponse(error.message, 500)
-    }
+    // RLS automatically ensures user can only delete their own tasks
+    await withRLS((db) =>
+      db.delete(fitnessDatabase).where(eq(fitnessDatabase.id, validatedId))
+    )
 
     return NextResponse.json({ success: true })
   } catch (err) {

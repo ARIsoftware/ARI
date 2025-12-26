@@ -1,4 +1,6 @@
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { tasks, shipments } from '@/lib/db/schema'
+import { desc } from 'drizzle-orm'
 import { Task } from '@/lib/supabase'
 import { Shipment } from '@/lib/shipments'
 
@@ -28,77 +30,112 @@ export interface TaskContext {
 
 export async function getTaskContext(): Promise<TaskContext> {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
-    
-    if (!user) {
+    const { user, withRLS } = await getAuthenticatedUser()
+
+    if (!user || !withRLS) {
       throw new Error('Authentication required')
     }
 
-    // Fetch all tasks for the authenticated user
-    const { data: tasks, error } = await supabase
-      .from('tasks')
-      .select('*')
-      .order('updated_at', { ascending: false })
-    
-    if (error) {
-      console.error('Error fetching tasks for context:', error)
-      throw new Error('Failed to fetch tasks')
-    }
+    // Fetch all tasks for the authenticated user (RLS filters automatically)
+    const tasksData = await withRLS((db) =>
+      db.select()
+        .from(tasks)
+        .orderBy(desc(tasks.updatedAt))
+    )
 
-    if (!tasks) {
+    if (!tasksData) {
       return createEmptyContext()
     }
 
-    // Fetch all shipments for the authenticated user
-    const { data: shipments, error: shipmentsError } = await supabase
-      .from('shipments')
-      .select('*')
-      .order('created_at', { ascending: false })
-    
-    if (shipmentsError) {
-      console.warn('Error fetching shipments for context:', shipmentsError)
-      // Continue without shipments if fetch fails
-    }
+    // Map Drizzle results to Task type (snake_case to camelCase mapping)
+    const mappedTasks: Task[] = tasksData.map(t => ({
+      id: t.id,
+      title: t.title,
+      assignees: t.assignees,
+      due_date: t.dueDate,
+      subtasks_completed: t.subtasksCompleted,
+      subtasks_total: t.subtasksTotal,
+      status: t.status,
+      priority: t.priority,
+      pinned: t.pinned,
+      completed: t.completed,
+      created_at: t.createdAt || '',
+      updated_at: t.updatedAt || '',
+      order_index: t.orderIndex,
+      completion_count: t.completionCount,
+      user_email: t.userEmail,
+      user_id: t.userId,
+      impact: t.impact,
+      severity: t.severity,
+      timeliness: t.timeliness,
+      effort: t.effort,
+      strategic_fit: t.strategicFit,
+      priority_score: t.priorityScore,
+      project_id: t.projectId,
+      monster_type: t.monsterType,
+      monster_colors: t.monsterColors,
+    }))
 
-    const allShipments = shipments || []
+    // Fetch all shipments for the authenticated user (RLS filters automatically)
+    const shipmentsData = await withRLS((db) =>
+      db.select()
+        .from(shipments)
+        .orderBy(desc(shipments.createdAt))
+    )
+
+    // Map Drizzle results to Shipment type
+    const allShipments: Shipment[] = (shipmentsData || []).map(s => ({
+      id: s.id,
+      user_id: s.userId,
+      name: s.name,
+      tracking_code: s.trackingCode,
+      tracking_link: s.trackingLink,
+      carrier: s.carrier,
+      status: s.status as Shipment['status'],
+      expected_delivery: s.expectedDelivery,
+      notes: s.notes,
+      created_at: s.createdAt || '',
+      updated_at: s.updatedAt || '',
+    }))
+
     const now = new Date()
-    
+
     // Calculate metrics
-    const totalTasks = tasks.length
-    const completedTasks = tasks.filter(t => t.completed).length
-    const pendingTasks = tasks.filter(t => t.status === 'Pending').length
-    const inProgressTasks = tasks.filter(t => t.status === 'In Progress').length
-    
-    const highPriorityTasks = tasks.filter(t => t.priority === 'High').length
-    const mediumPriorityTasks = tasks.filter(t => t.priority === 'Medium').length
-    const lowPriorityTasks = tasks.filter(t => t.priority === 'Low').length
-    
-    const pinnedTasks = tasks.filter(t => t.pinned).length
-    const tasksWithDueDates = tasks.filter(t => t.due_date).length
-    
+    const totalTasks = mappedTasks.length
+    const completedTasks = mappedTasks.filter(t => t.completed).length
+    const pendingTasks = mappedTasks.filter(t => t.status === 'Pending').length
+    const inProgressTasks = mappedTasks.filter(t => t.status === 'In Progress').length
+
+    const highPriorityTasks = mappedTasks.filter(t => t.priority === 'High').length
+    const mediumPriorityTasks = mappedTasks.filter(t => t.priority === 'Medium').length
+    const lowPriorityTasks = mappedTasks.filter(t => t.priority === 'Low').length
+
+    const pinnedTasks = mappedTasks.filter(t => t.pinned).length
+    const tasksWithDueDates = mappedTasks.filter(t => t.due_date).length
+
     // Calculate overdue tasks
-    const overdueTasks = tasks.filter(t => {
+    const overdueTasks = mappedTasks.filter(t => {
       if (!t.due_date || t.completed) return false
       return new Date(t.due_date) < now
     }).length
-    
+
     // Get recent completions (last 10)
-    const recentCompletions = tasks
+    const recentCompletions = mappedTasks
       .filter(t => t.completed)
       .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
       .slice(0, 10)
-    
+
     // Get high priority pending tasks
-    const highPriorityPendingTasks = tasks
+    const highPriorityPendingTasks = mappedTasks
       .filter(t => t.priority === 'High' && !t.completed)
       .slice(0, 5)
-    
+
     // Calculate completion rate
     const completionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0
-    
+
     // Find last completion date
-    const lastCompletionDate = recentCompletions.length > 0 
-      ? recentCompletions[0].updated_at 
+    const lastCompletionDate = recentCompletions.length > 0
+      ? recentCompletions[0].updated_at
       : null
 
     // Calculate shipment metrics
@@ -121,7 +158,7 @@ export async function getTaskContext(): Promise<TaskContext> {
       overdueTasks,
       recentCompletions,
       highPriorityPendingTasks,
-      allTasks: tasks,
+      allTasks: mappedTasks,
       completionRate: Math.round(completionRate * 100) / 100,
       lastCompletionDate,
       allShipments,
@@ -184,7 +221,7 @@ export function formatTaskContextForAI(context: TaskContext): string {
   } = context
 
   let contextText = `## User's Task & Shipment Summary\n\n`
-  
+
   contextText += `**Task Statistics:**\n`
   contextText += `- Total tasks: ${totalTasks}\n`
   contextText += `- Completed: ${completedTasks}\n`
@@ -231,17 +268,17 @@ export function formatTaskContextForAI(context: TaskContext): string {
     const pinned = task.pinned ? '📌' : ''
     const dueInfo = task.due_date ? ` (due: ${new Date(task.due_date).toLocaleDateString()})` : ''
     const createdDate = new Date(task.created_at).toLocaleDateString()
-    
+
     contextText += `${status} ${priority} ${pinned} ${task.title}${dueInfo}\n`
     contextText += `  Created: ${createdDate}, Order: ${task.order_index}, Completed: ${task.completion_count || 0} times\n`
-    
+
     if (task.assignees && task.assignees.length > 0) {
       contextText += `  Assignees: ${task.assignees.join(', ')}\n`
     }
     if (task.subtasks_total > 0) {
       contextText += `  Subtasks: ${task.subtasks_completed}/${task.subtasks_total}\n`
     }
-    
+
     // Add priority scoring details if available
     if (task.impact || task.severity || task.timeliness || task.effort || task.strategic_fit) {
       contextText += `  Priority Analysis: Impact=${task.impact || 3}, Severity=${task.severity || 3}, Timeliness=${task.timeliness || 3}, Effort=${task.effort || 3}, Strategic Fit=${task.strategic_fit || 3}`
@@ -258,17 +295,17 @@ export function formatTaskContextForAI(context: TaskContext): string {
       const statusIcon = getShipmentStatusIcon(shipment.status)
       const createdDate = new Date(shipment.created_at).toLocaleDateString()
       const updatedDate = new Date(shipment.updated_at).toLocaleDateString()
-      const expectedDelivery = shipment.expected_delivery 
-        ? new Date(shipment.expected_delivery).toLocaleDateString() 
+      const expectedDelivery = shipment.expected_delivery
+        ? new Date(shipment.expected_delivery).toLocaleDateString()
         : 'Not specified'
-      
+
       contextText += `${statusIcon} ${shipment.name}\n`
       contextText += `  Status: ${shipment.status}\n`
       contextText += `  Tracking: ${shipment.tracking_code || 'Not provided'}\n`
       contextText += `  Carrier: ${shipment.carrier || 'Not specified'}\n`
       contextText += `  Expected Delivery: ${expectedDelivery}\n`
       contextText += `  Created: ${createdDate}, Updated: ${updatedDate}\n`
-      
+
       if (shipment.tracking_link) {
         contextText += `  Tracking Link: ${shipment.tracking_link}\n`
       }

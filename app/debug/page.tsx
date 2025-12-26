@@ -1446,12 +1446,12 @@ export default function DatabaseTestPage() {
 
         updateTestResult('Test RLS Policies', {
           status: 'success',
-          message: 'RLS policies test complete (note: using service role client now)',
+          message: 'RLS policies test complete',
           data: {
             userId: user.id,
             tasksWithUserFilter: tasksWithFilter?.length || 0,
             tasksWithoutFilter: tasksNoFilter?.length || 0,
-            note: 'API routes now use service role client which bypasses RLS',
+            note: 'API routes use Drizzle ORM with portable RLS (SET LOCAL role + user_id)',
             rlsWorking: (tasksWithFilter?.length || 0) === (tasksNoFilter?.length || 0)
           }
         })

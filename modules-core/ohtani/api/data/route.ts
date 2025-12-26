@@ -10,7 +10,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { toSnakeCase } from '@/lib/api-helpers'
 import { z } from 'zod'
+import { ohtaniGridCells } from '@/lib/db/schema'
+import { eq, asc, and, sql } from 'drizzle-orm'
 
 /**
  * Validation Schema for PUT requests
@@ -37,33 +40,24 @@ const UpdateCellSchema = z.object({
  */
 export async function GET(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
       )
     }
 
-    // Query database with explicit user_id filter
-    const { data: cells, error: dbError } = await supabase
-      .from('ohtani_grid_cells')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('row_index', { ascending: true })
-      .order('col_index', { ascending: true })
-
-    if (dbError) {
-      console.error('Database error:', dbError)
-      return NextResponse.json(
-        { error: 'Failed to fetch grid cells' },
-        { status: 500 }
-      )
-    }
+    // RLS automatically filters by user_id
+    const cells = await withRLS((db) =>
+      db.select()
+        .from(ohtaniGridCells)
+        .orderBy(asc(ohtaniGridCells.rowIndex), asc(ohtaniGridCells.colIndex))
+    )
 
     return NextResponse.json({
-      cells: cells || []
+      cells: toSnakeCase(cells) || []
     })
 
   } catch (error) {
@@ -84,9 +78,9 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
@@ -109,29 +103,46 @@ export async function PUT(request: NextRequest) {
 
     const { row_index, col_index, content } = parseResult.data
 
-    // Upsert cell (update if exists, insert if not)
-    const { data: cell, error: dbError } = await supabase
-      .from('ohtani_grid_cells')
-      .upsert({
-        user_id: user.id,
-        row_index,
-        col_index,
-        content
-      }, {
-        onConflict: 'user_id,row_index,col_index'
-      })
-      .select()
-      .single()
+    // Check if cell exists (RLS filters automatically)
+    const existing = await withRLS((db) =>
+      db.select({ id: ohtaniGridCells.id })
+        .from(ohtaniGridCells)
+        .where(and(
+          eq(ohtaniGridCells.rowIndex, row_index),
+          eq(ohtaniGridCells.colIndex, col_index)
+        ))
+        .limit(1)
+    )
 
-    if (dbError) {
-      console.error('Database error:', dbError)
-      return NextResponse.json(
-        { error: 'Failed to update cell' },
-        { status: 500 }
+    let cell
+    if (existing.length > 0) {
+      // Update existing cell
+      const updated = await withRLS((db) =>
+        db.update(ohtaniGridCells)
+          .set({
+            content,
+            updatedAt: sql`timezone('utc'::text, now())`
+          })
+          .where(eq(ohtaniGridCells.id, existing[0].id))
+          .returning()
       )
+      cell = updated[0]
+    } else {
+      // Insert new cell
+      const inserted = await withRLS((db) =>
+        db.insert(ohtaniGridCells)
+          .values({
+            userId: user.id,
+            rowIndex: row_index,
+            colIndex: col_index,
+            content
+          })
+          .returning()
+      )
+      cell = inserted[0]
     }
 
-    return NextResponse.json({ cell })
+    return NextResponse.json({ cell: toSnakeCase(cell) })
 
   } catch (error) {
     console.error('PUT /api/modules/ohtani/data error:', error)

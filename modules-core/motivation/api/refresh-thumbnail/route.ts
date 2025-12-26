@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-helpers";
+import { motivationContent } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 
 export async function POST(req: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser();
+    const { user, withRLS } = await getAuthenticatedUser();
 
-    if (!user || !supabase) {
+    if (!user || !withRLS) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
@@ -15,18 +17,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Item ID is required" }, { status: 400 });
     }
 
-    // Get the item
-    const { data: item, error: fetchError } = await supabase
-      .from("motivation_content")
-      .select("*")
-      .eq("id", itemId)
-      .eq("user_id", user.id)
-      .single();
+    // Get the item (RLS filters automatically)
+    const itemData = await withRLS((db) =>
+      db.select()
+        .from(motivationContent)
+        .where(eq(motivationContent.id, itemId))
+        .limit(1)
+    );
 
-    if (fetchError || !item) {
+    if (itemData.length === 0) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
+    const item = itemData[0];
     let thumbnailUrl = null;
 
     // Fetch metadata based on type
@@ -92,23 +95,19 @@ export async function POST(req: NextRequest) {
 
     // Update the item with new thumbnail
     if (thumbnailUrl) {
-      const { error: updateError } = await supabase
-        .from("motivation_content")
-        .update({ thumbnail_url: thumbnailUrl })
-        .eq("id", itemId)
-        .eq("user_id", user.id);
-
-      if (updateError) {
-        return NextResponse.json({ error: "Failed to update thumbnail" }, { status: 500 });
-      }
+      await withRLS((db) =>
+        db.update(motivationContent)
+          .set({ thumbnailUrl })
+          .where(eq(motivationContent.id, itemId))
+      );
 
       return NextResponse.json({ success: true, thumbnail_url: thumbnailUrl });
     } else {
       return NextResponse.json({ error: "Could not fetch thumbnail" }, { status: 400 });
     }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error refreshing thumbnail:", error);
-    return NextResponse.json({ error: error.message || "Failed to refresh thumbnail" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to refresh thumbnail" }, { status: 500 });
   }
 }

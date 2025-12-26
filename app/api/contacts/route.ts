@@ -1,30 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
+import { validateRequestBody, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
 import { createContactSchema } from '@/lib/validation'
+import { contacts } from '@/lib/db/schema'
+import { asc } from 'drizzle-orm'
 
 // GET /api/contacts - Fetch all contacts
 export async function GET(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
-    
-    if (!user) {
+    const { user, withRLS } = await getAuthenticatedUser()
+
+    if (!user || !withRLS) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // Explicit user filtering for defense-in-depth
-    const { data, error } = await supabase
-      .from('contacts')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('name', { ascending: true })
+    // RLS automatically filters by user_id
+    const data = await withRLS((db) =>
+      db.select().from(contacts).orderBy(asc(contacts.name))
+    )
 
-    if (error) {
-      console.error('Error fetching contacts:', error)
-      return NextResponse.json({ error: 'Failed to fetch contacts' }, { status: 500 })
-    }
-
-    return NextResponse.json(data || [])
+    return NextResponse.json(toSnakeCase(data) || [])
   } catch (error) {
     console.error('Unexpected error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -41,25 +36,30 @@ export async function POST(request: NextRequest) {
     }
 
     const { contact } = validation.data
-    const { user, supabase } = await getAuthenticatedUser()
-    
-    if (!user) {
+    const { user, withRLS } = await getAuthenticatedUser()
+
+    if (!user || !withRLS) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // Explicitly set user_id since we use service role client (bypasses RLS)
-    const { data, error } = await supabase
-      .from('contacts')
-      .insert([{ ...contact, user_id: user.id }])
-      .select()
-      .single()
+    // INSERT requires explicit user_id - RLS validates it
+    const data = await withRLS((db) =>
+      db.insert(contacts).values({
+        name: contact.name,
+        email: contact.email,
+        phone: contact.phone,
+        category: contact.category,
+        description: contact.description,
+        company: contact.company,
+        address: contact.address,
+        website: contact.website,
+        birthday: contact.birthday,
+        nextContactDate: contact.next_contact_date,
+        userId: user.id,
+      }).returning()
+    )
 
-    if (error) {
-      console.error('Error creating contact:', error)
-      return createErrorResponse('Failed to create contact', 500)
-    }
-
-    return NextResponse.json(data, { status: 201 })
+    return NextResponse.json(toSnakeCase(data[0]), { status: 201 })
   } catch (error) {
     console.error('Unexpected error:', error)
     return createErrorResponse('Internal server error', 500)

@@ -10,7 +10,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { toSnakeCase } from '@/lib/api-helpers'
 import { z } from 'zod'
+import { travel } from '@/lib/db/schema'
+import { eq, asc } from 'drizzle-orm'
 
 /**
  * Validation Schema for POST requests
@@ -36,31 +39,22 @@ const UpdateTaskSchema = z.object({
  */
 export async function GET(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
       )
     }
 
-    const { data: tasks, error: dbError } = await supabase
-      .from('travel')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: true })
-
-    if (dbError) {
-      console.error('Database error:', dbError)
-      return NextResponse.json(
-        { error: 'Failed to fetch tasks' },
-        { status: 500 }
-      )
-    }
+    // RLS automatically filters by user_id
+    const tasks = await withRLS((db) =>
+      db.select().from(travel).orderBy(asc(travel.createdAt))
+    )
 
     return NextResponse.json({
-      tasks: tasks || [],
+      tasks: toSnakeCase(tasks) || [],
       count: tasks?.length || 0
     })
 
@@ -78,9 +72,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
@@ -102,27 +96,19 @@ export async function POST(request: NextRequest) {
 
     const { title, category } = parseResult.data
 
-    const { data: task, error: dbError } = await supabase
-      .from('travel')
-      .insert({
-        user_id: user.id,
-        title,
-        category,
-        completed: false
-      })
-      .select()
-      .single()
-
-    if (dbError) {
-      console.error('Database error:', dbError)
-      return NextResponse.json(
-        { error: 'Failed to create task' },
-        { status: 500 }
-      )
-    }
+    const data = await withRLS((db) =>
+      db.insert(travel)
+        .values({
+          userId: user.id,
+          title,
+          category,
+          completed: false
+        })
+        .returning()
+    )
 
     return NextResponse.json(
-      { task },
+      { task: toSnakeCase(data[0]) },
       { status: 201 }
     )
 
@@ -140,9 +126,9 @@ export async function POST(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
@@ -174,23 +160,28 @@ export async function PATCH(request: NextRequest) {
 
     const updates = parseResult.data
 
-    const { data: task, error: dbError } = await supabase
-      .from('travel')
-      .update(updates)
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .select()
-      .single()
+    // Build update object with camelCase keys
+    const updateData: Record<string, unknown> = {}
+    if (updates.completed !== undefined) updateData.completed = updates.completed
+    if (updates.title !== undefined) updateData.title = updates.title
+    if (updates.completed_at !== undefined) updateData.completedAt = updates.completed_at
 
-    if (dbError) {
-      console.error('Database error:', dbError)
+    // RLS automatically ensures user can only update their own tasks
+    const data = await withRLS((db) =>
+      db.update(travel)
+        .set(updateData)
+        .where(eq(travel.id, id))
+        .returning()
+    )
+
+    if (data.length === 0) {
       return NextResponse.json(
-        { error: 'Failed to update task' },
-        { status: 500 }
+        { error: 'Task not found' },
+        { status: 404 }
       )
     }
 
-    return NextResponse.json({ task })
+    return NextResponse.json({ task: toSnakeCase(data[0]) })
 
   } catch (error) {
     console.error('PATCH /api/modules/south-africa/tasks error:', error)
@@ -206,9 +197,9 @@ export async function PATCH(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
@@ -225,19 +216,10 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    const { error: dbError } = await supabase
-      .from('travel')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', user.id)
-
-    if (dbError) {
-      console.error('Database error:', dbError)
-      return NextResponse.json(
-        { error: 'Failed to delete task' },
-        { status: 500 }
-      )
-    }
+    // RLS automatically ensures user can only delete their own tasks
+    await withRLS((db) =>
+      db.delete(travel).where(eq(travel.id, id))
+    )
 
     return NextResponse.json({
       success: true,

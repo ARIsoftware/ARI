@@ -8,7 +8,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { toSnakeCase } from '@/lib/api-helpers'
 import { z } from 'zod'
+import { knowledgeCollections, knowledgeArticles } from '@/lib/db/schema'
+import { eq, asc, desc } from 'drizzle-orm'
 
 /**
  * Validation Schema for POST requests
@@ -30,47 +33,34 @@ const CreateCollectionSchema = z.object({
  */
 export async function GET(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
       )
     }
 
-    // Get collections with article counts
-    const { data: collections, error: dbError } = await supabase
-      .from('knowledge_collections')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('sort_order', { ascending: true })
-      .order('name', { ascending: true })
+    // Get collections (RLS filters automatically)
+    const collections = await withRLS((db) =>
+      db.select()
+        .from(knowledgeCollections)
+        .orderBy(asc(knowledgeCollections.sortOrder), asc(knowledgeCollections.name))
+    )
 
-    if (dbError) {
-      console.error('Database error:', dbError)
-      return NextResponse.json(
-        { error: 'Failed to fetch collections' },
-        { status: 500 }
-      )
-    }
-
-    // Get article counts for each collection
-    const { data: articles, error: articlesError } = await supabase
-      .from('knowledge_articles')
-      .select('collection_id')
-      .eq('user_id', user.id)
-      .eq('is_deleted', false)
-
-    if (articlesError) {
-      console.error('Database error:', articlesError)
-    }
+    // Get article counts for each collection (RLS filters automatically)
+    const articles = await withRLS((db) =>
+      db.select({ collectionId: knowledgeArticles.collectionId })
+        .from(knowledgeArticles)
+        .where(eq(knowledgeArticles.isDeleted, false))
+    )
 
     // Calculate counts
     const countMap = new Map<string, number>()
     for (const article of articles || []) {
-      if (article.collection_id) {
-        countMap.set(article.collection_id, (countMap.get(article.collection_id) || 0) + 1)
+      if (article.collectionId) {
+        countMap.set(article.collectionId, (countMap.get(article.collectionId) || 0) + 1)
       }
     }
 
@@ -81,7 +71,7 @@ export async function GET(request: NextRequest) {
     }))
 
     return NextResponse.json({
-      collections: collectionsWithCounts
+      collections: toSnakeCase(collectionsWithCounts)
     })
 
   } catch (error) {
@@ -98,9 +88,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
@@ -122,38 +112,31 @@ export async function POST(request: NextRequest) {
 
     const { name, color, icon } = parseResult.data
 
-    // Get max sort_order
-    const { data: existing } = await supabase
-      .from('knowledge_collections')
-      .select('sort_order')
-      .eq('user_id', user.id)
-      .order('sort_order', { ascending: false })
-      .limit(1)
+    // Get max sort_order (RLS filters automatically)
+    const existing = await withRLS((db) =>
+      db.select({ sortOrder: knowledgeCollections.sortOrder })
+        .from(knowledgeCollections)
+        .orderBy(desc(knowledgeCollections.sortOrder))
+        .limit(1)
+    )
 
-    const nextSortOrder = (existing?.[0]?.sort_order ?? -1) + 1
+    const nextSortOrder = (existing?.[0]?.sortOrder ?? -1) + 1
 
-    const { data: collection, error: dbError } = await supabase
-      .from('knowledge_collections')
-      .insert({
-        user_id: user.id,
-        name,
-        color,
-        icon,
-        sort_order: nextSortOrder
-      })
-      .select()
-      .single()
-
-    if (dbError) {
-      console.error('Database error:', dbError)
-      return NextResponse.json(
-        { error: 'Failed to create collection' },
-        { status: 500 }
-      )
-    }
+    // INSERT requires explicit user_id
+    const collection = await withRLS((db) =>
+      db.insert(knowledgeCollections)
+        .values({
+          userId: user.id,
+          name,
+          color,
+          icon,
+          sortOrder: nextSortOrder
+        })
+        .returning()
+    )
 
     return NextResponse.json(
-      { collection: { ...collection, article_count: 0 } },
+      { collection: toSnakeCase({ ...collection[0], article_count: 0 }) },
       { status: 201 }
     )
 

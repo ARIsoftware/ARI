@@ -12,12 +12,17 @@
  */
 export interface OhtaniGridCell {
   id: string              // UUID primary key
-  user_id: string         // Foreign key to auth.users
-  row_index: number       // Grid row (0-8)
-  col_index: number       // Grid column (0-8)
+  user_id?: string        // Foreign key (snake_case, legacy)
+  userId?: string         // Foreign key (camelCase, Drizzle)
+  row_index?: number      // Grid row (snake_case, legacy)
+  rowIndex?: number       // Grid row (camelCase, Drizzle)
+  col_index?: number      // Grid column (snake_case, legacy)
+  colIndex?: number       // Grid column (camelCase, Drizzle)
   content: string         // Cell content (max 15 chars)
-  created_at: string      // ISO timestamp
-  updated_at?: string     // Optional ISO timestamp
+  created_at?: string     // ISO timestamp (snake_case)
+  createdAt?: string      // ISO timestamp (camelCase)
+  updated_at?: string     // Optional ISO timestamp (snake_case)
+  updatedAt?: string      // Optional ISO timestamp (camelCase)
 }
 
 /**

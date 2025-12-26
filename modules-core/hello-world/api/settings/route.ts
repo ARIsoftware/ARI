@@ -15,6 +15,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { z } from 'zod'
+import { moduleSettings } from '@/lib/db/schema'
+import { eq, and, sql } from 'drizzle-orm'
 
 /**
  * Settings Schema
@@ -37,37 +39,29 @@ const SettingsSchema = z.object({
  */
 export async function GET(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       )
     }
 
-    // Fetch settings from module_settings table
-    const { data, error: dbError } = await supabase
-      .from('module_settings')
-      .select('settings')
-      .eq('user_id', user.id)
-      .eq('module_id', 'hello-world')
-      .single()
+    // Fetch settings from module_settings table (RLS filters automatically)
+    const data = await withRLS((db) =>
+      db.select({ settings: moduleSettings.settings })
+        .from(moduleSettings)
+        .where(eq(moduleSettings.moduleId, 'hello-world'))
+        .limit(1)
+    )
 
     // If no settings found, return empty object (client will use defaults)
-    if (dbError && dbError.code === 'PGRST116') {
+    if (data.length === 0) {
       return NextResponse.json({})
     }
 
-    if (dbError) {
-      console.error('Database error:', dbError)
-      return NextResponse.json(
-        { error: 'Failed to fetch settings' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json(data?.settings || {})
+    return NextResponse.json(data[0]?.settings || {})
 
   } catch (error) {
     console.error('GET /api/modules/hello-world/settings error:', error)
@@ -87,9 +81,9 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -110,24 +104,33 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    // Upsert settings
-    // Note: This will create a new row if one doesn't exist
-    const { error: dbError } = await supabase
-      .from('module_settings')
-      .upsert({
-        user_id: user.id,
-        module_id: 'hello-world',
-        settings: parseResult.data,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'user_id,module_id'
-      })
+    // Check if settings exist for this module (RLS filters automatically)
+    const existing = await withRLS((db) =>
+      db.select({ id: moduleSettings.id })
+        .from(moduleSettings)
+        .where(eq(moduleSettings.moduleId, 'hello-world'))
+        .limit(1)
+    )
 
-    if (dbError) {
-      console.error('Database error:', dbError)
-      return NextResponse.json(
-        { error: 'Failed to save settings' },
-        { status: 500 }
+    if (existing.length > 0) {
+      // Update existing settings
+      await withRLS((db) =>
+        db.update(moduleSettings)
+          .set({
+            settings: parseResult.data,
+            updatedAt: sql`timezone('utc'::text, now())`
+          })
+          .where(eq(moduleSettings.id, existing[0].id))
+      )
+    } else {
+      // Insert new settings
+      await withRLS((db) =>
+        db.insert(moduleSettings)
+          .values({
+            userId: user.id,
+            moduleId: 'hello-world',
+            settings: parseResult.data
+          })
       )
     }
 
@@ -144,35 +147,3 @@ export async function PUT(request: NextRequest) {
     )
   }
 }
-
-/**
- * DEVELOPER NOTES:
- *
- * 1. Settings Storage:
- *    - Stored in module_settings table
- *    - settings column is JSONB (flexible schema)
- *    - Per-user settings (user_id + module_id unique constraint)
- *    - RLS policies enforce user isolation
- *
- * 2. Upsert Pattern:
- *    - Use upsert() with onConflict to create or update
- *    - Sets updated_at timestamp automatically
- *    - No need to check if row exists first
- *
- * 3. Settings Schema:
- *    - Define Zod schema for validation
- *    - All fields optional (partial updates supported)
- *    - Client provides default values for missing fields
- *
- * 4. Error Handling:
- *    - PGRST116 = not found (expected for new users)
- *    - Return empty object on not found
- *    - Log other database errors
- *    - Return 500 for unexpected errors
- *
- * 5. Best Practices:
- *    - Keep settings lightweight (< 100KB)
- *    - Don't store sensitive data in settings
- *    - Validate all input with Zod
- *    - Consider versioning for schema changes
- */

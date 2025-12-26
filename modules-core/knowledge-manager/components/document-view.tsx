@@ -25,6 +25,18 @@ import { TagInput } from './tag-input'
 import type { KnowledgeArticle, KnowledgeCollection, ArticleStatus } from '../types'
 import { formatDistanceToNow } from 'date-fns'
 
+// Helper to safely format date
+function safeFormatDistanceToNow(timestamp: string | null | undefined): string {
+  if (!timestamp) return 'Unknown'
+  try {
+    const date = new Date(timestamp)
+    if (isNaN(date.getTime())) return 'Unknown'
+    return formatDistanceToNow(date, { addSuffix: true })
+  } catch {
+    return 'Unknown'
+  }
+}
+
 interface DocumentViewProps {
   article: KnowledgeArticle | null
   collections: KnowledgeCollection[]
@@ -91,7 +103,7 @@ export function DocumentView({
     )
   }
 
-  const timeAgo = formatDistanceToNow(new Date(article.updated_at), { addSuffix: true })
+  const timeAgo = safeFormatDistanceToNow(article.updated_at)
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
