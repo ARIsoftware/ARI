@@ -186,7 +186,7 @@ function MiniFishPreview({ fishType, color }: { fishType: FishType; color: strin
 }
 
 export default function TaskAquariumPage() {
-  const { session } = useSupabase()
+  const { session, isLoading: authLoading } = useSupabase()
   const [tasks, setTasks] = useState<Task[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -229,6 +229,14 @@ export default function TaskAquariumPage() {
 
   // Sort fish by priority score to show priority order in legend
   const sortedFish = [...fish].sort((a, b) => a.priorityScore - b.priorityScore)
+
+  if (authLoading) {
+    return (
+      <div className="h-[calc(100vh-4rem)] w-full flex items-center justify-center bg-background">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    )
+  }
 
   if (!session) {
     return (
