@@ -5,7 +5,7 @@
  * It demonstrates:
  * - Authentication validation
  * - Zod schema validation
- * - Database operations with Supabase
+ * - Database operations with Drizzle ORM + withRLS
  * - Error handling
  * - HTTP method handlers (GET, POST, DELETE)
  *
@@ -20,7 +20,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { toSnakeCase } from '@/lib/api-helpers'
 import { z } from 'zod'
+import { helloWorldEntries } from '@/lib/db/schema'
+import { eq, desc } from 'drizzle-orm'
 
 /**
  * Validation Schema for POST requests
@@ -41,32 +44,24 @@ const CreateEntrySchema = z.object({
  */
 export async function GET(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
       )
     }
 
-    // Query database with explicit user_id filter
-    const { data: entries, error: dbError } = await supabase
-      .from('hello_world_entries')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-
-    if (dbError) {
-      console.error('Database error:', dbError)
-      return NextResponse.json(
-        { error: 'Failed to fetch entries' },
-        { status: 500 }
-      )
-    }
+    // RLS automatically filters by user_id
+    const entries = await withRLS((db) =>
+      db.select()
+        .from(helloWorldEntries)
+        .orderBy(desc(helloWorldEntries.createdAt))
+    )
 
     return NextResponse.json({
-      entries: entries || [],
+      entries: toSnakeCase(entries) || [],
       count: entries?.length || 0
     })
 
@@ -88,9 +83,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
@@ -113,27 +108,18 @@ export async function POST(request: NextRequest) {
 
     const { message } = parseResult.data
 
-    // Insert into database
-    // Note: RLS policies automatically set user_id
-    const { data: entry, error: dbError } = await supabase
-      .from('hello_world_entries')
-      .insert({
-        user_id: user.id,
-        message: message
-      })
-      .select()
-      .single()
-
-    if (dbError) {
-      console.error('Database error:', dbError)
-      return NextResponse.json(
-        { error: 'Failed to create entry' },
-        { status: 500 }
-      )
-    }
+    // INSERT requires explicit user_id
+    const data = await withRLS((db) =>
+      db.insert(helloWorldEntries)
+        .values({
+          userId: user.id,
+          message
+        })
+        .returning()
+    )
 
     return NextResponse.json(
-      { entry },
+      { entry: toSnakeCase(data[0]) },
       { status: 201 }
     )
 
@@ -155,9 +141,9 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
@@ -175,20 +161,10 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Delete from database with explicit user_id filter
-    const { error: dbError } = await supabase
-      .from('hello_world_entries')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', user.id)
-
-    if (dbError) {
-      console.error('Database error:', dbError)
-      return NextResponse.json(
-        { error: 'Failed to delete entry' },
-        { status: 500 }
-      )
-    }
+    // RLS automatically ensures user can only delete their own entries
+    await withRLS((db) =>
+      db.delete(helloWorldEntries).where(eq(helloWorldEntries.id, id))
+    )
 
     return NextResponse.json({
       success: true,
@@ -203,49 +179,3 @@ export async function DELETE(request: NextRequest) {
     )
   }
 }
-
-/**
- * DEVELOPER NOTES:
- *
- * 1. Authentication:
- *    - ALWAYS validate authentication in module API routes
- *    - Use getAuthenticatedUser() from @/lib/auth-helpers
- *    - This returns a server-side Supabase client with cookies
- *    - Return 401 if authentication fails
- *
- * 2. Input Validation:
- *    - Use Zod for runtime validation
- *    - Validate query params, body, and headers
- *    - Return 400 for validation errors
- *    - Include helpful error messages
- *
- * 3. Database Operations:
- *    - RLS policies automatically enforce user isolation
- *    - Always use Supabase client, never raw SQL
- *    - Handle database errors gracefully
- *    - Log errors for debugging
- *
- * 4. Error Handling:
- *    - Use try-catch for all handlers
- *    - Return appropriate HTTP status codes
- *    - Include error messages for debugging
- *    - Don't expose sensitive information
- *
- * 5. API Design:
- *    - Follow REST conventions
- *    - Use appropriate HTTP methods
- *    - Return consistent response formats
- *    - Document all endpoints
- *
- * 6. Testing:
- *    - Test with valid authentication
- *    - Test with invalid authentication
- *    - Test with invalid input
- *    - Test database error scenarios
- *
- * 7. Performance:
- *    - Use database indexes for queries
- *    - Limit result sets where appropriate
- *    - Consider caching for expensive operations
- *    - Monitor API response times
- */

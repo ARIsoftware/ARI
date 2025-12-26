@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { validateRequestBody, validateQueryParams, createErrorResponse } from '@/lib/api-helpers'
+import { validateRequestBody, validateQueryParams, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
 import { z } from 'zod'
+import { quotes } from '@/lib/db/schema'
+import { eq, desc, sql } from 'drizzle-orm'
 
 // Validation schemas
 const createQuoteSchema = z.object({
@@ -25,25 +27,20 @@ const deleteQuerySchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // Explicit user filtering for defense-in-depth (RLS also enforces this)
-    const { data, error } = await supabase
-      .from('quotes')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
+    // RLS automatically filters by user_id
+    const data = await withRLS((db) =>
+      db.select()
+        .from(quotes)
+        .orderBy(desc(quotes.createdAt))
+    )
 
-    if (error) {
-      console.error('Error fetching quotes:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json(data)
+    return NextResponse.json(toSnakeCase(data))
   } catch (err) {
     console.error('API error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -59,28 +56,23 @@ export async function POST(request: NextRequest) {
     }
 
     const { quote } = validation.data
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // Insert quote with user_id
-    const { data, error } = await supabase
-      .from('quotes')
-      .insert([{
-        ...quote,
-        user_id: user.id
-      }])
-      .select()
-      .single()
+    // INSERT requires explicit user_id
+    const data = await withRLS((db) =>
+      db.insert(quotes)
+        .values({
+          ...quote,
+          userId: user.id
+        })
+        .returning()
+    )
 
-    if (error) {
-      console.error('Error creating quote:', error)
-      return createErrorResponse(error.message, 500)
-    }
-
-    return NextResponse.json(data, { status: 201 })
+    return NextResponse.json(toSnakeCase(data[0]), { status: 201 })
   } catch (err) {
     console.error('API error:', err)
     return createErrorResponse('Internal server error', 500)
@@ -96,34 +88,28 @@ export async function PUT(request: NextRequest) {
     }
 
     const { id, updates } = validation.data
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // Explicit user filtering - only update user's own quotes
-    const { data, error } = await supabase
-      .from('quotes')
-      .update({
-        ...updates,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .select()
-      .single()
+    // RLS automatically ensures user can only update their own quotes
+    const data = await withRLS((db) =>
+      db.update(quotes)
+        .set({
+          ...updates,
+          updatedAt: sql`timezone('utc'::text, now())`
+        })
+        .where(eq(quotes.id, id))
+        .returning()
+    )
 
-    if (error) {
-      console.error('Error updating quote:', error)
-      return createErrorResponse(error.message, 500)
-    }
-
-    if (!data) {
+    if (data.length === 0) {
       return createErrorResponse('Quote not found or unauthorized', 404)
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(toSnakeCase(data[0]))
   } catch (err) {
     console.error('API error:', err)
     return createErrorResponse('Internal server error', 500)
@@ -141,23 +127,16 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { id } = queryValidation.data
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // Explicit user filtering - only delete user's own quotes
-    const { error } = await supabase
-      .from('quotes')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', user.id)
-
-    if (error) {
-      console.error('Error deleting quote:', error)
-      return createErrorResponse(error.message, 500)
-    }
+    // RLS automatically ensures user can only delete their own quotes
+    await withRLS((db) =>
+      db.delete(quotes).where(eq(quotes.id, id))
+    )
 
     return NextResponse.json({ success: true })
   } catch (err) {

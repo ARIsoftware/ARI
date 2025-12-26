@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
+import { validateRequestBody, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
 import { createShipmentSchema, updateShipmentSchema } from '@/modules-core/shipments/lib/validation'
+import { shipments } from '@/lib/db/schema'
+import { eq, desc } from 'drizzle-orm'
 
 /**
  * Shipments API - Consolidated Route
@@ -16,9 +18,9 @@ import { createShipmentSchema, updateShipmentSchema } from '@/modules-core/shipm
 // GET - Fetch all shipments OR single shipment by ID
 export async function GET(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
@@ -27,36 +29,26 @@ export async function GET(request: NextRequest) {
     const id = searchParams.get('id')
 
     if (id) {
-      // Fetch single shipment with explicit user_id filter
-      const { data, error } = await supabase
-        .from('shipments')
-        .select('*')
-        .eq('id', id)
-        .eq('user_id', user.id)
-        .single()
+      // Fetch single shipment (RLS filters automatically)
+      const data = await withRLS((db) =>
+        db.select()
+          .from(shipments)
+          .where(eq(shipments.id, id))
+          .limit(1)
+      )
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          return NextResponse.json({ error: 'Shipment not found' }, { status: 404 })
-        }
-        console.error('Error fetching shipment:', error)
-        return NextResponse.json({ error: error.message }, { status: 500 })
+      if (data.length === 0) {
+        return NextResponse.json({ error: 'Shipment not found' }, { status: 404 })
       }
 
-      return NextResponse.json(data)
+      return NextResponse.json(toSnakeCase(data[0]))
     } else {
-      // Fetch all shipments
-      const { data, error } = await supabase
-        .from('shipments')
-        .select('*')
-        .order('created_at', { ascending: false })
+      // Fetch all shipments (RLS filters automatically)
+      const data = await withRLS((db) =>
+        db.select().from(shipments).orderBy(desc(shipments.createdAt))
+      )
 
-      if (error) {
-        console.error('Error fetching shipments:', error)
-        return NextResponse.json({ error: error.message }, { status: 500 })
-      }
-
-      return NextResponse.json(data || [])
+      return NextResponse.json(toSnakeCase(data) || [])
     }
   } catch (error) {
     console.error('Unexpected error:', error)
@@ -74,24 +66,22 @@ export async function POST(request: NextRequest) {
     }
 
     const { shipment } = validation.data
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    const { data, error } = await supabase
-      .from('shipments')
-      .insert([{ ...shipment, user_id: user.id }])
-      .select()
-      .single()
+    const data = await withRLS((db) =>
+      db.insert(shipments)
+        .values({
+          ...shipment,
+          userId: user.id
+        })
+        .returning()
+    )
 
-    if (error) {
-      console.error('Error creating shipment:', error)
-      return createErrorResponse(error.message, 500)
-    }
-
-    return NextResponse.json(data, { status: 201 })
+    return NextResponse.json(toSnakeCase(data[0]), { status: 201 })
   } catch (error) {
     console.error('Unexpected error:', error)
     return createErrorResponse('Internal server error', 500)
@@ -115,29 +105,25 @@ export async function PATCH(request: NextRequest) {
     }
 
     const updates = validation.data
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    const { data, error } = await supabase
-      .from('shipments')
-      .update(updates)
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .select()
-      .single()
+    // RLS automatically ensures user can only update their own shipments
+    const data = await withRLS((db) =>
+      db.update(shipments)
+        .set(updates)
+        .where(eq(shipments.id, id))
+        .returning()
+    )
 
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return createErrorResponse('Shipment not found', 404)
-      }
-      console.error('Error updating shipment:', error)
-      return createErrorResponse(error.message, 500)
+    if (data.length === 0) {
+      return createErrorResponse('Shipment not found', 404)
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(toSnakeCase(data[0]))
   } catch (error) {
     console.error('Unexpected error:', error)
     return createErrorResponse('Internal server error', 500)
@@ -154,25 +140,16 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Shipment ID is required' }, { status: 400 })
     }
 
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    const { error } = await supabase
-      .from('shipments')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', user.id)
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return NextResponse.json({ error: 'Shipment not found' }, { status: 404 })
-      }
-      console.error('Error deleting shipment:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    // RLS automatically ensures user can only delete their own shipments
+    await withRLS((db) =>
+      db.delete(shipments).where(eq(shipments.id, id))
+    )
 
     return NextResponse.json({ success: true }, { status: 200 })
   } catch (error) {

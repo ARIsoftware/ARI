@@ -15,10 +15,10 @@ import { getEnabledModules, setModuleEnabled } from '@/lib/modules/module-regist
  * Returns all enabled modules for the authenticated user
  */
 export async function GET(request: NextRequest) {
-  const { user, supabase } = await getAuthenticatedUser()
+  const { user, withRLS } = await getAuthenticatedUser()
 
   // Validate authentication
-  if (!user) {
+  if (!user || !withRLS) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401 }
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       modules,
       count: modules.length
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API /modules] Error:', error)
     return NextResponse.json(
       { error: 'Failed to load modules' },
@@ -49,10 +49,10 @@ export async function GET(request: NextRequest) {
  * Body: { moduleId: string, enabled: boolean }
  */
 export async function POST(request: NextRequest) {
-  const { user, supabase } = await getAuthenticatedUser()
+  const { user, withRLS } = await getAuthenticatedUser()
 
   // Validate authentication
-  if (!user) {
+  if (!user || !withRLS) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401 }
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
       moduleId,
       enabled
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API /modules POST] Error:', error)
     return NextResponse.json(
       { error: 'Failed to update module' },

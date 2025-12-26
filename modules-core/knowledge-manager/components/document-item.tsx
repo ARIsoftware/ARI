@@ -7,6 +7,18 @@ import { CollectionBadge } from './collection-badge'
 import type { KnowledgeArticle } from '../types'
 import { formatDistanceToNow } from 'date-fns'
 
+// Helper to safely format date
+function safeFormatDistanceToNow(timestamp: string | null | undefined): string {
+  if (!timestamp) return 'Unknown'
+  try {
+    const date = new Date(timestamp)
+    if (isNaN(date.getTime())) return 'Unknown'
+    return formatDistanceToNow(date, { addSuffix: true })
+  } catch {
+    return 'Unknown'
+  }
+}
+
 interface DocumentItemProps {
   article: KnowledgeArticle
   isSelected: boolean
@@ -25,7 +37,7 @@ export function DocumentItem({
     return text.slice(0, maxLength).trim() + '...'
   }
 
-  const timeAgo = formatDistanceToNow(new Date(article.updated_at), { addSuffix: true })
+  const timeAgo = safeFormatDistanceToNow(article.updated_at)
 
   return (
     <div

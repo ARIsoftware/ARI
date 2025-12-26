@@ -116,7 +116,10 @@ export default function OhtaniPage() {
       // Convert array to Map for easy lookup
       const cellMap = new Map<string, string>()
       data.cells.forEach((cell: OhtaniGridCell) => {
-        const key = `${cell.row_index}-${cell.col_index}`
+        // Support both camelCase (new Drizzle API) and snake_case (legacy)
+        const rowIndex = cell.rowIndex ?? cell.row_index
+        const colIndex = cell.colIndex ?? cell.col_index
+        const key = `${rowIndex}-${colIndex}`
         cellMap.set(key, cell.content)
       })
 

@@ -1,13 +1,14 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from '@/lib/auth-helpers';
+import { motivationContent } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 
 export async function POST(req: NextRequest) {
   try {
     // Authenticate user first
-    const { user, supabase } = await getAuthenticatedUser();
+    const { user, withRLS } = await getAuthenticatedUser();
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
@@ -21,27 +22,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Update positions for all items (RLS ensures user can only update their own items)
-    const updates = items.map((item, index) => ({
-      id: item.id,
-      position: index,
-    }));
-
-    // Batch update all positions - RLS automatically restricts to user's own items
-    for (const update of updates) {
-      const { error } = await supabase
-        .from("motivation_content")
-        .update({ position: update.position })
-        .eq("id", update.id)
-        .eq("user_id", user.id);
-
-      if (error) {
-        console.error("Error updating position:", error);
-        throw error;
-      }
+    for (let i = 0; i < items.length; i++) {
+      await withRLS((db) =>
+        db.update(motivationContent)
+          .set({ position: i })
+          .where(eq(motivationContent.id, items[i].id))
+      );
     }
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Reorder error:", error);
     return NextResponse.json(
       { error: "Failed to reorder items" },

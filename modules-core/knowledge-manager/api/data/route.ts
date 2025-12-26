@@ -8,7 +8,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { toSnakeCase } from '@/lib/api-helpers'
 import { z } from 'zod'
+import { knowledgeArticles, knowledgeCollections } from '@/lib/db/schema'
+import { eq, desc, asc, ilike, or, sql, arrayContains } from 'drizzle-orm'
 import type { TagWithCount } from '../../types'
 
 /**
@@ -33,22 +36,12 @@ const CreateArticleSchema = z.object({
 
 /**
  * GET Handler - Fetch articles with filtering and search
- *
- * Query Parameters:
- * - search: Search in title and content
- * - tag: Filter by tag
- * - collection_id: Filter by collection
- * - status: Filter by status (draft/published)
- * - is_favorite: Filter favorites only
- * - is_deleted: Filter deleted/trash items
- * - sort_by: Sort field (updated_at, created_at, title)
- * - sort_dir: Sort direction (asc, desc)
  */
 export async function GET(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
@@ -65,73 +58,98 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get('sort_by') || 'updated_at'
     const sortDir = searchParams.get('sort_dir') || 'desc'
 
-    // Build query with collection join
-    let query = supabase
-      .from('knowledge_articles')
-      .select(`
-        *,
-        collection:knowledge_collections(id, name, color, icon)
-      `)
-      .eq('user_id', user.id)
+    // Fetch articles with collection join (RLS filters automatically)
+    const articles = await withRLS(async (db) => {
+      // Build base query with left join to get collection data
+      let query = db
+        .select({
+          id: knowledgeArticles.id,
+          userId: knowledgeArticles.userId,
+          title: knowledgeArticles.title,
+          content: knowledgeArticles.content,
+          tags: knowledgeArticles.tags,
+          collectionId: knowledgeArticles.collectionId,
+          status: knowledgeArticles.status,
+          isFavorite: knowledgeArticles.isFavorite,
+          isDeleted: knowledgeArticles.isDeleted,
+          deletedAt: knowledgeArticles.deletedAt,
+          createdAt: knowledgeArticles.createdAt,
+          updatedAt: knowledgeArticles.updatedAt,
+          collection: {
+            id: knowledgeCollections.id,
+            name: knowledgeCollections.name,
+            color: knowledgeCollections.color,
+            icon: knowledgeCollections.icon,
+          }
+        })
+        .from(knowledgeArticles)
+        .leftJoin(knowledgeCollections, eq(knowledgeArticles.collectionId, knowledgeCollections.id))
 
-    // Filter by deleted status (default: show non-deleted)
-    if (isDeleted === 'true') {
-      query = query.eq('is_deleted', true)
-    } else {
-      query = query.eq('is_deleted', false)
-    }
+      // Filter by deleted status (default: show non-deleted)
+      if (isDeleted === 'true') {
+        query = query.where(eq(knowledgeArticles.isDeleted, true))
+      } else {
+        query = query.where(eq(knowledgeArticles.isDeleted, false))
+      }
 
-    // Filter by collection
-    if (collectionId) {
-      query = query.eq('collection_id', collectionId)
-    }
+      const results = await query
 
-    // Filter by status
-    if (status === 'draft' || status === 'published') {
-      query = query.eq('status', status)
-    }
+      // Apply additional filters in JS (Drizzle doesn't support dynamic where chaining well)
+      let filtered = results
 
-    // Filter favorites
-    if (isFavorite === 'true') {
-      query = query.eq('is_favorite', true)
-    }
+      // Filter by collection
+      if (collectionId) {
+        filtered = filtered.filter(a => a.collectionId === collectionId)
+      }
 
-    // Filter by tag
-    if (tag) {
-      query = query.contains('tags', [tag.toLowerCase().trim().replace(/^#/, '')])
-    }
+      // Filter by status
+      if (status === 'draft' || status === 'published') {
+        filtered = filtered.filter(a => a.status === status)
+      }
 
-    // Search in title and content
-    if (search) {
-      query = query.or(`title.ilike.%${search}%,content.ilike.%${search}%`)
-    }
+      // Filter favorites
+      if (isFavorite === 'true') {
+        filtered = filtered.filter(a => a.isFavorite === true)
+      }
 
-    // Apply sorting
-    const ascending = sortDir === 'asc'
-    if (sortBy === 'title') {
-      query = query.order('title', { ascending })
-    } else if (sortBy === 'created_at') {
-      query = query.order('created_at', { ascending })
-    } else {
-      query = query.order('updated_at', { ascending })
-    }
+      // Filter by tag
+      if (tag) {
+        const normalizedTag = tag.toLowerCase().trim().replace(/^#/, '')
+        filtered = filtered.filter(a => a.tags && a.tags.includes(normalizedTag))
+      }
 
-    const { data: articles, error: dbError } = await query
+      // Search in title and content
+      if (search) {
+        const searchLower = search.toLowerCase()
+        filtered = filtered.filter(a =>
+          a.title.toLowerCase().includes(searchLower) ||
+          (a.content && a.content.toLowerCase().includes(searchLower))
+        )
+      }
 
-    if (dbError) {
-      console.error('Database error:', dbError)
-      return NextResponse.json(
-        { error: 'Failed to fetch articles' },
-        { status: 500 }
-      )
-    }
+      // Apply sorting
+      const ascending = sortDir === 'asc'
+      if (sortBy === 'title') {
+        filtered.sort((a, b) => ascending
+          ? a.title.localeCompare(b.title)
+          : b.title.localeCompare(a.title))
+      } else if (sortBy === 'created_at') {
+        filtered.sort((a, b) => ascending
+          ? (a.createdAt || '').localeCompare(b.createdAt || '')
+          : (b.createdAt || '').localeCompare(a.createdAt || ''))
+      } else {
+        filtered.sort((a, b) => ascending
+          ? (a.updatedAt || '').localeCompare(b.updatedAt || '')
+          : (b.updatedAt || '').localeCompare(a.updatedAt || ''))
+      }
+
+      return filtered
+    })
 
     // Extract all unique tags with counts (from non-deleted articles)
     const tagCounts = new Map<string, number>()
-    const allArticles = articles || []
-
-    for (const article of allArticles) {
-      if (!article.is_deleted) {
+    for (const article of articles) {
+      if (!article.isDeleted) {
         for (const tag of article.tags || []) {
           tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1)
         }
@@ -143,7 +161,7 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.count - a.count)
 
     return NextResponse.json({
-      articles: articles || [],
+      articles: toSnakeCase(articles) || [],
       count: articles?.length || 0,
       allTags
     })
@@ -162,9 +180,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
@@ -186,34 +204,52 @@ export async function POST(request: NextRequest) {
 
     const { title, content, tags, collection_id, status, is_favorite } = parseResult.data
 
-    const { data: article, error: dbError } = await supabase
-      .from('knowledge_articles')
-      .insert({
-        user_id: user.id,
-        title,
-        content,
-        tags,
-        collection_id: collection_id || null,
-        status,
-        is_favorite,
-        is_deleted: false
-      })
-      .select(`
-        *,
-        collection:knowledge_collections(id, name, color, icon)
-      `)
-      .single()
+    // INSERT requires explicit user_id
+    const articleData = await withRLS((db) =>
+      db.insert(knowledgeArticles)
+        .values({
+          userId: user.id,
+          title,
+          content,
+          tags,
+          collectionId: collection_id || null,
+          status,
+          isFavorite: is_favorite,
+          isDeleted: false
+        })
+        .returning()
+    )
 
-    if (dbError) {
-      console.error('Database error:', dbError)
-      return NextResponse.json(
-        { error: 'Failed to create article' },
-        { status: 500 }
-      )
-    }
+    // Fetch with collection data
+    const article = await withRLS((db) =>
+      db.select({
+        id: knowledgeArticles.id,
+        userId: knowledgeArticles.userId,
+        title: knowledgeArticles.title,
+        content: knowledgeArticles.content,
+        tags: knowledgeArticles.tags,
+        collectionId: knowledgeArticles.collectionId,
+        status: knowledgeArticles.status,
+        isFavorite: knowledgeArticles.isFavorite,
+        isDeleted: knowledgeArticles.isDeleted,
+        deletedAt: knowledgeArticles.deletedAt,
+        createdAt: knowledgeArticles.createdAt,
+        updatedAt: knowledgeArticles.updatedAt,
+        collection: {
+          id: knowledgeCollections.id,
+          name: knowledgeCollections.name,
+          color: knowledgeCollections.color,
+          icon: knowledgeCollections.icon,
+        }
+      })
+      .from(knowledgeArticles)
+      .leftJoin(knowledgeCollections, eq(knowledgeArticles.collectionId, knowledgeCollections.id))
+      .where(eq(knowledgeArticles.id, articleData[0].id))
+      .limit(1)
+    )
 
     return NextResponse.json(
-      { article },
+      { article: toSnakeCase(article[0]) },
       { status: 201 }
     )
 

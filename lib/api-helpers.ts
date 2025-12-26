@@ -151,3 +151,36 @@ export function createSuccessResponse<T>(
 ): NextResponse {
   return NextResponse.json(data, { status })
 }
+
+/**
+ * Converts a camelCase string to snake_case
+ */
+function camelToSnake(str: string): string {
+  return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)
+}
+
+/**
+ * Recursively transforms an object's keys from camelCase to snake_case
+ * Used to maintain backward compatibility with frontend that expects snake_case
+ * after migrating from Supabase (snake_case) to Drizzle (camelCase)
+ */
+export function toSnakeCase<T>(obj: T): T {
+  if (obj === null || obj === undefined) {
+    return obj
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => toSnakeCase(item)) as T
+  }
+
+  if (typeof obj === 'object' && !(obj instanceof Date)) {
+    const result: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      const snakeKey = camelToSnake(key)
+      result[snakeKey] = toSnakeCase(value)
+    }
+    return result as T
+  }
+
+  return obj
+}

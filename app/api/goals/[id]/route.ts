@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { toSnakeCase } from '@/lib/api-helpers'
 import { z } from 'zod'
+import { northstar } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 
 // Validation schema for goal updates
 const goalUpdateSchema = z.object({
@@ -21,9 +24,9 @@ export async function PATCH(
   try {
     const body = await request.json()
     const goalId = params.id
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
@@ -42,20 +45,28 @@ export async function PATCH(
       )
     }
 
-    const { data, error } = await supabase
-      .from("northstar")
-      .update({ ...bodyValidation.data, updated_at: new Date().toISOString() })
-      .eq('id', goalId)
-      .eq('user_id', user.id)  // Defense-in-depth: explicit user filtering
-      .select()
-      .single()
+    // Map snake_case to camelCase and add updatedAt
+    const updates = bodyValidation.data
+    const updateData: Record<string, unknown> = {
+      updatedAt: new Date().toISOString(),
+    }
+    if (updates.title !== undefined) updateData.title = updates.title
+    if (updates.description !== undefined) updateData.description = updates.description
+    if (updates.progress !== undefined) updateData.progress = updates.progress
 
-    if (error) {
-      console.error('Error updating goal:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    // RLS automatically ensures user can only update their own goals
+    const data = await withRLS((db) =>
+      db.update(northstar)
+        .set(updateData)
+        .where(eq(northstar.id, goalId))
+        .returning()
+    )
+
+    if (data.length === 0) {
+      return NextResponse.json({ error: 'Goal not found' }, { status: 404 })
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(toSnakeCase(data[0]))
   } catch (err) {
     console.error('API error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

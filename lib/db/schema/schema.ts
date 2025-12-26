@@ -698,3 +698,23 @@ export const knowledgeCollections = pgTable("knowledge_collections", {
 	pgPolicy("knowledge_collections_select", { as: "permissive", for: "select", to: ["public"] }),
 	pgPolicy("knowledge_collections_update", { as: "permissive", for: "update", to: ["public"] }),
 ]);
+
+export const hyroxStationRecords = pgTable("hyrox_station_records", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	userId: text("user_id").notNull(),
+	stationName: text("station_name").notNull(),
+	stationType: text("station_type").notNull(),
+	distance: text().notNull(),
+	bestTime: integer("best_time").notNull(),
+	goalTime: integer("goal_time").notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+}, (table) => [
+	index("idx_hyrox_station_records_user_id").using("btree", table.userId.asc().nullsLast().op("text_ops")),
+	unique("hyrox_station_records_user_id_station_name_key").on(table.userId, table.stationName),
+	pgPolicy("hyrox_station_records_delete", { as: "permissive", for: "delete", to: ["public"] }),
+	pgPolicy("hyrox_station_records_insert", { as: "permissive", for: "insert", to: ["public"] }),
+	pgPolicy("hyrox_station_records_select", { as: "permissive", for: "select", to: ["public"] }),
+	pgPolicy("hyrox_station_records_update", { as: "permissive", for: "update", to: ["public"] }),
+	check("hyrox_station_records_station_type_check", sql`station_type = ANY (ARRAY['run'::text, 'exercise'::text])`),
+]);

@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { toSnakeCase } from '@/lib/api-helpers'
+import { contacts } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 
 // GET /api/contacts/[id] - Get a specific contact
 export async function GET(
@@ -8,25 +11,25 @@ export async function GET(
 ) {
   try {
     const { id } = await context.params
-    const { user, supabase } = await getAuthenticatedUser()
-    
-    if (!user) {
+    const { user, withRLS } = await getAuthenticatedUser()
+
+    if (!user || !withRLS) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    const { data, error } = await supabase
-      .from('contacts')
-      .select('*')
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .single()
+    // RLS automatically filters by user_id
+    const data = await withRLS((db) =>
+      db.select()
+        .from(contacts)
+        .where(eq(contacts.id, id))
+        .limit(1)
+    )
 
-    if (error) {
-      console.error('Error fetching contact:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    if (data.length === 0) {
+      return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(toSnakeCase(data[0]))
   } catch (error) {
     console.error('Unexpected error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -41,26 +44,25 @@ export async function PATCH(
   try {
     const { id } = await context.params
     const updates = await request.json()
-    const { user, supabase } = await getAuthenticatedUser()
-    
-    if (!user) {
+    const { user, withRLS } = await getAuthenticatedUser()
+
+    if (!user || !withRLS) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    const { data, error } = await supabase
-      .from('contacts')
-      .update(updates)
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .select()
-      .single()
+    // RLS automatically ensures user can only update their own contacts
+    const data = await withRLS((db) =>
+      db.update(contacts)
+        .set(updates)
+        .where(eq(contacts.id, id))
+        .returning()
+    )
 
-    if (error) {
-      console.error('Error updating contact:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    if (data.length === 0) {
+      return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(toSnakeCase(data[0]))
   } catch (error) {
     console.error('Unexpected error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -74,22 +76,16 @@ export async function DELETE(
 ) {
   try {
     const { id } = await context.params
-    const { user, supabase } = await getAuthenticatedUser()
-    
-    if (!user) {
+    const { user, withRLS } = await getAuthenticatedUser()
+
+    if (!user || !withRLS) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    const { error } = await supabase
-      .from('contacts')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', user.id)
-
-    if (error) {
-      console.error('Error deleting contact:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    // RLS automatically ensures user can only delete their own contacts
+    await withRLS((db) =>
+      db.delete(contacts).where(eq(contacts.id, id))
+    )
 
     return NextResponse.json({ success: true })
   } catch (error) {

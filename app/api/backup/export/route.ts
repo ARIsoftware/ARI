@@ -26,6 +26,12 @@ const getServiceSupabase = () => {
 async function discoverTables(client: any): Promise<{ tables: string[], method: string, warnings: string[] }> {
   const warnings: string[] = []
   const COMPLETE_TABLE_LIST = [
+    // Better Auth tables
+    'user',
+    'session',
+    'account',
+    'verification',
+    // Application tables
     'tasks',
     'fitness_database',
     'contacts',

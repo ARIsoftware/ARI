@@ -9,7 +9,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { toSnakeCase } from '@/lib/api-helpers'
 import { z } from 'zod'
+import { knowledgeArticles, knowledgeCollections } from '@/lib/db/schema'
+import { eq, sql } from 'drizzle-orm'
 
 /**
  * Validation Schema for PATCH requests
@@ -42,9 +45,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
@@ -60,24 +63,42 @@ export async function GET(
       )
     }
 
-    const { data: article, error: dbError } = await supabase
-      .from('knowledge_articles')
-      .select(`
-        *,
-        collection:knowledge_collections(id, name, color, icon)
-      `)
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .single()
+    // RLS filters automatically
+    const article = await withRLS((db) =>
+      db.select({
+        id: knowledgeArticles.id,
+        userId: knowledgeArticles.userId,
+        title: knowledgeArticles.title,
+        content: knowledgeArticles.content,
+        tags: knowledgeArticles.tags,
+        collectionId: knowledgeArticles.collectionId,
+        status: knowledgeArticles.status,
+        isFavorite: knowledgeArticles.isFavorite,
+        isDeleted: knowledgeArticles.isDeleted,
+        deletedAt: knowledgeArticles.deletedAt,
+        createdAt: knowledgeArticles.createdAt,
+        updatedAt: knowledgeArticles.updatedAt,
+        collection: {
+          id: knowledgeCollections.id,
+          name: knowledgeCollections.name,
+          color: knowledgeCollections.color,
+          icon: knowledgeCollections.icon,
+        }
+      })
+      .from(knowledgeArticles)
+      .leftJoin(knowledgeCollections, eq(knowledgeArticles.collectionId, knowledgeCollections.id))
+      .where(eq(knowledgeArticles.id, id))
+      .limit(1)
+    )
 
-    if (dbError || !article) {
+    if (article.length === 0) {
       return NextResponse.json(
         { error: 'Article not found' },
         { status: 404 }
       )
     }
 
-    return NextResponse.json({ article })
+    return NextResponse.json({ article: toSnakeCase(article[0]) })
 
   } catch (error) {
     console.error('GET /api/modules/knowledge-manager/data/[id] error:', error)
@@ -96,9 +117,9 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
@@ -127,13 +148,35 @@ export async function PATCH(
       )
     }
 
-    const updateData: Record<string, unknown> = { ...parseResult.data }
+    const updateData: Record<string, unknown> = {}
+
+    // Map API fields to Drizzle column names
+    if (parseResult.data.title !== undefined) {
+      updateData.title = parseResult.data.title
+    }
+    if (parseResult.data.content !== undefined) {
+      updateData.content = parseResult.data.content
+    }
+    if (parseResult.data.tags !== undefined) {
+      updateData.tags = parseResult.data.tags
+    }
+    if (parseResult.data.collection_id !== undefined) {
+      updateData.collectionId = parseResult.data.collection_id
+    }
+    if (parseResult.data.status !== undefined) {
+      updateData.status = parseResult.data.status
+    }
+    if (parseResult.data.is_favorite !== undefined) {
+      updateData.isFavorite = parseResult.data.is_favorite
+    }
 
     // Handle soft delete - set deleted_at timestamp
-    if (updateData.is_deleted === true) {
-      updateData.deleted_at = new Date().toISOString()
-    } else if (updateData.is_deleted === false) {
-      updateData.deleted_at = null
+    if (parseResult.data.is_deleted === true) {
+      updateData.isDeleted = true
+      updateData.deletedAt = sql`timezone('utc'::text, now())`
+    } else if (parseResult.data.is_deleted === false) {
+      updateData.isDeleted = false
+      updateData.deletedAt = null
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -143,26 +186,49 @@ export async function PATCH(
       )
     }
 
-    const { data: article, error: dbError } = await supabase
-      .from('knowledge_articles')
-      .update(updateData)
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .select(`
-        *,
-        collection:knowledge_collections(id, name, color, icon)
-      `)
-      .single()
+    // RLS automatically ensures user can only update their own articles
+    await withRLS((db) =>
+      db.update(knowledgeArticles)
+        .set(updateData)
+        .where(eq(knowledgeArticles.id, id))
+    )
 
-    if (dbError || !article) {
-      console.error('Database error:', dbError)
+    // Fetch updated article with collection
+    const article = await withRLS((db) =>
+      db.select({
+        id: knowledgeArticles.id,
+        userId: knowledgeArticles.userId,
+        title: knowledgeArticles.title,
+        content: knowledgeArticles.content,
+        tags: knowledgeArticles.tags,
+        collectionId: knowledgeArticles.collectionId,
+        status: knowledgeArticles.status,
+        isFavorite: knowledgeArticles.isFavorite,
+        isDeleted: knowledgeArticles.isDeleted,
+        deletedAt: knowledgeArticles.deletedAt,
+        createdAt: knowledgeArticles.createdAt,
+        updatedAt: knowledgeArticles.updatedAt,
+        collection: {
+          id: knowledgeCollections.id,
+          name: knowledgeCollections.name,
+          color: knowledgeCollections.color,
+          icon: knowledgeCollections.icon,
+        }
+      })
+      .from(knowledgeArticles)
+      .leftJoin(knowledgeCollections, eq(knowledgeArticles.collectionId, knowledgeCollections.id))
+      .where(eq(knowledgeArticles.id, id))
+      .limit(1)
+    )
+
+    if (article.length === 0) {
       return NextResponse.json(
         { error: 'Article not found or update failed' },
         { status: 404 }
       )
     }
 
-    return NextResponse.json({ article })
+    return NextResponse.json({ article: toSnakeCase(article[0]) })
 
   } catch (error) {
     console.error('PATCH /api/modules/knowledge-manager/data/[id] error:', error)
@@ -184,9 +250,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
@@ -206,20 +272,11 @@ export async function DELETE(
     const permanent = searchParams.get('permanent') === 'true'
 
     if (permanent) {
-      // Hard delete
-      const { error: dbError } = await supabase
-        .from('knowledge_articles')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', user.id)
-
-      if (dbError) {
-        console.error('Database error:', dbError)
-        return NextResponse.json(
-          { error: 'Failed to delete article' },
-          { status: 500 }
-        )
-      }
+      // Hard delete - RLS automatically ensures user can only delete their own
+      await withRLS((db) =>
+        db.delete(knowledgeArticles)
+          .where(eq(knowledgeArticles.id, id))
+      )
 
       return NextResponse.json({
         success: true,
@@ -227,22 +284,14 @@ export async function DELETE(
       })
     } else {
       // Soft delete - move to trash
-      const { error: dbError } = await supabase
-        .from('knowledge_articles')
-        .update({
-          is_deleted: true,
-          deleted_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .eq('user_id', user.id)
-
-      if (dbError) {
-        console.error('Database error:', dbError)
-        return NextResponse.json(
-          { error: 'Failed to delete article' },
-          { status: 500 }
-        )
-      }
+      await withRLS((db) =>
+        db.update(knowledgeArticles)
+          .set({
+            isDeleted: true,
+            deletedAt: sql`timezone('utc'::text, now())`
+          })
+          .where(eq(knowledgeArticles.id, id))
+      )
 
       return NextResponse.json({
         success: true,

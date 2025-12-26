@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
 import { z } from 'zod'
+import { tasks } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 
 const incrementCompletionSchema = z.object({
   taskId: z.string().uuid('Invalid task ID format'),
@@ -17,45 +19,42 @@ export async function POST(request: NextRequest) {
     }
 
     const { taskId, increment } = validation.data
-    const { user, supabase } = await getAuthenticatedUser()
-    
-    if (!user) {
+    const { user, withRLS } = await getAuthenticatedUser()
+
+    if (!user || !withRLS) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // Get current completion count
-    const { data: task, error: fetchError } = await supabase
-      .from('tasks')
-      .select('completion_count')
-      .eq('id', taskId)
-      .single()
+    // Get current completion count (RLS automatically filters by user_id)
+    const taskData = await withRLS((db) =>
+      db.select({ completionCount: tasks.completionCount })
+        .from(tasks)
+        .where(eq(tasks.id, taskId))
+        .limit(1)
+    )
 
-    if (fetchError) {
-      console.error('Error fetching task for completion increment:', fetchError)
-      return NextResponse.json({ error: fetchError.message }, { status: 500 })
+    if (taskData.length === 0) {
+      return createErrorResponse('Task not found', 404)
     }
 
     // Increment the completion count with validation
-    const currentCount = task?.completion_count || 0
+    const currentCount = taskData[0].completionCount || 0
     const newCount = currentCount + increment
-    
+
     // Prevent excessive completion counts
     if (newCount > 10000) {
       return createErrorResponse('Completion count too high', 400)
     }
 
-    const { error: updateError } = await supabase
-      .from('tasks')
-      .update({ 
-        completion_count: newCount,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', taskId)
-
-    if (updateError) {
-      console.error('Error incrementing task completion:', updateError)
-      return createErrorResponse(updateError.message, 500)
-    }
+    // Update the task (RLS automatically ensures user can only update their own)
+    await withRLS((db) =>
+      db.update(tasks)
+        .set({
+          completionCount: newCount,
+          updatedAt: new Date().toISOString()
+        })
+        .where(eq(tasks.id, taskId))
+    )
 
     return NextResponse.json({ success: true, completion_count: newCount })
   } catch (err) {

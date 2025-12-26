@@ -8,7 +8,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { toSnakeCase } from '@/lib/api-helpers'
 import { z } from 'zod'
+import { gratitudeEntries } from '@/lib/db/schema'
+import { eq, and, sql } from 'drizzle-orm'
 
 /**
  * Validation Schema for POST requests
@@ -31,9 +34,9 @@ const SaveEntrySchema = z.object({
  */
 export async function GET(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
@@ -51,25 +54,16 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Query database for entry on this date with explicit user_id filter
-    const { data: entry, error: dbError } = await supabase
-      .from('gratitude_entries')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('entry_date', date)
-      .single()
-
-    if (dbError && dbError.code !== 'PGRST116') {
-      // PGRST116 is "no rows returned" which is fine
-      console.error('Database error:', dbError)
-      return NextResponse.json(
-        { error: 'Failed to fetch entry' },
-        { status: 500 }
-      )
-    }
+    // Query database for entry on this date (RLS filters automatically)
+    const data = await withRLS((db) =>
+      db.select()
+        .from(gratitudeEntries)
+        .where(eq(gratitudeEntries.entryDate, date))
+        .limit(1)
+    )
 
     return NextResponse.json({
-      entry: entry || null
+      entry: data.length > 0 ? toSnakeCase(data[0]) : null
     })
 
   } catch (error) {
@@ -90,9 +84,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: 'Unauthorized - Valid authentication required' },
         { status: 401 }
@@ -115,33 +109,51 @@ export async function POST(request: NextRequest) {
 
     const { entry_date, question1, question2, question3, question4, question5 } = parseResult.data
 
-    // Upsert entry (insert or update if exists for this date)
-    const { data: entry, error: dbError } = await supabase
-      .from('gratitude_entries')
-      .upsert({
-        user_id: user.id,
-        entry_date,
-        question1: question1 || null,
-        question2: question2 || null,
-        question3: question3 || null,
-        question4: question4 || null,
-        question5: question5 || null,
-      }, {
-        onConflict: 'user_id,entry_date'
-      })
-      .select()
-      .single()
+    // Check if entry exists for this date (RLS filters automatically)
+    const existing = await withRLS((db) =>
+      db.select({ id: gratitudeEntries.id })
+        .from(gratitudeEntries)
+        .where(eq(gratitudeEntries.entryDate, entry_date))
+        .limit(1)
+    )
 
-    if (dbError) {
-      console.error('Database error:', dbError)
-      return NextResponse.json(
-        { error: 'Failed to save entry' },
-        { status: 500 }
+    let entry
+    if (existing.length > 0) {
+      // Update existing entry
+      const updated = await withRLS((db) =>
+        db.update(gratitudeEntries)
+          .set({
+            question1: question1 || null,
+            question2: question2 || null,
+            question3: question3 || null,
+            question4: question4 || null,
+            question5: question5 || null,
+            updatedAt: sql`timezone('utc'::text, now())`
+          })
+          .where(eq(gratitudeEntries.id, existing[0].id))
+          .returning()
       )
+      entry = updated[0]
+    } else {
+      // Insert new entry
+      const inserted = await withRLS((db) =>
+        db.insert(gratitudeEntries)
+          .values({
+            userId: user.id,
+            entryDate: entry_date,
+            question1: question1 || null,
+            question2: question2 || null,
+            question3: question3 || null,
+            question4: question4 || null,
+            question5: question5 || null,
+          })
+          .returning()
+      )
+      entry = inserted[0]
     }
 
     return NextResponse.json(
-      { entry },
+      { entry: toSnakeCase(entry) },
       { status: 200 }
     )
 
