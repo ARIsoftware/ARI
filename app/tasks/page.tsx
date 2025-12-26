@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { Fragment } from "react"
 import { useSupabase } from "@/components/providers"
 import { DM_Sans } from "next/font/google"
 import { AppSidebar } from "../../components/app-sidebar"
@@ -116,24 +117,8 @@ export default function TasksPage() {
         console.log("  User ID:", user.id)
         console.log("  Email:", user.email)
         
-        try {
-          const token = session?.access_token
-          if (token) {
-            // Decode JWT payload (safe - just reading claims)
-            const payload = JSON.parse(atob(token.split('.')[1]))
-            console.log("  JWT Claims:", {
-              sub: payload.sub,
-              email: payload.email,
-              iss: payload.iss,
-              exp: new Date(payload.exp * 1000).toISOString()
-            })
-            console.log("✅ JWT contains email:", !!payload.email)
-          } else {
-            console.log("❌ No Supabase JWT token available")
-          }
-        } catch (error) {
-          console.error("❌ JWT Debug Error:", error)
-        }
+        // Note: Better Auth uses opaque session tokens, not JWTs
+        console.log("  Session active:", !!session)
       }
     }
     
@@ -1147,15 +1132,14 @@ export default function TasksPage() {
                 const needsSpacing = prevTask && prevTask.pinned && !task.pinned
 
                 return (
-                  <>
+                  <Fragment key={task.id}>
                     {needsSpacing && viewMode === "list" && (
-                      <div key={`spacer-${task.id}`} className="h-[30px]" />
+                      <div className="h-[30px]" />
                     )}
                     {needsSpacing && viewMode === "card" && (
-                      <div key={`spacer-${task.id}`} className="col-span-full h-[30px]" />
+                      <div className="col-span-full h-[30px]" />
                     )}
                     <div
-                      key={task.id}
                       draggable
                       onDragStart={(e) => handleDragStart(e, task.id)}
                       onDragOver={handleDragOver}
@@ -1425,7 +1409,7 @@ export default function TasksPage() {
                     </>
                   )}
                 </div>
-                  </>
+                  </Fragment>
                 )
               })}
               </div>
