@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Search, Plus, Package, Truck, Clock, CheckCircle, AlertCircle, Loader2, ExternalLink, Edit2, Trash2, TruckIcon } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import {
   Select,
   SelectContent,
@@ -33,7 +33,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { MoreVertical } from "lucide-react"
 import {
-  getShipments,
   createShipment,
   updateShipment,
   deleteShipment,
@@ -41,14 +40,18 @@ import {
   formatExpectedDelivery,
   type Shipment
 } from "@/modules-core/shipments/lib/shipments"
+import { useShipments, useInvalidateShipments } from "@/lib/hooks/use-shipments"
 import { useToast } from "@/hooks/use-toast"
 
 export default function ShipmentsPage() {
-  const { session, supabase } = useSupabase()
+  const { session } = useSupabase()
   const user = session?.user
   const { toast } = useToast()
-  const [shipments, setShipments] = useState<Shipment[]>([])
-  const [loading, setLoading] = useState(true)
+
+  // TanStack Query for shipments - replaces local state + realtime subscription
+  const { data: shipments = [], isLoading: loading } = useShipments()
+  const invalidateShipments = useInvalidateShipments()
+
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedStatus, setSelectedStatus] = useState("all")
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -68,79 +71,6 @@ export default function ShipmentsPage() {
   })
 
   const statuses = ["all", "pending", "in_transit", "out_for_delivery", "delivered", "delayed", "returned"]
-
-  // Load shipments from Supabase
-  useEffect(() => {
-    if (user?.id) {
-      loadShipments()
-
-      // Set up real-time subscription
-      const channel = supabase
-        .channel("shipments-changes")
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "shipments",
-          },
-          (payload) => {
-            console.log("Real-time update:", payload)
-
-            if (payload.eventType === "INSERT") {
-              setShipments((prev) => [payload.new as Shipment, ...prev])
-            } else if (payload.eventType === "UPDATE") {
-              setShipments((prev) =>
-                prev.map((shipment) =>
-                  shipment.id === payload.new.id ? (payload.new as Shipment) : shipment
-                )
-              )
-            } else if (payload.eventType === "DELETE") {
-              setShipments((prev) => prev.filter((shipment) => shipment.id !== payload.old.id))
-            }
-          }
-        )
-        .subscribe()
-
-      // Cleanup subscription on unmount
-      return () => {
-        supabase.removeChannel(channel)
-      }
-    }
-  }, [user?.id])
-
-  const loadShipments = async () => {
-    if (!user?.id) {
-      console.log("User not authenticated, skipping shipments load")
-      setLoading(false)
-      return
-    }
-
-    try {
-      setLoading(true)
-      const tokenFn = async () => session?.access_token || null
-      const data = await getShipments(tokenFn)
-      setShipments(data)
-    } catch (error: any) {
-      console.error("Failed to load shipments:", error)
-      let errorMessage = "Failed to load shipments. Please try again."
-
-      // Provide more specific error messages
-      if (error?.message?.includes('relation "public.shipments" does not exist')) {
-        errorMessage = "The shipments table hasn't been created yet. Please run the SQL script to set up the database."
-      } else if (error?.message?.includes('authentication')) {
-        errorMessage = "You need to be logged in to view shipments."
-      }
-
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleSubmit = async () => {
     if (!formData.name.trim()) {
@@ -193,8 +123,8 @@ export default function ShipmentsPage() {
       setEditingShipment(null)
       setDialogOpen(false)
 
-      // Reload shipments
-      await loadShipments()
+      // Refresh shipments
+      invalidateShipments()
     } catch (error: any) {
       console.error("Failed to save shipment:", error)
       let errorMessage = "Failed to save shipment. Please try again."
@@ -244,7 +174,7 @@ export default function ShipmentsPage() {
         title: "Success",
         description: "Shipment deleted successfully",
       })
-      await loadShipments()
+      invalidateShipments()
     } catch (error) {
       console.error("Failed to delete shipment:", error)
       toast({
@@ -264,12 +194,8 @@ export default function ShipmentsPage() {
       const tokenFn = async () => session?.access_token || null
       await updateShipment(shipment.id, { ...shipment, status: 'delivered' }, tokenFn)
 
-      // Update local state immediately
-      setShipments((prev) =>
-        prev.map((s) =>
-          s.id === shipment.id ? { ...s, status: 'delivered' as Shipment['status'] } : s
-        )
-      )
+      // Refresh shipments from server
+      invalidateShipments()
 
       // Show success message
       toast({

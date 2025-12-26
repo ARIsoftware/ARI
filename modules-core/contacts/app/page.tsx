@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Search, Filter, Plus, Phone, Mail, MoreVertical, Grid3X3, List, Edit } from "lucide-react"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   Select,
@@ -18,14 +18,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  getContacts,
   getCategoryColor,
   getAvatarColor,
   getInitials,
   formatNextContactDate,
   type Contact
 } from "@/modules-core/contacts/lib/contacts"
-import { supabase } from "@/lib/supabase"
+import { useContacts } from "@/lib/hooks/use-contacts"
 import { useToast } from "@/hooks/use-toast"
 
 const dmSans = DM_Sans({
@@ -34,82 +33,19 @@ const dmSans = DM_Sans({
 })
 
 export default function ContactsPage() {
-  const { session, supabase } = useSupabase()
+  const { session } = useSupabase()
   const user = session?.user
   const router = useRouter()
   const { toast } = useToast()
-  const [contacts, setContacts] = useState<Contact[]>([])
-  const [loading, setLoading] = useState(true)
+
+  // TanStack Query for contacts - replaces local state + realtime subscription
+  const { data: contacts = [], isLoading: loading } = useContacts()
+
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("All Categories")
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
 
   const categories = ["All Categories", "Work", "Friends", "Family", "Business", "Other"]
-
-  // Load contacts from Supabase
-  useEffect(() => {
-    if (user?.id) {
-      loadContacts()
-
-      // Set up real-time subscription
-      const channel = supabase
-        .channel("contacts-changes")
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "contacts",
-          },
-          (payload) => {
-            console.log("Real-time update:", payload)
-
-            if (payload.eventType === "INSERT") {
-              setContacts((prev) => [...prev, payload.new as Contact].sort((a, b) => a.name.localeCompare(b.name)))
-            } else if (payload.eventType === "UPDATE") {
-              setContacts((prev) => {
-                const updated = prev.map((contact) => 
-                  contact.id === payload.new.id ? (payload.new as Contact) : contact
-                )
-                return updated.sort((a, b) => a.name.localeCompare(b.name))
-              })
-            } else if (payload.eventType === "DELETE") {
-              setContacts((prev) => prev.filter((contact) => contact.id !== payload.old.id))
-            }
-          }
-        )
-        .subscribe()
-
-      // Cleanup subscription on unmount
-      return () => {
-        supabase.removeChannel(channel)
-      }
-    }
-  }, [user?.id])
-
-  const loadContacts = async () => {
-    if (!user?.id) {
-      console.log("User not authenticated, skipping contacts load")
-      setLoading(false)
-      return
-    }
-
-    try {
-      setLoading(true)
-      const tokenFn = async () => session?.access_token || null
-      const data = await getContacts(tokenFn)
-      setContacts(data)
-    } catch (error) {
-      console.error("Failed to load contacts:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load contacts. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const filteredContacts = contacts.filter((contact) => {
     const matchesSearch = 
