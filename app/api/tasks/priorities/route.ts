@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { toSnakeCase } from '@/lib/api-helpers'
 import { calculatePriorityScore } from '@/lib/priority-utils'
 import { z } from 'zod'
+import { tasks } from '@/lib/db/schema'
+import { eq, asc } from 'drizzle-orm'
 
 // Force dynamic rendering - no caching
 export const dynamic = 'force-dynamic'
@@ -19,26 +22,18 @@ const updatePrioritiesSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
-    
-    if (!user) {
+    const { user, withRLS } = await getAuthenticatedUser()
+
+    if (!user || !withRLS) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // Fetch all tasks with priority axes - only user's own tasks
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('priority_score', { ascending: true }) // Lower score = higher priority
+    // Fetch all tasks with priority axes (RLS automatically filters by user_id)
+    const data = await withRLS((db) =>
+      db.select().from(tasks).orderBy(asc(tasks.priorityScore))
+    )
 
-    if (error) {
-      console.error('Error fetching task priorities:', error)
-      // Don't expose database error details to client
-      return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 })
-    }
-
-    return NextResponse.json(data)
+    return NextResponse.json(toSnakeCase(data))
   } catch (err) {
     console.error('API error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -47,10 +42,9 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    // Check auth FIRST before any other processing
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
@@ -69,30 +63,27 @@ export async function PUT(request: NextRequest) {
     // Calculate priority score
     const priorityScore = calculatePriorityScore(axes)
 
-    // Update task with new axes and calculated score - only user's own tasks
-    const { data, error } = await supabase
-      .from('tasks')
-      .update({
-        impact: axes.impact,
-        severity: axes.severity,
-        timeliness: axes.timeliness,
-        effort: axes.effort,
-        strategic_fit: axes.strategic_fit,
-        priority_score: priorityScore,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', taskId)
-      .eq('user_id', user.id)
-      .select()
-      .single()
+    // Update task with new axes and calculated score (RLS ensures user can only update their own)
+    const data = await withRLS((db) =>
+      db.update(tasks)
+        .set({
+          impact: axes.impact,
+          severity: axes.severity,
+          timeliness: axes.timeliness,
+          effort: axes.effort,
+          strategicFit: axes.strategic_fit,
+          priorityScore: String(priorityScore),
+          updatedAt: new Date().toISOString()
+        })
+        .where(eq(tasks.id, taskId))
+        .returning()
+    )
 
-    if (error) {
-      console.error('Error updating task priorities:', error)
-      // Don't expose database error details to client
+    if (data.length === 0) {
       return NextResponse.json({ error: 'Task not found or update failed' }, { status: 404 })
     }
 
-    return NextResponse.json(data)
+    return NextResponse.json(toSnakeCase(data[0]))
   } catch (err) {
     console.error('API error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -102,10 +93,9 @@ export async function PUT(request: NextRequest) {
 // Batch update multiple tasks
 export async function POST(request: NextRequest) {
   try {
-    // Check auth FIRST before any other processing
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
@@ -116,42 +106,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid task IDs' }, { status: 400 })
     }
 
-    // Recalculate priority scores for all specified tasks - only user's own tasks
+    // Recalculate priority scores for all specified tasks
     const updates = []
     for (const taskId of taskIds) {
-      // Fetch current task data - only user's own tasks
-      const { data: task, error: fetchError } = await supabase
-        .from('tasks')
-        .select('impact, severity, timeliness, effort, strategic_fit')
-        .eq('id', taskId)
-        .eq('user_id', user.id)
-        .single()
+      // Fetch current task data (RLS filters automatically)
+      const taskData = await withRLS((db) =>
+        db.select({
+          impact: tasks.impact,
+          severity: tasks.severity,
+          timeliness: tasks.timeliness,
+          effort: tasks.effort,
+          strategicFit: tasks.strategicFit
+        })
+        .from(tasks)
+        .where(eq(tasks.id, taskId))
+        .limit(1)
+      )
 
-      if (fetchError || !task) continue
+      if (taskData.length === 0) continue
 
+      const task = taskData[0]
       const axes = {
         impact: task.impact || 3,
         severity: task.severity || 3,
         timeliness: task.timeliness || 3,
         effort: task.effort || 3,
-        strategic_fit: task.strategic_fit || 3
+        strategic_fit: task.strategicFit || 3
       }
 
       const priorityScore = calculatePriorityScore(axes)
 
-      // Update task with new score - only user's own tasks
-      const { error: updateError } = await supabase
-        .from('tasks')
-        .update({
-          priority_score: priorityScore,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', taskId)
-        .eq('user_id', user.id)
+      // Update task with new score (RLS ensures user can only update their own)
+      await withRLS((db) =>
+        db.update(tasks)
+          .set({
+            priorityScore: String(priorityScore),
+            updatedAt: new Date().toISOString()
+          })
+          .where(eq(tasks.id, taskId))
+      )
 
-      if (!updateError) {
-        updates.push({ taskId, priorityScore })
-      }
+      updates.push({ taskId, priorityScore })
     }
 
     return NextResponse.json({ updated: updates.length, tasks: updates })

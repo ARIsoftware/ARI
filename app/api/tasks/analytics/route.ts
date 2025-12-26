@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { tasks } from '@/lib/db/schema'
+import { eq, and, gte, lte } from 'drizzle-orm'
 
 export async function GET(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
@@ -18,32 +20,30 @@ export async function GET(request: NextRequest) {
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
 
-    // Get task creation data
-    const { data: taskCreationData, error: creationError } = await supabase
-      .from('tasks')
-      .select('created_at')
-      .eq('user_id', user.id)
-      .gte('created_at', startDate.toISOString())
-      .lte('created_at', endDate.toISOString())
+    // Get task creation data (RLS automatically filters by user_id)
+    const taskCreationData = await withRLS((db) =>
+      db.select({ createdAt: tasks.createdAt })
+        .from(tasks)
+        .where(
+          and(
+            gte(tasks.createdAt, startDate.toISOString()),
+            lte(tasks.createdAt, endDate.toISOString())
+          )
+        )
+    )
 
-    if (creationError) {
-      console.error('Error fetching task creation data:', creationError)
-      return NextResponse.json({ error: 'Failed to fetch task creation data' }, { status: 500 })
-    }
-
-    // Get task completion data
-    const { data: taskCompletionData, error: completionError } = await supabase
-      .from('tasks')
-      .select('updated_at, completed')
-      .eq('user_id', user.id)
-      .eq('completed', true)
-      .gte('updated_at', startDate.toISOString())
-      .lte('updated_at', endDate.toISOString())
-
-    if (completionError) {
-      console.error('Error fetching task completion data:', completionError)
-      return NextResponse.json({ error: 'Failed to fetch task completion data' }, { status: 500 })
-    }
+    // Get task completion data (RLS automatically filters by user_id)
+    const taskCompletionData = await withRLS((db) =>
+      db.select({ updatedAt: tasks.updatedAt, completed: tasks.completed })
+        .from(tasks)
+        .where(
+          and(
+            eq(tasks.completed, true),
+            gte(tasks.updatedAt, startDate.toISOString()),
+            lte(tasks.updatedAt, endDate.toISOString())
+          )
+        )
+    )
 
     // Process data into daily counts
     const dailyData: Record<string, { date: string; tasksCreated: number; tasksCompleted: number }> = {}
@@ -60,17 +60,21 @@ export async function GET(request: NextRequest) {
 
     // Count task creations
     taskCreationData?.forEach(task => {
-      const dateStr = new Date(task.created_at).toISOString().split('T')[0]
-      if (dailyData[dateStr]) {
-        dailyData[dateStr].tasksCreated++
+      if (task.createdAt) {
+        const dateStr = new Date(task.createdAt).toISOString().split('T')[0]
+        if (dailyData[dateStr]) {
+          dailyData[dateStr].tasksCreated++
+        }
       }
     })
 
     // Count task completions
     taskCompletionData?.forEach(task => {
-      const dateStr = new Date(task.updated_at).toISOString().split('T')[0]
-      if (dailyData[dateStr]) {
-        dailyData[dateStr].tasksCompleted++
+      if (task.updatedAt) {
+        const dateStr = new Date(task.updatedAt).toISOString().split('T')[0]
+        if (dailyData[dateStr]) {
+          dailyData[dateStr].tasksCompleted++
+        }
       }
     })
 

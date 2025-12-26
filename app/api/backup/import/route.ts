@@ -205,9 +205,9 @@ async function executeInTransaction(
 export async function POST(req: NextRequest) {
   try {
     // Authenticate user
-    const { user, supabase: userSupabase } = await getAuthenticatedUser()
-    
-    if (!user) {
+    const { user, withRLS } = await getAuthenticatedUser()
+
+    if (!user || !withRLS) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
@@ -364,9 +364,9 @@ export async function POST(req: NextRequest) {
 // Validation endpoint - separate from import
 export async function PUT(req: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
-    
-    if (!user) {
+    const { user, withRLS } = await getAuthenticatedUser()
+
+    if (!user || !withRLS) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
     }
 

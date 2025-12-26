@@ -53,7 +53,10 @@ export async function withUserContext<T>(
 
     // Set user context for RLS policies
     // app.current_user_id() function reads this value
-    await client.query('SET LOCAL app.current_user_id = $1', [userId])
+    // Note: SET doesn't support parameterized queries, so we escape manually
+    // Escape single quotes to prevent SQL injection
+    const escapedUserId = userId.replace(/'/g, "''")
+    await client.query(`SET LOCAL app.current_user_id = '${escapedUserId}'`)
 
     // Create Drizzle instance for this connection
     const db = drizzle(client as PoolClient)

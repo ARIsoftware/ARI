@@ -42,21 +42,28 @@ export default async function RootLayout({
   let initialFeatures: Record<string, boolean> | undefined = undefined
 
   try {
-    const { user, supabase } = await getAuthenticatedUser()
-    if (user) {
+    const { user, withRLS } = await getAuthenticatedUser()
+    if (user && withRLS) {
       // Fetch modules and features in parallel
-      const [modules, featuresResult] = await Promise.all([
+      const { userFeaturePreferences } = await import('@/lib/db/schema')
+      const [modules, featurePrefs] = await Promise.all([
         getEnabledModules(user.id),
-        supabase.from('user_feature_preferences').select('feature_name, enabled')
+        withRLS((db) =>
+          db.select({
+            featureName: userFeaturePreferences.featureName,
+            enabled: userFeaturePreferences.enabled
+          })
+          .from(userFeaturePreferences)
+        )
       ])
 
       enabledModules = modules
 
       // Convert features array to map
-      if (featuresResult.data) {
+      if (featurePrefs) {
         initialFeatures = {}
-        featuresResult.data.forEach((pref: { feature_name: string; enabled: boolean }) => {
-          initialFeatures![pref.feature_name] = pref.enabled
+        featurePrefs.forEach((pref) => {
+          initialFeatures![pref.featureName] = pref.enabled
         })
       }
     }

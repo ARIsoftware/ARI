@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { getModules } from '@/lib/modules/module-registry'
+import { moduleSettings } from '@/lib/db/schema'
 
 /**
  * GET /api/modules/all
@@ -15,10 +16,10 @@ import { getModules } from '@/lib/modules/module-registry'
  * Used by Settings page to allow users to manage module state
  */
 export async function GET(request: NextRequest) {
-  const { user, supabase } = await getAuthenticatedUser()
+  const { user, withRLS } = await getAuthenticatedUser()
 
   // Validate authentication
-  if (!user) {
+  if (!user || !withRLS) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401 }
@@ -30,17 +31,16 @@ export async function GET(request: NextRequest) {
     // Registry is generated at build time via npm run generate-module-registry
     const allModules = await getModules()
 
-    // Get user's module settings from database to populate isEnabled
-    const { data: settings } = await supabase
-      .from('module_settings')
-      .select('*')
-      .eq('user_id', user.id)
+    // Get user's module settings from database (RLS filters automatically)
+    const settings = await withRLS((db) =>
+      db.select().from(moduleSettings)
+    )
 
     // Create a map of module_id -> enabled state
     const settingsMap = new Map<string, boolean>()
     if (settings) {
-      settings.forEach((setting: any) => {
-        settingsMap.set(setting.module_id, setting.enabled)
+      settings.forEach((setting) => {
+        settingsMap.set(setting.moduleId, setting.enabled ?? true)
       })
     }
 
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
       modules: modulesWithEnabledState,
       count: modulesWithEnabledState.length
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API /modules/all] Error:', error)
     return NextResponse.json(
       { error: 'Failed to load modules' },

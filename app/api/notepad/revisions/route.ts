@@ -1,26 +1,28 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { createErrorResponse } from '@/lib/api-helpers'
+import { createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
+import { notepadRevisions, notepad } from '@/lib/db/schema'
+import { eq, desc, max, sql } from 'drizzle-orm'
 
 export async function GET(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // Fetch all revisions for this user, ordered by revision number descending
-    const { data, error } = await supabase
-      .from("notepad_revisions")
-      .select("id, content, created_at, revision_number")
-      .eq("user_id", user.id)
-      .order("revision_number", { ascending: false })
-
-    if (error) {
-      console.error('Error fetching notepad revisions:', error)
-      return createErrorResponse(error.message, 500)
-    }
+    // RLS automatically filters by user_id
+    const data = await withRLS((db) =>
+      db.select({
+        id: notepadRevisions.id,
+        content: notepadRevisions.content,
+        created_at: notepadRevisions.createdAt,
+        revision_number: notepadRevisions.revisionNumber
+      })
+      .from(notepadRevisions)
+      .orderBy(desc(notepadRevisions.revisionNumber))
+    )
 
     return NextResponse.json(data || [])
   } catch (err) {
@@ -32,9 +34,9 @@ export async function GET(request: NextRequest) {
 // POST endpoint to restore a specific revision
 export async function POST(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return createErrorResponse('Authentication required', 401)
     }
 
@@ -45,65 +47,69 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('revision_id is required', 400)
     }
 
-    // Fetch the specific revision
-    const { data: revision, error: fetchError } = await supabase
-      .from("notepad_revisions")
-      .select("content, revision_number")
-      .eq("id", revision_id)
-      .eq("user_id", user.id) // Ensure user owns this revision
-      .single()
+    // Fetch the specific revision (RLS filters automatically)
+    const revision = await withRLS((db) =>
+      db.select({
+        content: notepadRevisions.content,
+        revisionNumber: notepadRevisions.revisionNumber
+      })
+      .from(notepadRevisions)
+      .where(eq(notepadRevisions.id, revision_id))
+      .limit(1)
+    )
 
-    if (fetchError || !revision) {
-      console.error('Error fetching revision:', fetchError)
+    if (revision.length === 0) {
       return createErrorResponse('Revision not found', 404)
     }
 
-    // Get the next revision number
-    const { data: revisionData, error: revisionError } = await supabase
-      .rpc('get_next_revision_number', { p_user_id: user.id })
+    // Get the max revision number (replaces RPC call)
+    const maxRevisionResult = await withRLS((db) =>
+      db.select({ maxRevision: max(notepadRevisions.revisionNumber) })
+        .from(notepadRevisions)
+    )
 
-    if (revisionError) {
-      console.error('Error getting revision number:', revisionError)
-      return createErrorResponse(revisionError.message, 500)
-    }
-
-    const newRevisionNumber = revisionData as number
+    const newRevisionNumber = (maxRevisionResult[0]?.maxRevision || 0) + 1
 
     // Create a new revision with the restored content
-    const { data: newRevision, error: insertError } = await supabase
-      .from("notepad_revisions")
-      .insert([{
-        content: revision.content,
-        user_id: user.id,
-        revision_number: newRevisionNumber
-      }])
-      .select()
-      .single()
+    const newRevision = await withRLS((db) =>
+      db.insert(notepadRevisions)
+        .values({
+          content: revision[0].content,
+          userId: user.id,
+          revisionNumber: newRevisionNumber
+        })
+        .returning()
+    )
 
-    if (insertError) {
-      console.error('Error creating restored revision:', insertError)
-      return createErrorResponse(insertError.message, 500)
-    }
+    // Check if notepad exists for this user
+    const existingNotepad = await withRLS((db) =>
+      db.select({ id: notepad.id })
+        .from(notepad)
+        .limit(1)
+    )
 
-    // Update the main notepad table
-    const { data: existingData } = await supabase
-      .from("notepad")
-      .select("id")
-      .eq("user_id", user.id)
-      .single()
-
-    if (existingData) {
-      await supabase
-        .from("notepad")
-        .update({ content: revision.content })
-        .eq("user_id", user.id)
+    if (existingNotepad.length > 0) {
+      // Update existing notepad
+      await withRLS((db) =>
+        db.update(notepad)
+          .set({
+            content: revision[0].content,
+            updatedAt: sql`timezone('utc'::text, now())`
+          })
+          .where(eq(notepad.id, existingNotepad[0].id))
+      )
     } else {
-      await supabase
-        .from("notepad")
-        .insert([{ content: revision.content, user_id: user.id }])
+      // Create new notepad
+      await withRLS((db) =>
+        db.insert(notepad)
+          .values({
+            content: revision[0].content,
+            userId: user.id
+          })
+      )
     }
 
-    return NextResponse.json(newRevision)
+    return NextResponse.json(toSnakeCase(newRevision[0]))
   } catch (err) {
     console.error('API error:', err)
     return createErrorResponse('Internal server error', 500)

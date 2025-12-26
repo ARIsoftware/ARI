@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { createErrorResponse } from '@/lib/api-helpers'
+import { createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
+import { winterArcGoals } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return createErrorResponse('Authentication required', 401)
     }
 
+    const { id } = await params
     const body = await request.json()
     const { completed } = body
 
@@ -20,21 +23,20 @@ export async function PATCH(
       return NextResponse.json({ error: 'Completed must be a boolean' }, { status: 400 })
     }
 
-    const { data, error } = await supabase
-      .from('winter_arc_goals')
-      .update({ completed })
-      .eq('id', params.id)
-      .eq('user_id', user.id)
-      .select()
-      .single()
+    // RLS automatically ensures user can only update their own goals
+    const data = await withRLS((db) =>
+      db.update(winterArcGoals)
+        .set({ completed })
+        .where(eq(winterArcGoals.id, id))
+        .returning()
+    )
 
-    if (error) {
-      console.error('Error updating winter arc goal:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    if (data.length === 0) {
+      return NextResponse.json({ error: 'Goal not found' }, { status: 404 })
     }
 
-    return NextResponse.json(data)
-  } catch (error: any) {
+    return NextResponse.json(toSnakeCase(data[0]))
+  } catch (error: unknown) {
     console.error('Error in PATCH /api/winter-arc-goals/[id]:', error)
     return createErrorResponse('Internal server error', 500)
   }
@@ -42,28 +44,24 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    const { error } = await supabase
-      .from('winter_arc_goals')
-      .delete()
-      .eq('id', params.id)
-      .eq('user_id', user.id)
+    const { id } = await params
 
-    if (error) {
-      console.error('Error deleting winter arc goal:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    // RLS automatically ensures user can only delete their own goals
+    await withRLS((db) =>
+      db.delete(winterArcGoals).where(eq(winterArcGoals.id, id))
+    )
 
     return NextResponse.json({ success: true })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in DELETE /api/winter-arc-goals/[id]:', error)
     return createErrorResponse('Internal server error', 500)
   }
