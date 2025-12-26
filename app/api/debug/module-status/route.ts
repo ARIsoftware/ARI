@@ -6,35 +6,28 @@
  */
 
 import { NextResponse } from 'next/server'
-import { headers } from 'next/headers'
-import { auth } from '@/lib/auth'
-import { createDbClient } from '@/lib/db-supabase'
+import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { moduleSettings } from '@/lib/db/schema'
 import { getModules, getEnabledModule } from '@/lib/modules/module-registry'
 
 export async function GET() {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    })
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!session?.user) {
+    if (!user || !withRLS) {
       return NextResponse.json({
         error: 'No authenticated user',
         authenticated: false
       })
     }
 
-    const user = session.user
-    const supabase = createDbClient()
-
     // Get all modules
     const allModules = await getModules()
 
-    // Get user's module settings
-    const { data: settings } = await supabase
-      .from('module_settings')
-      .select('*')
-      .eq('user_id', user.id)
+    // Get user's module settings (RLS filters automatically)
+    const settings = await withRLS((db) =>
+      db.select().from(moduleSettings)
+    )
 
     // Check specific modules
     const contactsModule = await getEnabledModule('contacts')
@@ -45,7 +38,7 @@ export async function GET() {
       authenticated: true,
       userId: user.id,
       allModules: allModules.map(m => ({ id: m.id, enabled: m.enabled })),
-      userSettings: settings || [],
+      userSettings: settings,
       moduleChecks: {
         contacts: {
           exists: allModules.some(m => m.id === 'contacts'),
