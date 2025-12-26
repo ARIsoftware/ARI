@@ -7,7 +7,7 @@
 
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
-import { createDbClient } from '@/lib/db'
+import { createDbClient } from '@/lib/db-supabase'
 import SouthAfricaClient from './south-africa-client'
 import type { TravelTask, Activity } from '../types'
 
