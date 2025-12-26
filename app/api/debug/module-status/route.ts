@@ -8,7 +8,7 @@
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
-import { createDbClient } from '@/lib/db'
+import { createDbClient } from '@/lib/db-supabase'
 import { getModules, getEnabledModule } from '@/lib/modules/module-registry'
 
 export async function GET() {

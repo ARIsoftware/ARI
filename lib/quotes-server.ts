@@ -1,4 +1,4 @@
-import { createDbClient } from './db'
+import { createDbClient } from './db-supabase'
 
 interface Quote {
   id: string

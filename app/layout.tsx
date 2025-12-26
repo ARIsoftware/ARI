@@ -1,6 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Providers } from "@/components/providers"
+import { QueryProvider } from "@/components/query-provider"
 import { getInstalledModules, getDuplicateModuleErrors } from "@/lib/modules"
 import { getEnabledModules } from "@/lib/modules/module-registry"
 import { getAuthenticatedUser } from "@/lib/auth-helpers"
@@ -87,11 +88,13 @@ export default async function RootLayout({
         />
       </head>
       <body>
-        {duplicateErrors.length > 0 ? (
-          <ModuleErrorOverlay errors={duplicateErrors} />
-        ) : (
-          <Providers modules={installedModules} enabledModules={enabledModules} initialFeatures={initialFeatures}>{children}</Providers>
-        )}
+        <QueryProvider>
+          {duplicateErrors.length > 0 ? (
+            <ModuleErrorOverlay errors={duplicateErrors} />
+          ) : (
+            <Providers modules={installedModules} enabledModules={enabledModules} initialFeatures={initialFeatures}>{children}</Providers>
+          )}
+        </QueryProvider>
       </body>
     </html>
   )
