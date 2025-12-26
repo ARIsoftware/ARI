@@ -8,10 +8,10 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Search, Filter, List, Grid3X3, Calendar, Pin, Bell, Plus, Loader2, Trash2, Pencil, Columns, Play, Activity } from "lucide-react"
-import { useState, useEffect } from "react"
-import { getFitnessTasks, toggleFitnessTaskCompletion, toggleFitnessTaskPin, reorderFitnessTasks, deleteFitnessTask, updateFitnessTask, type FitnessTask, addSampleFitnessTasks } from "@/modules-core/daily-fitness/lib/fitness"
+import { useState } from "react"
+import { toggleFitnessTaskCompletion, toggleFitnessTaskPin, reorderFitnessTasks, deleteFitnessTask, updateFitnessTask, type FitnessTask, addSampleFitnessTasks } from "@/modules-core/daily-fitness/lib/fitness"
+import { useFitnessTasks, useInvalidateFitnessTasks, useSetFitnessTasksCache } from "@/lib/hooks/use-fitness"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { YouTubeModal } from "@/components/youtube-modal"
 import { schoolPride } from "@/lib/confetti"
@@ -57,11 +57,15 @@ const formatDate = (dateString: string | null) => {
 }
 
 export default function DailyFitnessPage() {
-  const { session, supabase } = useSupabase()
+  const { session } = useSupabase()
   const user = session?.user
   const { toast } = useToast()
-  const [tasks, setTasks] = useState<FitnessTask[]>([])
-  const [loading, setLoading] = useState(true)
+
+  // TanStack Query for fitness tasks - replaces local state + realtime subscription
+  const { data: tasks = [], isLoading: loading } = useFitnessTasks()
+  const invalidateFitnessTasks = useInvalidateFitnessTasks()
+  const setTasksCache = useSetFitnessTasksCache()
+
   const [activeFilter, setActiveFilter] = useState("All")
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
@@ -76,75 +80,8 @@ export default function DailyFitnessPage() {
 
   const filters = ["All", "Pinned", "In Progress", "Completed"]
 
-  // Load tasks from Supabase and set up real-time subscription
-  useEffect(() => {
-    if (user?.id) {
-      loadTasks()
-
-      // Set up real-time subscription
-      const channel = supabase
-        .channel("fitness_database-changes")
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "fitness_database",
-          },
-          (payload) => {
-            console.log("Real-time update:", payload)
-
-            if (payload.eventType === "INSERT") {
-              setTasks((prev) => [payload.new as FitnessTask, ...prev])
-            } else if (payload.eventType === "UPDATE") {
-              setTasks((prev) => prev.map((task) => (task.id === payload.new.id ? (payload.new as FitnessTask) : task)))
-            } else if (payload.eventType === "DELETE") {
-              setTasks((prev) => prev.filter((task) => task.id !== payload.old.id))
-            }
-          },
-        )
-        .subscribe()
-
-      // Cleanup subscription on unmount
-      return () => {
-        supabase.removeChannel(channel)
-      }
-    }
-  }, [user?.id])
-
-  const loadTasks = async () => {
-    if (!user?.id) {
-      console.log("User not authenticated, skipping task load")
-      setLoading(false)
-      return
-    }
-
-    try {
-      setLoading(true)
-
-      const tokenFn = async () => session?.access_token || null
-      const data = await getFitnessTasks(tokenFn)
-
-      // If no tasks exist, add sample tasks
-      if (data.length === 0) {
-        console.log("No tasks found, adding sample tasks...")
-        await addSampleFitnessTasks(tokenFn)
-        const newData = await getFitnessTasks(tokenFn)
-        setTasks(newData)
-      } else {
-        setTasks(data)
-      }
-    } catch (error) {
-      console.error("Failed to load fitness tasks:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load fitness tasks. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Note: Sample tasks are now added via the API if no tasks exist
+  // The /api/fitness GET endpoint handles this automatically
 
   const filteredTasks = tasks
     .filter((task) => {
@@ -204,8 +141,8 @@ export default function DailyFitnessPage() {
       order_index: index
     }))
 
-    // Update local state immediately for better UX
-    setTasks(updatedTasks)
+    // Update cache immediately for better UX (optimistic update)
+    setTasksCache(() => updatedTasks)
     setDraggedTask(null)
 
     try {
@@ -213,11 +150,12 @@ export default function DailyFitnessPage() {
       if (user?.id) {
         const tokenFn = async () => session?.access_token || null
         await reorderFitnessTasks(updatedTasks.map((task) => task.id), tokenFn)
+        invalidateFitnessTasks() // Sync with server
       }
     } catch (error) {
       console.error("Failed to reorder fitness tasks:", error)
-      // Revert local state on error
-      setTasks(tasks)
+      // Revert cache on error
+      invalidateFitnessTasks()
       toast({
         title: "Error",
         description: "Failed to reorder fitness tasks. Please try again.",
@@ -247,11 +185,16 @@ export default function DailyFitnessPage() {
       updates.priority = columnType.charAt(0).toUpperCase() + columnType.slice(1) as "High" | "Medium" | "Low"
     }
 
+    // Optimistic update
+    const taskId = draggedTask
+    setTasksCache((old) => old.map((t) => t.id === taskId ? { ...t, ...updates } : t))
+    setDraggedTask(null)
+
     try {
       if (user?.id) {
         const tokenFn = async () => session?.access_token || null
-        await updateFitnessTask(draggedTask, updates, tokenFn)
-        setTasks(tasks.map((t) => t.id === draggedTask ? { ...t, ...updates } : t))
+        await updateFitnessTask(taskId, updates, tokenFn)
+        invalidateFitnessTasks() // Sync with server
       }
       toast({
         title: "Success",
@@ -259,14 +202,13 @@ export default function DailyFitnessPage() {
       })
     } catch (error) {
       console.error("Failed to update fitness task:", error)
+      invalidateFitnessTasks() // Revert on error
       toast({
         title: "Error",
         description: "Failed to update exercise. Please try again.",
         variant: "destructive",
       })
     }
-
-    setDraggedTask(null)
   }
 
   const handleToggleCompletion = async (taskId: string) => {
@@ -287,8 +229,8 @@ export default function DailyFitnessPage() {
         setTimeout(async () => {
           if (user?.id) {
             const tokenFn = async () => session?.access_token || null
-            const updatedTask = await toggleFitnessTaskCompletion(taskId, task.completed, tokenFn)
-            setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
+            await toggleFitnessTaskCompletion(taskId, task.completed, tokenFn)
+            invalidateFitnessTasks() // Sync with server
           }
           setFadingTasks(prev => {
             const newSet = new Set(prev)
@@ -305,7 +247,7 @@ export default function DailyFitnessPage() {
         if (user?.id) {
           const tokenFn = async () => session?.access_token || null
           const updatedTask = await toggleFitnessTaskCompletion(taskId, task.completed, tokenFn)
-          setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
+          invalidateFitnessTasks() // Sync with server
 
           // Trigger confetti only if completing (not uncompleting) - with 1 second delay
           if (updatedTask.completed) {
@@ -338,8 +280,8 @@ export default function DailyFitnessPage() {
       if (!task) return
 
       const tokenFn = async () => session?.access_token || null
-      const updatedTask = await toggleFitnessTaskPin(taskId, task.pinned, tokenFn)
-      setTasks(tasks.map((task) => (task.id === taskId ? updatedTask : task)))
+      await toggleFitnessTaskPin(taskId, task.pinned, tokenFn)
+      invalidateFitnessTasks() // Sync with server
     } catch (error) {
       console.error("Failed to toggle fitness task pin:", error)
       toast({
@@ -365,7 +307,7 @@ export default function DailyFitnessPage() {
       if (user?.id) {
         const tokenFn = async () => session?.access_token || null
         await deleteFitnessTask(taskToDelete.id, tokenFn)
-        setTasks(tasks.filter((task) => task.id !== taskToDelete.id))
+        invalidateFitnessTasks() // Sync with server
       }
       toast({
         title: "Success",
