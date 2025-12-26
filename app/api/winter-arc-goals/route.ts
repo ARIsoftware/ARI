@@ -1,38 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { createErrorResponse } from '@/lib/api-helpers'
+import { createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
+import { winterArcGoals } from '@/lib/db/schema'
+import { asc } from 'drizzle-orm'
 
 export async function GET(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    const { data, error } = await supabase
-      .from('winter_arc_goals')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: true })
+    // RLS automatically filters by user_id
+    const data = await withRLS((db) =>
+      db.select().from(winterArcGoals).orderBy(asc(winterArcGoals.createdAt))
+    )
 
-    if (error) {
-      console.error('Error fetching winter arc goals:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json(data)
-  } catch (error: any) {
+    return NextResponse.json(toSnakeCase(data))
+  } catch (error: unknown) {
     console.error('Error in GET /api/winter-arc-goals:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return createErrorResponse('Authentication required', 401)
     }
 
@@ -43,22 +39,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 })
     }
 
-    const { data, error } = await supabase
-      .from('winter_arc_goals')
-      .insert({
-        user_id: user.id,
-        title: title.trim(),
-      })
-      .select()
-      .single()
+    // INSERT requires explicit user_id
+    const data = await withRLS((db) =>
+      db.insert(winterArcGoals)
+        .values({
+          userId: user.id,
+          title: title.trim(),
+        })
+        .returning()
+    )
 
-    if (error) {
-      console.error('Error creating winter arc goal:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json(data, { status: 201 })
-  } catch (error: any) {
+    return NextResponse.json(toSnakeCase(data[0]), { status: 201 })
+  } catch (error: unknown) {
     console.error('Error in POST /api/winter-arc-goals:', error)
     return createErrorResponse('Internal server error', 500)
   }

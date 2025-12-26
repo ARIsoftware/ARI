@@ -18,6 +18,29 @@ import {
 import { Loader2, Activity, CheckCircle, Clock, Plus, User } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 
+// Helper to safely format date
+function safeFormatDistanceToNow(timestamp: string | null | undefined): string {
+  if (!timestamp) return 'Unknown time'
+  try {
+    const date = new Date(timestamp)
+    if (isNaN(date.getTime())) return 'Unknown time'
+    return formatDistanceToNow(date, { addSuffix: true })
+  } catch {
+    return 'Unknown time'
+  }
+}
+
+// Helper to check if timestamp is valid
+function isValidTimestamp(timestamp: string | null | undefined): boolean {
+  if (!timestamp) return false
+  try {
+    const date = new Date(timestamp)
+    return !isNaN(date.getTime())
+  } catch {
+    return false
+  }
+}
+
 interface ActivityItem {
   id: string
   type: 'task_created' | 'task_completed' | 'contact_added' | 'fitness_completed'
@@ -62,7 +85,12 @@ export function RecentActivityFeed({ token }: RecentActivityFeedProps) {
         if (tasksResponse.ok) {
           const tasks = await tasksResponse.json()
           const recentTasks = tasks
-            .sort((a: any, b: any) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime())
+            .filter((t: any) => isValidTimestamp(t.updated_at) || isValidTimestamp(t.created_at))
+            .sort((a: any, b: any) => {
+              const dateA = new Date(b.updated_at || b.created_at).getTime() || 0
+              const dateB = new Date(a.updated_at || a.created_at).getTime() || 0
+              return dateA - dateB
+            })
             .slice(0, 10)
 
           recentTasks.forEach((task: any) => {
@@ -96,7 +124,12 @@ export function RecentActivityFeed({ token }: RecentActivityFeedProps) {
         if (contactsResponse.ok) {
           const contacts = await contactsResponse.json()
           const recentContacts = contacts
-            .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .filter((c: any) => isValidTimestamp(c.created_at))
+            .sort((a: any, b: any) => {
+              const dateA = new Date(b.created_at).getTime() || 0
+              const dateB = new Date(a.created_at).getTime() || 0
+              return dateA - dateB
+            })
             .slice(0, 5)
 
           recentContacts.forEach((contact: any) => {
@@ -112,8 +145,9 @@ export function RecentActivityFeed({ token }: RecentActivityFeedProps) {
           })
         }
 
-        // Sort all activities by timestamp and take the most recent 15
+        // Filter out activities with invalid timestamps, sort, and take the most recent 15
         const sortedActivities = allActivities
+          .filter(a => isValidTimestamp(a.timestamp))
           .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
           .slice(0, 15)
 
@@ -217,7 +251,7 @@ export function RecentActivityFeed({ token }: RecentActivityFeedProps) {
                     <div className="text-xs">
                       <p className="font-semibold">{activity.title}</p>
                       <p className="text-muted-foreground">
-                        {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
+                        {safeFormatDistanceToNow(activity.timestamp)}
                       </p>
                     </div>
                   </TooltipContent>

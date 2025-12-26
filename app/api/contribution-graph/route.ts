@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
+import { validateRequestBody, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
 import { z } from 'zod'
+import { contributionGraph } from '@/lib/db/schema'
+import { eq, asc, and, sql } from 'drizzle-orm'
 
 const updateColorSchema = z.object({
   goal_id: z.string().uuid(),
@@ -11,25 +13,18 @@ const updateColorSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // Fetch all contribution graph boxes for the user
-    const { data, error } = await supabase
-      .from('contribution_graph')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('box_index', { ascending: true })
+    // RLS automatically filters by user_id
+    const data = await withRLS((db) =>
+      db.select().from(contributionGraph).orderBy(asc(contributionGraph.boxIndex))
+    )
 
-    if (error) {
-      console.error('Error fetching contribution graph:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json(data || [])
+    return NextResponse.json(toSnakeCase(data) || [])
   } catch (err) {
     console.error('API error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -45,33 +40,52 @@ export async function POST(request: NextRequest) {
     }
 
     const { goal_id, box_index, color } = validation.data
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !withRLS) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // Use upsert to insert or update the box color
-    const { data, error } = await supabase
-      .from('contribution_graph')
-      .upsert({
-        user_id: user.id,
-        goal_id,
-        box_index,
-        color,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'user_id,goal_id,box_index'
-      })
-      .select()
-      .single()
+    // Check if entry exists (RLS filters automatically)
+    const existing = await withRLS((db) =>
+      db.select({ id: contributionGraph.id })
+        .from(contributionGraph)
+        .where(and(
+          eq(contributionGraph.goalId, goal_id),
+          eq(contributionGraph.boxIndex, box_index)
+        ))
+        .limit(1)
+    )
 
-    if (error) {
-      console.error('Error updating contribution graph:', error)
-      return createErrorResponse(error.message, 500)
+    let data
+    if (existing.length > 0) {
+      // Update existing entry
+      const updated = await withRLS((db) =>
+        db.update(contributionGraph)
+          .set({
+            color,
+            updatedAt: sql`timezone('utc'::text, now())`
+          })
+          .where(eq(contributionGraph.id, existing[0].id))
+          .returning()
+      )
+      data = updated[0]
+    } else {
+      // Insert new entry
+      const inserted = await withRLS((db) =>
+        db.insert(contributionGraph)
+          .values({
+            userId: user.id,
+            goalId: goal_id,
+            boxIndex: box_index,
+            color
+          })
+          .returning()
+      )
+      data = inserted[0]
     }
 
-    return NextResponse.json(data, { status: 200 })
+    return NextResponse.json(toSnakeCase(data), { status: 200 })
   } catch (err) {
     console.error('API error:', err)
     return createErrorResponse('Internal server error', 500)
