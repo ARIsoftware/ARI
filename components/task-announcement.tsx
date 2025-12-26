@@ -23,7 +23,6 @@ import {
 import { DM_Sans } from "next/font/google"
 import { Announcement, AnnouncementTag, AnnouncementTitle } from "@/components/ui/kibo-ui/announcement"
 import { getLastCompletedTask, truncateTaskName } from "@/lib/get-last-completed-task"
-import { getAuthenticatedSupabase } from "@/lib/supabase"
 import { useIsMobile } from "@/components/ui/use-mobile"
 import { useSupabase } from "@/components/providers"
 import { authClient } from "@/lib/auth-client"
@@ -243,36 +242,10 @@ export function TaskAnnouncement() {
     }
     globalTimerState.listeners.push(listener)
 
-    // Set up real-time subscription for task completions
-    const setupSubscription = async () => {
-      const client = await getAuthenticatedSupabase()
-      const channel = client
-        .channel("task-completions")
-        .on(
-          "postgres_changes",
-          {
-            event: "UPDATE",
-            schema: "public",
-            table: "tasks",
-            filter: "completed=eq.true",
-          },
-          (payload) => {
-            if (payload.new && payload.new.completed === true) {
-              setLastTask({ title: payload.new.title })
-            }
-          }
-        )
-        .subscribe()
+    // Note: Realtime subscription removed - using TanStack Query refetch pattern instead
+    // The task announcement will update when the user navigates or on window focus
 
-      return () => {
-        client.removeChannel(channel)
-      }
-    }
-
-    const cleanup = setupSubscription()
-    
     return () => {
-      cleanup.then(fn => fn && fn())
       // Clean up focus timer listener
       globalTimerState.listeners = globalTimerState.listeners.filter(l => l !== listener)
     }
