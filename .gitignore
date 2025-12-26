@@ -54,3 +54,6 @@ next-env.d.ts
 # database dumps (but allow migrations folder)
 *.sql
 !/migrations/*.sql
+
+# Drizzle generated migrations (we use lib/db/schema/ instead)
+lib/db/migrations/
