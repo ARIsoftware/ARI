@@ -9,7 +9,7 @@
 
 import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
-import { createDbClient } from '@/lib/db'
+import { createDbClient } from '@/lib/db-supabase'
 import { loadModules } from './module-loader'
 import type { ModuleMetadata, ModuleSettings } from './module-types'
 
