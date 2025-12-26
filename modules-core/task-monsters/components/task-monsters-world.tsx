@@ -15,7 +15,7 @@ interface TaskWithMonster extends Task {
 }
 
 export default function TaskMonstersWorld() {
-  const { session } = useSupabase()
+  const { session, isLoading: authLoading } = useSupabase()
   const [tasks, setTasks] = useState<TaskWithMonster[]>([])
   const [selectedTaskIndex, setSelectedTaskIndex] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -83,6 +83,14 @@ export default function TaskMonstersWorld() {
   const selectedTask = selectedTaskIndex !== null ? tasks[selectedTaskIndex] : null
 
   const monsterCount = tasks.length
+
+  if (authLoading) {
+    return (
+      <div className="h-[calc(100vh-4rem)] w-full flex items-center justify-center bg-background">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    )
+  }
 
   if (!session) {
     return (
