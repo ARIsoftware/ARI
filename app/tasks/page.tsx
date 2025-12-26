@@ -21,8 +21,10 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Search, Filter, List, Grid3X3, Calendar, Pin, Bell, Plus, Trash2, Pencil, Columns, StickyNote, Table } from "lucide-react"
 import { FocusTimer } from "@/components/focus-timer"
-import { useState, useEffect } from "react"
-import { getTasks, toggleTaskCompletion, toggleTaskPin, reorderTasks, deleteTask, updateTask, type Task } from "@/lib/tasks"
+import { useState, useEffect, useMemo } from "react"
+import { toggleTaskCompletion, toggleTaskPin, reorderTasks, deleteTask, updateTask, type Task } from "@/lib/tasks"
+import { useTasks } from "@/lib/hooks/use-tasks"
+import { useQueryClient } from "@tanstack/react-query"
 import { getMajorProjects } from "@/modules-core/major-projects/lib/utils"
 import type { MajorProject } from "@/modules-core/major-projects/types"
 import { useFeatures } from "@/lib/features-context"
@@ -124,8 +126,11 @@ export default function TasksPage() {
     
     debugJWT()
   }, [user?.id, user?.email, session?.access_token])
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [loading, setLoading] = useState(true)
+
+  // TanStack Query for tasks - replaces local state + realtime subscription
+  const queryClient = useQueryClient()
+  const { data: tasks = [], isLoading: loading, refetch: refetchTasks } = useTasks()
+
   const [activeFilter, setActiveFilter] = useState("All")
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
@@ -139,42 +144,6 @@ export default function TasksPage() {
   const projectFilter = searchParams.get('filter')
 
   const filters = ["All", "Pinned", "In Progress", "Completed"]
-
-  // Load tasks from Supabase and set up real-time subscription
-  useEffect(() => {
-    if (user?.id) {
-      loadTasks()
-
-      // Set up real-time subscription
-      const channel = supabase
-        .channel("ari-database-changes")
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "ari-database",
-          },
-          (payload) => {
-            console.log("Real-time update:", payload)
-
-            if (payload.eventType === "INSERT") {
-              setTasks((prev) => [payload.new as Task, ...prev])
-            } else if (payload.eventType === "UPDATE") {
-              setTasks((prev) => prev.map((task) => (task.id === payload.new.id ? (payload.new as Task) : task)))
-            } else if (payload.eventType === "DELETE") {
-              setTasks((prev) => prev.filter((task) => task.id !== payload.old.id))
-            }
-          },
-        )
-        .subscribe()
-
-      // Cleanup subscription on unmount
-      return () => {
-        supabase.removeChannel(channel)
-      }
-    }
-  }, [user?.id])
 
   // Redirect to sign-in if user is not authenticated
   useEffect(() => {
@@ -200,32 +169,14 @@ export default function TasksPage() {
     loadProjects()
   }, [isFeatureEnabled])
 
-  const loadTasks = async () => {
-    if (!user?.id) {
-      console.log("User not authenticated, skipping task load")
-      setLoading(false)
-      return
-    }
+  // Helper to update tasks cache optimistically
+  const setTasksCache = (updater: (tasks: Task[]) => Task[]) => {
+    queryClient.setQueryData<Task[]>(['tasks'], (old = []) => updater(old))
+  }
 
-    try {
-      setLoading(true)
-      const tokenFn = async () => {
-        const token = session?.access_token || null
-        console.log('🔑 Token generated:', token ? 'SUCCESS' : 'FAILED')
-        return token
-      }
-      const data = await getTasks(tokenFn)
-      setTasks(data)
-    } catch (error) {
-      console.error("Failed to load tasks:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load tasks. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
+  // Helper to invalidate and refetch tasks
+  const invalidateTasks = () => {
+    queryClient.invalidateQueries({ queryKey: ['tasks'] })
   }
 
   const filteredTasks = tasks
@@ -290,8 +241,8 @@ export default function TasksPage() {
       order_index: index
     }))
 
-    // Update local state immediately for better UX
-    setTasks(updatedTasks)
+    // Update cache immediately for better UX (optimistic update)
+    setTasksCache(() => updatedTasks)
     setDraggedTask(null)
 
     try {
@@ -299,11 +250,12 @@ export default function TasksPage() {
       if (user?.id) {
         const tokenFn = async () => session?.access_token || null
         await reorderTasks(updatedTasks.map((task) => task.id), tokenFn)
+        invalidateTasks() // Sync with server
       }
     } catch (error) {
       console.error("Failed to reorder tasks:", error)
-      // Revert local state on error
-      setTasks(tasks)
+      // Revert cache on error
+      invalidateTasks()
       toast({
         title: "Error",
         description: "Failed to reorder tasks. Please try again.",
@@ -333,11 +285,16 @@ export default function TasksPage() {
       updates.priority = columnType.charAt(0).toUpperCase() + columnType.slice(1) as "High" | "Medium" | "Low"
     }
 
+    // Optimistic update
+    const taskId = draggedTask
+    setTasksCache((old) => old.map((t) => t.id === taskId ? { ...t, ...updates } : t))
+    setDraggedTask(null)
+
     try {
       if (user?.id) {
         const tokenFn = async () => session?.access_token || null
-        await updateTask(draggedTask, updates, tokenFn)
-        setTasks(tasks.map((t) => t.id === draggedTask ? { ...t, ...updates } : t))
+        await updateTask(taskId, updates, tokenFn)
+        invalidateTasks() // Sync with server
       }
       toast({
         title: "Success",
@@ -345,14 +302,13 @@ export default function TasksPage() {
       })
     } catch (error) {
       console.error("Failed to update task:", error)
+      invalidateTasks() // Revert on error
       toast({
         title: "Error",
         description: "Failed to update task. Please try again.",
         variant: "destructive",
       })
     }
-    
-    setDraggedTask(null)
   }
 
   const handleToggleCompletion = async (taskId: string) => {
@@ -373,8 +329,8 @@ export default function TasksPage() {
         setTimeout(async () => {
           if (user?.id) {
             const tokenFn = async () => session?.access_token || null
-            const updatedTask = await toggleTaskCompletion(taskId, tokenFn)
-            setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
+            await toggleTaskCompletion(taskId, tokenFn)
+            invalidateTasks() // Sync with server
           }
           setFadingTasks(prev => {
             const newSet = new Set(prev)
@@ -391,7 +347,7 @@ export default function TasksPage() {
         if (user?.id) {
           const tokenFn = async () => session?.access_token || null
           const updatedTask = await toggleTaskCompletion(taskId, tokenFn)
-          setTasks(tasks.map((t) => (t.id === taskId ? updatedTask : t)))
+          invalidateTasks() // Sync with server
 
           // Trigger confetti only if completing (not uncompleting) - with 1 second delay
           if (updatedTask.completed) {
@@ -421,8 +377,8 @@ export default function TasksPage() {
 
     try {
       const tokenFn = async () => session?.access_token || null
-      const updatedTask = await toggleTaskPin(taskId, tokenFn)
-      setTasks(tasks.map((task) => (task.id === taskId ? updatedTask : task)))
+      await toggleTaskPin(taskId, tokenFn)
+      invalidateTasks() // Sync with server
     } catch (error) {
       console.error("Failed to toggle task pin:", error)
       toast({
@@ -443,12 +399,12 @@ export default function TasksPage() {
 
   const confirmDeleteTask = async () => {
     if (!taskToDelete) return
-    
+
     try {
       if (user?.id) {
         const tokenFn = async () => session?.access_token || null
         await deleteTask(taskToDelete.id, tokenFn)
-        setTasks(tasks.filter((task) => task.id !== taskToDelete.id))
+        invalidateTasks() // Sync with server
       }
       toast({
         title: "Success",
