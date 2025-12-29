@@ -55,6 +55,7 @@ const COMPLETE_TABLE_LIST = [
   'gratitude_entries',
   'knowledge_articles',
   'knowledge_collections',
+  'ari_launch_entries',
 ]
 
 interface TableInfo {

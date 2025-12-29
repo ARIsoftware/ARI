@@ -19,10 +19,11 @@
 6. [Database Integration](#6-database-integration)
 7. [API Routes](#7-api-routes)
 8. [Components](#8-components)
-9. [Module Utility Functions](#9-module-utility-functions)
-10. [QA Verification Steps](#10-qa-verification-steps)
-11. [Troubleshooting](#11-troubleshooting)
-12. [Reference](#12-reference)
+9. [Data Fetching with TanStack Query](#9-data-fetching-with-tanstack-query)
+10. [Module Utility Functions](#10-module-utility-functions)
+11. [QA Verification Steps](#11-qa-verification-steps)
+12. [Troubleshooting](#12-troubleshooting)
+13. [Reference](#13-reference)
 
 ---
 
@@ -1417,7 +1418,207 @@ import { getContacts } from '@/lib/contacts'
 
 ---
 
-## 9. Module Utility Functions
+## 9. Data Fetching with TanStack Query
+
+### Why TanStack Query?
+
+ARI uses TanStack Query (React Query) for client-side data fetching. **New modules should use TanStack Query** instead of manual `useState` + `useEffect` + `fetch` patterns.
+
+**Benefits:**
+- **Caching**: 30-second stale time prevents unnecessary refetches
+- **Auto-refetch on focus**: Data stays fresh when users switch tabs
+- **Optimistic updates**: Built-in support for instant UI feedback
+- **Loading/error states**: Clean `isLoading`, `isError` handling
+- **Consistency**: Matches patterns in tasks, contacts, and other modules
+
+### Creating TanStack Query Hooks
+
+Create a hooks file in `/lib/hooks/use-[module-name].ts`:
+
+```typescript
+// lib/hooks/use-my-module.ts
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import type { MyModuleEntry } from '@/modules-custom/my-module/types'
+
+/**
+ * Fetch all entries for the current user
+ */
+export function useMyModuleEntries() {
+  return useQuery({
+    queryKey: ['my-module-entries'],
+    queryFn: async (): Promise<MyModuleEntry[]> => {
+      const res = await fetch('/api/modules/my-module/data')
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || 'Failed to fetch entries')
+      }
+      const data = await res.json()
+      return data.entries || []
+    },
+  })
+}
+
+/**
+ * Create a new entry with optimistic updates
+ */
+export function useCreateMyModuleEntry() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: { title: string }): Promise<MyModuleEntry> => {
+      const res = await fetch('/api/modules/my-module/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      })
+      if (!res.ok) throw new Error('Failed to create entry')
+      return (await res.json()).entry
+    },
+    // Optimistic update - update UI immediately before server responds
+    onMutate: async (newEntry) => {
+      await queryClient.cancelQueries({ queryKey: ['my-module-entries'] })
+      const previous = queryClient.getQueryData<MyModuleEntry[]>(['my-module-entries'])
+
+      queryClient.setQueryData<MyModuleEntry[]>(['my-module-entries'], (old = []) => [
+        ...old,
+        { ...newEntry, id: 'temp-' + Date.now(), /* other fields */ } as MyModuleEntry,
+      ])
+
+      return { previous }
+    },
+    // Rollback on error
+    onError: (_err, _newEntry, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['my-module-entries'], context.previous)
+      }
+    },
+    // Refetch to sync with server
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-module-entries'] })
+    },
+  })
+}
+
+// Similar patterns for useUpdateMyModuleEntry, useDeleteMyModuleEntry
+```
+
+### Using Hooks in Page Component
+
+```tsx
+// modules-custom/my-module/app/page.tsx
+'use client'
+
+import { useState } from 'react'
+import { useToast } from '@/hooks/use-toast'
+import {
+  useMyModuleEntries,
+  useCreateMyModuleEntry,
+  useDeleteMyModuleEntry
+} from '@/lib/hooks/use-my-module'
+
+export default function MyModulePage() {
+  const { toast } = useToast()
+
+  // TanStack Query hooks - no manual state management needed!
+  const { data: entries = [], isLoading } = useMyModuleEntries()
+  const createEntry = useCreateMyModuleEntry()
+  const deleteEntry = useDeleteMyModuleEntry()
+
+  const handleCreate = () => {
+    // Close modal immediately (optimistic UX)
+    setModalOpen(false)
+
+    createEntry.mutate(
+      { title: newTitle },
+      {
+        onError: () => {
+          toast({ variant: 'destructive', title: 'Failed to save' })
+        },
+      }
+    )
+  }
+
+  // Grid renders immediately - no blocking auth check needed
+  // (middleware handles auth, cookies handle API auth)
+  return (
+    <div className="p-6">
+      {isLoading && <LoadingOverlay />}
+      {/* Render content */}
+    </div>
+  )
+}
+```
+
+### Optimistic Updates Pattern
+
+For the best user experience, implement optimistic updates:
+
+1. **Close modals immediately** after user clicks save (don't wait for `onSuccess`)
+2. **Update cache in `onMutate`** so UI reflects changes instantly
+3. **Rollback in `onError`** if the server request fails
+4. **Show toast on error** to inform user of failure
+
+```typescript
+const handleAddItem = () => {
+  const title = inputValue.trim()
+
+  // Close modal immediately (optimistic)
+  setModalOpen(false)
+  setInputValue('')
+
+  // Mutation handles optimistic cache update via onMutate
+  createItem.mutate(
+    { title },
+    {
+      onError: () => {
+        toast({ variant: 'destructive', title: 'Failed to save' })
+      },
+    }
+  )
+}
+```
+
+### Don't Block on Session
+
+The old pattern waited for session before rendering:
+
+```tsx
+// ❌ OLD - Don't do this
+const { session } = useSupabase()
+if (!session) {
+  return <div>Authenticating...</div>
+}
+```
+
+**New pattern**: Render immediately, let TanStack Query handle loading:
+
+```tsx
+// ✅ NEW - Render immediately
+const { data: entries = [], isLoading } = useMyModuleEntries()
+
+return (
+  <div className="p-6">
+    {isLoading && <LoadingOverlay />}
+    <Grid entries={entries} />
+  </div>
+)
+```
+
+**Why this works:**
+- Middleware already protects routes (unauthenticated users are redirected)
+- API routes use cookies/headers for auth (no need to pass session)
+- TanStack Query handles loading state elegantly
+
+### Reference Implementations
+
+See these files for complete examples:
+- `/lib/hooks/use-tasks.ts` - Full CRUD with optimistic updates
+- `/lib/hooks/use-ari-launch.ts` - Simple module example
+- `/app/tasks/page.tsx` - Page using TanStack Query hooks
+
+---
+
+## 10. Module Utility Functions
 
 ARI provides utility functions and hooks for working with modules programmatically.
 
@@ -1526,7 +1727,7 @@ const { modules, enabledModules, loading, refreshModules } = useModulesContext()
 
 ---
 
-## 10. QA Verification Steps
+## 11. QA Verification Steps
 
 Run through this checklist after creating or updating a module:
 
@@ -1589,7 +1790,7 @@ Run through this checklist after creating or updating a module:
 
 ---
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
 ### Module Not Appearing in Sidebar
 
@@ -1697,7 +1898,7 @@ npm run build 2>&1 | head -50
 
 ---
 
-## 12. Reference
+## 13. Reference
 
 ### Template Module
 
