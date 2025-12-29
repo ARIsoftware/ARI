@@ -85,6 +85,9 @@ const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
     'data/[id]': () => import('@/modules-core/knowledge-manager/api/data/[id]/route'), // GET/PATCH/DELETE for single article
     'collections': () => import('@/modules-core/knowledge-manager/api/collections/route'), // GET/POST for collections
     'collections/[id]': () => import('@/modules-core/knowledge-manager/api/collections/[id]/route') // PATCH/DELETE for single collection
+  },
+  'ari-launch': {
+    'data': () => import('@/modules-custom/ari-launch/api/data/route') // GET/POST for entries (upsert by day)
   }
 }
 

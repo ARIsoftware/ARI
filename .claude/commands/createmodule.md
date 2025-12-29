@@ -46,10 +46,43 @@ When approved, create the module following this order:
 4. **Create API routes** if needed (follow auth patterns from hello-world)
 5. **Create database migration** in `database/schema.sql` if tables needed
 6. **Update types** in `types/index.ts`
-7. **Run `npm run generate-module-registry`** to register the new module
-8. Ask the user for permission to execute the .sql file, or ask if they want to run the .SQL statements themselves.
-9. If the user needs to take any action to complete the setup of the module (run a .sql file, restart the dev server etc), please clearly indicate the actions they need to take with clear instructions.
-10. If database tables are created, remind the user to enable RLS on each new table. If the project is using Supabase you can tell them to enable RLS via Supabase Dashboard > Table Editor > [table] > RLS policies > Enable RLS.
+7. **Create TanStack Query hooks** in `/lib/hooks/use-[module-name].ts` (see below)
+8. **Run `npm run generate-module-registry`** to register the new module
+9. Ask the user for permission to execute the .sql file, or ask if they want to run the .SQL statements themselves.
+10. If the user needs to take any action to complete the setup of the module (run a .sql file, restart the dev server etc), please clearly indicate the actions they need to take with clear instructions.
+11. If database tables are created, remind the user to enable RLS on each new table. If the project is using Supabase you can tell them to enable RLS via Supabase Dashboard > Table Editor > [table] > RLS policies > Enable RLS.
+
+## Data Fetching Best Practices
+
+**Always use TanStack Query** for modules that fetch data. Do NOT use the old `useState` + `useEffect` + `fetch` pattern.
+
+### Create TanStack Query Hooks
+
+Create `/lib/hooks/use-[module-name].ts` with:
+- `useModuleEntries()` - fetches data with `useQuery`
+- `useCreateModuleEntry()` - creates with `useMutation` + optimistic updates
+- `useUpdateModuleEntry()` - updates with `useMutation` + optimistic updates
+- `useDeleteModuleEntry()` - deletes with `useMutation` + optimistic updates
+
+See `/lib/hooks/use-ari-launch.ts` or `/lib/hooks/use-tasks.ts` for examples.
+
+### Optimistic Updates Pattern
+
+All mutations should implement optimistic updates:
+1. Close modals immediately after user clicks save (don't wait for `onSuccess`)
+2. Update cache in `onMutate` so UI reflects changes instantly
+3. Rollback in `onError` if the server request fails
+4. Show toast notification on error
+
+### Don't Block on Session
+
+Do NOT add `if (!session) return <Loading />` at the start of the page component. This causes a visible "Authenticating..." delay. Instead:
+- Render the page structure immediately
+- Let TanStack Query handle the loading state with `isLoading`
+- Middleware already protects routes from unauthenticated users
+- API routes use cookies/headers for auth automatically
+
+See `/docs/MODULES.md` section 9 "Data Fetching with TanStack Query" for full documentation.
 
 ## Quality Assurance Checklist
 
@@ -57,6 +90,10 @@ Before marking complete, verify:
 - [ ] module.json is valid and complete
 - [ ] All API routes use proper authentication (see hello-world patterns)
 - [ ] Database schema includes RLS policies with `auth.uid()`
+- [ ] TanStack Query hooks created in `/lib/hooks/use-[module-name].ts`
+- [ ] Page uses TanStack Query hooks (not manual useState/useEffect/fetch)
+- [ ] Optimistic updates implemented for all mutations
+- [ ] Page does NOT block on session check (no "Authenticating..." spinner)
 - [ ] Component uses proper theming (Tailwind classes, not hardcoded colors)
 - [ ] No TypeScript errors (`npx tsc --noEmit`)
 - [ ] Module appears in sidebar after registry generation
