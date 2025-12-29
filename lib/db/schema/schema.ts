@@ -718,3 +718,26 @@ export const hyroxStationRecords = pgTable("hyrox_station_records", {
 	pgPolicy("hyrox_station_records_update", { as: "permissive", for: "update", to: ["public"] }),
 	check("hyrox_station_records_station_type_check", sql`station_type = ANY (ARRAY['run'::text, 'exercise'::text])`),
 ]);
+
+export const ariLaunchEntries = pgTable("ari_launch_entries", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	userId: uuid("user_id").notNull(),
+	dayNumber: integer("day_number").notNull(),
+	title: varchar({ length: 500 }).notNull(),
+	orderIndex: integer("order_index").default(0),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+}, (table) => [
+	index("idx_ari_launch_entries_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
+	index("idx_ari_launch_entries_user_day").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.dayNumber.asc().nullsLast().op("int4_ops")),
+	index("idx_ari_launch_entries_order").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.dayNumber.asc().nullsLast().op("int4_ops"), table.orderIndex.asc().nullsLast().op("int4_ops")),
+	pgPolicy("Users can view their own ari_launch_entries", { as: "permissive", for: "select", to: ["public"], using: sql`(auth.uid() = user_id)` }),
+	pgPolicy("Users can insert their own ari_launch_entries", { as: "permissive", for: "insert", to: ["public"] }),
+	pgPolicy("Users can update their own ari_launch_entries", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("Users can delete their own ari_launch_entries", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() = user_id)` }),
+	pgPolicy("ari_launch_entries_select", { as: "permissive", for: "select", to: ["public"] }),
+	pgPolicy("ari_launch_entries_insert", { as: "permissive", for: "insert", to: ["public"] }),
+	pgPolicy("ari_launch_entries_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("ari_launch_entries_delete", { as: "permissive", for: "delete", to: ["public"] }),
+	check("ari_launch_entries_day_number_check", sql`(day_number >= 1) AND (day_number <= 45)`),
+]);
