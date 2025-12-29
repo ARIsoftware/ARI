@@ -448,9 +448,9 @@ export default function HDDashboardPage() {
                                 {formatDate(task.due_date)}
                               </Badge>
                             )}
-                            {task.priority_score && (
+                            {task.priority_score != null && (
                               <span className="text-[9px] text-gray-500 dark:text-gray-400 blueprint:text-white light:text-gray-500 font-mono">
-                                P:{task.priority_score.toFixed(1)}
+                                P:{Number(task.priority_score).toFixed(1)}
                               </span>
                             )}
                             {task.impact && (
