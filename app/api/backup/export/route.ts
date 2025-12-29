@@ -59,6 +59,7 @@ async function discoverTables(client: any): Promise<{ tables: string[], method: 
     'gratitude_entries',
     'knowledge_articles',
     'knowledge_collections',
+    'ari_launch_entries',
   ];
 
   try {
