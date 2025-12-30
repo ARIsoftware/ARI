@@ -12,8 +12,8 @@ interface NotepadProps {
   onClose: () => void
 }
 
-const MAX_CHARACTERS = 2250
-const WARNING_THRESHOLD = 2150
+const MAX_CHARACTERS = 6000
+const WARNING_THRESHOLD = 5900
 
 export function Notepad({ isOpen, onClose }: NotepadProps) {
   const { toast } = useToast()
@@ -72,10 +72,7 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
       await saveNotepad(content)
       setSavedContent(content)
       setHasUnsavedChanges(false)
-      // Reload revisions to include the new one
-      const revisionsList = await getNotepadRevisions()
-      setRevisions(revisionsList)
-      setCurrentRevisionIndex(-1) // Reset to latest
+      setCurrentRevisionIndex(-1)
       setIsViewingHistory(false)
       toast({
         title: "Notepad saved",
