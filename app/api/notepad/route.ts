@@ -4,7 +4,7 @@ import { createErrorResponse } from '@/lib/api-helpers'
 import { notepad, notepadRevisions } from '@/lib/db/schema'
 import { eq, desc, max, sql } from 'drizzle-orm'
 
-const MAX_CONTENT_LENGTH = 2250
+const MAX_CONTENT_LENGTH = 6000
 
 export async function GET(request: NextRequest) {
   try {
@@ -56,52 +56,49 @@ export async function POST(request: NextRequest) {
       return createErrorResponse(`Content exceeds maximum length of ${MAX_CONTENT_LENGTH} characters`, 400)
     }
 
-    // Get the max revision number for this user (RLS filters automatically)
-    const maxRevisionResult = await withRLS((db) =>
-      db.select({ maxRevision: max(notepadRevisions.revisionNumber) })
-        .from(notepadRevisions)
-    )
+    // Run independent queries in parallel for better performance
+    const [maxRevisionResult, existingNotepad] = await Promise.all([
+      withRLS((db) =>
+        db.select({ maxRevision: max(notepadRevisions.revisionNumber) })
+          .from(notepadRevisions)
+      ),
+      withRLS((db) =>
+        db.select({ id: notepad.id })
+          .from(notepad)
+          .limit(1)
+      )
+    ])
 
     const revisionNumber = (maxRevisionResult[0]?.maxRevision || 0) + 1
 
-    // Insert new revision
-    const newRevision = await withRLS((db) =>
-      db.insert(notepadRevisions)
-        .values({
-          content,
-          userId: user.id,
-          revisionNumber
-        })
-        .returning()
-    )
-
-    // Check if notepad exists for this user
-    const existingNotepad = await withRLS((db) =>
-      db.select({ id: notepad.id })
-        .from(notepad)
-        .limit(1)
-    )
-
-    if (existingNotepad.length > 0) {
-      // Update existing notepad (RLS ensures user can only update their own)
-      await withRLS((db) =>
-        db.update(notepad)
-          .set({
-            content,
-            updatedAt: sql`timezone('utc'::text, now())`
-          })
-          .where(eq(notepad.id, existingNotepad[0].id))
-      )
-    } else {
-      // Create new notepad
-      await withRLS((db) =>
-        db.insert(notepad)
+    // Insert revision and update/create notepad in parallel
+    const [newRevision] = await Promise.all([
+      withRLS((db) =>
+        db.insert(notepadRevisions)
           .values({
             content,
-            userId: user.id
+            userId: user.id,
+            revisionNumber
           })
-      )
-    }
+          .returning()
+      ),
+      existingNotepad.length > 0
+        ? withRLS((db) =>
+            db.update(notepad)
+              .set({
+                content,
+                updatedAt: sql`timezone('utc'::text, now())`
+              })
+              .where(eq(notepad.id, existingNotepad[0].id))
+          )
+        : withRLS((db) =>
+            db.insert(notepad)
+              .values({
+                content,
+                userId: user.id
+              })
+          )
+    ])
 
     return NextResponse.json(newRevision[0])
   } catch (err) {

@@ -364,7 +364,7 @@ export default function RadarPage() {
                               </div>
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              Score: {task.score.toFixed(2)}
+                              Score: {typeof task.score === 'number' ? task.score.toFixed(2) : 'N/A'}
                             </div>
                           </div>
                         )
