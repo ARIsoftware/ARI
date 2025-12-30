@@ -18,6 +18,7 @@ import { useState } from 'react'
 import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Loader2, Rocket, Plus, GripVertical, Trash2 } from 'lucide-react'
 import {
   Dialog,
@@ -310,13 +311,15 @@ export default function AriLaunchPage() {
           </DialogHeader>
 
           <div className="py-4">
-            <Input
+            <Textarea
               value={newTaskTitle}
               onChange={(e) => setNewTaskTitle(e.target.value)}
               placeholder="Enter task title..."
               autoFocus
+              maxLength={800}
+              rows={4}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && newTaskTitle.trim()) {
+                if (e.key === 'Enter' && e.metaKey && newTaskTitle.trim()) {
                   handleAddTask()
                 }
               }}
@@ -351,13 +354,15 @@ export default function AriLaunchPage() {
           </DialogHeader>
 
           <div className="py-4">
-            <Input
+            <Textarea
               value={editTitle}
               onChange={(e) => setEditTitle(e.target.value)}
               placeholder="Enter task title..."
               autoFocus
+              maxLength={800}
+              rows={4}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && editTitle.trim()) {
+                if (e.key === 'Enter' && e.metaKey && editTitle.trim()) {
                   handleUpdateTask()
                 }
               }}
