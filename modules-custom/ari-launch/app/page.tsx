@@ -229,7 +229,7 @@ export default function AriLaunchPage() {
             <Loader2 className="w-6 h-6 animate-spin" />
           </div>
         )}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
         {Array.from({ length: TOTAL_DAYS }, (_, i) => i + 1).map(day => {
           const dayEntries = getEntriesForDay(day)
           const isDropTarget = dragOverDay === day
@@ -239,7 +239,7 @@ export default function AriLaunchPage() {
             <div
               key={day}
               className={`
-                min-h-[140px] rounded-lg border-2 transition-all flex flex-col
+                min-h-[180px] rounded-lg border-2 transition-all flex flex-col
                 ${isDropTarget
                   ? 'border-primary bg-primary/20 scale-105'
                   : hasEntries
