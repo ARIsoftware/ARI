@@ -1,54 +1,89 @@
 # ARI Application - Claude Memory & Setup Documentation
 
-This documentation reflects the current state of the ARI application as of September 2025, including the latest priority radar feature and authentication architecture.
+This documentation reflects the current state of the ARI application as of December 2025, including Better Auth authentication and the module system.
 
 ## Overview
-ARI is a Next.js 15 (React 19) application using Supabase for authentication, database operations, and Row Level Security (RLS).
+ARI is a Next.js 15 (React 19) application using Better Auth for authentication and Supabase PostgreSQL for database operations.
 
 ## Tech Stack
 - **Framework**: Next.js 15.2.4 with React 19
-- **Authentication**: Supabase Auth (native email/password)
-- **Database**: Supabase (PostgreSQL with RLS)
+- **Authentication**: Better Auth (email/password with Argon2 hashing)
+- **Database**: Supabase PostgreSQL (with application-level security)
+- **ORM**: Drizzle ORM (with RLS support via `withRLS()`)
 - **Styling**: Tailwind CSS + Shadcn/ui components
 - **Font**: DM Sans
 - **Deployment**: Vercel-ready
 
 ## Authentication Architecture
 
-### Supabase Auth Integration
-The app uses native Supabase authentication with the following components:
+### Better Auth Integration
+The app uses Better Auth for authentication with the following components:
 
 #### 1. Authentication Flow
-- **Sign In/Up**: Custom forms at `/sign-in` using Supabase Auth
-- **Session Management**: Handled automatically by Supabase
+- **Sign In/Up**: Custom forms at `/sign-in` using Better Auth
+- **Session Management**: Handled by Better Auth with secure HTTP-only cookies
 - **Protected Routes**: Middleware validates sessions before allowing access
-- **RLS Policies**: Database uses `auth.uid()` to filter user-specific data
+- **Password Hashing**: Argon2id (winner of Password Hashing Competition)
+- **Rate Limiting**: Built-in protection against brute force attacks
 
 #### 2. Key Authentication Files
 
-##### `/lib/supabase-auth.ts`
+##### `/lib/auth.ts`
+Server-side Better Auth configuration:
 ```typescript
-// Browser client for client components
-export function createSupabaseClient() {
-  return createBrowserClient(supabaseUrl, supabaseAnonKey)
+import { betterAuth } from "better-auth"
+import { nextCookies } from "better-auth/next-js"
+
+export const auth = betterAuth({
+  database: pool,
+  emailAndPassword: {
+    enabled: true,
+    password: { minLength: 18, hash: argon2Hash, verify: argon2Verify }
+  },
+  user: {
+    additionalFields: {
+      firstName: { type: "string", required: false },
+      lastName: { type: "string", required: false },
+    }
+  },
+  rateLimit: { enabled: true, window: 60, max: 10 },
+  plugins: [nextCookies()]
+})
+```
+
+##### `/lib/auth-client.ts`
+Client-side auth for React components:
+```typescript
+import { createAuthClient } from "better-auth/react"
+export const authClient = createAuthClient({})
+```
+
+##### `/lib/auth-helpers.ts`
+API route helper that provides backward-compatible interface:
+```typescript
+export async function getAuthenticatedUser() {
+  // Returns: { user, session, supabase (legacy), withRLS (Drizzle) }
 }
 ```
 
 ##### `/components/providers.tsx`
-- Global context provider for Supabase client and session
-- Exposes `useSupabase()` hook for all components
-- Manages auth state changes and real-time subscriptions
+- Global context provider using `authClient.useSession()`
+- Exposes `useSupabase()` hook (legacy name) and `useAuth()` for components
+- Note: Does NOT provide direct database access - use API routes instead
 
 ##### `/middleware.ts`
-- Protects routes requiring authentication
-- Refreshes sessions automatically
+- Protects routes requiring authentication via `auth.api.getSession()`
 - Redirects unauthenticated users to `/sign-in`
-- Protected routes: `/dashboard`, `/tasks`, `/contacts`, `/fitness`, etc.
+- Sets security headers (CSP, HSTS, X-Frame-Options, etc.)
 
 ##### `/components/auth/auth-form.tsx`
 - Reusable authentication form component
-- Handles both sign-in and sign-up flows
+- Uses `authClient.signIn.email()` for sign-in
 - Email/password authentication only (sign-ups can be disabled)
+
+##### `/app/api/auth/[...all]/route.ts`
+- Better Auth API handler for all auth endpoints
+- Handles sign-in, sign-out, session management
 
 ## Database Schema
 
@@ -60,31 +95,41 @@ export function createSupabaseClient() {
 - **`hyrox_workouts`**: HYROX training data
 - **`hyrox_workout_stations`**: HYROX station performance
 
-### RLS Implementation
-All tables use Row Level Security with policies based on `auth.uid()`:
-- Each user can only access their own data
-- Policies enforce user isolation at the database level
-- No data leakage between users
+### Security Implementation
+User data isolation is enforced at the application level using Drizzle ORM with RLS:
+
+#### Using `withRLS()` for Database Operations
+```typescript
+const { user, withRLS } = await getAuthenticatedUser()
+if (!user || !withRLS) return unauthorized()
+
+// SELECT - RLS filters automatically by user_id
+const tasks = await withRLS((db) =>
+  db.select().from(tasks).orderBy(desc(tasks.createdAt))
+)
+
+// INSERT - must set user_id explicitly (RLS validates but doesn't auto-populate)
+const newTask = await withRLS((db) =>
+  db.insert(tasks).values({ title: 'New', user_id: user.id })
+)
+```
+
+#### Legacy Supabase Client (Deprecated)
+The `supabase` client from `getAuthenticatedUser()` uses the service role key and bypasses RLS. It's kept for backward compatibility but new code should use `withRLS()`.
 
 ### SQL Development Tips
 
-#### `auth.uid()` Only Works in Authenticated Contexts
-When running SQL directly in **Supabase SQL Editor**, there is no authenticated session:
-- `auth.uid()` returns `NULL`
-- Inserts using `auth.uid()` for `user_id` will fail or insert NULL
-- Conditions like `WHERE auth.uid() IS NOT NULL` silently skip execution
-
 #### Writing Sample Data SQL
-For sample data or seed scripts that need a `user_id`, query `auth.users` directly:
+For sample data or seed scripts that need a `user_id`, query the Better Auth `user` table:
 
 ```sql
 DO $$
 DECLARE
-  my_user_id UUID;
+  my_user_id TEXT;
   my_collection_id UUID;
 BEGIN
-  -- Get user ID from auth.users table
-  SELECT id INTO my_user_id FROM auth.users LIMIT 1;
+  -- Get user ID from Better Auth user table
+  SELECT id INTO my_user_id FROM public."user" LIMIT 1;
 
   -- Use RETURNING INTO to capture generated IDs for foreign keys
   INSERT INTO collections (user_id, name)
@@ -100,7 +145,7 @@ END $$;
 **Key patterns:**
 - Use PL/pgSQL `DO $$ ... END $$` blocks for multi-step inserts
 - `RETURNING id INTO variable` captures auto-generated UUIDs
-- Query `auth.users` to get real user IDs for sample data
+- Query `public."user"` (Better Auth table) to get user IDs for sample data
 
 ## Application Features
 
@@ -192,13 +237,15 @@ END $$;
   /task-priority-modal.tsx  # Priority editing modal
 
 /lib                  # Utilities and helpers
-  /supabase-auth.ts  # Supabase client setup
-  /supabase.ts       # Legacy client (anon key only)
+  /auth.ts           # Better Auth server configuration
+  /auth-client.ts    # Better Auth client for React
+  /auth-helpers.ts   # getAuthenticatedUser() helper
+  /db.ts             # Drizzle ORM with RLS support
+  /db-supabase.ts    # Supabase client (legacy)
   /tasks.ts          # Task operations
   /contacts.ts       # Contact operations
   /fitness-stats.ts  # Fitness analytics
   /priority-utils.ts # Priority scoring calculations
-  /auth-helpers.ts   # Authentication utilities
   /api-helpers.ts    # API validation helpers
 
 /middleware.ts        # Route protection
@@ -233,15 +280,19 @@ For full module documentation, see `/docs/MODULES.md`.
 
 ### Required
 ```env
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_publishable_key  # Use new publishable key (sb_publishable_...) format
-```
+# Better Auth
+BETTER_AUTH_SECRET=<generate with: openssl rand -base64 32>
+BETTER_AUTH_URL=http://localhost:3000  # Or your production URL
+DATABASE_URL=postgresql://...  # Supabase PostgreSQL connection string
 
-**Note**: As of November 2025, Supabase is deprecating legacy anon keys (JWT format starting with `eyJhbGci...`). Use the new publishable key format (`sb_publishable_...`) instead. Both key formats work with the same environment variable name. See `/docs/SUPABASE_KEY_MIGRATION.md` for migration details.
+# Supabase (for database access)
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_KEY=your_service_role_key  # Server-side only
+```
 
 ### Optional
 ```env
-SUPABASE_SECRET_KEY=your_service_role_key  # Server-side only, bypasses RLS
+NEXT_PUBLIC_APP_URL=https://your-domain.com  # For trusted origins
 OPENAI_API_KEY=your_openai_api_key  # For AI Assistant feature
 ```
 
@@ -263,18 +314,10 @@ npm start
 ```
 
 ### Authentication Testing
-1. Create test account at `/sign-in`
-2. Use Supabase dashboard to manage users
-3. Test RLS policies with different users
-4. Monitor auth state in browser DevTools
-
-### JWT Signing Key Rotation
-The application **does not require code changes** for JWT signing key rotation:
-- All JWT verification is handled by Supabase client libraries (`@supabase/ssr`, `@supabase/supabase-js`)
-- JWKS is automatically fetched from `/.well-known/jwks.json` endpoint
-- No custom JWT verification code exists in the codebase
-- Rotation can be performed safely in Supabase dashboard without downtime
-- See `/docs/SUPABASE_KEY_MIGRATION.md` for detailed rotation guidance
+1. Sign in at `/sign-in` with existing credentials
+2. Better Auth stores users in `public."user"` and sessions in `public."session"` tables
+3. Test protected routes redirect to `/sign-in` when not authenticated
+4. Monitor auth state via `authClient.useSession()` in browser DevTools
 
 ### Database Management
 - Use Supabase dashboard for schema changes
@@ -285,23 +328,24 @@ The application **does not require code changes** for JWT signing key rotation:
 ## Security Considerations
 
 ### Authentication
-- All routes protected by middleware
-- Sessions expire and refresh automatically
-- No sensitive data in localStorage
+- All routes protected by middleware using Better Auth sessions
+- Sessions stored in HTTP-only cookies (not localStorage)
+- Passwords hashed with Argon2id (OWASP recommended)
+- Rate limiting on auth endpoints (5 sign-in attempts/minute)
 - HTTPS required in production
 
 ### Database
-- RLS policies on all tables
-- User isolation at database level
-- No direct database access from client
-- Service role key never exposed to client
+- Application-level RLS via `withRLS()` helper
+- User isolation enforced in Drizzle queries
+- No direct database access from client components
+- Service role key only used server-side
 
 ### API Security
-- All API routes require authentication via Bearer tokens
+- All API routes require authentication via `getAuthenticatedUser()`
 - Comprehensive Zod validation on all endpoints
-- Rate limiting via Supabase
+- Rate limiting via Better Auth
 - Input validation on all endpoints
-- CORS configured for production domain
+- Security headers set in middleware (CSP, HSTS, X-Frame-Options)
 
 ## Deployment
 
@@ -312,28 +356,22 @@ The application **does not require code changes** for JWT signing key rotation:
 4. Monitor performance and errors
 
 ### Post-Deployment
-- Verify authentication flow
-- Test all protected routes
-- Check RLS policies
+- Verify authentication flow works with Better Auth
+- Test all protected routes redirect properly
+- Confirm `withRLS()` queries filter by user correctly
 - Monitor error logs
 
 ## Recent Updates
 
-### Supabase API Key Migration (November 2025)
-Migrated from legacy anon keys to new publishable keys:
-- Updated environment variable to use new `sb_publishable_...` format
-- No code changes required (full backward compatibility with existing Supabase client libraries)
-- Improved security with independent key rotation
-- Aligned with Supabase's timeline (legacy keys removed October 1, 2025)
-- See `/docs/SUPABASE_KEY_MIGRATION.md` for complete migration guide
-
-### Authentication Migration (August 2025)
-Successfully migrated from Clerk to Supabase Auth:
-- Removed all Clerk dependencies
-- Implemented custom authentication UI
-- Updated all components to use Supabase context
-- Maintained full functionality with improved performance
-- Simplified authentication architecture
+### Better Auth Migration (December 2025)
+Successfully migrated from Supabase Auth to Better Auth:
+- Replaced Supabase Auth with Better Auth for authentication
+- Implemented Argon2id password hashing (OWASP recommended)
+- Added built-in rate limiting on auth endpoints
+- Sessions stored in HTTP-only cookies for security
+- Created backward-compatible `getAuthenticatedUser()` helper
+- Added Drizzle ORM with `withRLS()` for database operations
+- See `/docs/BETTERAUTH-MIGRATION-PLAN.md` for migration details
 
 ### Priority Radar Feature (September 2025)
 Added comprehensive task priority visualization system:
@@ -526,14 +564,14 @@ Before trusting your backup system, verify:
 
 ### Common Issues
 1. **"Module not found" errors**: Run `npm install`
-2. **Authentication failures**: Check Supabase project status
-3. **RLS errors**: Verify user is authenticated and policies are correct
+2. **Authentication failures**: Check `BETTER_AUTH_SECRET` and `DATABASE_URL` env vars
+3. **Database errors**: Verify `SUPABASE_SERVICE_KEY` and database connectivity
 4. **Build errors**: Clear `.next` folder and rebuild
 
 ### Debug Tools
-- Browser DevTools for network requests
-- Supabase dashboard for auth logs
-- RLS Debug component (development only)
+- Browser DevTools for network requests and cookies
+- Check `public."user"` and `public."session"` tables for auth state
+- `/debug` page for system diagnostics
 - Next.js error overlay in development
 
 ## Performance Optimizations
@@ -542,7 +580,7 @@ Before trusting your backup system, verify:
 - Dynamic imports for heavy components
 - Image optimization with Next.js Image
 - Prefetching enabled for navigation
-- Edge middleware for auth checks
+- Middleware for auth checks and security headers
 
 
 ## Project Specific Claude Code Rules
