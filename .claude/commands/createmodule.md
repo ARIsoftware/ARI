@@ -8,6 +8,15 @@ Before doing anything:
 3. Confirm `modules-core/hello-world` exists. If not, inform the user that this template module is missing.
 4. Confirm we are at the repo root and that `modules-custom` exists. If not, create it.
 
+## MCP Server Tools
+
+This project has the `pg-aiguide` MCP server configured (via `.mcp.json`) which provides PostgreSQL documentation and best practices. When creating database schemas:
+
+- Use `mcp__plugin_pg_pg-aiguide__semantic_search_postgres_docs` to look up PostgreSQL best practices for data types, indexes, constraints, and table design
+- Use `mcp__plugin_pg_pg-aiguide__semantic_search_tiger_docs` for TimescaleDB/Tiger Cloud guidance if time-series data is involved
+
+These tools help ensure database tables follow PostgreSQL conventions and best practices.
+
 ## Questions to Ask
 
 Ask the user the following questions ONE AT A TIME, waiting for each answer before continuing:
@@ -45,6 +54,7 @@ When approved, create the module following this order:
 3. **Create/update page component** in `app/page.tsx`
 4. **Create API routes** if needed (follow auth patterns from hello-world)
 5. **Create database migration** in `database/schema.sql` if tables needed
+   - Use `mcp__plugin_pg_pg-aiguide__semantic_search_postgres_docs` to verify best practices for data types, indexes, and constraints
 6. **Update types** in `types/index.ts`
 7. **Create TanStack Query hooks** in `/lib/hooks/use-[module-name].ts` (see below)
 8. **Run `npm run generate-module-registry`** to register the new module
