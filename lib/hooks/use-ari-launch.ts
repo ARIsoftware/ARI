@@ -57,17 +57,25 @@ export function useCreateAriLaunchEntry() {
       await queryClient.cancelQueries({ queryKey: ['ari-launch-entries'] })
       const previous = queryClient.getQueryData<AriLaunchEntry[]>(['ari-launch-entries'])
 
-      queryClient.setQueryData<AriLaunchEntry[]>(['ari-launch-entries'], (old = []) => [
-        ...old,
-        {
-          ...newEntry,
-          id: 'temp-' + Date.now(),
-          user_id: '',
-          order_index: old.filter(e => e.day_number === newEntry.day_number).length,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        } as AriLaunchEntry,
-      ])
+      queryClient.setQueryData<AriLaunchEntry[]>(['ari-launch-entries'], (old = []) => {
+        // Find max order_index for this day to place new task at bottom
+        const dayEntries = old.filter(e => e.day_number === newEntry.day_number)
+        const maxOrderIndex = dayEntries.length > 0
+          ? Math.max(...dayEntries.map(e => e.order_index ?? 0))
+          : -1
+
+        return [
+          ...old,
+          {
+            ...newEntry,
+            id: 'temp-' + Date.now(),
+            user_id: '',
+            order_index: maxOrderIndex + 1,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          } as AriLaunchEntry,
+        ]
+      })
 
       return { previous }
     },
