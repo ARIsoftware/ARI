@@ -1,6 +1,7 @@
 {
   "id": "tasks",
   "name": "Tasks",
+  "title": "Todo",
   "description": "Task management with priority radar, analytics, and focus timer",
   "version": "1.0.0",
   "author": "ARI Team",
@@ -16,8 +17,20 @@
   "routes": [
     {
       "path": "/tasks",
-      "label": "Tasks",
+      "label": "All Tasks",
       "icon": "CheckSquare",
+      "sidebarPosition": "main"
+    },
+    {
+      "path": "/add-task",
+      "label": "Add Task",
+      "icon": "Plus",
+      "sidebarPosition": "main"
+    },
+    {
+      "path": "/radar",
+      "label": "Task Radar",
+      "icon": "Radar",
       "sidebarPosition": "main"
     }
   ],
