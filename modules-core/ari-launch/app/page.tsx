@@ -373,7 +373,7 @@ export default function AriLaunchPage() {
             <Button
               variant="destructive"
               onClick={() => editingTask && handleDeleteTask(editingTask.id)}
-              disabled={isMutating}
+              disabled={deleteEntry.isPending}
             >
               <Trash2 className="w-4 h-4 mr-2" />
               Delete
