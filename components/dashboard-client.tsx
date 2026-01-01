@@ -16,9 +16,9 @@ import { Button } from "@/components/ui/button"
 import { CalendarDays, TrendingUp, Trophy, Target, Users, CheckSquare, Plus, Eye, BarChart3, Activity } from "lucide-react"
 import { getFitnessStats } from "@/lib/fitness-stats"
 import { getContacts } from "@/modules/contacts/lib/contacts"
-import { getTasks } from "@/lib/tasks"
+import { getTasks } from "@/modules/tasks/lib/utils"
 import { useSupabase } from "@/components/providers"
-import { TaskAnalyticsChart } from "@/components/task-analytics-chart"
+import { TaskAnalyticsChart } from "@/modules/tasks/components/task-analytics-chart"
 import { RecentActivityFeed } from "@/components/recent-activity-feed"
 
 interface FitnessStats {

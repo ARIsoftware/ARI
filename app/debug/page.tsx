@@ -273,7 +273,7 @@ export default function DatabaseTestPage() {
 
       // Test 2: Check MODULE_PAGES registry completeness
       updateModuleResult('Registry Completeness', { status: 'testing' })
-      const registeredModules = ['ari-launch', 'assist', 'contacts', 'daily-fitness', 'gratitude', 'hello-world', 'hyrox', 'knowledge-manager', 'major-projects', 'motivation', 'northstar', 'ohtani', 'quotes', 'shipments', 'south-africa', 'task-aquarium', 'task-monsters', 'winter-arc', 'world-clock']
+      const registeredModules = ['ari-launch', 'assist', 'contacts', 'daily-fitness', 'gratitude', 'hello-world', 'hyrox', 'knowledge-manager', 'major-projects', 'motivation', 'northstar', 'ohtani', 'quotes', 'shipments', 'south-africa', 'task-aquarium', 'task-monsters', 'tasks', 'winter-arc', 'world-clock']
       const discoveredModuleIds = modules.map((m: any) => m.id)
       const missingFromRegistry = discoveredModuleIds.filter((id: string) => !registeredModules.includes(id))
       const extraInRegistry = registeredModules.filter(id => !discoveredModuleIds.includes(id))
