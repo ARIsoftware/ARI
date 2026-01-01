@@ -112,52 +112,60 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         ))}
 
         {/* Module navigation - Main position */}
-        {mainModules.map((module) =>
-          module.routes?.map((route) => {
-            const Icon = getLucideIcon(route.icon || module.icon)
-            return (
-              <SidebarGroup key={route.path}>
-                {module.title && <SidebarGroupLabel>{module.title}</SidebarGroupLabel>}
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild>
-                        <a href={route.path} className="flex items-center">
-                          <Icon className="mr-2 size-4" />
-                          <span>{route.label}</span>
-                        </a>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            )
-          })
-        )}
+        {mainModules.map((module) => {
+          const mainRoutes = module.routes?.filter(r => r.sidebarPosition === 'main') || []
+          if (mainRoutes.length === 0) return null
+          return (
+            <SidebarGroup key={module.id}>
+              {module.title && <SidebarGroupLabel>{module.title}</SidebarGroupLabel>}
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {mainRoutes.map((route) => {
+                    const Icon = getLucideIcon(route.icon || module.icon)
+                    return (
+                      <SidebarMenuItem key={route.path}>
+                        <SidebarMenuButton asChild>
+                          <a href={route.path} className="flex items-center">
+                            <Icon className="mr-2 size-4" />
+                            <span>{route.label}</span>
+                          </a>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    )
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )
+        })}
 
         {/* Module navigation - Bottom position */}
-        {bottomModules.map((module) =>
-          module.routes?.map((route) => {
-            const Icon = getLucideIcon(route.icon || module.icon)
-            return (
-              <SidebarGroup key={route.path}>
-                {module.title && <SidebarGroupLabel>{module.title}</SidebarGroupLabel>}
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild>
-                        <a href={route.path} className="flex items-center">
-                          <Icon className="mr-2 size-4" />
-                          <span>{route.label}</span>
-                        </a>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            )
-          })
-        )}
+        {bottomModules.map((module) => {
+          const bottomRoutes = module.routes?.filter(r => r.sidebarPosition === 'bottom') || []
+          if (bottomRoutes.length === 0) return null
+          return (
+            <SidebarGroup key={module.id}>
+              {module.title && <SidebarGroupLabel>{module.title}</SidebarGroupLabel>}
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {bottomRoutes.map((route) => {
+                    const Icon = getLucideIcon(route.icon || module.icon)
+                    return (
+                      <SidebarMenuItem key={route.path}>
+                        <SidebarMenuButton asChild>
+                          <a href={route.path} className="flex items-center">
+                            <Icon className="mr-2 size-4" />
+                            <span>{route.label}</span>
+                          </a>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    )
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )
+        })}
       </SidebarContent>
       <SidebarRail />
     </Sidebar>

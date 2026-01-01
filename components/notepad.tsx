@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X, StickyNote, ChevronLeft, ChevronRight } from "lucide-react"
+import { X, StickyNote, ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
@@ -25,6 +25,7 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
   const [revisions, setRevisions] = useState<NotepadRevision[]>([])
   const [currentRevisionIndex, setCurrentRevisionIndex] = useState(-1) // -1 means viewing latest
   const [isViewingHistory, setIsViewingHistory] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   // Load saved content and revisions from database when component mounts
   useEffect(() => {
@@ -189,9 +190,19 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
       )}
 
       {/* Sliding Panel - always rendered but off-screen when closed */}
-      <div className={`fixed top-0 right-0 h-full w-[500px] bg-white shadow-2xl z-[101] transform transition-transform duration-300 ease-in-out ${
-        isOpen ? "translate-x-0" : "translate-x-full"
-      }`}>
+      <div
+        className={`fixed bg-white z-[101] transform transition-all duration-300 ease-in-out overflow-hidden ${
+          isFullscreen
+            ? "inset-4 w-auto h-auto"
+            : "top-0 right-0 h-full w-[500px] shadow-2xl"
+        } ${
+          isOpen ? (isFullscreen ? "opacity-100 scale-100" : "translate-x-0") : (isFullscreen ? "opacity-0 scale-95 pointer-events-none" : "translate-x-full")
+        }`}
+        style={isFullscreen ? {
+          boxShadow: '0 16px 40px rgba(0, 0, 0, 0.5)',
+          borderRadius: '15px',
+        } : undefined}
+      >
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b">
@@ -199,14 +210,28 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
               <StickyNote className="w-5 h-5" />
               <h2 className="text-xl font-semibold">Notepad</h2>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleClose}
-              className="hover:bg-gray-100"
-            >
-              <X className="w-5 h-5" />
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                className="hover:bg-gray-100"
+              >
+                {isFullscreen ? (
+                  <Minimize2 className="w-5 h-5" />
+                ) : (
+                  <Maximize2 className="w-5 h-5" />
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleClose}
+                className="hover:bg-gray-100"
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
 
           {/* Instructions */}
