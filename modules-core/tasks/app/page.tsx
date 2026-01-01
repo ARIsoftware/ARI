@@ -450,10 +450,10 @@ export default function TasksPage() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" className="bg-white" onClick={() => router.push("/radar")}>
+                <Button variant="outline" className="bg-white" onClick={() => router.push("/tasks/radar")}>
                   Radar
                 </Button>
-                <Button className="bg-black hover:bg-gray-800" onClick={() => router.push("/add-task")}>
+                <Button className="bg-black hover:bg-gray-800" onClick={() => router.push("/tasks/add")}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add Task
                 </Button>
@@ -719,7 +719,7 @@ export default function TasksPage() {
                                 className="h-8 w-8 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  router.push(`/edit-task/${task.id}`)
+                                  router.push(`/tasks/edit/${task.id}`)
                                 }}
                               >
                                 <Pencil className="w-4 h-4" />
@@ -805,7 +805,7 @@ export default function TasksPage() {
                             className="h-6 w-6 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
                             onClick={(e) => {
                               e.stopPropagation()
-                              router.push(`/edit-task/${task.id}`)
+                              router.push(`/tasks/edit/${task.id}`)
                             }}
                           >
                             <Pencil className="w-3 h-3" />
@@ -885,7 +885,7 @@ export default function TasksPage() {
                             className="h-6 w-6 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
                             onClick={(e) => {
                               e.stopPropagation()
-                              router.push(`/edit-task/${task.id}`)
+                              router.push(`/tasks/edit/${task.id}`)
                             }}
                           >
                             <Pencil className="w-3 h-3" />
@@ -965,7 +965,7 @@ export default function TasksPage() {
                             className="h-6 w-6 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
                             onClick={(e) => {
                               e.stopPropagation()
-                              router.push(`/edit-task/${task.id}`)
+                              router.push(`/tasks/edit/${task.id}`)
                             }}
                           >
                             <Pencil className="w-3 h-3" />
@@ -1045,7 +1045,7 @@ export default function TasksPage() {
                             className="h-6 w-6 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
                             onClick={(e) => {
                               e.stopPropagation()
-                              router.push(`/edit-task/${task.id}`)
+                              router.push(`/tasks/edit/${task.id}`)
                             }}
                           >
                             <Pencil className="w-3 h-3" />
@@ -1203,7 +1203,7 @@ export default function TasksPage() {
                           className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-blue-600 hover:bg-blue-50"}`}
                           onClick={(e) => {
                             e.stopPropagation()
-                            router.push(`/edit-task/${task.id}`)
+                            router.push(`/tasks/edit/${task.id}`)
                           }}
                         >
                           <Pencil className="w-4 h-4" />
@@ -1331,7 +1331,7 @@ export default function TasksPage() {
                             className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-blue-600 hover:bg-blue-50"}`}
                             onClick={(e) => {
                               e.stopPropagation()
-                              router.push(`/edit-task/${task.id}`)
+                              router.push(`/tasks/edit/${task.id}`)
                             }}
                           >
                             <Pencil className="w-4 h-4" />

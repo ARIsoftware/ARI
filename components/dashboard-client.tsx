@@ -116,7 +116,7 @@ export default function DashboardClient({ initialQuote }: DashboardClientProps) 
                   <Plus className="w-4 h-4 mr-2" />
                   New Task
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => window.location.href = '/radar'}>
+                <Button variant="outline" size="sm" onClick={() => window.location.href = '/tasks/radar'}>
                   <BarChart3 className="w-4 h-4 mr-2" />
                   Priority Radar
                 </Button>
