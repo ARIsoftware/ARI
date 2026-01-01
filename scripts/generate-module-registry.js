@@ -175,7 +175,7 @@ function generateRegistry(moduleMap) {
   const entries = Array.from(moduleMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
 
   const imports = entries.map(([id, { dirName, folder }]) =>
-    `  '${id}': () => import('@/${dirName}/${folder}/app/page'),`
+    `  '${id}': () => import('@/modules/${folder}/app/page'),`
   ).join('\n');
 
   const moduleIds = entries.map(([id]) => id);

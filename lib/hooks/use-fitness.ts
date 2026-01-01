@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import type { FitnessTask } from '@/modules-core/daily-fitness/lib/fitness'
+import type { FitnessTask } from '@/modules/daily-fitness/lib/fitness'
 
 /**
  * Fetch all fitness tasks for the current user.
