@@ -15,6 +15,7 @@ import {
   X
 } from "lucide-react"
 import { FocusTimerTopBarIcon } from "@/components/focus-timer-top-bar-icon"
+import { NotepadTopBarIcon } from "@/components/notepad-top-bar-icon"
 import { useModules } from "@/lib/modules/module-hooks"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
 import {
@@ -145,6 +146,9 @@ function TopBarIcons() {
         >
           <Package className="h-5 w-5" />
         </Button>
+
+        {/* Notepad */}
+        <NotepadTopBarIcon />
 
         {/* Focus Timer */}
         <FocusTimerTopBarIcon />
@@ -338,13 +342,25 @@ export function TaskAnnouncement() {
     )
   }
 
+  // Dismiss the completion message
+  const dismissComplete = () => {
+    setFocusTimer({ isActive: false, timeRemaining: 0, isComplete: false })
+  }
+
   // Show completion message
   if (focusTimer.isComplete) {
     return (
-      <div className="topbar bg-black w-full relative z-50 flex items-center justify-center" style={{ height: '90vh' }}>
+      <div className="topbar w-full relative z-50 flex flex-col items-center justify-center" style={{ height: '90vh', backgroundColor: '#247524' }}>
         <h1 className="text-white text-6xl font-bold">
-          FOCUS TIME COMPLETE 💪
+          FOCUS TIME COMPLETE
         </h1>
+        <button
+          onClick={dismissComplete}
+          className="absolute bottom-12 text-white hover:text-gray-300 transition-colors"
+          aria-label="Dismiss"
+        >
+          <X className="w-10 h-10" />
+        </button>
       </div>
     )
   }
