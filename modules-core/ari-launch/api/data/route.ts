@@ -107,14 +107,25 @@ export async function POST(request: NextRequest) {
 
     const { day_number, title } = parseResult.data
 
-    // Insert new task (order by created_at, no need for order_index calculation)
+    // Find the maximum order_index for this day to place new task at the bottom
+    const existingEntries = await withRLS((db) =>
+      db.select({ orderIndex: ariLaunchEntries.orderIndex })
+        .from(ariLaunchEntries)
+        .where(eq(ariLaunchEntries.dayNumber, day_number))
+    )
+
+    const maxOrderIndex = existingEntries.length > 0
+      ? Math.max(...existingEntries.map(e => e.orderIndex ?? 0))
+      : -1
+
+    // Insert new task at the bottom (max order_index + 1)
     const data = await withRLS((db) =>
       db.insert(ariLaunchEntries)
         .values({
           userId: user.id,
           dayNumber: day_number,
           title,
-          orderIndex: Date.now() % 1000000 // Simple ordering based on time
+          orderIndex: maxOrderIndex + 1
         })
         .returning()
     )
