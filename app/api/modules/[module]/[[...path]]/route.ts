@@ -24,70 +24,70 @@ import { getEnabledModule } from '@/lib/modules/module-registry'
  * Maps module IDs and API paths to their corresponding route handlers.
  * This registry uses static import paths that can be analyzed at build time.
  *
- * Pattern: { 'module-id': { 'api-path': () => import('@/modules-core/module-id/api/api-path/route') } }
+ * Pattern: { 'module-id': { 'api-path': () => import('@/modules/module-id/api/api-path/route') } }
  *
  * When adding a new module with API routes:
  * 1. Add the module ID as a key
  * 2. For each API route in /modules-core/[module]/api/[route]/, add an entry
  * 3. Use the folder name as the key (e.g., 'data' for /api/data/)
- * 4. Use static import path: () => import('@/modules-core/[module]/api/[route]/route')
+ * 4. Use static import path: () => import('@/modules/[module]/api/[route]/route')
  */
 const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
   'south-africa': {
-    'tasks': () => import('@/modules-core/south-africa/api/tasks/route'),
-    'activities': () => import('@/modules-core/south-africa/api/activities/route')
+    'tasks': () => import('@/modules/south-africa/api/tasks/route'),
+    'activities': () => import('@/modules/south-africa/api/activities/route')
   },
   'hello-world': {
-    'data': () => import('@/modules-core/hello-world/api/data/route'),
-    'settings': () => import('@/modules-core/hello-world/api/settings/route')
+    'data': () => import('@/modules/hello-world/api/data/route'),
+    'settings': () => import('@/modules/hello-world/api/settings/route')
   },
   'shipments': {
-    'items': () => import('@/modules-core/shipments/api/items/route')
+    'items': () => import('@/modules/shipments/api/items/route')
   },
   'hyrox': {
-    'workouts': () => import('@/modules-core/hyrox/api/workouts/route'),
-    'workout-stations': () => import('@/modules-core/hyrox/api/workout-stations/route'),
-    'station-records': () => import('@/modules-core/hyrox/api/station-records/route'),
-    'setup': () => import('@/modules-core/hyrox/api/setup/route'),
-    'reset': () => import('@/modules-core/hyrox/api/reset/route'),
-    'test-database': () => import('@/modules-core/hyrox/api/test-database/route')
+    'workouts': () => import('@/modules/hyrox/api/workouts/route'),
+    'workout-stations': () => import('@/modules/hyrox/api/workout-stations/route'),
+    'station-records': () => import('@/modules/hyrox/api/station-records/route'),
+    'setup': () => import('@/modules/hyrox/api/setup/route'),
+    'reset': () => import('@/modules/hyrox/api/reset/route'),
+    'test-database': () => import('@/modules/hyrox/api/test-database/route')
   },
   'quotes': {
-    'quotes': () => import('@/modules-core/quotes/api/quotes/route'),
-    'settings': () => import('@/modules-core/quotes/api/settings/route')
+    'quotes': () => import('@/modules/quotes/api/quotes/route'),
+    'settings': () => import('@/modules/quotes/api/settings/route')
   },
   'contacts': {
-    '': () => import('@/modules-core/contacts/api/route'), // Base route for list/create
-    '[id]': () => import('@/modules-core/contacts/api/[id]/route') // Dynamic ID route
+    '': () => import('@/modules/contacts/api/route'), // Base route for list/create
+    '[id]': () => import('@/modules/contacts/api/[id]/route') // Dynamic ID route
   },
   'motivation': {
-    'refresh-thumbnail': () => import('@/modules-core/motivation/api/refresh-thumbnail/route'),
-    'reorder': () => import('@/modules-core/motivation/api/reorder/route'),
-    'setup': () => import('@/modules-core/motivation/api/setup/route')
+    'refresh-thumbnail': () => import('@/modules/motivation/api/refresh-thumbnail/route'),
+    'reorder': () => import('@/modules/motivation/api/reorder/route'),
+    'setup': () => import('@/modules/motivation/api/setup/route')
   },
   'winter-arc': {
-    '': () => import('@/modules-core/winter-arc/api/route'), // Base route for list/create
-    '[id]': () => import('@/modules-core/winter-arc/api/[id]/route') // Dynamic ID route
+    '': () => import('@/modules/winter-arc/api/route'), // Base route for list/create
+    '[id]': () => import('@/modules/winter-arc/api/[id]/route') // Dynamic ID route
   },
   'major-projects': {
-    'data': () => import('@/modules-core/major-projects/api/data/route'), // GET/POST for list/create
-    'data/[id]': () => import('@/modules-core/major-projects/api/data/[id]/route'), // PATCH/DELETE for update/delete
-    'settings': () => import('@/modules-core/major-projects/api/settings/route') // Settings GET/PUT
+    'data': () => import('@/modules/major-projects/api/data/route'), // GET/POST for list/create
+    'data/[id]': () => import('@/modules/major-projects/api/data/[id]/route'), // PATCH/DELETE for update/delete
+    'settings': () => import('@/modules/major-projects/api/settings/route') // Settings GET/PUT
   },
   'ohtani': {
-    'data': () => import('@/modules-core/ohtani/api/data/route') // GET/PUT for grid cells
+    'data': () => import('@/modules/ohtani/api/data/route') // GET/PUT for grid cells
   },
   'gratitude': {
-    'entries': () => import('@/modules-core/gratitude/api/entries/route') // GET/POST for daily entries
+    'entries': () => import('@/modules/gratitude/api/entries/route') // GET/POST for daily entries
   },
   'knowledge-manager': {
-    'data': () => import('@/modules-core/knowledge-manager/api/data/route'), // GET/POST for list/create
-    'data/[id]': () => import('@/modules-core/knowledge-manager/api/data/[id]/route'), // GET/PATCH/DELETE for single article
-    'collections': () => import('@/modules-core/knowledge-manager/api/collections/route'), // GET/POST for collections
-    'collections/[id]': () => import('@/modules-core/knowledge-manager/api/collections/[id]/route') // PATCH/DELETE for single collection
+    'data': () => import('@/modules/knowledge-manager/api/data/route'), // GET/POST for list/create
+    'data/[id]': () => import('@/modules/knowledge-manager/api/data/[id]/route'), // GET/PATCH/DELETE for single article
+    'collections': () => import('@/modules/knowledge-manager/api/collections/route'), // GET/POST for collections
+    'collections/[id]': () => import('@/modules/knowledge-manager/api/collections/[id]/route') // PATCH/DELETE for single collection
   },
   'ari-launch': {
-    'data': () => import('@/modules-custom/ari-launch/api/data/route') // GET/POST for entries (upsert by day)
+    'data': () => import('@/modules/ari-launch/api/data/route') // GET/POST for entries (upsert by day)
   }
 }
 
