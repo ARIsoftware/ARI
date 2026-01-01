@@ -1,4 +1,4 @@
-import { CheckSquare, Plus, Archive, BarChart3, Grid3x3, Radar } from "lucide-react"
+import { BarChart3, Grid3x3 } from "lucide-react"
 
 export interface MenuItem {
   title: string
@@ -29,34 +29,6 @@ export const menuConfig: MenuGroup[] = [
         title: "HD Dashboard",
         url: "/hd-dashboard",
         icon: Grid3x3,
-      },
-    ],
-  },
-  {
-    title: "Todo",
-    url: "#",
-    icon: CheckSquare,
-    items: [
-      {
-        title: "All Tasks",
-        url: "/tasks",
-        icon: CheckSquare,
-      },
-      {
-        title: "Add Task",
-        url: "/add-task",
-        icon: Plus,
-      },
-      {
-        title: "Task Radar",
-        url: "/radar",
-        icon: Radar,
-      },
-      {
-        title: "Completed",
-        url: "#",
-        icon: Archive,
-        isActive: false,
       },
     ],
   },
@@ -137,9 +109,6 @@ function getFeatureDescription(title: string, url: string): string {
   const descriptions: Record<string, string> = {
     '/dashboard': 'Overview of your tasks, fitness, and goals',
     '/hd-dashboard': 'High-density dashboard view',
-    '/tasks': 'Manage your todo list',
-    '/add-task': 'Create new tasks',
-    '/radar': 'Visualize task priorities',
     '/settings': 'Application settings and preferences',
     '/modules': 'Enable or disable installed modules to extend your app functionality',
   }
