@@ -76,7 +76,7 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
             <CheckSquare className="mr-2 h-4 w-4" />
             <span>Tasks</span>
           </CommandItem>
-          <CommandItem onSelect={() => runCommand(() => router.push("/radar"))}>
+          <CommandItem onSelect={() => runCommand(() => router.push("/tasks/radar"))}>
             <Radar className="mr-2 h-4 w-4" />
             <span>Priority Radar</span>
           </CommandItem>
@@ -117,7 +117,7 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
         <CommandSeparator />
 
         <CommandGroup heading="Quick Actions">
-          <CommandItem onSelect={() => runCommand(() => router.push("/add-task"))}>
+          <CommandItem onSelect={() => runCommand(() => router.push("/tasks/add"))}>
             <Plus className="mr-2 h-4 w-4" />
             <span>New Task</span>
             <CommandShortcut>N</CommandShortcut>
