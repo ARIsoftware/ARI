@@ -55,7 +55,7 @@ const statusOptions = [
 ]
 
 export default function AddTaskPage() {
-  const { session, supabase } = useSupabase()
+  const { session, supabase, isLoading: sessionLoading } = useSupabase()
   const user = session?.user
   const { toast } = useToast()
   const router = useRouter()
@@ -688,7 +688,7 @@ export default function AddTaskPage() {
 
                   {/* Action Buttons */}
                   <div className="flex gap-3 pt-4">
-                    <Button type="submit" disabled={loading} className="bg-black hover:bg-gray-800">
+                    <Button type="submit" disabled={loading || sessionLoading || !user} className="bg-black hover:bg-gray-800">
                       {loading ? (
                         <>
                           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
