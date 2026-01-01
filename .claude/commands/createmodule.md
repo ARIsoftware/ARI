@@ -52,7 +52,7 @@ Note: The user may have requested to create the module in the modules-core direc
 ## Before Proceeding
 
 After collecting answers:
-1. Ask any clarifying questions about unclear requirements
+1. Ask any additional clarifying questions if required.
 2. Present a detailed summary with your understandings and then ask for explicit approval to proceed.
 
 ## Implementation Steps
