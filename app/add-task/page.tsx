@@ -29,13 +29,13 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Slider } from "@/components/ui/slider"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useState, useEffect } from "react"
-import { createTask } from "@/lib/tasks"
+import { createTask } from "@/modules/tasks/lib/utils"
 import { getGoals, type Goal } from "@/lib/goals"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
-import { calculatePriorityScore, getTaskPriorityLevel } from "@/lib/priority-utils"
+import { calculatePriorityScore, getTaskPriorityLevel } from "@/modules/tasks/lib/priority-utils"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],

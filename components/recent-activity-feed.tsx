@@ -70,7 +70,7 @@ export function RecentActivityFeed({ token }: RecentActivityFeedProps) {
 
         // Fetch recent tasks, contacts, and fitness activities
         const [tasksResponse, contactsResponse, fitnessResponse] = await Promise.all([
-          fetch('/api/tasks', {
+          fetch('/api/modules/tasks', {
             headers: { 'Authorization': `Bearer ${token}` }
           }),
           fetch('/api/modules/contacts', {

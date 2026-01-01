@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { toSnakeCase } from '@/lib/api-helpers'
-import { calculatePriorityScore } from '@/lib/priority-utils'
+import { calculatePriorityScore } from '../../lib/priority-utils'
 import { z } from 'zod'
 import { tasks } from '@/lib/db/schema'
 import { eq, asc } from 'drizzle-orm'
