@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Loader2, Plus, Check, Trash2 } from 'lucide-react';
 import { getJournalEntry, saveJournalEntry } from '@/lib/journal';
 import { useToast } from '@/hooks/use-toast';
-import { getWinterArcGoals, createWinterArcGoal, toggleWinterArcGoal, deleteWinterArcGoal, type WinterArcGoal } from '@/modules-core/winter-arc/lib/winter-arc-goals';
+import { getWinterArcGoals, createWinterArcGoal, toggleWinterArcGoal, deleteWinterArcGoal, type WinterArcGoal } from '@/modules/winter-arc/lib/winter-arc-goals';
 
 const QUESTIONS = [
   {

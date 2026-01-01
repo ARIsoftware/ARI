@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { AriLaunchEntry } from '@/modules-custom/ari-launch/types'
+import type { AriLaunchEntry } from '@/modules/ari-launch/types'
 
 // Input types for mutations
 export type CreateEntryInput = {

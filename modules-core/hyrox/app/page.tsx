@@ -32,7 +32,7 @@ import {
   getTimeDifference,
   type HyroxStationRecord,
   type HyroxWorkout,
-} from "@/modules-core/hyrox/lib/hyrox-client"
+} from "@/modules/hyrox/lib/hyrox-client"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],

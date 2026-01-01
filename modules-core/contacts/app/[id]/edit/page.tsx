@@ -34,7 +34,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
-import { getContact, updateContact, createContact, type Contact } from "@/modules-core/contacts/lib/contacts"
+import { getContact, updateContact, createContact, type Contact } from "@/modules/contacts/lib/contacts"
 import { useSupabase } from "@/components/providers"
 
 const dmSans = DM_Sans({

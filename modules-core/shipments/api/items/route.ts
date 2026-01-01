@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
-import { createShipmentSchema, updateShipmentSchema } from '@/modules-core/shipments/lib/validation'
+import { createShipmentSchema, updateShipmentSchema } from '@/modules/shipments/lib/validation'
 import { shipments } from '@/lib/db/schema'
 import { eq, desc } from 'drizzle-orm'
 

@@ -39,7 +39,7 @@ import {
   getStatusBadgeColor,
   formatExpectedDelivery,
   type Shipment
-} from "@/modules-core/shipments/lib/shipments"
+} from "@/modules/shipments/lib/shipments"
 import { useShipments, useInvalidateShipments } from "@/lib/hooks/use-shipments"
 import { useToast } from "@/hooks/use-toast"
 
