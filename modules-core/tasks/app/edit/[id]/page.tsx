@@ -1,9 +1,9 @@
 "use client"
 
 import type React from "react"
-import { use } from "react"
 import { useSupabase } from "@/components/providers"
 import { DM_Sans } from "next/font/google"
+import { useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -54,8 +54,13 @@ const axisDescriptions = {
   strategic_fit: "How well this aligns with your strategic priorities"
 }
 
-export default function EditTaskPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
+export default function EditTaskPage() {
+  // Get params from URL - works with both direct routing and catch-all module routing
+  // For /tasks/edit/[id] the params are { id: '...' }
+  // For catch-all /[module]/[[...slug]] the slug is ['edit', '...']
+  const params = useParams()
+  const id = params.id as string || (params.slug as string[])?.[1]
+
   const { session, supabase } = useSupabase()
   const user = session?.user
   const { toast } = useToast()

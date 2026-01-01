@@ -26,8 +26,49 @@ if (!fs.existsSync(outputDir)) {
 }
 
 /**
+ * Recursively scan for page files in a directory
+ * Returns array of relative paths like ['page.tsx', 'radar/page.tsx', 'add/page.tsx']
+ */
+function scanPagesRecursively(appDir, relativePath = '') {
+  const pages = [];
+
+  if (!fs.existsSync(appDir)) {
+    return pages;
+  }
+
+  const entries = fs.readdirSync(appDir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const entryPath = path.join(appDir, entry.name);
+    const entryRelative = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+
+    if (entry.isDirectory()) {
+      // Handle [param] dynamic route folders - register the parent path
+      if (entry.name.startsWith('[') && entry.name.endsWith(']')) {
+        // Check if there's a page inside the dynamic folder
+        const dynamicPageTsx = path.join(entryPath, 'page.tsx');
+        const dynamicPageJsx = path.join(entryPath, 'page.jsx');
+        if (fs.existsSync(dynamicPageTsx) || fs.existsSync(dynamicPageJsx)) {
+          // Register the parent path (e.g., 'edit' for 'edit/[id]/page.tsx')
+          // The component will use useParams() to get the dynamic segment
+          pages.push({ path: relativePath, isDynamic: true, dynamicFolder: entry.name });
+        }
+        continue;
+      }
+      // Recursively scan subdirectories
+      pages.push(...scanPagesRecursively(entryPath, entryRelative));
+    } else if (entry.name === 'page.tsx' || entry.name === 'page.jsx') {
+      // Found a page file
+      pages.push(relativePath || '');
+    }
+  }
+
+  return pages;
+}
+
+/**
  * Scan a single modules directory
- * Returns array of { id: moduleId, dirName: 'modules-custom' | 'modules-core' }
+ * Returns array of { id: moduleId, dirName: 'modules-custom' | 'modules-core', subRoutes: string[] }
  */
 function scanModulesDirectory(dirName) {
   const modules = [];
@@ -45,8 +86,9 @@ function scanModulesDirectory(dirName) {
     const moduleFolder = entry.name;
     const modulePath = path.join(modulesDir, moduleFolder);
     const manifestPath = path.join(modulePath, 'module.json');
-    const pagePathTsx = path.join(modulePath, 'app', 'page.tsx');
-    const pagePathJsx = path.join(modulePath, 'app', 'page.jsx');
+    const appDir = path.join(modulePath, 'app');
+    const pagePathTsx = path.join(appDir, 'page.tsx');
+    const pagePathJsx = path.join(appDir, 'page.jsx');
 
     // Check if module.json exists
     if (!fs.existsSync(manifestPath)) {
@@ -68,13 +110,16 @@ function scanModulesDirectory(dirName) {
       continue;
     }
 
-    // Check if app/page.tsx or app/page.jsx exists
+    // Check if app/page.tsx or app/page.jsx exists (main page required)
     if (!fs.existsSync(pagePathTsx) && !fs.existsSync(pagePathJsx)) {
       console.warn(`⚠️  Skipping ${dirName}/${moduleFolder}: No app/page.tsx found`);
       continue;
     }
 
-    modules.push({ id: moduleId, dirName, folder: moduleFolder });
+    // Scan for all pages (including sub-routes)
+    const subRoutes = scanPagesRecursively(appDir);
+
+    modules.push({ id: moduleId, dirName, folder: moduleFolder, subRoutes });
   }
 
   return modules;
@@ -82,10 +127,10 @@ function scanModulesDirectory(dirName) {
 
 /**
  * Scan all module directories with override precedence
- * Returns Map of moduleId -> { dirName, folder }
+ * Returns Map of moduleId -> { dirName, folder, subRoutes }
  */
 function scanAllModules() {
-  // Map moduleId -> { dirName, folder }
+  // Map moduleId -> { dirName, folder, subRoutes }
   const moduleMap = new Map();
 
   for (const dirName of MODULE_DIRECTORIES) {
@@ -95,7 +140,10 @@ function scanAllModules() {
     for (const mod of modules) {
       // Only add if not already present (override takes precedence)
       if (!moduleMap.has(mod.id)) {
-        moduleMap.set(mod.id, { dirName: mod.dirName, folder: mod.folder });
+        moduleMap.set(mod.id, { dirName: mod.dirName, folder: mod.folder, subRoutes: mod.subRoutes });
+        if (mod.subRoutes.length > 1) {
+          console.log(`  ↳ ${mod.id}: Found ${mod.subRoutes.length} pages (${mod.subRoutes.join(', ')})`);
+        }
       } else {
         console.log(`  ↳ Skipping ${mod.id} from ${dirName} (overridden by ${moduleMap.get(mod.id).dirName})`);
       }
@@ -171,12 +219,33 @@ function generateManifest(moduleMap) {
 
 // Generate TypeScript registry file
 function generateRegistry(moduleMap) {
-  // Convert Map to sorted array of [id, { dirName, folder }]
+  // Convert Map to sorted array of [id, { dirName, folder, subRoutes }]
   const entries = Array.from(moduleMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
 
-  const imports = entries.map(([id, { dirName, folder }]) =>
-    `  '${id}': () => import('@/modules/${folder}/app/page'),`
-  ).join('\n');
+  // Generate imports for all pages (main + sub-routes)
+  const allImports = [];
+  for (const [id, { folder, subRoutes }] of entries) {
+    for (const route of subRoutes) {
+      // Handle both string routes and dynamic route objects
+      if (typeof route === 'object' && route.isDynamic) {
+        // Dynamic route like edit/[id] - register parent path
+        const routeKey = route.path ? `${id}/${route.path}` : id;
+        const importPath = route.path
+          ? `@/modules/${folder}/app/${route.path}/${route.dynamicFolder}/page`
+          : `@/modules/${folder}/app/${route.dynamicFolder}/page`;
+        allImports.push(`  '${routeKey}': () => import('${importPath}'),`);
+      } else {
+        // Static route
+        const routeKey = route ? `${id}/${route}` : id;
+        const importPath = route ? `@/modules/${folder}/app/${route}/page` : `@/modules/${folder}/app/page`;
+        allImports.push(`  '${routeKey}': () => import('${importPath}'),`);
+      }
+    }
+  }
+
+  // Sort imports alphabetically
+  allImports.sort();
+  const imports = allImports.join('\n');
 
   const moduleIds = entries.map(([id]) => id);
 

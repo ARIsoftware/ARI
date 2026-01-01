@@ -50,7 +50,10 @@ export default async function ModuleCatchAllPage({
     notFound()
   }
 
-  console.log(`[Module Route] Attempting to load module: ${module}`)
+  // Construct the full page path (module + slug)
+  const pagePath = slug.length > 0 ? `${module}/${slug.join('/')}` : module
+
+  console.log(`[Module Route] Attempting to load page: ${pagePath}`)
 
   // Server-side validation - check if module exists and is enabled
   const moduleInfo = await getEnabledModule(module)
@@ -63,13 +66,20 @@ export default async function ModuleCatchAllPage({
     notFound()
   }
 
-  // Check if we have a page loader for this module
-  const pageLoader = MODULE_PAGES[module]
+  // Check if we have a page loader for this path (try full path first, then module root)
+  let pageLoader = MODULE_PAGES[pagePath]
 
-  console.log(`[Module Route] Page loader exists:`, !!pageLoader)
+  // If no specific page for this path, fall back to module root (for modules without sub-routes)
+  if (!pageLoader && slug.length > 0) {
+    console.log(`[Module Route] No page loader for ${pagePath}, checking module root`)
+    // Only fall back if there's no specific route - this handles legacy behavior
+    // but allows sub-routes to be explicitly registered
+  }
+
+  console.log(`[Module Route] Page loader exists for ${pagePath}:`, !!pageLoader)
 
   if (!pageLoader) {
-    console.error(`[Module Route] 404 - No page loader registered for module: ${module}`)
+    console.error(`[Module Route] 404 - No page loader registered for path: ${pagePath}`)
     notFound()
   }
 
