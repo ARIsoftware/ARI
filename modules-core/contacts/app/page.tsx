@@ -23,7 +23,7 @@ import {
   getInitials,
   formatNextContactDate,
   type Contact
-} from "@/modules-core/contacts/lib/contacts"
+} from "@/modules/contacts/lib/contacts"
 import { useContacts } from "@/lib/hooks/use-contacts"
 import { useToast } from "@/hooks/use-toast"
 

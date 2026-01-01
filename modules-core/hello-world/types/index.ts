@@ -160,5 +160,5 @@ export interface ApiErrorResponse {
  *    - Import types in API routes:
  *      import type { CreateEntryRequest } from '../../types'
  *    - Import types in other modules:
- *      import type { HelloWorldEntry } from '@/modules-core/hello-world/types'
+ *      import type { HelloWorldEntry } from '@/modules/hello-world/types'
  */

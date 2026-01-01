@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import type { Contact } from '@/modules-core/contacts/lib/contacts'
+import type { Contact } from '@/modules/contacts/lib/contacts'
 
 /**
  * Fetch all contacts for the current user.

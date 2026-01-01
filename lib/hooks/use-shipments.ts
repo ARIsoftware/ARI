@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import type { Shipment } from '@/modules-core/shipments/lib/shipments'
+import type { Shipment } from '@/modules/shipments/lib/shipments'
 
 /**
  * Fetch all shipments for the current user.
