@@ -4,17 +4,6 @@ import type React from "react"
 import { Fragment } from "react"
 import { useSupabase } from "@/components/providers"
 import { DM_Sans } from "next/font/google"
-import { AppSidebar } from "@/components/app-sidebar"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
-import { TopBar } from "@/components/top-bar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -30,7 +19,6 @@ import { useFeatures } from "@/lib/features-context"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
 import { useRouter, useSearchParams } from "next/navigation"
-import { TaskAnnouncement } from "@/components/task-announcement"
 import { schoolPride } from "@/lib/confetti"
 
 const dmSans = DM_Sans({
@@ -421,26 +409,7 @@ export default function TasksPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      <TaskAnnouncement />
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <TopBar>
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="#">Todo</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>All Tasks</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </TopBar>
-
-          <div className="flex flex-1 flex-col gap-6 p-6">
+    <div className="flex flex-1 flex-col gap-6 p-6">
               {/* Header */}
               <div className="flex items-center justify-between">
               <div>
@@ -1358,16 +1327,13 @@ export default function TasksPage() {
               </div>
             )}
 
-            {filteredTasks.length === 0 && !loading && (
-              <div className="text-center py-12 text-gray-500">
-                {searchQuery || activeFilter !== "All"
-                  ? "No tasks found matching your criteria."
-                  : "No tasks yet. Click 'Add Task' to get started!"}
-              </div>
-            )}
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
+      {filteredTasks.length === 0 && !loading && (
+        <div className="text-center py-12 text-gray-500">
+          {searchQuery || activeFilter !== "All"
+            ? "No tasks found matching your criteria."
+            : "No tasks yet. Click 'Add Task' to get started!"}
+        </div>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
