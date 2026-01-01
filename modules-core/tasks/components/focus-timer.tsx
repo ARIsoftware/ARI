@@ -109,13 +109,6 @@ export function FocusTimerDialog({
         ) : (
           <div className="flex flex-col gap-3 py-4">
             <Button
-              onClick={() => startTimer(10/60)}
-              className="w-full py-6 text-lg"
-              variant="outline"
-            >
-              10 seconds
-            </Button>
-            <Button
               onClick={() => startTimer(5)}
               className="w-full py-6 text-lg"
               variant="outline"
