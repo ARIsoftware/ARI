@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { TaskAnnouncement } from "@/components/task-announcement"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/breadcrumb"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TopBar } from "@/components/top-bar"
@@ -19,12 +20,21 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   AlertCircle,
   Package,
+  Loader2,
+  Save,
+  X,
 } from "lucide-react"
 
 export default function ModulesPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   const [allModules, setAllModules] = useState<any[]>([])
   const [modulesLoading, setModulesLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+
+  // Track original enabled states (from server)
+  const [originalStates, setOriginalStates] = useState<Record<string, boolean>>({})
+  // Track current toggle states (local, may differ from server)
+  const [toggleStates, setToggleStates] = useState<Record<string, boolean>>({})
 
   // Load all modules (not just enabled) for settings management
   useEffect(() => {
@@ -40,6 +50,14 @@ export default function ModulesPage() {
             a.name.localeCompare(b.name)
           )
           setAllModules(sortedModules)
+
+          // Initialize both original and toggle states from server data
+          const initialStates: Record<string, boolean> = {}
+          sortedModules.forEach((module: any) => {
+            initialStates[module.id] = module.isEnabled
+          })
+          setOriginalStates(initialStates)
+          setToggleStates(initialStates)
         }
       } catch (error) {
         console.error('Error loading all modules:', error)
@@ -50,32 +68,58 @@ export default function ModulesPage() {
     loadAllModules()
   }, [])
 
-  const toggleModule = async (moduleId: string, currentEnabled: boolean) => {
-    const newEnabled = !currentEnabled
+  // Compute pending changes
+  const pendingChanges = useMemo(() => {
+    return Object.entries(toggleStates).filter(
+      ([moduleId, enabled]) => originalStates[moduleId] !== enabled
+    )
+  }, [originalStates, toggleStates])
+
+  const hasChanges = pendingChanges.length > 0
+
+  // Toggle module locally (no API call)
+  const toggleModule = (moduleId: string) => {
+    setToggleStates(prev => ({
+      ...prev,
+      [moduleId]: !prev[moduleId]
+    }))
+    // Clear any previous messages when user makes changes
+    setMessage(null)
+  }
+
+  // Discard all pending changes
+  const discardChanges = () => {
+    setToggleStates(originalStates)
+    setMessage(null)
+  }
+
+  // Save all pending changes
+  const saveChanges = async () => {
+    setIsSaving(true)
+    setMessage(null)
 
     try {
-      const response = await fetch('/api/modules', {
+      const response = await fetch('/api/modules/batch', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          moduleId,
-          enabled: newEnabled
+          changes: pendingChanges.map(([moduleId, enabled]) => ({ moduleId, enabled }))
         })
       })
 
       if (!response.ok) {
-        throw new Error('Failed to update module')
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to save changes')
       }
 
-      // Refresh page to update module registry
-      setTimeout(() => {
-        window.location.reload()
-      }, 500)
+      // Reload page to update sidebar navigation
+      window.location.reload()
     } catch (error) {
-      console.error('Error updating module:', error)
-      setMessage({ type: 'error', text: 'Failed to update module. Please try again.' })
+      console.error('Error saving module changes:', error)
+      setMessage({ type: 'error', text: 'Failed to save changes. Please try again.' })
+      setIsSaving(false)
     }
   }
 
@@ -96,7 +140,7 @@ export default function ModulesPage() {
           </TopBar>
 
           <main className="flex-1 bg-slate-50">
-            <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8 lg:px-8">
+            <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8 lg:px-8 pb-24">
               <div className="flex flex-col gap-3">
                 <Badge className="w-fit text-sm font-medium">Extend your app functionality</Badge>
                 <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Modules</h1>
@@ -119,7 +163,7 @@ export default function ModulesPage() {
                     Modules
                   </CardTitle>
                   <CardDescription>
-                    Toggle modules on or off below. Changes take effect after page refresh.
+                    Toggle modules on or off below, then click "Save Changes" to apply.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -137,7 +181,8 @@ export default function ModulesPage() {
                   ) : (
                     allModules.map((module) => {
                       const Icon = getLucideIcon(module.icon)
-                      const isEnabled = module.isEnabled
+                      const isEnabled = toggleStates[module.id] ?? module.isEnabled
+                      const hasChanged = originalStates[module.id] !== toggleStates[module.id]
                       const isCustomModule = module.path?.includes('/modules-custom/')
                       const isOverridden = module.isOverridden === true
 
@@ -153,7 +198,12 @@ export default function ModulesPage() {
                       }
 
                       return (
-                        <div key={`${module.id}-${module.path}`} className="flex items-start justify-between rounded-lg border p-4">
+                        <div
+                          key={`${module.id}-${module.path}`}
+                          className={`flex items-start justify-between rounded-lg border p-4 transition-colors ${
+                            hasChanged ? 'border-amber-400 bg-amber-50/50' : ''
+                          }`}
+                        >
                           <div className="pr-4 flex-1">
                             <div className="flex items-center gap-3 mb-2">
                               <Icon className="h-5 w-5 text-blue-600" />
@@ -166,6 +216,11 @@ export default function ModulesPage() {
                                   >
                                     {badgeText}
                                   </Badge>
+                                  {hasChanged && (
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500 text-amber-600">
+                                      UNSAVED
+                                    </Badge>
+                                  )}
                                 </div>
                                 <p className="text-xs text-muted-foreground">v{module.version} by {module.author}</p>
                                 <p className="text-xs text-muted-foreground">ID: {module.id}</p>
@@ -180,12 +235,12 @@ export default function ModulesPage() {
                             <p className="text-sm text-muted-foreground">{module.description}</p>
                           </div>
                           <div className={`flex items-center gap-3 ${isOverridden ? 'opacity-30' : ''}`}>
-                            <span className="text-sm font-medium text-muted-foreground">
+                            <span className={`text-sm font-medium ${hasChanged ? 'text-amber-600' : 'text-muted-foreground'}`}>
                               {isEnabled ? 'On' : 'Off'}
                             </span>
                             <Switch
                               checked={isEnabled}
-                              onCheckedChange={() => toggleModule(module.id, isEnabled)}
+                              onCheckedChange={() => toggleModule(module.id)}
                               disabled={isOverridden}
                             />
                           </div>
@@ -197,12 +252,54 @@ export default function ModulesPage() {
                 <CardFooter className="border-t bg-muted/60">
                   <div className="flex w-full items-center text-sm text-muted-foreground">
                     <AlertCircle className="mr-2 h-4 w-4" />
-                    <span>Disabled modules won't appear in navigation. Toggling requires page refresh.</span>
+                    <span>Disabled modules won't appear in navigation.</span>
                   </div>
                 </CardFooter>
               </Card>
             </div>
           </main>
+
+          {/* Sticky Save Bar */}
+          {hasChanges && (
+            <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-white shadow-lg">
+              <div className="mx-auto max-w-6xl px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                    <span className="text-sm text-muted-foreground">
+                      {pendingChanges.length} module{pendingChanges.length !== 1 ? 's' : ''} will be {pendingChanges.some(([, enabled]) => enabled) && pendingChanges.some(([, enabled]) => !enabled) ? 'changed' : pendingChanges[0]?.[1] ? 'enabled' : 'disabled'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={discardChanges}
+                      disabled={isSaving}
+                    >
+                      <X className="mr-2 h-4 w-4" />
+                      Discard
+                    </Button>
+                    <Button
+                      onClick={saveChanges}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="mr-2 h-4 w-4" />
+                          Save Changes
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </SidebarInset>
       </SidebarProvider>
     </div>
