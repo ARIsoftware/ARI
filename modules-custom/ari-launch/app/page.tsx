@@ -36,7 +36,7 @@ import {
 import type { AriLaunchEntry } from '../types'
 
 const TOTAL_DAYS = 45
-const TRUNCATE_LENGTH = 18
+const TRUNCATE_LENGTH = 30
 
 export default function AriLaunchPage() {
   const { toast } = useToast()
