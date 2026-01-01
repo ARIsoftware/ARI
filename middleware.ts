@@ -7,9 +7,7 @@ const protectedRoutes = [
   "/tasks",
   "/dashboard",
   "/daily-fitness",
-  "/add-task",
   "/add-fitness",
-  "/edit-task",
   "/edit-fitness",
   "/northstar",
   "/winter-arc",
@@ -26,7 +24,6 @@ const protectedRoutes = [
   "/modules",
   "/profile",
   "/logs",
-  "/radar",
   "/debug",
   "/api" // All API routes require authentication (defense-in-depth)
 ]
