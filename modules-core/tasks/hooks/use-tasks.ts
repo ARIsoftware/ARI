@@ -16,7 +16,7 @@ export function useTasks() {
   return useQuery({
     queryKey: ['tasks'],
     queryFn: async (): Promise<Task[]> => {
-      const res = await fetch('/api/tasks')
+      const res = await fetch('/api/modules/tasks')
       if (!res.ok) {
         const error = await res.json()
         throw new Error(error.error || 'Failed to fetch tasks')
@@ -35,7 +35,7 @@ export function useCreateTask() {
 
   return useMutation({
     mutationFn: async (task: CreateTaskInput): Promise<Task> => {
-      const res = await fetch('/api/tasks', {
+      const res = await fetch('/api/modules/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ task }),
@@ -90,7 +90,7 @@ export function useUpdateTask() {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: UpdateTaskInput): Promise<Task> => {
-      const res = await fetch('/api/tasks', {
+      const res = await fetch('/api/modules/tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, updates }),
@@ -133,7 +133,7 @@ export function useDeleteTask() {
 
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
-      const res = await fetch(`/api/tasks?id=${encodeURIComponent(id)}`, {
+      const res = await fetch(`/api/modules/tasks?id=${encodeURIComponent(id)}`, {
         method: 'DELETE'
       })
       if (!res.ok) {
@@ -181,7 +181,7 @@ export function useToggleTaskCompletion() {
       const newCompleted = !currentTask.completed
       const newStatus = newCompleted ? 'Completed' : 'Pending'
 
-      const res = await fetch('/api/tasks', {
+      const res = await fetch('/api/modules/tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -241,7 +241,7 @@ export function useToggleTaskPin() {
         throw new Error('Task not found')
       }
 
-      const res = await fetch('/api/tasks', {
+      const res = await fetch('/api/modules/tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -291,7 +291,7 @@ export function useReorderTasks() {
     mutationFn: async (taskIds: string[]): Promise<void> => {
       // Update each task's order_index
       const updates = taskIds.map((id, index) =>
-        fetch('/api/tasks', {
+        fetch('/api/modules/tasks', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id, updates: { order_index: index } }),

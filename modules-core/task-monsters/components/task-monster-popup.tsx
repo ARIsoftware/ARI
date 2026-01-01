@@ -72,7 +72,7 @@ export default function TaskMonsterPopup({ task, tasks, currentIndex, onClose, o
 
     // Mark task as complete in the background
     try {
-      await fetch('/api/tasks', {
+      await fetch('/api/modules/tasks', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

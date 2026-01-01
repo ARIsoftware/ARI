@@ -63,7 +63,7 @@ export function TaskAnalyticsChart({ token }: TaskAnalyticsChartProps) {
         setLoading(true)
         setError(null)
 
-        const response = await fetch('/api/tasks/analytics?days=30', {
+        const response = await fetch('/api/modules/tasks/analytics?days=30', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',

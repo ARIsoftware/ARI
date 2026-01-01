@@ -1,22 +1,22 @@
 export async function getLastCompletedTask(getToken: () => Promise<string | null>, userId?: string) {
   try {
     const token = await getToken()
-    
+
     if (!token) {
       console.error("Authentication required for getLastCompletedTask")
       return null
     }
 
-    const url = userId 
-      ? `/api/last-completed-task?userId=${encodeURIComponent(userId)}`
-      : '/api/last-completed-task'
-    
+    const url = userId
+      ? `/api/modules/tasks/last-completed?userId=${encodeURIComponent(userId)}`
+      : '/api/modules/tasks/last-completed'
+
     const response = await fetch(url, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
     })
-    
+
     if (!response.ok) {
       const error = await response.json()
       console.error("Error fetching last completed task:", error)

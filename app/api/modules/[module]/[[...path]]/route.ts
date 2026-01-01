@@ -88,6 +88,13 @@ const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
   },
   'ari-launch': {
     'data': () => import('@/modules/ari-launch/api/data/route') // GET/POST for entries (upsert by day)
+  },
+  'tasks': {
+    '': () => import('@/modules/tasks/api/route'), // GET/POST/PUT/DELETE for tasks CRUD
+    'priorities': () => import('@/modules/tasks/api/priorities/route'), // GET/PUT/POST for priority management
+    'analytics': () => import('@/modules/tasks/api/analytics/route'), // GET for task analytics
+    'increment-completion': () => import('@/modules/tasks/api/increment-completion/route'), // POST for incrementing completion count
+    'last-completed': () => import('@/modules/tasks/api/last-completed/route') // GET for last completed task
   }
 }
 

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSupabase } from '@/components/providers'
 import type { Task } from '@/lib/supabase'
-import { calculatePriorityScore, getTaskColor } from '@/lib/priority-utils'
+import { calculatePriorityScore, getTaskColor } from '@/modules/tasks/lib/priority-utils'
 import type { FishData, FishType } from '../types'
 import { Aquarium } from '../components/aquarium'
 
@@ -196,7 +196,7 @@ export default function TaskAquariumPage() {
     if (!session?.access_token) return
 
     try {
-      const response = await fetch('/api/tasks', {
+      const response = await fetch('/api/modules/tasks', {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },

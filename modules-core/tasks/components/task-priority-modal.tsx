@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Badge } from "@/components/ui/badge"
-import { calculatePriorityScore, getTaskPriorityLevel } from "@/lib/priority-utils"
+import { calculatePriorityScore, getTaskPriorityLevel } from "../lib/priority-utils"
 import { Info } from "lucide-react"
 import {
   Tooltip,
@@ -167,7 +167,7 @@ export function TaskPriorityModal({
           {/* Visual Indicator */}
           <div className="p-3 bg-blue-50 rounded-lg">
             <p className="text-xs text-blue-700">
-              <strong>Tip:</strong> Tasks with high impact, severity, and timeliness but low effort 
+              <strong>Tip:</strong> Tasks with high impact, severity, and timeliness but low effort
               will appear closer to the center of the radar chart (higher priority).
             </p>
           </div>

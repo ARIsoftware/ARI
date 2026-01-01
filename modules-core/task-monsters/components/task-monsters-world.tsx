@@ -26,7 +26,7 @@ export default function TaskMonstersWorld() {
     if (!session?.access_token) return
 
     try {
-      const response = await fetch('/api/tasks', {
+      const response = await fetch('/api/modules/tasks', {
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
         },

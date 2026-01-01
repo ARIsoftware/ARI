@@ -85,7 +85,7 @@ export async function incrementTaskCompletion(taskId: string, getToken: () => Pr
       throw new Error('Authentication required')
     }
 
-    const response = await fetch('/api/tasks/increment-completion', {
+    const response = await fetch('/api/modules/tasks/increment-completion', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -33,9 +33,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useSupabase } from "@/components/providers"
 import { Task } from "@/lib/supabase"
-import { transformTaskForRadar, getTaskPriorityLevel } from "@/lib/priority-utils"
-import { TaskPriorityModal } from "@/components/task-priority-modal"
-import { RadarTaskDots } from "@/components/radar-task-dots"
+import { transformTaskForRadar, getTaskPriorityLevel } from "@/modules/tasks/lib/priority-utils"
+import { TaskPriorityModal } from "@/modules/tasks/components/task-priority-modal"
+import { RadarTaskDots } from "@/modules/tasks/components/radar-task-dots"
 
 const chartConfig = {
   value: {
@@ -95,7 +95,7 @@ export default function RadarPage() {
     if (!session?.access_token) return
     
     try {
-      const response = await fetch('/api/tasks/priorities', {
+      const response = await fetch('/api/modules/tasks/priorities', {
         headers: {
           'Authorization': `Bearer ${session.access_token}`
         }
@@ -147,7 +147,7 @@ export default function RadarPage() {
     if (!session?.access_token) return
     
     try {
-      const response = await fetch('/api/tasks/priorities', {
+      const response = await fetch('/api/modules/tasks/priorities', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

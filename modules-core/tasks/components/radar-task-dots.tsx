@@ -1,7 +1,7 @@
 "use client"
 
 import { Task } from "@/lib/supabase"
-import { transformTaskForRadar } from "@/lib/priority-utils"
+import { transformTaskForRadar } from "../lib/priority-utils"
 
 interface RadarTaskDotsProps {
   tasks: Task[]
@@ -11,10 +11,10 @@ interface RadarTaskDotsProps {
   limit?: number
 }
 
-export function RadarTaskDots({ 
-  tasks, 
-  hoveredTask, 
-  onTaskHover, 
+export function RadarTaskDots({
+  tasks,
+  hoveredTask,
+  onTaskHover,
   onTaskClick,
   limit = 5
 }: RadarTaskDotsProps) {
@@ -30,22 +30,22 @@ export function RadarTaskDots({
     // Lower score = closer to center = higher priority
     const maxRadius = 140 // Maximum radius in pixels
     const radius = Math.min(task.score, 1) * maxRadius
-    
+
     // Distribute tasks around different angles to avoid overlap
     const angleStep = 360 / Math.min(transformedTasks.length, 5)
     const taskIndex = transformedTasks.findIndex(t => t.id === task.id)
     const angle = (taskIndex * angleStep - 90) * Math.PI / 180
-    
+
     const x = radius * Math.cos(angle)
     const y = radius * Math.sin(angle)
-    
+
     return { x, y }
   }
 
   return (
     <div className="absolute inset-0 pointer-events-none">
-      <svg 
-        className="w-full h-full pointer-events-auto" 
+      <svg
+        className="w-full h-full pointer-events-auto"
         viewBox="0 0 400 400"
         style={{ position: 'absolute', top: 0, left: 0 }}
       >
@@ -54,15 +54,15 @@ export function RadarTaskDots({
           <circle cx={0} cy={0} r={35} fill="rgba(239, 68, 68, 0.1)" strokeWidth={1} stroke="rgba(239, 68, 68, 0.3)" strokeDasharray="2 2" />
           <circle cx={0} cy={0} r={70} fill="rgba(251, 146, 60, 0.05)" strokeWidth={1} stroke="rgba(251, 146, 60, 0.2)" strokeDasharray="2 2" />
           <circle cx={0} cy={0} r={105} fill="rgba(250, 204, 21, 0.05)" strokeWidth={1} stroke="rgba(250, 204, 21, 0.2)" strokeDasharray="2 2" />
-          
+
           {/* Task dots */}
           {transformedTasks.map((task, index) => {
             const fullTask = tasks.find(t => t.id === task.id)
             if (!fullTask) return null
-            
+
             const { x, y } = getPosition(task)
             const isHovered = hoveredTask === task.id
-            
+
             return (
               <g key={task.id}>
                 {/* Connection line to center for hovered task */}
@@ -78,7 +78,7 @@ export function RadarTaskDots({
                     strokeDasharray="3 3"
                   />
                 )}
-                
+
                 {/* Task dot */}
                 <circle
                   cx={x}
@@ -88,7 +88,7 @@ export function RadarTaskDots({
                   fillOpacity={isHovered ? 1 : 0.8}
                   stroke="white"
                   strokeWidth={2}
-                  style={{ 
+                  style={{
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
                     filter: isHovered ? 'drop-shadow(0 0 8px rgba(0,0,0,0.3))' : 'none'
@@ -97,7 +97,7 @@ export function RadarTaskDots({
                   onMouseLeave={() => onTaskHover(null)}
                   onClick={() => onTaskClick(fullTask)}
                 />
-                
+
                 {/* Priority number */}
                 <text
                   x={x}
@@ -111,7 +111,7 @@ export function RadarTaskDots({
                 >
                   {index + 1}
                 </text>
-                
+
                 {/* Task title on hover */}
                 {isHovered && (
                   <foreignObject

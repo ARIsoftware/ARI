@@ -1,10 +1,10 @@
-import { type Task } from "./supabase"
-import { incrementTaskCompletion } from "./fitness-stats"
+import { type Task } from "@/lib/supabase"
+import { incrementTaskCompletion } from "@/lib/fitness-stats"
 
 // Helper function to create authenticated fetch requests
 async function authenticatedFetch(url: string, options: RequestInit = {}, getToken: () => Promise<string | null>) {
   const token = await getToken()
-  
+
   if (!token) {
     throw new Error('Authentication required')
   }
@@ -24,9 +24,9 @@ export async function getTasks(getToken?: () => Promise<string | null>): Promise
   if (!getToken) {
     throw new Error('Authentication token provider required')
   }
-  
-  const response = await authenticatedFetch('/api/tasks', {}, getToken)
-  
+
+  const response = await authenticatedFetch('/api/modules/tasks', {}, getToken)
+
   if (!response.ok) {
     const error = await response.json()
     console.error("Error fetching tasks:", error)
@@ -37,7 +37,7 @@ export async function getTasks(getToken?: () => Promise<string | null>): Promise
 }
 
 export async function createTask(task: Omit<Task, "id" | "created_at" | "updated_at" | "order_index">, getToken: () => Promise<string | null>): Promise<Task> {
-  const response = await authenticatedFetch('/api/tasks', {
+  const response = await authenticatedFetch('/api/modules/tasks', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -55,7 +55,7 @@ export async function createTask(task: Omit<Task, "id" | "created_at" | "updated
 }
 
 export async function updateTask(id: string, updates: Partial<Task>, getToken: () => Promise<string | null>): Promise<Task> {
-  const response = await authenticatedFetch('/api/tasks', {
+  const response = await authenticatedFetch('/api/modules/tasks', {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -73,7 +73,7 @@ export async function updateTask(id: string, updates: Partial<Task>, getToken: (
 }
 
 export async function deleteTask(id: string, getToken: () => Promise<string | null>): Promise<void> {
-  const response = await authenticatedFetch(`/api/tasks?id=${encodeURIComponent(id)}`, {
+  const response = await authenticatedFetch(`/api/modules/tasks?id=${encodeURIComponent(id)}`, {
     method: 'DELETE',
   }, getToken)
 
@@ -86,8 +86,8 @@ export async function deleteTask(id: string, getToken: () => Promise<string | nu
 
 export async function toggleTaskCompletion(id: string, getToken: () => Promise<string | null>): Promise<Task> {
   // First get the current task state
-  const response = await authenticatedFetch('/api/tasks', {}, getToken)
-  
+  const response = await authenticatedFetch('/api/modules/tasks', {}, getToken)
+
   if (!response.ok) {
     const error = await response.json()
     console.error("Error fetching tasks:", error)
@@ -96,7 +96,7 @@ export async function toggleTaskCompletion(id: string, getToken: () => Promise<s
 
   const tasks = await response.json()
   const currentTask = tasks.find((t: Task) => t.id === id)
-  
+
   if (!currentTask) {
     throw new Error('Task not found')
   }
@@ -125,7 +125,7 @@ export async function toggleTaskCompletion(id: string, getToken: () => Promise<s
 
 export async function toggleTaskPin(id: string, getToken: () => Promise<string | null>): Promise<Task> {
   // First get the current task state
-  const response = await authenticatedFetch('/api/tasks', {}, getToken)
+  const response = await authenticatedFetch('/api/modules/tasks', {}, getToken)
 
   if (!response.ok) {
     const error = await response.json()
@@ -154,13 +154,13 @@ export async function reorderTasks(taskIds: string[], getToken: () => Promise<st
 
   // Update each task's order using the API
   for (const update of updates) {
-    const response = await authenticatedFetch('/api/tasks', {
+    const response = await authenticatedFetch('/api/modules/tasks', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ 
-        id: update.id, 
+      body: JSON.stringify({
+        id: update.id,
         updates: { order_index: update.order_index }
       }),
     }, getToken)

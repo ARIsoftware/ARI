@@ -53,7 +53,7 @@ export function TaskCompletionChart({ token }: TaskCompletionChartProps) {
         setLoading(true)
         setError(null)
 
-        const response = await fetch('/api/tasks', {
+        const response = await fetch('/api/modules/tasks', {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
