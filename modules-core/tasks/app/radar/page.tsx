@@ -3,17 +3,6 @@
 import { useEffect, useState } from "react"
 import { Filter, TrendingUp } from "lucide-react"
 import { PolarAngleAxis, PolarGrid, Radar, RadarChart, PolarRadiusAxis } from "recharts"
-import { AppSidebar } from "@/components/app-sidebar"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
-import { TopBar } from "@/components/top-bar"
 import {
   Card,
   CardContent,
@@ -28,7 +17,6 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart"
-import { TaskAnnouncement } from "@/components/task-announcement"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useSupabase } from "@/components/providers"
@@ -174,26 +162,7 @@ export default function RadarPage() {
   const transformedPriorityTasks = priorityTasks.map(transformTaskForRadar)
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      <TaskAnnouncement />
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <TopBar>
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>Task Priority Radar</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </TopBar>
-          
-          <div className="flex flex-1 flex-col gap-6 p-6">
+    <div className="flex flex-1 flex-col gap-6 p-6">
             <div className="flex justify-between items-start">
               <div>
                 <h1 className="text-3xl font-medium">Task Priority Radar</h1>
@@ -415,9 +384,6 @@ export default function RadarPage() {
                 </div>
               </CardContent>
             </Card>
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
 
       {/* Task Priority Edit Modal */}
       {selectedTask && (

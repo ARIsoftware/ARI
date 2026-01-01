@@ -3,18 +3,6 @@
 import type React from "react"
 import { useSupabase } from "@/components/providers"
 import { DM_Sans } from "next/font/google"
-import { TaskAnnouncement } from "@/components/task-announcement"
-import { AppSidebar } from "../../components/app-sidebar"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
-import { TopBar } from "@/components/top-bar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -216,26 +204,7 @@ export default function AddTaskPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      <TaskAnnouncement />
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <TopBar>
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="/tasks">Todo</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>Add Task</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </TopBar>
-
-          <div className="flex flex-1 flex-col gap-6 p-6">
+    <div className="flex flex-1 flex-col gap-6 p-6">
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
@@ -708,9 +677,6 @@ export default function AddTaskPage() {
                 </CardContent>
               </Card>
             </form>
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
     </div>
   )
 }
