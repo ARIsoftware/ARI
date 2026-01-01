@@ -384,15 +384,25 @@ export default function DatabaseTestPage() {
       }
 
       // Test 5: Module API Routes Registry (NEW - Post-Migration)
+      // Only test modules that have API routes AND are enabled
       updateModuleResult('Module API Routes', { status: 'testing' })
-      const migratedModules = ['contacts', 'motivation', 'winter-arc']
+      const modulesWithApiRoutes: Record<string, string[]> = {
+        'contacts': [''], // Base route
+        'motivation': ['setup', 'reorder', 'refresh-thumbnail'],
+        'winter-arc': [''] // Base route
+      }
       const apiRouteTests: Array<{ module: string; route: string; status: string; message?: string }> = []
+      const skippedModules: string[] = []
 
-      // Test migrated module API endpoints
-      for (const moduleId of migratedModules) {
-        const testRoutes = moduleId === 'motivation'
-          ? ['setup', 'reorder', 'refresh-thumbnail']
-          : [''] // Base route for contacts and winter-arc
+      // Only test enabled modules
+      const enabledModuleIds = enabledModules.map((m: any) => m.id)
+
+      for (const [moduleId, testRoutes] of Object.entries(modulesWithApiRoutes)) {
+        // Skip if module is not enabled
+        if (!enabledModuleIds.includes(moduleId)) {
+          skippedModules.push(moduleId)
+          continue
+        }
 
         for (const route of testRoutes) {
           const endpoint = route
@@ -427,12 +437,12 @@ export default function DatabaseTestPage() {
       if (failedApiRoutes.length === 0) {
         updateModuleResult('Module API Routes', {
           status: 'success',
-          message: `All ${apiRouteTests.length} migrated module API routes accessible`,
+          message: `All ${apiRouteTests.length} enabled module API routes accessible${skippedModules.length > 0 ? ` (${skippedModules.length} disabled module(s) skipped)` : ''}`,
           data: {
             tested: apiRouteTests.length,
             routes: apiRouteTests,
-            migratedModules,
-            info: 'Tests contacts, motivation, and winter-arc module API endpoints'
+            skippedModules: skippedModules.length > 0 ? skippedModules : undefined,
+            info: 'Only tests API routes for enabled modules'
           }
         })
         console.log('✅ Module API routes check passed')
@@ -443,6 +453,7 @@ export default function DatabaseTestPage() {
           data: {
             failedApiRoutes,
             allTests: apiRouteTests,
+            skippedModules: skippedModules.length > 0 ? skippedModules : undefined,
             hint: 'Check MODULE_API_ROUTES registry in /app/api/modules/[module]/[[...path]]/route.ts'
           }
         })
