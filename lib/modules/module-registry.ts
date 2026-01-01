@@ -13,6 +13,9 @@ import { createDbClient } from '@/lib/db-supabase'
 import { loadModules } from './module-loader'
 import type { ModuleMetadata, ModuleSettings } from './module-types'
 
+// Track if we've logged the module list on server start
+let hasLoggedModuleListOnStartup = false
+
 /**
  * Get all discovered modules (regardless of enabled state)
  *
@@ -20,6 +23,13 @@ import type { ModuleMetadata, ModuleSettings } from './module-types'
  */
 export async function getModules(): Promise<ModuleMetadata[]> {
   const { modules } = await loadModules()
+
+  // Log module list once on server startup
+  if (!hasLoggedModuleListOnStartup) {
+    hasLoggedModuleListOnStartup = true
+    console.log(`[Modules] Server startup - discovered ${modules.length} modules:`, modules.map(m => m.id))
+  }
+
   return modules
 }
 
@@ -85,8 +95,6 @@ export async function getEnabledModule(
   moduleId: string,
   userId?: string
 ): Promise<ModuleMetadata | null> {
-  console.log(`[getEnabledModule] Checking module: ${moduleId}`)
-
   const supabase = createDbClient()
 
   // Get current user if not provided
@@ -95,9 +103,7 @@ export async function getEnabledModule(
     const session = await auth.api.getSession({
       headers: await headers(),
     })
-    console.log(`[getEnabledModule] User from session:`, session?.user ? session.user.id : 'null')
     if (!session?.user) {
-      console.log(`[getEnabledModule] No user session - returning null`)
       return null // No user session = no access
     }
     currentUserId = session.user.id
@@ -105,29 +111,23 @@ export async function getEnabledModule(
 
   // Get all modules
   const allModules = await getModules()
-  console.log(`[getEnabledModule] All modules:`, allModules.map(m => m.id))
 
   // Find the requested module
   const module = allModules.find(m => m.id === moduleId)
-  console.log(`[getEnabledModule] Module found:`, !!module)
   if (!module) {
-    console.log(`[getEnabledModule] Module doesn't exist - returning null`)
     return null // Module doesn't exist
   }
 
   // Check if module is enabled for this user
-  const { data: setting, error: dbError } = await supabase
+  const { data: setting } = await supabase
     .from('module_settings')
     .select('enabled')
     .eq('user_id', currentUserId)
     .eq('module_id', moduleId)
     .single()
 
-  console.log(`[getEnabledModule] DB setting:`, setting, 'error:', dbError?.message)
-
   // If no setting exists, use manifest default
   const isEnabled = setting ? setting.enabled : (module.enabled ?? true)
-  console.log(`[getEnabledModule] isEnabled:`, isEnabled, '(from:', setting ? 'database' : 'manifest default', ')')
 
   return isEnabled ? module : null
 }
