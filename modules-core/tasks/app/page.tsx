@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Search, Filter, List, Grid3X3, Calendar, Pin, Bell, Plus, Trash2, Pencil, Columns, StickyNote, Table } from "lucide-react"
+import { Search, Filter, List, Grid3X3, Calendar, Pin, Bell, Plus, Trash2, Pencil, Columns, Table } from "lucide-react"
 import { useState, useEffect, useMemo } from "react"
 import { toggleTaskCompletion, toggleTaskPin, reorderTasks, deleteTask, updateTask, type Task } from "../lib/utils"
 import { useTasks } from "../hooks/use-tasks"
@@ -31,7 +31,6 @@ import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
 import { useRouter, useSearchParams } from "next/navigation"
 import { TaskAnnouncement } from "@/components/task-announcement"
-import { Notepad } from "@/components/notepad"
 import { schoolPride } from "@/lib/confetti"
 
 const dmSans = DM_Sans({
@@ -137,7 +136,6 @@ export default function TasksPage() {
   const [fadingTasks, setFadingTasks] = useState<Set<string>>(new Set())
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
-  const [isNotepadOpen, setIsNotepadOpen] = useState(false)
   const [projects, setProjects] = useState<MajorProject[]>([])
   const router = useRouter()
   const projectFilter = searchParams.get('filter')
@@ -452,15 +450,6 @@ export default function TasksPage() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setIsNotepadOpen(true)}
-                  className="bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                  title="Open Notepad"
-                >
-                  <StickyNote className="w-5 h-5" />
-                </Button>
                 <Button variant="outline" className="bg-white" onClick={() => router.push("/radar")}>
                   Radar
                 </Button>
@@ -1379,9 +1368,6 @@ export default function TasksPage() {
           </div>
         </SidebarInset>
       </SidebarProvider>
-
-      {/* Notepad Sliding Panel */}
-      <Notepad isOpen={isNotepadOpen} onClose={() => setIsNotepadOpen(false)} />
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
