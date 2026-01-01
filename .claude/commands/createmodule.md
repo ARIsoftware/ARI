@@ -26,6 +26,20 @@ Ask the user the following questions ONE AT A TIME, waiting for each answer befo
 4. **Navigation**: Should it appear in the sidebar? If so, what should the page name be?
 5. **Top Bar**: Should it have a quick-access icon in the top bar?
 
+Then ask follow-up clarifying questions based on their answers. You can ask any clarifying questions. Here are some examples of clarifying questions:
+
+- What data needs to be stored?
+- How do you envision the main UI/layout? (list view, cards, calendar, etc.)
+- Do you need to create, edit, and delete entries? Or just view them?
+- Are there any statuses, categories, or tags needed?
+- Do you need any sorting, filtering, or search capabilities?
+- Should entries have dates/timestamps? Due dates? Recurring items?
+- Do you need any calculations, totals, or statistics displayed?
+- Are there any relationships to other modules or data (e.g., linking to tasks, contacts)? What should happen if the other data/module is not available or installed?
+- Are there any existing apps or tools that do something similar to what you want?
+
+Continue asking questions until you have a very clear picture of what to build. The goal is to avoid building the wrong thing or missing important requirements.
+
 Note: The user may have requested to create the module in the modules-core directory. If so, please inform them that it is highly recommended that all new modules are placed in the modules-custom directory, and confirm with them that the new module should be placed in the modules-custom directory as recommended. Give the user the opportunity to confirm that the module can be placed in the the modules-custom directory. If they reply that the module should be in the modules-core directory please comply with that request.
 
 ## Validation Rules
