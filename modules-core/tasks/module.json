@@ -22,16 +22,22 @@
       "sidebarPosition": "main"
     },
     {
-      "path": "/add-task",
+      "path": "/tasks/add",
       "label": "Add Task",
       "icon": "Plus",
-      "sidebarPosition": "main"
+      "sidebarPosition": "none"
     },
     {
-      "path": "/radar",
+      "path": "/tasks/radar",
       "label": "Task Radar",
       "icon": "Radar",
-      "sidebarPosition": "main"
+      "sidebarPosition": "none"
+    },
+    {
+      "path": "/tasks/edit",
+      "label": "Edit Task",
+      "icon": "Pencil",
+      "sidebarPosition": "none"
     }
   ],
   "database": {
