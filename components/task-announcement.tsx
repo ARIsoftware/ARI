@@ -10,8 +10,11 @@ import {
   LogOut,
   User,
   Play,
-  Pause
+  Pause,
+  Clock,
+  X
 } from "lucide-react"
+import { FocusTimerTopBarIcon } from "@/components/focus-timer-top-bar-icon"
 import { useModules } from "@/lib/modules/module-hooks"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
 import {
@@ -22,7 +25,7 @@ import {
 } from "@/components/ui/tooltip"
 import { DM_Sans } from "next/font/google"
 import { Announcement, AnnouncementTag, AnnouncementTitle } from "@/components/ui/kibo-ui/announcement"
-import { getLastCompletedTask, truncateTaskName } from "@/lib/get-last-completed-task"
+import { getLastCompletedTask, truncateTaskName } from "@/modules/tasks/lib/get-last-completed-task"
 import { useIsMobile } from "@/components/ui/use-mobile"
 import { useSupabase } from "@/components/providers"
 import { authClient } from "@/lib/auth-client"
@@ -143,6 +146,9 @@ function TopBarIcons() {
           <Package className="h-5 w-5" />
         </Button>
 
+        {/* Focus Timer */}
+        <FocusTimerTopBarIcon />
+
         {/* Music Player */}
         <Button
           variant="ghost"
@@ -251,6 +257,31 @@ export function TaskAnnouncement() {
     }
   }, [user?.id, session?.access_token])
 
+  // Run the countdown interval when timer is active
+  // This is the main timer that decrements every second
+  useEffect(() => {
+    if (!focusTimer.isActive || focusTimer.timeRemaining <= 0) {
+      return
+    }
+
+    const interval = setInterval(() => {
+      const newTime = globalTimerState.timeRemaining - 1
+      globalTimerState.timeRemaining = newTime
+
+      if (newTime <= 0) {
+        globalTimerState.isActive = false
+        globalTimerState.timeRemaining = 0
+        // Notify all listeners that timer completed
+        globalTimerState.listeners.forEach(listener => listener(false, 0))
+      } else {
+        // Notify all listeners of the new time
+        globalTimerState.listeners.forEach(listener => listener(true, newTime))
+      }
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [focusTimer.isActive])
+
   const loadLastTask = async () => {
     if (!session?.access_token) {
       setLoading(false)
@@ -281,13 +312,28 @@ export function TaskAnnouncement() {
     rawColor: process.env.NEXT_PUBLIC_TOP_BAR_COLOR
   })
 
+  // Stop the focus timer
+  const stopFocusTimer = () => {
+    globalTimerState.isActive = false
+    globalTimerState.timeRemaining = 0
+    globalTimerState.listeners.forEach(listener => listener(false, 0))
+    setFocusTimer({ isActive: false, timeRemaining: 0, isComplete: false })
+  }
+
   // Show focus timer when active
   if (focusTimer.isActive) {
     return (
-      <div className="topbar bg-black w-full relative z-50 flex items-center justify-center" style={{ height: '90vh' }}>
+      <div className="topbar bg-black w-full relative z-50 flex flex-col items-center justify-center" style={{ height: '90vh' }}>
         <h1 className="text-white text-6xl font-bold">
           FOCUS TIME {formatTime(focusTimer.timeRemaining)}
         </h1>
+        <button
+          onClick={stopFocusTimer}
+          className="absolute bottom-12 text-white hover:text-gray-300 transition-colors"
+          aria-label="Stop focus timer"
+        >
+          <X className="w-10 h-10" />
+        </button>
       </div>
     )
   }

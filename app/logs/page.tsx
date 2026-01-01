@@ -74,7 +74,7 @@ export default function LogsPage() {
       // Step 3: Test API authentication
       addLog("📋 STEP 3: Testing API authentication")
       try {
-        const response = await fetch('/api/tasks', {
+        const response = await fetch('/api/modules/tasks', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json'
@@ -104,7 +104,7 @@ export default function LogsPage() {
       try {
         const token = session?.access_token
         if (token) {
-          const response = await fetch('/api/tasks', {
+          const response = await fetch('/api/modules/tasks', {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',

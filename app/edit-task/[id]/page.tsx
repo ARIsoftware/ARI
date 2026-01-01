@@ -30,7 +30,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { CalendarIcon, Save, X, Pin, ArrowLeft, Loader2, Pencil, Info, Compass, Briefcase } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useState, useEffect } from "react"
-import { getTasks, updateTask, type Task } from "@/lib/tasks"
+import { getTasks, updateTask, type Task } from "@/modules/tasks/lib/utils"
 import { getGoals, type Goal } from "@/lib/goals"
 import { getMajorProjects } from "@/modules/major-projects/lib/utils"
 import type { MajorProject } from "@/modules/major-projects/types"
@@ -39,7 +39,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
-import { calculatePriorityScore, getTaskPriorityLevel } from "@/lib/priority-utils"
+import { calculatePriorityScore, getTaskPriorityLevel } from "@/modules/tasks/lib/priority-utils"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
