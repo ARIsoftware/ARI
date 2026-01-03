@@ -41,5 +41,8 @@
     "icon": "Hand",
     "route": "/hello-world",
     "tooltip": "Hello World"
+  },
+  "submenu": {
+    "component": "./components/sidebar-submenu.tsx"
   }
 }

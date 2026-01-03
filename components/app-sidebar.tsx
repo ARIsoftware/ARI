@@ -1,6 +1,9 @@
 "use client"
 
 import type * as React from "react"
+import { useState, useEffect } from "react"
+import { usePathname } from "next/navigation"
+import { ChevronRight } from "lucide-react"
 import { useFeatures } from "@/lib/features-context"
 import { menuConfig, getUrlToFeatureMap } from "@/lib/menu-config"
 import { useEnabledModulesFromContext } from "@/lib/modules/context"
@@ -17,15 +20,30 @@ import {
   SidebarRail,
   SidebarFooter,
 } from "@/components/ui/sidebar"
+import { SubmenuRenderer } from "@/components/sidebar-submenu-renderer"
 
 // Get URL to feature name mapping dynamically
 const URL_TO_FEATURE_MAP = getUrlToFeatureMap()
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const pathname = usePathname()
   const { isFeatureEnabled, loading } = useFeatures()
+  const [showMainMenu, setShowMainMenu] = useState(false)
 
   // Get enabled modules from context (pre-fetched server-side)
   const enabledModules = useEnabledModulesFromContext()
+
+  // Find if current route belongs to a module with a submenu
+  const activeSubmenuModule = enabledModules.find(module => {
+    if (!module.submenu?.component) return false
+    // Check if current path starts with any of the module's routes
+    return module.routes?.some(route => pathname.startsWith(route.path))
+  })
+
+  // Reset showMainMenu when navigating to a route outside the current submenu module
+  useEffect(() => {
+    setShowMainMenu(false)
+  }, [activeSubmenuModule?.id])
 
   // Sort modules by menuPriority (lower first), then alphabetically
   const sortModules = (modules: typeof enabledModules) => {
@@ -87,6 +105,23 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     )
   }
 
+  // If we're on a page with a submenu and not forcing main menu, show the submenu
+  if (activeSubmenuModule && !showMainMenu) {
+    return (
+      <Sidebar {...props}>
+        <SidebarContent>
+          <SubmenuRenderer
+            moduleId={activeSubmenuModule.id}
+            module={activeSubmenuModule}
+            onBack={() => setShowMainMenu(true)}
+          />
+        </SidebarContent>
+        <SidebarRail />
+      </Sidebar>
+    )
+  }
+
+  // Otherwise show the main menu
   return (
     <Sidebar {...props}>
       <SidebarContent>
@@ -115,6 +150,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {mainModules.map((module) => {
           const mainRoutes = module.routes?.filter(r => r.sidebarPosition === 'main') || []
           if (mainRoutes.length === 0) return null
+          const hasSubmenu = !!module.submenu?.component
+
           return (
             <SidebarGroup key={module.id}>
               {module.title && <SidebarGroupLabel>{module.title}</SidebarGroupLabel>}
@@ -122,12 +159,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <SidebarMenu>
                   {mainRoutes.map((route) => {
                     const Icon = getLucideIcon(route.icon || module.icon)
+
                     return (
                       <SidebarMenuItem key={route.path}>
                         <SidebarMenuButton asChild>
                           <a href={route.path} className="flex items-center">
                             <Icon className="mr-2 size-4" />
-                            <span>{route.label}</span>
+                            <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
+                            {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
                           </a>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
@@ -143,6 +182,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {bottomModules.map((module) => {
           const bottomRoutes = module.routes?.filter(r => r.sidebarPosition === 'bottom') || []
           if (bottomRoutes.length === 0) return null
+          const hasSubmenu = !!module.submenu?.component
+
           return (
             <SidebarGroup key={module.id}>
               {module.title && <SidebarGroupLabel>{module.title}</SidebarGroupLabel>}
@@ -150,12 +191,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <SidebarMenu>
                   {bottomRoutes.map((route) => {
                     const Icon = getLucideIcon(route.icon || module.icon)
+
                     return (
                       <SidebarMenuItem key={route.path}>
                         <SidebarMenuButton asChild>
                           <a href={route.path} className="flex items-center">
                             <Icon className="mr-2 size-4" />
-                            <span>{route.label}</span>
+                            <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
+                            {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
                           </a>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
