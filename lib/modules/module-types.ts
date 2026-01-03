@@ -65,6 +65,15 @@ export interface ModuleSettingsConfig {
 }
 
 /**
+ * Module Submenu Configuration
+ * Defines a custom submenu component that slides in when the module is clicked
+ */
+export interface ModuleSubmenuConfig {
+  /** Path to submenu component (relative to module root) */
+  component: string
+}
+
+/**
  * Module Top Bar Icon Configuration
  * Defines an icon shortcut that appears in the top navigation bar
  */
@@ -129,6 +138,8 @@ export interface ModuleManifest {
   settings?: ModuleSettingsConfig
   /** Top bar icon configuration for quick access shortcut */
   topBarIcon?: ModuleTopBarIcon
+  /** Submenu configuration - if present, clicking the menu item shows a sliding submenu */
+  submenu?: ModuleSubmenuConfig
 }
 
 /**
