@@ -23,7 +23,8 @@ Ask the user the following questions ONE AT A TIME, waiting for each answer befo
 
 1. **Module Name**: What is the name of the module? (e.g., "Habit Tracker")
 2. **Description**: Please describe this module in detail. What is the purpose of the module? What features does it need? What data will be stored in the database?
-4. **Navigation**: Should it appear in the sidebar? If so, what should the page name be?
+3. **Navigation**: Should it appear in the sidebar? If so, what should the page name be?
+4. **Submenu**: Does the module have any subpages which require a submenu?
 5. **Top Bar**: Should it have a quick-access icon in the top bar?
 
 Then ask follow-up clarifying questions based on their answers. You can ask any clarifying questions. Here are some examples of clarifying questions:
@@ -64,6 +65,7 @@ When approved, create the module following this order:
    - Correct id, name, description
    - Proper icon and route
    - topBarIcon if requested
+   - submenu configuration if requested (see Submenu section below)
    - Required dependencies
 3. **Create/update page component** in `app/page.tsx`
 4. **Create API routes** if needed (follow auth patterns from hello-world)
@@ -107,6 +109,19 @@ Do NOT add `if (!session) return <Loading />` at the start of the page component
 - API routes use cookies/headers for auth automatically
 
 See `/docs/MODULES.md` section 9 "Data Fetching with TanStack Query" for full documentation.
+
+## Submenu Implementation
+
+If the module requires a sidebar submenu, follow the Hello World module as the template:
+
+1. **Read the Hello World submenu component** at `modules-core/hello-world/components/sidebar-submenu.tsx` - copy and adapt this for your module
+2. **Read the Hello World module.json** to see how the `submenu` field is configured
+3. **Register your submenu** in `/components/sidebar-submenu-renderer.tsx`:
+   - Add a static import at the top: `import YourModuleSubmenu from '@/modules-custom/your-module/components/sidebar-submenu'`
+   - Add an entry to the `SUBMENU_COMPONENTS` registry: `'your-module': YourModuleSubmenu`
+4. **Create sub-pages** for each submenu item (e.g., `app/settings/page.tsx`)
+
+Always reference the Hello World module's actual code as the source of truth for submenu implementation.
 
 ## Quality Assurance Checklist
 
