@@ -22,7 +22,7 @@ import { eq, asc, and } from 'drizzle-orm'
  */
 const CreateEntrySchema = z.object({
   day_number: z.number().int().min(1).max(45),
-  title: z.string().min(1).max(500)
+  title: z.string().min(1).max(3000)
 })
 
 /**
@@ -31,7 +31,7 @@ const CreateEntrySchema = z.object({
 const UpdateEntrySchema = z.object({
   id: z.string().uuid(),
   day_number: z.number().int().min(1).max(45).optional(),
-  title: z.string().min(1).max(500).optional(),
+  title: z.string().min(1).max(3000).optional(),
   order_index: z.number().int().min(0).optional()
 })
 
