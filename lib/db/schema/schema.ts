@@ -723,7 +723,7 @@ export const ariLaunchEntries = pgTable("ari_launch_entries", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	userId: uuid("user_id").notNull(),
 	dayNumber: integer("day_number").notNull(),
-	title: varchar({ length: 500 }).notNull(),
+	title: varchar({ length: 3000 }).notNull(),
 	orderIndex: integer("order_index").default(0),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
