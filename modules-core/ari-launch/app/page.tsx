@@ -37,6 +37,8 @@ import type { AriLaunchEntry } from '../types'
 
 const TOTAL_DAYS = 45
 const TRUNCATE_LENGTH = 30
+const MAX_TITLE_LENGTH = 3000
+const WARNING_THRESHOLD = 2900
 
 export default function AriLaunchPage() {
   const { toast } = useToast()
@@ -310,13 +312,13 @@ export default function AriLaunchPage() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="py-4">
+          <div className="py-4 space-y-2">
             <Textarea
               value={newTaskTitle}
               onChange={(e) => setNewTaskTitle(e.target.value)}
               placeholder="Enter task title..."
               autoFocus
-              maxLength={800}
+              maxLength={MAX_TITLE_LENGTH}
               rows={4}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && e.metaKey && newTaskTitle.trim()) {
@@ -324,6 +326,11 @@ export default function AriLaunchPage() {
                 }
               }}
             />
+            {newTaskTitle.length >= WARNING_THRESHOLD && (
+              <div className="text-sm text-red-600 font-medium">
+                {MAX_TITLE_LENGTH - newTaskTitle.length} characters left
+              </div>
+            )}
           </div>
 
           <DialogFooter>
@@ -353,13 +360,13 @@ export default function AriLaunchPage() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="py-4">
+          <div className="py-4 space-y-2">
             <Textarea
               value={editTitle}
               onChange={(e) => setEditTitle(e.target.value)}
               placeholder="Enter task title..."
               autoFocus
-              maxLength={800}
+              maxLength={MAX_TITLE_LENGTH}
               rows={4}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && e.metaKey && editTitle.trim()) {
@@ -367,6 +374,11 @@ export default function AriLaunchPage() {
                 }
               }}
             />
+            {editTitle.length >= WARNING_THRESHOLD && (
+              <div className="text-sm text-red-600 font-medium">
+                {MAX_TITLE_LENGTH - editTitle.length} characters left
+              </div>
+            )}
           </div>
 
           <DialogFooter className="flex justify-between">
