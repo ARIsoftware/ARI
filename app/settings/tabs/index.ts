@@ -1,0 +1,7 @@
+export { GeneralTab } from "./GeneralTab"
+export { FontsTab } from "./FontsTab"
+export { FeaturesTab } from "./FeaturesTab"
+export { NotificationsTab } from "./NotificationsTab"
+export { SecurityTab } from "./SecurityTab"
+export { IntegrationsTab } from "./IntegrationsTab"
+export { BackupsTab } from "./BackupsTab"
