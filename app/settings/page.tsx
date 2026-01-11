@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { AppSidebar } from "@/components/app-sidebar"
 import { TaskAnnouncement } from "@/components/task-announcement"
 import { getAllFeatures } from "@/lib/menu-config"
@@ -13,105 +12,60 @@ import {
   BreadcrumbPage,
 } from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Switch } from "@/components/ui/switch"
-import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TopBar } from "@/components/top-bar"
-import { Progress } from "@/components/ui/progress"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { Check, Sparkles, TimerReset } from "lucide-react"
 import {
-  AlertCircle,
-  Bell,
-  Check,
-  CheckCircle2,
-  Database,
-  Download,
-  Eye,
-  Grid3x3,
-  Loader2,
-  Lock,
-  LogOut,
-  Monitor,
-  Palette,
-  Plug,
-  ShieldCheck,
-  Smartphone,
-  Sparkles,
-  TimerReset,
-  Type,
-  Upload,
-} from "lucide-react"
+  GeneralTab,
+  FontsTab,
+  FeaturesTab,
+  NotificationsTab,
+  SecurityTab,
+  IntegrationsTab,
+  BackupsTab,
+} from "./tabs"
+import {
+  FONT_OPTIONS,
+  type Session,
+  type NotificationSettings,
+  type BetaFeatureSettings,
+  type FeaturePreference,
+  type BackupStats,
+  type BackupMessage,
+  type ImportProgress,
+  type ValidationResult,
+  type VerificationResult,
+} from "./types"
 
-// Session type from Better Auth
-interface Session {
-  id: string
-  token: string
-  userId: string
-  expiresAt: Date
-  createdAt: Date
-  updatedAt: Date
-  userAgent?: string | null
-  ipAddress?: string | null
-}
-
-interface NotificationSettings {
-  taskReminders: boolean
-  productUpdates: boolean
-  securityAlerts: boolean
-  weeklySummary: boolean
-}
-
-interface BetaFeatureSettings {
-  smartPriorities: boolean
-  predictiveScheduling: boolean
-  aiMeetingNotes: boolean
-}
-
-interface FeaturePreference {
-  id: string
-  user_id: string
-  feature_name: string
-  enabled: boolean
-  created_at: string
-  updated_at: string
-}
-
-export default function SettingsPage() {
-  const router = useRouter()
+export default function SettingsPage(): React.ReactElement {
+  // UI state
   const [isSaving, setIsSaving] = useState(false)
   const [savedMessage, setSavedMessage] = useState<string | null>(null)
+
+  // General tab state
   const [themePreference, setThemePreference] = useState("system")
-
-  // Session management state
-  const [sessions, setSessions] = useState<Session[]>([])
-  const [sessionsLoading, setSessionsLoading] = useState(false)
-  const [currentSessionToken, setCurrentSessionToken] = useState<string | null>(null)
-  const [revokingSession, setRevokingSession] = useState<string | null>(null)
-  const [revokingAllSessions, setRevokingAllSessions] = useState(false)
-
-  // Backup state
-  const [exportLoading, setExportLoading] = useState(false)
-  const [importLoading, setImportLoading] = useState(false)
-  const [verifyLoading, setVerifyLoading] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error' | 'warning', text: string } | null>(null)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [backupStats, setBackupStats] = useState<{ tables: number, totalRows: number, discoveryMethod?: string, warnings?: number } | null>(null)
-  const [verificationResult, setVerificationResult] = useState<any | null>(null)
-  const [importProgress, setImportProgress] = useState<{ current: number, total: number } | null>(null)
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
-  const [validationResult, setValidationResult] = useState<{ valid: boolean; errors: string[]; warnings: string[]; metadata?: any } | null>(null)
   const [workspaceName, setWorkspaceName] = useState("Ari Operations")
   const [workspaceTagline, setWorkspaceTagline] = useState("Resilient workflows for focused teams")
   const [landingView, setLandingView] = useState("dashboard")
+  const [betaFeatures, setBetaFeatures] = useState<BetaFeatureSettings>({
+    smartPriorities: true,
+    predictiveScheduling: false,
+    aiMeetingNotes: false,
+  })
+
+  // Font tab state
+  const [selectedFont, setSelectedFont] = useState("Overpass Mono")
+  const [savedFont, setSavedFont] = useState("Overpass Mono")
+  const [fontSaving, setFontSaving] = useState(false)
+
+  // Features tab state
+  const [featurePreferences, setFeaturePreferences] = useState<Record<string, boolean>>({})
+  const [loadingFeatures, setLoadingFeatures] = useState(true)
+  const menuFeatures = getAllFeatures()
+
+  // Notifications tab state
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
     taskReminders: true,
     productUpdates: false,
@@ -119,121 +73,44 @@ export default function SettingsPage() {
     weeklySummary: true,
   })
   const [pushNotifications, setPushNotifications] = useState(true)
-  const [betaFeatures, setBetaFeatures] = useState<BetaFeatureSettings>({
-    smartPriorities: true,
-    predictiveScheduling: false,
-    aiMeetingNotes: false,
-  })
-  const [sessionTimeout, setSessionTimeout] = useState("30")
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(true)
-  const [deviceApprovals, setDeviceApprovals] = useState(true)
-  const [featurePreferences, setFeaturePreferences] = useState<Record<string, boolean>>({})
-  const [loadingFeatures, setLoadingFeatures] = useState(true)
 
-  // Font settings
-  const [selectedFont, setSelectedFont] = useState("Overpass Mono")
-  const [savedFont, setSavedFont] = useState("Overpass Mono")
-  const [fontSaving, setFontSaving] = useState(false)
+  // Security tab state
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [sessionsLoading, setSessionsLoading] = useState(false)
+  const [currentSessionToken, setCurrentSessionToken] = useState<string | null>(null)
+  const [revokingSession, setRevokingSession] = useState<string | null>(null)
+  const [revokingAllSessions, setRevokingAllSessions] = useState(false)
 
-  const fontOptions = [
-    { value: "Overpass Mono", label: "Overpass Mono", css: '"Overpass Mono", monospace' },
-    { value: "Outfit", label: "Outfit", css: '"Outfit", sans-serif' },
-    { value: "Open Sans", label: "Open Sans", css: '"Open Sans", sans-serif' },
-    { value: "Science Gothic", label: "Science Gothic", css: '"Science Gothic", sans-serif' },
-  ]
-
-  // Get all menu features dynamically from menu config
-  const menuFeatures = getAllFeatures()
-
-  const toggleNotification = (key: keyof NotificationSettings) => {
-    setNotificationSettings((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }))
-  }
-
-  const toggleBetaFeature = (key: keyof BetaFeatureSettings) => {
-    setBetaFeatures((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }))
-  }
-
-  const toggleFeature = async (featureName: string) => {
-    const currentState = featurePreferences[featureName] ?? true
-    const newState = !currentState
-
-    // Optimistically update UI
-    setFeaturePreferences((prev) => ({
-      ...prev,
-      [featureName]: newState
-    }))
-
-    try {
-      const response = await fetch('/api/features', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          feature_name: featureName,
-          enabled: newState
-        })
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to update feature preference')
-      }
-    } catch (error) {
-      console.error('Error updating feature:', error)
-      // Revert on error
-      setFeaturePreferences((prev) => ({
-        ...prev,
-        [featureName]: currentState
-      }))
-      setMessage({ type: 'error', text: 'Failed to update feature preference' })
-    }
-  }
-
+  // Backup tab state
+  const [exportLoading, setExportLoading] = useState(false)
+  const [importLoading, setImportLoading] = useState(false)
+  const [verifyLoading, setVerifyLoading] = useState(false)
+  const [message, setMessage] = useState<BackupMessage | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [backupStats, setBackupStats] = useState<BackupStats | null>(null)
+  const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null)
+  const [importProgress, setImportProgress] = useState<ImportProgress | null>(null)
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
 
   // Load saved font on mount
   useEffect(() => {
-    const saved = localStorage.getItem('ari-font-preference')
+    const saved = localStorage.getItem("ari-font-preference")
     if (saved) {
-      const fontOption = fontOptions.find(f => f.value === saved)
+      const fontOption = FONT_OPTIONS.find(f => f.value === saved)
       if (fontOption) {
         setSelectedFont(saved)
         setSavedFont(saved)
-        document.documentElement.style.setProperty('--font-family', fontOption.css)
+        document.documentElement.style.setProperty("--font-family", fontOption.css)
       }
     }
   }, [])
 
-  // Apply font dynamically when selection changes
-  const handleFontChange = (fontValue: string) => {
-    setSelectedFont(fontValue)
-    const fontOption = fontOptions.find(f => f.value === fontValue)
-    if (fontOption) {
-      document.documentElement.style.setProperty('--font-family', fontOption.css)
-    }
-  }
-
-  // Save font preference
-  const handleSaveFont = () => {
-    setFontSaving(true)
-    localStorage.setItem('ari-font-preference', selectedFont)
-    setSavedFont(selectedFont)
-    setTimeout(() => {
-      setFontSaving(false)
-      setSavedMessage("Font preference saved successfully.")
-    }, 500)
-  }
-
   // Load feature preferences on mount
   useEffect(() => {
-    const loadFeaturePreferences = async () => {
+    async function loadFeaturePreferences(): Promise<void> {
       try {
-        const response = await fetch('/api/features')
+        const response = await fetch("/api/features")
         if (response.ok) {
           const data: FeaturePreference[] = await response.json()
           const preferences: Record<string, boolean> = {}
@@ -243,7 +120,7 @@ export default function SettingsPage() {
           setFeaturePreferences(preferences)
         }
       } catch (error) {
-        console.error('Error loading feature preferences:', error)
+        console.error("Error loading feature preferences:", error)
       } finally {
         setLoadingFeatures(false)
       }
@@ -251,188 +128,187 @@ export default function SettingsPage() {
     loadFeaturePreferences()
   }, [])
 
-  const handleSaveChanges = () => {
-    setIsSaving(true)
-    setSavedMessage(null)
+  // Load sessions on mount
+  useEffect(() => {
+    loadSessions()
+  }, [])
 
-    window.setTimeout(() => {
-      setIsSaving(false)
-      setSavedMessage("Your preferences are synced across devices.")
-    }, 800)
-  }
-
-  // Load active sessions
-  const loadSessions = async () => {
+  async function loadSessions(): Promise<void> {
     setSessionsLoading(true)
     try {
       const result = await authClient.listSessions()
       if (result.data) {
         setSessions(result.data)
       }
-      // Get current session to identify which one is "this device"
       const currentSession = await authClient.getSession()
       if (currentSession.data?.session) {
         setCurrentSessionToken(currentSession.data.session.token)
       }
     } catch (error) {
-      console.error('Failed to load sessions:', error)
+      console.error("Failed to load sessions:", error)
     } finally {
       setSessionsLoading(false)
     }
   }
 
-  // Load sessions on mount
-  useEffect(() => {
-    loadSessions()
-  }, [])
+  function handleFontChange(fontValue: string): void {
+    setSelectedFont(fontValue)
+    const fontOption = FONT_OPTIONS.find(f => f.value === fontValue)
+    if (fontOption) {
+      document.documentElement.style.setProperty("--font-family", fontOption.css)
+    }
+  }
 
-  // Revoke a specific session
-  const handleRevokeSession = async (token: string) => {
+  function handleSaveFont(): void {
+    setFontSaving(true)
+    localStorage.setItem("ari-font-preference", selectedFont)
+    setSavedFont(selectedFont)
+    setTimeout(() => {
+      setFontSaving(false)
+      setSavedMessage("Font preference saved successfully.")
+    }, 500)
+  }
+
+  function handleSaveChanges(): void {
+    setIsSaving(true)
+    setSavedMessage(null)
+    window.setTimeout(() => {
+      setIsSaving(false)
+      setSavedMessage("Your preferences are synced across devices.")
+    }, 800)
+  }
+
+  function toggleBetaFeature(key: keyof BetaFeatureSettings): void {
+    setBetaFeatures(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  function toggleNotification(key: keyof NotificationSettings): void {
+    setNotificationSettings(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  async function toggleFeature(featureName: string): Promise<void> {
+    const currentState = featurePreferences[featureName] ?? true
+    const newState = !currentState
+
+    setFeaturePreferences(prev => ({ ...prev, [featureName]: newState }))
+
+    try {
+      const response = await fetch("/api/features", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feature_name: featureName, enabled: newState }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to update feature preference")
+      }
+    } catch (error) {
+      console.error("Error updating feature:", error)
+      setFeaturePreferences(prev => ({ ...prev, [featureName]: currentState }))
+      setMessage({ type: "error", text: "Failed to update feature preference" })
+    }
+  }
+
+  async function handleRevokeSession(token: string): Promise<void> {
     setRevokingSession(token)
     try {
       await authClient.revokeSession({ token })
-      // Reload sessions
       await loadSessions()
       setSavedMessage("Session revoked successfully.")
     } catch (error) {
-      console.error('Failed to revoke session:', error)
+      console.error("Failed to revoke session:", error)
     } finally {
       setRevokingSession(null)
     }
   }
 
-  // Revoke all other sessions
-  const handleRevokeAllSessions = async () => {
+  async function handleRevokeAllSessions(): Promise<void> {
     setRevokingAllSessions(true)
     try {
       await authClient.revokeSessions()
-      // Reload sessions
       await loadSessions()
       setSavedMessage("All other sessions have been signed out.")
     } catch (error) {
-      console.error('Failed to revoke sessions:', error)
+      console.error("Failed to revoke sessions:", error)
     } finally {
       setRevokingAllSessions(false)
     }
   }
 
-  // Helper to parse user agent
-  const parseUserAgent = (userAgent: string | null | undefined): { device: string; browser: string } => {
-    if (!userAgent) return { device: 'Unknown device', browser: 'Unknown browser' }
-
-    let device = 'Desktop'
-    let browser = 'Unknown'
-
-    // Detect device
-    if (userAgent.includes('iPhone')) device = 'iPhone'
-    else if (userAgent.includes('iPad')) device = 'iPad'
-    else if (userAgent.includes('Android')) device = 'Android'
-    else if (userAgent.includes('Macintosh')) device = 'Mac'
-    else if (userAgent.includes('Windows')) device = 'Windows'
-    else if (userAgent.includes('Linux')) device = 'Linux'
-
-    // Detect browser
-    if (userAgent.includes('Chrome') && !userAgent.includes('Edg')) browser = 'Chrome'
-    else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) browser = 'Safari'
-    else if (userAgent.includes('Firefox')) browser = 'Firefox'
-    else if (userAgent.includes('Edg')) browser = 'Edge'
-
-    return { device, browser }
-  }
-
-  // Format relative time
-  const formatRelativeTime = (date: Date): string => {
-    const now = new Date()
-    const diffMs = now.getTime() - new Date(date).getTime()
-    const diffMins = Math.floor(diffMs / 60000)
-    const diffHours = Math.floor(diffMs / 3600000)
-    const diffDays = Math.floor(diffMs / 86400000)
-
-    if (diffMins < 1) return 'Just now'
-    if (diffMins < 60) return `${diffMins}m ago`
-    if (diffHours < 24) return `${diffHours}h ago`
-    if (diffDays < 7) return `${diffDays}d ago`
-    return new Date(date).toLocaleDateString()
-  }
-
-  // Backup functions
-  const handleVerify = async () => {
+  async function handleVerify(): Promise<void> {
     try {
       setVerifyLoading(true)
       setMessage(null)
       setVerificationResult(null)
 
-      const response = await fetch('/api/backup/verify')
+      const response = await fetch("/api/backup/verify")
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.error || 'Verification failed')
+        throw new Error(error.error || "Verification failed")
       }
 
       const result = await response.json()
       setVerificationResult(result)
 
-      // Set friendly message based on status
-      if (result.status === 'ok') {
+      if (result.status === "ok") {
         setMessage({
-          type: 'success',
-          text: `Backup system is working correctly! Found ${result.tablesFound} tables with ${result.totalRows.toLocaleString()} total rows. Using discovery method: ${result.discoveryMethod}.`
+          type: "success",
+          text: `Backup system is working correctly! Found ${result.tablesFound} tables with ${result.totalRows.toLocaleString()} total rows. Using discovery method: ${result.discoveryMethod}.`,
         })
-      } else if (result.status === 'warning') {
+      } else if (result.status === "warning") {
         setMessage({
-          type: 'warning',
-          text: `Backup system is functional but has warnings. Found ${result.tablesFound} tables. Please review warnings below.`
+          type: "warning",
+          text: `Backup system is functional but has warnings. Found ${result.tablesFound} tables. Please review warnings below.`,
         })
       } else {
         setMessage({
-          type: 'error',
-          text: `Backup system has critical issues. Please review the details below and consider running the database migration.`
+          type: "error",
+          text: "Backup system has critical issues. Please review the details below and consider running the database migration.",
         })
       }
-
-    } catch (error: any) {
-      console.error('Verify error:', error)
-      setMessage({ type: 'error', text: error.message || 'Failed to verify backup system' })
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to verify backup system"
+      console.error("Verify error:", error)
+      setMessage({ type: "error", text: errorMessage })
     } finally {
       setVerifyLoading(false)
     }
   }
 
-  const handleExport = async () => {
+  async function handleExport(): Promise<void> {
     try {
       setExportLoading(true)
       setMessage(null)
       setBackupStats(null)
 
-      const response = await fetch('/api/backup/export', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const response = await fetch("/api/backup/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
       })
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.error || 'Export failed')
+        throw new Error(error.error || "Export failed")
       }
 
-      const metadataHeader = response.headers.get('X-Backup-Metadata')
-      let metadata: any = {}
+      const metadataHeader = response.headers.get("X-Backup-Metadata")
+      let metadata: Record<string, unknown> = {}
       if (metadataHeader) {
         try {
           metadata = JSON.parse(metadataHeader)
-        } catch (e) {
-          console.warn('Could not parse backup metadata')
+        } catch {
+          console.warn("Could not parse backup metadata")
         }
       }
 
       const blob = await response.blob()
       const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
+      const a = document.createElement("a")
       a.href = url
 
-      const contentDisposition = response.headers.get('Content-Disposition')
-      let filename = `database-backup-${new Date().toISOString().split('T')[0]}.sql`
+      const contentDisposition = response.headers.get("Content-Disposition")
+      let filename = `database-backup-${new Date().toISOString().split("T")[0]}.sql`
       if (contentDisposition) {
         const filenameMatch = contentDisposition.match(/filename="(.+)"/)
         if (filenameMatch) {
@@ -448,98 +324,97 @@ export default function SettingsPage() {
 
       if (metadata.tables && metadata.rows) {
         setBackupStats({
-          tables: metadata.tables,
-          totalRows: metadata.rows,
-          discoveryMethod: metadata.discoveryMethod,
-          warnings: metadata.warnings
+          tables: metadata.tables as number,
+          totalRows: metadata.rows as number,
+          discoveryMethod: metadata.discoveryMethod as string | undefined,
+          warnings: metadata.warnings as number | undefined,
         })
 
-        let messageText = `Database exported successfully! ${metadata.rows.toLocaleString()} rows from ${metadata.tables} tables.`
+        let messageText = `Database exported successfully! ${(metadata.rows as number).toLocaleString()} rows from ${metadata.tables} tables.`
 
-        // Add discovery method info
         if (metadata.discoveryMethod) {
           const methodLabels: Record<string, string> = {
-            'rpc_function': 'RPC function (optimal)',
-            'raw_sql': 'Raw SQL',
-            'individual_validation': 'Individual validation',
-            'hardcoded_fallback': 'Hardcoded list (needs migration)'
+            rpc_function: "RPC function (optimal)",
+            raw_sql: "Raw SQL",
+            individual_validation: "Individual validation",
+            hardcoded_fallback: "Hardcoded list (needs migration)",
           }
-          messageText += ` Discovery: ${methodLabels[metadata.discoveryMethod] || metadata.discoveryMethod}.`
+          messageText += ` Discovery: ${methodLabels[metadata.discoveryMethod as string] || metadata.discoveryMethod}.`
         }
 
-        // Determine message type based on warnings/errors
-        let messageType: 'success' | 'warning' | 'error' = 'success'
+        let messageType: BackupMessage["type"] = "success"
 
-        if (metadata.warnings > 0) {
+        if ((metadata.warnings as number) > 0) {
           messageText += ` ${metadata.warnings} warning(s) detected.`
-          messageType = 'warning'
+          messageType = "warning"
         }
-        if (metadata.errors > 0) {
+        if ((metadata.errors as number) > 0) {
           messageText += ` ${metadata.errors} error(s) occurred during export.`
-          messageType = 'error'
+          messageType = "error"
         }
 
         setMessage({ type: messageType, text: messageText })
       } else {
-        setMessage({ type: 'success', text: 'Database exported successfully!' })
+        setMessage({ type: "success", text: "Database exported successfully!" })
       }
-
-    } catch (error: any) {
-      console.error('Export error:', error)
-      setMessage({ type: 'error', text: error.message || 'Failed to export database' })
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to export database"
+      console.error("Export error:", error)
+      setMessage({ type: "error", text: errorMessage })
     } finally {
       setExportLoading(false)
     }
   }
 
-  const handleImportClick = async () => {
+  async function handleImportClick(): Promise<void> {
     if (!selectedFile) {
-      setMessage({ type: 'error', text: 'Please select a file to import' })
+      setMessage({ type: "error", text: "Please select a file to import" })
       return
     }
 
     if (selectedFile.size > 50 * 1024 * 1024) {
-      setMessage({ type: 'error', text: 'File too large. Maximum size is 50MB.' })
+      setMessage({ type: "error", text: "File too large. Maximum size is 50MB." })
       return
     }
 
     try {
-      setMessage({ type: 'success', text: 'Validating SQL file...' })
+      setMessage({ type: "success", text: "Validating SQL file..." })
 
       const formData = new FormData()
-      formData.append('file', selectedFile)
+      formData.append("file", selectedFile)
 
-      const response = await fetch('/api/backup/import', {
-        method: 'PUT',
-        body: formData
+      const response = await fetch("/api/backup/import", {
+        method: "PUT",
+        body: formData,
       })
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.error || 'Validation failed')
+        throw new Error(error.error || "Validation failed")
       }
 
       const validation = await response.json()
       setValidationResult(validation)
 
       if (!validation.valid) {
-        setMessage({ type: 'error', text: `SQL validation failed: ${validation.errors[0]}` })
+        setMessage({ type: "error", text: `SQL validation failed: ${validation.errors[0]}` })
         return
       }
 
       if (validation.warnings && validation.warnings.length > 0) {
-        setMessage({ type: 'success', text: `File validated with ${validation.warnings.length} warnings. Ready to import.` })
+        setMessage({ type: "success", text: `File validated with ${validation.warnings.length} warnings. Ready to import.` })
       } else {
-        setMessage({ type: 'success', text: 'SQL file validated successfully. Ready to import.' })
+        setMessage({ type: "success", text: "SQL file validated successfully. Ready to import." })
       }
 
       setShowConfirmDialog(true)
-    } catch (error: any) {
-      setMessage({ type: 'error', text: `Failed to validate file: ${error.message}` })
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      setMessage({ type: "error", text: `Failed to validate file: ${errorMessage}` })
     }
   }
 
-  const handleConfirmedImport = async () => {
+  async function handleConfirmedImport(): Promise<void> {
     setShowConfirmDialog(false)
 
     try {
@@ -548,15 +423,15 @@ export default function SettingsPage() {
       setImportProgress({ current: 0, total: 100 })
 
       if (!selectedFile) {
-        throw new Error('No file selected')
+        throw new Error("No file selected")
       }
 
       const formData = new FormData()
-      formData.append('file', selectedFile)
+      formData.append("file", selectedFile)
 
-      const response = await fetch('/api/backup/import', {
-        method: 'POST',
-        body: formData
+      const response = await fetch("/api/backup/import", {
+        method: "POST",
+        body: formData,
       })
 
       if (!response.ok) {
@@ -564,38 +439,38 @@ export default function SettingsPage() {
         if (error.rollback) {
           throw new Error(`Import failed and was rolled back: ${error.details?.[0] || error.error}`)
         }
-        throw new Error(error.error || 'Import failed')
+        throw new Error(error.error || "Import failed")
       }
 
       const result = await response.json()
 
       setImportProgress({ current: 100, total: 100 })
 
-      let message = result.message
+      let resultMessage = result.message
       if (result.stats) {
-        message += ` (Duration: ${result.stats.duration}, Tables: ${result.stats.tablesCreated}, Records: ${result.stats.recordsImported})`
+        resultMessage += ` (Duration: ${result.stats.duration}, Tables: ${result.stats.tablesCreated}, Records: ${result.stats.recordsImported})`
 
         if (result.stats.warnings && result.stats.warnings.length > 0) {
-          message += ` Warning: ${result.stats.warnings.length} validation warnings.`
+          resultMessage += ` Warning: ${result.stats.warnings.length} validation warnings.`
         }
       }
 
-      if (result.integrityCheck !== 'passed') {
-        message += ` Data integrity check: ${result.integrityCheck.failures?.length || 0} issues detected.`
+      if (result.integrityCheck !== "passed") {
+        resultMessage += ` Data integrity check: ${result.integrityCheck.failures?.length || 0} issues detected.`
       }
 
-      const messageType = result.integrityCheck === 'passed' ? 'success' : 'error'
-      setMessage({ type: messageType, text: message })
+      const messageType = result.integrityCheck === "passed" ? "success" : "error"
+      setMessage({ type: messageType, text: resultMessage })
 
       setSelectedFile(null)
 
       setTimeout(() => {
         window.location.reload()
       }, 3000)
-
-    } catch (error: any) {
-      console.error('Import error:', error)
-      setMessage({ type: 'error', text: error.message || 'Failed to import database' })
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to import database"
+      console.error("Import error:", error)
+      setMessage({ type: "error", text: errorMessage })
     } finally {
       setImportLoading(false)
       setImportProgress(null)
@@ -640,7 +515,7 @@ export default function SettingsPage() {
                     <TabsTrigger value="backups">Backups</TabsTrigger>
                   </TabsList>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => window.location.href = '/debug'}>
+                    <Button variant="outline" size="sm" onClick={() => window.location.href = "/debug"}>
                       <Sparkles className="mr-2 h-4 w-4" />
                       Run Diagnostics
                     </Button>
@@ -660,945 +535,84 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                <TabsContent value="general" className="space-y-6">
-                  <div className="grid gap-6 lg:grid-cols-2">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg">
-                          <Palette className="h-5 w-5 text-purple-500" />
-                          Appearance
-                        </CardTitle>
-                        <CardDescription>
-                          Choose from four distinct themes to match your workflow and preference.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-5">
-                        <RadioGroup
-                          value={themePreference}
-                          onValueChange={(value) => setThemePreference(value)}
-                          className="grid gap-3"
-                        >
-                          <div className="flex items-center justify-between rounded-lg border p-4">
-                            <div>
-                              <Label htmlFor="theme-pastel" className="text-base">Pastel Theme</Label>
-                              <p className="text-sm text-muted-foreground">Soft pastel backgrounds for a gentle interface.</p>
-                            </div>
-                            <RadioGroupItem id="theme-pastel" value="pastel" />
-                          </div>
-                          <div className="flex items-center justify-between rounded-lg border p-4">
-                            <div>
-                              <Label htmlFor="theme-light" className="text-base">Light Theme</Label>
-                              <p className="text-sm text-muted-foreground">Clean white/transparent backgrounds for minimal look.</p>
-                            </div>
-                            <RadioGroupItem id="theme-light" value="light" />
-                          </div>
-                          <div className="flex items-center justify-between rounded-lg border p-4">
-                            <div>
-                              <Label htmlFor="theme-blueprint" className="text-base">Blueprint Theme</Label>
-                              <p className="text-sm text-muted-foreground">Professional blue theme for focused work.</p>
-                            </div>
-                            <RadioGroupItem id="theme-blueprint" value="blueprint" />
-                          </div>
-                          <div className="flex items-center justify-between rounded-lg border p-4">
-                            <div>
-                              <Label htmlFor="theme-dark" className="text-base">Dark Theme</Label>
-                              <p className="text-sm text-muted-foreground">Reduce glare during late sessions.</p>
-                            </div>
-                            <RadioGroupItem id="theme-dark" value="dark" />
-                          </div>
-                        </RadioGroup>
-                        <div className="rounded-lg bg-muted p-4">
-                          <p className="text-sm text-muted-foreground">
-                            Appearance updates are instant and persist across all Ari surfaces.
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg">
-                          <Sparkles className="h-5 w-5 text-blue-500" />
-                          Workspace identity
-                        </CardTitle>
-                        <CardDescription>
-                          Fine tune your workspace branding and global defaults.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="workspace-name">Workspace name</Label>
-                          <Input
-                            id="workspace-name"
-                            value={workspaceName}
-                            onChange={(event) => setWorkspaceName(event.target.value)}
-                            placeholder="Give your workspace a friendly name"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="workspace-tagline">Tagline</Label>
-                          <Textarea
-                            id="workspace-tagline"
-                            value={workspaceTagline}
-                            onChange={(event) => setWorkspaceTagline(event.target.value)}
-                            placeholder="Describe your team's mission"
-                            rows={3}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Default landing view</Label>
-                          <Select value={landingView} onValueChange={setLandingView}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Choose your home view" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="dashboard">Dashboard</SelectItem>
-                              <SelectItem value="tasks">Tasks</SelectItem>
-                              <SelectItem value="daily-fitness">Daily fitness</SelectItem>
-                              <SelectItem value="assist">Assist</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <p className="text-sm text-muted-foreground">
-                            Everyone in this workspace uses this view after sign-in.
-                          </p>
-                        </div>
-                      </CardContent>
-                      <CardFooter className="border-t bg-muted/60">
-                        <div className="flex w-full items-center justify-between text-sm text-muted-foreground">
-                          <span>Brand updates go live instantly.</span>
-                          <Badge variant="secondary">Synced</Badge>
-                        </div>
-                      </CardFooter>
-                    </Card>
-                  </div>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-lg">
-                        <Sparkles className="h-5 w-5 text-rose-500" />
-                        Beta lab
-                      </CardTitle>
-                      <CardDescription>
-                        Experiment with upcoming intelligence features before general release.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-start justify-between rounded-lg border p-4">
-                        <div className="pr-4">
-                          <p className="text-sm font-medium">Smart priorities</p>
-                          <p className="text-sm text-muted-foreground">AI reorders tasks based on urgency, dependencies, and team load.</p>
-                        </div>
-                        <Switch
-                          checked={betaFeatures.smartPriorities}
-                          onCheckedChange={() => toggleBetaFeature("smartPriorities")}
-                        />
-                      </div>
-                      <div className="flex items-start justify-between rounded-lg border p-4">
-                        <div className="pr-4">
-                          <p className="text-sm font-medium">Predictive scheduling</p>
-                          <p className="text-sm text-muted-foreground">Auto-distribute open tasks across the week with sprint-friendly pacing.</p>
-                        </div>
-                        <Switch
-                          checked={betaFeatures.predictiveScheduling}
-                          onCheckedChange={() => toggleBetaFeature("predictiveScheduling")}
-                        />
-                      </div>
-                      <div className="flex items-start justify-between rounded-lg border p-4">
-                        <div className="pr-4">
-                          <p className="text-sm font-medium">AI meeting notes</p>
-                          <p className="text-sm text-muted-foreground">Attach transcripts, highlights, and follow-ups to meeting records.</p>
-                        </div>
-                        <Switch
-                          checked={betaFeatures.aiMeetingNotes}
-                          onCheckedChange={() => toggleBetaFeature("aiMeetingNotes")}
-                        />
-                      </div>
-                    </CardContent>
-                  </Card>
+                <TabsContent value="general">
+                  <GeneralTab
+                    themePreference={themePreference}
+                    onThemeChange={setThemePreference}
+                    workspaceName={workspaceName}
+                    onWorkspaceNameChange={setWorkspaceName}
+                    workspaceTagline={workspaceTagline}
+                    onWorkspaceTaglineChange={setWorkspaceTagline}
+                    landingView={landingView}
+                    onLandingViewChange={setLandingView}
+                    betaFeatures={betaFeatures}
+                    onBetaFeatureToggle={toggleBetaFeature}
+                  />
                 </TabsContent>
 
-                <TabsContent value="fonts" className="space-y-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-lg">
-                        <Type className="h-5 w-5 text-indigo-500" />
-                        Font Selection
-                      </CardTitle>
-                      <CardDescription>
-                        Choose the font family used throughout the application. Changes are previewed immediately.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      <div className="space-y-3">
-                        <Label htmlFor="font-select">Application Font</Label>
-                        <Select value={selectedFont} onValueChange={handleFontChange}>
-                          <SelectTrigger id="font-select" className="w-full max-w-xs">
-                            <SelectValue placeholder="Select a font" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {fontOptions.map((font) => (
-                              <SelectItem
-                                key={font.value}
-                                value={font.value}
-                                style={{ fontFamily: font.css }}
-                              >
-                                {font.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <p className="text-sm text-muted-foreground">
-                          Select a font to preview it immediately. Click "Save Font" to make it permanent.
-                        </p>
-                      </div>
-
-                      {selectedFont !== savedFont && (
-                        <div className="rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800">
-                          You have unsaved font changes. Click "Save Font" to apply permanently.
-                        </div>
-                      )}
-                    </CardContent>
-                    <CardFooter className="border-t bg-muted/60 flex justify-between items-center pt-4">
-                      <div className="text-sm text-muted-foreground">
-                        Current saved font: <span className="font-medium">{savedFont}</span>
-                      </div>
-                      <Button
-                        onClick={handleSaveFont}
-                        disabled={fontSaving || selectedFont === savedFont}
-                      >
-                        {fontSaving ? (
-                          <span className="flex items-center gap-2">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Saving...
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-2">
-                            <Check className="h-4 w-4" />
-                            Save Font
-                          </span>
-                        )}
-                      </Button>
-                    </CardFooter>
-                  </Card>
+                <TabsContent value="fonts">
+                  <FontsTab
+                    selectedFont={selectedFont}
+                    savedFont={savedFont}
+                    fontSaving={fontSaving}
+                    onFontChange={handleFontChange}
+                    onSaveFont={handleSaveFont}
+                  />
                 </TabsContent>
 
-                <TabsContent value="features" className="space-y-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-lg">
-                        <Grid3x3 className="h-5 w-5 text-blue-500" />
-                        Menu Features
-                      </CardTitle>
-                      <CardDescription>
-                        Enable or disable features to customize your navigation menu and available pages.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {menuFeatures.map((feature) => {
-                          const isEnabled = featurePreferences[feature.name] ?? true
-                          return (
-                            <div key={feature.name} className="flex items-start justify-between rounded-lg border p-4">
-                              <div className="pr-4 flex-1">
-                                <div className="flex items-center gap-2">
-                                  <p className="text-sm font-medium">{feature.label}</p>
-                                  {!feature.canBeDisabled && (
-                                    <Badge variant="secondary" className="text-xs">Required</Badge>
-                                  )}
-                                </div>
-                                <p className="text-sm text-muted-foreground">{feature.description}</p>
-                                <p className="text-xs text-muted-foreground mt-1">URL: {feature.url}</p>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                {feature.canBeDisabled ? (
-                                  <>
-                                    <span className="text-sm font-medium text-muted-foreground">
-                                      {isEnabled ? 'On' : 'Off'}
-                                    </span>
-                                    <Switch
-                                      checked={isEnabled}
-                                      onCheckedChange={() => toggleFeature(feature.name)}
-                                    />
-                                  </>
-                                ) : (
-                                  <span className="text-sm font-medium text-muted-foreground">
-                                    Always On
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          )
-                        })}
-                    </CardContent>
-                    <CardFooter className="border-t bg-muted/60">
-                      <div className="flex w-full items-center text-sm text-muted-foreground">
-                        <AlertCircle className="mr-2 h-4 w-4" />
-                        <span>Disabled features will be hidden from the menu and their URLs will be inaccessible.</span>
-                      </div>
-                    </CardFooter>
-                  </Card>
+                <TabsContent value="features">
+                  <FeaturesTab
+                    menuFeatures={menuFeatures}
+                    featurePreferences={featurePreferences}
+                    loadingFeatures={loadingFeatures}
+                    onToggleFeature={toggleFeature}
+                  />
                 </TabsContent>
 
-                <TabsContent value="notifications" className="space-y-6">
-                  <div className="grid gap-6 lg:grid-cols-2">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg">
-                          <Bell className="h-5 w-5 text-blue-500" />
-                          Email alerts
-                        </CardTitle>
-                        <CardDescription>
-                          Decide which summaries and nudges land in your inbox.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="flex items-start justify-between rounded-lg border p-4">
-                          <div className="pr-4">
-                            <p className="text-sm font-medium">Task reminders</p>
-                            <p className="text-sm text-muted-foreground">Deadline nudges and follow-up prompts.</p>
-                          </div>
-                          <Switch
-                            checked={notificationSettings.taskReminders}
-                            onCheckedChange={() => toggleNotification("taskReminders")}
-                          />
-                        </div>
-                        <div className="flex items-start justify-between rounded-lg border p-4">
-                          <div className="pr-4">
-                            <p className="text-sm font-medium">Product updates</p>
-                            <p className="text-sm text-muted-foreground">Release highlights, tips, and changelog notes.</p>
-                          </div>
-                          <Switch
-                            checked={notificationSettings.productUpdates}
-                            onCheckedChange={() => toggleNotification("productUpdates")}
-                          />
-                        </div>
-                        <div className="flex items-start justify-between rounded-lg border p-4">
-                          <div className="pr-4">
-                            <p className="text-sm font-medium">Security alerts</p>
-                            <p className="text-sm text-muted-foreground">New device sign-ins and policy changes.</p>
-                          </div>
-                          <Switch
-                            checked={notificationSettings.securityAlerts}
-                            onCheckedChange={() => toggleNotification("securityAlerts")}
-                          />
-                        </div>
-                        <div className="flex items-start justify-between rounded-lg border p-4">
-                          <div className="pr-4">
-                            <p className="text-sm font-medium">Weekly summary</p>
-                            <p className="text-sm text-muted-foreground">Digest of accomplishments, blockers, and fitness wins.</p>
-                          </div>
-                          <Switch
-                            checked={notificationSettings.weeklySummary}
-                            onCheckedChange={() => toggleNotification("weeklySummary")}
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg">
-                          <Bell className="h-5 w-5 text-purple-500" />
-                          Push & in-app
-                        </CardTitle>
-                        <CardDescription>
-                          Quick nudges when you are active in Ari or on mobile.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-6">
-                        <div className="flex items-start justify-between rounded-lg border p-4">
-                          <div className="pr-4">
-                            <p className="text-sm font-medium">Push notifications</p>
-                            <p className="text-sm text-muted-foreground">Mirrors urgent alerts to your paired devices.</p>
-                          </div>
-                          <Switch
-                            checked={pushNotifications}
-                            onCheckedChange={setPushNotifications}
-                          />
-                        </div>
-                        <div className="space-y-3">
-                          <Label htmlFor="digest-day">Weekly digest day</Label>
-                          <Select defaultValue="friday">
-                            <SelectTrigger id="digest-day">
-                              <SelectValue placeholder="Choose weekday" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="monday">Monday</SelectItem>
-                              <SelectItem value="wednesday">Wednesday</SelectItem>
-                              <SelectItem value="friday">Friday</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <p className="text-sm text-muted-foreground">
-                            Digest arrives at 8AM in your timezone with highlights, trends, and focus recs.
-                          </p>
-                        </div>
-                        <div className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">
-                          Mute mode detected? Ari pauses push alerts automatically when Focus Timer is active.
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
+                <TabsContent value="notifications">
+                  <NotificationsTab
+                    notificationSettings={notificationSettings}
+                    pushNotifications={pushNotifications}
+                    onToggleNotification={toggleNotification}
+                    onPushNotificationsChange={setPushNotifications}
+                  />
                 </TabsContent>
 
-                <TabsContent value="security" className="space-y-6">
-                  {/* Active Sessions */}
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="flex items-center gap-2 text-lg">
-                            <Monitor className="h-5 w-5 text-blue-500" />
-                            Active Sessions
-                          </CardTitle>
-                          <CardDescription>
-                            Manage devices where you're currently signed in.
-                          </CardDescription>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleRevokeAllSessions}
-                          disabled={revokingAllSessions || sessions.length <= 1}
-                        >
-                          {revokingAllSessions ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <LogOut className="mr-2 h-4 w-4" />
-                          )}
-                          Sign out all other devices
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      {sessionsLoading ? (
-                        <div className="flex items-center justify-center py-8">
-                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                        </div>
-                      ) : sessions.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          No active sessions found
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {sessions.map((session) => {
-                            const { device, browser } = parseUserAgent(session.userAgent)
-                            const isCurrentSession = session.token === currentSessionToken
-                            const isMobile = device === 'iPhone' || device === 'iPad' || device === 'Android'
-
-                            return (
-                              <div
-                                key={session.id}
-                                className={`flex items-center justify-between rounded-lg border p-4 ${
-                                  isCurrentSession ? 'border-blue-500/50 bg-blue-50/50' : ''
-                                }`}
-                              >
-                                <div className="flex items-center gap-3">
-                                  {isMobile ? (
-                                    <Smartphone className="h-5 w-5 text-muted-foreground" />
-                                  ) : (
-                                    <Monitor className="h-5 w-5 text-muted-foreground" />
-                                  )}
-                                  <div>
-                                    <p className="text-sm font-medium">
-                                      {device} · {browser}
-                                      {isCurrentSession && (
-                                        <Badge variant="secondary" className="ml-2">
-                                          This device
-                                        </Badge>
-                                      )}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {session.ipAddress || 'Unknown IP'} · Last active {formatRelativeTime(session.updatedAt)}
-                                    </p>
-                                  </div>
-                                </div>
-                                {!isCurrentSession && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleRevokeSession(session.token)}
-                                    disabled={revokingSession === session.token}
-                                  >
-                                    {revokingSession === session.token ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <LogOut className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                )}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Account Security */}
-                  <div className="grid gap-6 lg:grid-cols-2">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg">
-                          <ShieldCheck className="h-5 w-5 text-emerald-500" />
-                          Account Security
-                        </CardTitle>
-                        <CardDescription>
-                          Manage your password and security settings.
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="flex items-start justify-between rounded-lg border p-4">
-                          <div className="pr-4">
-                            <p className="text-sm font-medium">Password</p>
-                            <p className="text-sm text-muted-foreground">
-                              Change your password to keep your account secure.
-                            </p>
-                          </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => router.push('/profile')}
-                          >
-                            Change
-                          </Button>
-                        </div>
-                        <div className="rounded-lg border border-emerald-500/40 bg-emerald-50 p-4 text-sm">
-                          <p className="font-medium text-emerald-700">Authentication: Better Auth</p>
-                          <p className="mt-1 text-emerald-600">
-                            Your account is secured with Better Auth using Argon2id password hashing.
-                          </p>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                  </div>
+                <TabsContent value="security">
+                  <SecurityTab
+                    sessions={sessions}
+                    sessionsLoading={sessionsLoading}
+                    currentSessionToken={currentSessionToken}
+                    revokingSession={revokingSession}
+                    revokingAllSessions={revokingAllSessions}
+                    onRevokeSession={handleRevokeSession}
+                    onRevokeAllSessions={handleRevokeAllSessions}
+                  />
                 </TabsContent>
 
-                <TabsContent value="integrations" className="space-y-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-lg">
-                        <Plug className="h-5 w-5 text-indigo-500" />
-                        Connected apps
-                      </CardTitle>
-                      <CardDescription>
-                        Manage the tools that sync data into Ari.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="grid gap-4 md:grid-cols-2">
-                      <div className="rounded-xl border p-5">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium">Supabase</p>
-                            <p className="text-xs text-muted-foreground">Realtime tasks & auth</p>
-                          </div>
-                          <Badge variant="secondary">Connected</Badge>
-                        </div>
-                        <Separator className="my-4" />
-                        <p className="text-sm text-muted-foreground">
-                          Syncs tasks, fitness logs, and motivation content via secured service role.
-                        </p>
-                        <Button variant="outline" size="sm" className="mt-4 w-full">
-                          Manage keys
-                        </Button>
-                      </div>
-                      <div className="rounded-xl border p-5">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium">Notion</p>
-                            <p className="text-xs text-muted-foreground">Docs & rituals</p>
-                          </div>
-                          <Badge variant="outline">Available</Badge>
-                        </div>
-                        <Separator className="my-4" />
-                        <p className="text-sm text-muted-foreground">
-                          Mirror rituals, handbooks, and SOPs directly into Ari dashboards.
-                        </p>
-                        <Button size="sm" className="mt-4 w-full">
-                          Connect
-                        </Button>
-                      </div>
-                      <div className="rounded-xl border p-5">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium">Linear</p>
-                            <p className="text-xs text-muted-foreground">Engineering backlog</p>
-                          </div>
-                          <Badge variant="outline">Available</Badge>
-                        </div>
-                        <Separator className="my-4" />
-                        <p className="text-sm text-muted-foreground">
-                          Auto-link shipped tickets to Ari milestones with status mirroring.
-                        </p>
-                        <Button size="sm" className="mt-4 w-full">
-                          Connect
-                        </Button>
-                      </div>
-                      <div className="rounded-xl border p-5">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium">Slack</p>
-                            <p className="text-xs text-muted-foreground">Channel digests</p>
-                          </div>
-                          <Badge variant="outline">Available</Badge>
-                        </div>
-                        <Separator className="my-4" />
-                        <p className="text-sm text-muted-foreground">
-                          Send curated notifications into team channels with context-aware summaries.
-                        </p>
-                        <Button size="sm" className="mt-4 w-full">
-                          Connect
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg font-semibold">Automation recipes</CardTitle>
-                      <CardDescription>
-                        Kick-start automation with prebuilt flows. Toggle to activate instantly.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="grid gap-4 md:grid-cols-2">
-                      <div className="flex flex-col justify-between rounded-xl border p-5">
-                        <div>
-                          <p className="text-sm font-medium">Quiet hours</p>
-                          <p className="mt-2 text-sm text-muted-foreground">Mute notifications nightly and resurface blockers each morning.</p>
-                        </div>
-                        <div className="mt-4 flex items-center justify-between">
-                          <Badge variant="outline">Recommended</Badge>
-                          <Switch defaultChecked />
-                        </div>
-                      </div>
-                      <div className="flex flex-col justify-between rounded-xl border p-5">
-                        <div>
-                          <p className="text-sm font-medium">Post-meeting recap</p>
-                          <p className="mt-2 text-sm text-muted-foreground">Collect action items after calendar events tagged “Ari”.</p>
-                        </div>
-                        <div className="mt-4 flex items-center justify-between">
-                          <Badge variant="secondary">Active</Badge>
-                          <Switch defaultChecked />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                <TabsContent value="integrations">
+                  <IntegrationsTab />
                 </TabsContent>
 
-                <TabsContent value="backups" className="space-y-6">
-                  {/* Alert Messages */}
-                  {message && (
-                    <Alert variant={message.type === 'error' ? 'destructive' : message.type === 'warning' ? 'default' : 'default'}>
-                      {message.type === 'error' ? (
-                        <AlertCircle className="h-4 w-4 text-red-500" />
-                      ) : message.type === 'warning' ? (
-                        <AlertCircle className="h-4 w-4 text-yellow-500" />
-                      ) : (
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                      )}
-                      <AlertTitle>
-                        {message.type === 'error' ? 'Error' : message.type === 'warning' ? 'Warning' : 'Success'}
-                      </AlertTitle>
-                      <AlertDescription>{message.text}</AlertDescription>
-                    </Alert>
-                  )}
-
-                  {/* Verification Result */}
-                  {verificationResult && (
-                    <Card className={verificationResult.status === 'critical' ? 'border-red-500' : verificationResult.status === 'warning' ? 'border-yellow-500' : 'border-green-500'}>
-                      <CardHeader>
-                        <CardTitle className="text-lg flex items-center gap-2">
-                          {verificationResult.status === 'ok' ? (
-                            <CheckCircle2 className="h-5 w-5 text-green-500" />
-                          ) : verificationResult.status === 'warning' ? (
-                            <AlertCircle className="h-5 w-5 text-yellow-500" />
-                          ) : (
-                            <AlertCircle className="h-5 w-5 text-red-500" />
-                          )}
-                          Backup System Status
-                        </CardTitle>
-                        <CardDescription>
-                          Last verified: {new Date(verificationResult.timestamp).toLocaleString()}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                          <div>
-                            <span className="font-medium">Discovery Method:</span>
-                            <div className="text-muted-foreground mt-1">{verificationResult.discoveryMethod.replace(/_/g, ' ')}</div>
-                          </div>
-                          <div>
-                            <span className="font-medium">Tables Found:</span>
-                            <div className="text-muted-foreground mt-1">{verificationResult.tablesFound} / {verificationResult.expectedTables}</div>
-                          </div>
-                          <div>
-                            <span className="font-medium">Total Rows:</span>
-                            <div className="text-muted-foreground mt-1">{verificationResult.totalRows.toLocaleString()}</div>
-                          </div>
-                          <div>
-                            <span className="font-medium">Status:</span>
-                            <Badge variant={verificationResult.status === 'ok' ? 'default' : verificationResult.status === 'warning' ? 'secondary' : 'destructive'} className="mt-1">
-                              {verificationResult.status.toUpperCase()}
-                            </Badge>
-                          </div>
-                        </div>
-
-                        {/* Warnings */}
-                        {verificationResult.warnings && verificationResult.warnings.length > 0 && (
-                          <div className="space-y-2">
-                            <p className="font-medium text-sm">Warnings:</p>
-                            <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                              {verificationResult.warnings.map((warning: string, idx: number) => (
-                                <li key={idx}>{warning}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {/* Missing/Extra Tables */}
-                        {(verificationResult.missingTables.length > 0 || verificationResult.extraTables.length > 0) && (
-                          <div className="grid md:grid-cols-2 gap-4">
-                            {verificationResult.missingTables.length > 0 && (
-                              <div>
-                                <p className="font-medium text-sm text-red-600">Missing Tables:</p>
-                                <p className="text-xs text-muted-foreground mt-1">{verificationResult.missingTables.join(', ')}</p>
-                              </div>
-                            )}
-                            {verificationResult.extraTables.length > 0 && (
-                              <div>
-                                <p className="font-medium text-sm text-blue-600">New Tables Found:</p>
-                                <p className="text-xs text-muted-foreground mt-1">{verificationResult.extraTables.join(', ')}</p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Backup Statistics */}
-                  {backupStats && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Last Export Statistics</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                          <div>
-                            <span className="font-medium">Tables Exported:</span>
-                            <span className="ml-2">{backupStats.tables}</span>
-                          </div>
-                          <div>
-                            <span className="font-medium">Total Records:</span>
-                            <span className="ml-2">{backupStats.totalRows.toLocaleString()}</span>
-                          </div>
-                          {backupStats.discoveryMethod && (
-                            <div>
-                              <span className="font-medium">Discovery Method:</span>
-                              <span className="ml-2">{backupStats.discoveryMethod.replace(/_/g, ' ')}</span>
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Import Progress */}
-                  {importProgress && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg">Import Progress</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span>Processing records...</span>
-                            <span>{importProgress.current} / {importProgress.total}</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${(importProgress.current / importProgress.total) * 100}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Import Confirmation Dialog */}
-                  <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle className="flex items-center gap-2">
-                          <AlertCircle className="h-5 w-5 text-red-500" />
-                          Confirm Database Import
-                        </AlertDialogTitle>
-                        <AlertDialogDescription className="space-y-3">
-                          <p>
-                            <strong>⚠️ WARNING:</strong> This action will permanently delete all existing data in your database and replace it with the backup data.
-                          </p>
-                          <p>This includes:</p>
-                          <ul className="list-disc list-inside space-y-1 text-sm">
-                            <li>All tasks and their completion history</li>
-                            <li>All fitness activities and records</li>
-                            <li>All contacts and their information</li>
-                            <li>All fitness completion history</li>
-                            <li>ALL tables and data in your database (automatically discovered)</li>
-                          </ul>
-                          <p>
-                            <strong>File to import:</strong> {selectedFile?.name}
-                          </p>
-
-                          {/* Validation Results */}
-                          {validationResult && (
-                            <div className="border rounded p-3 space-y-2">
-                              <h4 className="font-medium text-sm">📋 Validation Results:</h4>
-
-                              {validationResult.valid && (
-                                <div className="flex items-center gap-2 text-green-600 text-sm">
-                                  <CheckCircle2 className="h-4 w-4" />
-                                  <span>SQL file passed all validation checks</span>
-                                </div>
-                              )}
-
-                              {validationResult.warnings && validationResult.warnings.length > 0 && (
-                                <div className="space-y-1">
-                                  <p className="text-yellow-600 font-medium text-sm">⚠️ Warnings ({validationResult.warnings.length}):</p>
-                                  <ul className="text-xs text-yellow-700 ml-4">
-                                    {validationResult.warnings.slice(0, 3).map((warning, idx) => (
-                                      <li key={idx}>• {warning}</li>
-                                    ))}
-                                    {validationResult.warnings.length > 3 && (
-                                      <li>• ... and {validationResult.warnings.length - 3} more</li>
-                                    )}
-                                  </ul>
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          <p className="text-red-600 font-medium">
-                            This action cannot be undone. Are you sure you want to continue?
-                          </p>
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setShowConfirmDialog(false)}>
-                          Cancel
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={handleConfirmedImport}
-                          className="bg-red-600 hover:bg-red-700 text-white"
-                        >
-                          Yes, Replace All Data
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-
-                  <div className="grid gap-6 md:grid-cols-2">
-                    {/* Export Card */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Download className="h-5 w-5" />
-                          Export Database
-                        </CardTitle>
-                        <CardDescription>
-                          Automatically discovers and exports ALL tables in your database as an SQL file
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <Button
-                          onClick={handleVerify}
-                          disabled={verifyLoading}
-                          variant="outline"
-                          className="w-full"
-                        >
-                          {verifyLoading ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Checking...
-                            </>
-                          ) : (
-                            <>
-                              <Eye className="mr-2 h-4 w-4" />
-                              Preview Backup
-                            </>
-                          )}
-                        </Button>
-                        <Button
-                          onClick={handleExport}
-                          disabled={exportLoading || verifyLoading}
-                          className="w-full"
-                        >
-                          {exportLoading ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Exporting...
-                            </>
-                          ) : (
-                            <>
-                              <Download className="mr-2 h-4 w-4" />
-                              Export Database
-                            </>
-                          )}
-                        </Button>
-                        <p className="text-xs text-muted-foreground">
-                          Click "Preview Backup" to verify what will be exported before downloading
-                        </p>
-                      </CardContent>
-                    </Card>
-
-                    {/* Import Card */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Upload className="h-5 w-5" />
-                          Import Database
-                        </CardTitle>
-                        <CardDescription>
-                          Restore your database from a previously exported SQL file
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-4">
-                          <Input
-                            type="file"
-                            accept=".sql"
-                            onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                            disabled={importLoading}
-                          />
-                          <Button
-                            onClick={handleImportClick}
-                            disabled={importLoading || !selectedFile}
-                            className="w-full"
-                            variant="outline"
-                          >
-                            {importLoading ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Importing...
-                              </>
-                            ) : (
-                              <>
-                                <Upload className="mr-2 h-4 w-4" />
-                                Import Database
-                              </>
-                            )}
-                          </Button>
-                          <Alert>
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertTitle>Warning</AlertTitle>
-                            <AlertDescription>
-                              Importing will replace all existing data in your database
-                            </AlertDescription>
-                          </Alert>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
+                <TabsContent value="backups">
+                  <BackupsTab
+                    message={message}
+                    verificationResult={verificationResult}
+                    backupStats={backupStats}
+                    importProgress={importProgress}
+                    showConfirmDialog={showConfirmDialog}
+                    validationResult={validationResult}
+                    selectedFile={selectedFile}
+                    exportLoading={exportLoading}
+                    importLoading={importLoading}
+                    verifyLoading={verifyLoading}
+                    onVerify={handleVerify}
+                    onExport={handleExport}
+                    onImportClick={handleImportClick}
+                    onConfirmedImport={handleConfirmedImport}
+                    onFileSelect={setSelectedFile}
+                    onConfirmDialogChange={setShowConfirmDialog}
+                  />
                 </TabsContent>
               </Tabs>
 
