@@ -12,6 +12,7 @@ export type UpdateEntryInput = {
   day_number?: number
   title?: string
   order_index?: number
+  completed?: boolean
 }
 
 /**
@@ -71,6 +72,7 @@ export function useCreateAriLaunchEntry() {
             id: 'temp-' + Date.now(),
             user_id: '',
             order_index: maxOrderIndex + 1,
+            completed: false,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           } as AriLaunchEntry,
