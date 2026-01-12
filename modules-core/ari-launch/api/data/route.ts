@@ -32,7 +32,8 @@ const UpdateEntrySchema = z.object({
   id: z.string().uuid(),
   day_number: z.number().int().min(1).max(45).optional(),
   title: z.string().min(1).max(3000).optional(),
-  order_index: z.number().int().min(0).optional()
+  order_index: z.number().int().min(0).optional(),
+  completed: z.boolean().optional()
 })
 
 /**
@@ -176,7 +177,7 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    const { id, day_number, title, order_index } = parseResult.data
+    const { id, day_number, title, order_index, completed } = parseResult.data
 
     // Build update object
     const updateData: Record<string, any> = {
@@ -186,6 +187,7 @@ export async function PATCH(request: NextRequest) {
     if (day_number !== undefined) updateData.dayNumber = day_number
     if (title !== undefined) updateData.title = title
     if (order_index !== undefined) updateData.orderIndex = order_index
+    if (completed !== undefined) updateData.completed = completed
 
     // Update the task
     const data = await withRLS((db) =>

@@ -19,7 +19,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Loader2, Rocket, Plus, GripVertical, Trash2 } from 'lucide-react'
+import { Loader2, Rocket, Plus, GripVertical, Trash2, Pencil, Check } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -212,6 +212,24 @@ export default function AriLaunchPage() {
     setDragOverDay(null)
   }
 
+  /**
+   * Toggle completed status
+   */
+  const handleToggleCompleted = (task: AriLaunchEntry) => {
+    updateEntry.mutate(
+      { id: task.id, completed: !task.completed },
+      {
+        onError: () => {
+          toast({
+            variant: 'destructive',
+            title: 'Failed to update task',
+            description: 'Please try again.',
+          })
+        },
+      }
+    )
+  }
+
   const isMutating = createEntry.isPending || updateEntry.isPending || deleteEntry.isPending
 
   return (
@@ -276,10 +294,6 @@ export default function AriLaunchPage() {
                     draggable
                     onDragStart={(e) => handleDragStart(e, task)}
                     onDragEnd={handleDragEnd}
-                    onClick={() => {
-                      setEditingTask(task)
-                      setEditTitle(task.title)
-                    }}
                     className={`
                       flex items-center gap-1 px-2 py-1 rounded text-sm
                       bg-background border border-border/50
@@ -287,12 +301,37 @@ export default function AriLaunchPage() {
                       hover:border-primary/50 hover:bg-primary/5
                       transition-all group
                       ${draggedTask?.id === task.id ? 'opacity-50' : ''}
+                      ${task.completed ? 'opacity-10 text-gray-500' : ''}
                     `}
                   >
                     <GripVertical className="w-3 h-3 text-muted-foreground/50 flex-shrink-0" />
                     <span className="truncate flex-1" title={task.title}>
                       {truncateText(task.title)}
                     </span>
+                    {/* Hover action icons */}
+                    <div className="hidden group-hover:flex items-center gap-1 flex-shrink-0">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setEditingTask(task)
+                          setEditTitle(task.title)
+                        }}
+                        className="p-0.5 rounded hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors"
+                        title="Edit task"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleToggleCompleted(task)
+                        }}
+                        className="p-0.5 rounded hover:bg-primary/20 text-muted-foreground hover:text-primary transition-colors"
+                        title={task.completed ? 'Mark as incomplete' : 'Mark as complete'}
+                      >
+                        <Check className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
