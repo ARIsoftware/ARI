@@ -17,6 +17,7 @@ export interface AriLaunchEntry {
   day_number: number      // Day 1-45
   title: string           // Task title
   order_index: number     // Order within the day
+  completed: boolean      // Whether task is completed
   created_at: string      // ISO timestamp
   updated_at: string      // ISO timestamp
 }
@@ -41,6 +42,7 @@ export interface UpdateEntryRequest {
   day_number?: number     // For drag-and-drop to new day
   title?: string          // For editing title
   order_index?: number    // For reordering within day
+  completed?: boolean     // For marking task as completed
 }
 
 /**
