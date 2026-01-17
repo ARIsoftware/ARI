@@ -36,7 +36,6 @@ import {
 import type { AriLaunchEntry } from '../types'
 
 const TOTAL_DAYS = 45
-const TRUNCATE_LENGTH = 30
 const MAX_TITLE_LENGTH = 3000
 const WARNING_THRESHOLD = 2900
 
@@ -68,14 +67,6 @@ export default function AriLaunchPage() {
     return entries
       .filter(e => e.day_number === day)
       .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
-  }
-
-  /**
-   * Truncate text with ellipsis
-   */
-  const truncateText = (text: string, maxLength: number = TRUNCATE_LENGTH): string => {
-    if (text.length <= maxLength) return text
-    return text.substring(0, maxLength) + '...'
   }
 
   /**
@@ -287,7 +278,7 @@ export default function AriLaunchPage() {
               </div>
 
               {/* Tasks List */}
-              <div className="flex-1 p-1 space-y-1 overflow-hidden">
+              <div className="flex-1 p-1 space-y-1">
                 {dayEntries.map(task => (
                   <div
                     key={task.id}
@@ -295,7 +286,7 @@ export default function AriLaunchPage() {
                     onDragStart={(e) => handleDragStart(e, task)}
                     onDragEnd={handleDragEnd}
                     className={`
-                      flex items-center gap-1 px-2 py-1 rounded text-sm
+                      flex items-start gap-1 px-2 py-1 rounded text-sm
                       bg-background border border-border/50
                       cursor-grab active:cursor-grabbing
                       hover:border-primary/50 hover:bg-primary/5
@@ -304,9 +295,9 @@ export default function AriLaunchPage() {
                       ${task.completed ? 'opacity-10 text-gray-500' : ''}
                     `}
                   >
-                    <GripVertical className="w-3 h-3 text-muted-foreground/50 flex-shrink-0" />
-                    <span className="truncate flex-1" title={task.title}>
-                      {truncateText(task.title)}
+                    <GripVertical className="w-3 h-3 text-muted-foreground/50 flex-shrink-0 mt-0.5" />
+                    <span className="flex-1 break-words">
+                      {task.title}
                     </span>
                     {/* Hover action icons */}
                     <div className="hidden group-hover:flex items-center gap-1 flex-shrink-0">
