@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 
 type BoxColor = 'light-grey' | 'dark-grey' | 'black' | 'green' | 'red'
 
@@ -39,7 +39,6 @@ export function CustomContributionGraph({
   onColorChange,
   initialColors = [],
   opacity = 1,
-  shimmerIndex = 0
 }: CustomContributionGraphProps) {
   const [boxes, setBoxes] = useState<BoxData[]>(() => {
     // Initialize 28 boxes (4 rows x 7 columns)
@@ -79,58 +78,17 @@ export function CustomContributionGraph({
   }
 
   return (
-    <>
-      {/* SHIMMER EFFECT - TEMPORARILY DISABLED */}
-      {/* <style jsx>{`
-        @keyframes shimmer-sweep {
-          0% {
-            transform: translateX(-100%);
-          }
-          100% {
-            transform: translateX(100%);
-          }
-        }
-        .shimmer-container {
-          animation: shimmer-sweep 1.2s ease-in-out infinite;
-          animation-delay: ${shimmerIndex === 0 ? 0 : 0.5 + shimmerIndex * 0.5}s;
-          animation-iteration-count: infinite;
-          animation-duration: 6s;
-          animation-timing-function: linear;
-        }
-        @keyframes shimmer-animation {
-          0%, 12% {
-            transform: translateX(-100%);
-          }
-          24%, 100% {
-            transform: translateX(200%);
-          }
-        }
-        .shimmer-overlay {
-          animation: shimmer-animation 6s ease-in-out infinite;
-          animation-delay: ${shimmerIndex === 0 ? 0 : 0.5 + shimmerIndex * 0.5}s;
-        }
-      `}</style> */}
-      <div className="w-full relative" style={{ opacity }}>
-        <div className="grid grid-cols-7 gap-1 w-full">
-          {boxes.map((box) => (
-            <button
-              key={box.index}
-              onClick={() => handleBoxClick(box.index)}
-              className={`h-[25px] rounded transition-all hover:opacity-80 ${getColorClasses(box.color)}`}
-              aria-label={`Box ${box.index + 1}, current color: ${box.color}`}
-            />
-          ))}
-        </div>
-        {/* Shimmer overlay - TEMPORARILY DISABLED */}
-        {/* <div
-          className="shimmer-overlay absolute inset-0 pointer-events-none overflow-hidden rounded"
-          style={{
-            background: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.6) 50%, transparent 100%)',
-            width: '50%',
-            transform: 'translateX(-100%)',
-          }}
-        /> */}
+    <div className="w-full relative" style={{ opacity }}>
+      <div className="grid grid-cols-7 gap-1 w-full">
+        {boxes.map((box) => (
+          <button
+            key={box.index}
+            onClick={() => handleBoxClick(box.index)}
+            className={`h-[25px] rounded transition-all hover:opacity-80 ${getColorClasses(box.color)}`}
+            aria-label={`Box ${box.index + 1}, current color: ${box.color}`}
+          />
+        ))}
       </div>
-    </>
+    </div>
   )
 }
