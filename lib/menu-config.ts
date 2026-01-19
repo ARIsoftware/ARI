@@ -1,4 +1,4 @@
-import { BarChart3, Grid3x3 } from "lucide-react"
+import { BarChart3 } from "lucide-react"
 
 export interface MenuItem {
   title: string
@@ -24,11 +24,6 @@ export const menuConfig: MenuGroup[] = [
         title: "Dashboard",
         url: "/dashboard",
         icon: BarChart3,
-      },
-      {
-        title: "HD Dashboard",
-        url: "/hd-dashboard",
-        icon: Grid3x3,
       },
     ],
   },
@@ -108,7 +103,6 @@ export function getAllFeatures(): FeatureInfo[] {
 function getFeatureDescription(title: string, url: string): string {
   const descriptions: Record<string, string> = {
     '/dashboard': 'Overview of your tasks, fitness, and goals',
-    '/hd-dashboard': 'High-density dashboard view',
     '/settings': 'Application settings and preferences',
     '/modules': 'Enable or disable installed modules to extend your app functionality',
   }
