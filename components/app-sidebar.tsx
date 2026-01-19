@@ -1,13 +1,15 @@
 "use client"
 
 import type * as React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { usePathname } from "next/navigation"
 import { ChevronRight } from "lucide-react"
+import { createSwapy, type Swapy } from "swapy"
 import { useFeatures } from "@/lib/features-context"
 import { menuConfig, getUrlToFeatureMap } from "@/lib/menu-config"
 import { useEnabledModulesFromContext } from "@/lib/modules/context"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
+import { useDragDropMode } from "@/components/drag-drop-mode-context"
 import {
   Sidebar,
   SidebarContent,
@@ -32,6 +34,43 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   // Get enabled modules from context (pre-fetched server-side)
   const enabledModules = useEnabledModulesFromContext()
+
+  // Drag and drop mode
+  const { isDragMode, setPendingOrder } = useDragDropMode()
+  const sidebarRef = useRef<HTMLDivElement>(null)
+  const swapyRef = useRef<Swapy | null>(null)
+
+  // Initialize Swapy when drag mode is active
+  useEffect(() => {
+    if (isDragMode && sidebarRef.current) {
+      // Small delay to ensure DOM is ready
+      const timer = setTimeout(() => {
+        if (sidebarRef.current) {
+          swapyRef.current = createSwapy(sidebarRef.current, {
+            animation: 'dynamic',
+            swapMode: 'hover'
+          })
+
+          swapyRef.current.onSwapEnd((event) => {
+            // Convert swap result to menuPriority mapping
+            const newOrder: Record<string, number> = {}
+            event.slotItemMap.asArray.forEach((item, index) => {
+              if (item.item) {
+                newOrder[item.item] = (index + 1) * 10 // Priority 10, 20, 30, etc.
+              }
+            })
+            setPendingOrder(newOrder)
+          })
+        }
+      }, 100)
+
+      return () => {
+        clearTimeout(timer)
+        swapyRef.current?.destroy()
+        swapyRef.current = null
+      }
+    }
+  }, [isDragMode, setPendingOrder])
 
   // Find if current route belongs to a module with a submenu
   const activeSubmenuModule = enabledModules.find(module => {
@@ -121,11 +160,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     )
   }
 
+  // Drag mode styling class
+  const dragModeClass = isDragMode
+    ? "outline outline-3 outline-dashed outline-[lightblue] mx-[3px] my-[3px] w-[95%]"
+    : ""
+
   // Otherwise show the main menu
   return (
-    <Sidebar {...props}>
+    <Sidebar {...props} className={isDragMode ? "drag-mode-active" : ""}>
       <SidebarContent>
-        {/* Core navigation groups */}
+        {/* Core navigation groups - not draggable */}
         {filteredNavMain.map((item) => (
           <SidebarGroup key={item.title}>
             <SidebarGroupLabel>{item.title}</SidebarGroupLabel>
@@ -146,69 +190,80 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarGroup>
         ))}
 
-        {/* Module navigation - Main position */}
-        {mainModules.map((module) => {
-          const mainRoutes = module.routes?.filter(r => r.sidebarPosition === 'main') || []
-          if (mainRoutes.length === 0) return null
-          const hasSubmenu = !!module.submenu?.component
+        {/* Draggable modules container */}
+        <div ref={sidebarRef} className="swapy-container">
+          {/* Module navigation - Main position */}
+          {mainModules.map((module) => {
+            const mainRoutes = module.routes?.filter(r => r.sidebarPosition === 'main') || []
+            if (mainRoutes.length === 0) return null
+            const hasSubmenu = !!module.submenu?.component
 
-          return (
-            <SidebarGroup key={module.id}>
-              {module.title && <SidebarGroupLabel>{module.title}</SidebarGroupLabel>}
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {mainRoutes.map((route) => {
-                    const Icon = getLucideIcon(route.icon || module.icon)
+            return (
+              <div key={module.id} data-swapy-slot={module.id}>
+                <div data-swapy-item={module.id}>
+                  <SidebarGroup className={dragModeClass}>
+                    {module.title && <SidebarGroupLabel>{module.title}</SidebarGroupLabel>}
+                    <SidebarGroupContent>
+                      <SidebarMenu>
+                        {mainRoutes.map((route) => {
+                          const Icon = getLucideIcon(route.icon || module.icon)
 
-                    return (
-                      <SidebarMenuItem key={route.path}>
-                        <SidebarMenuButton asChild>
-                          <a href={route.path} className="flex items-center">
-                            <Icon className="mr-2 size-4" />
-                            <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
-                            {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
-                          </a>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    )
-                  })}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          )
-        })}
+                          return (
+                            <SidebarMenuItem key={route.path}>
+                              <SidebarMenuButton asChild>
+                                <a href={route.path} className="flex items-center">
+                                  <Icon className="mr-2 size-4" />
+                                  <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
+                                  {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
+                                </a>
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                          )
+                        })}
+                      </SidebarMenu>
+                    </SidebarGroupContent>
+                  </SidebarGroup>
+                </div>
+              </div>
+            )
+          })}
 
-        {/* Module navigation - Bottom position */}
-        {bottomModules.map((module) => {
-          const bottomRoutes = module.routes?.filter(r => r.sidebarPosition === 'bottom') || []
-          if (bottomRoutes.length === 0) return null
-          const hasSubmenu = !!module.submenu?.component
+          {/* Module navigation - Bottom position */}
+          {bottomModules.map((module) => {
+            const bottomRoutes = module.routes?.filter(r => r.sidebarPosition === 'bottom') || []
+            if (bottomRoutes.length === 0) return null
+            const hasSubmenu = !!module.submenu?.component
 
-          return (
-            <SidebarGroup key={module.id}>
-              {module.title && <SidebarGroupLabel>{module.title}</SidebarGroupLabel>}
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {bottomRoutes.map((route) => {
-                    const Icon = getLucideIcon(route.icon || module.icon)
+            return (
+              <div key={module.id} data-swapy-slot={module.id}>
+                <div data-swapy-item={module.id}>
+                  <SidebarGroup className={dragModeClass}>
+                    {module.title && <SidebarGroupLabel>{module.title}</SidebarGroupLabel>}
+                    <SidebarGroupContent>
+                      <SidebarMenu>
+                        {bottomRoutes.map((route) => {
+                          const Icon = getLucideIcon(route.icon || module.icon)
 
-                    return (
-                      <SidebarMenuItem key={route.path}>
-                        <SidebarMenuButton asChild>
-                          <a href={route.path} className="flex items-center">
-                            <Icon className="mr-2 size-4" />
-                            <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
-                            {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
-                          </a>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    )
-                  })}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          )
-        })}
+                          return (
+                            <SidebarMenuItem key={route.path}>
+                              <SidebarMenuButton asChild>
+                                <a href={route.path} className="flex items-center">
+                                  <Icon className="mr-2 size-4" />
+                                  <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
+                                  {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
+                                </a>
+                              </SidebarMenuButton>
+                            </SidebarMenuItem>
+                          )
+                        })}
+                      </SidebarMenu>
+                    </SidebarGroupContent>
+                  </SidebarGroup>
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </SidebarContent>
       <SidebarRail />
     </Sidebar>

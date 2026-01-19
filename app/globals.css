@@ -132,3 +132,54 @@
 [class*="task"] {
   font-size: 13px;
 }
+
+/* Swapy Drag-and-Drop Mode */
+.swapy-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+[data-swapy-slot] {
+  position: relative;
+  width: 100%;
+}
+
+[data-swapy-item] {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  width: 100%;
+}
+
+[data-swapy-item]:active {
+  cursor: grabbing;
+}
+
+[data-swapy-item][data-swapy-dragging] {
+  opacity: 0.85;
+  z-index: 9999;
+  position: relative;
+  background: hsl(var(--sidebar-background));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+}
+
+/* Disable overflow on sidebar content during drag mode */
+.drag-mode-active [data-sidebar="content"] {
+  overflow: visible !important;
+}
+
+/* Disable links and hover effects in drag mode */
+.drag-mode-active [data-swapy-item] a {
+  pointer-events: none;
+  cursor: grab;
+}
+
+.drag-mode-active [data-swapy-item] [data-sidebar="menu-button"]:hover {
+  background-color: transparent !important;
+}
+
+.drag-mode-active [data-swapy-item]:active a {
+  cursor: grabbing;
+}

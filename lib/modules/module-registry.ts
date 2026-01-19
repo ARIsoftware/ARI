@@ -63,23 +63,41 @@ export async function getEnabledModules(userId?: string): Promise<ModuleMetadata
     .select('*')
     .eq('user_id', currentUserId)
 
-  // Create a map of module_id -> enabled state
+  // Create maps for module_id -> enabled state and settings
   const settingsMap = new Map<string, boolean>()
+  const moduleSettingsMap = new Map<string, Record<string, any>>()
   if (settings) {
     settings.forEach((setting: ModuleSettings) => {
       settingsMap.set(setting.module_id, setting.enabled)
+      if (setting.settings) {
+        moduleSettingsMap.set(setting.module_id, setting.settings as Record<string, any>)
+      }
     })
   }
 
-  // Filter modules based on enabled state
+  // Filter modules based on enabled state and merge user's custom menuPriority
   // Default to enabled if no setting exists
   // Exclude overridden modules - they should never appear in enabled list
-  return allModules.filter(module => {
-    if (module.isOverridden) return false
+  return allModules
+    .filter(module => {
+      if (module.isOverridden) return false
 
-    const isEnabledInDb = settingsMap.get(module.id)
-    return isEnabledInDb !== undefined ? isEnabledInDb : (module.enabled ?? true)
-  })
+      const isEnabledInDb = settingsMap.get(module.id)
+      return isEnabledInDb !== undefined ? isEnabledInDb : (module.enabled ?? true)
+    })
+    .map(module => {
+      // Merge user's custom menuPriority from settings if available
+      const userSettings = moduleSettingsMap.get(module.id)
+      const customPriority = userSettings?.menuPriority
+
+      if (customPriority !== undefined) {
+        return {
+          ...module,
+          menuPriority: customPriority
+        }
+      }
+      return module
+    })
 }
 
 /**
