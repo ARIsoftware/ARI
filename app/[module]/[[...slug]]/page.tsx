@@ -28,6 +28,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb'
 import { TaskAnnouncement } from '@/components/task-announcement'
+import { MainContentWrapper } from '@/components/main-content-wrapper'
 import { MODULE_PAGES } from '@/lib/generated/module-pages-registry'
 
 /**
@@ -122,20 +123,22 @@ export default async function ModuleCatchAllPage({
           <SidebarProvider>
             <AppSidebar />
             <SidebarInset>
-              <TopBar>
-                <Breadcrumb>
-                  <BreadcrumbList>
-                    <BreadcrumbItem>
-                      <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator />
-                    <BreadcrumbItem>
-                      <BreadcrumbPage>{moduleInfo.name}</BreadcrumbPage>
-                    </BreadcrumbItem>
-                  </BreadcrumbList>
-                </Breadcrumb>
-              </TopBar>
-              {pageContent}
+              <MainContentWrapper>
+                <TopBar>
+                  <Breadcrumb>
+                    <BreadcrumbList>
+                      <BreadcrumbItem>
+                        <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+                      </BreadcrumbItem>
+                      <BreadcrumbSeparator />
+                      <BreadcrumbItem>
+                        <BreadcrumbPage>{moduleInfo.name}</BreadcrumbPage>
+                      </BreadcrumbItem>
+                    </BreadcrumbList>
+                  </Breadcrumb>
+                </TopBar>
+                {pageContent}
+              </MainContentWrapper>
             </SidebarInset>
           </SidebarProvider>
         </div>

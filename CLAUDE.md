@@ -210,6 +210,23 @@ END $$;
 - Sign out option
 - Located in sidebar footer
 
+#### Keyboard Shortcuts
+| Shortcut | Action |
+|----------|--------|
+| `Cmd+K` | Open command palette |
+| `Cmd+B` | Toggle sidebar visibility |
+| `Cmd+D` | Enter drag-and-drop mode for sidebar reordering |
+
+#### Sidebar Module Reordering
+- Press `Cmd+D` to enter drag-and-drop mode
+- Sidebar modules display dashed lightblue outlines
+- Main content fades to 10% opacity
+- Top bar shows instruction text with X button to exit
+- Drag modules to reorder them
+- Click X to save order and exit
+- Order is persisted per-user in `module_settings.settings.menuPriority`
+- Uses Swapy library for drag-and-drop functionality
+
 ## File Structure
 
 ### Key Directories
