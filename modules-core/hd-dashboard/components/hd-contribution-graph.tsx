@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { CustomContributionGraph } from "./custom-contribution-graph"
-import { useSupabase } from "./providers"
+import { useSupabase } from "@/components/providers"
 
 type BoxColor = 'light-grey' | 'dark-grey' | 'black' | 'green' | 'red'
 
@@ -45,7 +45,7 @@ export function HDContributionGraph({ goals }: HDContributionGraphProps) {
 
         // Group colors by goal_id
         const colorsByGoal: Record<string, BoxData[]> = {}
-        data.forEach((item: any) => {
+        data.forEach((item: { goal_id: string; box_index: number; color: BoxColor }) => {
           if (!colorsByGoal[item.goal_id]) {
             colorsByGoal[item.goal_id] = []
           }

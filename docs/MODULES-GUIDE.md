@@ -150,12 +150,15 @@ app/
     └── page.tsx       → /my-module/settings
 ```
 
-Pages must use `export default function`:
+Pages must use `export default function` and **return only your content** - no layout wrappers!
+
+> **Important:** Module pages are automatically wrapped with the sidebar, header, and other layout components. Don't include `SidebarProvider`, `AppSidebar`, `DarkModeProvider`, or similar in your module pages, or you'll get duplicate toolbars.
 
 ```tsx
 'use client'
 
 export default function MyModulePage() {
+  // Just return your content - no layout wrappers needed!
   return (
     <div className="p-6">
       <h1>My Module</h1>
@@ -289,6 +292,7 @@ git clone https://github.com/yourname/ari-my-module.git my-module
 |-------|----------|
 | Module not in sidebar | Check `module.json` is valid JSON, restart dev server |
 | Page shows 404 | Ensure page uses `export default function` |
+| **Duplicate toolbars/headers** | **Remove layout wrappers** (`SidebarProvider`, `AppSidebar`, etc.) from your module page - these are already provided |
 | API returns 401 | Check authentication token is being sent |
 | Widget not showing | Verify `dashboard.widgets: true` in manifest |
 | Database errors | Ensure migrations applied and RLS enabled |
