@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { authClient } from "@/lib/auth-client"
 import {
   CommandDialog,
   CommandEmpty,
@@ -14,13 +13,11 @@ import {
   CommandShortcut,
 } from "@/components/ui/command"
 import {
-  LayoutDashboard,
-  CheckSquare,
   Settings,
   Package,
-  LogOut,
   Radar,
   Plus,
+  Loader2,
 } from "lucide-react"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
 import { useModules } from "@/lib/modules/module-hooks"
@@ -56,10 +53,20 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
     command()
   }, [setOpen])
 
-  const handleSignOut = async () => {
-    await authClient.signOut()
-    router.push("/sign-in")
-  }
+  // Sort modules by menuPriority (lower = higher in list), then alphabetically
+  const sortedModules = React.useMemo(() => {
+    return modules
+      .filter(m => m.routes && m.routes.length > 0)
+      .sort((a, b) => {
+        const priorityA = a.menuPriority ?? 50
+        const priorityB = b.menuPriority ?? 50
+        if (priorityA !== priorityB) return priorityA - priorityB
+        return a.name.localeCompare(b.name)
+      })
+  }, [modules])
+
+  // Check if Tasks module is enabled for Quick Actions
+  const tasksEnabled = modules.some(m => m.id === 'tasks')
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
@@ -67,19 +74,29 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
       <CommandList>
         <CommandEmpty>No results found.</CommandEmpty>
 
-        <CommandGroup heading="Navigation">
-          <CommandItem onSelect={() => runCommand(() => router.push("/dashboard"))}>
-            <LayoutDashboard className="mr-2 h-4 w-4" />
-            <span>Dashboard</span>
-          </CommandItem>
-          <CommandItem onSelect={() => runCommand(() => router.push("/tasks"))}>
-            <CheckSquare className="mr-2 h-4 w-4" />
-            <span>Tasks</span>
-          </CommandItem>
-          <CommandItem onSelect={() => runCommand(() => router.push("/tasks/radar"))}>
-            <Radar className="mr-2 h-4 w-4" />
-            <span>Priority Radar</span>
-          </CommandItem>
+        {/* Dynamic modules - sorted by priority */}
+        <CommandGroup heading="Go to">
+          {modulesLoading ? (
+            <CommandItem disabled>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <span className="text-muted-foreground">Loading modules...</span>
+            </CommandItem>
+          ) : sortedModules.length > 0 ? (
+            sortedModules.map((module) => {
+              const Icon = getLucideIcon(module.icon)
+              const route = module.routes![0]
+              return (
+                <CommandItem
+                  key={module.id}
+                  onSelect={() => runCommand(() => router.push(route.path))}
+                >
+                  <Icon className="mr-2 h-4 w-4" />
+                  <span>{module.name}</span>
+                </CommandItem>
+              )
+            })
+          ) : null}
+          {/* Static core pages (not modules) */}
           <CommandItem onSelect={() => runCommand(() => router.push("/settings"))}>
             <Settings className="mr-2 h-4 w-4" />
             <span>Settings</span>
@@ -90,52 +107,22 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
           </CommandItem>
         </CommandGroup>
 
-        <CommandSeparator />
-
-        {modules.length > 0 && (
-          <CommandGroup heading="Modules">
-            {modules
-              .filter(m => m.routes && m.routes.length > 0)
-              .sort((a, b) => a.name.localeCompare(b.name))
-              .map((module) => {
-                const Icon = getLucideIcon(module.icon)
-                const route = module.routes![0]
-                return (
-                  <CommandItem
-                    key={module.id}
-                    onSelect={() => runCommand(() => router.push(route.path))}
-                  >
-                    <Icon className="mr-2 h-4 w-4" />
-                    <span>{module.name}</span>
-                  </CommandItem>
-                )
-              })
-            }
-          </CommandGroup>
+        {tasksEnabled && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading="Quick Actions">
+              <CommandItem onSelect={() => runCommand(() => router.push("/tasks/add"))}>
+                <Plus className="mr-2 h-4 w-4" />
+                <span>New Task</span>
+                <CommandShortcut>N</CommandShortcut>
+              </CommandItem>
+              <CommandItem onSelect={() => runCommand(() => router.push("/tasks/radar"))}>
+                <Radar className="mr-2 h-4 w-4" />
+                <span>Priority Radar</span>
+              </CommandItem>
+            </CommandGroup>
+          </>
         )}
-
-        <CommandSeparator />
-
-        <CommandGroup heading="Quick Actions">
-          <CommandItem onSelect={() => runCommand(() => router.push("/tasks/add"))}>
-            <Plus className="mr-2 h-4 w-4" />
-            <span>New Task</span>
-            <CommandShortcut>N</CommandShortcut>
-          </CommandItem>
-          <CommandItem onSelect={() => runCommand(() => router.push("/add-fitness"))}>
-            <Plus className="mr-2 h-4 w-4" />
-            <span>New Fitness Task</span>
-          </CommandItem>
-        </CommandGroup>
-
-        <CommandSeparator />
-
-        <CommandGroup heading="Account">
-          <CommandItem onSelect={() => runCommand(handleSignOut)}>
-            <LogOut className="mr-2 h-4 w-4" />
-            <span>Sign Out</span>
-          </CommandItem>
-        </CommandGroup>
       </CommandList>
     </CommandDialog>
   )
