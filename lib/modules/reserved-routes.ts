@@ -13,7 +13,6 @@
  */
 export const RESERVED_MODULE_IDS = [
   // Core pages
-  'dashboard',
   'tasks',
   'settings',
   'profile',
