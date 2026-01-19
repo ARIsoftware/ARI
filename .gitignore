@@ -2,6 +2,8 @@
 
 # macOS
 .DS_Store
+.AppleDouble
+.LSOverride
 
 # Icon must end with two \r
 Icon
@@ -9,14 +11,33 @@ Icon
 # Thumbnails
 ._*
 
+# Files that might appear on external volumes
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+*~
 
 # Markdown Reports
 *-report.md
 
+# IDE/Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
 
-# Files that might appear on external volumes
-.Spotlight-V100
-.Trashes
+# Testing/Coverage
+/coverage/
+.nyc_output/
+*.lcov
 
 # dependencies
 /node_modules
@@ -57,3 +78,32 @@ next-env.d.ts
 
 # Drizzle generated migrations (we use lib/db/schema/ instead)
 lib/db/migrations/
+
+# Turbo
+.turbo/
+
+# Cache
+.cache/
+*.cache
+
+# Logs
+logs/
+*.log
+!.gitkeep
+
+# Temp files
+*.tmp
+*.temp
+*.bak
+
+# Sentry
+.sentryclirc
+
+# PWA generated
+/public/sw.js
+/public/workbox-*.js
+
+# Local testing
+/playwright-report/
+/playwright/.cache/
+/test-results/
