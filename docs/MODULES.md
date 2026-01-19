@@ -372,6 +372,18 @@ Modules can add a quick access icon to the global top navigation bar:
   ```
 
 - [ ] **4.3 Create main page** (`app/page.tsx`)
+
+  > **⚠️ CRITICAL: Do NOT include layout components!**
+  >
+  > Module pages are rendered inside the module routing system (`/app/[module]/[[...slug]]/page.tsx`) which **already provides**:
+  > - `SidebarProvider` and `AppSidebar`
+  > - `SidebarInset` wrapper
+  > - Top bar (`TaskAnnouncement`)
+  > - Breadcrumb header
+  >
+  > **Never include these in your module page** - doing so causes duplicate toolbars/headers (a nested layout bug).
+  > Just return your content directly, optionally wrapped in a React fragment `<>`.
+
   ```tsx
   'use client'
 
@@ -390,6 +402,7 @@ Modules can add a quick access icon to the global top navigation bar:
       )
     }
 
+    // Return content directly - NO SidebarProvider, AppSidebar, or header!
     return (
       <div className="p-6 space-y-6">
         <div>
@@ -1255,6 +1268,68 @@ export async function DELETE(
 
 ## 8. Components
 
+### ⚠️ CRITICAL: Module Page Layout Rules
+
+**Module pages must NOT include their own layout components.**
+
+The module routing system (`/app/[module]/[[...slug]]/page.tsx`) already wraps your module page with:
+- `DarkModeProvider`
+- `TaskAnnouncement` (top bar)
+- `SidebarProvider` + `AppSidebar`
+- `SidebarInset`
+- Breadcrumb header
+
+**If you include any of these in your module page, you will see duplicate toolbars/headers (a nested layout bug).**
+
+#### What NOT to include in module pages:
+
+```tsx
+// ❌ WRONG - These cause duplicate toolbars!
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
+import { AppSidebar } from '@/components/app-sidebar'
+import { DarkModeProvider } from '@/components/dark-mode-provider'
+import { TaskAnnouncement } from '@/components/task-announcement'
+
+export default function MyModulePage() {
+  return (
+    <DarkModeProvider>           {/* ❌ Already provided */}
+      <TaskAnnouncement />       {/* ❌ Already provided */}
+      <SidebarProvider>          {/* ❌ Already provided */}
+        <AppSidebar />           {/* ❌ Already provided */}
+        <SidebarInset>           {/* ❌ Already provided */}
+          <header>...</header>   {/* ❌ Breadcrumbs already provided */}
+          <main>Content</main>
+        </SidebarInset>
+      </SidebarProvider>
+    </DarkModeProvider>
+  )
+}
+```
+
+#### Correct pattern:
+
+```tsx
+// ✅ CORRECT - Just return your content
+export default function MyModulePage() {
+  return (
+    <>
+      {/* Optional: Loading overlay */}
+      {isLoading && <LoadingOverlay />}
+
+      {/* Your content - no layout wrappers! */}
+      <div className="p-6">
+        <h1>My Module</h1>
+        {/* ... */}
+      </div>
+    </>
+  )
+}
+```
+
+When migrating existing pages from `/app/` to modules, **remove all layout wrappers** - they are no longer needed.
+
+---
+
 ### Dashboard Widget Template
 
 ```tsx
@@ -1895,6 +1970,54 @@ SELECT * FROM pg_policies WHERE tablename = 'my_module_data';
 # Check for type errors
 npm run build 2>&1 | head -50
 ```
+
+### Duplicate Toolbar / Header (Nested Layout Bug)
+
+**Symptom:** Module shows two toolbars - a black toolbar inside another toolbar, or duplicate headers/breadcrumbs.
+
+**Cause:** Module page includes layout components that the module routing system already provides.
+
+**Check:**
+- [ ] Module page does NOT import `SidebarProvider` or `SidebarInset`
+- [ ] Module page does NOT import `AppSidebar`
+- [ ] Module page does NOT import `DarkModeProvider`
+- [ ] Module page does NOT import `TaskAnnouncement`
+- [ ] Module page does NOT render its own `<header>` with breadcrumbs
+
+**Fix:**
+
+Remove all layout wrappers from your module page. The module routing system (`/app/[module]/[[...slug]]/page.tsx`) already provides these.
+
+```tsx
+// ❌ WRONG - causes duplicate toolbars
+export default function MyModulePage() {
+  return (
+    <DarkModeProvider>
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <header>...</header>
+          <main>Content</main>
+        </SidebarInset>
+      </SidebarProvider>
+    </DarkModeProvider>
+  )
+}
+
+// ✅ CORRECT - just return content
+export default function MyModulePage() {
+  return (
+    <>
+      <div className="p-6">
+        <h1>My Module</h1>
+        {/* ... */}
+      </div>
+    </>
+  )
+}
+```
+
+See [Section 8: Components](#8-components) for full details.
 
 ---
 
