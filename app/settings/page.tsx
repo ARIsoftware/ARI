@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { TaskAnnouncement } from "@/components/task-announcement"
-import { getAllFeatures } from "@/lib/menu-config"
 import { authClient } from "@/lib/auth-client"
 import {
   Breadcrumb,
@@ -20,7 +19,7 @@ import { Check, Sparkles, TimerReset } from "lucide-react"
 import {
   GeneralTab,
   FontsTab,
-  FeaturesTab,
+  KeybindingsTab,
   NotificationsTab,
   SecurityTab,
   IntegrationsTab,
@@ -31,7 +30,6 @@ import {
   type Session,
   type NotificationSettings,
   type BetaFeatureSettings,
-  type FeaturePreference,
   type BackupStats,
   type BackupMessage,
   type ImportProgress,
@@ -59,11 +57,6 @@ export default function SettingsPage(): React.ReactElement {
   const [selectedFont, setSelectedFont] = useState("Overpass Mono")
   const [savedFont, setSavedFont] = useState("Overpass Mono")
   const [fontSaving, setFontSaving] = useState(false)
-
-  // Features tab state
-  const [featurePreferences, setFeaturePreferences] = useState<Record<string, boolean>>({})
-  const [loadingFeatures, setLoadingFeatures] = useState(true)
-  const menuFeatures = getAllFeatures()
 
   // Notifications tab state
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
@@ -104,28 +97,6 @@ export default function SettingsPage(): React.ReactElement {
         document.documentElement.style.setProperty("--font-family", fontOption.css)
       }
     }
-  }, [])
-
-  // Load feature preferences on mount
-  useEffect(() => {
-    async function loadFeaturePreferences(): Promise<void> {
-      try {
-        const response = await fetch("/api/features")
-        if (response.ok) {
-          const data: FeaturePreference[] = await response.json()
-          const preferences: Record<string, boolean> = {}
-          data.forEach(pref => {
-            preferences[pref.feature_name] = pref.enabled
-          })
-          setFeaturePreferences(preferences)
-        }
-      } catch (error) {
-        console.error("Error loading feature preferences:", error)
-      } finally {
-        setLoadingFeatures(false)
-      }
-    }
-    loadFeaturePreferences()
   }, [])
 
   // Load sessions on mount
@@ -184,29 +155,6 @@ export default function SettingsPage(): React.ReactElement {
 
   function toggleNotification(key: keyof NotificationSettings): void {
     setNotificationSettings(prev => ({ ...prev, [key]: !prev[key] }))
-  }
-
-  async function toggleFeature(featureName: string): Promise<void> {
-    const currentState = featurePreferences[featureName] ?? true
-    const newState = !currentState
-
-    setFeaturePreferences(prev => ({ ...prev, [featureName]: newState }))
-
-    try {
-      const response = await fetch("/api/features", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ feature_name: featureName, enabled: newState }),
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed to update feature preference")
-      }
-    } catch (error) {
-      console.error("Error updating feature:", error)
-      setFeaturePreferences(prev => ({ ...prev, [featureName]: currentState }))
-      setMessage({ type: "error", text: "Failed to update feature preference" })
-    }
   }
 
   async function handleRevokeSession(token: string): Promise<void> {
@@ -508,7 +456,7 @@ export default function SettingsPage(): React.ReactElement {
                   <TabsList>
                     <TabsTrigger value="general">General</TabsTrigger>
                     <TabsTrigger value="fonts">Fonts</TabsTrigger>
-                    <TabsTrigger value="features">Features</TabsTrigger>
+                    <TabsTrigger value="keybindings">Keybindings</TabsTrigger>
                     <TabsTrigger value="notifications">Notifications</TabsTrigger>
                     <TabsTrigger value="security">Security</TabsTrigger>
                     <TabsTrigger value="integrations">Integrations</TabsTrigger>
@@ -560,13 +508,8 @@ export default function SettingsPage(): React.ReactElement {
                   />
                 </TabsContent>
 
-                <TabsContent value="features">
-                  <FeaturesTab
-                    menuFeatures={menuFeatures}
-                    featurePreferences={featurePreferences}
-                    loadingFeatures={loadingFeatures}
-                    onToggleFeature={toggleFeature}
-                  />
+                <TabsContent value="keybindings">
+                  <KeybindingsTab />
                 </TabsContent>
 
                 <TabsContent value="notifications">

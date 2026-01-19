@@ -32,6 +32,7 @@ import { useSupabase } from "@/components/providers"
 import { authClient } from "@/lib/auth-client"
 import { useCommandPalette } from "@/components/command-palette"
 import { useMusicPlayer } from "@/components/youtube-music-player"
+import { useDragDropMode } from "@/components/drag-drop-mode-context"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -232,6 +233,7 @@ export function TaskAnnouncement() {
   const isMobile = useIsMobile()
   const { session, supabase } = useSupabase()
   const user = session?.user
+  const { isDragMode, setDragMode, saveOrder } = useDragDropMode()
 
   useEffect(() => {
     // Load initial task
@@ -361,6 +363,31 @@ export function TaskAnnouncement() {
         >
           <X className="w-10 h-10" />
         </button>
+      </div>
+    )
+  }
+
+  // Handle exit drag mode - optimistic UI, save in background
+  const handleExitDragMode = () => {
+    saveOrder() // Fire and forget - saves in background
+    setDragMode(false) // Exit immediately
+  }
+
+  // Show drag mode UI
+  if (isDragMode) {
+    return (
+      <div className="topbar h-[45px] w-full relative z-50 flex items-center justify-center px-4 bg-blue-900">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute left-4 h-8 w-8 text-white hover:bg-white/10 hover:text-white"
+          onClick={handleExitDragMode}
+        >
+          <X className="h-5 w-5" />
+        </Button>
+        <span className={`text-white font-medium ${dmSans.className}`}>
+          Drag and drop sidebar items to reorder. Press X to save and exit.
+        </span>
       </div>
     )
   }

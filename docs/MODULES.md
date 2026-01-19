@@ -252,7 +252,7 @@ These are the ONLY places where code/configuration must exist outside the module
 |-------|------|-------------|
 | `title` | `string` | Optional title shown above name in sidebar |
 | `fullscreen` | `boolean` | Hide sidebar/header when `true` (default: `false`) |
-| `menuPriority` | `number` | Sort order in sidebar (1-100, lower = higher, default: 50) |
+| `menuPriority` | `number` | Sort order in sidebar (1-100, lower = higher, default: 50). Users can override via drag-and-drop (Cmd+D), which saves to `module_settings.settings.menuPriority` |
 | `permissions` | `object` | Metadata about module capabilities (informational) |
 | `routes` | `array` | Navigation items for sidebar |
 | `database` | `object` | Database table configuration |
