@@ -23,7 +23,6 @@ export const RESERVED_MODULE_IDS = [
   // Core features
   'radar',
   'fitness',
-  'hd-dashboard',
   'logs',
 
   // Core add/edit pages

@@ -133,10 +133,11 @@ Before marking complete, verify:
 - [ ] Page uses TanStack Query hooks (not manual useState/useEffect/fetch)
 - [ ] Optimistic updates implemented for all mutations
 - [ ] Page does NOT block on session check (no "Authenticating..." spinner)
+- [ ] **Page does NOT include layout wrappers** (no SidebarProvider, AppSidebar, DarkModeProvider, SidebarInset, or header with breadcrumbs - these are already provided by the module routing system)
 - [ ] Component uses proper theming (Tailwind classes, not hardcoded colors)
 - [ ] No TypeScript errors (`npx tsc --noEmit`)
 - [ ] Module appears in sidebar after registry generation
-- [ ] Page loads without errors in dev server
+- [ ] Page loads without errors in dev server (no duplicate toolbars)
 
 ## Important Reminders
 
