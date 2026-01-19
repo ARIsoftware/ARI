@@ -15,7 +15,7 @@ import {
   Eye,
   BarChart3,
   Activity,
-  AlertTriangle,
+  Info,
   Loader2,
 } from 'lucide-react'
 import { useDashboardData } from '@/lib/hooks/use-dashboard'
@@ -51,19 +51,19 @@ export default function DashboardPage() {
   if (!tasksEnabled) {
     return (
       <div className="p-6 max-w-2xl mx-auto">
-        <Alert variant="destructive" className="border-orange-200 bg-orange-50 dark:bg-orange-950/20">
-          <AlertTriangle className="h-5 w-5 text-orange-600" />
-          <AlertTitle className="text-orange-800 dark:text-orange-200 text-lg">
+        <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
+          <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          <AlertTitle className="text-blue-900 dark:text-blue-100 text-lg font-medium">
             Tasks Module Required
           </AlertTitle>
-          <AlertDescription className="text-orange-700 dark:text-orange-300 mt-2">
+          <AlertDescription className="text-blue-700 dark:text-blue-300 mt-2">
             <p className="mb-4">
               The Dashboard requires the <strong>Tasks</strong> module to be enabled.
               The Tasks module provides the core task data that powers the dashboard analytics and overview.
             </p>
             <Button
               variant="outline"
-              className="border-orange-300 text-orange-700 hover:bg-orange-100 dark:border-orange-700 dark:text-orange-300 dark:hover:bg-orange-900/30"
+              className="border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-600 dark:text-blue-300 dark:hover:bg-blue-900/30"
               onClick={() => (window.location.href = '/settings')}
             >
               Go to Settings to Enable Tasks
