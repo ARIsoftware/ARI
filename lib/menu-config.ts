@@ -1,5 +1,3 @@
-import { BarChart3 } from "lucide-react"
-
 export interface MenuItem {
   title: string
   url: string
@@ -14,20 +12,8 @@ export interface MenuGroup {
   items: MenuItem[]
 }
 
-export const menuConfig: MenuGroup[] = [
-  {
-    title: "Dashboard",
-    url: "/dashboard",
-    icon: BarChart3,
-    items: [
-      {
-        title: "Dashboard",
-        url: "/dashboard",
-        icon: BarChart3,
-      },
-    ],
-  },
-]
+// Menu config is now empty - modules provide their own menu items
+export const menuConfig: MenuGroup[] = []
 
 // Extract all unique page URLs from menu config (excluding placeholders like '#')
 export function getAllPageUrls(): string[] {
@@ -102,7 +88,6 @@ export function getAllFeatures(): FeatureInfo[] {
 
 function getFeatureDescription(title: string, url: string): string {
   const descriptions: Record<string, string> = {
-    '/dashboard': 'Overview of your tasks, fitness, and goals',
     '/settings': 'Application settings and preferences',
     '/modules': 'Enable or disable installed modules to extend your app functionality',
   }
