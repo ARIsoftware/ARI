@@ -25,7 +25,10 @@ import {
   Triangle,
   Shield,
   Check,
-  X
+  X,
+  Github,
+  GitFork,
+  Terminal
 } from "lucide-react"
 import {
   Select,
@@ -36,6 +39,8 @@ import {
 } from "@/components/ui/select"
 
 interface OnboardingData {
+  // GitHub (tracking)
+  githubSetupComplete: boolean
   // Supabase (required)
   supabaseUrl: string
   supabaseAnonKey: string
@@ -67,8 +72,9 @@ export default function WelcomePage() {
   const [showIntro, setShowIntro] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
 
-  const [currentTab, setCurrentTab] = useState("supabase")
+  const [currentTab, setCurrentTab] = useState("github")
   const [formData, setFormData] = useState<OnboardingData>({
+    githubSetupComplete: false,
     supabaseUrl: "",
     supabaseAnonKey: "",
     supabaseSecretKey: "",
@@ -157,12 +163,13 @@ export default function WelcomePage() {
   // Calculate progress
   const getProgress = () => {
     let completed = 0
+    if (formData.githubSetupComplete) completed++
     if (formData.supabaseUrl && formData.supabaseAnonKey && formData.supabaseSecretKey) completed++
     if (formData.openaiApiKey) completed++
     if (formData.resendApiKey) completed++
     if (formData.vercelSetupComplete) completed++
     if (formData.name || formData.email) completed++
-    return Math.round((completed / 5) * 100)
+    return Math.round((completed / 6) * 100)
   }
 
   const generateEnvFileContent = () => {
@@ -358,7 +365,13 @@ export default function WelcomePage() {
 
                 {/* Tabs */}
                 <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
-                  <TabsList className="mb-6 grid w-full grid-cols-6 bg-muted/50 rounded-lg p-1">
+                  <TabsList className="mb-6 grid w-full grid-cols-7 bg-muted/50 rounded-lg p-1">
+                    <TabsTrigger
+                      value="github"
+                      className="text-sm rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                    >
+                      GitHub
+                    </TabsTrigger>
                     <TabsTrigger
                       value="supabase"
                       className="text-sm rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm"
@@ -397,7 +410,122 @@ export default function WelcomePage() {
                     </TabsTrigger>
                   </TabsList>
 
-                  {/* Tab 1: Supabase */}
+                  {/* Tab 1: GitHub */}
+                  <TabsContent value="github" className="space-y-6 mt-0">
+                    {/* Header section */}
+                    <div className="flex items-start gap-4 p-4 bg-muted/30 rounded-lg">
+                      <div className="rounded-lg bg-gray-900 p-3">
+                        <Github className="h-6 w-6 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <h2 className="mb-1 text-lg font-semibold text-foreground">GitHub Setup</h2>
+                        <p className="text-sm text-muted-foreground">
+                          Create a GitHub repository for your ARI instance. This enables version control, easy deployment to Vercel, and the ability to receive updates.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Step 1: Create repo */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
+                        1
+                      </div>
+                      <h3 className="text-base font-semibold text-foreground">Create a new repository</h3>
+                    </div>
+
+                    <div className="p-4 bg-muted/30 rounded-lg">
+                      <ol className="space-y-3">
+                        <li className="flex items-start gap-3">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                            1
+                          </span>
+                          <div className="flex-1 pt-0.5 text-sm">
+                            <span className="text-foreground">Go to </span>
+                            <a href="https://github.com/new" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-accent hover:underline">
+                              github.com/new
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </div>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                            2
+                          </span>
+                          <div className="flex-1 pt-0.5 text-sm text-foreground">
+                            Name your repository (e.g., <code className="bg-muted px-1 rounded text-xs">ari</code> or <code className="bg-muted px-1 rounded text-xs">my-ari</code>)
+                          </div>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                            3
+                          </span>
+                          <p className="flex-1 pt-0.5 text-sm text-foreground">Set it to <strong>Private</strong> (recommended) and click <strong>Create repository</strong></p>
+                        </li>
+                      </ol>
+                    </div>
+
+                    {/* Step 2: Push code */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
+                        2
+                      </div>
+                      <h3 className="text-base font-semibold text-foreground">Push your code</h3>
+                    </div>
+
+                    <div className="p-4 bg-muted/30 rounded-lg space-y-3">
+                      <p className="text-sm text-foreground">In your project folder, run these commands:</p>
+                      <div className="bg-gray-900 text-gray-100 p-3 rounded-md space-y-1">
+                        <code className="text-xs block" style={{ fontFamily: 'Geist Mono, monospace' }}>
+                          git init
+                        </code>
+                        <code className="text-xs block" style={{ fontFamily: 'Geist Mono, monospace' }}>
+                          git add .
+                        </code>
+                        <code className="text-xs block" style={{ fontFamily: 'Geist Mono, monospace' }}>
+                          git commit -m &quot;Initial commit&quot;
+                        </code>
+                        <code className="text-xs block" style={{ fontFamily: 'Geist Mono, monospace' }}>
+                          git branch -M main
+                        </code>
+                        <code className="text-xs block" style={{ fontFamily: 'Geist Mono, monospace' }}>
+                          git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
+                        </code>
+                        <code className="text-xs block" style={{ fontFamily: 'Geist Mono, monospace' }}>
+                          git push -u origin main
+                        </code>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Replace YOUR_USERNAME and YOUR_REPO with your GitHub username and repository name
+                      </p>
+                    </div>
+
+                    {/* Confirmation */}
+                    <div className="flex items-center space-x-2 pt-2">
+                      <Switch
+                        id="github-setup"
+                        checked={formData.githubSetupComplete}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, githubSetupComplete: checked }))}
+                      />
+                      <Label htmlFor="github-setup">I&apos;ve pushed my code to GitHub</Label>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-between pt-4">
+                      <Button variant="outline" size="sm" className="gap-2 text-xs" asChild>
+                        <a href="https://github.com/new" target="_blank" rel="noopener noreferrer">
+                          <Github className="h-3.5 w-3.5" />
+                          Create Repository
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </Button>
+                      <Button onClick={() => setCurrentTab("supabase")} className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90">
+                        Continue to Supabase
+                        <CheckCircle className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TabsContent>
+
+                  {/* Tab 2: Supabase */}
                   <TabsContent value="supabase" className="space-y-6 mt-0">
                     {/* Header section */}
                     <div className="flex items-start gap-4 p-4 bg-muted/30 rounded-lg">
@@ -533,13 +661,18 @@ export default function WelcomePage() {
 
                       {/* Footer */}
                       <div className="flex items-center justify-between pt-4">
-                        <Button variant="outline" size="sm" className="gap-2 text-xs" asChild>
-                          <a href="https://supabase.com/docs/guides/api/api-keys" target="_blank" rel="noopener noreferrer">
-                            <Info className="h-3.5 w-3.5" />
-                            Read documentation
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" onClick={() => setCurrentTab("github")}>
+                            Back
+                          </Button>
+                          <Button variant="outline" size="sm" className="gap-2 text-xs" asChild>
+                            <a href="https://supabase.com/docs/guides/api/api-keys" target="_blank" rel="noopener noreferrer">
+                              <Info className="h-3.5 w-3.5" />
+                              Docs
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </Button>
+                        </div>
                         <Button onClick={() => setCurrentTab("openai")} className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90">
                           Continue
                           <CheckCircle className="h-4 w-4" />
