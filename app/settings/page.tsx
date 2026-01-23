@@ -19,6 +19,7 @@ import { Check, Sparkles, TimerReset } from "lucide-react"
 import {
   GeneralTab,
   FontsTab,
+  ThemesTab,
   KeybindingsTab,
   NotificationsTab,
   SecurityTab,
@@ -455,6 +456,7 @@ export default function SettingsPage(): React.ReactElement {
                 <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
                   <TabsList>
                     <TabsTrigger value="general">General</TabsTrigger>
+                    <TabsTrigger value="themes">Themes</TabsTrigger>
                     <TabsTrigger value="fonts">Fonts</TabsTrigger>
                     <TabsTrigger value="keybindings">Keybindings</TabsTrigger>
                     <TabsTrigger value="notifications">Notifications</TabsTrigger>
@@ -496,6 +498,10 @@ export default function SettingsPage(): React.ReactElement {
                     betaFeatures={betaFeatures}
                     onBetaFeatureToggle={toggleBetaFeature}
                   />
+                </TabsContent>
+
+                <TabsContent value="themes">
+                  <ThemesTab />
                 </TabsContent>
 
                 <TabsContent value="fonts">

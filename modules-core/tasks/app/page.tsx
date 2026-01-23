@@ -79,9 +79,9 @@ const formatTaskAge = (createdAt: string) => {
 const getTaskAgeColor = (createdAt: string, isStarred: boolean = false) => {
   const days = calculateTaskAge(createdAt)
   if (days > 4) {
-    return "text-red-600"
+    return "text-destructive"
   }
-  return isStarred ? "text-gray-300" : "text-gray-600"
+  return isStarred ? "text-gray-300" : "text-muted-foreground"
 }
 
 const getProjectName = (projectId: string | null | undefined, projects: MajorProject[]): string | null => {
@@ -419,10 +419,10 @@ export default function TasksPage() {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" className="bg-white" onClick={() => router.push("/tasks/radar")}>
+                <Button variant="outline" onClick={() => router.push("/tasks/radar")}>
                   Radar
                 </Button>
-                <Button className="bg-black hover:bg-gray-800" onClick={() => router.push("/tasks/add")}>
+                <Button onClick={() => router.push("/tasks/add")}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add Task
                 </Button>
@@ -431,7 +431,7 @@ export default function TasksPage() {
 
             {/* Filters and Search */}
             <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-1 p-1 bg-gray-200/75 rounded-lg">
+              <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
                 {filters.map((filter) => (
                   <Button
                     key={filter}
@@ -439,7 +439,7 @@ export default function TasksPage() {
                     size="sm"
                     onClick={() => setActiveFilter(filter)}
                     className={`h-8 px-4 rounded-md transition-colors ${
-                      activeFilter === filter ? "bg-white text-gray-800 shadow-sm" : "text-gray-600 hover:bg-gray-200"
+                      activeFilter === filter ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"
                     }`}
                   >
                     {filter}
@@ -449,22 +449,22 @@ export default function TasksPage() {
 
               <div className="flex items-center gap-2">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                   <Input
                     placeholder="Search tasks..."
-                    className="pl-10 w-64 bg-white"
+                    className="pl-10 w-64"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
-                <Button variant="outline" size="icon" className="bg-white">
+                <Button variant="outline" size="icon">
                   <Filter className="w-4 h-4" />
                 </Button>
-                <div className="flex items-center rounded-lg border bg-white">
+                <div className="flex items-center rounded-lg border bg-card">
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={`rounded-r-none ${viewMode === "list" ? "bg-gray-100" : ""}`}
+                    className={`rounded-r-none ${viewMode === "list" ? "bg-muted" : ""}`}
                     onClick={() => setViewMode("list")}
                   >
                     <List className="w-4 h-4" />
@@ -472,7 +472,7 @@ export default function TasksPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={`border-x ${viewMode === "card" ? "bg-gray-100" : ""}`}
+                    className={`border-x ${viewMode === "card" ? "bg-muted" : ""}`}
                     onClick={() => setViewMode("card")}
                   >
                     <Grid3X3 className="w-4 h-4" />
@@ -480,7 +480,7 @@ export default function TasksPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={`border-x ${viewMode === "kanban" ? "bg-gray-100" : ""}`}
+                    className={`border-x ${viewMode === "kanban" ? "bg-muted" : ""}`}
                     onClick={() => setViewMode("kanban")}
                   >
                     <Columns className="w-4 h-4" />
@@ -488,7 +488,7 @@ export default function TasksPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={`rounded-l-none ${viewMode === "table" ? "bg-gray-100" : ""}`}
+                    className={`rounded-l-none ${viewMode === "table" ? "bg-muted" : ""}`}
                     onClick={() => setViewMode("table")}
                   >
                     <Table className="w-4 h-4" />
@@ -500,12 +500,12 @@ export default function TasksPage() {
             {/* Task List/Grid/Kanban/Table */}
             {viewMode === "table" ? (
               /* Table View */
-              <div className="bg-white rounded-lg border overflow-hidden">
+              <div className="bg-card rounded-lg border overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-50 border-b">
+                    <thead className="bg-muted border-b">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           <input
                             type="checkbox"
                             className="w-4 h-4 rounded border-gray-300"
@@ -518,36 +518,36 @@ export default function TasksPage() {
                             }}
                           />
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           Task
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           Assignees
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           Due Date
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           Status
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           Priority
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           Project
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           Progress
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           Age
                         </th>
-                        <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        <th className="px-6 py-3 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                           Actions
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-card divide-y divide-border">
                       {filteredTasks.map((task, index) => {
                         // Check if we need to add spacing (transition from pinned to non-pinned)
                         const prevTask = index > 0 ? filteredTasks[index - 1] : null
@@ -557,13 +557,13 @@ export default function TasksPage() {
                           <>
                             {needsSpacing && (
                               <tr key={`spacer-${task.id}`} className="h-[30px]">
-                                <td colSpan={7} className="bg-gray-50/30" />
+                                <td colSpan={7} className="bg-muted/30" />
                               </tr>
                             )}
                             <tr
                               key={task.id}
-                              className={`hover:bg-gray-50 transition-colors ${
-                                task.pinned ? "bg-blue-50/50" : ""
+                              className={`hover:bg-muted transition-colors ${
+                                task.pinned ? "bg-primary/5" : ""
                               } ${task.completed ? "opacity-60" : ""} ${
                                 fadingTasks.has(task.id) ? "task-fade-out" : ""
                               }`}
@@ -583,12 +583,12 @@ export default function TasksPage() {
                                 className="transition-colors"
                               >
                                 <Pin
-                                  className={`w-4 h-4 ${task.pinned ? "text-[hsl(var(--primary))]" : "text-gray-300"}`}
+                                  className={`w-4 h-4 ${task.pinned ? "text-[hsl(var(--primary))]" : "text-muted-foreground"}`}
                                   fill={task.pinned ? "hsl(var(--primary))" : "none"}
                                 />
                               </button>
                               <span className={`font-medium text-sm ${
-                                task.completed ? "line-through text-gray-500" : "text-gray-900"
+                                task.completed ? "line-through text-muted-foreground" : "text-foreground"
                               }`}>
                                 {task.title.length > 25 ? task.title.substring(0, 25) + '...' : task.title}
                               </span>
@@ -600,18 +600,18 @@ export default function TasksPage() {
                                 task.assignees.map((name: string) => (
                                   <span
                                     key={name}
-                                    className="px-2 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-700"
+                                    className="px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground"
                                   >
                                     {name}
                                   </span>
                                 ))
                               ) : (
-                                <span className="text-xs text-gray-400">—</span>
+                                <span className="text-xs text-muted-foreground">—</span>
                               )}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                               <Calendar className="w-4 h-4" />
                               <span>{formatDate(task.due_date)}</span>
                             </div>
@@ -648,7 +648,7 @@ export default function TasksPage() {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-2">
-                              <div className="flex-1 bg-gray-200 rounded-full h-2 max-w-[80px]">
+                              <div className="flex-1 bg-muted rounded-full h-2 max-w-[80px]">
                                 <div
                                   className="bg-blue-600 h-2 rounded-full transition-all"
                                   style={{
@@ -656,7 +656,7 @@ export default function TasksPage() {
                                   }}
                                 />
                               </div>
-                              <span className="text-xs text-gray-600 whitespace-nowrap">
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">
                                 {task.subtasks_completed}/{task.subtasks_total}
                               </span>
                             </div>
@@ -678,14 +678,14 @@ export default function TasksPage() {
                                 }}
                               >
                                 <Pin
-                                  className={`w-4 h-4 ${task.pinned ? "text-[hsl(var(--primary))]" : "text-gray-300 hover:text-[hsl(var(--primary))]"}`}
+                                  className={`w-4 h-4 ${task.pinned ? "text-[hsl(var(--primary))]" : "text-muted-foreground hover:text-[hsl(var(--primary))]"}`}
                                   fill={task.pinned ? "hsl(var(--primary))" : "none"}
                                 />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                                className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-muted"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   router.push(`/tasks/edit/${task.id}`)
@@ -696,7 +696,7 @@ export default function TasksPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleDeleteTask(task.id)
@@ -718,7 +718,7 @@ export default function TasksPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Pinned Column */}
                 <div
-                  className="bg-gray-50 rounded-lg p-4"
+                  className="bg-muted rounded-lg p-4"
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleKanbanDrop(e, "pinned")}
                 >
@@ -733,7 +733,7 @@ export default function TasksPage() {
                         draggable
                         onDragStart={(e) => handleDragStart(e, task.id)}
                         onDragEnd={handleDragEnd}
-                        className={`p-3 bg-white rounded-md shadow-sm hover:shadow-md transition-all cursor-move ${
+                        className={`p-3 bg-card rounded-md shadow-sm hover:shadow-md transition-all cursor-move ${
                           draggedTask === task.id ? "opacity-50" : ""
                         } ${fadingTasks.has(task.id) ? "task-fade-out" : ""}`}
                       >
@@ -746,7 +746,7 @@ export default function TasksPage() {
                             className="w-4 h-4 rounded border-gray-300"
                           />
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Calendar className="w-3 h-3" />
                           <span>{formatDate(task.due_date)}</span>
                         </div>
@@ -771,7 +771,7 @@ export default function TasksPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                            className="h-6 w-6 text-muted-foreground hover:text-primary hover:bg-muted"
                             onClick={(e) => {
                               e.stopPropagation()
                               router.push(`/tasks/edit/${task.id}`)
@@ -782,7 +782,7 @@ export default function TasksPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                             onClick={(e) => {
                               e.stopPropagation()
                               handleDeleteTask(task.id)
@@ -798,7 +798,7 @@ export default function TasksPage() {
 
                 {/* High Priority Column */}
                 <div
-                  className="bg-gray-50 rounded-lg p-4"
+                  className="bg-muted rounded-lg p-4"
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleKanbanDrop(e, "high")}
                 >
@@ -813,7 +813,7 @@ export default function TasksPage() {
                         draggable
                         onDragStart={(e) => handleDragStart(e, task.id)}
                         onDragEnd={handleDragEnd}
-                        className={`p-3 bg-white rounded-md shadow-sm hover:shadow-md transition-all cursor-move ${
+                        className={`p-3 bg-card rounded-md shadow-sm hover:shadow-md transition-all cursor-move ${
                           draggedTask === task.id ? "opacity-50" : ""
                         } ${fadingTasks.has(task.id) ? "task-fade-out" : ""}`}
                       >
@@ -826,7 +826,7 @@ export default function TasksPage() {
                             className="w-4 h-4 rounded border-gray-300"
                           />
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Calendar className="w-3 h-3" />
                           <span>{formatDate(task.due_date)}</span>
                         </div>
@@ -851,7 +851,7 @@ export default function TasksPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                            className="h-6 w-6 text-muted-foreground hover:text-primary hover:bg-muted"
                             onClick={(e) => {
                               e.stopPropagation()
                               router.push(`/tasks/edit/${task.id}`)
@@ -862,7 +862,7 @@ export default function TasksPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                             onClick={(e) => {
                               e.stopPropagation()
                               handleDeleteTask(task.id)
@@ -878,7 +878,7 @@ export default function TasksPage() {
 
                 {/* Medium Priority Column */}
                 <div
-                  className="bg-gray-50 rounded-lg p-4"
+                  className="bg-muted rounded-lg p-4"
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleKanbanDrop(e, "medium")}
                 >
@@ -893,7 +893,7 @@ export default function TasksPage() {
                         draggable
                         onDragStart={(e) => handleDragStart(e, task.id)}
                         onDragEnd={handleDragEnd}
-                        className={`p-3 bg-white rounded-md shadow-sm hover:shadow-md transition-all cursor-move ${
+                        className={`p-3 bg-card rounded-md shadow-sm hover:shadow-md transition-all cursor-move ${
                           draggedTask === task.id ? "opacity-50" : ""
                         } ${fadingTasks.has(task.id) ? "task-fade-out" : ""}`}
                       >
@@ -906,7 +906,7 @@ export default function TasksPage() {
                             className="w-4 h-4 rounded border-gray-300"
                           />
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Calendar className="w-3 h-3" />
                           <span>{formatDate(task.due_date)}</span>
                         </div>
@@ -931,7 +931,7 @@ export default function TasksPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                            className="h-6 w-6 text-muted-foreground hover:text-primary hover:bg-muted"
                             onClick={(e) => {
                               e.stopPropagation()
                               router.push(`/tasks/edit/${task.id}`)
@@ -942,7 +942,7 @@ export default function TasksPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                             onClick={(e) => {
                               e.stopPropagation()
                               handleDeleteTask(task.id)
@@ -958,7 +958,7 @@ export default function TasksPage() {
 
                 {/* Low Priority Column */}
                 <div
-                  className="bg-gray-50 rounded-lg p-4"
+                  className="bg-muted rounded-lg p-4"
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleKanbanDrop(e, "low")}
                 >
@@ -973,7 +973,7 @@ export default function TasksPage() {
                         draggable
                         onDragStart={(e) => handleDragStart(e, task.id)}
                         onDragEnd={handleDragEnd}
-                        className={`p-3 bg-white rounded-md shadow-sm hover:shadow-md transition-all cursor-move ${
+                        className={`p-3 bg-card rounded-md shadow-sm hover:shadow-md transition-all cursor-move ${
                           draggedTask === task.id ? "opacity-50" : ""
                         } ${fadingTasks.has(task.id) ? "task-fade-out" : ""}`}
                       >
@@ -986,7 +986,7 @@ export default function TasksPage() {
                             className="w-4 h-4 rounded border-gray-300"
                           />
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-gray-600">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Calendar className="w-3 h-3" />
                           <span>{formatDate(task.due_date)}</span>
                         </div>
@@ -1011,7 +1011,7 @@ export default function TasksPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+                            className="h-6 w-6 text-muted-foreground hover:text-primary hover:bg-muted"
                             onClick={(e) => {
                               e.stopPropagation()
                               router.push(`/tasks/edit/${task.id}`)
@@ -1022,7 +1022,7 @@ export default function TasksPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                             onClick={(e) => {
                               e.stopPropagation()
                               handleDeleteTask(task.id)
@@ -1062,7 +1062,7 @@ export default function TasksPage() {
                           ? "flex flex-col gap-3 p-4 border rounded-lg hover:shadow-md transition-all cursor-move h-full"
                           : "flex items-start gap-4 p-4 border rounded-lg hover:shadow-sm transition-all cursor-move"
                       } ${
-                        task.pinned ? "bg-[#214b88] text-white shadow-lg" : "bg-white border-gray-200"
+                        task.pinned ? "bg-[#214b88] text-white shadow-lg" : "bg-card border-border"
                       } ${draggedTask === task.id ? "opacity-50" : ""} ${task.completed ? "taskdone" : ""} ${fadingTasks.has(task.id) ? "task-fade-out" : ""}`}
                     >
                   {viewMode === "list" ? (
@@ -1078,7 +1078,7 @@ export default function TasksPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
                           <h3
-                            className={`font-medium ${task.completed ? "line-through text-gray-500" : task.pinned ? "text-white" : "text-gray-800"}`}
+                            className={`font-medium ${task.completed ? "line-through text-muted-foreground" : task.pinned ? "text-white" : "text-foreground"}`}
                           >
                             {task.title}
                           </h3>
@@ -1087,20 +1087,20 @@ export default function TasksPage() {
                             className="transition-colors"
                           >
                             <Pin
-                              className={`w-5 h-5 ${task.pinned ? "text-white" : "text-gray-400 hover:text-[hsl(var(--primary))]"}`}
+                              className={`w-5 h-5 ${task.pinned ? "text-white" : "text-muted-foreground hover:text-[hsl(var(--primary))]"}`}
                               fill={task.pinned ? "white" : "none"}
                             />
                           </button>
                         </div>
 
                         <div
-                          className={`flex items-center flex-wrap gap-x-4 gap-y-2 text-sm ${task.pinned ? "text-gray-300" : "text-gray-600"}`}
+                          className={`flex items-center flex-wrap gap-x-4 gap-y-2 text-sm ${task.pinned ? "text-gray-300" : "text-muted-foreground"}`}
                         >
                           <div className="flex items-center gap-2">
                             {task.assignees.map((name: string) => (
                               <span
                                 key={name}
-                                className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.pinned ? "bg-white/10 text-gray-200" : "bg-gray-100 text-gray-700"}`}
+                                className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.pinned ? "bg-white/10 text-gray-200" : "bg-muted text-muted-foreground"}`}
                               >
                                 {name}
                               </span>
@@ -1162,14 +1162,14 @@ export default function TasksPage() {
                           }}
                         >
                           <Pin
-                            className={`w-4 h-4 ${task.pinned ? "text-white" : "text-gray-300 hover:text-[hsl(var(--primary))]"}`}
+                            className={`w-4 h-4 ${task.pinned ? "text-white" : "text-muted-foreground hover:text-[hsl(var(--primary))]"}`}
                             fill={task.pinned ? "white" : "none"}
                           />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-blue-600 hover:bg-blue-50"}`}
+                          className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-muted-foreground hover:text-primary hover:bg-muted"}`}
                           onClick={(e) => {
                             e.stopPropagation()
                             router.push(`/tasks/edit/${task.id}`)
@@ -1180,7 +1180,7 @@ export default function TasksPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-red-600 hover:bg-red-50"}`}
+                          className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-muted-foreground hover:text-destructive hover:bg-destructive/10"}`}
                           onClick={(e) => {
                             e.stopPropagation()
                             handleDeleteTask(task.id)
@@ -1205,7 +1205,7 @@ export default function TasksPage() {
                           className="transition-colors"
                         >
                           <Pin
-                            className={`w-5 h-5 ${task.pinned ? "text-white" : "text-gray-400 hover:text-[hsl(var(--primary))]"}`}
+                            className={`w-5 h-5 ${task.pinned ? "text-white" : "text-muted-foreground hover:text-[hsl(var(--primary))]"}`}
                             fill={task.pinned ? "white" : "none"}
                           />
                         </button>
@@ -1213,18 +1213,18 @@ export default function TasksPage() {
 
                       <div className="flex-1">
                         <h3
-                          className={`font-medium text-base mb-3 line-clamp-2 ${task.completed ? "line-through text-gray-500" : task.pinned ? "text-white" : "text-gray-800"}`}
+                          className={`font-medium text-base mb-3 line-clamp-2 ${task.completed ? "line-through text-muted-foreground" : task.pinned ? "text-white" : "text-foreground"}`}
                         >
                           {task.title}
                         </h3>
 
-                        <div className={`space-y-2 text-sm ${task.pinned ? "text-gray-300" : "text-gray-600"}`}>
+                        <div className={`space-y-2 text-sm ${task.pinned ? "text-gray-300" : "text-muted-foreground"}`}>
                           {task.assignees.length > 0 && (
                             <div className="flex flex-wrap gap-1">
                               {task.assignees.map((name: string) => (
                                 <span
                                   key={name}
-                                  className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.pinned ? "bg-white/10 text-gray-200" : "bg-gray-100 text-gray-700"}`}
+                                  className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.pinned ? "bg-white/10 text-gray-200" : "bg-muted text-muted-foreground"}`}
                                 >
                                   {name}
                                 </span>
@@ -1290,14 +1290,14 @@ export default function TasksPage() {
                             }}
                           >
                             <Pin
-                              className={`w-4 h-4 ${task.pinned ? "text-white" : "text-gray-300 hover:text-[hsl(var(--primary))]"}`}
+                              className={`w-4 h-4 ${task.pinned ? "text-white" : "text-muted-foreground hover:text-[hsl(var(--primary))]"}`}
                               fill={task.pinned ? "white" : "none"}
                             />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-blue-600 hover:bg-blue-50"}`}
+                            className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-muted-foreground hover:text-primary hover:bg-muted"}`}
                             onClick={(e) => {
                               e.stopPropagation()
                               router.push(`/tasks/edit/${task.id}`)
@@ -1308,7 +1308,7 @@ export default function TasksPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-red-600 hover:bg-red-50"}`}
+                            className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-muted-foreground hover:text-destructive hover:bg-destructive/10"}`}
                             onClick={(e) => {
                               e.stopPropagation()
                               handleDeleteTask(task.id)
@@ -1328,7 +1328,7 @@ export default function TasksPage() {
             )}
 
       {filteredTasks.length === 0 && !loading && (
-        <div className="text-center py-12 text-gray-500">
+        <div className="text-center py-12 text-muted-foreground">
           {searchQuery || activeFilter !== "All"
             ? "No tasks found matching your criteria."
             : "No tasks yet. Click 'Add Task' to get started!"}

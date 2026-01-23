@@ -58,30 +58,37 @@ export function GeneralTab({
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div>
                   <Label htmlFor="theme-pastel" className="text-base">Pastel Theme</Label>
-                  <p className="text-sm text-muted-foreground">Soft pastel backgrounds for a gentle interface.</p>
+                  <p className="text-sm text-muted-foreground">Warm cream and peach tones for a gentle interface.</p>
                 </div>
                 <RadioGroupItem id="theme-pastel" value="pastel" />
               </div>
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div>
                   <Label htmlFor="theme-light" className="text-base">Light Theme</Label>
-                  <p className="text-sm text-muted-foreground">Clean white/transparent backgrounds for minimal look.</p>
+                  <p className="text-sm text-muted-foreground">Clean white with cool blue accents.</p>
                 </div>
                 <RadioGroupItem id="theme-light" value="light" />
               </div>
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div>
                   <Label htmlFor="theme-blueprint" className="text-base">Blueprint Theme</Label>
-                  <p className="text-sm text-muted-foreground">Professional blue theme for focused work.</p>
+                  <p className="text-sm text-muted-foreground">Professional deep blue for focused work.</p>
                 </div>
                 <RadioGroupItem id="theme-blueprint" value="blueprint" />
               </div>
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div>
                   <Label htmlFor="theme-dark" className="text-base">Dark Theme</Label>
-                  <p className="text-sm text-muted-foreground">Reduce glare during late sessions.</p>
+                  <p className="text-sm text-muted-foreground">OLED black with emerald green accents.</p>
                 </div>
                 <RadioGroupItem id="theme-dark" value="dark" />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div>
+                  <Label htmlFor="theme-terminal" className="text-base">Terminal Theme</Label>
+                  <p className="text-sm text-muted-foreground">Retro mainframe aesthetic with phosphor green.</p>
+                </div>
+                <RadioGroupItem id="theme-terminal" value="terminal" />
               </div>
             </RadioGroup>
             <div className="rounded-lg bg-muted p-4">

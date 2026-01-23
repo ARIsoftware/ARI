@@ -15,8 +15,13 @@ import {
  * NotepadTopBarIcon - Renders a sticky note icon in the top bar
  * that opens the Notepad sliding panel when clicked
  */
-export function NotepadTopBarIcon() {
+export function NotepadTopBarIcon({ isDragMode = false }: { isDragMode?: boolean }) {
   const [isNotepadOpen, setIsNotepadOpen] = useState(false)
+
+  // Apple-esque drag mode styling: subtle ring with glow effect
+  const dragItemClass = isDragMode
+    ? "ring-1 ring-white/40 shadow-[0_0_8px_rgba(255,255,255,0.15)] rounded-lg"
+    : ""
 
   return (
     <>
@@ -26,8 +31,8 @@ export function NotepadTopBarIcon() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-white hover:bg-white/10"
-              onClick={() => setIsNotepadOpen(true)}
+              className={`h-8 w-8 text-white hover:bg-white/10 ${dragItemClass}`}
+              onClick={isDragMode ? undefined : () => setIsNotepadOpen(true)}
             >
               <StickyNote className="h-5 w-5" />
             </Button>
