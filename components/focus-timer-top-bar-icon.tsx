@@ -25,9 +25,14 @@ if (typeof window !== 'undefined' && (window as any).globalTimerState) {
  * FocusTimerTopBarIcon - Clock icon for the top bar that opens the focus timer dialog
  * Positioned to the left of the Play button in TopBarIcons
  */
-export function FocusTimerTopBarIcon() {
+export function FocusTimerTopBarIcon({ isDragMode = false }: { isDragMode?: boolean }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isTimerActive, setIsTimerActive] = useState(false)
+
+  // Apple-esque drag mode styling: subtle ring with glow effect
+  const dragItemClass = isDragMode
+    ? "ring-1 ring-white/40 shadow-[0_0_8px_rgba(255,255,255,0.15)] rounded-lg"
+    : ""
 
   useEffect(() => {
     // Initialize state from global
@@ -51,8 +56,8 @@ export function FocusTimerTopBarIcon() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"
-            onClick={() => setIsDialogOpen(true)}
+            className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+            onClick={isDragMode ? undefined : () => setIsDialogOpen(true)}
           >
             {isTimerActive ? (
               <StopCircle className="h-5 w-5" />

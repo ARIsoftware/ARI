@@ -77,7 +77,7 @@ export default function DashboardPage() {
   return (
     <>
       {isDataLoading && (
-        <div className="absolute inset-0 bg-white/50 dark:bg-gray-900/50 z-10 flex items-center justify-center">
+        <div className="absolute inset-0 bg-background/50 z-10 flex items-center justify-center">
           <Loader2 className="w-6 h-6 animate-spin" />
         </div>
       )}
@@ -296,7 +296,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Right Sidebar - Recent Activity */}
-        <div className="w-80 bg-white dark:bg-gray-900 p-6 pl-3">
+        <div className="w-80 bg-background p-6 pl-3">
           <RecentActivityFeed activities={recentActivity} isLoading={isDataLoading} />
         </div>
       </div>

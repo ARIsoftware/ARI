@@ -1,5 +1,6 @@
 export { GeneralTab } from "./GeneralTab"
 export { FontsTab } from "./FontsTab"
+export { ThemesTab } from "./ThemesTab"
 export { KeybindingsTab } from "./KeybindingsTab"
 export { NotificationsTab } from "./NotificationsTab"
 export { SecurityTab } from "./SecurityTab"

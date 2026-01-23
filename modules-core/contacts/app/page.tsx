@@ -80,8 +80,8 @@ export default function ContactsPage() {
                   <Filter className="w-4 h-4" />
                   Categories
                 </Button>
-                <Button 
-                  className="bg-black hover:bg-gray-800 flex items-center gap-2"
+                <Button
+                  className="flex items-center gap-2"
                   onClick={() => router.push("/contacts/new/edit")}
                 >
                   <Plus className="w-4 h-4" />
@@ -92,27 +92,27 @@ export default function ContactsPage() {
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-white p-6 rounded-lg border">
-                <p className="text-sm text-gray-600 mb-2">Total Contacts</p>
+              <div className="bg-card p-6 rounded-lg border">
+                <p className="text-sm text-muted-foreground mb-2">Total Contacts</p>
                 <p className="text-3xl font-medium">{contacts.length}</p>
               </div>
-              <div className="bg-white p-6 rounded-lg border">
-                <p className="text-sm text-gray-600 mb-2">Categories</p>
+              <div className="bg-card p-6 rounded-lg border">
+                <p className="text-sm text-muted-foreground mb-2">Categories</p>
                 <p className="text-3xl font-medium">5</p>
               </div>
-              <div className="bg-white p-6 rounded-lg border">
-                <p className="text-sm text-gray-600 mb-2">This Month</p>
+              <div className="bg-card p-6 rounded-lg border">
+                <p className="text-sm text-muted-foreground mb-2">This Month</p>
                 <p className="text-3xl font-medium">
                   {contacts.filter(c => {
                     const createdDate = new Date(c.created_at)
                     const now = new Date()
-                    return createdDate.getMonth() === now.getMonth() && 
+                    return createdDate.getMonth() === now.getMonth() &&
                            createdDate.getFullYear() === now.getFullYear()
                   }).length}
                 </p>
               </div>
-              <div className="bg-white p-6 rounded-lg border">
-                <p className="text-sm text-gray-600 mb-2">Filtered Results</p>
+              <div className="bg-card p-6 rounded-lg border">
+                <p className="text-sm text-muted-foreground mb-2">Filtered Results</p>
                 <p className="text-3xl font-medium">{filteredContacts.length}</p>
               </div>
             </div>
@@ -120,16 +120,16 @@ export default function ContactsPage() {
             {/* Search and Filter Bar */}
             <div className="flex items-center gap-4">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
                   placeholder="Search contacts by name, email, or phone..."
-                  className="pl-10 bg-white"
+                  className="pl-10"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-[180px] bg-white">
+                <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
@@ -140,19 +140,19 @@ export default function ContactsPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <div className="flex items-center rounded-lg border bg-white">
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className={`rounded-r-none ${viewMode === "grid" ? "bg-gray-100" : ""}`}
+              <div className="flex items-center rounded-lg border bg-card">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={`rounded-r-none ${viewMode === "grid" ? "bg-muted" : ""}`}
                   onClick={() => setViewMode("grid")}
                 >
                   <Grid3X3 className="w-4 h-4" />
                 </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className={`rounded-l-none ${viewMode === "list" ? "bg-gray-100" : ""}`}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={`rounded-l-none ${viewMode === "list" ? "bg-muted" : ""}`}
                   onClick={() => setViewMode("list")}
                 >
                   <List className="w-4 h-4" />
@@ -164,7 +164,7 @@ export default function ContactsPage() {
             {viewMode === "grid" ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {filteredContacts.map((contact) => (
-                  <div key={contact.id} className="bg-white p-6 rounded-lg border hover:shadow-md transition-shadow">
+                  <div key={contact.id} className="bg-card p-6 rounded-lg border hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
                         <div className={`w-12 h-12 rounded-full ${getAvatarColor(contact.category)} text-white flex items-center justify-center font-medium`}>
@@ -187,7 +187,7 @@ export default function ContactsPage() {
                     
                     <h3 className="font-medium text-lg mb-2">{contact.name}</h3>
                     
-                    <div className="space-y-2 text-sm text-gray-600 mb-4">
+                    <div className="space-y-2 text-sm text-muted-foreground mb-4">
                       <div className="flex items-center gap-2">
                         <Phone className="w-4 h-4" />
                         <span>{contact.phone}</span>
@@ -198,7 +198,7 @@ export default function ContactsPage() {
                       </div>
                     </div>
                     
-                    <p className="text-sm text-gray-500 line-clamp-2 mb-2">
+                    <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
                       {contact.description || "No description"}
                     </p>
                     
@@ -224,7 +224,7 @@ export default function ContactsPage() {
             ) : (
               <div className="space-y-3">
                 {filteredContacts.map((contact) => (
-                  <div key={contact.id} className="bg-white p-4 rounded-lg border hover:shadow-sm transition-shadow flex items-center gap-4">
+                  <div key={contact.id} className="bg-card p-4 rounded-lg border hover:shadow-sm transition-shadow flex items-center gap-4">
                     <div className={`w-12 h-12 rounded-full ${getAvatarColor(contact.category)} text-white flex items-center justify-center font-medium flex-shrink-0`}>
                       {getInitials(contact.name)}
                     </div>
@@ -238,7 +238,7 @@ export default function ContactsPage() {
                         </Badge>
                       </div>
                       
-                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                         <div className="flex items-center gap-1">
                           <Phone className="w-4 h-4" />
                           <span>{contact.phone}</span>
@@ -249,7 +249,7 @@ export default function ContactsPage() {
                         </div>
                       </div>
                       
-                      <p className="text-sm text-gray-500 mt-1">
+                      <p className="text-sm text-muted-foreground mt-1">
                         {contact.description || "No description"}
                       </p>
                       {contact.next_contact_date && (
@@ -281,7 +281,7 @@ export default function ContactsPage() {
             )}
 
             {filteredContacts.length === 0 && !loading && (
-              <div className="text-center py-12 text-gray-500">
+              <div className="text-center py-12 text-muted-foreground">
                 {searchQuery || selectedCategory !== "All Categories"
                   ? "No contacts found matching your criteria."
                   : "No contacts yet. Click 'Add Contact' to get started!"}

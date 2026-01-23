@@ -8,6 +8,9 @@ interface DragDropModeContextType {
   setDragMode: (mode: boolean) => void
   pendingOrder: Record<string, number> | null
   setPendingOrder: (order: Record<string, number> | null) => void
+  pendingIconOrder: Record<string, number> | null
+  setPendingIconOrder: (order: Record<string, number> | null) => void
+  iconOrder: Record<string, number> | null
   saveOrder: () => Promise<void>
 }
 
@@ -16,10 +19,33 @@ const DragDropModeContext = createContext<DragDropModeContextType | null>(null)
 export function DragDropModeProvider({ children }: { children: React.ReactNode }) {
   const [isDragMode, setIsDragMode] = useState(false)
   const [pendingOrder, setPendingOrder] = useState<Record<string, number> | null>(null)
+  const [pendingIconOrder, setPendingIconOrder] = useState<Record<string, number> | null>(null)
+  const [iconOrder, setIconOrder] = useState<Record<string, number> | null>(null)
 
   // Use ref to access pendingOrder in saveOrder without stale closure
   const pendingOrderRef = useRef<Record<string, number> | null>(null)
   pendingOrderRef.current = pendingOrder
+
+  // Use ref to access pendingIconOrder in saveOrder without stale closure
+  const pendingIconOrderRef = useRef<Record<string, number> | null>(null)
+  pendingIconOrderRef.current = pendingIconOrder
+
+  // Load icon order on mount
+  useEffect(() => {
+    fetch("/api/modules/order")
+      .then(response => {
+        if (response.ok) return response.json()
+        throw new Error("Failed to fetch icon order")
+      })
+      .then(data => {
+        if (data.iconOrder) {
+          setIconOrder(data.iconOrder)
+        }
+      })
+      .catch(error => {
+        console.error("[DragDrop] Failed to load icon order:", error)
+      })
+  }, [])
 
   // Keyboard shortcut: Cmd+D to toggle drag mode
   useEffect(() => {
@@ -36,36 +62,48 @@ export function DragDropModeProvider({ children }: { children: React.ReactNode }
 
   const setDragMode = useCallback((mode: boolean) => {
     setIsDragMode(mode)
-    // Reset pending order when exiting drag mode
+    // Reset pending orders when exiting drag mode
     if (!mode) {
       setPendingOrder(null)
+      setPendingIconOrder(null)
     }
   }, [])
 
   // Optimistic save - fire and forget, don't block UI
   const saveOrder = useCallback(async () => {
-    const orderToSave = pendingOrderRef.current
-    if (!orderToSave) {
-      console.log("[DragDrop] No pending order to save")
+    const moduleOrderToSave = pendingOrderRef.current
+    const iconOrderToSave = pendingIconOrderRef.current
+
+    if (!moduleOrderToSave && !iconOrderToSave) {
+      console.log("[DragDrop] No pending orders to save")
       return
     }
 
-    console.log("[DragDrop] Saving order:", orderToSave)
+    console.log("[DragDrop] Saving orders:", { moduleOrder: moduleOrderToSave, iconOrder: iconOrderToSave })
+
+    // Build request body with only the orders that have changes
+    const body: { moduleOrder?: Record<string, number>; iconOrder?: Record<string, number> } = {}
+    if (moduleOrderToSave) body.moduleOrder = moduleOrderToSave
+    if (iconOrderToSave) body.iconOrder = iconOrderToSave
 
     // Fire the save request in the background - don't await
     fetch("/api/modules/order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ moduleOrder: orderToSave }),
+      body: JSON.stringify(body),
     })
       .then(response => {
         if (!response.ok) {
-          throw new Error("Failed to save module order")
+          throw new Error("Failed to save order")
         }
-        console.log("[DragDrop] Order saved successfully")
+        console.log("[DragDrop] Orders saved successfully")
+        // Update local icon order state if we saved icon order
+        if (iconOrderToSave) {
+          setIconOrder(iconOrderToSave)
+        }
       })
       .catch(error => {
-        console.error("[DragDrop] Failed to save module order:", error)
+        console.error("[DragDrop] Failed to save order:", error)
         // Could show a toast notification here on error
       })
   }, [])
@@ -77,6 +115,9 @@ export function DragDropModeProvider({ children }: { children: React.ReactNode }
         setDragMode,
         pendingOrder,
         setPendingOrder,
+        pendingIconOrder,
+        setPendingIconOrder,
+        iconOrder,
         saveOrder,
       }}
     >
