@@ -160,9 +160,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     )
   }
 
-  // Drag mode styling class
+  // Apple-esque drag mode styling: subtle ring with glow effect (ring-inset keeps it within bounds)
   const dragModeClass = isDragMode
-    ? "outline outline-3 outline-dashed outline-[lightblue] mx-[3px] my-[3px] w-[95%]"
+    ? "ring-1 ring-inset ring-blue-400/50 shadow-[0_0_12px_rgba(96,165,250,0.2)] rounded-lg mx-2 my-1"
     : ""
 
   // Otherwise show the main menu

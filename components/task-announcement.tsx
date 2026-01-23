@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import {
   ArrowUpRight,
@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import { FocusTimerTopBarIcon } from "@/components/focus-timer-top-bar-icon"
 import { NotepadTopBarIcon } from "@/components/notepad-top-bar-icon"
+import { ThemePickerDropdown } from "@/components/theme-picker-dropdown"
 import { useModules } from "@/lib/modules/module-hooks"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
 import {
@@ -60,8 +61,20 @@ const dmSans = DM_Sans({
   weight: ["400", "500", "600", "700"],
 })
 
+// Define the order of built-in icons
+const BUILTIN_ICONS = [
+  { id: "icon-theme", label: "Theme" },
+  { id: "icon-command", label: "Command" },
+  { id: "icon-settings", label: "Settings" },
+  { id: "icon-modules", label: "Modules" },
+  { id: "icon-notepad", label: "Notepad" },
+  { id: "icon-focus", label: "Focus Timer" },
+  { id: "icon-music", label: "Music" },
+  { id: "icon-logout", label: "Logout" },
+] as const
+
 // Icons component for the top bar
-function TopBarIcons() {
+function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
   const router = useRouter()
   const { session, supabase } = useSupabase()
   const { setOpen: setCommandPaletteOpen } = useCommandPalette()
@@ -69,117 +82,205 @@ function TopBarIcons() {
   const [mounted, setMounted] = useState(false)
   const user = session?.user
   const { modules } = useModules()
+  const { iconOrder, setPendingIconOrder } = useDragDropMode()
+  const containerRef = useRef<HTMLDivElement>(null)
+  const swapyRef = useRef<any>(null)
 
   // Filter modules that have topBarIcon configured
   const moduleIcons = modules.filter(m => m.topBarIcon)
+
+  // Build all icons list with their IDs
+  const allIcons = [
+    ...moduleIcons.map(m => ({ id: `module-${m.id}`, type: "module" as const, module: m })),
+    ...BUILTIN_ICONS.map(icon => ({ id: icon.id, type: "builtin" as const, builtinId: icon.id })),
+  ]
+
+  // Sort icons by saved order (lower number = earlier position)
+  const sortedIcons = [...allIcons].sort((a, b) => {
+    const orderA = iconOrder?.[a.id] ?? 50
+    const orderB = iconOrder?.[b.id] ?? 50
+    return orderA - orderB
+  })
 
   // Only render portals after mounting to avoid hydration issues
   useEffect(() => {
     setMounted(true)
   }, [])
 
+  // Initialize Swapy when drag mode is active
+  useEffect(() => {
+    if (isDragMode && containerRef.current && mounted) {
+      // Dynamic import of Swapy to avoid SSR issues
+      import("swapy").then(({ createSwapy }) => {
+        // Small delay to ensure DOM is ready
+        const timer = setTimeout(() => {
+          if (containerRef.current) {
+            swapyRef.current = createSwapy(containerRef.current, {
+              animation: "dynamic",
+              swapMode: "hover",
+            })
+
+            swapyRef.current.onSwapEnd((event: any) => {
+              // Convert swap result to icon order mapping
+              const newOrder: Record<string, number> = {}
+              event.slotItemMap.asArray.forEach((item: any, index: number) => {
+                if (item.item) {
+                  newOrder[item.item] = (index + 1) * 10 // Priority 10, 20, 30, etc.
+                }
+              })
+              setPendingIconOrder(newOrder)
+            })
+          }
+        }, 100)
+
+        return () => {
+          clearTimeout(timer)
+          swapyRef.current?.destroy()
+          swapyRef.current = null
+        }
+      })
+    }
+
+    return () => {
+      swapyRef.current?.destroy()
+      swapyRef.current = null
+    }
+  }, [isDragMode, mounted, setPendingIconOrder])
+
   const handleSignOut = async () => {
     await authClient.signOut()
     router.push("/sign-in")
   }
 
+  // Apple-esque drag mode styling: subtle ring with glow effect
+  const dragItemClass = isDragMode
+    ? "ring-1 ring-white/40 shadow-[0_0_8px_rgba(255,255,255,0.15)] rounded-lg"
+    : ""
+
+  // Render a built-in icon by its ID
+  const renderBuiltinIcon = (iconId: string) => {
+    switch (iconId) {
+      case "icon-theme":
+        return <ThemePickerDropdown isDragMode={isDragMode} />
+      case "icon-command":
+        return (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+            onClick={isDragMode ? undefined : () => setCommandPaletteOpen(true)}
+          >
+            <Command className="h-5 w-5" />
+          </Button>
+        )
+      case "icon-settings":
+        return (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+            onClick={isDragMode ? undefined : () => router.push("/settings")}
+          >
+            <Settings className="h-5 w-5" />
+          </Button>
+        )
+      case "icon-modules":
+        return (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+            onClick={isDragMode ? undefined : () => router.push("/modules")}
+          >
+            <Package className="h-5 w-5" />
+          </Button>
+        )
+      case "icon-notepad":
+        return <NotepadTopBarIcon isDragMode={isDragMode} />
+      case "icon-focus":
+        return <FocusTimerTopBarIcon isDragMode={isDragMode} />
+      case "icon-music":
+        return (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+            onClick={isDragMode ? undefined : togglePlayPause}
+            disabled={!isReady && !isDragMode}
+          >
+            {isPlaying ? (
+              <Pause className="h-5 w-5" />
+            ) : (
+              <Play className="h-5 w-5" />
+            )}
+          </Button>
+        )
+      case "icon-logout":
+        return (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+            onClick={isDragMode ? undefined : handleSignOut}
+          >
+            <LogOut className="h-5 w-5" />
+          </Button>
+        )
+      default:
+        return null
+    }
+  }
+
   return (
     <TooltipProvider>
       <div className="flex items-center gap-1">
-        {/* Module icons - rendered first (left side) */}
-        {moduleIcons.map(module => {
-          const Icon = getLucideIcon(module.topBarIcon!.icon)
-          return module.topBarIcon!.tooltip ? (
-            <Tooltip key={module.id}>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"
-                  onClick={() => router.push(module.topBarIcon!.route)}
-                >
-                  <Icon className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{module.topBarIcon!.tooltip}</p>
-              </TooltipContent>
-            </Tooltip>
-          ) : (
-            <Button
-              key={module.id}
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"
-              onClick={() => router.push(module.topBarIcon!.route)}
-            >
-              <Icon className="h-5 w-5" />
-            </Button>
-          )
-        })}
+        {/* Draggable icons container */}
+        <div ref={containerRef} className="flex items-center gap-1">
+          {sortedIcons.map((icon) => (
+            <div key={icon.id} data-swapy-slot={icon.id}>
+              <div data-swapy-item={icon.id}>
+                {icon.type === "module" ? (
+                  // Module icon
+                  (() => {
+                    const module = icon.module
+                    const Icon = getLucideIcon(module.topBarIcon!.icon)
+                    return module.topBarIcon!.tooltip ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+                            onClick={isDragMode ? undefined : () => router.push(module.topBarIcon!.route)}
+                          >
+                            <Icon className="h-5 w-5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{module.topBarIcon!.tooltip}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+                        onClick={isDragMode ? undefined : () => router.push(module.topBarIcon!.route)}
+                      >
+                        <Icon className="h-5 w-5" />
+                      </Button>
+                    )
+                  })()
+                ) : (
+                  // Built-in icon
+                  renderBuiltinIcon(icon.builtinId)
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
 
-        {/* Command - opens command palette */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"
-          onClick={() => setCommandPaletteOpen(true)}
-        >
-          <Command className="h-5 w-5" />
-        </Button>
-
-        {/* Settings */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"
-          onClick={() => router.push("/settings")}
-        >
-          <Settings className="h-5 w-5" />
-        </Button>
-
-        {/* Modules */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"
-          onClick={() => router.push("/modules")}
-        >
-          <Package className="h-5 w-5" />
-        </Button>
-
-        {/* Notepad */}
-        <NotepadTopBarIcon />
-
-        {/* Focus Timer */}
-        <FocusTimerTopBarIcon />
-
-        {/* Music Player */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"
-          onClick={togglePlayPause}
-          disabled={!isReady}
-        >
-          {isPlaying ? (
-            <Pause className="h-5 w-5" />
-          ) : (
-            <Play className="h-5 w-5" />
-          )}
-        </Button>
-
-        {/* Logout */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-white hover:bg-white/10 hover:text-white"
-          onClick={handleSignOut}
-        >
-          <LogOut className="h-5 w-5" />
-        </Button>
-
-        {/* User Avatar - only render DropdownMenu after mounting to avoid portal hydration issues */}
+        {/* User Avatar - NOT draggable, always at the end */}
         {mounted ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -376,18 +477,17 @@ export function TaskAnnouncement() {
   // Show drag mode UI
   if (isDragMode) {
     return (
-      <div className="topbar h-[45px] w-full relative z-50 flex items-center justify-center px-4 bg-blue-900">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute left-4 h-8 w-8 text-white hover:bg-white/10 hover:text-white"
+      <div className="topbar h-[45px] w-full relative z-50 flex items-center justify-between px-4 bg-blue-900">
+        <div className="flex-1" />
+        <button
           onClick={handleExitDragMode}
+          className={`px-4 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/30 text-white font-normal transition-colors cursor-pointer ${dmSans.className}`}
         >
-          <X className="h-5 w-5" />
-        </Button>
-        <span className={`text-white font-medium ${dmSans.className}`}>
-          Drag and drop sidebar items to reorder. Press X to save and exit.
-        </span>
+          Drag items to reorder. Press here to save and exit.
+        </button>
+        <div className="flex-1 flex justify-end">
+          <TopBarIcons isDragMode={true} />
+        </div>
       </div>
     )
   }

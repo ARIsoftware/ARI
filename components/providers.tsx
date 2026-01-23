@@ -11,6 +11,7 @@ import { FeaturesProvider } from "@/lib/features-context"
 import { ModulesProvider } from "@/lib/modules/context"
 import { CommandPaletteProvider } from "@/components/command-palette"
 import { DragDropModeProvider } from "@/components/drag-drop-mode-context"
+import { ThemeProvider } from "@/lib/theme/theme-context"
 import type { ModuleMetadata } from '@/lib/modules/module-types'
 
 // Define types matching Better Auth session structure
@@ -70,20 +71,6 @@ export function Providers({
   // Create supabase client for realtime subscriptions (not for auth)
   const supabase = useMemo(() => createSupabaseClient(), [])
 
-  // Load saved font preference on mount
-  useEffect(() => {
-    const fontMap: Record<string, string> = {
-      'Overpass Mono': '"Overpass Mono", monospace',
-      'Outfit': '"Outfit", sans-serif',
-      'Open Sans': '"Open Sans", sans-serif',
-      'Science Gothic': '"Science Gothic", sans-serif',
-    }
-    const savedFont = localStorage.getItem('ari-font-preference')
-    if (savedFont && fontMap[savedFont]) {
-      document.documentElement.style.setProperty('--font-family', fontMap[savedFont])
-    }
-  }, [])
-
   // Map Better Auth user/session to compatible format
   // Cast to include custom fields (firstName, lastName) defined in auth.ts additionalFields
   type BetterAuthUser = {
@@ -127,20 +114,22 @@ export function Providers({
 
   return (
     <Context.Provider value={{ user, session, isLoading: isPending, supabase }}>
-      <ModulesProvider modules={modules} enabledModules={enabledModules}>
-        <FeaturesProvider initialFeatures={initialFeatures}>
-          <MusicPlayerProvider>
-            <CommandPaletteProvider>
-              <DragDropModeProvider>
-                {children}
-                <Toaster />
-                {/* Only show exercise reminder when user is authenticated */}
-                {user && <ExerciseReminder />}
-              </DragDropModeProvider>
-            </CommandPaletteProvider>
-          </MusicPlayerProvider>
-        </FeaturesProvider>
-      </ModulesProvider>
+      <ThemeProvider>
+        <ModulesProvider modules={modules} enabledModules={enabledModules}>
+          <FeaturesProvider initialFeatures={initialFeatures}>
+            <MusicPlayerProvider>
+              <CommandPaletteProvider>
+                <DragDropModeProvider>
+                  {children}
+                  <Toaster />
+                  {/* Only show exercise reminder when user is authenticated */}
+                  {user && <ExerciseReminder />}
+                </DragDropModeProvider>
+              </CommandPaletteProvider>
+            </MusicPlayerProvider>
+          </FeaturesProvider>
+        </ModulesProvider>
+      </ThemeProvider>
     </Context.Provider>
   )
 }
