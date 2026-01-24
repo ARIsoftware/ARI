@@ -599,7 +599,6 @@ Before trusting your backup system, verify:
 - Prefetching enabled for navigation
 - Middleware for auth checks and security headers
 
-
 ## Project Specific Claude Code Rules
 
 - Never start a server. I will start them, usually on port 3000.
