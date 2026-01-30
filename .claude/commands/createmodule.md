@@ -68,15 +68,24 @@ When approved, create the module following this order:
    - submenu configuration if requested (see Submenu section below)
    - Required dependencies
 3. **Create/update page component** in `app/page.tsx`
-4. **Create API routes** if needed (follow auth patterns from hello-world)
+4. **Create API routes** if needed:
+   - Use `const { user, withRLS } = await getAuthenticatedUser()` (NOT supabase client)
+   - Use `withRLS((db) => db.select()...)` for all database operations
+   - Import tables from `@/lib/db/schema`
+   - Use `toSnakeCase()` from `@/lib/api-helpers` for responses
+   - See `modules-core/hello-world/api/data/route.ts` as the reference
 5. **Create database migration** in `database/schema.sql` if tables needed
    - Use `mcp__plugin_pg_pg-aiguide__semantic_search_postgres_docs` to verify best practices for data types, indexes, and constraints
-6. **Update types** in `types/index.ts`
-7. **Create TanStack Query hooks** in `/lib/hooks/use-[module-name].ts` (see below)
-8. **Run `npm run generate-module-registry`** to register the new module
-9. Ask the user for permission to execute the .sql file, or ask if they want to run the .SQL statements themselves.
-10. If the user needs to take any action to complete the setup of the module (run a .sql file, restart the dev server etc), please clearly indicate the actions they need to take with clear instructions.
-11. If database tables are created, remind the user to enable RLS on each new table. If the project is using Supabase you can tell them to enable RLS via Supabase Dashboard > Table Editor > [table] > RLS policies > Enable RLS.
+   - Use `TEXT` type for `user_id` (matches Better Auth)
+   - Do NOT add `auth.uid()` RLS policies (Better Auth doesn't use this)
+6. **Add Drizzle schema definition** to `/lib/db/schema/schema.ts` (REQUIRED for API routes to work)
+   - See existing table definitions in that file for examples
+   - Use `text("user_id")` for the user_id column
+7. **Update types** in `types/index.ts`
+8. **Create TanStack Query hooks** in `/lib/hooks/use-[module-name].ts` (see below)
+9. **Run `npm run generate-module-registry`** to register the new module
+10. Ask the user for permission to execute the .sql file, or ask if they want to run the .SQL statements themselves.
+11. If the user needs to take any action to complete the setup of the module (run a .sql file, restart the dev server etc), please clearly indicate the actions they need to take with clear instructions.
 
 ## Data Fetching Best Practices
 
@@ -127,8 +136,9 @@ Always reference the Hello World module's actual code as the source of truth for
 
 Before marking complete, verify:
 - [ ] module.json is valid and complete
-- [ ] All API routes use proper authentication (see hello-world patterns)
-- [ ] Database schema includes RLS policies with `auth.uid()`
+- [ ] All API routes use `withRLS()` helper (NOT Supabase client) - see hello-world/api/data/route.ts
+- [ ] Drizzle schema added to `/lib/db/schema/schema.ts` (required for API routes)
+- [ ] Database schema.sql created (for reference/manual setup)
 - [ ] TanStack Query hooks created in `/lib/hooks/use-[module-name].ts`
 - [ ] Page uses TanStack Query hooks (not manual useState/useEffect/fetch)
 - [ ] Optimistic updates implemented for all mutations
@@ -143,5 +153,8 @@ Before marking complete, verify:
 
 - NEVER start the dev server - the user will do this
 - Never run a .sql statement without explicit approval.
-- Follow existing code patterns exactly (auth, RLS, theming)
+- Follow existing code patterns exactly - **use hello-world as the template**
+- **API routes must use Drizzle + withRLS()** - NOT Supabase client
+- **Do NOT use `auth.uid()` in database RLS policies** - Better Auth doesn't support this
+- User isolation is enforced at the **application level** via `withRLS()` helper
 - The module registry auto-generates on `npm run dev` or `npm run build`

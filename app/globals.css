@@ -164,6 +164,8 @@
     @apply border-border;
   }
   html {
+    /* Reduce base font size for a more compact UI (13.5px = ~84% of 16px) */
+    font-size: 13.5px;
     /* Smooth transition for theme switching */
     transition: background-color 0.2s ease, color 0.2s ease;
   }
@@ -172,6 +174,37 @@
     font-family: var(--font-family);
     font-weight: 500;
   }
+}
+
+/* Keep topbar at original size by using pixel values instead of rem */
+.topbar {
+  font-size: 16px;
+  height: 45px;
+}
+
+/* Topbar icon buttons - maintain 32px size (was h-8 w-8 = 2rem) */
+.topbar button,
+.topbar [role="button"] {
+  min-width: 32px;
+  min-height: 32px;
+}
+
+/* Topbar icons - maintain 20px size (was h-5 w-5 = 1.25rem) */
+.topbar svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Topbar smaller icons (h-4 w-4) - maintain 16px */
+.topbar svg.h-4,
+.topbar .h-4 svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Announcement badge in topbar */
+.topbar [data-announcement] {
+  font-size: 14px;
 }
 
 .bg-sidebar {

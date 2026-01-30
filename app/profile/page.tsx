@@ -118,9 +118,9 @@ export default function ProfilePage() {
   const initials = `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase() || user.email?.[0]?.toUpperCase()
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b dark:border-gray-700">
+      <div className="bg-card border-b">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-4">
           <Button
             variant="ghost"

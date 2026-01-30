@@ -111,14 +111,14 @@ export default async function ModuleCatchAllPage({
     if (isFullscreen) {
       // Fullscreen mode - pure module content only, no sidebar, no top bar
       return (
-        <div className="min-h-screen bg-gray-50/50">
+        <div className="min-h-screen bg-background">
           {pageContent}
         </div>
       )
     } else {
       // Normal mode - show sidebar and top bar (default)
       return (
-        <div className="min-h-screen bg-gray-50/50">
+        <div className="min-h-screen bg-background">
           <TaskAnnouncement />
           <SidebarProvider>
             <AppSidebar />

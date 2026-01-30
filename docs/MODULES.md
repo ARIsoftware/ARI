@@ -3,9 +3,15 @@
 > **For Claude/AI**: This document provides the complete technical specification for creating and managing ARI modules.
 > **For Humans**: See `/docs/MODULES-GUIDE.md` for a high-level overview.
 
-**Version**: 4.0
-**Last Updated**: November 2025
+**Version**: 5.0
+**Last Updated**: January 2026
 **Status**: Production Ready
+
+> **Important Change in v5.0**: This document now reflects **Better Auth** + **Drizzle ORM** patterns.
+> - API routes use `withRLS()` helper instead of Supabase client
+> - Database RLS policies using `auth.uid()` do NOT work with Better Auth
+> - Client components use `useAuth()` instead of `useSupabase()`
+> - Module tables must be defined in `/lib/db/schema/schema.ts`
 
 ---
 
@@ -173,6 +179,7 @@ These are the ONLY places where code/configuration must exist outside the module
 |----------|-------------|------|
 | `/lib/generated/module-pages-registry.ts` | Page import in `MODULE_PAGES` + ID in `REGISTERED_MODULE_IDS` | Always |
 | `/app/api/modules/[module]/[[...path]]/route.ts` | API route imports in `MODULE_API_ROUTES` | If module has API |
+| `/lib/db/schema/schema.ts` | Drizzle table definition (see [Database Integration](#6-database-integration)) | If module has DB table |
 | `/app/debug/page.tsx` (~line 274) | Module ID to `registeredModules` array | Always |
 | `/app/debug/page.tsx` (~line 595) | Increment `expectedTables` count | If module has DB table |
 | `/app/api/backup/export/route.ts` | Table name to `COMPLETE_TABLE_LIST` | If module has DB table |
@@ -387,14 +394,14 @@ Modules can add a quick access icon to the global top navigation bar:
   ```tsx
   'use client'
 
-  import { useSupabase } from '@/components/providers'
+  import { useAuth } from '@/components/providers'
   import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
   import { Loader2 } from 'lucide-react'
 
   export default function MyModulePage() {
-    const { session, user } = useSupabase()
+    const { user, isLoading } = useAuth()
 
-    if (!session) {
+    if (isLoading) {
       return (
         <div className="flex items-center justify-center h-96">
           <Loader2 className="w-6 h-6 animate-spin" />
@@ -425,6 +432,8 @@ Modules can add a quick access icon to the global top navigation bar:
   }
   ```
   **IMPORTANT**: Must use `export default function` (not named export)
+
+  **Note**: Use `useAuth()` from `@/components/providers` for client-side auth state. Middleware already protects routes, so you can often skip the loading check and render immediately.
 
 - [ ] **4.4 Create database schema** (if needed) - See [Database Integration](#6-database-integration)
 
@@ -670,19 +679,22 @@ CREATE POLICY "Users can view their own records"
 - [ ] Include developer notes section
 - [ ] Add error handling with descriptive messages
 
-**Pattern:**
+**Pattern (Drizzle + withRLS):**
 ```typescript
+import { myTable } from '@/lib/db/schema'
+import { desc } from 'drizzle-orm'
+
 export async function GET(request: NextRequest) {
-  const { user, supabase } = await getAuthenticatedUser()
-  if (!user) return createErrorResponse('Unauthorized', 401)
+  const { user, withRLS } = await getAuthenticatedUser()
+  if (!user || !withRLS) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
-  const { data, error } = await supabase
-    .from('table')
-    .select('*')
-    .eq('user_id', user.id)
+  const data = await withRLS((db) =>
+    db.select().from(myTable).orderBy(desc(myTable.createdAt))
+  )
 
-  if (error) return createErrorResponse(error.message, 500)
-  return NextResponse.json(data)
+  return NextResponse.json({ data: toSnakeCase(data) })
 }
 ```
 
@@ -715,7 +727,7 @@ export async function GET(request: NextRequest) {
 
 - [ ] Add `'use client'` directive (required for React hooks)
 - [ ] Import all necessary dependencies
-- [ ] Set up authentication context (`useSupabase`)
+- [ ] Set up authentication context (`useAuth` from `@/components/providers`)
 - [ ] Add state management (useState for data, loading, errors)
 - [ ] Implement data fetching (useEffect with session dependency)
 - [ ] Add CRUD operation handlers
@@ -983,7 +995,17 @@ Closes #[issue-number]
 
 ## 6. Database Integration
 
-### Schema Template
+### Important: ARI Uses Application-Level RLS
+
+ARI uses **Better Auth** for authentication (not Supabase Auth), which means:
+- **Database RLS policies using `auth.uid()` will NOT work** - Better Auth doesn't populate this function
+- Instead, ARI enforces user isolation at the **application level** using Drizzle ORM with the `withRLS()` helper
+- The `withRLS()` helper automatically filters queries by user_id in SELECT operations
+- For INSERT operations, you must explicitly set `user_id: user.id`
+
+### Step 1: Create SQL Schema (for reference)
+
+Create a schema file in your module for documentation and initial setup:
 
 ```sql
 -- modules/my-module/database/schema.sql
@@ -993,49 +1015,27 @@ Closes #[issue-number]
 -- =============================================================================
 -- Table: my_module_data
 -- Purpose: Store module data with user isolation
+--
+-- NOTE: User isolation is enforced at the application level via withRLS(),
+-- not via database RLS policies. Better Auth doesn't use auth.uid().
 -- =============================================================================
 
 -- Create table
 CREATE TABLE IF NOT EXISTS my_module_data (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL,  -- TEXT to match Better Auth user.id type
   title VARCHAR(255) NOT NULL,
   content TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create index for common queries
+-- Create indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_my_module_data_user_id
   ON my_module_data(user_id);
 
--- Enable Row Level Security
-ALTER TABLE my_module_data ENABLE ROW LEVEL SECURITY;
-
--- =============================================================================
--- RLS POLICIES (All 4 required)
--- =============================================================================
-
--- SELECT: Users can view their own data
-CREATE POLICY "Users can view their own my_module_data"
-  ON my_module_data FOR SELECT
-  USING (auth.uid() = user_id);
-
--- INSERT: Users can insert their own data
-CREATE POLICY "Users can insert their own my_module_data"
-  ON my_module_data FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-
--- UPDATE: Users can update their own data
-CREATE POLICY "Users can update their own my_module_data"
-  ON my_module_data FOR UPDATE
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-
--- DELETE: Users can delete their own data
-CREATE POLICY "Users can delete their own my_module_data"
-  ON my_module_data FOR DELETE
-  USING (auth.uid() = user_id);
+CREATE INDEX IF NOT EXISTS idx_my_module_data_created_at
+  ON my_module_data(created_at DESC);
 
 -- =============================================================================
 -- TRIGGERS
@@ -1058,20 +1058,45 @@ CREATE TRIGGER my_module_data_updated_at
 -- =============================================================================
 -- VERIFICATION
 -- =============================================================================
--- Run these to verify setup:
--- SELECT tablename, rowsecurity FROM pg_tables WHERE tablename = 'my_module_data';
--- SELECT * FROM pg_policies WHERE tablename = 'my_module_data';
+-- Run to verify table was created:
+-- SELECT tablename FROM pg_tables WHERE tablename = 'my_module_data';
+```
+
+### Step 2: Add Drizzle Schema Definition (REQUIRED)
+
+**This step is critical!** You must add your table definition to the Drizzle schema file so API routes can use it.
+
+Edit `/lib/db/schema/schema.ts` and add your table:
+
+```typescript
+// Add your table definition in /lib/db/schema/schema.ts
+
+export const myModuleData = pgTable("my_module_data", {
+  id: uuid().defaultRandom().primaryKey().notNull(),
+  userId: text("user_id").notNull(),  // TEXT to match Better Auth
+  title: varchar({ length: 255 }).notNull(),
+  content: text(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+}, (table) => [
+  index("idx_my_module_data_user_id").using("btree", table.userId.asc().nullsLast()),
+  index("idx_my_module_data_created_at").using("btree", table.createdAt.desc().nullsFirst()),
+]);
+```
+
+**Then export from the schema index file** `/lib/db/schema/index.ts`:
+```typescript
+export * from './schema'
+// Your table is automatically exported since it's in schema.ts
 ```
 
 ### Migration Application Process
 
-1. Enable module in Settings → Features
-2. App shows "Migrations Pending" status (or view SQL manually)
-3. Open Supabase SQL Editor
-4. Copy and paste SQL from `database/schema.sql`
-5. Click "Run" to execute
-6. Verify tables created successfully
-7. Return to ARI and click "Mark as Applied" (if using migration UI)
+1. Copy SQL from `modules/my-module/database/schema.sql`
+2. Open Supabase SQL Editor
+3. Paste and run the SQL to create the table
+4. Add the Drizzle schema definition to `/lib/db/schema/schema.ts`
+5. Verify the table works by testing your API routes
 
 ### Register in module.json
 
@@ -1084,9 +1109,24 @@ CREATE TRIGGER my_module_data_updated_at
 }
 ```
 
+### Reference: Hello World Schema
+
+See `/modules-core/hello-world/database/schema.sql` and the `helloWorldEntries` definition in `/lib/db/schema/schema.ts` for a complete working example.
+
 ---
 
 ## 7. API Routes
+
+### Important: Use Drizzle ORM with `withRLS()`
+
+ARI uses **Drizzle ORM** with the `withRLS()` helper for database operations, NOT the Supabase client.
+
+**Key patterns:**
+- Use `const { user, withRLS } = await getAuthenticatedUser()` (NOT `supabase`)
+- Import your table from `@/lib/db/schema`
+- Use `toSnakeCase()` from `@/lib/api-helpers` for API responses
+- SELECT operations are automatically filtered by user_id via `withRLS()`
+- INSERT operations require explicit `userId: user.id`
 
 ### Basic API Route Template
 
@@ -1094,7 +1134,10 @@ CREATE TRIGGER my_module_data_updated_at
 // modules/my-module/api/data/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { toSnakeCase } from '@/lib/api-helpers'
 import { z } from 'zod'
+import { myModuleData } from '@/lib/db/schema'  // Import your Drizzle table
+import { eq, desc } from 'drizzle-orm'
 
 // Validation schema
 const CreateDataSchema = z.object({
@@ -1102,39 +1145,53 @@ const CreateDataSchema = z.object({
   content: z.string().optional()
 })
 
+/**
+ * GET - Fetch all entries for the authenticated user
+ */
 export async function GET(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user || !withRLS) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Valid authentication required' },
+        { status: 401 }
+      )
     }
 
-    // Query with explicit user filtering (defense-in-depth)
-    const { data, error } = await supabase
-      .from('my_module_data')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
+    // withRLS automatically filters by user_id for SELECT
+    const data = await withRLS((db) =>
+      db.select()
+        .from(myModuleData)
+        .orderBy(desc(myModuleData.createdAt))
+    )
 
-    if (error) {
-      console.error('Database error:', error)
-      return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 })
-    }
+    return NextResponse.json({
+      data: toSnakeCase(data) || [],
+      count: data?.length || 0
+    })
 
-    return NextResponse.json({ data })
   } catch (error) {
-    console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('GET /api/modules/my-module/data error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }
 
+/**
+ * POST - Create a new entry
+ */
 export async function POST(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user || !withRLS) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Valid authentication required' },
+        { status: 401 }
+      )
     }
 
     // Parse and validate body
@@ -1143,40 +1200,95 @@ export async function POST(request: NextRequest) {
 
     if (!parseResult.success) {
       return NextResponse.json(
-        { error: 'Validation failed', details: parseResult.error },
+        { error: 'Validation failed', details: parseResult.error.issues },
         { status: 400 }
       )
     }
 
     const { title, content } = parseResult.data
 
-    // Insert with user_id
-    const { data, error } = await supabase
-      .from('my_module_data')
-      .insert({ user_id: user.id, title, content })
-      .select()
-      .single()
+    // INSERT requires explicit userId
+    const data = await withRLS((db) =>
+      db.insert(myModuleData)
+        .values({
+          userId: user.id,  // Must explicitly set user_id
+          title,
+          content
+        })
+        .returning()
+    )
 
-    if (error) {
-      console.error('Database error:', error)
-      return NextResponse.json({ error: 'Failed to create' }, { status: 500 })
+    return NextResponse.json(
+      { data: toSnakeCase(data[0]) },
+      { status: 201 }
+    )
+
+  } catch (error) {
+    console.error('POST /api/modules/my-module/data error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * DELETE - Delete an entry by ID (via query param)
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const { user, withRLS } = await getAuthenticatedUser()
+
+    if (!user || !withRLS) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Valid authentication required' },
+        { status: 401 }
+      )
     }
 
-    return NextResponse.json({ data }, { status: 201 })
+    // Get ID from query params
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Missing required parameter: id' },
+        { status: 400 }
+      )
+    }
+
+    // withRLS ensures user can only delete their own entries
+    await withRLS((db) =>
+      db.delete(myModuleData).where(eq(myModuleData.id, id))
+    )
+
+    return NextResponse.json({
+      success: true,
+      message: 'Entry deleted successfully'
+    })
+
   } catch (error) {
-    console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('DELETE /api/modules/my-module/data error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }
 ```
 
-### Dynamic Route Template (PATCH/DELETE)
+### Dynamic Route Template (PATCH by ID)
+
+For routes like `/api/modules/my-module/data/[id]`:
 
 ```typescript
 // modules/my-module/api/data/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { toSnakeCase } from '@/lib/api-helpers'
 import { z } from 'zod'
+import { myModuleData } from '@/lib/db/schema'
+import { eq, and } from 'drizzle-orm'
 
 const UpdateSchema = z.object({
   title: z.string().min(1).max(255).optional(),
@@ -1185,84 +1297,87 @@ const UpdateSchema = z.object({
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!user || !withRLS) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
     }
 
-    // Validate UUID
+    const { id } = await params
+
+    // Validate UUID format
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-    if (!uuidRegex.test(params.id)) {
-      return NextResponse.json({ error: 'Invalid ID format' }, { status: 400 })
+    if (!uuidRegex.test(id)) {
+      return NextResponse.json(
+        { error: 'Invalid ID format' },
+        { status: 400 }
+      )
     }
 
     const body = await request.json()
     const parseResult = UpdateSchema.safeParse(body)
 
     if (!parseResult.success) {
-      return NextResponse.json({ error: 'Validation failed' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Validation failed' },
+        { status: 400 }
+      )
     }
 
-    const { data, error } = await supabase
-      .from('my_module_data')
-      .update(parseResult.data)
-      .eq('id', params.id)
-      .eq('user_id', user.id)  // Defense-in-depth
-      .select()
-      .single()
+    // Update with user_id check for security
+    const data = await withRLS((db) =>
+      db.update(myModuleData)
+        .set({
+          ...parseResult.data,
+          updatedAt: new Date().toISOString()
+        })
+        .where(and(
+          eq(myModuleData.id, id),
+          eq(myModuleData.userId, user.id)  // Ensure user owns this record
+        ))
+        .returning()
+    )
 
-    if (error || !data) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (!data || data.length === 0) {
+      return NextResponse.json(
+        { error: 'Not found' },
+        { status: 404 }
+      )
     }
 
-    return NextResponse.json({ data })
+    return NextResponse.json({ data: toSnakeCase(data[0]) })
+
   } catch (error) {
-    console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
-}
-
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const { user, supabase } = await getAuthenticatedUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { error } = await supabase
-      .from('my_module_data')
-      .delete()
-      .eq('id', params.id)
-      .eq('user_id', user.id)
-
-    if (error) {
-      return NextResponse.json({ error: 'Failed to delete' }, { status: 500 })
-    }
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('API error:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('PATCH error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }
 ```
 
 ### API Security Checklist
 
-- [ ] Always validate authentication with `getAuthenticatedUser()`
+- [ ] Always use `getAuthenticatedUser()` and check for `user` AND `withRLS`
 - [ ] Use Zod for input validation
-- [ ] Add explicit `user_id` filtering (defense-in-depth, even with RLS)
-- [ ] Return appropriate HTTP status codes
-- [ ] Log errors for debugging
+- [ ] Use `withRLS()` for all database operations (not Supabase client)
+- [ ] For INSERT: explicitly set `userId: user.id`
+- [ ] For UPDATE/DELETE: include `eq(table.userId, user.id)` in WHERE clause
+- [ ] Use `toSnakeCase()` for API responses (converts camelCase to snake_case)
+- [ ] Return appropriate HTTP status codes (401, 400, 404, 500)
+- [ ] Log errors with descriptive context
 - [ ] Never expose internal error details to client
+
+### Reference Implementation
+
+See `/modules-core/hello-world/api/data/route.ts` for a complete working example with GET, POST, and DELETE handlers.
 
 ---
 
@@ -1337,22 +1452,17 @@ When migrating existing pages from `/app/` to modules, **remove all layout wrapp
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useSupabase } from '@/components/providers'
 import { useEffect, useState } from 'react'
 import { Package, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 
 export function MyModuleWidget() {
-  const { session } = useSupabase()
   const [count, setCount] = useState(0)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!session?.access_token) return
-
-    fetch('/api/modules/my-module/data', {
-      headers: { 'Authorization': `Bearer ${session.access_token}` }
-    })
+    // Auth is handled via cookies - no need to pass tokens
+    fetch('/api/modules/my-module/data')
       .then(res => res.json())
       .then(data => {
         setCount(data.data?.length || 0)
@@ -1362,7 +1472,7 @@ export function MyModuleWidget() {
         console.error('Widget error:', err)
         setLoading(false)
       })
-  }, [session])
+  }, [])
 
   return (
     <Link href="/my-module">
@@ -1387,6 +1497,8 @@ export default MyModuleWidget
 
 **Required exports**: Both named and default exports.
 
+**Note**: With Better Auth, authentication is handled via HTTP-only cookies. You don't need to pass Authorization headers - just make fetch calls and the browser sends cookies automatically.
+
 ### Settings Panel Template
 
 ```tsx
@@ -1397,11 +1509,9 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { useSupabase } from '@/components/providers'
 import { Loader2 } from 'lucide-react'
 
 export function MyModuleSettings() {
-  const { session } = useSupabase()
   const [settings, setSettings] = useState({
     showInDashboard: true,
     enableNotifications: false
@@ -1410,10 +1520,15 @@ export function MyModuleSettings() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    if (!session?.access_token) return
-    // Load settings from API
-    setLoading(false)
-  }, [session])
+    // Load settings from API (auth handled via cookies)
+    fetch('/api/modules/my-module/settings')
+      .then(res => res.json())
+      .then(data => {
+        if (data.settings) setSettings(data.settings)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [])
 
   const handleSave = async () => {
     setSaving(true)
@@ -1483,7 +1598,7 @@ export default MyModuleSettings
 
 ```typescript
 // Available imports from core app
-import { useSupabase } from '@/components/providers'       // Auth context
+import { useAuth } from '@/components/providers'           // Auth context (Better Auth)
 import { Button } from '@/components/ui/button'            // UI components
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -1659,8 +1774,8 @@ The old pattern waited for session before rendering:
 
 ```tsx
 // ❌ OLD - Don't do this
-const { session } = useSupabase()
-if (!session) {
+const { isLoading } = useAuth()
+if (isLoading) {
   return <div>Authenticating...</div>
 }
 ```
@@ -2055,5 +2170,5 @@ Use `/modules/hello-world/` as a complete reference implementation. It demonstra
 
 ---
 
-**Last Updated**: November 2025
+**Last Updated**: January 2026
 **Maintained By**: ARI Team
