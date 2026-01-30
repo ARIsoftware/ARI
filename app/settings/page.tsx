@@ -18,7 +18,6 @@ import { TopBar } from "@/components/top-bar"
 import { Check, Sparkles, TimerReset } from "lucide-react"
 import {
   GeneralTab,
-  FontsTab,
   ThemesTab,
   KeybindingsTab,
   NotificationsTab,
@@ -27,7 +26,6 @@ import {
   BackupsTab,
 } from "./tabs"
 import {
-  FONT_OPTIONS,
   type Session,
   type NotificationSettings,
   type BetaFeatureSettings,
@@ -53,11 +51,6 @@ export default function SettingsPage(): React.ReactElement {
     predictiveScheduling: false,
     aiMeetingNotes: false,
   })
-
-  // Font tab state
-  const [selectedFont, setSelectedFont] = useState("Overpass Mono")
-  const [savedFont, setSavedFont] = useState("Overpass Mono")
-  const [fontSaving, setFontSaving] = useState(false)
 
   // Notifications tab state
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
@@ -87,19 +80,6 @@ export default function SettingsPage(): React.ReactElement {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
 
-  // Load saved font on mount
-  useEffect(() => {
-    const saved = localStorage.getItem("ari-font-preference")
-    if (saved) {
-      const fontOption = FONT_OPTIONS.find(f => f.value === saved)
-      if (fontOption) {
-        setSelectedFont(saved)
-        setSavedFont(saved)
-        document.documentElement.style.setProperty("--font-family", fontOption.css)
-      }
-    }
-  }, [])
-
   // Load sessions on mount
   useEffect(() => {
     loadSessions()
@@ -121,24 +101,6 @@ export default function SettingsPage(): React.ReactElement {
     } finally {
       setSessionsLoading(false)
     }
-  }
-
-  function handleFontChange(fontValue: string): void {
-    setSelectedFont(fontValue)
-    const fontOption = FONT_OPTIONS.find(f => f.value === fontValue)
-    if (fontOption) {
-      document.documentElement.style.setProperty("--font-family", fontOption.css)
-    }
-  }
-
-  function handleSaveFont(): void {
-    setFontSaving(true)
-    localStorage.setItem("ari-font-preference", selectedFont)
-    setSavedFont(selectedFont)
-    setTimeout(() => {
-      setFontSaving(false)
-      setSavedMessage("Font preference saved successfully.")
-    }, 500)
   }
 
   function handleSaveChanges(): void {
@@ -427,7 +389,7 @@ export default function SettingsPage(): React.ReactElement {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background">
       <TaskAnnouncement />
       <SidebarProvider>
         <AppSidebar />
@@ -442,11 +404,11 @@ export default function SettingsPage(): React.ReactElement {
             </Breadcrumb>
           </TopBar>
 
-          <main className="flex-1 bg-slate-50">
+          <main className="flex-1 bg-background">
             <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8 lg:px-8">
               <div className="flex flex-col gap-3">
                 <Badge className="w-fit text-sm font-medium">Crafted for focus-first teams</Badge>
-                <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Settings</h1>
+                <h1 className="text-3xl font-semibold tracking-tight text-foreground">Settings</h1>
                 <p className="max-w-2xl text-sm text-muted-foreground">
                   Personalize Ari to match the rhythm of your team. Adjust themes, notifications, security, and integrations—everything stays synced across web and mobile.
                 </p>
@@ -457,7 +419,6 @@ export default function SettingsPage(): React.ReactElement {
                   <TabsList>
                     <TabsTrigger value="general">General</TabsTrigger>
                     <TabsTrigger value="themes">Themes</TabsTrigger>
-                    <TabsTrigger value="fonts">Fonts</TabsTrigger>
                     <TabsTrigger value="keybindings">Keybindings</TabsTrigger>
                     <TabsTrigger value="notifications">Notifications</TabsTrigger>
                     <TabsTrigger value="security">Security</TabsTrigger>
@@ -502,16 +463,6 @@ export default function SettingsPage(): React.ReactElement {
 
                 <TabsContent value="themes">
                   <ThemesTab />
-                </TabsContent>
-
-                <TabsContent value="fonts">
-                  <FontsTab
-                    selectedFont={selectedFont}
-                    savedFont={savedFont}
-                    fontSaving={fontSaving}
-                    onFontChange={handleFontChange}
-                    onSaveFont={handleSaveFont}
-                  />
                 </TabsContent>
 
                 <TabsContent value="keybindings">
@@ -566,7 +517,7 @@ export default function SettingsPage(): React.ReactElement {
               </Tabs>
 
               {savedMessage && (
-                <div className="sticky bottom-6 flex items-center justify-between rounded-xl border border-emerald-500/50 bg-emerald-50 px-6 py-4 text-sm text-emerald-700 shadow-lg shadow-emerald-500/10">
+                <div className="sticky bottom-6 flex items-center justify-between rounded-xl border border-accent/50 bg-accent/10 px-6 py-4 text-sm text-accent-foreground shadow-lg">
                   <span>{savedMessage}</span>
                   <Button variant="outline" size="sm" onClick={() => setSavedMessage(null)}>
                     Dismiss

@@ -76,8 +76,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
-  // Get current theme object
+  // Get current theme object (check for customization first)
   const currentTheme: ThemePreset | CustomTheme | null =
+    customThemes.find((t) => t.basePresetId === activeThemeId) ??
     getThemeById(activeThemeId) ??
     customThemes.find((t) => t.id === activeThemeId) ??
     null
@@ -95,8 +96,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         setActiveFont(settings.activeFont || DEFAULT_FONT_ID)
         setCustomThemes(settings.customThemes || [])
 
-        // Apply immediately from cache
-        const theme = getThemeById(settings.activeThemeId) ??
+        // Apply immediately from cache (check for customization first)
+        const customization = settings.customThemes?.find((t) => t.basePresetId === settings.activeThemeId)
+        const theme = customization ?? getThemeById(settings.activeThemeId) ??
           settings.customThemes?.find((t) => t.id === settings.activeThemeId)
         if (theme) {
           applyThemeColors(theme.colors)
@@ -157,8 +159,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         setActiveFont(settings.activeFont || DEFAULT_FONT_ID)
         setCustomThemes(settings.customThemes || [])
 
-        // Apply from API data
-        const theme = getThemeById(settings.activeThemeId) ??
+        // Apply from API data (check for customization first)
+        const apiCustomization = settings.customThemes?.find((t) => t.basePresetId === settings.activeThemeId)
+        const theme = apiCustomization ?? getThemeById(settings.activeThemeId) ??
           settings.customThemes?.find((t) => t.id === settings.activeThemeId)
         if (theme) {
           applyThemeColors(theme.colors)
@@ -206,7 +209,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Set theme
   const setTheme = useCallback(
     (themeId: string) => {
-      const theme = getThemeById(themeId) ?? customThemes.find((t) => t.id === themeId)
+      // Check for a customization of a preset first
+      const customization = customThemes.find((t) => t.basePresetId === themeId)
+      const theme = customization ?? getThemeById(themeId) ?? customThemes.find((t) => t.id === themeId)
       if (!theme) return
 
       setActiveThemeId(themeId)

@@ -2,7 +2,9 @@
 
 > Build powerful, self-contained features for ARI using the modular plugin architecture.
 
-**Version**: 4.0 | **Status**: Production Ready
+**Version**: 5.0 | **Status**: Production Ready
+
+> **Note**: ARI uses **Better Auth** for authentication and **Drizzle ORM** for database access. See the [Technical Reference](/docs/MODULES.md) for the correct API patterns.
 
 ---
 
@@ -184,9 +186,11 @@ API routes automatically require authentication and support standard HTTP method
 Modules can define their own database tables:
 
 1. Create `database/schema.sql` with your table definition
-2. Include Row Level Security (RLS) policies for user isolation
+2. Add Drizzle schema definition to `/lib/db/schema/schema.ts`
 3. List tables in `module.json` under `database.tables`
 4. Apply SQL via Supabase SQL Editor
+
+> **Note**: User data isolation is handled at the **application level** via the `withRLS()` helper, not via database RLS policies. This is because ARI uses Better Auth (not Supabase Auth).
 
 ### Dashboard Widgets
 
@@ -222,8 +226,8 @@ This hides the sidebar and header, giving your module the full screen.
 
 ### Security
 
-- **Always validate authentication** in API routes
-- **Use RLS policies** on all database tables
+- **Always validate authentication** in API routes using `getAuthenticatedUser()`
+- **Use `withRLS()` helper** for all database operations (provides application-level user isolation)
 - **Validate inputs** with Zod schemas
 - **Never expose secrets** in client code
 

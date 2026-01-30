@@ -4,7 +4,7 @@
  * This widget appears on the main dashboard when the module is enabled.
  * It demonstrates:
  * - Client component usage ('use client')
- * - API calls with authentication
+ * - API calls with cookie-based auth (Better Auth)
  * - Loading states
  * - Error handling
  * - ARI card design patterns
@@ -20,7 +20,6 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { useSupabase } from '@/components/providers'
 import { Package, Loader2, AlertCircle } from 'lucide-react'
 
 interface WidgetStats {
@@ -36,28 +35,21 @@ interface WidgetStats {
  * by the dashboard via dynamic import.
  */
 export function HelloWorldWidget() {
-  const { session } = useSupabase()
   const [stats, setStats] = useState<WidgetStats>({ entryCount: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
   useEffect(() => {
-    if (!session?.access_token) return
-
     loadStats()
-  }, [session])
+  }, [])
 
   const loadStats = async () => {
     try {
       setLoading(true)
       setError(false)
 
-      // Fetch data from module API
-      const response = await fetch('/api/modules/hello-world/data', {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`
-        }
-      })
+      // Auth is handled via cookies - no need to pass Authorization header
+      const response = await fetch('/api/modules/hello-world/data')
 
       if (!response.ok) {
         throw new Error('Failed to load stats')
@@ -171,33 +163,32 @@ export function HelloWorldWidget() {
 /**
  * DEVELOPER NOTES:
  *
- * 1. Widget Performance:
+ * 1. Authentication:
+ *    - Better Auth uses HTTP-only cookies
+ *    - No need to pass Authorization headers
+ *    - Just make fetch calls - cookies are sent automatically
+ *
+ * 2. Widget Performance:
  *    - Keep widgets lightweight
  *    - Avoid heavy computations
  *    - Cache data where appropriate
  *    - Consider polling interval for real-time updates
  *
- * 2. Error Handling:
+ * 3. Error Handling:
  *    - Always show error states
  *    - Provide retry mechanism
  *    - Don't crash the dashboard
  *    - Log errors for debugging
  *
- * 3. Design Patterns:
+ * 4. Design Patterns:
  *    - Follow ARI's card design
  *    - Use Shadcn/ui components
  *    - Maintain consistent spacing
  *    - Show loading states
  *
- * 4. Integration:
+ * 5. Integration:
  *    - Widget must be client component ('use client')
  *    - Use named export (export function WidgetName)
  *    - Register in module.json dashboard.widgetComponents
  *    - Dashboard will dynamically import this component
- *
- * 5. Data Fetching:
- *    - Always authenticate API calls
- *    - Handle loading and error states
- *    - Consider caching/memoization
- *    - Respect user's module enable/disable state
  */

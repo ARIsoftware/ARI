@@ -30,9 +30,9 @@ This is a fully-featured example module demonstrating all capabilities of the AR
 
 ### 3. **Database Integration**
 - Custom table: `hello_world_entries`
-- Row Level Security (RLS) policies
-- User-specific data isolation
-- Supabase client usage
+- Drizzle ORM with `withRLS()` helper
+- User-specific data isolation at application level
+- Table defined in `/lib/db/schema/schema.ts`
 
 ### 4. **Dashboard Widget**
 - Displays count of user's entries
@@ -113,17 +113,36 @@ Navigate to `/hello-world` in your browser. The page shows:
 
 ### Using the API
 
-```bash
-# Get all entries (requires authentication)
-curl -H "Authorization: Bearer YOUR_TOKEN" \
-  http://localhost:3000/api/modules-core/hello-world/data
+Authentication is handled via HTTP-only cookies (Better Auth), so no Authorization header is needed for browser requests.
 
-# Create new entry
-curl -X POST \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Hello from API"}' \
-  http://localhost:3000/api/modules-core/hello-world/data
+```typescript
+// From a React component - cookies are sent automatically
+const response = await fetch('/api/modules/hello-world/data')
+const { entries } = await response.json()
+
+// Create new entry
+const response = await fetch('/api/modules/hello-world/data', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ message: 'Hello from API' })
+})
+```
+
+### Using TanStack Query Hooks (Recommended)
+
+```typescript
+import {
+  useHelloWorldEntries,
+  useCreateHelloWorldEntry,
+  useDeleteHelloWorldEntry,
+} from '@/lib/hooks/use-hello-world'
+
+// In your component
+const { data: entries = [], isLoading } = useHelloWorldEntries()
+const createEntry = useCreateHelloWorldEntry()
+
+// Create with optimistic updates
+createEntry.mutate('My message')
 ```
 
 ### Using from Another Module
@@ -132,12 +151,8 @@ curl -X POST \
 // Import types
 import { HelloWorldEntry } from '@/modules-core/hello-world/types'
 
-// Call the API
-const response = await fetch('/api/modules-core/hello-world/data', {
-  headers: {
-    'Authorization': `Bearer ${session.access_token}`
-  }
-})
+// Call the API (cookies handle auth automatically)
+const response = await fetch('/api/modules/hello-world/data')
 const data = await response.json()
 ```
 
@@ -233,15 +248,15 @@ Check terminal for:
 ## Best Practices Demonstrated
 
 ### ✅ Security
-- All API routes validate authentication
-- Database uses RLS policies
-- User data isolation enforced
+- All API routes validate authentication via `getAuthenticatedUser()`
+- User data isolation via `withRLS()` helper (application-level RLS)
 - Input validation with Zod
+- Better Auth cookies (no token exposure in JavaScript)
 
 ### ✅ Performance
+- TanStack Query for caching and deduplication
+- Optimistic updates for instant UI feedback
 - Lazy loading for components
-- Efficient database queries
-- Proper React hooks usage
 - Loading states for async operations
 
 ### ✅ Code Quality

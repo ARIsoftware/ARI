@@ -3,10 +3,9 @@
  *
  * This component appears in Settings → Features when the module is enabled.
  * It demonstrates:
- * - Client component for interactivity
- * - Settings state management
- * - Saving/loading user preferences
+ * - TanStack Query for settings management
  * - Form controls (toggle, input, select)
+ * - Optimistic updates with rollback
  * - ARI UI patterns
  *
  * IMPORTANT: Settings panel MUST be a client component.
@@ -29,28 +28,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useSupabase } from '@/components/providers'
+import { useToast } from '@/hooks/use-toast'
 import { Loader2, Save, CheckCircle2 } from 'lucide-react'
-
-/**
- * Settings Schema
- *
- * Define the structure of your module's settings.
- * These are stored in the module_settings.settings JSONB column.
- */
-interface HelloWorldSettings {
-  // Feature toggles
-  enableNotifications: boolean
-  showInDashboard: boolean
-
-  // Text settings
-  defaultMessage: string
-  userDisplayName: string
-
-  // Dropdown settings
-  theme: 'light' | 'dark' | 'auto'
-  refreshInterval: '30' | '60' | '120'
-}
+import {
+  useHelloWorldSettings,
+  useUpdateHelloWorldSettings,
+} from '@/lib/hooks/use-hello-world'
+import type { HelloWorldSettings } from '../types'
 
 /**
  * Default settings values
@@ -72,80 +56,43 @@ const DEFAULT_SETTINGS: HelloWorldSettings = {
  * by the Settings page via dynamic import.
  */
 export function HelloWorldSettingsPanel() {
-  const { session } = useSupabase()
+  const { toast } = useToast()
+
+  // TanStack Query hooks
+  const { data: savedSettings, isLoading } = useHelloWorldSettings()
+  const updateSettings = useUpdateHelloWorldSettings()
+
+  // Local state for form (merged with defaults)
   const [settings, setSettings] = useState<HelloWorldSettings>(DEFAULT_SETTINGS)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
-  // Load settings on mount
+  // Update local state when saved settings load
   useEffect(() => {
-    if (session?.access_token) {
-      loadSettings()
+    if (savedSettings) {
+      setSettings({ ...DEFAULT_SETTINGS, ...savedSettings })
     }
-  }, [session])
+  }, [savedSettings])
 
   /**
-   * Load settings from API
-   * Demonstrates: GET request, default values handling
+   * Save settings
+   * Uses optimistic updates via TanStack Query mutation
    */
-  const loadSettings = async () => {
-    try {
-      setLoading(true)
+  const handleSave = () => {
+    setSaved(false)
 
-      const response = await fetch('/api/modules/hello-world/settings', {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`
-        }
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setSettings({ ...DEFAULT_SETTINGS, ...data })
-      } else {
-        // Use defaults if no settings saved yet
-        setSettings(DEFAULT_SETTINGS)
-      }
-    } catch (err) {
-      console.error('Error loading settings:', err)
-      // Use defaults on error
-      setSettings(DEFAULT_SETTINGS)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  /**
-   * Save settings to API
-   * Demonstrates: PUT request, optimistic updates, user feedback
-   */
-  const handleSave = async () => {
-    try {
-      setSaving(true)
-      setSaved(false)
-
-      const response = await fetch('/api/modules/hello-world/settings', {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(settings)
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to save settings')
-      }
-
-      // Show success indicator
-      setSaved(true)
-      setTimeout(() => setSaved(false), 3000)
-    } catch (err) {
-      console.error('Error saving settings:', err)
-      alert('Failed to save settings. Please try again.')
-    } finally {
-      setSaving(false)
-    }
+    updateSettings.mutate(settings, {
+      onSuccess: () => {
+        setSaved(true)
+        setTimeout(() => setSaved(false), 3000)
+      },
+      onError: () => {
+        toast({
+          variant: 'destructive',
+          title: 'Failed to save settings',
+          description: 'Please try again.',
+        })
+      },
+    })
   }
 
   /**
@@ -159,7 +106,7 @@ export function HelloWorldSettingsPanel() {
   }
 
   // Loading state
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-2">
@@ -300,8 +247,8 @@ export function HelloWorldSettingsPanel() {
 
       {/* Save Button */}
       <div className="flex items-center gap-2 pt-4 border-t">
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? (
+        <Button onClick={handleSave} disabled={updateSettings.isPending}>
+          {updateSettings.isPending ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               Saving...
@@ -337,6 +284,7 @@ export function HelloWorldSettingsPanel() {
             <p>• API endpoint: <code>/api/modules/hello-world/settings</code></p>
             <p>• User-specific: Each user has their own settings</p>
             <p>• Default values: Defined in DEFAULT_SETTINGS constant</p>
+            <p>• Auth: Better Auth cookies (no Authorization header needed)</p>
           </div>
         </details>
       </div>
@@ -347,33 +295,31 @@ export function HelloWorldSettingsPanel() {
 /**
  * DEVELOPER NOTES:
  *
- * 1. Settings Architecture:
+ * 1. Authentication:
+ *    - Better Auth uses HTTP-only cookies
+ *    - No need to pass Authorization headers
+ *    - API routes read auth from cookies automatically
+ *
+ * 2. Settings Architecture:
  *    - Stored in module_settings table, settings column (JSONB)
- *    - Per-user settings (RLS enforced)
+ *    - Per-user settings (enforced via withRLS)
  *    - Always provide default values
  *    - Merge defaults with loaded settings
  *
- * 2. Form Controls:
+ * 3. TanStack Query:
+ *    - useHelloWorldSettings() - fetches current settings
+ *    - useUpdateHelloWorldSettings() - saves with optimistic updates
+ *    - Automatic cache invalidation on mutation
+ *
+ * 4. Form Controls:
  *    - Use Shadcn/ui components for consistency
  *    - Provide clear labels and descriptions
  *    - Show validation errors
  *    - Disable inputs while saving
  *
- * 3. User Feedback:
+ * 5. User Feedback:
  *    - Show loading state while fetching
  *    - Show saving state while saving
  *    - Show success confirmation
- *    - Handle errors gracefully
- *
- * 4. Best Practices:
- *    - Always validate input before saving
- *    - Use TypeScript for type safety
- *    - Keep settings organized in sections
- *    - Document what each setting does
- *
- * 5. Integration:
- *    - Must be client component ('use client')
- *    - Use named export (export function PanelName)
- *    - Register in module.json settings.panel
- *    - Settings page will dynamically import this component
+ *    - Handle errors gracefully with toast
  */
