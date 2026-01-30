@@ -95,6 +95,11 @@ const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
     'analytics': () => import('@/modules/tasks/api/analytics/route'), // GET for task analytics
     'increment-completion': () => import('@/modules/tasks/api/increment-completion/route'), // POST for incrementing completion count
     'last-completed': () => import('@/modules/tasks/api/last-completed/route') // GET for last completed task
+  },
+  'memento': {
+    'settings': () => import('@/modules-custom/memento/api/settings/route'), // GET/POST for user settings
+    'milestones': () => import('@/modules-custom/memento/api/milestones/route'), // GET/POST/PATCH/DELETE for milestones
+    'eras': () => import('@/modules-custom/memento/api/eras/route') // GET/POST/PATCH/DELETE for eras
   }
 }
 

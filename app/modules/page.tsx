@@ -124,7 +124,7 @@ export default function ModulesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background">
       <TaskAnnouncement />
       <SidebarProvider>
         <AppSidebar />
@@ -139,11 +139,11 @@ export default function ModulesPage() {
             </Breadcrumb>
           </TopBar>
 
-          <main className="flex-1 bg-slate-50">
+          <main className="flex-1 bg-background">
             <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8 lg:px-8 pb-24">
               <div className="flex flex-col gap-3">
                 <Badge className="w-fit text-sm font-medium">Extend your app functionality</Badge>
-                <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Modules</h1>
+                <h1 className="text-3xl font-semibold tracking-tight text-foreground">Modules</h1>
                 <p className="max-w-2xl text-sm text-muted-foreground">
                   Enable or disable installed modules to extend your app functionality. <br /><span className="text-red-600">Note: Always assess third-party modules to ensure they are trustworthy and secure.</span>
                 </p>

@@ -273,7 +273,7 @@ export default function DatabaseTestPage() {
 
       // Test 2: Check MODULE_PAGES registry completeness
       updateModuleResult('Registry Completeness', { status: 'testing' })
-      const registeredModules = ['ari-launch', 'assist', 'contacts', 'daily-fitness', 'dashboard', 'gratitude', 'hd-dashboard', 'hello-world', 'hyrox', 'knowledge-manager', 'major-projects', 'motivation', 'northstar', 'ohtani', 'quotes', 'shipments', 'south-africa', 'task-aquarium', 'task-monsters', 'tasks', 'winter-arc', 'world-clock']
+      const registeredModules = ['ari-launch', 'assist', 'contacts', 'daily-fitness', 'dashboard', 'gratitude', 'hd-dashboard', 'hello-world', 'hyrox', 'knowledge-manager', 'major-projects', 'memento', 'motivation', 'northstar', 'ohtani', 'quotes', 'shipments', 'south-africa', 'task-aquarium', 'task-monsters', 'tasks', 'winter-arc', 'world-clock']
       const discoveredModuleIds = modules.map((m: any) => m.id)
       const missingFromRegistry = discoveredModuleIds.filter((id: string) => !registeredModules.includes(id))
       const extraInRegistry = registeredModules.filter(id => !discoveredModuleIds.includes(id))
@@ -605,7 +605,7 @@ export default function DatabaseTestPage() {
       const response = await fetch('/api/backup/verify')
       const result = await response.json()
 
-      const expectedTables = 32 // Updated: added ari_launch_entries table
+      const expectedTables = 35 // Updated: added memento_settings, memento_milestones, memento_eras tables
       const foundTables = result.tablesFound
 
       if (foundTables === expectedTables) {
