@@ -73,7 +73,7 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="robots" content="noindex, nofollow" />
         <link rel="manifest" href="/manifest.json" />
@@ -84,6 +84,12 @@ export default async function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600;700&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Outfit:wght@100..900&family=Overpass+Mono:wght@300..700&family=Science+Gothic:wght@100..900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Fira+Code:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        {/* Inline script to apply theme/font immediately before React hydration to prevent FOUT */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var c=localStorage.getItem('ari-theme-cache');if(c){var s=JSON.parse(c);var fonts={'overpass-mono':'"Overpass Mono", monospace','geist':'"Geist", sans-serif','geist-mono':'"Geist Mono", monospace','open-sans':'"Open Sans", sans-serif','outfit':'"Outfit", sans-serif','science-gothic':'"Science Gothic", sans-serif','inter':'"Inter", sans-serif','jetbrains-mono':'"JetBrains Mono", monospace','ibm-plex-sans':'"IBM Plex Sans", sans-serif','fira-code':'"Fira Code", monospace'};if(s.activeFont&&fonts[s.activeFont]){document.documentElement.style.setProperty('--font-family',fonts[s.activeFont])}}}catch(e){}})();`,
+          }}
+        />
         <script
           type="speculationrules"
           dangerouslySetInnerHTML={{

@@ -56,6 +56,9 @@ const COMPLETE_TABLE_LIST = [
   'knowledge_articles',
   'knowledge_collections',
   'ari_launch_entries',
+  'memento_settings',
+  'memento_milestones',
+  'memento_eras',
 ]
 
 interface TableInfo {

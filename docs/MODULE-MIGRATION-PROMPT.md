@@ -74,7 +74,7 @@ Based on your analysis, create a detailed migration plan that includes:
 ## Important Considerations
 
 - **Don't break existing functionality** - Migration should be incremental
-- **Adapt, don't copy blindly** - The reference uses Supabase; adapt patterns to this app's stack
+- **Use current patterns** - ARI uses **Better Auth** (not Supabase Auth) and **Drizzle ORM with `withRLS()`** (not Supabase client)
 - **Preserve existing patterns** - Match this codebase's coding style and conventions
 - **Test each module** - Ensure each migrated module works before moving to the next
 

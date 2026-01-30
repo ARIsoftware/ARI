@@ -74,6 +74,8 @@ export interface ThemePreset {
 export interface CustomTheme extends ThemePreset {
   createdAt: string
   updatedAt: string
+  // For preset customizations, this tracks which preset was customized
+  basePresetId?: string
 }
 
 export interface ThemeSettings {

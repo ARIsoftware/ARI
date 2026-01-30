@@ -1,91 +1,9 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { Input } from "@/components/ui/input"
 import { ChevronDown, Palette, Paintbrush, Layout, BarChart3, PanelLeft, AlertCircle } from "lucide-react"
+import { InputColor, hslToHex, hexToHsl } from "@/components/ui/input-color"
 import type { ThemeColors } from "@/lib/theme/types"
-
-// Convert HSL string "H S% L%" to hex color
-function hslToHex(hsl: string): string {
-  const parts = hsl.trim().split(/\s+/)
-  const h = parseFloat(parts[0]) || 0
-  const s = parseFloat(parts[1]) || 0
-  const l = parseFloat(parts[2]) || 0
-
-  const sNorm = s / 100
-  const lNorm = l / 100
-
-  const c = (1 - Math.abs(2 * lNorm - 1)) * sNorm
-  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
-  const m = lNorm - c / 2
-
-  let r = 0, g = 0, b = 0
-
-  if (h >= 0 && h < 60) {
-    r = c; g = x; b = 0
-  } else if (h >= 60 && h < 120) {
-    r = x; g = c; b = 0
-  } else if (h >= 120 && h < 180) {
-    r = 0; g = c; b = x
-  } else if (h >= 180 && h < 240) {
-    r = 0; g = x; b = c
-  } else if (h >= 240 && h < 300) {
-    r = x; g = 0; b = c
-  } else {
-    r = c; g = 0; b = x
-  }
-
-  const toHex = (n: number) => {
-    const hex = Math.round((n + m) * 255).toString(16)
-    return hex.length === 1 ? '0' + hex : hex
-  }
-
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`
-}
-
-// Convert hex to HSL string "H S% L%"
-function hexToHsl(hex: string): string {
-  let r = 0, g = 0, b = 0
-
-  if (hex.length === 4) {
-    r = parseInt(hex[1] + hex[1], 16)
-    g = parseInt(hex[2] + hex[2], 16)
-    b = parseInt(hex[3] + hex[3], 16)
-  } else if (hex.length === 7) {
-    r = parseInt(hex.slice(1, 3), 16)
-    g = parseInt(hex.slice(3, 5), 16)
-    b = parseInt(hex.slice(5, 7), 16)
-  }
-
-  r /= 255
-  g /= 255
-  b /= 255
-
-  const max = Math.max(r, g, b)
-  const min = Math.min(r, g, b)
-  let h = 0
-  let s = 0
-  const l = (max + min) / 2
-
-  if (max !== min) {
-    const d = max - min
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
-
-    switch (max) {
-      case r:
-        h = ((g - b) / d + (g < b ? 6 : 0)) / 6
-        break
-      case g:
-        h = ((b - r) / d + 2) / 6
-        break
-      case b:
-        h = ((r - g) / d + 4) / 6
-        break
-    }
-  }
-
-  return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`
-}
 
 interface ColorFieldProps {
   label: string
@@ -95,23 +13,10 @@ interface ColorFieldProps {
 }
 
 function ColorField({ label, description, value, onChange }: ColorFieldProps) {
-  const hexValue = hslToHex(value)
-
   return (
     <div className="group flex items-center gap-4 p-4 rounded-xl hover:bg-muted/40 transition-colors">
-      {/* Color swatch - larger and more prominent */}
-      <div className="relative">
-        <input
-          type="color"
-          value={hexValue}
-          onChange={(e) => onChange(hexToHsl(e.target.value))}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-        />
-        <div
-          className="w-12 h-12 rounded-xl shadow-sm border-2 border-white/20 ring-1 ring-black/5 transition-transform group-hover:scale-105"
-          style={{ backgroundColor: hexValue }}
-        />
-      </div>
+      {/* Color picker */}
+      <InputColor value={value} onChange={onChange} />
 
       {/* Label and description */}
       <div className="flex-1 min-w-0">
@@ -121,13 +26,10 @@ function ColorField({ label, description, value, onChange }: ColorFieldProps) {
         )}
       </div>
 
-      {/* HSL input */}
-      <Input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-40 font-mono text-xs h-9 bg-muted/50 border-0 focus-visible:ring-1"
-        placeholder="H S% L%"
-      />
+      {/* HSL value display */}
+      <div className="text-xs font-mono text-muted-foreground bg-muted/50 px-2 py-1 rounded hidden sm:block">
+        {value}
+      </div>
     </div>
   )
 }
