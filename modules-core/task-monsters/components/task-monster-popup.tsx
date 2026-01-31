@@ -373,21 +373,35 @@ function MonsterIllustration({ type, primary, secondary }: { type: MonsterType; 
           <circle cx="55" cy="70" r="3" fill="#1a1a1a" />
         </svg>
       )
-    case "demon":
+    case "dragon":
       return (
         <svg viewBox="0 0 100 100" className="w-full h-full">
-          <rect x="32" y="40" width="36" height="40" rx="3" fill={primary} />
-          <rect x="34" y="15" width="32" height="30" rx="3" fill={primary} />
-          <polygon points="38,18 32,2 42,12" fill={secondary} />
-          <polygon points="62,18 68,2 58,12" fill={secondary} />
-          <rect x="42" y="28" width="6" height="4" fill="#ffff00" />
-          <rect x="52" y="28" width="6" height="4" fill="#ffff00" />
-          <polygon points="20,45 32,35 32,65" fill={secondary} />
-          <polygon points="80,45 68,35 68,65" fill={secondary} />
-          <rect x="46" y="78" width="8" height="20" fill={primary} />
-          <polygon points="50,98 45,92 55,92" fill={secondary} />
-          <rect x="38" y="78" width="10" height="15" rx="2" fill={primary} />
-          <rect x="52" y="78" width="10" height="15" rx="2" fill={primary} />
+          {/* Body */}
+          <ellipse cx="50" cy="55" rx="22" ry="18" fill={primary} />
+          {/* Head */}
+          <ellipse cx="50" cy="32" rx="16" ry="14" fill={primary} />
+          {/* Snout */}
+          <ellipse cx="50" cy="40" rx="10" ry="6" fill={primary} />
+          {/* Eyes */}
+          <circle cx="43" cy="28" r="5" fill="white" />
+          <circle cx="57" cy="28" r="5" fill="white" />
+          <circle cx="44" cy="29" r="2.5" fill="#1a1a1a" />
+          <circle cx="58" cy="29" r="2.5" fill="#1a1a1a" />
+          {/* Nostrils */}
+          <circle cx="46" cy="42" r="2" fill="#1a1a1a" />
+          <circle cx="54" cy="42" r="2" fill="#1a1a1a" />
+          {/* Small horns */}
+          <polygon points="38,20 35,8 42,16" fill={secondary} />
+          <polygon points="62,20 65,8 58,16" fill={secondary} />
+          {/* Wings */}
+          <ellipse cx="25" cy="50" rx="12" ry="18" fill={secondary} opacity="0.9" />
+          <ellipse cx="75" cy="50" rx="12" ry="18" fill={secondary} opacity="0.9" />
+          {/* Tail */}
+          <path d="M 68 60 Q 85 65 90 55 Q 95 45 88 42" stroke={primary} strokeWidth="8" fill="none" strokeLinecap="round" />
+          <polygon points="88,38 95,42 88,48" fill={secondary} />
+          {/* Legs */}
+          <rect x="35" y="68" width="10" height="14" rx="3" fill={primary} />
+          <rect x="55" y="68" width="10" height="14" rx="3" fill={primary} />
         </svg>
       )
     case "blob":

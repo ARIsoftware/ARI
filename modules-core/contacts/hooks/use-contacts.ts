@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import type { Contact } from '@/modules/contacts/lib/contacts'
+import type { Contact } from '../lib/contacts'
 
 /**
  * Fetch all contacts for the current user.
@@ -9,7 +9,7 @@ export function useContacts() {
   return useQuery({
     queryKey: ['contacts'],
     queryFn: async (): Promise<Contact[]> => {
-      const res = await fetch('/api/contacts')
+      const res = await fetch('/api/modules/contacts')
       if (!res.ok) {
         const error = await res.json()
         throw new Error(error.error || 'Failed to fetch contacts')

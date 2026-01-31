@@ -2,7 +2,7 @@
  * Mail Stream Module - Settings Page
  *
  * Configure retention period for webhook events.
- * Route: /mail-stream/settings
+ * Route: /mailstream/settings
  */
 
 'use client'
@@ -23,7 +23,7 @@ import { Loader2, Save, CheckCircle2, AlertTriangle } from 'lucide-react'
 import {
   useMailStreamSettings,
   useUpdateMailStreamSettings,
-} from '@/lib/hooks/use-mail-stream'
+} from '../../hooks/use-mail-stream'
 import { RETENTION_OPTIONS, DEFAULT_MAIL_STREAM_SETTINGS } from '../../types'
 
 export default function MailStreamSettingsPage() {

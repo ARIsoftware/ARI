@@ -32,7 +32,7 @@ import {
   useCreateAriLaunchEntry,
   useUpdateAriLaunchEntry,
   useDeleteAriLaunchEntry,
-} from '@/lib/hooks/use-ari-launch'
+} from '../hooks/use-ari-launch'
 import type { AriLaunchEntry } from '../types'
 
 const TOTAL_DAYS = 45

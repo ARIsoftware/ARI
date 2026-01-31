@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import type { FitnessTask } from '@/modules/daily-fitness/lib/fitness'
+import type { FitnessTask } from '../lib/fitness'
 
 /**
  * Fetch all fitness tasks for the current user.
@@ -8,7 +8,7 @@ export function useFitnessTasks() {
   return useQuery({
     queryKey: ['fitness-tasks'],
     queryFn: async (): Promise<FitnessTask[]> => {
-      const res = await fetch('/api/fitness')
+      const res = await fetch('/api/modules/daily-fitness', { credentials: 'include' })
       if (!res.ok) {
         const error = await res.json()
         throw new Error(error.error || 'Failed to fetch fitness tasks')

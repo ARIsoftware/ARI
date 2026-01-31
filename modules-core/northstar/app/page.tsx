@@ -1,7 +1,7 @@
 import { DM_Sans } from "next/font/google"
 import NorthstarClient from "@/modules/northstar/components/northstar-client"
 import { getAuthenticatedUser } from "@/lib/auth-helpers"
-import { getRandomQuote } from "@/lib/quotes-server"
+import { getRandomQuote } from "../lib/quotes-server"
 
 const dmSans = DM_Sans({
   subsets: ["latin"],

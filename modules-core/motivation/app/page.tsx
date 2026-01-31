@@ -327,20 +327,28 @@ export default function MotivationPage() {
   const loadMotivationItems = async () => {
     try {
       setError(null);
-      const { data, error } = await supabase
-        .from("motivation_content")
-        .select("*")
-        .order("position", { ascending: true })
-        .order("created_at", { ascending: false });
+      const response = await fetch('/api/modules/motivation', {
+        credentials: 'include',
+      });
 
-      if (error) {
-        if (error.message.includes("relation") && error.message.includes("does not exist")) {
-          console.log("Table doesn't exist yet");
-          return;
-        }
-        throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to load items');
       }
-      setItems(data || []);
+
+      const data = await response.json();
+      // Map snake_case from API to camelCase for component
+      const mappedData = data.map((item: any) => ({
+        id: item.id,
+        type: item.type,
+        title: item.title,
+        url: item.url,
+        thumbnail_url: item.thumbnail_url || item.thumbnailUrl,
+        image_url: item.image_url || item.imageUrl,
+        position: item.position,
+        created_at: item.created_at || item.createdAt,
+      }));
+      setItems(mappedData || []);
     } catch (error: any) {
       console.error("Error loading motivation items:", error);
       setError(error.message || "Failed to load items");
@@ -349,12 +357,16 @@ export default function MotivationPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from("motivation_content")
-        .delete()
-        .eq("id", id);
+      const response = await fetch(`/api/modules/motivation?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete item');
+      }
+
       setItems(items.filter((item) => item.id !== id));
     } catch (error) {
       console.error("Error deleting item:", error);

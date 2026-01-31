@@ -24,7 +24,7 @@ import {
   formatNextContactDate,
   type Contact
 } from "@/modules/contacts/lib/contacts"
-import { useContacts } from "@/lib/hooks/use-contacts"
+import { useContacts } from "../hooks/use-contacts"
 import { useToast } from "@/hooks/use-toast"
 
 const dmSans = DM_Sans({

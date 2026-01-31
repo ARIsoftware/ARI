@@ -9,11 +9,11 @@
  * - Error handling
  *
  * Usage:
- *   import { useHelloWorldEntries, useCreateHelloWorldEntry } from '@/lib/hooks/use-hello-world'
+ *   import { useHelloWorldEntries, useCreateHelloWorldEntry } from '@/modules/hello-world/hooks/use-hello-world'
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { HelloWorldEntry, HelloWorldSettings } from '@/modules/hello-world/types'
+import type { HelloWorldEntry, HelloWorldSettings } from '../types'
 
 // Query keys
 const ENTRIES_KEY = ['hello-world-entries']

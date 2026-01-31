@@ -5,7 +5,7 @@ import { useRef, useState, useEffect } from "react"
 import { useFrame } from "@react-three/fiber"
 import * as THREE from "three"
 
-export type MonsterType = "slime" | "cyclops" | "ghost" | "goblin" | "spider" | "mushroom" | "demon" | "blob"
+export type MonsterType = "slime" | "cyclops" | "ghost" | "goblin" | "spider" | "mushroom" | "dragon" | "blob"
 
 interface VoxelMonsterProps {
   monsterType: MonsterType
@@ -130,8 +130,8 @@ export default function VoxelMonster({
         return <SpiderMonster primaryColor={primaryColor} secondaryColor={secondaryColor} limbRefs={limbRefs} />
       case "mushroom":
         return <MushroomMonster primaryColor={primaryColor} secondaryColor={secondaryColor} limbRefs={limbRefs} />
-      case "demon":
-        return <DemonMonster primaryColor={primaryColor} secondaryColor={secondaryColor} limbRefs={limbRefs} />
+      case "dragon":
+        return <DragonMonster primaryColor={primaryColor} secondaryColor={secondaryColor} limbRefs={limbRefs} />
       case "blob":
         return <BlobMonster primaryColor={primaryColor} secondaryColor={secondaryColor} />
       default:
@@ -498,58 +498,85 @@ function MushroomMonster({
   )
 }
 
-// Demon Monster - fiery imp
-function DemonMonster({
+// Dragon Monster - friendly winged creature (larger)
+function DragonMonster({
   primaryColor,
   secondaryColor,
   limbRefs,
 }: { primaryColor: string; secondaryColor: string; limbRefs: React.MutableRefObject<THREE.Mesh[]> }) {
   return (
-    <group>
+    <group scale={[1.4, 1.4, 1.4]}>
       {/* Body */}
       <mesh position={[0, 0.45, 0]} castShadow>
-        <boxGeometry args={[0.4, 0.5, 0.3]} />
+        <boxGeometry args={[0.45, 0.5, 0.65]} />
         <meshStandardMaterial color={primaryColor} />
       </mesh>
       {/* Head */}
-      <mesh position={[0, 0.95, 0]} castShadow>
-        <boxGeometry args={[0.38, 0.4, 0.35]} />
+      <mesh position={[0, 0.9, 0.28]} castShadow>
+        <boxGeometry args={[0.38, 0.38, 0.42]} />
         <meshStandardMaterial color={primaryColor} />
       </mesh>
-      {/* Horns */}
-      <mesh position={[-0.15, 1.25, 0]} rotation={[0.2, 0, -0.2]}>
-        <coneGeometry args={[0.06, 0.3, 4]} />
-        <meshStandardMaterial color={secondaryColor} />
+      {/* Snout */}
+      <mesh position={[0, 0.82, 0.58]} castShadow>
+        <boxGeometry args={[0.25, 0.2, 0.25]} />
+        <meshStandardMaterial color={primaryColor} />
       </mesh>
-      <mesh position={[0.15, 1.25, 0]} rotation={[0.2, 0, 0.2]}>
-        <coneGeometry args={[0.06, 0.3, 4]} />
-        <meshStandardMaterial color={secondaryColor} />
+      {/* Nostrils */}
+      <mesh position={[-0.06, 0.85, 0.72]}>
+        <sphereGeometry args={[0.03, 6, 6]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+      <mesh position={[0.06, 0.85, 0.72]}>
+        <sphereGeometry args={[0.03, 6, 6]} />
+        <meshStandardMaterial color="#1a1a1a" />
       </mesh>
       {/* Eyes */}
-      <mesh position={[-0.1, 1, 0.18]}>
-        <boxGeometry args={[0.08, 0.05, 0.02]} />
-        <meshStandardMaterial color="#ffff00" emissive="#ffaa00" emissiveIntensity={0.8} />
+      <mesh position={[-0.12, 1.0, 0.42]}>
+        <sphereGeometry args={[0.08, 6, 6]} />
+        <meshStandardMaterial color="#ffffff" />
       </mesh>
-      <mesh position={[0.1, 1, 0.18]}>
-        <boxGeometry args={[0.08, 0.05, 0.02]} />
-        <meshStandardMaterial color="#ffff00" emissive="#ffaa00" emissiveIntensity={0.8} />
+      <mesh position={[0.12, 1.0, 0.42]}>
+        <sphereGeometry args={[0.08, 6, 6]} />
+        <meshStandardMaterial color="#ffffff" />
+      </mesh>
+      <mesh position={[-0.12, 1.0, 0.47]}>
+        <sphereGeometry args={[0.04, 6, 6]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+      <mesh position={[0.12, 1.0, 0.47]}>
+        <sphereGeometry args={[0.04, 6, 6]} />
+        <meshStandardMaterial color="#1a1a1a" />
+      </mesh>
+      {/* Horns */}
+      <mesh position={[-0.15, 1.18, 0.2]} rotation={[0.3, 0, -0.3]}>
+        <coneGeometry args={[0.05, 0.22, 4]} />
+        <meshStandardMaterial color={secondaryColor} />
+      </mesh>
+      <mesh position={[0.15, 1.18, 0.2]} rotation={[0.3, 0, 0.3]}>
+        <coneGeometry args={[0.05, 0.22, 4]} />
+        <meshStandardMaterial color={secondaryColor} />
       </mesh>
       {/* Wings */}
-      <mesh position={[-0.3, 0.6, -0.1]} rotation={[0, -0.3, 0.5]}>
-        <boxGeometry args={[0.3, 0.4, 0.03]} />
-        <meshStandardMaterial color={secondaryColor} />
+      <mesh position={[-0.38, 0.65, -0.08]} rotation={[0.2, -0.3, 0.6]}>
+        <boxGeometry args={[0.5, 0.45, 0.03]} />
+        <meshStandardMaterial color={secondaryColor} transparent opacity={0.9} />
       </mesh>
-      <mesh position={[0.3, 0.6, -0.1]} rotation={[0, 0.3, -0.5]}>
-        <boxGeometry args={[0.3, 0.4, 0.03]} />
-        <meshStandardMaterial color={secondaryColor} />
+      <mesh position={[0.38, 0.65, -0.08]} rotation={[0.2, 0.3, -0.6]}>
+        <boxGeometry args={[0.5, 0.45, 0.03]} />
+        <meshStandardMaterial color={secondaryColor} transparent opacity={0.9} />
       </mesh>
       {/* Tail */}
-      <mesh position={[0, 0.3, -0.25]} rotation={[0.5, 0, 0]}>
-        <boxGeometry args={[0.08, 0.08, 0.4]} />
+      <mesh position={[0, 0.4, -0.45]} rotation={[0.3, 0, 0]}>
+        <boxGeometry args={[0.14, 0.14, 0.4]} />
         <meshStandardMaterial color={primaryColor} />
       </mesh>
-      <mesh position={[0, 0.2, -0.5]} rotation={[0.3, 0, 0]}>
-        <coneGeometry args={[0.08, 0.15, 4]} />
+      <mesh position={[0, 0.35, -0.72]} rotation={[0.4, 0, 0]}>
+        <boxGeometry args={[0.1, 0.1, 0.28]} />
+        <meshStandardMaterial color={primaryColor} />
+      </mesh>
+      {/* Tail fin */}
+      <mesh position={[0, 0.38, -0.9]} rotation={[1.2, 0, 0]}>
+        <coneGeometry args={[0.1, 0.16, 3]} />
         <meshStandardMaterial color={secondaryColor} />
       </mesh>
       {/* Legs */}
@@ -557,20 +584,41 @@ function DemonMonster({
         ref={(el) => {
           if (el) limbRefs.current[0] = el
         }}
-        position={[-0.12, 0.1, 0]}
+        position={[-0.15, 0.12, 0.15]}
         castShadow
       >
-        <boxGeometry args={[0.14, 0.25, 0.14]} />
+        <boxGeometry args={[0.15, 0.3, 0.15]} />
         <meshStandardMaterial color={primaryColor} />
       </mesh>
       <mesh
         ref={(el) => {
           if (el) limbRefs.current[1] = el
         }}
-        position={[0.12, 0.1, 0]}
+        position={[0.15, 0.12, 0.15]}
         castShadow
       >
-        <boxGeometry args={[0.14, 0.25, 0.14]} />
+        <boxGeometry args={[0.15, 0.3, 0.15]} />
+        <meshStandardMaterial color={primaryColor} />
+      </mesh>
+      {/* Back legs */}
+      <mesh
+        ref={(el) => {
+          if (el) limbRefs.current[2] = el
+        }}
+        position={[-0.15, 0.12, -0.2]}
+        castShadow
+      >
+        <boxGeometry args={[0.15, 0.3, 0.15]} />
+        <meshStandardMaterial color={primaryColor} />
+      </mesh>
+      <mesh
+        ref={(el) => {
+          if (el) limbRefs.current[3] = el
+        }}
+        position={[0.15, 0.12, -0.2]}
+        castShadow
+      >
+        <boxGeometry args={[0.15, 0.3, 0.15]} />
         <meshStandardMaterial color={primaryColor} />
       </mesh>
     </group>

@@ -5,7 +5,7 @@ import { use } from "react"
 import { useSupabase } from "@/components/providers"
 import { DM_Sans } from "next/font/google"
 import { TaskAnnouncement } from "@/components/task-announcement"
-import { AppSidebar } from "../../../components/app-sidebar"
+import { AppSidebar } from "@/components/app-sidebar"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -27,7 +27,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Switch } from "@/components/ui/switch"
 import { CalendarIcon, Save, X, Pin, ArrowLeft, Loader2, Pencil } from "lucide-react"
 import { useState, useEffect } from "react"
-import { getFitnessTasks, updateFitnessTask, type FitnessTask } from "@/lib/fitness"
+import { getFitnessTasks, updateFitnessTask, type FitnessTask } from "../../../lib/fitness"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
@@ -80,11 +80,11 @@ export default function EditFitnessPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     const loadTask = async () => {
       if (!user?.id) return // Wait for user to be loaded
-      
+
       try {
         const tasks = await getFitnessTasks()
         const foundTask = tasks.find((t) => t.id === id)
-        
+
         if (!foundTask) {
           toast({
             title: "Error",
@@ -107,7 +107,7 @@ export default function EditFitnessPage({ params }: { params: Promise<{ id: stri
           completed: foundTask.completed,
           youtube_url: foundTask.youtube_url || "",
         })
-        
+
         if (foundTask.due_date) {
           setDate(new Date(foundTask.due_date))
         }

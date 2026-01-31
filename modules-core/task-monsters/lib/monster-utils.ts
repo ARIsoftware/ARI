@@ -1,6 +1,6 @@
 import type { Task } from "@/lib/supabase"
 
-export const MONSTER_TYPES = ['slime', 'cyclops', 'ghost', 'goblin', 'spider', 'mushroom', 'demon', 'blob'] as const
+export const MONSTER_TYPES = ['slime', 'cyclops', 'ghost', 'goblin', 'spider', 'mushroom', 'dragon', 'blob'] as const
 
 export type MonsterType = typeof MONSTER_TYPES[number]
 
@@ -11,7 +11,7 @@ export const DEFAULT_MONSTER_COLORS: Record<MonsterType, { primary: string; seco
   goblin: { primary: "#558B2F", secondary: "#33691E" },
   spider: { primary: "#37474F", secondary: "#ff1744" },
   mushroom: { primary: "#E53935", secondary: "#FFEB3B" },
-  demon: { primary: "#C62828", secondary: "#FF6F00" },
+  dragon: { primary: "#D32F2F", secondary: "#FF8A65" },
   blob: { primary: "#00BCD4", secondary: "#006064" },
 }
 
@@ -40,9 +40,9 @@ export const MONSTER_INFO: Record<MonsterType, { name: string; description: stri
     name: "Mushroom",
     description: "Mushroom creatures are adorable fungal beings that waddle through the village on their tiny stem-feet. Their colorful spotted caps release tiny spores that smell like fresh rain and forest flowers.",
   },
-  demon: {
-    name: "Demon",
-    description: "Despite their fearsome appearance with horns, wings, and a pointed tail, village Demons are surprisingly well-mannered creatures. Their glowing eyes and fiery coloring come from their ability to regulate their own body temperature.",
+  dragon: {
+    name: "Dragon",
+    description: "Dragons are majestic winged creatures with shimmering scales and a gentle disposition. Their small wings flutter excitedly when they meet new friends, and they love to curl up in sunny spots around the village.",
   },
   blob: {
     name: "Blob",

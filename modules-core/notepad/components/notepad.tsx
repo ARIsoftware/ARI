@@ -5,7 +5,7 @@ import { X, StickyNote, ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { getNotepad, saveNotepad, getNotepadRevisions, restoreNotepadRevision, NotepadRevision } from "@/lib/notepad"
+import { getNotepad, saveNotepad, getNotepadRevisions, restoreNotepadRevision, NotepadRevision } from "../lib/notepad"
 
 interface NotepadProps {
   isOpen: boolean
