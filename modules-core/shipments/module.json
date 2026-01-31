@@ -1,6 +1,6 @@
 {
   "id": "shipments",
-  "title": "Shipments",
+  "group": "Shipments",
   "name": "Shipment Tracker",
   "description": "Track packages, deliveries, and shipments with status updates and delivery dates",
   "version": "1.0.0",

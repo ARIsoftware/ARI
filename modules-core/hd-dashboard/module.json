@@ -1,7 +1,7 @@
 {
   "id": "hd-dashboard",
   "name": "HD Dashboard",
-  "title": "Dashboard",
+  "group": "Dashboard",
   "description": "High-density dashboard view aggregating tasks, fitness, contacts, and goals",
   "version": "1.0.0",
   "author": "ARI Team",

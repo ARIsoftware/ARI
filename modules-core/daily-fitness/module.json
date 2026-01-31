@@ -1,6 +1,6 @@
 {
   "id": "daily-fitness",
-  "title": "Daily Fitness",
+  "group": "Daily Fitness",
   "name": "Daily Fitness",
   "description": "Track and manage daily fitness exercises with drag-and-drop organization",
   "version": "1.0.0",

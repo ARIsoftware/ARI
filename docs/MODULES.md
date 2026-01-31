@@ -245,7 +245,7 @@ These are the ONLY places where code/configuration must exist outside the module
 
 ```json
 {
-  "title": "Section Title",
+  "group": "Section Name",
   "fullscreen": false,
   "menuPriority": 50,
   "permissions": {
@@ -282,7 +282,7 @@ These are the ONLY places where code/configuration must exist outside the module
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `title` | `string` | Optional title shown above name in sidebar |
+| `group` | `string` | Group name for sidebar organization. Modules with the same group appear together under a shared header. |
 | `fullscreen` | `boolean` | Hide sidebar/header when `true` (default: `false`) |
 | `menuPriority` | `number` | Sort order in sidebar (1-100, lower = higher, default: 50). Users can override via drag-and-drop (Cmd+D), which saves to `module_settings.settings.menuPriority` |
 | `permissions` | `object` | Metadata about module capabilities (informational) |
@@ -330,22 +330,35 @@ When `fullscreen: true`:
 
 Use cases: Games, dashboards, visualization tools, focused experiences.
 
-### Title Field
+### Group Field
 
-Displays a small title above the module name in sidebar:
+Organizes modules into groups in the sidebar. Modules with the same `group` value appear together under a shared header:
 
 ```json
+// tasks/module.json
 {
-  "title": "Welcome!",
-  "name": "Hello World"
+  "group": "Todo",
+  "name": "All Tasks"
+}
+
+// mail-stream/module.json
+{
+  "group": "Todo",
+  "name": "Mail Stream"
 }
 ```
 
 Renders as:
 ```
-Welcome!
-📦 Hello World
+Todo
+✓ All Tasks
+📧 Mail Stream
 ```
+
+**Notes:**
+- Group position is determined by the lowest `menuPriority` among modules in that group
+- Modules without a `group` field appear as standalone items
+- Drag-and-drop (Cmd+D) reorders entire groups as units; modules within a group stay together
 
 ### Top Bar Icon
 

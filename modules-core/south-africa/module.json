@@ -1,6 +1,6 @@
 {
   "id": "south-africa",
-  "title": "South Africa",
+  "group": "South Africa",
   "name": "South Africa",
   "description": "Task and packing list tracker for South Africa trip",
   "version": "1.0.0",

@@ -1,6 +1,6 @@
 {
   "id": "ohtani",
-  "title": "Welcome!",
+  "group": "Welcome!",
   "name": "Ohtani",
   "description": "A 9x9 grid module for personal organization and planning",
   "version": "1.0.0",

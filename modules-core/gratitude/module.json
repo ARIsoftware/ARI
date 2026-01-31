@@ -1,6 +1,6 @@
 {
   "id": "gratitude",
-  "title": "Gratitude",
+  "group": "Gratitude",
   "name": "Gratitude",
   "description": "Daily gratitude journal to reflect on positive moments and appreciate life",
   "version": "1.0.0",

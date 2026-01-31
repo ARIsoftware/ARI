@@ -219,13 +219,18 @@ END $$;
 
 #### Sidebar Module Reordering
 - Press `Cmd+D` to enter drag-and-drop mode
-- Sidebar modules display dashed lightblue outlines
+- Sidebar module groups display blue outlines with glow effect
 - Main content fades to 10% opacity
 - Top bar shows instruction text with X button to exit
-- Drag modules to reorder them
+- Drag entire groups to reorder them (modules within a group stay together)
 - Click X to save order and exit
 - Order is persisted per-user in `module_settings.settings.menuPriority`
 - Uses Swapy library for drag-and-drop functionality
+
+#### Sidebar View Settings
+- Go to Settings > Themes > Sidebar section
+- **Default**: Shows group labels (Overview, Dashboard, Todo, etc.)
+- **Compressed**: Hides group labels for a more compact sidebar
 
 ## File Structure
 
