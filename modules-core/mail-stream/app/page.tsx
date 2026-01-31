@@ -36,11 +36,6 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
-import {
   Mail,
   Users,
   Globe,
@@ -134,42 +129,43 @@ function EventRow({
     : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <TableRow className="cursor-pointer hover:bg-muted/50">
-        <TableCell>
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm" className="p-0 h-auto">
-              {isOpen ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-            </Button>
-          </CollapsibleTrigger>
+    <>
+      <TableRow
+        className="cursor-pointer hover:bg-muted/50"
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <TableCell className="p-2 w-10">
+          <Button variant="ghost" size="sm" className="p-0 h-auto">
+            {isOpen ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </Button>
         </TableCell>
-        <TableCell>
+        <TableCell className="p-2">
           <Badge variant="outline" className={categoryColor}>
             {event.event_category}
           </Badge>
         </TableCell>
-        <TableCell>
+        <TableCell className="p-2">
           <Badge className={statusColor}>
             {statusLabel}
           </Badge>
         </TableCell>
-        <TableCell className="max-w-[200px] truncate">
+        <TableCell className="p-2 max-w-[150px] truncate">
           {event.to_addresses?.join(', ') || '-'}
         </TableCell>
-        <TableCell className="max-w-[250px] truncate">
+        <TableCell className="p-2 max-w-[200px] truncate">
           {event.subject || '-'}
         </TableCell>
-        <TableCell className="text-muted-foreground">
+        <TableCell className="p-2 max-w-[180px] text-muted-foreground truncate">
           {event.from_address || '-'}
         </TableCell>
-        <TableCell className="text-muted-foreground whitespace-nowrap">
+        <TableCell className="p-2 text-muted-foreground whitespace-nowrap">
           {formatRelativeTime(event.created_at)}
         </TableCell>
-        <TableCell>
+        <TableCell className="p-2 w-12">
           <Button
             variant="ghost"
             size="sm"
@@ -188,7 +184,7 @@ function EventRow({
           </Button>
         </TableCell>
       </TableRow>
-      <CollapsibleContent asChild>
+      {isOpen && (
         <TableRow className="bg-muted/30">
           <TableCell colSpan={8} className="p-4">
             <div className="space-y-3">
@@ -249,8 +245,8 @@ function EventRow({
             </div>
           </TableCell>
         </TableRow>
-      </CollapsibleContent>
-    </Collapsible>
+      )}
+    </>
   )
 }
 
@@ -429,7 +425,7 @@ export default function MailStreamPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 overflow-hidden">
       {/* Loading overlay */}
       {isLoading && (
         <div className="fixed inset-0 bg-background/50 flex items-center justify-center z-50">
@@ -458,43 +454,11 @@ export default function MailStreamPage() {
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="space-y-4">
-        {/* Category tabs */}
-        <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit">
-          {CATEGORY_TABS.map((tab) => (
-            <Button
-              key={tab.value}
-              variant={filters.category === tab.value ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setFilters((f) => ({ ...f, category: tab.value as any }))}
-              className="gap-2"
-            >
-              {tab.icon && <tab.icon className="w-4 h-4" />}
-              {tab.label}
-            </Button>
-          ))}
-        </div>
-
-        {/* Status tabs (only show for email category) */}
-        {(filters.category === 'all' || filters.category === 'email') && (
-          <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit">
-            {STATUS_TABS.map((tab) => (
-              <Button
-                key={tab.value}
-                variant={filters.status === tab.value ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setFilters((f) => ({ ...f, status: tab.value as any }))}
-              >
-                {tab.label}
-              </Button>
-            ))}
-          </div>
-        )}
-
+      {/* Search and Filters */}
+      <div className="flex flex-wrap items-center gap-4">
         {/* Search */}
-        <form onSubmit={handleSearch} className="flex gap-2 max-w-md">
-          <div className="relative flex-1">
+        <form onSubmit={handleSearch} className="flex gap-2 flex-1 min-w-[300px]">
+          <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search by recipient, subject, or sender..."
@@ -519,21 +483,69 @@ export default function MailStreamPage() {
             </Button>
           )}
         </form>
+
+        {/* Filters */}
+        <div className="flex items-center gap-4">
+          {/* Category filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">View:</span>
+            <Select
+              value={filters.category}
+              onValueChange={(value) => setFilters((f) => ({ ...f, category: value as any }))}
+            >
+              <SelectTrigger className="w-[130px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CATEGORY_TABS.map((tab) => (
+                  <SelectItem key={tab.value} value={tab.value}>
+                    <div className="flex items-center gap-2">
+                      {tab.icon && <tab.icon className="w-4 h-4" />}
+                      {tab.label}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Status filter (only show for email category) */}
+          {(filters.category === 'all' || filters.category === 'email') && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Status:</span>
+              <Select
+                value={filters.status}
+                onValueChange={(value) => setFilters((f) => ({ ...f, status: value as any }))}
+              >
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_TABS.map((tab) => (
+                    <SelectItem key={tab.value} value={tab.value}>
+                      {tab.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Events Table */}
-      <div className="border rounded-lg">
+      <div className="border rounded-lg overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[40px]"></TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>To</TableHead>
-              <TableHead>Subject</TableHead>
-              <TableHead>From</TableHead>
-              <TableHead>Age</TableHead>
-              <TableHead className="w-[60px]">Actions</TableHead>
+              <TableHead className="w-10 p-2"></TableHead>
+              <TableHead className="p-2">Category</TableHead>
+              <TableHead className="p-2">Status</TableHead>
+              <TableHead className="p-2">To</TableHead>
+              <TableHead className="p-2">Subject</TableHead>
+              <TableHead className="p-2">From</TableHead>
+              <TableHead className="p-2">Age</TableHead>
+              <TableHead className="w-12 p-2"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
