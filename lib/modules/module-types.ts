@@ -100,6 +100,42 @@ export interface ModulePermissions {
 }
 
 /**
+ * Public Route Security Configuration
+ * Defines security requirements for public (unauthenticated) API routes
+ */
+export interface PublicRouteSecurity {
+  /** Security mechanism type */
+  type: 'webhook_signature' | 'api_key' | 'rate_limit_only' | 'ip_allowlist' | 'custom'
+  /** Environment variable containing the webhook signing secret (for webhook_signature type) */
+  secretEnvVar?: string
+  /** Environment variable containing the API key (for api_key type) */
+  apiKeyEnvVar?: string
+  /** Header name for API key (default: 'x-api-key') */
+  apiKeyHeader?: string
+  /** Allowed IP addresses (for ip_allowlist type) */
+  allowedIps?: string[]
+  /** Rate limit: maximum requests per minute (optional, applies to all types) */
+  rateLimit?: number
+  /** Description of custom security implementation (for custom type) */
+  customDescription?: string
+}
+
+/**
+ * Public Route Configuration
+ * Defines a public (unauthenticated) API route with mandatory security
+ */
+export interface PublicRouteConfig {
+  /** API path relative to module (e.g., "webhook" for /api/modules/{moduleId}/webhook) */
+  path: string
+  /** Allowed HTTP methods */
+  methods: ('GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE')[]
+  /** Security configuration - REQUIRED for all public routes */
+  security: PublicRouteSecurity
+  /** Human-readable description of the endpoint */
+  description?: string
+}
+
+/**
  * Module Manifest
  * The complete module.json structure
  */
@@ -140,6 +176,8 @@ export interface ModuleManifest {
   topBarIcon?: ModuleTopBarIcon
   /** Submenu configuration - if present, clicking the menu item shows a sliding submenu */
   submenu?: ModuleSubmenuConfig
+  /** Public (unauthenticated) API routes with mandatory security configuration */
+  publicRoutes?: PublicRouteConfig[]
 }
 
 /**
