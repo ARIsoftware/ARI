@@ -12,6 +12,21 @@ import { useToast } from '@/hooks/use-toast'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Label } from '@/components/ui/label'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -35,9 +50,12 @@ import {
   ChevronDown,
   ChevronRight,
   RefreshCw,
+  Inbox,
 } from 'lucide-react'
 import {
   useMailStreamEvents,
+  useMailStreamSettings,
+  useUpdateMailStreamSettings,
   useDeleteMailStreamEvent,
 } from '@/lib/hooks/use-mail-stream'
 import type {
@@ -49,6 +67,7 @@ import type {
 import {
   STATUS_COLORS,
   CATEGORY_COLORS,
+  RETENTION_OPTIONS,
 } from '../types'
 
 /**
@@ -238,6 +257,11 @@ function EventRow({
 export default function MailStreamPage() {
   const { toast } = useToast()
 
+  // Settings and setup state
+  const { data: settings, isLoading: settingsLoading } = useMailStreamSettings()
+  const updateSettings = useUpdateMailStreamSettings()
+  const [setupRetention, setSetupRetention] = useState<7 | 30 | 90 | 360 | -1>(-1)
+
   // Filter state
   const [filters, setFilters] = useState<MailStreamFilters>({
     category: 'all',
@@ -252,6 +276,138 @@ export default function MailStreamPage() {
 
   const events = data?.events || []
   const totalCount = data?.total || 0
+
+  // Handle setup completion
+  const handleCompleteSetup = () => {
+    updateSettings.mutate(
+      { retention_days: setupRetention, setup_complete: true },
+      {
+        onSuccess: () => {
+          toast({
+            title: 'Setup complete',
+            description: 'Mail Stream is ready to receive webhook events.',
+          })
+        },
+        onError: () => {
+          toast({
+            variant: 'destructive',
+            title: 'Setup failed',
+            description: 'Please try again.',
+          })
+        },
+      }
+    )
+  }
+
+  // Show loading while fetching settings
+  if (settingsLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center h-64">
+        <div className="flex items-center gap-2">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <span>Loading...</span>
+        </div>
+      </div>
+    )
+  }
+
+  // Show setup screen if not completed
+  if (!settings?.setup_complete) {
+    return (
+      <div className="p-6 max-w-2xl mx-auto">
+        <Card>
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+              <Inbox className="h-8 w-8 text-primary" />
+            </div>
+            <CardTitle className="text-2xl">Welcome to Mail Stream</CardTitle>
+            <CardDescription>
+              Configure your webhook settings to start receiving email events from Resend.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Webhook Configuration */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Webhook Configuration</h3>
+              <div className="space-y-2">
+                <Label>Webhook URL</Label>
+                <div className="p-3 bg-muted rounded-lg font-mono text-sm break-all">
+                  https://YOUR-DOMAIN/api/modules/mail-stream/webhook
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Add this URL in your Resend dashboard under Webhooks
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Environment Variable</Label>
+                <div className="p-3 bg-muted rounded-lg font-mono text-sm">
+                  RESEND_WEBHOOK_SECRET=whsec_your_secret_here
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Copy the signing secret from Resend and add it to your local .env.local and/or Vercel environment variables.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Event Types</Label>
+                <p className="text-sm text-muted-foreground">
+                  Select &quot;All Events&quot; in Resend to capture all email, contact, and domain events.
+                </p>
+              </div>
+            </div>
+
+            {/* Data Retention */}
+            <div className="space-y-4 pt-4 border-t">
+              <h3 className="text-lg font-medium">Data Retention</h3>
+              <div className="space-y-2">
+                <Label htmlFor="setup-retention">Retention Period</Label>
+                <Select
+                  value={setupRetention.toString()}
+                  onValueChange={(value) => setSetupRetention(parseInt(value) as 7 | 30 | 90 | 360 | -1)}
+                >
+                  <SelectTrigger id="setup-retention" className="w-[200px]">
+                    <SelectValue placeholder="Select retention" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {RETENTION_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value.toString()}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  {setupRetention === -1
+                    ? 'Events will be kept forever. You can change this in settings later.'
+                    : `Events older than ${setupRetention} days will be automatically deleted.`}
+                </p>
+              </div>
+            </div>
+
+            {/* Done Button */}
+            <div className="pt-4">
+              <Button
+                onClick={handleCompleteSetup}
+                disabled={updateSettings.isPending}
+                className="w-full"
+                size="lg"
+              >
+                {updateSettings.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Done'
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   // Handle search
   const handleSearch = (e: React.FormEvent) => {

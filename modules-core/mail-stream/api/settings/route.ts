@@ -24,7 +24,8 @@ const UpdateSettingsSchema = z.object({
   retention_days: z.number().refine(
     (val) => val === -1 || [7, 30, 90, 360].includes(val),
     { message: 'Invalid retention period' }
-  )
+  ).optional(),
+  setup_complete: z.boolean().optional()
 })
 
 /**
@@ -53,7 +54,8 @@ export async function GET(request: NextRequest) {
       // Return defaults if no settings exist
       return NextResponse.json({
         settings: {
-          retention_days: 30
+          retention_days: -1,
+          setup_complete: false
         }
       })
     }
@@ -96,7 +98,7 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    const { retention_days } = parseResult.data
+    const { retention_days, setup_complete } = parseResult.data
 
     await withAdminDb(async (db) => {
       // Check if settings exist
@@ -105,23 +107,32 @@ export async function PUT(request: NextRequest) {
         .from(mailStreamSettings)
         .limit(1)
 
+      // Build the values object with only provided fields
+      const updateValues: Record<string, any> = {
+        updatedAt: new Date().toISOString()
+      }
+      if (retention_days !== undefined) {
+        updateValues.retentionDays = retention_days
+      }
+      if (setup_complete !== undefined) {
+        updateValues.setupComplete = setup_complete
+      }
+
       if (existingSettings.length === 0) {
-        // Insert new settings
+        // Insert new settings with defaults
         await db.insert(mailStreamSettings).values({
-          retentionDays: retention_days
+          retentionDays: retention_days ?? -1,
+          setupComplete: setup_complete ?? false
         })
       } else {
         // Update existing settings
         await db
           .update(mailStreamSettings)
-          .set({
-            retentionDays: retention_days,
-            updatedAt: new Date().toISOString()
-          })
+          .set(updateValues)
       }
 
-      // If retention is not indefinite, cleanup old events
-      if (retention_days !== -1) {
+      // If retention is set and not indefinite, cleanup old events
+      if (retention_days !== undefined && retention_days !== -1) {
         const cutoffDate = new Date()
         cutoffDate.setDate(cutoffDate.getDate() - retention_days)
 
