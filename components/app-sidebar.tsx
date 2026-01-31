@@ -10,6 +10,7 @@ import { menuConfig, getUrlToFeatureMap } from "@/lib/menu-config"
 import { useEnabledModulesFromContext } from "@/lib/modules/context"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
 import { useDragDropMode } from "@/components/drag-drop-mode-context"
+import { useTheme } from "@/lib/theme/theme-context"
 import {
   Sidebar,
   SidebarContent,
@@ -37,6 +38,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   // Drag and drop mode
   const { isDragMode, setPendingOrder } = useDragDropMode()
+
+  // Theme settings for sidebar view
+  const { sidebarView } = useTheme()
+  const isCompressed = sidebarView === 'compressed'
   const sidebarRef = useRef<HTMLDivElement>(null)
   const swapyRef = useRef<Swapy | null>(null)
 
@@ -53,10 +58,29 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
           swapyRef.current.onSwapEnd((event) => {
             // Convert swap result to menuPriority mapping
+            // For groups, we set all modules in the group to the same base priority
             const newOrder: Record<string, number> = {}
             event.slotItemMap.asArray.forEach((item, index) => {
               if (item.item) {
-                newOrder[item.item] = (index + 1) * 10 // Priority 10, 20, 30, etc.
+                const basePriority = (index + 1) * 10 // Priority 10, 20, 30, etc.
+
+                if (item.item.startsWith('group-')) {
+                  // For groups, find all modules in this group and set their priority
+                  const groupTitle = item.item.replace('group-', '')
+                  const allRenderItems = [...mainRenderItems, ...bottomRenderItems]
+                  const groupItem = allRenderItems.find(
+                    ri => ri.type === 'group' && ri.title === groupTitle
+                  )
+                  if (groupItem && groupItem.type === 'group') {
+                    groupItem.modules.forEach((mod, modIndex) => {
+                      // Add small offset to maintain order within group
+                      newOrder[mod.id] = basePriority + modIndex * 0.1
+                    })
+                  }
+                } else {
+                  // Single module
+                  newOrder[item.item] = basePriority
+                }
               }
             })
             setPendingOrder(newOrder)
@@ -109,6 +133,80 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const mainModules = sortModules(mainModulesUnsorted)
   const bottomModules = sortModules(bottomModulesUnsorted)
+
+  // Group modules by title/group field
+  // Modules with same title are collected together; ungrouped modules render individually
+  type ModuleGroup = {
+    type: 'group'
+    title: string
+    modules: typeof mainModules
+    minPriority: number
+  }
+  type SingleModule = {
+    type: 'single'
+    module: typeof mainModules[0]
+    minPriority: number
+  }
+  type RenderItem = ModuleGroup | SingleModule
+
+  const groupModulesForRender = (
+    modules: typeof mainModules,
+    position: 'main' | 'bottom'
+  ): RenderItem[] => {
+    // Filter to modules that have routes for this position
+    const modulesWithRoutes = modules.filter(module => {
+      const routes = module.routes?.filter(r => r.sidebarPosition === position) || []
+      return routes.length > 0
+    })
+
+    // Collect modules by title (group field)
+    const grouped: Record<string, typeof mainModules> = {}
+    const ungrouped: typeof mainModules = []
+
+    for (const module of modulesWithRoutes) {
+      const groupName = module.group
+      if (groupName) {
+        if (!grouped[groupName]) {
+          grouped[groupName] = []
+        }
+        grouped[groupName].push(module)
+      } else {
+        ungrouped.push(module)
+      }
+    }
+
+    // Build render items
+    const renderItems: RenderItem[] = []
+
+    // Add groups
+    for (const [title, mods] of Object.entries(grouped)) {
+      // Sort modules within group by menuPriority
+      mods.sort((a, b) => (a.menuPriority ?? 50) - (b.menuPriority ?? 50))
+      renderItems.push({
+        type: 'group',
+        title,
+        modules: mods,
+        minPriority: Math.min(...mods.map(m => m.menuPriority ?? 50))
+      })
+    }
+
+    // Add ungrouped modules as singles
+    for (const module of ungrouped) {
+      renderItems.push({
+        type: 'single',
+        module,
+        minPriority: module.menuPriority ?? 50
+      })
+    }
+
+    // Sort all render items by minPriority
+    renderItems.sort((a, b) => a.minPriority - b.minPriority)
+
+    return renderItems
+  }
+
+  const mainRenderItems = groupModulesForRender(mainModules, 'main')
+  const bottomRenderItems = groupModulesForRender(bottomModules, 'bottom')
 
   // Filter items based on feature preferences
   const filterItems = (items: typeof menuConfig[0]['items']) => {
@@ -172,7 +270,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {/* Core navigation groups - not draggable */}
         {filteredNavMain.map((item) => (
           <SidebarGroup key={item.title}>
-            <SidebarGroupLabel>{item.title}</SidebarGroupLabel>
+            {!isCompressed && <SidebarGroupLabel>{item.title}</SidebarGroupLabel>}
             <SidebarGroupContent>
               <SidebarMenu>
                 {item.items.map((item) => (
@@ -190,24 +288,200 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarGroup>
         ))}
 
-        {/* Draggable modules container */}
-        <div ref={sidebarRef} className="swapy-container">
-          {/* Module navigation - Main position */}
-          {mainModules.map((module) => {
-            const mainRoutes = module.routes?.filter(r => r.sidebarPosition === 'main') || []
-            if (mainRoutes.length === 0) return null
-            const hasSubmenu = !!module.submenu?.component
+        {/* Modules container - groups are draggable units */}
+        {isDragMode ? (
+          /* Drag mode: Groups as draggable units */
+          <div ref={sidebarRef} className="swapy-container">
+            {/* Main position render items */}
+            {mainRenderItems.map((item) => {
+              const itemId = item.type === 'group' ? `group-${item.title}` : item.module.id
 
-            return (
-              <div key={module.id} data-swapy-slot={module.id}>
-                <div data-swapy-item={module.id}>
-                  <SidebarGroup className={dragModeClass}>
-                    {module.title && <SidebarGroupLabel>{module.title}</SidebarGroupLabel>}
+              if (item.type === 'group') {
+                return (
+                  <div key={itemId} data-swapy-slot={itemId}>
+                    <div data-swapy-item={itemId} className={dragModeClass}>
+                      <SidebarGroup>
+                        <SidebarGroupLabel>{item.title}</SidebarGroupLabel>
+                        <SidebarGroupContent>
+                          <SidebarMenu>
+                            {item.modules.map((module) => {
+                              const mainRoutes = module.routes?.filter(r => r.sidebarPosition === 'main') || []
+                              const hasSubmenu = !!module.submenu?.component
+                              return mainRoutes.map((route) => {
+                                const Icon = getLucideIcon(route.icon || module.icon)
+                                return (
+                                  <SidebarMenuItem key={route.path}>
+                                    <SidebarMenuButton asChild>
+                                      <a href={route.path} className="flex items-center">
+                                        <Icon className="mr-2 size-4" />
+                                        <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
+                                        {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
+                                      </a>
+                                    </SidebarMenuButton>
+                                  </SidebarMenuItem>
+                                )
+                              })
+                            })}
+                          </SidebarMenu>
+                        </SidebarGroupContent>
+                      </SidebarGroup>
+                    </div>
+                  </div>
+                )
+              } else {
+                const module = item.module
+                const mainRoutes = module.routes?.filter(r => r.sidebarPosition === 'main') || []
+                const hasSubmenu = !!module.submenu?.component
+                return (
+                  <div key={itemId} data-swapy-slot={itemId}>
+                    <div data-swapy-item={itemId} className={dragModeClass}>
+                      <SidebarGroup>
+                        <SidebarGroupContent>
+                          <SidebarMenu>
+                            {mainRoutes.map((route) => {
+                              const Icon = getLucideIcon(route.icon || module.icon)
+                              return (
+                                <SidebarMenuItem key={route.path}>
+                                  <SidebarMenuButton asChild>
+                                    <a href={route.path} className="flex items-center">
+                                      <Icon className="mr-2 size-4" />
+                                      <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
+                                      {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
+                                    </a>
+                                  </SidebarMenuButton>
+                                </SidebarMenuItem>
+                              )
+                            })}
+                          </SidebarMenu>
+                        </SidebarGroupContent>
+                      </SidebarGroup>
+                    </div>
+                  </div>
+                )
+              }
+            })}
+            {/* Bottom position render items */}
+            {bottomRenderItems.map((item) => {
+              const itemId = item.type === 'group' ? `group-${item.title}` : item.module.id
+
+              if (item.type === 'group') {
+                return (
+                  <div key={itemId} data-swapy-slot={itemId}>
+                    <div data-swapy-item={itemId} className={dragModeClass}>
+                      <SidebarGroup>
+                        <SidebarGroupLabel>{item.title}</SidebarGroupLabel>
+                        <SidebarGroupContent>
+                          <SidebarMenu>
+                            {item.modules.map((module) => {
+                              const bottomRoutes = module.routes?.filter(r => r.sidebarPosition === 'bottom') || []
+                              const hasSubmenu = !!module.submenu?.component
+                              return bottomRoutes.map((route) => {
+                                const Icon = getLucideIcon(route.icon || module.icon)
+                                return (
+                                  <SidebarMenuItem key={route.path}>
+                                    <SidebarMenuButton asChild>
+                                      <a href={route.path} className="flex items-center">
+                                        <Icon className="mr-2 size-4" />
+                                        <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
+                                        {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
+                                      </a>
+                                    </SidebarMenuButton>
+                                  </SidebarMenuItem>
+                                )
+                              })
+                            })}
+                          </SidebarMenu>
+                        </SidebarGroupContent>
+                      </SidebarGroup>
+                    </div>
+                  </div>
+                )
+              } else {
+                const module = item.module
+                const bottomRoutes = module.routes?.filter(r => r.sidebarPosition === 'bottom') || []
+                const hasSubmenu = !!module.submenu?.component
+                return (
+                  <div key={itemId} data-swapy-slot={itemId}>
+                    <div data-swapy-item={itemId} className={dragModeClass}>
+                      <SidebarGroup>
+                        <SidebarGroupContent>
+                          <SidebarMenu>
+                            {bottomRoutes.map((route) => {
+                              const Icon = getLucideIcon(route.icon || module.icon)
+                              return (
+                                <SidebarMenuItem key={route.path}>
+                                  <SidebarMenuButton asChild>
+                                    <a href={route.path} className="flex items-center">
+                                      <Icon className="mr-2 size-4" />
+                                      <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
+                                      {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
+                                    </a>
+                                  </SidebarMenuButton>
+                                </SidebarMenuItem>
+                              )
+                            })}
+                          </SidebarMenu>
+                        </SidebarGroupContent>
+                      </SidebarGroup>
+                    </div>
+                  </div>
+                )
+              }
+            })}
+          </div>
+        ) : (
+          /* Normal mode: Grouped modules */
+          <>
+            {/* Module navigation - Main position */}
+            {mainRenderItems.map((item) => {
+              if (item.type === 'group') {
+                // Render a group of modules under one title
+                return (
+                  <SidebarGroup key={`main-group-${item.title}`}>
+                    {!isCompressed && <SidebarGroupLabel>{item.title}</SidebarGroupLabel>}
+                    <SidebarGroupContent>
+                      <SidebarMenu>
+                        {item.modules.map((module, moduleIndex) => {
+                          const mainRoutes = module.routes?.filter(r => r.sidebarPosition === 'main') || []
+                          const hasSubmenu = !!module.submenu?.component
+                          // Tighter spacing for non-first modules in group
+                          const groupingClass = moduleIndex > 0 ? '[&>li]:mt-0' : ''
+
+                          return (
+                            <div key={module.id} className={groupingClass}>
+                              {mainRoutes.map((route) => {
+                                const Icon = getLucideIcon(route.icon || module.icon)
+                                return (
+                                  <SidebarMenuItem key={route.path}>
+                                    <SidebarMenuButton asChild>
+                                      <a href={route.path} className="flex items-center">
+                                        <Icon className="mr-2 size-4" />
+                                        <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
+                                        {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
+                                      </a>
+                                    </SidebarMenuButton>
+                                  </SidebarMenuItem>
+                                )
+                              })}
+                            </div>
+                          )
+                        })}
+                      </SidebarMenu>
+                    </SidebarGroupContent>
+                  </SidebarGroup>
+                )
+              } else {
+                // Render a single ungrouped module
+                const module = item.module
+                const mainRoutes = module.routes?.filter(r => r.sidebarPosition === 'main') || []
+                const hasSubmenu = !!module.submenu?.component
+
+                return (
+                  <SidebarGroup key={module.id}>
                     <SidebarGroupContent>
                       <SidebarMenu>
                         {mainRoutes.map((route) => {
                           const Icon = getLucideIcon(route.icon || module.icon)
-
                           return (
                             <SidebarMenuItem key={route.path}>
                               <SidebarMenuButton asChild>
@@ -223,27 +497,59 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       </SidebarMenu>
                     </SidebarGroupContent>
                   </SidebarGroup>
-                </div>
-              </div>
-            )
-          })}
+                )
+              }
+            })}
 
-          {/* Module navigation - Bottom position */}
-          {bottomModules.map((module) => {
-            const bottomRoutes = module.routes?.filter(r => r.sidebarPosition === 'bottom') || []
-            if (bottomRoutes.length === 0) return null
-            const hasSubmenu = !!module.submenu?.component
+            {/* Module navigation - Bottom position */}
+            {bottomRenderItems.map((item) => {
+              if (item.type === 'group') {
+                // Render a group of modules under one title
+                return (
+                  <SidebarGroup key={`bottom-group-${item.title}`}>
+                    {!isCompressed && <SidebarGroupLabel>{item.title}</SidebarGroupLabel>}
+                    <SidebarGroupContent>
+                      <SidebarMenu>
+                        {item.modules.map((module, moduleIndex) => {
+                          const bottomRoutes = module.routes?.filter(r => r.sidebarPosition === 'bottom') || []
+                          const hasSubmenu = !!module.submenu?.component
+                          const groupingClass = moduleIndex > 0 ? '[&>li]:mt-0' : ''
 
-            return (
-              <div key={module.id} data-swapy-slot={module.id}>
-                <div data-swapy-item={module.id}>
-                  <SidebarGroup className={dragModeClass}>
-                    {module.title && <SidebarGroupLabel>{module.title}</SidebarGroupLabel>}
+                          return (
+                            <div key={module.id} className={groupingClass}>
+                              {bottomRoutes.map((route) => {
+                                const Icon = getLucideIcon(route.icon || module.icon)
+                                return (
+                                  <SidebarMenuItem key={route.path}>
+                                    <SidebarMenuButton asChild>
+                                      <a href={route.path} className="flex items-center">
+                                        <Icon className="mr-2 size-4" />
+                                        <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
+                                        {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
+                                      </a>
+                                    </SidebarMenuButton>
+                                  </SidebarMenuItem>
+                                )
+                              })}
+                            </div>
+                          )
+                        })}
+                      </SidebarMenu>
+                    </SidebarGroupContent>
+                  </SidebarGroup>
+                )
+              } else {
+                // Render a single ungrouped module
+                const module = item.module
+                const bottomRoutes = module.routes?.filter(r => r.sidebarPosition === 'bottom') || []
+                const hasSubmenu = !!module.submenu?.component
+
+                return (
+                  <SidebarGroup key={module.id}>
                     <SidebarGroupContent>
                       <SidebarMenu>
                         {bottomRoutes.map((route) => {
                           const Icon = getLucideIcon(route.icon || module.icon)
-
                           return (
                             <SidebarMenuItem key={route.path}>
                               <SidebarMenuButton asChild>
@@ -259,11 +565,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       </SidebarMenu>
                     </SidebarGroupContent>
                   </SidebarGroup>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+                )
+              }
+            })}
+          </>
+        )}
       </SidebarContent>
       <SidebarRail />
     </Sidebar>

@@ -142,8 +142,8 @@ export interface PublicRouteConfig {
 export interface ModuleManifest {
   /** Unique module identifier (kebab-case, e.g., "hello-world") */
   id: string
-  /** Optional title shown above name in sidebar menu */
-  title?: string
+  /** Group name for organizing modules in sidebar (modules with same group appear together) */
+  group?: string
   /** Display name shown in UI */
   name: string
   /** Brief description (max 200 chars) */
