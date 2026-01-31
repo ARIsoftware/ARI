@@ -7,7 +7,6 @@ import {
   SidebarGroup,
   SidebarGroupContent,
 } from '@/components/ui/sidebar'
-import { getLucideIcon } from '@/lib/modules/icon-utils'
 
 // Static imports for submenu components
 // IMPORTANT: Use @/modules/ alias (not @/modules-core/ or @/modules-custom/)
@@ -41,7 +40,6 @@ interface SubmenuRendererProps {
 }
 
 export function SubmenuRenderer({ moduleId, module, onBack }: SubmenuRendererProps) {
-  const Icon = getLucideIcon(module.icon)
   const SubmenuComponent = SUBMENU_COMPONENTS[moduleId]
 
   return (
@@ -52,10 +50,6 @@ export function SubmenuRenderer({ moduleId, module, onBack }: SubmenuRendererPro
           <SidebarMenuButton onClick={onBack} className="w-full">
             <ArrowLeft className="mr-2 size-4" />
             <span>Back</span>
-          </SidebarMenuButton>
-          <SidebarMenuButton className="w-full pointer-events-none">
-            <Icon className="mr-2 size-4" />
-            <span>{module.name}</span>
           </SidebarMenuButton>
         </SidebarGroupContent>
       </SidebarGroup>
