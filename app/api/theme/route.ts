@@ -14,7 +14,7 @@ import { moduleSettings } from '@/lib/db/schema'
 import { z } from 'zod'
 import { DEFAULT_THEME_ID } from '@/lib/theme/presets'
 import { DEFAULT_FONT_ID } from '@/lib/theme/fonts'
-import type { ThemeSettings, CustomTheme, ThemeColors } from '@/lib/theme/types'
+import type { ThemeSettings, CustomTheme, ThemeColors, SidebarView } from '@/lib/theme/types'
 
 const THEME_MODULE_ID = 'theme-system'
 
@@ -65,11 +65,15 @@ const CustomThemeSchema = z.object({
   updatedAt: z.string(),
 })
 
+// Schema for sidebar view
+const SidebarViewSchema = z.enum(['default', 'compressed'])
+
 // Schema for updating theme settings
 const UpdateThemeSettingsSchema = z.object({
   activeThemeId: z.string().optional(),
   activeFont: z.string().optional(),
   customThemes: z.array(CustomThemeSchema).optional(),
+  sidebarView: SidebarViewSchema.optional(),
 })
 
 // Default theme settings
@@ -77,6 +81,7 @@ const DEFAULT_THEME_SETTINGS: ThemeSettings = {
   activeThemeId: DEFAULT_THEME_ID,
   activeFont: DEFAULT_FONT_ID,
   customThemes: [],
+  sidebarView: 'default',
 }
 
 /**
@@ -115,6 +120,7 @@ export async function GET() {
       activeThemeId: (settings.activeThemeId as string) || DEFAULT_THEME_SETTINGS.activeThemeId,
       activeFont: (settings.activeFont as string) || DEFAULT_THEME_SETTINGS.activeFont,
       customThemes: (settings.customThemes as CustomTheme[]) || DEFAULT_THEME_SETTINGS.customThemes,
+      sidebarView: (settings.sidebarView as 'default' | 'compressed') || DEFAULT_THEME_SETTINGS.sidebarView,
     }
 
     return NextResponse.json(themeSettings)
@@ -172,6 +178,7 @@ export async function PUT(request: NextRequest) {
       activeThemeId: updates.activeThemeId ?? (existingSettings.activeThemeId as string) ?? DEFAULT_THEME_SETTINGS.activeThemeId,
       activeFont: updates.activeFont ?? (existingSettings.activeFont as string) ?? DEFAULT_THEME_SETTINGS.activeFont,
       customThemes: updates.customThemes ?? (existingSettings.customThemes as CustomTheme[]) ?? DEFAULT_THEME_SETTINGS.customThemes,
+      sidebarView: updates.sidebarView ?? (existingSettings.sidebarView as 'default' | 'compressed') ?? DEFAULT_THEME_SETTINGS.sidebarView,
     }
 
     // Upsert the settings

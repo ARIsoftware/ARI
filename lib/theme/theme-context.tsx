@@ -8,7 +8,7 @@ import {
   useCallback,
   type ReactNode,
 } from 'react'
-import type { ThemeSettings, ThemeColors, CustomTheme, ThemePreset } from './types'
+import type { ThemeSettings, ThemeColors, CustomTheme, ThemePreset, SidebarView } from './types'
 import { THEME_PRESETS, DEFAULT_THEME_ID, getThemeById } from './presets'
 import { FONTS, DEFAULT_FONT_ID, getFontById, getFontFamily } from './fonts'
 import { CSS_VAR_MAP } from './types'
@@ -18,6 +18,7 @@ interface ThemeContextValue {
   activeThemeId: string
   activeFont: string
   customThemes: CustomTheme[]
+  sidebarView: SidebarView
   isLoading: boolean
 
   // Current theme details
@@ -27,6 +28,7 @@ interface ThemeContextValue {
   // Actions
   setTheme: (themeId: string) => void
   setFont: (fontId: string) => void
+  setSidebarView: (view: SidebarView) => void
   addCustomTheme: (theme: CustomTheme) => void
   updateCustomTheme: (theme: CustomTheme) => void
   deleteCustomTheme: (themeId: string) => void
@@ -58,8 +60,8 @@ function applyFont(fontId: string) {
   document.documentElement.style.setProperty('--font-family', family)
 }
 
-// Apply dark mode class
-function applyDarkModeClass(isDark: boolean) {
+// Apply dark mode class and theme identifier
+function applyDarkModeClass(isDark: boolean, themeId?: string) {
   const root = document.documentElement
   // Remove all theme classes
   root.classList.remove('dark', 'blueprint', 'light')
@@ -67,12 +69,18 @@ function applyDarkModeClass(isDark: boolean) {
   if (isDark) {
     root.classList.add('dark')
   }
+
+  // Set theme ID as data attribute for CSS targeting
+  if (themeId) {
+    root.dataset.theme = themeId
+  }
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [activeThemeId, setActiveThemeId] = useState(DEFAULT_THEME_ID)
   const [activeFont, setActiveFont] = useState(DEFAULT_FONT_ID)
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([])
+  const [sidebarView, setSidebarViewState] = useState<SidebarView>('default')
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
@@ -95,6 +103,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         setActiveThemeId(settings.activeThemeId || DEFAULT_THEME_ID)
         setActiveFont(settings.activeFont || DEFAULT_FONT_ID)
         setCustomThemes(settings.customThemes || [])
+        setSidebarViewState(settings.sidebarView || 'default')
 
         // Apply immediately from cache (check for customization first)
         const customization = settings.customThemes?.find((t) => t.basePresetId === settings.activeThemeId)
@@ -102,7 +111,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           settings.customThemes?.find((t) => t.id === settings.activeThemeId)
         if (theme) {
           applyThemeColors(theme.colors)
-          applyDarkModeClass(theme.category === 'dark')
+          applyDarkModeClass(theme.category === 'dark', settings.activeThemeId)
         }
         applyFont(settings.activeFont || DEFAULT_FONT_ID)
       } catch (e) {
@@ -126,7 +135,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         const theme = getThemeById(mappedTheme)
         if (theme) {
           applyThemeColors(theme.colors)
-          applyDarkModeClass(theme.category === 'dark')
+          applyDarkModeClass(theme.category === 'dark', mappedTheme)
         }
       }
     }
@@ -158,6 +167,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         setActiveThemeId(settings.activeThemeId || DEFAULT_THEME_ID)
         setActiveFont(settings.activeFont || DEFAULT_FONT_ID)
         setCustomThemes(settings.customThemes || [])
+        setSidebarViewState(settings.sidebarView || 'default')
 
         // Apply from API data (check for customization first)
         const apiCustomization = settings.customThemes?.find((t) => t.basePresetId === settings.activeThemeId)
@@ -165,7 +175,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           settings.customThemes?.find((t) => t.id === settings.activeThemeId)
         if (theme) {
           applyThemeColors(theme.colors)
-          applyDarkModeClass(theme.category === 'dark')
+          applyDarkModeClass(theme.category === 'dark', settings.activeThemeId)
         }
         applyFont(settings.activeFont || DEFAULT_FONT_ID)
 
@@ -216,7 +226,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
       setActiveThemeId(themeId)
       applyThemeColors(theme.colors)
-      applyDarkModeClass(theme.category === 'dark')
+      applyDarkModeClass(theme.category === 'dark', themeId)
       saveSettings({ activeThemeId: themeId })
 
       // Also update old localStorage for backward compat
@@ -237,6 +247,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
       // Also update old localStorage for backward compat
       localStorage.setItem('ari-font-preference', font.name)
+    },
+    [saveSettings]
+  )
+
+  // Set sidebar view
+  const setSidebarView = useCallback(
+    (view: SidebarView) => {
+      setSidebarViewState(view)
+      saveSettings({ sidebarView: view })
     },
     [saveSettings]
   )
@@ -304,11 +323,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         activeThemeId,
         activeFont,
         customThemes,
+        sidebarView,
         isLoading,
         currentTheme,
         isDarkMode,
         setTheme,
         setFont,
+        setSidebarView,
         addCustomTheme,
         updateCustomTheme,
         deleteCustomTheme,
