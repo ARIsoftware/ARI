@@ -14,7 +14,7 @@ export function MainContentWrapper({ children }: MainContentWrapperProps) {
   const { isDragMode } = useDragDropMode()
 
   return (
-    <div className={isDragMode ? "opacity-10 pointer-events-none transition-opacity duration-200" : "transition-opacity duration-200"}>
+    <div className={`overflow-x-hidden ${isDragMode ? "opacity-10 pointer-events-none transition-opacity duration-200" : "transition-opacity duration-200"}`}>
       {children}
     </div>
   )
