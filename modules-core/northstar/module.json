@@ -1,6 +1,6 @@
 {
   "id": "northstar",
-  "title": "Northstar",
+  "group": "Northstar",
   "name": "Northstar",
   "description": "Track your goals and milestones - define and achieve your long-term objectives",
   "version": "1.0.0",

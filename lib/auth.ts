@@ -72,7 +72,7 @@ export const auth = betterAuth({
   rateLimit: {
     enabled: true,
     window: 60, // 1 minute window
-    max: 10, // Maximum 10 attempts per window
+    max: 30, // Maximum 30 attempts per window (increased for session checks)
     // Stricter limits for sign-in endpoint
     customRules: {
       "/sign-in/*": {
@@ -82,6 +82,10 @@ export const auth = betterAuth({
       "/sign-up/*": {
         window: 300, // 5 minute window
         max: 3, // Only 3 sign-up attempts per 5 minutes
+      },
+      "/get-session": {
+        window: 60,
+        max: 60, // Session checks are read-only, allow more
       },
     },
   },

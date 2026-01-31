@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { AppSidebar } from "@/components/app-sidebar"
 import { TaskAnnouncement } from "@/components/task-announcement"
 import { authClient } from "@/lib/auth-client"
+import { useAuth } from "@/components/providers"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -37,6 +38,9 @@ import {
 } from "./types"
 
 export default function SettingsPage(): React.ReactElement {
+  // Get session from context (avoids redundant API call)
+  const { session } = useAuth()
+
   // UI state
   const [isSaving, setIsSaving] = useState(false)
   const [savedMessage, setSavedMessage] = useState<string | null>(null)
@@ -85,6 +89,13 @@ export default function SettingsPage(): React.ReactElement {
     loadSessions()
   }, [])
 
+  // Set current session token from context when available
+  useEffect(() => {
+    if (session?.token) {
+      setCurrentSessionToken(session.token)
+    }
+  }, [session?.token])
+
   async function loadSessions(): Promise<void> {
     setSessionsLoading(true)
     try {
@@ -92,9 +103,9 @@ export default function SettingsPage(): React.ReactElement {
       if (result.data) {
         setSessions(result.data)
       }
-      const currentSession = await authClient.getSession()
-      if (currentSession.data?.session) {
-        setCurrentSessionToken(currentSession.data.session.token)
+      // Use session from context instead of fetching again
+      if (session?.token) {
+        setCurrentSessionToken(session.token)
       }
     } catch (error) {
       console.error("Failed to load sessions:", error)

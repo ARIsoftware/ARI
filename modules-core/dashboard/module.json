@@ -1,7 +1,7 @@
 {
   "id": "dashboard",
   "name": "Dashboard",
-  "title": "Overview",
+  "group": "Overview",
   "description": "Overview of your tasks, fitness, and goals with quick stats and recent activity",
   "version": "1.0.0",
   "author": "ARI Team",

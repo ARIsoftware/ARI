@@ -1,6 +1,6 @@
 {
   "id": "hyrox",
-  "title": "HYROX",
+  "group": "HYROX",
   "name": "HYROX Training",
   "description": "HYROX race simulation, station records tracking, progress monitoring, and race nutrition guidance",
   "version": "1.0.0",

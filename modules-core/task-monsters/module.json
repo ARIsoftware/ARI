@@ -1,6 +1,6 @@
 {
   "id": "task-monsters",
-  "title": "Todo",
+  "group": "Todo",
   "name": "Task Monsters",
   "description": "3D village where each monster represents a task",
   "version": "1.0.0",

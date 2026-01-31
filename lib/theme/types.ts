@@ -78,10 +78,13 @@ export interface CustomTheme extends ThemePreset {
   basePresetId?: string
 }
 
+export type SidebarView = 'default' | 'compressed'
+
 export interface ThemeSettings {
   activeThemeId: string
   activeFont: string
   customThemes: CustomTheme[]
+  sidebarView?: SidebarView
 }
 
 export interface FontOption {

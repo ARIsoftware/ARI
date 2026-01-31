@@ -1,6 +1,6 @@
 {
   "id": "hello-world",
-  "title": "Welcome!",
+  "group": "Welcome!",
   "name": "Hello World",
   "description": "A template module demonstrating all core features of the ARI module system",
   "version": "1.0.0",

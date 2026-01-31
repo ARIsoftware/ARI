@@ -1,7 +1,7 @@
 {
   "id": "tasks",
   "name": "Tasks",
-  "title": "Todo",
+  "group": "Todo",
   "description": "Task management with priority radar, analytics, and focus timer",
   "version": "1.0.0",
   "author": "ARI Team",

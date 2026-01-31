@@ -6,7 +6,7 @@
   "author": "ARI",
   "icon": "Fish",
   "enabled": true,
-  "title": "Aquarium",
+  "group": "Aquarium",
   "menuPriority": 25,
   "routes": [
     {

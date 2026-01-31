@@ -1,6 +1,6 @@
 {
   "id": "quotes",
-  "title": "Motivation",
+  "group": "Motivation",
   "name": "Quotes",
   "description": "Manage and organize your collection of inspirational quotes",
   "version": "1.0.0",

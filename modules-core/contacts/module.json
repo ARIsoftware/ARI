@@ -1,6 +1,6 @@
 {
   "id": "contacts",
-  "title": "People",
+  "group": "People",
   "name": "Contacts",
   "description": "People and contacts management - organize and manage your professional and personal connections",
   "version": "1.0.0",

@@ -1,6 +1,6 @@
 {
   "id": "world-clock",
-  "title": "World Clock",
+  "group": "World Clock",
   "name": "World Clock",
   "description": "Display time in South Africa, Toronto, and Nashville",
   "version": "1.0.0",

@@ -20,6 +20,7 @@ import {
   Check,
   Sun,
   Moon,
+  PanelLeft,
 } from "lucide-react"
 import { useTheme, THEME_PRESETS, FONTS } from "@/lib/theme/theme-context"
 
@@ -27,8 +28,10 @@ export function ThemesTab(): React.ReactElement {
   const {
     activeThemeId,
     activeFont,
+    sidebarView,
     setTheme,
     setFont,
+    setSidebarView,
   } = useTheme()
 
   // Get preview colors for a theme
@@ -142,6 +145,36 @@ export function ThemesTab(): React.ReactElement {
             </p>
             <p className="text-sm mt-1">
               ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Sidebar Settings Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <PanelLeft className="h-5 w-5 text-primary" />
+            Sidebar
+          </CardTitle>
+          <CardDescription>
+            Customize how the sidebar appears.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <label className="text-sm font-medium">Sidebar View</label>
+            <Select value={sidebarView} onValueChange={setSidebarView}>
+              <SelectTrigger className="w-full max-w-xs">
+                <SelectValue placeholder="Select a view" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Default</SelectItem>
+                <SelectItem value="compressed">Compressed</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Compressed view hides group labels for a more compact sidebar.
             </p>
           </div>
         </CardContent>
