@@ -129,6 +129,31 @@ const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
 
 ## 2. Module Self-Containment Rule
 
+### CRITICAL: Module Portability - Always Use `@/modules/` Alias
+
+**When importing from modules, ALWAYS use the `@/modules/` alias** (not `@/modules-custom/` or `@/modules-core/`).
+
+```typescript
+// ✅ CORRECT - Use @/modules/ alias
+import type { MyType } from '@/modules/my-module/types'
+import { MyComponent } from '@/modules/my-module/components/my-component'
+
+// ❌ WRONG - Hardcoded directory paths
+import type { MyType } from '@/modules-custom/my-module/types'
+import type { MyType } from '@/modules-core/my-module/types'
+```
+
+**Why?** The `@/modules/` alias (defined in `tsconfig.json`) resolves to `modules-custom` first, then `modules-core`. This allows:
+- Modules to be freely moved between `modules-custom` and `modules-core` without code changes
+- Override modules in `modules-custom` to automatically take precedence
+- Consistent import paths across the entire codebase
+
+**Module Directory Priority:**
+1. `modules-custom/` - User-created or override modules (highest priority)
+2. `modules-core/` - Core system modules (lower priority)
+
+If a module exists in both directories with the same ID, `modules-custom` wins.
+
 ### CRITICAL: All Module Code Must Be Self-Contained
 
 **ALL module code MUST live in `/modules/[module-id]/`**. This is essential for:
@@ -1628,7 +1653,7 @@ Create a hooks file in `/lib/hooks/use-[module-name].ts`:
 ```typescript
 // lib/hooks/use-my-module.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { MyModuleEntry } from '@/modules-custom/my-module/types'
+import type { MyModuleEntry } from '@/modules/my-module/types'  // Always use @/modules/ alias!
 
 /**
  * Fetch all entries for the current user
