@@ -11,6 +11,7 @@ import { getLucideIcon } from '@/lib/modules/icon-utils'
 
 // Static imports for submenu components
 import HelloWorldSubmenu from '@/modules-core/hello-world/components/sidebar-submenu'
+import MailStreamSubmenu from '@/modules-custom/mail-stream/components/sidebar-submenu'
 
 /**
  * Props passed to module submenu components
@@ -28,6 +29,7 @@ export interface ModuleSubmenuProps {
  */
 const SUBMENU_COMPONENTS: Record<string, React.ComponentType<ModuleSubmenuProps>> = {
   'hello-world': HelloWorldSubmenu,
+  'mail-stream': MailStreamSubmenu,
 }
 
 interface SubmenuRendererProps {
