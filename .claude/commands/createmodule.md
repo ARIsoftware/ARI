@@ -129,6 +129,8 @@ See `/docs/MODULES.md` section 9 "Data Fetching with TanStack Query" for full do
 
 If the module requires a sidebar submenu, follow the Hello World module as the template:
 
+**Note:** Submenus should only contain the actual navigation links (Overview, Settings, etc.). Do NOT include the module name as a header item - the Back button provides sufficient context for users to know which module they're in.
+
 1. **Read the Hello World submenu component** at `modules-core/hello-world/components/sidebar-submenu.tsx` - copy and adapt this for your module
 2. **Read the Hello World module.json** to see how the `submenu` field is configured
 3. **Register your submenu** in `/components/sidebar-submenu-renderer.tsx`:
