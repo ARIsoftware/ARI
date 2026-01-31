@@ -819,7 +819,8 @@ export const mailStreamEvents = pgTable("mail_stream_events", {
 
 export const mailStreamSettings = pgTable("mail_stream_settings", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
-	retentionDays: integer("retention_days").default(30).notNull(),
+	retentionDays: integer("retention_days").default(-1).notNull(),
+	setupComplete: boolean("setup_complete").default(false).notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 });
