@@ -99,6 +99,12 @@ Create `/lib/hooks/use-[module-name].ts` with:
 - `useUpdateModuleEntry()` - updates with `useMutation` + optimistic updates
 - `useDeleteModuleEntry()` - deletes with `useMutation` + optimistic updates
 
+**IMPORTANT**: When importing types from modules, always use `@/modules/` alias:
+```typescript
+import type { MyModuleEntry } from '@/modules/my-module/types'  // Correct!
+// NOT: '@/modules-custom/my-module/types' or '@/modules-core/my-module/types'
+```
+
 See `/lib/hooks/use-ari-launch.ts` or `/lib/hooks/use-tasks.ts` for examples.
 
 ### Optimistic Updates Pattern
@@ -126,7 +132,8 @@ If the module requires a sidebar submenu, follow the Hello World module as the t
 1. **Read the Hello World submenu component** at `modules-core/hello-world/components/sidebar-submenu.tsx` - copy and adapt this for your module
 2. **Read the Hello World module.json** to see how the `submenu` field is configured
 3. **Register your submenu** in `/components/sidebar-submenu-renderer.tsx`:
-   - Add a static import at the top: `import YourModuleSubmenu from '@/modules-custom/your-module/components/sidebar-submenu'`
+   - Add a static import at the top: `import YourModuleSubmenu from '@/modules/your-module/components/sidebar-submenu'`
+   - **IMPORTANT**: Always use `@/modules/` alias (NOT `@/modules-custom/` or `@/modules-core/`) - this allows modules to be moved between directories without code changes
    - Add an entry to the `SUBMENU_COMPONENTS` registry: `'your-module': YourModuleSubmenu`
 4. **Create sub-pages** for each submenu item (e.g., `app/settings/page.tsx`)
 
@@ -140,6 +147,7 @@ Before marking complete, verify:
 - [ ] Drizzle schema added to `/lib/db/schema/schema.ts` (required for API routes)
 - [ ] Database schema.sql created (for reference/manual setup)
 - [ ] TanStack Query hooks created in `/lib/hooks/use-[module-name].ts`
+- [ ] **All imports use `@/modules/` alias** (NOT `@/modules-custom/` or `@/modules-core/`)
 - [ ] Page uses TanStack Query hooks (not manual useState/useEffect/fetch)
 - [ ] Optimistic updates implemented for all mutations
 - [ ] Page does NOT block on session check (no "Authenticating..." spinner)
@@ -158,3 +166,4 @@ Before marking complete, verify:
 - **Do NOT use `auth.uid()` in database RLS policies** - Better Auth doesn't support this
 - User isolation is enforced at the **application level** via `withRLS()` helper
 - The module registry auto-generates on `npm run dev` or `npm run build`
+- **Module Portability**: Always use `@/modules/` alias for imports (NOT `@/modules-custom/` or `@/modules-core/`). This allows modules to be moved between directories without code changes. The alias resolves `modules-custom` first, then `modules-core`.

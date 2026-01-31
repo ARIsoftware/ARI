@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verify the webhook signature
+    // Verify the webhook signature using Svix
     const wh = new Webhook(webhookSecret)
     let payload: ResendWebhookPayload
 
