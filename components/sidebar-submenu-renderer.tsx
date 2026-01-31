@@ -10,8 +10,10 @@ import {
 import { getLucideIcon } from '@/lib/modules/icon-utils'
 
 // Static imports for submenu components
-import HelloWorldSubmenu from '@/modules-core/hello-world/components/sidebar-submenu'
-import MailStreamSubmenu from '@/modules-custom/mail-stream/components/sidebar-submenu'
+// IMPORTANT: Use @/modules/ alias (not @/modules-core/ or @/modules-custom/)
+// so modules can be moved between directories without code changes
+import HelloWorldSubmenu from '@/modules/hello-world/components/sidebar-submenu'
+import MailStreamSubmenu from '@/modules/mail-stream/components/sidebar-submenu'
 
 /**
  * Props passed to module submenu components

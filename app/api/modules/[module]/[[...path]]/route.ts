@@ -97,14 +97,14 @@ const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
     'last-completed': () => import('@/modules/tasks/api/last-completed/route') // GET for last completed task
   },
   'memento': {
-    'settings': () => import('@/modules-custom/memento/api/settings/route'), // GET/POST for user settings
-    'milestones': () => import('@/modules-custom/memento/api/milestones/route'), // GET/POST/PATCH/DELETE for milestones
-    'eras': () => import('@/modules-custom/memento/api/eras/route') // GET/POST/PATCH/DELETE for eras
+    'settings': () => import('@/modules/memento/api/settings/route'), // GET/POST for user settings
+    'milestones': () => import('@/modules/memento/api/milestones/route'), // GET/POST/PATCH/DELETE for milestones
+    'eras': () => import('@/modules/memento/api/eras/route') // GET/POST/PATCH/DELETE for eras
   },
   'mail-stream': {
-    'webhook': () => import('@/modules-custom/mail-stream/api/webhook/route'), // POST for Resend webhooks (public, signature-verified)
-    'data': () => import('@/modules-custom/mail-stream/api/data/route'), // GET/DELETE for events
-    'settings': () => import('@/modules-custom/mail-stream/api/settings/route') // GET/PUT for settings
+    'webhook': () => import('@/modules/mail-stream/api/webhook/route'), // POST for Resend webhooks (public, signature-verified)
+    'data': () => import('@/modules/mail-stream/api/data/route'), // GET/DELETE for events
+    'settings': () => import('@/modules/mail-stream/api/settings/route') // GET/PUT for settings
   }
 }
 

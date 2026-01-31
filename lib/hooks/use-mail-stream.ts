@@ -13,7 +13,7 @@ import type {
   MailStreamEvent,
   MailStreamSettings,
   MailStreamFilters
-} from '@/modules-custom/mail-stream/types'
+} from '@/modules/mail-stream/types'
 
 // Query keys
 const EVENTS_KEY = ['mail-stream-events']

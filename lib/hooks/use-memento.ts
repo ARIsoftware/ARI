@@ -13,7 +13,7 @@ import type {
   UpdateMilestoneRequest,
   CreateEraRequest,
   UpdateEraRequest
-} from '@/modules-custom/memento/types'
+} from '@/modules/memento/types'
 
 // ============================================
 // Settings Hooks
