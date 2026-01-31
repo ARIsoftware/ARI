@@ -13,10 +13,39 @@
  * IMPORTANT: This uses a registry-based approach since Next.js/Turbopack cannot
  * resolve dynamic imports with runtime-constructed paths. When adding a new module
  * API route, you must register it in the MODULE_API_ROUTES object below.
+ *
+ * PUBLIC ROUTES: Routes configured in module.json's publicRoutes array are
+ * accessible without authentication. Security is enforced by the route handler
+ * using the createPublicRouteHandler wrapper.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getEnabledModule } from '@/lib/modules/module-registry'
+import moduleManifest from '@/lib/generated/module-manifest.json'
+
+/**
+ * Public routes from module manifest
+ * These routes bypass authentication but must implement their own security
+ */
+interface PublicRouteEntry {
+  moduleId: string
+  path: string
+  methods: string[]
+}
+
+const publicRoutes: PublicRouteEntry[] = (moduleManifest.publicRoutes || []) as PublicRouteEntry[]
+
+/**
+ * Check if a route is configured as public in module.json
+ */
+function isPublicRoute(moduleId: string, apiPath: string, method: string): boolean {
+  return publicRoutes.some(
+    route =>
+      route.moduleId === moduleId &&
+      route.path === apiPath &&
+      route.methods.includes(method.toUpperCase())
+  )
+}
 
 /**
  * Module API Routes Registry
@@ -118,19 +147,25 @@ async function handleRequest(
 ) {
   const { module, path } = await params
 
-  try {
-    // Validate module exists and is enabled for current user
-    const moduleInfo = await getEnabledModule(module)
-    if (!moduleInfo) {
-      return NextResponse.json(
-        { error: 'Module not found or not enabled' },
-        { status: 404 }
-      )
-    }
+  // Build API path from segments (e.g., ['items'] -> 'items', undefined -> '')
+  const pathArray = path || []
+  const apiPath = pathArray.join('/')
 
-    // Build API path from segments (e.g., ['items'] -> 'items', undefined -> '')
-    const pathArray = path || []
-    const apiPath = pathArray.join('/')
+  try {
+    // Check if this is a public route (configured in module.json publicRoutes)
+    // Public routes skip authentication but must implement their own security
+    const isPublic = isPublicRoute(module, apiPath, method)
+
+    if (!isPublic) {
+      // For non-public routes, validate module exists and is enabled for current user
+      const moduleInfo = await getEnabledModule(module)
+      if (!moduleInfo) {
+        return NextResponse.json(
+          { error: 'Module not found or not enabled' },
+          { status: 404 }
+        )
+      }
+    }
 
     // Look up module in registry
     const moduleRoutes = MODULE_API_ROUTES[module]
@@ -197,7 +232,7 @@ async function handleRequest(
     return await handler[method](request, { params: dynamicParams || params })
   } catch (error: any) {
     // Log error for debugging
-    console.error(`[Module API ${module}/${path.join('/')}] Error:`, error)
+    console.error(`[Module API ${module}/${apiPath}] Error:`, error)
 
     // Generic error response
     return NextResponse.json(
