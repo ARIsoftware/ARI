@@ -1406,6 +1406,139 @@ See `/modules-core/hello-world/api/data/route.ts` for a complete working example
 
 ---
 
+## 7.5 Public Routes
+
+### When to Use Public Routes
+
+Public routes are API endpoints that can be accessed **without authentication**. Use them only when:
+
+1. **Webhook receivers** - External services (Resend, Stripe, GitHub) need to send data to your app
+2. **Health checks** - External monitoring services need to verify your endpoints are responsive
+3. **Public APIs** - Intentionally public data that doesn't require user context
+
+**WARNING**: Public routes bypass authentication. All public routes **MUST** have security configuration.
+
+### Configuring Public Routes in module.json
+
+Add a `publicRoutes` array to your module.json:
+
+```json
+{
+  "id": "my-module",
+  "name": "My Module",
+  "publicRoutes": [
+    {
+      "path": "webhook",
+      "methods": ["POST"],
+      "security": {
+        "type": "webhook_signature",
+        "secretEnvVar": "MY_WEBHOOK_SECRET",
+        "rateLimit": 100
+      },
+      "description": "Receives webhook events from external service"
+    }
+  ]
+}
+```
+
+### Security Types
+
+| Type | Description | Required Config |
+|------|-------------|-----------------|
+| `webhook_signature` | Validates cryptographic signatures (Svix, Stripe, GitHub) | `secretEnvVar` |
+| `api_key` | Validates API key in request header | `apiKeyEnvVar`, optionally `apiKeyHeader` |
+| `rate_limit_only` | Only applies rate limiting (use sparingly!) | `rateLimit` |
+| `ip_allowlist` | Restricts to specific IP addresses | `allowedIps[]` |
+| `custom` | Module handles its own validation | `customDescription` |
+
+### PublicRouteSecurity Configuration
+
+```typescript
+interface PublicRouteSecurity {
+  type: 'webhook_signature' | 'api_key' | 'rate_limit_only' | 'ip_allowlist' | 'custom'
+  secretEnvVar?: string      // For webhook_signature - env var with signing secret
+  apiKeyEnvVar?: string      // For api_key - env var with expected API key
+  apiKeyHeader?: string      // For api_key - header name (default: 'x-api-key')
+  allowedIps?: string[]      // For ip_allowlist - allowed IP addresses
+  rateLimit?: number         // Requests per minute (applies to all types)
+  customDescription?: string // For custom - document your security approach
+}
+```
+
+### Using createPublicRouteHandler
+
+The recommended way to implement public routes is using the `createPublicRouteHandler` wrapper:
+
+```typescript
+// modules/my-module/api/webhook/route.ts
+import { NextResponse } from 'next/server'
+import { createPublicRouteHandler } from '@/lib/modules/public-route-handler'
+import type { PublicRouteSecurity } from '@/lib/modules/module-types'
+
+// Security config must match module.json publicRoutes entry
+const securityConfig: PublicRouteSecurity = {
+  type: 'webhook_signature',
+  secretEnvVar: 'MY_WEBHOOK_SECRET',
+  rateLimit: 100
+}
+
+export const POST = createPublicRouteHandler(securityConfig, async (request, context) => {
+  // Security already validated at this point!
+  // context.rawBody contains the raw request body
+
+  const payload = JSON.parse(context.rawBody)
+
+  // Process the webhook payload...
+
+  return NextResponse.json({ received: true })
+})
+
+// Optional: Health check for the webhook endpoint
+export async function GET() {
+  return NextResponse.json({
+    status: 'ok',
+    endpoint: '/api/modules/my-module/webhook',
+    description: 'Webhook receiver for external service'
+  })
+}
+```
+
+### Webhook Signature Support
+
+The security validation utility supports multiple webhook signature formats:
+
+- **Svix** (used by Resend): `svix-id`, `svix-timestamp`, `svix-signature` headers
+- **Stripe**: `stripe-signature` header
+- **GitHub**: `x-hub-signature-256` or `x-hub-signature` headers
+
+The correct format is auto-detected based on which headers are present.
+
+### Verification Steps
+
+After configuring public routes:
+
+1. Run `npm run generate-module-registry` to update the manifest
+2. Restart the dev server
+3. Navigate to `/debug` → **Endpoints** tab
+4. Verify your public endpoint appears with the correct security type
+5. Test the endpoint:
+   - **Without signature**: Should return 400/401
+   - **With valid signature**: Should return 200
+   - **Rate limit test**: Send > rateLimit requests/minute, should get 429
+
+### Public Routes Checklist
+
+- [ ] `publicRoutes` configured in module.json
+- [ ] Security type chosen appropriately (prefer `webhook_signature` or `api_key`)
+- [ ] Environment variable for secret is set
+- [ ] `rateLimit` configured to prevent abuse
+- [ ] Route handler uses `createPublicRouteHandler` wrapper
+- [ ] Route appears in `/debug` → Endpoints tab
+- [ ] Tested without authentication (should fail without proper security headers)
+- [ ] Tested with valid security headers (should succeed)
+
+---
+
 ## 8. Components
 
 ### ⚠️ CRITICAL: Module Page Layout Rules

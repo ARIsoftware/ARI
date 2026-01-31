@@ -38,6 +38,7 @@ Then ask follow-up clarifying questions based on their answers. You can ask any 
 - Do you need any calculations, totals, or statistics displayed?
 - Are there any relationships to other modules or data (e.g., linking to tasks, contacts)? What should happen if the other data/module is not available or installed?
 - Are there any existing apps or tools that do something similar to what you want?
+- **Does this module need to receive data from external services?** (e.g., webhooks from Stripe, Resend, GitHub, etc.) If yes, a public route with security validation will be needed.
 
 Continue asking questions until you have a very clear picture of what to build. The goal is to avoid building the wrong thing or missing important requirements.
 
@@ -84,8 +85,16 @@ When approved, create the module following this order:
 7. **Update types** in `types/index.ts`
 8. **Create TanStack Query hooks** in `/lib/hooks/use-[module-name].ts` (see below)
 9. **Run `npm run generate-module-registry`** to register the new module
-10. Ask the user for permission to execute the .sql file, or ask if they want to run the .SQL statements themselves.
-11. If the user needs to take any action to complete the setup of the module (run a .sql file, restart the dev server etc), please clearly indicate the actions they need to take with clear instructions.
+10. **If public routes needed** (webhooks, external API access):
+    - Add `publicRoutes` array to module.json with security configuration
+    - Create route handler using `createPublicRouteHandler` wrapper
+    - Document the required environment variable for the secret
+    - See `/docs/MODULES.md` section 7.5 for detailed guidance
+11. **Update backup expected tables list** in `/app/api/backup/verify/route.ts`
+    - Add any new table names to the `COMPLETE_TABLE_LIST` array (around line 24)
+    - This ensures the backup verification system knows about the new tables
+12. Ask the user for permission to execute the .sql file, or ask if they want to run the .SQL statements themselves.
+13. If the user needs to take any action to complete the setup of the module (run a .sql file, restart the dev server etc), please clearly indicate the actions they need to take with clear instructions.
 
 ## Data Fetching Best Practices
 
@@ -158,6 +167,9 @@ Before marking complete, verify:
 - [ ] No TypeScript errors (`npx tsc --noEmit`)
 - [ ] Module appears in sidebar after registry generation
 - [ ] Page loads without errors in dev server (no duplicate toolbars)
+- [ ] **If public routes exist**: `publicRoutes` configured in module.json with security
+- [ ] **If public routes exist**: Route handler uses `createPublicRouteHandler` wrapper
+- [ ] **If public routes exist**: Endpoint visible in `/debug` → Endpoints tab
 
 ## Important Reminders
 

@@ -211,9 +211,27 @@ function generateManifest(moduleMap) {
     }
   }
 
+  // Extract all public routes with full paths
+  const publicRoutes = [];
+  for (const mod of modules) {
+    if (mod.publicRoutes && Array.isArray(mod.publicRoutes)) {
+      for (const route of mod.publicRoutes) {
+        publicRoutes.push({
+          moduleId: mod.id,
+          path: route.path,
+          fullPath: `/api/modules/${mod.id}/${route.path}`,
+          methods: route.methods,
+          security: route.security,
+          description: route.description
+        });
+      }
+    }
+  }
+
   return {
     generatedAt: new Date().toISOString(),
-    modules
+    modules,
+    publicRoutes
   };
 }
 
