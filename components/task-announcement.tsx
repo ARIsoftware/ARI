@@ -15,7 +15,7 @@ import {
   X
 } from "lucide-react"
 import { FocusTimerTopBarIcon } from "@/components/focus-timer-top-bar-icon"
-import { NotepadTopBarIcon } from "@/components/notepad-top-bar-icon"
+import { NotepadTopBarIcon } from "@/modules/notepad/components/notepad-top-bar-icon"
 import { ThemePickerDropdown } from "@/components/theme-picker-dropdown"
 import { useModules } from "@/lib/modules/module-hooks"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
