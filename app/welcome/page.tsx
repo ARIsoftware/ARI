@@ -869,9 +869,9 @@ export default function WelcomePage() {
                           <div className="flex-1 pt-0.5 text-sm">
                             <p className="text-foreground mb-2">Enter your webhook endpoint URL:</p>
                             <code className="block bg-gray-900 text-gray-100 px-3 py-2 rounded text-xs" style={{ fontFamily: 'Geist Mono, monospace' }}>
-                              https://YOUR-DOMAIN.vercel.app/api/modules/mail-stream/webhook
+                              https://YOUR-DOMAIN/api/modules/mail-stream/webhook
                             </code>
-                            <p className="text-xs text-muted-foreground mt-1">Replace YOUR-DOMAIN with your actual Vercel domain</p>
+                            <p className="text-xs text-muted-foreground mt-1">Replace YOUR-DOMAIN with your actual domain</p>
                           </div>
                         </li>
                         <li className="flex items-start gap-3">

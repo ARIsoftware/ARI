@@ -52,9 +52,3 @@ Or to enable Next.js Turbopack (for faster local development):
 6. Open web browser:
 
 `http://localhost:3000`
-
-
-
-
-
-
