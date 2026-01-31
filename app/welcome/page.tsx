@@ -49,6 +49,7 @@ interface OnboardingData {
   openaiApiKey: string
   // Resend (optional)
   resendApiKey: string
+  resendWebhookSecret: string
   // Vercel (tracking)
   vercelSetupComplete: boolean
   // Personal (optional)
@@ -67,7 +68,7 @@ export default function WelcomePage() {
   const [currentLineIndex, setCurrentLineIndex] = useState(-1)
   const [isTyping, setIsTyping] = useState(false)
   const [textOpacity, setTextOpacity] = useState(1)
-  const [showBackground, setShowBackground] = useState(true)
+  const [showBackground, setShowBackground] = useState(false)
   const [showContinue, setShowContinue] = useState(false)
   const [showIntro, setShowIntro] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
@@ -80,6 +81,7 @@ export default function WelcomePage() {
     supabaseSecretKey: "",
     openaiApiKey: "",
     resendApiKey: "",
+    resendWebhookSecret: "",
     vercelSetupComplete: false,
     name: "",
     email: "",
@@ -199,6 +201,9 @@ export default function WelcomePage() {
     if (formData.resendApiKey.trim()) {
       lines.push("# Resend Email Service")
       lines.push(`RESEND_API_KEY=${formData.resendApiKey}`)
+      if (formData.resendWebhookSecret.trim()) {
+        lines.push(`RESEND_WEBHOOK_SECRET=${formData.resendWebhookSecret}`)
+      }
       lines.push("")
     }
 
@@ -222,6 +227,7 @@ export default function WelcomePage() {
     setShowContinue(false)
     setTextOpacity(0)
     setTimeout(() => {
+      setShowBackground(true)
       setShowIntro(true)
     }, 2000)
   }
@@ -751,82 +757,236 @@ export default function WelcomePage() {
                   </TabsContent>
 
                   {/* Tab 3: Resend */}
-                  <TabsContent value="resend" className="space-y-4 mt-4">
-                    <Alert className="bg-green-50 border-green-200">
-                      <Mail className="w-4 h-4" />
-                      <AlertTitle>Resend Configuration (Optional)</AlertTitle>
-                      <AlertDescription>
-                        Enable email sending capabilities (notifications, password resets, etc.).
-                        You can skip this step if you don&apos;t need email features.
-                      </AlertDescription>
-                    </Alert>
+                  <TabsContent value="resend" className="space-y-6 mt-0">
+                    {/* Header section */}
+                    <div className="flex items-start gap-4 p-4 bg-muted/30 rounded-lg">
+                      <div className="rounded-lg bg-green-100 p-3">
+                        <Mail className="h-6 w-6 text-green-700" />
+                      </div>
+                      <div className="flex-1">
+                        <h2 className="mb-1 text-lg font-semibold text-foreground">Resend Configuration (Optional)</h2>
+                        <p className="text-sm text-muted-foreground">
+                          Enable email sending and the <strong>Mail Stream</strong> module. Resend lets you send transactional emails and track their delivery status in real-time.
+                        </p>
+                      </div>
+                    </div>
 
-                    <div className="space-y-3">
-                      <h3 className="font-semibold text-sm flex items-center gap-2">
-                        <Badge variant="outline">Step 1</Badge>
-                        Create a FREE Resend account
-                      </h3>
+                    {/* Step 1: API Key */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
+                        1
+                      </div>
+                      <h3 className="text-base font-semibold text-foreground">Get your Resend API Key</h3>
+                    </div>
 
-                      <ol className="text-sm space-y-2 ml-4 list-decimal list-inside text-muted-foreground">
-                        <li>
-                          Visit{" "}
-                          <a
-                            href="https://resend.com/api-keys"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline inline-flex items-center gap-1"
-                          >
-                            Resend Dashboard
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                          {" "}(3,000 emails/month free)
+                    <div className="p-4 bg-muted/30 rounded-lg">
+                      <ol className="space-y-3">
+                        <li className="flex items-start gap-3">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                            1
+                          </span>
+                          <div className="flex-1 pt-0.5 text-sm">
+                            <span className="text-foreground">Go to </span>
+                            <a href="https://resend.com/api-keys" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-accent hover:underline">
+                              Resend Dashboard → API Keys
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                            <span className="text-muted-foreground"> (3,000 emails/month free)</span>
+                          </div>
                         </li>
-                        <li>Create a new API key</li>
-                        <li>Copy and paste it below</li>
+                        <li className="flex items-start gap-3">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                            2
+                          </span>
+                          <p className="flex-1 pt-0.5 text-sm text-foreground">Click <strong>Create API Key</strong> and copy the key</p>
+                        </li>
                       </ol>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="resendApiKey">Resend API Key</Label>
-                      <Textarea
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="resendApiKey" className="text-sm font-medium text-foreground">Resend API Key</Label>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Info className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs max-w-xs">Your Resend API key for sending emails (starts with re_)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
                         id="resendApiKey"
                         value={formData.resendApiKey}
                         onChange={(e) => setFormData(prev => ({ ...prev, resendApiKey: e.target.value }))}
                         placeholder="re_..."
-                        className="text-xs min-h-[80px]"
+                        className="text-sm"
                         style={{ fontFamily: 'Geist Mono, monospace' }}
                       />
                     </div>
 
-                    <Alert>
-                      <Info className="w-4 h-4" />
-                      <AlertDescription>
-                        Need help?{" "}
-                        <a
-                          href="https://resend.com/docs/introduction"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline inline-flex items-center gap-1"
-                        >
-                          Read the Resend documentation
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
+                    {/* Step 2: Webhook Setup */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
+                        2
+                      </div>
+                      <h3 className="text-base font-semibold text-foreground">Set up Webhook for Mail Stream Module</h3>
+                    </div>
+
+                    <Alert className="bg-blue-50 border-blue-200">
+                      <Info className="w-4 h-4 text-blue-600" />
+                      <AlertTitle className="text-blue-800">Why set up a webhook?</AlertTitle>
+                      <AlertDescription className="text-blue-700">
+                        The <strong>Mail Stream</strong> module shows you a real-time log of all emails sent from ARI, including their delivery status (sent, delivered, bounced, etc.).
+                        Resend sends this status information to your app via webhooks. Without a webhook, Mail Stream won&apos;t receive email events.
                       </AlertDescription>
                     </Alert>
 
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={() => setCurrentTab("openai")}
-                        className="flex-1"
-                      >
-                        Back
-                      </Button>
-                      <Button
-                        onClick={() => setCurrentTab("vercel")}
-                        className="flex-1"
-                      >
+                    <div className="p-4 bg-muted/30 rounded-lg">
+                      <ol className="space-y-3">
+                        <li className="flex items-start gap-3">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                            1
+                          </span>
+                          <div className="flex-1 pt-0.5 text-sm">
+                            <span className="text-foreground">Go to </span>
+                            <a href="https://resend.com/webhooks" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-accent hover:underline">
+                              Resend Dashboard → Webhooks
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </div>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                            2
+                          </span>
+                          <p className="flex-1 pt-0.5 text-sm text-foreground">Click <strong>Add Webhook</strong></p>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                            3
+                          </span>
+                          <div className="flex-1 pt-0.5 text-sm">
+                            <p className="text-foreground mb-2">Enter your webhook endpoint URL:</p>
+                            <code className="block bg-gray-900 text-gray-100 px-3 py-2 rounded text-xs" style={{ fontFamily: 'Geist Mono, monospace' }}>
+                              https://YOUR-DOMAIN.vercel.app/api/modules/mail-stream/webhook
+                            </code>
+                            <p className="text-xs text-muted-foreground mt-1">Replace YOUR-DOMAIN with your actual Vercel domain</p>
+                          </div>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                            4
+                          </span>
+                          <p className="flex-1 pt-0.5 text-sm text-foreground">Select the events you want to track (recommended: <strong>all events</strong>)</p>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                            5
+                          </span>
+                          <p className="flex-1 pt-0.5 text-sm text-foreground">Click <strong>Create</strong> to save the webhook</p>
+                        </li>
+                      </ol>
+                    </div>
+
+                    {/* Step 3: Signing Secret */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
+                        3
+                      </div>
+                      <h3 className="text-base font-semibold text-foreground">Copy the Webhook Signing Secret</h3>
+                    </div>
+
+                    <Alert className="bg-amber-50 border-amber-200">
+                      <Shield className="w-4 h-4 text-amber-600" />
+                      <AlertTitle className="text-amber-800">Security: Signing Secret</AlertTitle>
+                      <AlertDescription className="text-amber-700">
+                        The signing secret verifies that webhook requests genuinely come from Resend, not from malicious actors.
+                        ARI uses this secret to validate each incoming webhook before processing it.
+                      </AlertDescription>
+                    </Alert>
+
+                    <div className="p-4 bg-muted/30 rounded-lg">
+                      <ol className="space-y-3">
+                        <li className="flex items-start gap-3">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                            1
+                          </span>
+                          <p className="flex-1 pt-0.5 text-sm text-foreground">After creating the webhook, click on it to view details</p>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                            2
+                          </span>
+                          <p className="flex-1 pt-0.5 text-sm text-foreground">Copy the <strong>Signing Secret</strong> (starts with <code className="bg-muted px-1 rounded text-xs">whsec_</code>)</p>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
+                            3
+                          </span>
+                          <p className="flex-1 pt-0.5 text-sm text-foreground">Paste it below</p>
+                        </li>
+                      </ol>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="resendWebhookSecret" className="text-sm font-medium text-foreground">Webhook Signing Secret</Label>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Info className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs max-w-xs">Used to verify webhook signatures (starts with whsec_)</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        id="resendWebhookSecret"
+                        value={formData.resendWebhookSecret}
+                        onChange={(e) => setFormData(prev => ({ ...prev, resendWebhookSecret: e.target.value }))}
+                        placeholder="whsec_..."
+                        className="text-sm"
+                        style={{ fontFamily: 'Geist Mono, monospace' }}
+                      />
+                    </div>
+
+                    {/* Vercel Env Vars Reminder */}
+                    <Alert>
+                      <Info className="w-4 h-4" />
+                      <AlertTitle>Don&apos;t forget Vercel!</AlertTitle>
+                      <AlertDescription>
+                        After downloading your <code className="bg-muted px-1 rounded text-xs">.env.local</code> file, you&apos;ll also need to add <code className="bg-muted px-1 rounded text-xs">RESEND_API_KEY</code> and <code className="bg-muted px-1 rounded text-xs">RESEND_WEBHOOK_SECRET</code> to your{" "}
+                        <a
+                          href="https://vercel.com/docs/environment-variables"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-accent hover:underline inline-flex items-center gap-1"
+                        >
+                          Vercel Environment Variables
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                        {" "}for production.
+                      </AlertDescription>
+                    </Alert>
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-between pt-4">
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setCurrentTab("openai")}>
+                          Back
+                        </Button>
+                        <Button variant="outline" size="sm" className="gap-2 text-xs" asChild>
+                          <a href="https://resend.com/docs/dashboard/webhooks/introduction" target="_blank" rel="noopener noreferrer">
+                            <Info className="h-3.5 w-3.5" />
+                            Webhook Docs
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        </Button>
+                      </div>
+                      <Button onClick={() => setCurrentTab("vercel")} className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90">
                         {formData.resendApiKey.trim() ? "Continue" : "Skip"} to Vercel
+                        <CheckCircle className="h-4 w-4" />
                       </Button>
                     </div>
                   </TabsContent>
