@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Search, Filter, List, Grid3X3, Calendar, Pin, Bell, Plus, Loader2, Trash2, Pencil, Columns, Play, Activity } from "lucide-react"
 import { useState } from "react"
 import { toggleFitnessTaskCompletion, toggleFitnessTaskPin, reorderFitnessTasks, deleteFitnessTask, updateFitnessTask, type FitnessTask, addSampleFitnessTasks } from "@/modules/daily-fitness/lib/fitness"
-import { useFitnessTasks, useInvalidateFitnessTasks, useSetFitnessTasksCache } from "@/lib/hooks/use-fitness"
+import { useFitnessTasks, useInvalidateFitnessTasks, useSetFitnessTasksCache } from "../hooks/use-fitness"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { YouTubeModal } from "@/components/youtube-modal"
@@ -148,8 +148,7 @@ export default function DailyFitnessPage() {
     try {
       // Update order in database
       if (user?.id) {
-        const tokenFn = async () => session?.access_token || null
-        await reorderFitnessTasks(updatedTasks.map((task) => task.id), tokenFn)
+        await reorderFitnessTasks(updatedTasks.map((task) => task.id))
         invalidateFitnessTasks() // Sync with server
       }
     } catch (error) {
@@ -192,8 +191,7 @@ export default function DailyFitnessPage() {
 
     try {
       if (user?.id) {
-        const tokenFn = async () => session?.access_token || null
-        await updateFitnessTask(taskId, updates, tokenFn)
+        await updateFitnessTask(taskId, updates)
         invalidateFitnessTasks() // Sync with server
       }
       toast({
@@ -228,8 +226,7 @@ export default function DailyFitnessPage() {
         // Wait for animation to complete before updating
         setTimeout(async () => {
           if (user?.id) {
-            const tokenFn = async () => session?.access_token || null
-            await toggleFitnessTaskCompletion(taskId, task.completed, tokenFn)
+            await toggleFitnessTaskCompletion(taskId, task.completed)
             invalidateFitnessTasks() // Sync with server
           }
           setFadingTasks(prev => {
@@ -245,8 +242,7 @@ export default function DailyFitnessPage() {
       } else {
         // If uncompleting or in Completed view, update immediately
         if (user?.id) {
-          const tokenFn = async () => session?.access_token || null
-          const updatedTask = await toggleFitnessTaskCompletion(taskId, task.completed, tokenFn)
+          const updatedTask = await toggleFitnessTaskCompletion(taskId, task.completed)
           invalidateFitnessTasks() // Sync with server
 
           // Trigger confetti only if completing (not uncompleting) - with 1 second delay
@@ -279,8 +275,7 @@ export default function DailyFitnessPage() {
       const task = tasks.find(t => t.id === taskId)
       if (!task) return
 
-      const tokenFn = async () => session?.access_token || null
-      await toggleFitnessTaskPin(taskId, task.pinned, tokenFn)
+      await toggleFitnessTaskPin(taskId, task.pinned)
       invalidateFitnessTasks() // Sync with server
     } catch (error) {
       console.error("Failed to toggle fitness task pin:", error)
@@ -305,8 +300,7 @@ export default function DailyFitnessPage() {
 
     try {
       if (user?.id) {
-        const tokenFn = async () => session?.access_token || null
-        await deleteFitnessTask(taskToDelete.id, tokenFn)
+        await deleteFitnessTask(taskToDelete.id)
         invalidateFitnessTasks() // Sync with server
       }
       toast({
@@ -348,7 +342,7 @@ export default function DailyFitnessPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={loadTasks} disabled={loading} className="bg-white">
+          <Button variant="outline" onClick={() => invalidateFitnessTasks()} disabled={loading} className="bg-white">
             {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
             Refresh
           </Button>
@@ -365,7 +359,7 @@ export default function DailyFitnessPage() {
             <Activity className="w-4 h-4 mr-2" />
             Test Reminder
           </Button>
-          <Button className="bg-black hover:bg-gray-800" onClick={() => router.push("/add-fitness")}>
+          <Button className="bg-black hover:bg-gray-800" onClick={() => router.push("/daily-fitness/add")}>
             <Plus className="w-4 h-4 mr-2" />
             Add Exercise
           </Button>
@@ -491,7 +485,7 @@ export default function DailyFitnessPage() {
                       className="h-6 w-6 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
                       onClick={(e) => {
                         e.stopPropagation()
-                        router.push(`/edit-fitness/${task.id}`)
+                        router.push(`/daily-fitness/edit/${task.id}`)
                       }}
                     >
                       <Pencil className="w-3 h-3" />
@@ -569,7 +563,7 @@ export default function DailyFitnessPage() {
                       className="h-6 w-6 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
                       onClick={(e) => {
                         e.stopPropagation()
-                        router.push(`/edit-fitness/${task.id}`)
+                        router.push(`/daily-fitness/edit/${task.id}`)
                       }}
                     >
                       <Pencil className="w-3 h-3" />
@@ -647,7 +641,7 @@ export default function DailyFitnessPage() {
                       className="h-6 w-6 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
                       onClick={(e) => {
                         e.stopPropagation()
-                        router.push(`/edit-fitness/${task.id}`)
+                        router.push(`/daily-fitness/edit/${task.id}`)
                       }}
                     >
                       <Pencil className="w-3 h-3" />
@@ -725,7 +719,7 @@ export default function DailyFitnessPage() {
                       className="h-6 w-6 text-gray-400 hover:text-blue-600 hover:bg-blue-50"
                       onClick={(e) => {
                         e.stopPropagation()
-                        router.push(`/edit-fitness/${task.id}`)
+                        router.push(`/daily-fitness/edit/${task.id}`)
                       }}
                     >
                       <Pencil className="w-3 h-3" />
@@ -867,7 +861,7 @@ export default function DailyFitnessPage() {
                     className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-blue-600 hover:bg-blue-50"}`}
                     onClick={(e) => {
                       e.stopPropagation()
-                      router.push(`/edit-fitness/${task.id}`)
+                      router.push(`/daily-fitness/edit/${task.id}`)
                     }}
                   >
                     <Pencil className="w-4 h-4" />
@@ -978,7 +972,7 @@ export default function DailyFitnessPage() {
                       className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-gray-400 hover:text-blue-600 hover:bg-blue-50"}`}
                       onClick={(e) => {
                         e.stopPropagation()
-                        router.push(`/edit-fitness/${task.id}`)
+                        router.push(`/daily-fitness/edit/${task.id}`)
                       }}
                     >
                       <Pencil className="w-4 h-4" />

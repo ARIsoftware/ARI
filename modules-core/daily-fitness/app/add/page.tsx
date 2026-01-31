@@ -4,7 +4,7 @@ import type React from "react"
 import { useSupabase } from "@/components/providers"
 import { DM_Sans } from "next/font/google"
 import { TaskAnnouncement } from "@/components/task-announcement"
-import { AppSidebar } from "../../components/app-sidebar"
+import { AppSidebar } from "@/components/app-sidebar"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft, Calendar, Plus, X, Pin, Loader2 } from "lucide-react"
 import { useState } from "react"
-import { createFitnessTask } from "@/lib/fitness"
+import { createFitnessTask } from "../../lib/fitness"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 
@@ -34,7 +34,7 @@ export default function AddFitnessPage() {
   const user = session?.user
   const { toast } = useToast()
   const router = useRouter()
-  
+
   const [title, setTitle] = useState("")
   const [assignees, setAssignees] = useState<string[]>([])
   const [newAssignee, setNewAssignee] = useState("")
@@ -59,7 +59,7 @@ export default function AddFitnessPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!title.trim()) {
       toast({
         title: "Error",
@@ -81,7 +81,6 @@ export default function AddFitnessPage() {
     setLoading(true)
 
     try {
-      const tokenFn = async () => session?.access_token || null
       await createFitnessTask({
         title: title.trim(),
         assignees: assignees.length > 0 ? assignees : [user?.firstName || "Me"],
@@ -93,7 +92,7 @@ export default function AddFitnessPage() {
         pinned,
         completed: status === "Completed",
         youtube_url: youtubeUrl.trim() || null,
-      }, tokenFn)
+      })
 
       toast({
         title: "Success",
@@ -141,8 +140,8 @@ export default function AddFitnessPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="icon"
                   onClick={() => router.push("/daily-fitness")}
                   className="bg-white"

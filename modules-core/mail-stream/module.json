@@ -1,7 +1,7 @@
 {
   "id": "mail-stream",
   "name": "Mail Stream",
-  "group": "Todo",
+  "group": "Email",
   "description": "Webhook event logging system for Resend.com - tracks all email, contact, and domain events",
   "version": "1.0.0",
   "author": "ARI",
@@ -16,7 +16,7 @@
   },
   "routes": [
     {
-      "path": "/mail-stream",
+      "path": "/mailstream",
       "label": "Mail Stream",
       "icon": "Mail",
       "sidebarPosition": "main"

@@ -28,7 +28,7 @@ import {
   useHelloWorldEntries,
   useCreateHelloWorldEntry,
   useDeleteHelloWorldEntry,
-} from '@/lib/hooks/use-hello-world'
+} from '../hooks/use-hello-world'
 import type { HelloWorldEntry } from '../types'
 
 export default function HelloWorldPage() {

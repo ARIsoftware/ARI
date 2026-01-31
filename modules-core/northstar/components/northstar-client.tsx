@@ -24,7 +24,7 @@ import { Carousel, CarouselContent, CarouselItem, CarouselApi } from "@/componen
 import { CheckCircle2, TrendingUp, Target, Plus, X, Calendar, Pencil } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useToast } from "@/hooks/use-toast"
-import { getGoals, createGoal, updateGoalProgress, updateGoal, type Goal } from "@/lib/goals"
+import { getGoals, createGoal, updateGoalProgress, updateGoal, type Goal } from "../lib/goals"
 import { cn } from "@/lib/utils"
 
 const priorityColors = {

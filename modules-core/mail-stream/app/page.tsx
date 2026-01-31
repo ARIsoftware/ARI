@@ -2,7 +2,7 @@
  * Mail Stream Module - Main Page
  *
  * Displays a table of all Resend webhook events with filtering and search.
- * Route: /mail-stream
+ * Route: /mailstream
  */
 
 'use client'
@@ -52,7 +52,7 @@ import {
   useMailStreamSettings,
   useUpdateMailStreamSettings,
   useDeleteMailStreamEvent,
-} from '@/lib/hooks/use-mail-stream'
+} from '../hooks/use-mail-stream'
 import type {
   MailStreamEvent,
   MailStreamFilters,

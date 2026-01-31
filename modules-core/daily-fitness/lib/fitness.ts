@@ -1,23 +1,15 @@
 import { type FitnessTask } from "@/lib/supabase"
-import { incrementFitnessTaskCompletion } from "@/lib/fitness-stats"
+import { incrementFitnessTaskCompletion } from "./fitness-stats"
 
 export type { FitnessTask }
 
-export async function getFitnessTasks(getToken: () => Promise<string | null>): Promise<FitnessTask[]> {
+export async function getFitnessTasks(): Promise<FitnessTask[]> {
   console.log("Attempting to fetch fitness tasks from fitness_database table")
-  
-  const token = await getToken()
-  
-  if (!token) {
-    throw new Error('Authentication required')
-  }
 
-  const response = await fetch('/api/fitness-tasks', {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
+  const response = await fetch('/api/modules/daily-fitness', {
+    credentials: 'include',
   })
-  
+
   if (!response.ok) {
     const error = await response.json()
     console.error("Error fetching fitness tasks:", error)
@@ -29,21 +21,15 @@ export async function getFitnessTasks(getToken: () => Promise<string | null>): P
   return data
 }
 
-export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_at" | "updated_at" | "order_index"> & { youtube_url?: string | null }, getToken: () => Promise<string | null>): Promise<FitnessTask> {
+export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_at" | "updated_at" | "order_index"> & { youtube_url?: string | null }): Promise<FitnessTask> {
   console.log("Attempting to create fitness task:", task)
-  
-  const token = await getToken()
-  
-  if (!token) {
-    throw new Error('Authentication required')
-  }
 
-  const response = await fetch('/api/fitness-tasks', {
+  const response = await fetch('/api/modules/daily-fitness', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
     },
+    credentials: 'include',
     body: JSON.stringify({ task }),
   })
 
@@ -58,19 +44,13 @@ export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_
   return data
 }
 
-export async function updateFitnessTask(id: string, updates: Partial<FitnessTask>, getToken: () => Promise<string | null>): Promise<FitnessTask> {
-  const token = await getToken()
-  
-  if (!token) {
-    throw new Error('Authentication required')
-  }
-
-  const response = await fetch('/api/fitness-tasks', {
+export async function updateFitnessTask(id: string, updates: Partial<FitnessTask>): Promise<FitnessTask> {
+  const response = await fetch('/api/modules/daily-fitness', {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
     },
+    credentials: 'include',
     body: JSON.stringify({ id, updates }),
   })
 
@@ -83,18 +63,10 @@ export async function updateFitnessTask(id: string, updates: Partial<FitnessTask
   return await response.json()
 }
 
-export async function deleteFitnessTask(id: string, getToken: () => Promise<string | null>): Promise<void> {
-  const token = await getToken()
-  
-  if (!token) {
-    throw new Error('Authentication required')
-  }
-
-  const response = await fetch(`/api/fitness-tasks?id=${encodeURIComponent(id)}`, {
+export async function deleteFitnessTask(id: string): Promise<void> {
+  const response = await fetch(`/api/modules/daily-fitness?id=${encodeURIComponent(id)}`, {
     method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
+    credentials: 'include',
   })
 
   if (!response.ok) {
@@ -104,7 +76,7 @@ export async function deleteFitnessTask(id: string, getToken: () => Promise<stri
   }
 }
 
-export async function toggleFitnessTaskCompletion(id: string, currentCompleted: boolean, getToken: () => Promise<string | null>): Promise<FitnessTask> {
+export async function toggleFitnessTaskCompletion(id: string, currentCompleted: boolean): Promise<FitnessTask> {
   const newCompleted = !currentCompleted
   const newStatus = newCompleted ? "Completed" : "Pending"
 
@@ -112,12 +84,12 @@ export async function toggleFitnessTaskCompletion(id: string, currentCompleted: 
   const updatedTask = await updateFitnessTask(id, {
     completed: newCompleted,
     status: newStatus,
-  }, getToken)
+  })
 
   // If the task is being marked as completed, increment completion count and add to history
   if (newCompleted) {
     try {
-      await incrementFitnessTaskCompletion(id, getToken)
+      await incrementFitnessTaskCompletion(id)
     } catch (error) {
       console.error("Failed to increment fitness task completion:", error)
       // Don't throw here - the task update was successful, completion count increment is secondary
@@ -127,17 +99,17 @@ export async function toggleFitnessTaskCompletion(id: string, currentCompleted: 
   return updatedTask
 }
 
-export async function toggleFitnessTaskPin(id: string, currentPinned: boolean, getToken: () => Promise<string | null>): Promise<FitnessTask> {
+export async function toggleFitnessTaskPin(id: string, currentPinned: boolean): Promise<FitnessTask> {
   return updateFitnessTask(id, {
     pinned: !currentPinned,
-  }, getToken)
+  })
 }
 
-export async function reorderFitnessTasks(taskIds: string[], getToken: () => Promise<string | null>): Promise<void> {
+export async function reorderFitnessTasks(taskIds: string[]): Promise<void> {
   // Update order_index for each task based on its position in the array
   for (let i = 0; i < taskIds.length; i++) {
     try {
-      await updateFitnessTask(taskIds[i], { order_index: i }, getToken)
+      await updateFitnessTask(taskIds[i], { order_index: i })
     } catch (error) {
       console.error("Error updating fitness task order:", error)
       throw error
@@ -146,19 +118,13 @@ export async function reorderFitnessTasks(taskIds: string[], getToken: () => Pro
 }
 
 // Add sample fitness tasks
-export async function addSampleFitnessTasks(getToken: () => Promise<string | null>): Promise<void> {
-  const token = await getToken()
-  
-  if (!token) {
-    throw new Error('Authentication required')
-  }
-
-  const response = await fetch('/api/sample-fitness-tasks', {
+export async function addSampleFitnessTasks(): Promise<void> {
+  const response = await fetch('/api/modules/daily-fitness/sample', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
     },
+    credentials: 'include',
     body: JSON.stringify({}),
   })
 

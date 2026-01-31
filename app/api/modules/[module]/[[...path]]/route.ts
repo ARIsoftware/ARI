@@ -90,6 +90,7 @@ const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
     '[id]': () => import('@/modules/contacts/api/[id]/route') // Dynamic ID route
   },
   'motivation': {
+    '': () => import('@/modules/motivation/api/route'), // GET/POST/DELETE for motivation items
     'refresh-thumbnail': () => import('@/modules/motivation/api/refresh-thumbnail/route'),
     'reorder': () => import('@/modules/motivation/api/reorder/route'),
     'setup': () => import('@/modules/motivation/api/setup/route')
@@ -134,6 +135,19 @@ const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
     'webhook': () => import('@/modules/mail-stream/api/webhook/route'), // POST for Resend webhooks (public, signature-verified)
     'data': () => import('@/modules/mail-stream/api/data/route'), // GET/DELETE for events
     'settings': () => import('@/modules/mail-stream/api/settings/route') // GET/PUT for settings
+  },
+  'notepad': {
+    '': () => import('@/modules/notepad/api/route'), // GET/POST for notepad content
+    'revisions': () => import('@/modules/notepad/api/revisions/route') // GET/POST for revision history
+  },
+  'northstar': {
+    'goals': () => import('@/modules/northstar/api/goals/route'), // GET/POST for goals
+    'goals/[id]': () => import('@/modules/northstar/api/goals/[id]/route') // PATCH for single goal
+  },
+  'daily-fitness': {
+    '': () => import('@/modules/daily-fitness/api/route'), // GET/POST/PUT/DELETE for fitness tasks
+    'stats': () => import('@/modules/daily-fitness/api/stats/route'), // GET for fitness stats
+    'sample': () => import('@/modules/daily-fitness/api/sample/route') // POST for sample tasks
   }
 }
 

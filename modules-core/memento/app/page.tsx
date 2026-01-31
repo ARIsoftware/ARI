@@ -21,7 +21,7 @@ import {
   useCreateMementoEra,
   useUpdateMementoEra,
   useDeleteMementoEra
-} from '@/lib/hooks/use-memento'
+} from '../hooks/use-memento'
 import {
   generateWeekData,
   calculateLifeStats,

@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { StickyNote } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Notepad } from "@/components/notepad"
+import { Notepad } from "./notepad"
 import {
   Tooltip,
   TooltipContent,

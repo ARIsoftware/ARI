@@ -15,6 +15,16 @@
       "label": "Daily Fitness",
       "icon": "Dumbbell",
       "sidebarPosition": "main"
+    },
+    {
+      "path": "/daily-fitness/add",
+      "label": "Add Exercise",
+      "sidebarPosition": "hidden"
+    },
+    {
+      "path": "/daily-fitness/edit/[id]",
+      "label": "Edit Exercise",
+      "sidebarPosition": "hidden"
     }
   ],
   "features": {

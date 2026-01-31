@@ -11,7 +11,7 @@ export interface NotepadRevision {
 }
 
 export async function getNotepad(): Promise<Notepad> {
-  const response = await fetch('/api/notepad', {
+  const response = await fetch('/api/modules/notepad', {
     credentials: 'include',
   })
 
@@ -25,7 +25,7 @@ export async function getNotepad(): Promise<Notepad> {
 }
 
 export async function saveNotepad(content: string): Promise<Notepad> {
-  const response = await fetch('/api/notepad', {
+  const response = await fetch('/api/modules/notepad', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -44,7 +44,7 @@ export async function saveNotepad(content: string): Promise<Notepad> {
 }
 
 export async function getNotepadRevisions(): Promise<NotepadRevision[]> {
-  const response = await fetch('/api/notepad/revisions', {
+  const response = await fetch('/api/modules/notepad/revisions', {
     credentials: 'include',
   })
 
@@ -58,7 +58,7 @@ export async function getNotepadRevisions(): Promise<NotepadRevision[]> {
 }
 
 export async function restoreNotepadRevision(revisionId: string): Promise<Notepad> {
-  const response = await fetch('/api/notepad/revisions', {
+  const response = await fetch('/api/modules/notepad/revisions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

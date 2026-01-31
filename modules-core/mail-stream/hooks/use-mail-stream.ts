@@ -5,7 +5,7 @@
  * Uses TanStack Query for caching, background refetching, and optimistic updates.
  *
  * Usage:
- *   import { useMailStreamEvents, useMailStreamSettings } from '@/lib/hooks/use-mail-stream'
+ *   import { useMailStreamEvents, useMailStreamSettings } from '@/modules/mail-stream/hooks/use-mail-stream'
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -13,7 +13,7 @@ import type {
   MailStreamEvent,
   MailStreamSettings,
   MailStreamFilters
-} from '@/modules/mail-stream/types'
+} from '../types'
 
 // Query keys
 const EVENTS_KEY = ['mail-stream-events']
@@ -51,7 +51,6 @@ export function useMailStreamEvents(
       }
       return await res.json()
     },
-    refetchInterval: 30000, // Auto-refresh every 30 seconds
   })
 }
 

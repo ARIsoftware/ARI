@@ -33,7 +33,7 @@ import { Loader2, Save, CheckCircle2 } from 'lucide-react'
 import {
   useHelloWorldSettings,
   useUpdateHelloWorldSettings,
-} from '@/lib/hooks/use-hello-world'
+} from '../hooks/use-hello-world'
 import type { HelloWorldSettings } from '../types'
 
 /**

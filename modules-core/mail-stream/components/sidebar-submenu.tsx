@@ -14,12 +14,12 @@ import { Mail, Settings } from 'lucide-react'
 const menuItems = [
   {
     label: 'Event Log',
-    path: '/mail-stream',
+    path: '/mailstream',
     icon: Mail,
   },
   {
     label: 'Settings',
-    path: '/mail-stream/settings',
+    path: '/mailstream/settings',
     icon: Settings,
   },
 ]

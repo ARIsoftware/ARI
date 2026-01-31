@@ -40,7 +40,7 @@ import {
   formatExpectedDelivery,
   type Shipment
 } from "@/modules/shipments/lib/shipments"
-import { useShipments, useInvalidateShipments } from "@/lib/hooks/use-shipments"
+import { useShipments, useInvalidateShipments } from "../hooks/use-shipments"
 import { useToast } from "@/hooks/use-toast"
 
 export default function ShipmentsPage() {
