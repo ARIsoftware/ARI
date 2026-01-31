@@ -125,13 +125,15 @@ export interface MailStreamEvent {
  */
 export interface MailStreamSettings {
   retention_days: 7 | 30 | 90 | 360 | -1  // -1 means indefinitely
+  setup_complete: boolean
 }
 
 /**
  * Default settings
  */
 export const DEFAULT_MAIL_STREAM_SETTINGS: MailStreamSettings = {
-  retention_days: 30
+  retention_days: -1,
+  setup_complete: false
 }
 
 /**

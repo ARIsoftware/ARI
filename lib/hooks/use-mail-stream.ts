@@ -116,7 +116,7 @@ export function useMailStreamSettings() {
       const res = await fetch('/api/modules/mail-stream/settings')
       if (!res.ok) {
         // Return defaults if error
-        return { retention_days: 30 }
+        return { retention_days: -1, setup_complete: false }
       }
       const data = await res.json()
       return data.settings

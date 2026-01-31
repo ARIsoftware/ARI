@@ -33,8 +33,8 @@ export default function MailStreamSettingsPage() {
   const { data: savedSettings, isLoading } = useMailStreamSettings()
   const updateSettings = useUpdateMailStreamSettings()
 
-  // Local state
-  const [retentionDays, setRetentionDays] = useState<7 | 30 | 90 | 360 | -1>(DEFAULT_MAIL_STREAM_SETTINGS.retention_days)
+  // Local state - default to indefinitely (-1)
+  const [retentionDays, setRetentionDays] = useState<7 | 30 | 90 | 360 | -1>(-1)
   const [saved, setSaved] = useState(false)
 
   // Update local state when settings load
@@ -194,7 +194,7 @@ export default function MailStreamSettingsPage() {
               RESEND_WEBHOOK_SECRET=whsec_your_secret_here
             </div>
             <p className="text-sm text-muted-foreground">
-              Copy the signing secret from Resend and add it to your environment variables
+              Copy the signing secret from Resend and add it to your local .env.local and/or Vercel environment variables.
             </p>
           </div>
 
