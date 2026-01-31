@@ -1,0 +1,35 @@
+{
+  "id": "mail-stream",
+  "name": "Mail Stream",
+  "description": "Webhook event logging system for Resend.com - tracks all email, contact, and domain events",
+  "version": "1.0.0",
+  "author": "ARI",
+  "icon": "Mail",
+  "enabled": true,
+  "fullscreen": false,
+  "menuPriority": 50,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": false
+  },
+  "routes": [
+    {
+      "path": "/mail-stream",
+      "label": "Mail Stream",
+      "icon": "Mail",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": ["mail_stream_events", "mail_stream_settings"],
+    "migrations": "./database/migrations"
+  },
+  "submenu": {
+    "component": "./components/sidebar-submenu.tsx"
+  }
+}

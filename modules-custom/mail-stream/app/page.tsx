@@ -1,0 +1,420 @@
+/**
+ * Mail Stream Module - Main Page
+ *
+ * Displays a table of all Resend webhook events with filtering and search.
+ * Route: /mail-stream
+ */
+
+'use client'
+
+import { useState } from 'react'
+import { useToast } from '@/hooks/use-toast'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
+import {
+  Mail,
+  Users,
+  Globe,
+  Search,
+  Trash2,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+  RefreshCw,
+} from 'lucide-react'
+import {
+  useMailStreamEvents,
+  useDeleteMailStreamEvent,
+} from '@/lib/hooks/use-mail-stream'
+import type {
+  MailStreamEvent,
+  MailStreamFilters,
+  EventCategory,
+  EmailStatus,
+} from '../types'
+import {
+  STATUS_COLORS,
+  CATEGORY_COLORS,
+} from '../types'
+
+/**
+ * Format relative time (e.g., "5 minutes ago")
+ */
+function formatRelativeTime(dateStr: string): string {
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMins / 60)
+  const diffDays = Math.floor(diffHours / 24)
+
+  if (diffMins < 1) return 'Just now'
+  if (diffMins < 60) return `${diffMins} min ago`
+  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
+  if (diffDays < 30) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
+  return date.toLocaleDateString()
+}
+
+/**
+ * Category filter tabs
+ */
+const CATEGORY_TABS = [
+  { value: 'all', label: 'All', icon: null },
+  { value: 'email', label: 'Emails', icon: Mail },
+  { value: 'contact', label: 'Contacts', icon: Users },
+  { value: 'domain', label: 'Domains', icon: Globe },
+] as const
+
+/**
+ * Status filter options
+ */
+const STATUS_TABS = [
+  { value: 'all', label: 'All' },
+  { value: 'delivered', label: 'Delivered' },
+  { value: 'opened', label: 'Opened' },
+  { value: 'clicked', label: 'Clicked' },
+  { value: 'bounced', label: 'Bounced' },
+  { value: 'failed', label: 'Failed' },
+] as const
+
+/**
+ * Expandable row component for showing event details
+ */
+function EventRow({
+  event,
+  onDelete,
+  isDeleting,
+}: {
+  event: MailStreamEvent
+  onDelete: (id: string) => void
+  isDeleting: boolean
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  const statusLabel = event.status
+    ? event.status.replace('_', ' ')
+    : event.event_type.split('.')[1]
+
+  const categoryColor = CATEGORY_COLORS[event.event_category as EventCategory]
+  const statusColor = event.status
+    ? STATUS_COLORS[event.status as EmailStatus]
+    : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <TableRow className="cursor-pointer hover:bg-muted/50">
+        <TableCell>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="p-0 h-auto">
+              {isOpen ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </Button>
+          </CollapsibleTrigger>
+        </TableCell>
+        <TableCell>
+          <Badge variant="outline" className={categoryColor}>
+            {event.event_category}
+          </Badge>
+        </TableCell>
+        <TableCell>
+          <Badge className={statusColor}>
+            {statusLabel}
+          </Badge>
+        </TableCell>
+        <TableCell className="max-w-[200px] truncate">
+          {event.to_addresses?.join(', ') || '-'}
+        </TableCell>
+        <TableCell className="max-w-[250px] truncate">
+          {event.subject || '-'}
+        </TableCell>
+        <TableCell className="text-muted-foreground">
+          {event.from_address || '-'}
+        </TableCell>
+        <TableCell className="text-muted-foreground whitespace-nowrap">
+          {formatRelativeTime(event.created_at)}
+        </TableCell>
+        <TableCell>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete(event.id)
+            }}
+            disabled={isDeleting}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+          >
+            {isDeleting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+          </Button>
+        </TableCell>
+      </TableRow>
+      <CollapsibleContent asChild>
+        <TableRow className="bg-muted/30">
+          <TableCell colSpan={8} className="p-4">
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Event Type:</span>
+                  <p className="font-mono">{event.event_type}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Email ID:</span>
+                  <p className="font-mono text-xs">{event.email_id || '-'}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Resend Timestamp:</span>
+                  <p>{new Date(event.resend_created_at).toLocaleString()}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Received:</span>
+                  <p>{new Date(event.created_at).toLocaleString()}</p>
+                </div>
+              </div>
+
+              {event.bounce_details && (
+                <div className="p-3 bg-red-50 dark:bg-red-950 rounded-lg">
+                  <span className="text-sm font-medium text-red-800 dark:text-red-200">
+                    Bounce Details:
+                  </span>
+                  <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                    {(event.bounce_details as any).message}
+                  </p>
+                  {(event.bounce_details as any).type && (
+                    <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                      Type: {(event.bounce_details as any).type} / {(event.bounce_details as any).subType}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {event.click_details && (
+                <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                  <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                    Click Details:
+                  </span>
+                  <p className="text-sm text-blue-700 dark:text-blue-300 mt-1 break-all">
+                    Link: {(event.click_details as any).link}
+                  </p>
+                </div>
+              )}
+
+              <details className="text-xs">
+                <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                  View Raw Payload
+                </summary>
+                <pre className="mt-2 p-3 bg-muted rounded-lg overflow-auto max-h-64">
+                  {JSON.stringify(event.raw_payload, null, 2)}
+                </pre>
+              </details>
+            </div>
+          </TableCell>
+        </TableRow>
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
+export default function MailStreamPage() {
+  const { toast } = useToast()
+
+  // Filter state
+  const [filters, setFilters] = useState<MailStreamFilters>({
+    category: 'all',
+    status: 'all',
+    search: '',
+  })
+  const [searchInput, setSearchInput] = useState('')
+
+  // Data fetching
+  const { data, isLoading, refetch, isRefetching } = useMailStreamEvents(filters)
+  const deleteEvent = useDeleteMailStreamEvent()
+
+  const events = data?.events || []
+  const totalCount = data?.total || 0
+
+  // Handle search
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    setFilters((f) => ({ ...f, search: searchInput }))
+  }
+
+  // Handle delete
+  const handleDelete = (id: string) => {
+    deleteEvent.mutate(id, {
+      onError: () => {
+        toast({
+          variant: 'destructive',
+          title: 'Failed to delete event',
+          description: 'Please try again.',
+        })
+      },
+    })
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Loading overlay */}
+      {isLoading && (
+        <div className="fixed inset-0 bg-background/50 flex items-center justify-center z-50">
+          <div className="flex items-center gap-2">
+            <Loader2 className="w-6 h-6 animate-spin" />
+            <span>Loading events...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Page Header */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-4xl font-medium">Mail Stream</h1>
+          <p className="text-muted-foreground mt-1">
+            {totalCount} event{totalCount !== 1 ? 's' : ''} logged
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => refetch()}
+          disabled={isRefetching}
+        >
+          <RefreshCw className={`w-4 h-4 mr-2 ${isRefetching ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Filters */}
+      <div className="space-y-4">
+        {/* Category tabs */}
+        <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit">
+          {CATEGORY_TABS.map((tab) => (
+            <Button
+              key={tab.value}
+              variant={filters.category === tab.value ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setFilters((f) => ({ ...f, category: tab.value as any }))}
+              className="gap-2"
+            >
+              {tab.icon && <tab.icon className="w-4 h-4" />}
+              {tab.label}
+            </Button>
+          ))}
+        </div>
+
+        {/* Status tabs (only show for email category) */}
+        {(filters.category === 'all' || filters.category === 'email') && (
+          <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit">
+            {STATUS_TABS.map((tab) => (
+              <Button
+                key={tab.value}
+                variant={filters.status === tab.value ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setFilters((f) => ({ ...f, status: tab.value as any }))}
+              >
+                {tab.label}
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {/* Search */}
+        <form onSubmit={handleSearch} className="flex gap-2 max-w-md">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by recipient, subject, or sender..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Button type="submit" variant="secondary">
+            Search
+          </Button>
+          {filters.search && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setSearchInput('')
+                setFilters((f) => ({ ...f, search: '' }))
+              }}
+            >
+              Clear
+            </Button>
+          )}
+        </form>
+      </div>
+
+      {/* Events Table */}
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[40px]"></TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>To</TableHead>
+              <TableHead>Subject</TableHead>
+              <TableHead>From</TableHead>
+              <TableHead>Age</TableHead>
+              <TableHead className="w-[60px]">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {events.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-12">
+                  <Mail className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                  <p className="text-muted-foreground">
+                    {filters.search || filters.category !== 'all' || filters.status !== 'all'
+                      ? 'No events match your filters'
+                      : 'No webhook events yet'}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Events will appear here when Resend sends webhooks
+                  </p>
+                </TableCell>
+              </TableRow>
+            ) : (
+              events.map((event) => (
+                <EventRow
+                  key={event.id}
+                  event={event}
+                  onDelete={handleDelete}
+                  isDeleting={deleteEvent.isPending}
+                />
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Pagination info */}
+      {events.length > 0 && (
+        <div className="text-sm text-muted-foreground">
+          Showing {events.length} of {totalCount} events
+        </div>
+      )}
+    </div>
+  )
+}
