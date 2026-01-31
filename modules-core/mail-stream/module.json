@@ -31,5 +31,17 @@
   },
   "submenu": {
     "component": "./components/sidebar-submenu.tsx"
-  }
+  },
+  "publicRoutes": [
+    {
+      "path": "webhook",
+      "methods": ["GET", "POST"],
+      "security": {
+        "type": "webhook_signature",
+        "secretEnvVar": "RESEND_WEBHOOK_SECRET",
+        "rateLimit": 100
+      },
+      "description": "Receives webhook events from Resend"
+    }
+  ]
 }

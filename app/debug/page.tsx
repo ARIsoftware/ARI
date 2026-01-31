@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { AlertCircle, CheckCircle2, XCircle, Loader2, Shield, ShieldAlert, ShieldCheck, Database as DatabaseIcon, Package, Save, Key } from 'lucide-react'
+import { AlertCircle, CheckCircle2, XCircle, Loader2, Shield, ShieldAlert, ShieldCheck, Database as DatabaseIcon, Package, Save, Key, Globe, Lock } from 'lucide-react'
 
 interface TestResult {
   name: string
@@ -62,11 +62,47 @@ export default function DatabaseTestPage() {
   const [moduleResults, setModuleResults] = useState<TestResult[]>([])
   const [backupResults, setBackupResults] = useState<TestResult[]>([])
   const [authConfigResults, setAuthConfigResults] = useState<TestResult[]>([])
+  const [endpointsData, setEndpointsData] = useState<{
+    publicEndpoints: Array<{
+      path: string
+      fullPath: string
+      moduleId: string
+      methods: string[]
+      securityType: string
+      description?: string
+      hasRateLimit: boolean
+    }>
+    privateEndpoints: Array<{
+      path: string
+      fullPath: string
+      moduleId: string
+      methods: string[]
+    }>
+    summary: {
+      totalPublic: number
+      totalPrivate: number
+      modulesWithPublicRoutes: string[]
+      securityCoverage: Record<string, number>
+    }
+    warnings: string[]
+  } | null>(null)
   const [isRunning, setIsRunning] = useState(false)
   const [isRunningSecurityTests, setIsRunningSecurityTests] = useState(false)
   const [isRunningModuleTests, setIsRunningModuleTests] = useState(false)
   const [isRunningBackupTests, setIsRunningBackupTests] = useState(false)
   const [isRunningAuthConfigTests, setIsRunningAuthConfigTests] = useState(false)
+  const [isRunningEndpointsTests, setIsRunningEndpointsTests] = useState(false)
+  const [isRunningPublicSecurityTests, setIsRunningPublicSecurityTests] = useState(false)
+  const [publicSecurityResults, setPublicSecurityResults] = useState<Array<{
+    endpoint: string
+    method: string
+    status: 'pending' | 'testing' | 'secure' | 'vulnerable' | 'error' | 'warning'
+    message?: string
+    responseStatus?: number
+    securityType?: string
+    hasSecurityValidation: boolean
+  }>>([])
+  const [securityValidationHeader, setSecurityValidationHeader] = useState<string | null>(null)
 
   // Define all API endpoints for testing
   const apiEndpoints: ApiEndpoint[] = [
@@ -756,6 +792,147 @@ export default function DatabaseTestPage() {
 
     setIsRunningBackupTests(false)
     console.log('💾 Backup system diagnostics complete!')
+  }
+
+  const runEndpointsTests = async () => {
+    setIsRunningEndpointsTests(true)
+    setEndpointsData(null)
+    console.log('🌐 Fetching endpoints data...')
+
+    try {
+      const response = await fetch('/api/debug/endpoints')
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      const data = await response.json()
+      setEndpointsData(data)
+      console.log('✅ Endpoints data loaded:', data.summary)
+    } catch (error: any) {
+      console.error('❌ Failed to fetch endpoints:', error)
+      setEndpointsData(null)
+    }
+
+    setIsRunningEndpointsTests(false)
+    console.log('🌐 Endpoints check complete!')
+  }
+
+  const runPublicSecurityTests = async () => {
+    setIsRunningPublicSecurityTests(true)
+    setPublicSecurityResults([])
+    console.log('🔐 Starting public endpoint security tests...')
+
+    try {
+      // First fetch endpoints data to get public routes
+      const response = await fetch('/api/debug/endpoints')
+      if (!response.ok) {
+        throw new Error(`Failed to fetch endpoints: ${response.status}`)
+      }
+      const data = await response.json()
+      const publicEndpoints = data.publicEndpoints || []
+
+      if (publicEndpoints.length === 0) {
+        console.log('No public endpoints to test')
+        setIsRunningPublicSecurityTests(false)
+        return
+      }
+
+      // Test each public endpoint
+      for (const endpoint of publicEndpoints) {
+        for (const method of endpoint.methods) {
+          // Skip GET requests for webhook endpoints (health checks are expected to pass)
+          if (method === 'GET' && endpoint.securityType === 'webhook_signature') {
+            setPublicSecurityResults(prev => [...prev, {
+              endpoint: endpoint.fullPath,
+              method,
+              status: 'secure',
+              message: 'GET health check endpoint (expected to be open)',
+              securityType: endpoint.securityType,
+              hasSecurityValidation: true
+            }])
+            continue
+          }
+
+          // Update status to testing
+          setPublicSecurityResults(prev => [...prev, {
+            endpoint: endpoint.fullPath,
+            method,
+            status: 'testing',
+            securityType: endpoint.securityType,
+            hasSecurityValidation: false
+          }])
+
+          try {
+            const options: RequestInit = {
+              method,
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'omit' // No cookies
+            }
+
+            // For POST/PUT/PATCH, send empty body (no signature headers)
+            if (['POST', 'PUT', 'PATCH'].includes(method)) {
+              options.body = JSON.stringify({ test: true })
+            }
+
+            const testResponse = await fetch(endpoint.fullPath, options)
+            const responseStatus = testResponse.status
+
+            // Check if response includes security validation header
+            const hasValidationHeader = testResponse.headers.get('x-security-validated') === 'true'
+
+            // Determine if endpoint properly rejected the request
+            // 400 = missing headers, 401 = invalid signature, 403 = forbidden
+            // 200 without auth = VULNERABLE (unless it's a health check)
+            let status: 'secure' | 'vulnerable' | 'warning' | 'error' = 'error'
+            let message = ''
+
+            if (responseStatus === 400) {
+              status = 'secure'
+              message = 'Properly rejected: missing security headers'
+            } else if (responseStatus === 401) {
+              status = 'secure'
+              message = 'Properly rejected: invalid/missing signature'
+            } else if (responseStatus === 403) {
+              status = 'secure'
+              message = 'Properly rejected: access denied'
+            } else if (responseStatus === 429) {
+              status = 'secure'
+              message = 'Rate limit enforced'
+            } else if (responseStatus === 200 || responseStatus === 201) {
+              // This is concerning - request succeeded without security headers
+              status = 'vulnerable'
+              message = 'WARNING: Request succeeded without security headers!'
+            } else if (responseStatus === 404) {
+              status = 'warning'
+              message = 'Endpoint not found (may not be registered in proxy)'
+            } else if (responseStatus === 500) {
+              status = 'warning'
+              message = 'Server error (may be missing env var for secret)'
+            } else {
+              status = 'warning'
+              message = `Unexpected response: ${responseStatus}`
+            }
+
+            setPublicSecurityResults(prev => prev.map(r =>
+              r.endpoint === endpoint.fullPath && r.method === method
+                ? { ...r, status, message, responseStatus, hasSecurityValidation: hasValidationHeader }
+                : r
+            ))
+
+          } catch (error: any) {
+            setPublicSecurityResults(prev => prev.map(r =>
+              r.endpoint === endpoint.fullPath && r.method === method
+                ? { ...r, status: 'error', message: `Network error: ${error.message}`, hasSecurityValidation: false }
+                : r
+            ))
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error('Failed to run public security tests:', error)
+    }
+
+    setIsRunningPublicSecurityTests(false)
+    console.log('🔐 Public endpoint security tests complete!')
   }
 
   const updateAuthConfigResult = (name: string, update: Partial<TestResult>) => {
@@ -1602,10 +1779,14 @@ export default function DatabaseTestPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="database" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 mb-8">
+        <TabsList className="grid w-full grid-cols-6 mb-8">
           <TabsTrigger value="database" className="flex items-center gap-2">
             <DatabaseIcon className="h-4 w-4" />
             Database
+          </TabsTrigger>
+          <TabsTrigger value="endpoints" className="flex items-center gap-2">
+            <Globe className="h-4 w-4" />
+            Endpoints
           </TabsTrigger>
           <TabsTrigger value="security" className="flex items-center gap-2">
             <Shield className="h-4 w-4" />
@@ -1824,6 +2005,158 @@ export default function DatabaseTestPage() {
                   </Card>
                 ))}
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Public Endpoint Security Tests */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl flex items-center gap-2">
+              <Globe className="h-5 w-5 text-orange-500" />
+              Public Endpoint Security Tests
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-2">
+              Verify that public endpoints properly enforce their configured security (signatures, API keys, rate limits)
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="space-y-3 mb-6">
+                <Button
+                  onClick={runPublicSecurityTests}
+                  disabled={isRunningPublicSecurityTests}
+                  size="lg"
+                  variant="outline"
+                  className="w-full border-orange-500/50 hover:bg-orange-500/10"
+                >
+                  {isRunningPublicSecurityTests ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Testing Public Endpoints...
+                    </>
+                  ) : (
+                    <>
+                      <Globe className="mr-2 h-4 w-4" />
+                      Run Public Endpoint Security Tests
+                    </>
+                  )}
+                </Button>
+                <p className="text-sm text-muted-foreground">
+                  Tests that public endpoints reject requests without valid security headers (signatures, API keys)
+                </p>
+              </div>
+
+              {/* Public Security Summary */}
+              {publicSecurityResults.length > 0 && (
+                <Card className="border-2 border-orange-500/30">
+                  <CardContent className="p-4">
+                    <h3 className="font-medium mb-3">Public Endpoint Security Summary</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="flex justify-between">
+                        <span>Total Tested:</span>
+                        <Badge variant="outline">{publicSecurityResults.length}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Properly Secured:</span>
+                        <Badge className="bg-green-500">{publicSecurityResults.filter(r => r.status === 'secure').length}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Vulnerable:</span>
+                        <Badge variant="destructive">{publicSecurityResults.filter(r => r.status === 'vulnerable').length}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Warnings:</span>
+                        <Badge variant="secondary">{publicSecurityResults.filter(r => r.status === 'warning').length}</Badge>
+                      </div>
+                    </div>
+                    {publicSecurityResults.some(r => r.status === 'vulnerable') && (
+                      <div className="mt-3 p-2 bg-red-50 dark:bg-red-950 rounded text-sm">
+                        <p className="text-red-600 dark:text-red-400 font-medium">
+                          ⚠️ CRITICAL: Some public endpoints accepted requests without security headers!
+                        </p>
+                        <p className="text-red-500 dark:text-red-300 text-xs mt-1">
+                          These endpoints may be vulnerable to unauthorized access. Review the security configuration.
+                        </p>
+                      </div>
+                    )}
+                    {publicSecurityResults.every(r => r.status === 'secure') && publicSecurityResults.length > 0 && (
+                      <div className="mt-3 p-2 bg-green-50 dark:bg-green-950 rounded text-sm">
+                        <p className="text-green-600 dark:text-green-400 font-medium">
+                          ✓ All public endpoints properly enforce security validation
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Public Security Test Results */}
+              {publicSecurityResults.length > 0 && (
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {publicSecurityResults.map((result, index) => (
+                    <Card key={index} className={`border ${
+                      result.status === 'vulnerable' ? 'border-red-500/50 bg-red-500/5' :
+                      result.status === 'secure' ? 'border-green-500/30' :
+                      result.status === 'warning' ? 'border-yellow-500/30' : ''
+                    }`}>
+                      <CardContent className="p-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start gap-3 flex-1">
+                            {result.status === 'secure' && <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5" />}
+                            {result.status === 'vulnerable' && <XCircle className="h-5 w-5 text-red-500 mt-0.5" />}
+                            {result.status === 'warning' && <AlertCircle className="h-5 w-5 text-yellow-500 mt-0.5" />}
+                            {result.status === 'error' && <XCircle className="h-5 w-5 text-gray-500 mt-0.5" />}
+                            {result.status === 'testing' && <Loader2 className="h-5 w-5 text-blue-500 mt-0.5 animate-spin" />}
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <Badge variant="outline" className="bg-orange-500/20 text-orange-500 border-orange-500/50 text-xs">
+                                  <Globe className="h-3 w-3 mr-1" />
+                                  Public
+                                </Badge>
+                                <code className="text-xs font-mono bg-gray-100 dark:bg-gray-800 px-1 rounded">
+                                  {result.method}
+                                </code>
+                                <span className="text-sm font-medium">{result.endpoint}</span>
+                              </div>
+
+                              <div className="flex items-center gap-2 mt-1">
+                                {result.securityType && (
+                                  <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-500 border-blue-500/30">
+                                    {result.securityType}
+                                  </Badge>
+                                )}
+                                {result.responseStatus && (
+                                  <span className="text-xs text-muted-foreground">
+                                    HTTP {result.responseStatus}
+                                  </span>
+                                )}
+                              </div>
+
+                              {result.message && (
+                                <p className={`text-xs mt-1 ${
+                                  result.status === 'vulnerable' ? 'text-red-500' :
+                                  result.status === 'secure' ? 'text-green-600 dark:text-green-400' :
+                                  'text-muted-foreground'
+                                }`}>
+                                  {result.message}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              {publicSecurityResults.length === 0 && !isRunningPublicSecurityTests && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Click the button above to test public endpoint security. This will verify that all public endpoints
+                  properly reject requests that don&apos;t include valid security headers.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -2245,6 +2578,184 @@ export default function DatabaseTestPage() {
             </div>
           </CardContent>
         </Card>
+        </TabsContent>
+
+        {/* Endpoints Tab */}
+        <TabsContent value="endpoints" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-2xl">API Endpoints Overview</CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                View all public and private API endpoints in the system with their security configurations
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <Button
+                  onClick={runEndpointsTests}
+                  disabled={isRunningEndpointsTests}
+                  size="lg"
+                  className="w-full"
+                >
+                  {isRunningEndpointsTests ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Loading Endpoints...
+                    </>
+                  ) : (
+                    <>
+                      <Globe className="mr-2 h-4 w-4" />
+                      Load Endpoints Data
+                    </>
+                  )}
+                </Button>
+
+                {endpointsData && (
+                  <div className="space-y-6">
+                    {/* Summary */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <Card>
+                        <CardContent className="pt-6">
+                          <div className="text-2xl font-bold text-orange-500">{endpointsData.summary.totalPublic}</div>
+                          <p className="text-xs text-muted-foreground">Public Endpoints</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-6">
+                          <div className="text-2xl font-bold text-green-500">{endpointsData.summary.totalPrivate}</div>
+                          <p className="text-xs text-muted-foreground">Private Endpoints</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-6">
+                          <div className="text-2xl font-bold">{endpointsData.summary.modulesWithPublicRoutes.length}</div>
+                          <p className="text-xs text-muted-foreground">Modules with Public Routes</p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-6">
+                          <div className="text-2xl font-bold text-blue-500">
+                            {endpointsData.summary.securityCoverage.webhookSignature || 0}
+                          </div>
+                          <p className="text-xs text-muted-foreground">Webhook Signature</p>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Warnings */}
+                    {endpointsData.warnings.length > 0 && (
+                      <Card className="border-yellow-500/50 bg-yellow-500/10">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-lg flex items-center gap-2">
+                            <AlertCircle className="h-5 w-5 text-yellow-500" />
+                            Warnings
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ul className="space-y-1">
+                            {endpointsData.warnings.map((warning, i) => (
+                              <li key={i} className="text-sm text-yellow-200">{warning}</li>
+                            ))}
+                          </ul>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Public Endpoints */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Globe className="h-5 w-5 text-orange-500" />
+                          Public Endpoints (Unauthenticated)
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                          These endpoints can be accessed without authentication but have security configured
+                        </p>
+                      </CardHeader>
+                      <CardContent>
+                        {endpointsData.publicEndpoints.length === 0 ? (
+                          <p className="text-muted-foreground">No public endpoints configured</p>
+                        ) : (
+                          <div className="space-y-3">
+                            {endpointsData.publicEndpoints.map((endpoint, i) => (
+                              <div key={i} className="flex items-start justify-between p-3 rounded-lg bg-muted/50 border border-orange-500/30">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="bg-orange-500/20 text-orange-500 border-orange-500/50">
+                                      <Globe className="h-3 w-3 mr-1" />
+                                      Public
+                                    </Badge>
+                                    <code className="text-sm font-mono">{endpoint.fullPath}</code>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <span className="text-muted-foreground">Methods:</span>
+                                    {endpoint.methods.map(method => (
+                                      <Badge key={method} variant="secondary" className="text-xs">{method}</Badge>
+                                    ))}
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <span className="text-muted-foreground">Security:</span>
+                                    <Badge variant="outline" className="bg-blue-500/20 text-blue-500 border-blue-500/50">
+                                      {endpoint.securityType}
+                                    </Badge>
+                                    {endpoint.hasRateLimit && (
+                                      <Badge variant="outline" className="bg-purple-500/20 text-purple-500 border-purple-500/50">
+                                        Rate Limited
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  {endpoint.description && (
+                                    <p className="text-xs text-muted-foreground">{endpoint.description}</p>
+                                  )}
+                                </div>
+                                <Badge variant="outline">{endpoint.moduleId}</Badge>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Private Endpoints */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Lock className="h-5 w-5 text-green-500" />
+                          Private Endpoints (Authenticated)
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                          These endpoints require authentication to access
+                        </p>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                          {endpointsData.privateEndpoints.map((endpoint, i) => (
+                            <div key={i} className="flex items-center justify-between p-2 rounded bg-muted/30 border border-green-500/20">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="bg-green-500/20 text-green-500 border-green-500/50 text-xs">
+                                  <Lock className="h-3 w-3 mr-1" />
+                                  Private
+                                </Badge>
+                                <code className="text-xs font-mono">{endpoint.fullPath}</code>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {endpoint.methods.slice(0, 3).map(method => (
+                                  <Badge key={method} variant="secondary" className="text-xs">{method}</Badge>
+                                ))}
+                                {endpoint.methods.length > 3 && (
+                                  <Badge variant="secondary" className="text-xs">+{endpoint.methods.length - 3}</Badge>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

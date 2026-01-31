@@ -59,6 +59,8 @@ const COMPLETE_TABLE_LIST = [
   'memento_settings',
   'memento_milestones',
   'memento_eras',
+  'mail_stream_events',
+  'mail_stream_settings',
 ]
 
 interface TableInfo {

@@ -1,6 +1,9 @@
 import { hasSessionCookie } from "@/lib/auth-middleware"
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+// Import the generated module manifest to get public routes
+// This is regenerated on build/dev via generate-module-registry script
+import moduleManifest from '@/lib/generated/module-manifest.json'
 
 const protectedRoutes = [
   "/",
@@ -27,7 +30,18 @@ const protectedRoutes = [
   "/debug",
   "/api" // All API routes require authentication (defense-in-depth)
 ]
-const publicRoutes = ["/sign-in", "/auth", "/api/auth", "/api/modules/mail-stream/webhook"]
+
+// Static public routes (non-module)
+const staticPublicRoutes = ["/sign-in", "/auth", "/api/auth"]
+
+// Get dynamic public routes from module manifest
+// These are module API routes that have publicRoutes configured in module.json
+const modulePublicRoutes: string[] = (moduleManifest.publicRoutes || []).map(
+  (route: { fullPath: string }) => route.fullPath
+)
+
+// Combine static and dynamic public routes
+const publicRoutes = [...staticPublicRoutes, ...modulePublicRoutes]
 
 export async function middleware(req: NextRequest) {
   let response = NextResponse.next({
