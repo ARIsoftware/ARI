@@ -181,9 +181,7 @@ export default function MailStreamSettingsPage() {
           <div className="space-y-2">
             <Label>Webhook URL</Label>
             <div className="p-3 bg-muted rounded-lg font-mono text-sm break-all">
-              {typeof window !== 'undefined'
-                ? `${window.location.origin}/api/modules/mail-stream/webhook`
-                : '/api/modules/mail-stream/webhook'}
+              https://YOUR-DOMAIN/api/modules/mail-stream/webhook
             </div>
             <p className="text-sm text-muted-foreground">
               Add this URL in your Resend dashboard under Webhooks

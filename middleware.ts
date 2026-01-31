@@ -27,7 +27,7 @@ const protectedRoutes = [
   "/debug",
   "/api" // All API routes require authentication (defense-in-depth)
 ]
-const publicRoutes = ["/sign-in", "/auth", "/api/auth"]
+const publicRoutes = ["/sign-in", "/auth", "/api/auth", "/api/modules/mail-stream/webhook"]
 
 export async function middleware(req: NextRequest) {
   let response = NextResponse.next({
