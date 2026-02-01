@@ -4,6 +4,11 @@ import { useState, useEffect } from "react"
 import { Palette } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useTheme, THEME_PRESETS } from "@/lib/theme/theme-context"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 export function ThemePickerDropdown({ isDragMode = false }: { isDragMode?: boolean }) {
   const { activeThemeId, setTheme } = useTheme()
@@ -31,7 +36,7 @@ export function ThemePickerDropdown({ isDragMode = false }: { isDragMode?: boole
   // Get current theme name for tooltip
   const currentTheme = THEME_PRESETS.find((t) => t.id === activeThemeId)
   const tooltipText = mounted && currentTheme
-    ? `Theme: ${currentTheme.name} (click to cycle)`
+    ? `Theme: ${currentTheme.name}`
     : "Theme"
 
   if (!mounted) {
@@ -47,14 +52,20 @@ export function ThemePickerDropdown({ isDragMode = false }: { isDragMode?: boole
   }
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={handleClick}
-      title={tooltipText}
-      className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
-    >
-      <Palette className="h-5 w-5" />
-    </Button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleClick}
+          className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+        >
+          <Palette className="h-5 w-5" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>{tooltipText}</p>
+      </TooltipContent>
+    </Tooltip>
   )
 }

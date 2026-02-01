@@ -19,13 +19,7 @@ export function requireAdmin(userId: string): void {
 
 // Additional safety check for production
 export function isProductionSafeOperation(): boolean {
-  const nodeEnv = process.env.NODE_ENV
-  const isProduction = nodeEnv === 'production'
-  
-  // In production, require explicit environment flag
-  if (isProduction) {
-    return process.env.ALLOW_BACKUP_OPERATIONS === 'true'
-  }
-  
-  return true
+  // Backup operations enabled by default
+  // Set ALLOW_BACKUP_OPERATIONS=false to disable
+  return process.env.ALLOW_BACKUP_OPERATIONS !== 'false'
 }

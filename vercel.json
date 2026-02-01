@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/modules/backup-manager/scheduled",
+      "schedule": "0 * * * *"
+    }
+  ]
+}
