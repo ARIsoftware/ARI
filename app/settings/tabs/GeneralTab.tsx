@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Palette, Sparkles } from "lucide-react"
+import { WorkspaceIdentitySection } from "./WorkspaceIdentitySection"
 import type { BetaFeatureSettings } from "../types"
 
 interface GeneralTabProps {
@@ -38,6 +39,9 @@ export function GeneralTab({
 }: GeneralTabProps): React.ReactElement {
   return (
     <div className="space-y-6">
+      {/* User Profile Section */}
+      <WorkspaceIdentitySection />
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>

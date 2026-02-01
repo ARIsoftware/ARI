@@ -23,6 +23,12 @@ import { eq, and, sql } from 'drizzle-orm'
  * Validates the structure of settings being saved
  */
 const SettingsSchema = z.object({
+  // Onboarding fields (demonstrates setup screen pattern)
+  onboardingCompleted: z.boolean().optional(),
+  sampleQuestion1: z.string().optional(),
+  sampleQuestion2: z.string().optional(),
+  sampleQuestion3: z.string().optional(),
+  // Feature toggles
   enableNotifications: z.boolean().optional(),
   showInDashboard: z.boolean().optional(),
   defaultMessage: z.string().optional(),

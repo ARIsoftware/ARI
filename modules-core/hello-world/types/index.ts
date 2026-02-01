@@ -73,6 +73,13 @@ export interface DeleteEntryResponse {
  * These are user-specific preferences for the module
  */
 export interface HelloWorldSettings {
+  // Onboarding fields (required before using module)
+  // This demonstrates the onboarding pattern for modules that need initial setup
+  onboardingCompleted: boolean
+  sampleQuestion1: string
+  sampleQuestion2: string
+  sampleQuestion3: string
+
   // Feature toggles
   enableNotifications: boolean
   showInDashboard: boolean

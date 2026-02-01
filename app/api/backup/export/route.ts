@@ -63,6 +63,11 @@ async function discoverTables(client: any): Promise<{ tables: string[], method: 
     'memento_settings',
     'memento_milestones',
     'memento_eras',
+    'mail_stream_events',
+    'mail_stream_settings',
+    // User preferences & Backup manager tables
+    'user_preferences',
+    'backup_metadata',
   ];
 
   try {

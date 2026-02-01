@@ -824,3 +824,59 @@ export const mailStreamSettings = pgTable("mail_stream_settings", {
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 });
+
+// =============================================================================
+// USER PREFERENCES TABLE
+// =============================================================================
+
+export const userPreferences = pgTable("user_preferences", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	userId: text("user_id").notNull(),
+	name: varchar({ length: 255 }),
+	email: varchar({ length: 255 }),
+	title: varchar({ length: 255 }),
+	companyName: varchar("company_name", { length: 255 }),
+	country: varchar({ length: 100 }),
+	city: varchar({ length: 100 }),
+	linkedinUrl: varchar("linkedin_url", { length: 500 }),
+	timezone: varchar({ length: 50 }).default('UTC'),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+}, (table) => [
+	index("idx_user_preferences_user_id").using("btree", table.userId.asc().nullsLast().op("text_ops")),
+	unique("user_preferences_user_id_key").on(table.userId),
+	foreignKey({
+		columns: [table.userId],
+		foreignColumns: [user.id],
+		name: "user_preferences_user_id_fkey"
+	}).onDelete("cascade"),
+]);
+
+// =============================================================================
+// BACKUP MANAGER MODULE TABLES
+// =============================================================================
+
+export const backupMetadata = pgTable("backup_metadata", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	userId: text("user_id").notNull(),
+	filename: varchar({ length: 255 }).notNull(),
+	storageProvider: varchar("storage_provider", { length: 50 }).notNull(),
+	storagePath: text("storage_path").notNull(),
+	sizeBytes: integer("size_bytes"),
+	tableCount: integer("table_count"),
+	rowCount: integer("row_count"),
+	checksum: varchar({ length: 64 }),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	expiresAt: timestamp("expires_at", { withTimezone: true, mode: 'string' }),
+}, (table) => [
+	index("idx_backup_metadata_user_id").using("btree", table.userId.asc().nullsLast().op("text_ops")),
+	index("idx_backup_metadata_created_at").using("btree", table.createdAt.desc().nullsFirst().op("timestamptz_ops")),
+	index("idx_backup_metadata_expires_at").using("btree", table.expiresAt.asc().nullsLast().op("timestamptz_ops")),
+	index("idx_backup_metadata_storage_provider").using("btree", table.storageProvider.asc().nullsLast().op("text_ops")),
+	foreignKey({
+		columns: [table.userId],
+		foreignColumns: [user.id],
+		name: "backup_metadata_user_id_fkey"
+	}).onDelete("cascade"),
+	check("backup_metadata_storage_provider_check", sql`(storage_provider)::text = ANY ((ARRAY['supabase'::character varying, 'r2'::character varying, 's3'::character varying])::text[])`),
+]);

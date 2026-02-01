@@ -61,6 +61,9 @@ const COMPLETE_TABLE_LIST = [
   'memento_eras',
   'mail_stream_events',
   'mail_stream_settings',
+  // User preferences & Backup manager tables
+  'user_preferences',
+  'backup_metadata',
 ]
 
 interface TableInfo {

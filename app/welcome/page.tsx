@@ -60,7 +60,33 @@ interface OnboardingData {
   country: string
   city: string
   linkedinUrl: string
+  timezone: string
 }
+
+// Common timezones for the dropdown
+const COMMON_TIMEZONES = [
+  { value: 'UTC', label: 'UTC (Coordinated Universal Time)' },
+  { value: 'America/New_York', label: 'Eastern Time (US & Canada)' },
+  { value: 'America/Chicago', label: 'Central Time (US & Canada)' },
+  { value: 'America/Denver', label: 'Mountain Time (US & Canada)' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (US & Canada)' },
+  { value: 'America/Toronto', label: 'Toronto' },
+  { value: 'America/Vancouver', label: 'Vancouver' },
+  { value: 'Europe/London', label: 'London' },
+  { value: 'Europe/Paris', label: 'Paris' },
+  { value: 'Europe/Berlin', label: 'Berlin' },
+  { value: 'Europe/Amsterdam', label: 'Amsterdam' },
+  { value: 'Asia/Tokyo', label: 'Tokyo' },
+  { value: 'Asia/Singapore', label: 'Singapore' },
+  { value: 'Asia/Hong_Kong', label: 'Hong Kong' },
+  { value: 'Asia/Shanghai', label: 'Shanghai' },
+  { value: 'Asia/Dubai', label: 'Dubai' },
+  { value: 'Asia/Jerusalem', label: 'Jerusalem' },
+  { value: 'Australia/Sydney', label: 'Sydney' },
+  { value: 'Australia/Melbourne', label: 'Melbourne' },
+  { value: 'Pacific/Auckland', label: 'Auckland' },
+  { value: 'Africa/Johannesburg', label: 'Johannesburg' },
+]
 
 export default function WelcomePage() {
   const [completedLines, setCompletedLines] = useState<string[]>([])
@@ -74,6 +100,15 @@ export default function WelcomePage() {
   const [showOnboarding, setShowOnboarding] = useState(false)
 
   const [currentTab, setCurrentTab] = useState("github")
+  // Auto-detect browser timezone
+  const getDefaultTimezone = () => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone
+    } catch {
+      return 'UTC'
+    }
+  }
+
   const [formData, setFormData] = useState<OnboardingData>({
     githubSetupComplete: false,
     supabaseUrl: "",
@@ -90,7 +125,9 @@ export default function WelcomePage() {
     country: "",
     city: "",
     linkedinUrl: "",
+    timezone: getDefaultTimezone(),
   })
+  const [isSavingPreferences, setIsSavingPreferences] = useState(false)
 
   const sequence = [
     { delay: 300, text: "HELLO." },
@@ -1089,7 +1126,7 @@ export default function WelcomePage() {
                       <User className="w-4 h-4" />
                       <AlertTitle>Personal Details (Optional)</AlertTitle>
                       <AlertDescription>
-                        Tell us about yourself. This information is optional and stored locally.
+                        Tell us about yourself. This information is optional and stored securely in your database.
                       </AlertDescription>
                     </Alert>
 
@@ -1290,6 +1327,35 @@ export default function WelcomePage() {
                       />
                     </div>
 
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="timezone">Timezone</Label>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Info className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs max-w-xs">Your timezone is used for scheduling features like automatic backups.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Select
+                        value={formData.timezone}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, timezone: value }))}
+                      >
+                        <SelectTrigger id="timezone">
+                          <SelectValue placeholder="Select timezone" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {COMMON_TIMEZONES.map((tz) => (
+                            <SelectItem key={tz.value} value={tz.value}>
+                              {tz.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
@@ -1299,10 +1365,37 @@ export default function WelcomePage() {
                         Back
                       </Button>
                       <Button
-                        onClick={() => setCurrentTab("download")}
+                        onClick={async () => {
+                          // Save preferences to database
+                          if (formData.name || formData.email || formData.timezone) {
+                            setIsSavingPreferences(true)
+                            try {
+                              await fetch('/api/user-preferences', {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  name: formData.name || null,
+                                  email: formData.email || null,
+                                  title: formData.title || null,
+                                  company_name: formData.companyName || null,
+                                  country: formData.country || null,
+                                  city: formData.city || null,
+                                  linkedin_url: formData.linkedinUrl || null,
+                                  timezone: formData.timezone,
+                                }),
+                              })
+                            } catch (error) {
+                              console.error('Failed to save preferences:', error)
+                            } finally {
+                              setIsSavingPreferences(false)
+                            }
+                          }
+                          setCurrentTab("download")
+                        }}
                         className="flex-1"
+                        disabled={isSavingPreferences}
                       >
-                        Continue to Download
+                        {isSavingPreferences ? 'Saving...' : 'Continue to Download'}
                       </Button>
                     </div>
                   </TabsContent>

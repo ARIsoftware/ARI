@@ -1,0 +1,36 @@
+{
+  "id": "backup-manager",
+  "group": "System",
+  "name": "Backup Manager",
+  "description": "Automated daily backups with configurable storage and retention",
+  "version": "1.0.0",
+  "author": "ARI",
+  "icon": "HardDrive",
+  "enabled": true,
+  "fullscreen": false,
+  "menuPriority": 99,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": false
+  },
+  "routes": [
+    {
+      "path": "/backup-manager",
+      "label": "Backup Manager",
+      "icon": "HardDrive",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": ["backup_metadata"],
+    "migrations": "./database"
+  },
+  "submenu": {
+    "component": "./components/sidebar-submenu.tsx"
+  }
+}

@@ -7,9 +7,20 @@
  * - Optimistic updates for instant UI feedback
  * - Modern Better Auth patterns (no session blocking)
  * - ARI UI components
+ * - Onboarding/setup screen pattern
  *
  * IMPORTANT: This component is rendered via the catch-all route at
  * /app/[module]/[[...slug]]/page.tsx and MUST use default export.
+ *
+ * ONBOARDING PATTERN:
+ * This template module ALWAYS shows the onboarding screen as a reference.
+ * When creating a real module, replace the condition with:
+ *
+ *   if (!settings?.onboardingCompleted) {
+ *     return <OnboardingScreen />
+ *   }
+ *
+ * This will show onboarding only until the user completes it.
  *
  * Route: /hello-world
  */
@@ -23,11 +34,14 @@ import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Loader2, Package, Plus, Trash2, BarChart3 } from 'lucide-react'
+import { Label } from '@/components/ui/label'
+import { Loader2, Package, Plus, Trash2, BarChart3, Sparkles } from 'lucide-react'
 import {
   useHelloWorldEntries,
   useCreateHelloWorldEntry,
   useDeleteHelloWorldEntry,
+  useHelloWorldSettings,
+  useUpdateHelloWorldSettings,
 } from '../hooks/use-hello-world'
 import type { HelloWorldEntry } from '../types'
 
@@ -43,9 +57,22 @@ export default function HelloWorldPage() {
   const createEntry = useCreateHelloWorldEntry()
   const deleteEntry = useDeleteHelloWorldEntry()
 
+  // Settings hooks for onboarding
+  const { data: settings, isLoading: settingsLoading } = useHelloWorldSettings()
+  const updateSettings = useUpdateHelloWorldSettings()
+
   // Local state for form
   const [newMessage, setNewMessage] = useState('')
   const [randomQuote, setRandomQuote] = useState<{ quote: string; author?: string } | null>(null)
+
+  // Onboarding form state
+  const [setupQuestion1, setSetupQuestion1] = useState('')
+  const [setupQuestion2, setSetupQuestion2] = useState('')
+  const [setupQuestion3, setSetupQuestion3] = useState('')
+
+  // TEMPLATE MODULE: Always show onboarding by default so users can see the pattern
+  // FOR REAL MODULES: Remove this state and use `!settings?.onboardingCompleted` instead
+  const [showOnboardingDemo, setShowOnboardingDemo] = useState(true)
 
   // Load random quote when quotes module is enabled
   useState(() => {
@@ -53,6 +80,31 @@ export default function HelloWorldPage() {
       loadRandomQuote()
     }
   })
+
+  /**
+   * Handle onboarding setup completion
+   * Saves the user's answers and marks onboarding as complete
+   */
+  const handleSetup = () => {
+    if (!setupQuestion1.trim()) {
+      toast({ variant: 'destructive', title: 'Please answer Sample Question 1' })
+      return
+    }
+
+    updateSettings.mutate(
+      {
+        onboardingCompleted: true,
+        sampleQuestion1: setupQuestion1.trim(),
+        sampleQuestion2: setupQuestion2.trim(),
+        sampleQuestion3: setupQuestion3.trim(),
+      },
+      {
+        onError: () => {
+          toast({ variant: 'destructive', title: 'Failed to save settings' })
+        },
+      }
+    )
+  }
 
   /**
    * Fetch a random quote from the quotes module
@@ -114,6 +166,91 @@ export default function HelloWorldPage() {
     })
   }
 
+  // Loading state while fetching settings
+  if (settingsLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  /**
+   * ONBOARDING SCREEN
+   *
+   * TEMPLATE MODULE: Uses `showOnboardingDemo` state to always show this as a reference.
+   *
+   * FOR REAL MODULES: Replace this condition with:
+   *   if (!settings?.onboardingCompleted) {
+   *
+   * This ensures the onboarding only shows until the user completes it.
+   */
+  if (showOnboardingDemo) {
+    return (
+      <div className="p-6 max-w-md mx-auto">
+        <Card>
+          <CardHeader className="text-center">
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Sparkles className="w-8 h-8 text-primary" />
+            </div>
+            <CardTitle className="text-2xl">Welcome to Hello World</CardTitle>
+            <CardDescription>
+              This is a sample onboarding screen. Use this pattern when your module needs
+              to collect initial configuration from the user before they can use it.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="question1">Sample Question 1 *</Label>
+              <Input
+                id="question1"
+                value={setupQuestion1}
+                onChange={(e) => setSetupQuestion1(e.target.value)}
+                placeholder="Your answer here..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="question2">Sample Question 2</Label>
+              <Input
+                id="question2"
+                value={setupQuestion2}
+                onChange={(e) => setSetupQuestion2(e.target.value)}
+                placeholder="Optional answer..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="question3">Sample Question 3</Label>
+              <Input
+                id="question3"
+                value={setupQuestion3}
+                onChange={(e) => setSetupQuestion3(e.target.value)}
+                placeholder="Optional answer..."
+              />
+            </div>
+            <Button
+              className="w-full"
+              onClick={handleSetup}
+              disabled={updateSettings.isPending}
+            >
+              {updateSettings.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Get Started
+            </Button>
+
+            {/* TEMPLATE MODULE ONLY: Skip button to view main content */}
+            <Button
+              variant="ghost"
+              className="w-full text-muted-foreground"
+              onClick={() => setShowOnboardingDemo(false)}
+            >
+              Skip to Module Demo
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Main view (after onboarding complete)
   return (
     <div className="p-6 space-y-6">
       {/* Loading overlay */}
@@ -137,6 +274,11 @@ export default function HelloWorldPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          {/* TEMPLATE MODULE ONLY: Button to view onboarding demo */}
+          <Button variant="outline" onClick={() => setShowOnboardingDemo(true)}>
+            <Sparkles className="w-4 h-4 mr-2" />
+            View Onboarding Demo
+          </Button>
           <Button>
             <Plus className="w-4 h-4 mr-2" />
             Button A
