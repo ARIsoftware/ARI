@@ -41,6 +41,12 @@ import type { HelloWorldSettings } from '../types'
  * Used when user hasn't saved any settings yet
  */
 const DEFAULT_SETTINGS: HelloWorldSettings = {
+  // Onboarding fields (managed by main page, not settings panel)
+  onboardingCompleted: true,
+  sampleQuestion1: '',
+  sampleQuestion2: '',
+  sampleQuestion3: '',
+  // Feature toggles
   enableNotifications: true,
   showInDashboard: true,
   defaultMessage: 'Hello, World!',

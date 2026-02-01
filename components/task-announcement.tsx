@@ -86,8 +86,9 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const swapyRef = useRef<any>(null)
 
-  // Filter modules that have topBarIcon configured
-  const moduleIcons = modules.filter(m => m.topBarIcon)
+  // Filter modules that have topBarIcon configured with an icon (not component-based)
+  // Component-based topBarIcons (like notepad) are handled as built-in icons
+  const moduleIcons = modules.filter(m => m.topBarIcon && m.topBarIcon.icon && !m.topBarIcon.component)
 
   // Build all icons list with their IDs
   const allIcons = [
@@ -164,36 +165,57 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
         return <ThemePickerDropdown isDragMode={isDragMode} />
       case "icon-command":
         return (
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
-            onClick={isDragMode ? undefined : () => setCommandPaletteOpen(true)}
-          >
-            <Command className="h-5 w-5" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+                onClick={isDragMode ? undefined : () => setCommandPaletteOpen(true)}
+              >
+                <Command className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Command Palette</p>
+            </TooltipContent>
+          </Tooltip>
         )
       case "icon-settings":
         return (
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
-            onClick={isDragMode ? undefined : () => router.push("/settings")}
-          >
-            <Settings className="h-5 w-5" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+                onClick={isDragMode ? undefined : () => router.push("/settings")}
+              >
+                <Settings className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Settings</p>
+            </TooltipContent>
+          </Tooltip>
         )
       case "icon-modules":
         return (
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
-            onClick={isDragMode ? undefined : () => router.push("/modules")}
-          >
-            <Package className="h-5 w-5" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+                onClick={isDragMode ? undefined : () => router.push("/modules")}
+              >
+                <Package className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Modules</p>
+            </TooltipContent>
+          </Tooltip>
         )
       case "icon-notepad":
         return <NotepadTopBarIcon isDragMode={isDragMode} />
@@ -201,30 +223,44 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
         return <FocusTimerTopBarIcon isDragMode={isDragMode} />
       case "icon-music":
         return (
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
-            onClick={isDragMode ? undefined : togglePlayPause}
-            disabled={!isReady && !isDragMode}
-          >
-            {isPlaying ? (
-              <Pause className="h-5 w-5" />
-            ) : (
-              <Play className="h-5 w-5" />
-            )}
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+                onClick={isDragMode ? undefined : togglePlayPause}
+                disabled={!isReady && !isDragMode}
+              >
+                {isPlaying ? (
+                  <Pause className="h-5 w-5" />
+                ) : (
+                  <Play className="h-5 w-5" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{isPlaying ? "Pause Music" : "Play Music"}</p>
+            </TooltipContent>
+          </Tooltip>
         )
       case "icon-logout":
         return (
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
-            onClick={isDragMode ? undefined : handleSignOut}
-          >
-            <LogOut className="h-5 w-5" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+                onClick={isDragMode ? undefined : handleSignOut}
+              >
+                <LogOut className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Sign Out</p>
+            </TooltipContent>
+          </Tooltip>
         )
       default:
         return null

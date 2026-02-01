@@ -38,7 +38,7 @@ export function NotepadTopBarIcon({ isDragMode = false }: { isDragMode?: boolean
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Open Notepad</p>
+            <p>Notepad</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
