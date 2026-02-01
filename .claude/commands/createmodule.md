@@ -26,6 +26,7 @@ Ask the user the following questions ONE AT A TIME, waiting for each answer befo
 3. **Navigation**: Should it appear in the sidebar? If so, what should the page name be?
 4. **Submenu**: Does the module have any subpages which require a submenu?
 5. **Top Bar**: Should it have a quick-access icon in the top bar?
+6. **Onboarding**: Does this module need an onboarding/setup screen to collect initial configuration from the user? (e.g., asking for birthdate, preferences, API keys, etc.)
 
 Then ask follow-up clarifying questions based on their answers. You can ask any clarifying questions. Here are some examples of clarifying questions:
 
@@ -150,6 +151,163 @@ If the module requires a sidebar submenu, follow the Hello World module as the t
 
 Always reference the Hello World module's actual code as the source of truth for submenu implementation.
 
+## Onboarding Section Implementation
+
+If the module requires an onboarding/setup screen, follow the **Hello World module** pattern at `modules-core/hello-world/app/page.tsx`. This provides a clean, centered card-based setup experience.
+
+**IMPORTANT**: Hello World is a template module that ALWAYS shows the onboarding screen (with a skip button) so developers can see the pattern. When creating a real module, you must modify the condition to only show onboarding until the user completes it.
+
+### Onboarding Pattern Overview
+
+1. **Settings storage**: Use the existing `module_settings` table with JSONB settings column (no separate table needed)
+2. **Conditional render**: Check if `settings?.onboardingCompleted` is true; if not, show onboarding screen
+3. **Centered card UI**: Use a centered Card component with icon, title, and form fields
+4. **Flag completion**: Set `onboardingCompleted: true` when user completes setup
+
+### Implementation Steps
+
+1. **Use existing module_settings table**: No separate table needed. Settings are stored in the `module_settings` table's JSONB `settings` column, keyed by `module_id`.
+
+2. **Add onboarding fields to your types** in `types/index.ts`:
+   ```typescript
+   export interface ModuleSettings {
+     onboardingCompleted: boolean
+     // Add your configuration fields here
+     myField1: string
+     myField2: string
+   }
+   ```
+
+3. **Create settings API route** (`api/settings/route.ts`) - copy from Hello World:
+   - GET: Fetch user settings (returns empty object `{}` if none exist)
+   - PUT: Create/update settings (upsert pattern using `module_id`)
+
+4. **Create TanStack Query hooks** for settings (see `modules-core/hello-world/hooks/use-hello-world.ts`):
+   ```typescript
+   export function useModuleSettings() {
+     return useQuery({
+       queryKey: ['module-name-settings'],
+       queryFn: async (): Promise<Partial<ModuleSettings>> => {
+         const res = await fetch('/api/modules/module-name/settings')
+         if (!res.ok) return {}
+         return await res.json()
+       },
+     })
+   }
+
+   export function useUpdateModuleSettings() {
+     const queryClient = useQueryClient()
+     return useMutation({
+       mutationFn: async (settings: Partial<ModuleSettings>): Promise<void> => {
+         const res = await fetch('/api/modules/module-name/settings', {
+           method: 'PUT',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify(settings),
+         })
+         if (!res.ok) throw new Error('Failed to save settings')
+       },
+       onMutate: async (newSettings) => {
+         await queryClient.cancelQueries({ queryKey: ['module-name-settings'] })
+         const previous = queryClient.getQueryData<Partial<ModuleSettings>>(['module-name-settings'])
+         queryClient.setQueryData<Partial<ModuleSettings>>(['module-name-settings'], (old = {}) => ({
+           ...old,
+           ...newSettings,
+         }))
+         return { previous }
+       },
+       onError: (_err, _newSettings, context) => {
+         if (context?.previous) {
+           queryClient.setQueryData(['module-name-settings'], context.previous)
+         }
+       },
+       onSettled: () => {
+         queryClient.invalidateQueries({ queryKey: ['module-name-settings'] })
+       },
+     })
+   }
+   ```
+
+5. **Implement onboarding UI in page component**:
+
+   **NOTE**: Hello World uses `showOnboardingDemo` state to always show the onboarding as a demo.
+   For real modules, remove that state and use `!settings?.onboardingCompleted` directly:
+
+   ```tsx
+   const { data: settings, isLoading: settingsLoading } = useModuleSettings()
+   const updateSettings = useUpdateModuleSettings()
+
+   // Loading state
+   if (settingsLoading) {
+     return (
+       <div className="flex items-center justify-center h-96">
+         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+       </div>
+     )
+   }
+
+   // Onboarding screen - shows until user completes it
+   // NOTE: Hello World uses `showOnboardingDemo` state instead - remove that for real modules!
+   if (!settings?.onboardingCompleted) {
+     return (
+       <div className="p-6 max-w-md mx-auto">
+         <Card>
+           <CardHeader className="text-center">
+             <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+               <YourIcon className="w-8 h-8 text-primary" />
+             </div>
+             <CardTitle className="text-2xl">Welcome to Module Name</CardTitle>
+             <CardDescription>
+               Brief description of what this module does.
+             </CardDescription>
+           </CardHeader>
+           <CardContent className="space-y-4">
+             {/* Form fields for initial setup */}
+             <div className="space-y-2">
+               <Label htmlFor="fieldName">Field Label</Label>
+               <Input
+                 id="fieldName"
+                 value={fieldValue}
+                 onChange={(e) => setFieldValue(e.target.value)}
+               />
+             </div>
+             <Button
+               className="w-full"
+               onClick={handleSetup}
+               disabled={updateSettings.isPending}
+             >
+               {updateSettings.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+               Get Started
+             </Button>
+             {/* NOTE: Remove the "Skip to Module Demo" button from Hello World - that's only for the template */}
+           </CardContent>
+         </Card>
+       </div>
+     )
+   }
+
+   // Main view (after onboarding complete)
+   return (
+     <div className="p-6">
+       {/* Main module content */}
+       {/* NOTE: Remove the "View Onboarding Demo" button from Hello World - that's only for the template */}
+     </div>
+   )
+   ```
+
+### Key Components Used
+- `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent` from `@/components/ui/card`
+- `Button` from `@/components/ui/button`
+- `Input` from `@/components/ui/input`
+- `Label` from `@/components/ui/label`
+- `Select` components for dropdown options
+- `Loader2` from `lucide-react` for loading spinner
+
+### Reference Files
+- **Main example**: `modules-core/hello-world/app/page.tsx` (onboarding UI pattern)
+- **Settings API**: `modules-core/hello-world/api/settings/route.ts`
+- **Hooks**: `modules-core/hello-world/hooks/use-hello-world.ts` (useHelloWorldSettings, useUpdateHelloWorldSettings)
+- **Types**: `modules-core/hello-world/types/index.ts`
+
 ## Quality Assurance Checklist
 
 Before marking complete, verify:
@@ -170,6 +328,11 @@ Before marking complete, verify:
 - [ ] **If public routes exist**: `publicRoutes` configured in module.json with security
 - [ ] **If public routes exist**: Route handler uses `createPublicRouteHandler` wrapper
 - [ ] **If public routes exist**: Endpoint visible in `/debug` → Endpoints tab
+- [ ] **If onboarding exists**: Settings types include `onboardingCompleted` flag
+- [ ] **If onboarding exists**: Settings API with GET (fetch) and PUT (upsert) endpoints
+- [ ] **If onboarding exists**: Conditional render shows onboarding when `!settings?.onboardingCompleted`
+- [ ] **If onboarding exists**: Centered card UI follows Hello World pattern
+- [ ] **If onboarding exists**: Removed Hello World demo-specific code (`showOnboardingDemo` state, "Skip to Module Demo" button, "View Onboarding Demo" button)
 
 ## Important Reminders
 
