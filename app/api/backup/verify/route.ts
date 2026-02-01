@@ -64,6 +64,11 @@ const COMPLETE_TABLE_LIST = [
   // User preferences & Backup manager tables
   'user_preferences',
   'backup_metadata',
+  // Documents module tables
+  'documents',
+  'document_folders',
+  'document_tags',
+  'document_tag_assignments',
 ]
 
 interface TableInfo {
