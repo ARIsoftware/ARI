@@ -6,15 +6,9 @@ import { hash as argon2Hash, verify as argon2Verify } from "@node-rs/argon2"
 // Build trusted origins
 const trustedOrigins: string[] = []
 
-// Add production domain (always trusted)
-trustedOrigins.push("https://redacted.invalid")
-
-// Add custom domain from env if set
+// Add production domain from env
 if (process.env.NEXT_PUBLIC_APP_URL) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL
-  if (!trustedOrigins.includes(appUrl)) {
-    trustedOrigins.push(appUrl)
-  }
+  trustedOrigins.push(process.env.NEXT_PUBLIC_APP_URL)
 }
 
 // Add Vercel preview URLs

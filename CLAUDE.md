@@ -489,7 +489,7 @@ User-friendly interface with:
 
 **If using fallback**: The system still works but may not discover new tables automatically. Run `/migrations/backup_system_functions.sql` for optimal performance.
 
-### Expected Tables (29 as of January 2026)
+### Expected Tables (33 as of February 2026)
 1. `tasks` - Task management
 2. `fitness_database` - Fitness tasks
 3. `contacts` - Contact management
@@ -519,6 +519,10 @@ User-friendly interface with:
 27. `knowledge_collections` - Knowledge Manager collections/folders
 28. `mail_stream_events` - Mail Stream module webhook events from Resend
 29. `mail_stream_settings` - Mail Stream module retention settings
+30. `documents` - Documents module file metadata
+31. `document_folders` - Documents module folder structure
+32. `document_tags` - Documents module tags
+33. `document_tag_assignments` - Documents module file-tag relationships
 
 ### Usage Guide
 
