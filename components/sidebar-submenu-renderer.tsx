@@ -13,6 +13,7 @@ import {
 // so modules can be moved between directories without code changes
 import HelloWorldSubmenu from '@/modules/hello-world/components/sidebar-submenu'
 import MailStreamSubmenu from '@/modules/mail-stream/components/sidebar-submenu'
+import BackupManagerSubmenu from '@/modules/backup-manager/components/sidebar-submenu'
 
 /**
  * Props passed to module submenu components
@@ -31,6 +32,7 @@ export interface ModuleSubmenuProps {
 const SUBMENU_COMPONENTS: Record<string, React.ComponentType<ModuleSubmenuProps>> = {
   'hello-world': HelloWorldSubmenu,
   'mail-stream': MailStreamSubmenu,
+  'backup-manager': BackupManagerSubmenu,
 }
 
 interface SubmenuRendererProps {
