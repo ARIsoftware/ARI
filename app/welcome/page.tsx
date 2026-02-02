@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
@@ -9,9 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-  Database,
   Zap,
-  Mail,
   User,
   Download,
   Info,
@@ -20,7 +17,6 @@ import {
   Shield,
   Check,
   X,
-  Github,
   ArrowRight
 } from "lucide-react"
 import {
@@ -293,7 +289,7 @@ export default function WelcomePage() {
     return (
       <div
         className="min-h-screen bg-[#f9fafe]"
-        style={{ fontFamily: 'Geist, sans-serif', padding: '70px 0 0 70px' }}
+        style={{ padding: '70px 0 0 70px' }}
       >
         {/* Typed lines */}
         <div>
@@ -321,7 +317,7 @@ export default function WelcomePage() {
           <div className="mt-12">
             <Button
               onClick={handleContinue}
-              className="bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 rounded-lg text-base"
+              className="bg-zinc-900 hover:bg-zinc-800 text-white px-6 py-3 rounded-lg text-base"
             >
               Let&apos;s get setup
             </Button>
@@ -335,17 +331,16 @@ export default function WelcomePage() {
   return (
     <TooltipProvider>
       <div
-        className="min-h-screen bg-[#f9fafe] overflow-y-auto flex items-start justify-center p-8 pt-12"
-        style={{ fontFamily: 'Geist, sans-serif' }}
+        className="min-h-screen bg-[#f9fafe] overflow-y-auto flex items-start justify-center px-8 py-12"
       >
-        <div className="w-full max-w-4xl">
+        <div style={{ width: '864px', maxWidth: '100%' }}>
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-4xl font-normal tracking-tight text-gray-900 mb-4">
+          <div className="mb-10">
+            <h1 className="text-4xl font-light tracking-tight text-zinc-900 mb-3">
               Configure ARI
             </h1>
-            <p className="text-base leading-relaxed text-gray-600">
-              Configure your environment to get ARI running. This step is about preparing your local setup so the application can run smoothly. Nothing here is difficult, but it does require a bit of care and attention to detail. This entire setup process should take around 10 to 20 minutes, depending on your system and familiarity with the tools involved.
+            <p className="text-zinc-500">
+              Configure your environment to get ARI running. This step is about preparing your local setup so the application can run smoothly.
             </p>
           </div>
 
@@ -353,112 +348,98 @@ export default function WelcomePage() {
           <StepIndicator currentStep={currentTab} onStepClick={setCurrentTab} />
 
           {/* Content Card */}
-          <Card className="w-full bg-white border border-gray-200 rounded-2xl shadow-sm">
-            <CardContent className="p-8">
+          <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
               {/* GitHub Tab */}
               {currentTab === "github" && (
-                <div className="space-y-6">
-                  {/* Header section */}
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0">
-                      <Github className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-semibold text-gray-900">GitHub Setup</h2>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Create a GitHub repository for your ARI instance. This enables version control, easy deployment to Vercel, and the ability to receive updates.
-                      </p>
-                    </div>
+                <div>
+                  {/* Header section with gradient background */}
+                  <div className="border-b border-zinc-100 px-6 py-5" style={{ background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
+                    <h2 className="text-xl font-semibold text-zinc-900">GitHub Setup</h2>
+                    <p className="mt-1 text-sm text-zinc-500">
+                      Create a GitHub repository for your ARI instance. This enables version control, easy deployment to Vercel, and the ability to receive updates.
+                    </p>
                   </div>
 
-                  {/* Step 1: Create repo */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
-                      1
-                    </div>
-                    <h3 className="text-base font-semibold text-gray-900">Create a new repository</h3>
-                  </div>
-
-                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                    <ol className="space-y-3">
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
-                          1
-                        </span>
-                        <div className="flex-1 pt-0.5 text-sm">
-                          <span className="text-gray-900">Go to </span>
-                          <a href="https://github.com/new" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-gray-900 hover:underline">
-                            github.com/new
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
+                  {/* Content section */}
+                  <div className="p-6">
+                    <div className="space-y-2">
+                      {/* Step 1: Create repo */}
+                      <div className="relative flex gap-4">
+                        <div className="flex flex-col items-center">
+                          <div className="flex w-8 h-8 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-sm font-semibold">1</div>
+                          <div className="mt-2 h-full w-px bg-zinc-200" />
                         </div>
-                      </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
-                          2
-                        </span>
-                        <div className="flex-1 pt-0.5 text-sm text-gray-900">
-                          Name your repository (e.g., <code className="bg-gray-200 px-1 rounded text-xs">ari</code> or <code className="bg-gray-200 px-1 rounded text-xs">my-ari</code>)
+                        <div className="flex-1 pb-8">
+                          <h3 className="mb-3 font-semibold text-zinc-900">Create a new repository</h3>
+                          <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
+                            <ol className="space-y-2.5">
+                              <li className="flex items-start gap-3 text-sm">
+                                <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>1</span>
+                                <span className="text-zinc-500">
+                                  Go to <a href="https://github.com/new" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
+                                    github.com/new
+                                    <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                </span>
+                              </li>
+                              <li className="flex items-start gap-3 text-sm">
+                                <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>2</span>
+                                <span className="text-zinc-500">
+                                  Name your repository (e.g., <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">ari</code> or <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">my-ari</code>)
+                                </span>
+                              </li>
+                              <li className="flex items-start gap-3 text-sm">
+                                <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>3</span>
+                                <span className="text-zinc-500">
+                                  Set it to <strong className="text-zinc-700">Private</strong> (recommended) and click <strong className="text-zinc-700">Create repository</strong>
+                                </span>
+                              </li>
+                            </ol>
+                          </div>
                         </div>
-                      </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
-                          3
-                        </span>
-                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Set it to <strong>Private</strong> (recommended) and click <strong>Create repository</strong></p>
-                      </li>
-                    </ol>
-                  </div>
+                      </div>
 
-                  {/* Step 2: Push code */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
-                      2
-                    </div>
-                    <h3 className="text-base font-semibold text-gray-900">Push your code</h3>
-                  </div>
-
-                  <div className="space-y-3">
-                    <p className="text-sm text-gray-900">In your project folder, run these commands:</p>
-                    <CodeBlock
-                      language="bash"
-                      code={`git init
+                      {/* Step 2: Push code */}
+                      <div className="relative flex gap-4">
+                        <div className="flex flex-col items-center">
+                          <div className="flex w-8 h-8 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-sm font-semibold">2</div>
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="mb-3 font-semibold text-zinc-900">Push your code</h3>
+                          <p className="mb-3 text-sm text-zinc-500">In your project folder, run these commands:</p>
+                          <CodeBlock
+                            language="bash"
+                            code={`git init
 git add .
 git commit -m "Initial commit"
 git branch -M main
 git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
 git push -u origin main`}
-                    />
-                    <p className="text-xs text-gray-500">
-                      Replace <code className="bg-gray-200 px-1 rounded text-xs">YOUR_USERNAME</code> and <code className="bg-gray-200 px-1 rounded text-xs">YOUR_REPO</code> with your GitHub username and repository name
-                    </p>
-                  </div>
+                          />
+                          <p className="mt-3 text-xs text-zinc-500">
+                            Replace <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-zinc-600">YOUR_USERNAME</code> and <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-zinc-600">YOUR_REPO</code> with your GitHub username and repository name
+                          </p>
+                        </div>
+                      </div>
+                    </div>
 
-                  {/* Footer */}
-                  <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
-                    <Button
-                      variant="outline"
-                      onClick={goToPreviousStep}
-                      className="border-gray-300"
-                      disabled
-                    >
-                      Back
-                    </Button>
-                    <div className="flex items-center gap-3">
-                      <Button
-                        variant="outline"
-                        onClick={goToNextStep}
-                        className="border-gray-300"
-                      >
-                        Skip this step
-                      </Button>
-                      <Button
-                        onClick={goToNextStep}
-                        className="bg-gray-900 hover:bg-gray-800 text-white gap-2"
-                      >
-                        I&apos;ve completed this step
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
+                    {/* Footer */}
+                    <div className="mt-8 flex items-center justify-end border-t border-zinc-200 pt-6">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={goToNextStep}
+                          className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                        >
+                          Skip this step
+                        </button>
+                        <button
+                          onClick={goToNextStep}
+                          className="inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                        >
+                          I&apos;ve completed this step
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -466,66 +447,60 @@ git push -u origin main`}
 
               {/* Supabase Tab */}
               {currentTab === "supabase" && (
-                <div className="space-y-6">
-                  {/* Header section */}
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0">
-                      <Database className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-semibold text-gray-900">Database &amp; Authentication</h2>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Configure your PostgreSQL database connection and authentication. You&apos;ll need API keys, the database connection string, and we&apos;ll generate a secure auth secret for you.
-                      </p>
-                    </div>
+                <div>
+                  {/* Header section with gradient background */}
+                  <div className="border-b border-zinc-100 px-6 py-5" style={{ background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
+                    <h2 className="text-xl font-semibold text-zinc-900">Database &amp; Authentication</h2>
+                    <p className="mt-1 text-sm text-zinc-500">
+                      Configure your PostgreSQL database connection and authentication. You&apos;ll need API keys, the database connection string, and we&apos;ll generate a secure auth secret for you.
+                    </p>
                   </div>
 
+                  {/* Content section */}
+                  <div className="p-6 space-y-6">
                   {/* Step 1 */}
                   <div className="flex items-center gap-3">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
+                    <div className="flex w-8 h-8 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       1
                     </div>
-                    <h3 className="text-base font-semibold text-gray-900">Create a FREE Supabase account</h3>
+                    <h3 className="font-semibold text-zinc-900">Create a FREE Supabase account</h3>
                   </div>
 
-                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                    <ol className="space-y-3">
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
+                    <ol className="space-y-2.5">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           1
                         </span>
-                        <div className="flex-1 pt-0.5 text-sm">
-                          <span className="text-gray-900">Go to </span>
-                          <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-gray-900 hover:underline">
+                        <span className="text-zinc-500">
+                          Go to <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
                             supabase.com
                             <ExternalLink className="h-3 w-3" />
-                          </a>
-                          <span className="text-gray-900"> and create a free account</span>
-                        </div>
+                          </a> and create a free account
+                        </span>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           2
                         </span>
-                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Create a new project (free tier)</p>
+                        <span className="text-zinc-500">Create a new project (free tier)</span>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           3
                         </span>
-                        <div className="flex-1 pt-0.5 text-sm">
-                          <span className="text-gray-900">Go to </span>
-                          <a href="https://supabase.com/dashboard/project/_/settings/api" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-gray-900 hover:underline">
+                        <span className="text-zinc-500">
+                          Go to <a href="https://supabase.com/dashboard/project/_/settings/api" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
                             Project Settings &rarr; API
                             <ExternalLink className="h-3 w-3" />
                           </a>
-                        </div>
+                        </span>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           4
                         </span>
-                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Copy each key below</p>
+                        <span className="text-zinc-500">Copy each key below</span>
                       </li>
                     </ol>
                   </div>
@@ -601,43 +576,42 @@ git push -u origin main`}
 
                   {/* Step 2: Database Connection */}
                   <div className="flex items-center gap-3">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
+                    <div className="flex w-8 h-8 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       2
                     </div>
-                    <h3 className="text-base font-semibold text-gray-900">Get your Database Connection String</h3>
+                    <h3 className="font-semibold text-zinc-900">Get your Database Connection String</h3>
                   </div>
 
-                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                    <ol className="space-y-3">
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
+                    <ol className="space-y-2.5">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           1
                         </span>
-                        <div className="flex-1 pt-0.5 text-sm">
-                          <span className="text-gray-900">Go to </span>
-                          <a href="https://supabase.com/dashboard/project/_/settings/database" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-gray-900 hover:underline">
+                        <span className="text-zinc-500">
+                          Go to <a href="https://supabase.com/dashboard/project/_/settings/database" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
                             Project Settings &rarr; Database
                             <ExternalLink className="h-3 w-3" />
                           </a>
-                        </div>
+                        </span>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           2
                         </span>
-                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Scroll to <strong>Connection string</strong> section</p>
+                        <span className="text-zinc-500">Scroll to <strong className="text-zinc-700">Connection string</strong> section</span>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           3
                         </span>
-                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Select <strong>URI</strong> tab and copy the connection string</p>
+                        <span className="text-zinc-500">Select <strong className="text-zinc-700">URI</strong> tab and copy the connection string</span>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           4
                         </span>
-                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Replace <code className="bg-gray-200 px-1 rounded text-xs">[YOUR-PASSWORD]</code> with your database password</p>
+                        <span className="text-zinc-500">Replace <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">[YOUR-PASSWORD]</code> with your database password</span>
                       </li>
                     </ol>
                   </div>
@@ -671,10 +645,10 @@ git push -u origin main`}
 
                   {/* Step 3: Auth Secret */}
                   <div className="flex items-center gap-3">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
+                    <div className="flex w-8 h-8 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       3
                     </div>
-                    <h3 className="text-base font-semibold text-gray-900">Authentication Secret</h3>
+                    <h3 className="font-semibold text-zinc-900">Authentication Secret</h3>
                   </div>
 
                   <Alert className="bg-blue-50 border-blue-200">
@@ -713,7 +687,7 @@ git push -u origin main`}
                           variant="outline"
                           size="sm"
                           onClick={() => setFormData(prev => ({ ...prev, betterAuthSecret: generateAuthSecret() }))}
-                          className="border-gray-300"
+                          className="border-zinc-200"
                         >
                           Regenerate
                         </Button>
@@ -722,50 +696,40 @@ git push -u origin main`}
                   </div>
 
                   {/* Footer */}
-                  <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
-                    <Button
-                      variant="outline"
-                      onClick={goToPreviousStep}
-                      className="border-gray-300"
-                    >
-                      Back
-                    </Button>
+                  <div className="mt-8 flex items-center justify-end border-t border-zinc-200 pt-6">
                     <div className="flex items-center gap-3">
-                      <Button
-                        variant="outline"
+                      <button
                         onClick={goToNextStep}
-                        className="border-gray-300"
+                        className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
                       >
                         Skip this step
-                      </Button>
-                      <Button
+                      </button>
+                      <button
                         onClick={goToNextStep}
-                        className="bg-gray-900 hover:bg-gray-800 text-white gap-2"
+                        className="inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
                       >
                         I&apos;ve completed this step
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
+                </div>
                 </div>
               )}
 
               {/* OpenAI Tab */}
               {currentTab === "openai" && (
-                <div className="space-y-6">
-                  {/* Header section */}
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0">
-                      <Zap className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-semibold text-gray-900">OpenAI Configuration</h2>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Enable AI-powered features like the /assist chat interface. You can skip this step if you don&apos;t need AI features.
-                      </p>
-                    </div>
+                <div>
+                  {/* Header section with gradient background */}
+                  <div className="border-b border-zinc-100 px-6 py-5" style={{ background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
+                    <h2 className="text-xl font-semibold text-zinc-900">OpenAI Configuration</h2>
+                    <p className="mt-1 text-sm text-zinc-500">
+                      Enable AI-powered features like the /assist chat interface. You can skip this step if you don&apos;t need AI features.
+                    </p>
                   </div>
 
+                  {/* Content section */}
+                  <div className="p-6 space-y-6">
                   <Alert className="bg-purple-50 border-purple-200">
                     <Zap className="w-4 h-4 text-purple-600" />
                     <AlertTitle className="text-purple-800">Optional</AlertTitle>
@@ -776,50 +740,48 @@ git push -u origin main`}
 
                   {/* Step 1 */}
                   <div className="flex items-center gap-3">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
+                    <div className="flex w-8 h-8 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       1
                     </div>
-                    <h3 className="text-base font-semibold text-gray-900">Create a FREE OpenAI account</h3>
+                    <h3 className="font-semibold text-zinc-900">Create a FREE OpenAI account</h3>
                   </div>
 
-                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                    <ol className="space-y-3">
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
+                    <ol className="space-y-2.5">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           1
                         </span>
-                        <div className="flex-1 pt-0.5 text-sm">
-                          <span className="text-gray-900">Visit </span>
-                          <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-gray-900 hover:underline">
+                        <span className="text-zinc-500">
+                          Visit <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
                             OpenAI Platform
                             <ExternalLink className="h-3 w-3" />
-                          </a>
-                          <span className="text-gray-500"> (includes free credits)</span>
-                        </div>
+                          </a> (includes free credits)
+                        </span>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           2
                         </span>
-                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Click <strong>&quot;Create new secret key&quot;</strong></p>
+                        <span className="text-zinc-500">Click <strong className="text-zinc-700">&quot;Create new secret key&quot;</strong></span>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           3
                         </span>
-                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Copy the key immediately (it won&apos;t be shown again)</p>
+                        <span className="text-zinc-500">Copy the key immediately (it won&apos;t be shown again)</span>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           4
                         </span>
-                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Paste it below</p>
+                        <span className="text-zinc-500">Paste it below</span>
                       </li>
                     </ol>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="openaiApiKey" className="text-sm font-medium text-gray-900">OpenAI API Key</Label>
+                    <Label htmlFor="openaiApiKey" className="text-sm font-medium text-zinc-900">OpenAI API Key</Label>
                     <Textarea
                       id="openaiApiKey"
                       value={formData.openaiApiKey}
@@ -834,78 +796,66 @@ git push -u origin main`}
                   </div>
 
                   {/* Footer */}
-                  <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
-                    <Button
-                      variant="outline"
-                      onClick={goToPreviousStep}
-                      className="border-gray-300"
-                    >
-                      Back
-                    </Button>
+                  <div className="mt-8 flex items-center justify-end border-t border-zinc-200 pt-6">
                     <div className="flex items-center gap-3">
-                      <Button
-                        variant="outline"
+                      <button
                         onClick={goToNextStep}
-                        className="border-gray-300"
+                        className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
                       >
                         Skip this step
-                      </Button>
-                      <Button
+                      </button>
+                      <button
                         onClick={goToNextStep}
-                        className="bg-gray-900 hover:bg-gray-800 text-white gap-2"
+                        className="inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
                       >
                         I&apos;ve completed this step
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
+                </div>
                 </div>
               )}
 
               {/* Resend Tab */}
               {currentTab === "resend" && (
-                <div className="space-y-6">
-                  {/* Header section */}
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0">
-                      <Mail className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-semibold text-gray-900">Resend Configuration</h2>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Enable email sending and the <strong>Mail Stream</strong> module. Resend lets you send transactional emails and track their delivery status in real-time.
-                      </p>
-                    </div>
+                <div>
+                  {/* Header section with gradient background */}
+                  <div className="border-b border-zinc-100 px-6 py-5" style={{ background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
+                    <h2 className="text-xl font-semibold text-zinc-900">Resend Configuration</h2>
+                    <p className="mt-1 text-sm text-zinc-500">
+                      Enable email sending and the <strong>Mail Stream</strong> module. Resend lets you send transactional emails and track their delivery status in real-time.
+                    </p>
                   </div>
 
+                  {/* Content section */}
+                  <div className="p-6 space-y-6">
                   {/* Step 1: API Key */}
                   <div className="flex items-center gap-3">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
+                    <div className="flex w-8 h-8 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       1
                     </div>
-                    <h3 className="text-base font-semibold text-gray-900">Get your Resend API Key</h3>
+                    <h3 className="font-semibold text-zinc-900">Get your Resend API Key</h3>
                   </div>
 
-                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                    <ol className="space-y-3">
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
+                    <ol className="space-y-2.5">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           1
                         </span>
-                        <div className="flex-1 pt-0.5 text-sm">
-                          <span className="text-gray-900">Go to </span>
-                          <a href="https://resend.com/api-keys" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-gray-900 hover:underline">
+                        <span className="text-zinc-500">
+                          Go to <a href="https://resend.com/api-keys" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
                             Resend Dashboard &rarr; API Keys
                             <ExternalLink className="h-3 w-3" />
-                          </a>
-                          <span className="text-gray-500"> (3,000 emails/month free)</span>
-                        </div>
+                          </a> (3,000 emails/month free)
+                        </span>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           2
                         </span>
-                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Click <strong>Create API Key</strong> and copy the key</p>
+                        <span className="text-zinc-500">Click <strong className="text-zinc-700">Create API Key</strong> and copy the key</span>
                       </li>
                     </ol>
                   </div>
@@ -934,10 +884,10 @@ git push -u origin main`}
 
                   {/* Step 2: Webhook Setup */}
                   <div className="flex items-center gap-3">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
+                    <div className="flex w-8 h-8 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       2
                     </div>
-                    <h3 className="text-base font-semibold text-gray-900">Set up Webhook for Mail Stream Module</h3>
+                    <h3 className="font-semibold text-zinc-900">Set up Webhook for Mail Stream Module</h3>
                   </div>
 
                   <Alert className="bg-blue-50 border-blue-200">
@@ -949,60 +899,59 @@ git push -u origin main`}
                     </AlertDescription>
                   </Alert>
 
-                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                    <ol className="space-y-3">
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
+                    <ol className="space-y-2.5">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           1
                         </span>
-                        <div className="flex-1 pt-0.5 text-sm">
-                          <span className="text-gray-900">Go to </span>
-                          <a href="https://resend.com/webhooks" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-gray-900 hover:underline">
+                        <span className="text-zinc-500">
+                          Go to <a href="https://resend.com/webhooks" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
                             Resend Dashboard &rarr; Webhooks
                             <ExternalLink className="h-3 w-3" />
                           </a>
-                        </div>
+                        </span>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           2
                         </span>
-                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Click <strong>Add Webhook</strong></p>
+                        <span className="text-zinc-500">Click <strong className="text-zinc-700">Add Webhook</strong></span>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           3
                         </span>
-                        <div className="flex-1 pt-0.5 text-sm">
-                          <p className="text-gray-900 mb-2">Enter your webhook endpoint URL:</p>
+                        <div className="flex-1">
+                          <span className="text-zinc-500 block mb-2">Enter your webhook endpoint URL:</span>
                           <CodeBlock
                             language="url"
                             code="https://YOUR-DOMAIN/api/modules/mail-stream/webhook"
                           />
-                          <p className="text-xs text-gray-500 mt-2">Replace YOUR-DOMAIN with your actual domain</p>
+                          <p className="text-xs text-zinc-500 mt-2">Replace YOUR-DOMAIN with your actual domain</p>
                         </div>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           4
                         </span>
-                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Select the events you want to track (recommended: <strong>all events</strong>)</p>
+                        <span className="text-zinc-500">Select the events you want to track (recommended: <strong className="text-zinc-700">all events</strong>)</span>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           5
                         </span>
-                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Click <strong>Create</strong> to save the webhook</p>
+                        <span className="text-zinc-500">Click <strong className="text-zinc-700">Create</strong> to save the webhook</span>
                       </li>
                     </ol>
                   </div>
 
                   {/* Step 3: Signing Secret */}
                   <div className="flex items-center gap-3">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
+                    <div className="flex w-8 h-8 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       3
                     </div>
-                    <h3 className="text-base font-semibold text-gray-900">Copy the Webhook Signing Secret</h3>
+                    <h3 className="font-semibold text-zinc-900">Copy the Webhook Signing Secret</h3>
                   </div>
 
                   <Alert className="bg-amber-50 border-amber-200">
@@ -1014,25 +963,25 @@ git push -u origin main`}
                     </AlertDescription>
                   </Alert>
 
-                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                    <ol className="space-y-3">
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
+                    <ol className="space-y-2.5">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           1
                         </span>
-                        <p className="flex-1 pt-0.5 text-sm text-gray-900">After creating the webhook, click on it to view details</p>
+                        <span className="text-zinc-500">After creating the webhook, click on it to view details</span>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           2
                         </span>
-                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Copy the <strong>Signing Secret</strong> (starts with <code className="bg-gray-200 px-1 rounded text-xs">whsec_</code>)</p>
+                        <span className="text-zinc-500">Copy the <strong className="text-zinc-700">Signing Secret</strong> (starts with <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">whsec_</code>)</span>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           3
                         </span>
-                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Paste it below</p>
+                        <span className="text-zinc-500">Paste it below</span>
                       </li>
                     </ol>
                   </div>
@@ -1060,52 +1009,40 @@ git push -u origin main`}
                   </div>
 
                   {/* Footer */}
-                  <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
-                    <Button
-                      variant="outline"
-                      onClick={goToPreviousStep}
-                      className="border-gray-300"
-                    >
-                      Back
-                    </Button>
+                  <div className="mt-8 flex items-center justify-end border-t border-zinc-200 pt-6">
                     <div className="flex items-center gap-3">
-                      <Button
-                        variant="outline"
+                      <button
                         onClick={goToNextStep}
-                        className="border-gray-300"
+                        className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
                       >
                         Skip this step
-                      </Button>
-                      <Button
+                      </button>
+                      <button
                         onClick={goToNextStep}
-                        className="bg-gray-900 hover:bg-gray-800 text-white gap-2"
+                        className="inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
                       >
                         I&apos;ve completed this step
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
+                </div>
                 </div>
               )}
 
               {/* Vercel Tab */}
               {currentTab === "vercel" && (
-                <div className="space-y-6">
-                  {/* Header section */}
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0">
-                      <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6 text-white">
-                        <path d="M24 22.525H0l12-21.05 12 21.05z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-semibold text-gray-900">Vercel Deployment</h2>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Deploy your app to the cloud with Vercel. You can skip this for local development only.
-                      </p>
-                    </div>
+                <div>
+                  {/* Header section with gradient background */}
+                  <div className="border-b border-zinc-100 px-6 py-5" style={{ background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
+                    <h2 className="text-xl font-semibold text-zinc-900">Vercel Deployment</h2>
+                    <p className="mt-1 text-sm text-zinc-500">
+                      Deploy your app to the cloud with Vercel. You can skip this for local development only.
+                    </p>
                   </div>
 
+                  {/* Content section */}
+                  <div className="p-6 space-y-6">
                   <Alert className="bg-gray-50 border-gray-200">
                     <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
                       <path d="M24 22.525H0l12-21.05 12 21.05z" />
@@ -1118,71 +1055,69 @@ git push -u origin main`}
 
                   {/* Step 1 */}
                   <div className="flex items-center gap-3">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
+                    <div className="flex w-8 h-8 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       1
                     </div>
-                    <h3 className="text-base font-semibold text-gray-900">Create a FREE Vercel Hobby account</h3>
+                    <h3 className="font-semibold text-zinc-900">Create a FREE Vercel Hobby account</h3>
                   </div>
 
-                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                    <ol className="space-y-3">
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
+                    <ol className="space-y-2.5">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           1
                         </span>
-                        <div className="flex-1 pt-0.5 text-sm">
-                          <span className="text-gray-900">Go to </span>
-                          <a href="https://vercel.com/signup" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-gray-900 hover:underline">
+                        <span className="text-zinc-500">
+                          Go to <a href="https://vercel.com/signup" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
                             vercel.com/signup
                             <ExternalLink className="h-3 w-3" />
-                          </a>
-                          <span className="text-gray-900"> and create a free account</span>
-                        </div>
+                          </a> and create a free account
+                        </span>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           2
                         </span>
-                        <div className="flex-1 pt-0.5 text-sm text-gray-900">
-                          Install Vercel CLI: <code className="bg-gray-200 px-1 rounded text-xs" style={{ fontFamily: 'Geist Mono, monospace' }}>npm install -g vercel</code>
-                        </div>
+                        <span className="text-zinc-500">
+                          Install Vercel CLI: <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">npm install -g vercel</code>
+                        </span>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           3
                         </span>
-                        <div className="flex-1 pt-0.5 text-sm text-gray-900">
-                          Run <code className="bg-gray-200 px-1 rounded text-xs" style={{ fontFamily: 'Geist Mono, monospace' }}>vercel login</code> in your terminal
-                        </div>
+                        <span className="text-zinc-500">
+                          Run <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">vercel login</code> in your terminal
+                        </span>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           4
                         </span>
-                        <div className="flex-1 pt-0.5 text-sm text-gray-900">
-                          Run <code className="bg-gray-200 px-1 rounded text-xs" style={{ fontFamily: 'Geist Mono, monospace' }}>vercel link</code> to connect your project
-                        </div>
+                        <span className="text-zinc-500">
+                          Run <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">vercel link</code> to connect your project
+                        </span>
                       </li>
-                      <li className="flex items-start gap-3">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           5
                         </span>
-                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Add environment variables in Vercel dashboard</p>
+                        <span className="text-zinc-500">Add environment variables in Vercel dashboard</span>
                       </li>
                     </ol>
                   </div>
 
                   <Alert>
                     <Info className="w-4 h-4" />
-                    <AlertDescription className="text-gray-700">
+                    <AlertDescription className="text-zinc-700">
                       After downloading your .env.local file, you can run{" "}
-                      <code className="bg-gray-200 px-1 rounded text-xs" style={{ fontFamily: 'Geist Mono, monospace' }}>vercel env pull</code>
+                      <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">vercel env pull</code>
                       {" "}to sync your environment variables.{" "}
                       <a
                         href="https://vercel.com/docs/cli"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-gray-900 hover:underline inline-flex items-center gap-1"
+                        className="font-medium text-zinc-900 hover:underline inline-flex items-center gap-1"
                       >
                         Learn more
                         <ExternalLink className="w-3 h-3" />
@@ -1191,50 +1126,40 @@ git push -u origin main`}
                   </Alert>
 
                   {/* Footer */}
-                  <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
-                    <Button
-                      variant="outline"
-                      onClick={goToPreviousStep}
-                      className="border-gray-300"
-                    >
-                      Back
-                    </Button>
+                  <div className="mt-8 flex items-center justify-end border-t border-zinc-200 pt-6">
                     <div className="flex items-center gap-3">
-                      <Button
-                        variant="outline"
+                      <button
                         onClick={goToNextStep}
-                        className="border-gray-300"
+                        className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
                       >
                         Skip this step
-                      </Button>
-                      <Button
+                      </button>
+                      <button
                         onClick={goToNextStep}
-                        className="bg-gray-900 hover:bg-gray-800 text-white gap-2"
+                        className="inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
                       >
                         I&apos;ve completed this step
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
+                </div>
                 </div>
               )}
 
               {/* Personal Tab */}
               {currentTab === "personal" && (
-                <div className="space-y-6">
-                  {/* Header section */}
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0">
-                      <User className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-semibold text-gray-900">Personal Details</h2>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Tell us about yourself. This information is optional and stored securely in your database.
-                      </p>
-                    </div>
+                <div>
+                  {/* Header section with gradient background */}
+                  <div className="border-b border-zinc-100 px-6 py-5" style={{ background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
+                    <h2 className="text-xl font-semibold text-zinc-900">Personal Details</h2>
+                    <p className="mt-1 text-sm text-zinc-500">
+                      Tell us about yourself. This information is optional and stored securely in your database.
+                    </p>
                   </div>
 
+                  {/* Content section */}
+                  <div className="p-6 space-y-6">
                   <Alert className="bg-gray-50 border-gray-200">
                     <User className="w-4 h-4 text-gray-600" />
                     <AlertTitle className="text-gray-800">Optional</AlertTitle>
@@ -1470,23 +1395,15 @@ git push -u origin main`}
                   </div>
 
                   {/* Footer */}
-                  <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
-                    <Button
-                      variant="outline"
-                      onClick={goToPreviousStep}
-                      className="border-gray-300"
-                    >
-                      Back
-                    </Button>
+                  <div className="mt-8 flex items-center justify-end border-t border-zinc-200 pt-6">
                     <div className="flex items-center gap-3">
-                      <Button
-                        variant="outline"
+                      <button
                         onClick={goToNextStep}
-                        className="border-gray-300"
+                        className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
                       >
                         Skip this step
-                      </Button>
-                      <Button
+                      </button>
+                      <button
                         onClick={async () => {
                           // Save preferences to database
                           if (formData.name || formData.email || formData.timezone) {
@@ -1514,33 +1431,31 @@ git push -u origin main`}
                           }
                           goToNextStep()
                         }}
-                        className="bg-gray-900 hover:bg-gray-800 text-white gap-2"
+                        className="inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
                         disabled={isSavingPreferences}
                       >
                         {isSavingPreferences ? 'Saving...' : "I've completed this step"}
-                        {!isSavingPreferences && <ArrowRight className="h-4 w-4" />}
-                      </Button>
+                        {!isSavingPreferences && <ArrowRight className="w-4 h-4" />}
+                      </button>
                     </div>
                   </div>
+                </div>
                 </div>
               )}
 
               {/* Download Tab */}
               {currentTab === "download" && (
-                <div className="space-y-6">
-                  {/* Header section */}
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0">
-                      <Download className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-semibold text-gray-900">Download &amp; Finish</h2>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Your environment configuration is ready. Download the files and place them in your project root directory.
-                      </p>
-                    </div>
+                <div>
+                  {/* Header section with gradient background */}
+                  <div className="border-b border-zinc-100 px-6 py-5" style={{ background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
+                    <h2 className="text-xl font-semibold text-zinc-900">Download &amp; Finish</h2>
+                    <p className="mt-1 text-sm text-zinc-500">
+                      Your environment configuration is ready. Download the files and place them in your project root directory.
+                    </p>
                   </div>
 
+                  {/* Content section */}
+                  <div className="p-6 space-y-6">
                   <Alert className="bg-green-50 border-green-200">
                     <CheckCircle className="w-4 h-4 text-green-600" />
                     <AlertTitle className="text-green-800">Setup Complete!</AlertTitle>
@@ -1634,7 +1549,7 @@ git push -u origin main`}
                   <Button
                     onClick={handleDownloadEnvFile}
                     disabled={!isSupabaseComplete}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white"
+                    className="w-full rounded-lg bg-green-600 hover:bg-green-700 text-white"
                   >
                     <Download className="w-4 h-4 mr-2" />
                     Download .env.local
@@ -1652,29 +1567,22 @@ git push -u origin main`}
                   </Alert>
 
                   {/* Footer */}
-                  <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
-                    <Button
-                      variant="outline"
-                      onClick={goToPreviousStep}
-                      className="border-gray-300"
-                    >
-                      Back
-                    </Button>
+                  <div className="mt-8 flex items-center justify-end border-t border-zinc-200 pt-6">
                     <div className="flex items-center gap-3">
-                      <Button
+                      <button
                         onClick={handleDownloadEnvFile}
                         disabled={!isSupabaseComplete}
-                        className="bg-gray-900 hover:bg-gray-800 text-white gap-2"
+                        className="inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
                       >
                         Finish Setup
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 </div>
+                </div>
               )}
-            </CardContent>
-          </Card>
+          </div>
         </div>
       </div>
     </TooltipProvider>
