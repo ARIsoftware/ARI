@@ -1,6 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-helpers";
 
+// Validate URL is a legitimate Twitter/X URL to prevent SSRF attacks
+function isValidTwitterUrl(urlString: string): boolean {
+  try {
+    const url = new URL(urlString);
+    // Only allow HTTPS
+    if (url.protocol !== "https:") {
+      return false;
+    }
+    // Only allow twitter.com and x.com domains
+    const allowedHosts = ["twitter.com", "www.twitter.com", "x.com", "www.x.com"];
+    if (!allowedHosts.includes(url.hostname)) {
+      return false;
+    }
+    // Must be a tweet/status URL pattern
+    if (!url.pathname.match(/^\/[A-Za-z0-9_]+\/status\/\d+\/?$/)) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { user } = await getAuthenticatedUser();
@@ -13,6 +36,11 @@ export async function POST(req: NextRequest) {
 
     if (!url) {
       return NextResponse.json({ error: "URL is required" }, { status: 400 });
+    }
+
+    // Validate URL to prevent SSRF attacks
+    if (!isValidTwitterUrl(url)) {
+      return NextResponse.json({ error: "Invalid Twitter/X URL" }, { status: 400 });
     }
 
     // Try multiple approaches to get Twitter/X metadata
