@@ -272,7 +272,7 @@ export default function WelcomePage() {
   return (
     <TooltipProvider>
       <div
-        className="min-h-screen bg-[#f9fafe] overflow-y-auto flex items-start justify-center px-8 py-12"
+        className="min-h-screen bg-[#f9fafe] overflow-y-auto flex items-start justify-center px-8 pt-20 pb-12"
       >
         <div style={{ width: '864px', maxWidth: '100%' }}>
           {/* Header */}
@@ -280,8 +280,8 @@ export default function WelcomePage() {
             <h1 className="text-4xl font-light tracking-tight text-zinc-900 mb-3">
               Configure ARI
             </h1>
-            <p className="text-zinc-500">
-              Configure your environment to get ARI running. This step is about preparing your local setup so the application can run smoothly.
+            <p className="text-zinc-500" style={{ lineHeight: '26px', fontSize: '16px', fontWeight: 300 }}>
+              Configure your environment to get ARI running. This step is about preparing your local setup so the application can run smoothly. Nothing here is difficult, but it does require a bit of care and attention to detail. This entire setup process should take around 10 to 20 minutes, depending on your system and familiarity with the tools involved.
             </p>
           </div>
 
@@ -370,14 +370,14 @@ git push -u origin main`}
                       <div className="flex items-center gap-3">
                         <button
                           onClick={goToNextStep}
-                          className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                          className="inline-flex items-center justify-center px-4 py-2 text-base font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
                           style={{ borderRadius: '6px' }}
                         >
                           Skip this step
                         </button>
                         <button
                           onClick={goToNextStep}
-                          className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
                           style={{ borderRadius: '6px' }}
                         >
                           I&apos;ve completed this step
@@ -643,7 +643,7 @@ git push -u origin main`}
                   <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
                     <button
                       onClick={goToPreviousStep}
-                      className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
+                      className="inline-flex items-center justify-center px-4 py-2 text-base font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
                       style={{ borderRadius: '6px' }}
                     >
                       Back
@@ -651,14 +651,14 @@ git push -u origin main`}
                     <div className="flex items-center gap-3">
                       <button
                         onClick={goToNextStep}
-                        className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                        className="inline-flex items-center justify-center px-4 py-2 text-base font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
                         style={{ borderRadius: '6px' }}
                       >
                         Skip this step
                       </button>
                       <button
                         onClick={goToNextStep}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
                         style={{ borderRadius: '6px' }}
                       >
                         I&apos;ve completed this step
@@ -752,7 +752,7 @@ git push -u origin main`}
                   <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
                     <button
                       onClick={goToPreviousStep}
-                      className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
+                      className="inline-flex items-center justify-center px-4 py-2 text-base font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
                       style={{ borderRadius: '6px' }}
                     >
                       Back
@@ -760,14 +760,14 @@ git push -u origin main`}
                     <div className="flex items-center gap-3">
                       <button
                         onClick={goToNextStep}
-                        className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                        className="inline-flex items-center justify-center px-4 py-2 text-base font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
                         style={{ borderRadius: '6px' }}
                       >
                         Skip this step
                       </button>
                       <button
                         onClick={goToNextStep}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
                         style={{ borderRadius: '6px' }}
                       >
                         I&apos;ve completed this step
@@ -974,7 +974,7 @@ git push -u origin main`}
                   <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
                     <button
                       onClick={goToPreviousStep}
-                      className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
+                      className="inline-flex items-center justify-center px-4 py-2 text-base font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
                       style={{ borderRadius: '6px' }}
                     >
                       Back
@@ -982,14 +982,14 @@ git push -u origin main`}
                     <div className="flex items-center gap-3">
                       <button
                         onClick={goToNextStep}
-                        className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                        className="inline-flex items-center justify-center px-4 py-2 text-base font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
                         style={{ borderRadius: '6px' }}
                       >
                         Skip this step
                       </button>
                       <button
                         onClick={goToNextStep}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
                         style={{ borderRadius: '6px' }}
                       >
                         I&apos;ve completed this step
@@ -1100,7 +1100,7 @@ git push -u origin main`}
                   <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
                     <button
                       onClick={goToPreviousStep}
-                      className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
+                      className="inline-flex items-center justify-center px-4 py-2 text-base font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
                       style={{ borderRadius: '6px' }}
                     >
                       Back
@@ -1108,14 +1108,14 @@ git push -u origin main`}
                     <div className="flex items-center gap-3">
                       <button
                         onClick={goToNextStep}
-                        className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                        className="inline-flex items-center justify-center px-4 py-2 text-base font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
                         style={{ borderRadius: '6px' }}
                       >
                         Skip this step
                       </button>
                       <button
                         onClick={goToNextStep}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
                         style={{ borderRadius: '6px' }}
                       >
                         I&apos;ve completed this step
@@ -1254,7 +1254,7 @@ git push -u origin main`}
                   <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
                     <button
                       onClick={goToPreviousStep}
-                      className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
+                      className="inline-flex items-center justify-center px-4 py-2 text-base font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
                       style={{ borderRadius: '6px' }}
                     >
                       Back
