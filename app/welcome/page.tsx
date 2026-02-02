@@ -9,7 +9,6 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   Zap,
-  User,
   Download,
   Info,
   ExternalLink,
@@ -19,13 +18,6 @@ import {
   X,
   ArrowRight
 } from "lucide-react"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { StepIndicator } from "./components/step-indicator"
 import { CodeBlock } from "./components/code-block"
 
@@ -46,15 +38,6 @@ interface OnboardingData {
   resendWebhookSecret: string
   // Vercel (tracking)
   vercelSetupComplete: boolean
-  // Personal (optional)
-  name: string
-  email: string
-  title: string
-  companyName: string
-  country: string
-  city: string
-  linkedinUrl: string
-  timezone: string
 }
 
 // Generate a cryptographically secure random string for BETTER_AUTH_SECRET
@@ -66,32 +49,7 @@ const generateAuthSecret = () => {
   return btoa(String.fromCharCode(...array))
 }
 
-// Common timezones for the dropdown
-const COMMON_TIMEZONES = [
-  { value: 'UTC', label: 'UTC (Coordinated Universal Time)' },
-  { value: 'America/New_York', label: 'Eastern Time (US & Canada)' },
-  { value: 'America/Chicago', label: 'Central Time (US & Canada)' },
-  { value: 'America/Denver', label: 'Mountain Time (US & Canada)' },
-  { value: 'America/Los_Angeles', label: 'Pacific Time (US & Canada)' },
-  { value: 'America/Toronto', label: 'Toronto' },
-  { value: 'America/Vancouver', label: 'Vancouver' },
-  { value: 'Europe/London', label: 'London' },
-  { value: 'Europe/Paris', label: 'Paris' },
-  { value: 'Europe/Berlin', label: 'Berlin' },
-  { value: 'Europe/Amsterdam', label: 'Amsterdam' },
-  { value: 'Asia/Tokyo', label: 'Tokyo' },
-  { value: 'Asia/Singapore', label: 'Singapore' },
-  { value: 'Asia/Hong_Kong', label: 'Hong Kong' },
-  { value: 'Asia/Shanghai', label: 'Shanghai' },
-  { value: 'Asia/Dubai', label: 'Dubai' },
-  { value: 'Asia/Jerusalem', label: 'Jerusalem' },
-  { value: 'Australia/Sydney', label: 'Sydney' },
-  { value: 'Australia/Melbourne', label: 'Melbourne' },
-  { value: 'Pacific/Auckland', label: 'Auckland' },
-  { value: 'Africa/Johannesburg', label: 'Johannesburg' },
-]
-
-const STEP_ORDER = ["github", "supabase", "openai", "resend", "vercel", "personal", "download"]
+const STEP_ORDER = ["github", "supabase", "openai", "resend", "vercel", "download"]
 
 export default function WelcomePage() {
   const [completedLines, setCompletedLines] = useState<string[]>([])
@@ -102,14 +60,6 @@ export default function WelcomePage() {
   const [showOnboarding, setShowOnboarding] = useState(false)
 
   const [currentTab, setCurrentTab] = useState("github")
-  // Auto-detect browser timezone
-  const getDefaultTimezone = () => {
-    try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone
-    } catch {
-      return 'UTC'
-    }
-  }
 
   const [formData, setFormData] = useState<OnboardingData>({
     githubSetupComplete: false,
@@ -122,14 +72,6 @@ export default function WelcomePage() {
     resendApiKey: "",
     resendWebhookSecret: "",
     vercelSetupComplete: false,
-    name: "",
-    email: "",
-    title: "",
-    companyName: "",
-    country: "",
-    city: "",
-    linkedinUrl: "",
-    timezone: getDefaultTimezone(),
   })
 
   // Generate BETTER_AUTH_SECRET on mount
@@ -138,7 +80,6 @@ export default function WelcomePage() {
       setFormData(prev => ({ ...prev, betterAuthSecret: generateAuthSecret() }))
     }
   }, [])
-  const [isSavingPreferences, setIsSavingPreferences] = useState(false)
 
   const sequence = [
     { delay: 1300, text: "Hello." },
@@ -354,7 +295,7 @@ export default function WelcomePage() {
                 <div>
                   {/* Header section with gradient background */}
                   <div className="border-b border-zinc-100 px-6 py-5" style={{ background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <h2 className="text-xl font-semibold text-zinc-900">GitHub Setup</h2>
+                    <h2 className="text-2xl font-semibold text-zinc-900">GitHub Setup</h2>
                     <p className="mt-1 text-sm text-zinc-500">
                       Create a GitHub repository for your ARI instance. This enables version control, easy deployment to Vercel, and the ability to receive updates.
                     </p>
@@ -366,15 +307,15 @@ export default function WelcomePage() {
                       {/* Step 1: Create repo */}
                       <div className="relative flex gap-4">
                         <div className="flex flex-col items-center">
-                          <div className="flex w-8 h-8 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-sm font-semibold">1</div>
+                          <div className="flex w-10 h-10 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-sm font-semibold">1</div>
                           <div className="mt-2 h-full w-px bg-zinc-200" />
                         </div>
                         <div className="flex-1 pb-8">
-                          <h3 className="mb-3 font-semibold text-zinc-900">Create a new repository</h3>
+                          <h3 className="mb-3 text-base font-semibold text-zinc-900">Create a new repository</h3>
                           <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
                             <ol className="space-y-2.5">
                               <li className="flex items-start gap-3 text-sm">
-                                <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>1</span>
+                                <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>1</span>
                                 <span className="text-zinc-500">
                                   Go to <a href="https://github.com/new" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
                                     github.com/new
@@ -383,13 +324,13 @@ export default function WelcomePage() {
                                 </span>
                               </li>
                               <li className="flex items-start gap-3 text-sm">
-                                <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>2</span>
+                                <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>2</span>
                                 <span className="text-zinc-500">
                                   Name your repository (e.g., <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">ari</code> or <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">my-ari</code>)
                                 </span>
                               </li>
                               <li className="flex items-start gap-3 text-sm">
-                                <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>3</span>
+                                <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>3</span>
                                 <span className="text-zinc-500">
                                   Set it to <strong className="text-zinc-700">Private</strong> (recommended) and click <strong className="text-zinc-700">Create repository</strong>
                                 </span>
@@ -402,11 +343,11 @@ export default function WelcomePage() {
                       {/* Step 2: Push code */}
                       <div className="relative flex gap-4">
                         <div className="flex flex-col items-center">
-                          <div className="flex w-8 h-8 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-sm font-semibold">2</div>
+                          <div className="flex w-10 h-10 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-sm font-semibold">2</div>
                         </div>
                         <div className="flex-1">
-                          <h3 className="mb-3 font-semibold text-zinc-900">Push your code</h3>
-                          <p className="mb-3 text-sm text-zinc-500">In your project folder, run these commands:</p>
+                          <h3 className="mb-3 text-base font-semibold text-zinc-900">Push your code</h3>
+                          <p className="mb-3 text-sm text-zinc-500">In your project folder, run these commands one line at a time:</p>
                           <CodeBlock
                             language="bash"
                             code={`git init
@@ -424,17 +365,20 @@ git push -u origin main`}
                     </div>
 
                     {/* Footer */}
-                    <div className="mt-8 flex items-center justify-end border-t border-zinc-200 pt-6">
+                    <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
+                      <div />
                       <div className="flex items-center gap-3">
                         <button
                           onClick={goToNextStep}
-                          className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                          className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                          style={{ borderRadius: '6px' }}
                         >
                           Skip this step
                         </button>
                         <button
                           onClick={goToNextStep}
-                          className="inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                          style={{ borderRadius: '6px' }}
                         >
                           I&apos;ve completed this step
                           <ArrowRight className="w-4 h-4" />
@@ -450,7 +394,7 @@ git push -u origin main`}
                 <div>
                   {/* Header section with gradient background */}
                   <div className="border-b border-zinc-100 px-6 py-5" style={{ background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <h2 className="text-xl font-semibold text-zinc-900">Database &amp; Authentication</h2>
+                    <h2 className="text-2xl font-semibold text-zinc-900">Database &amp; Authentication</h2>
                     <p className="mt-1 text-sm text-zinc-500">
                       Configure your PostgreSQL database connection and authentication. You&apos;ll need API keys, the database connection string, and we&apos;ll generate a secure auth secret for you.
                     </p>
@@ -460,16 +404,16 @@ git push -u origin main`}
                   <div className="p-6 space-y-6">
                   {/* Step 1 */}
                   <div className="flex items-center gap-3">
-                    <div className="flex w-8 h-8 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
+                    <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       1
                     </div>
-                    <h3 className="font-semibold text-zinc-900">Create a FREE Supabase account</h3>
+                    <h3 className="text-base font-semibold text-zinc-900">Create a FREE Supabase account</h3>
                   </div>
 
                   <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
                     <ol className="space-y-2.5">
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           1
                         </span>
                         <span className="text-zinc-500">
@@ -480,13 +424,13 @@ git push -u origin main`}
                         </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           2
                         </span>
                         <span className="text-zinc-500">Create a new project (free tier)</span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           3
                         </span>
                         <span className="text-zinc-500">
@@ -497,7 +441,7 @@ git push -u origin main`}
                         </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           4
                         </span>
                         <span className="text-zinc-500">Copy each key below</span>
@@ -576,16 +520,16 @@ git push -u origin main`}
 
                   {/* Step 2: Database Connection */}
                   <div className="flex items-center gap-3">
-                    <div className="flex w-8 h-8 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
+                    <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       2
                     </div>
-                    <h3 className="font-semibold text-zinc-900">Get your Database Connection String</h3>
+                    <h3 className="text-base font-semibold text-zinc-900">Get your Database Connection String</h3>
                   </div>
 
                   <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
                     <ol className="space-y-2.5">
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           1
                         </span>
                         <span className="text-zinc-500">
@@ -596,19 +540,19 @@ git push -u origin main`}
                         </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           2
                         </span>
                         <span className="text-zinc-500">Scroll to <strong className="text-zinc-700">Connection string</strong> section</span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           3
                         </span>
                         <span className="text-zinc-500">Select <strong className="text-zinc-700">URI</strong> tab and copy the connection string</span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           4
                         </span>
                         <span className="text-zinc-500">Replace <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">[YOUR-PASSWORD]</code> with your database password</span>
@@ -645,10 +589,10 @@ git push -u origin main`}
 
                   {/* Step 3: Auth Secret */}
                   <div className="flex items-center gap-3">
-                    <div className="flex w-8 h-8 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
+                    <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       3
                     </div>
-                    <h3 className="font-semibold text-zinc-900">Authentication Secret</h3>
+                    <h3 className="text-base font-semibold text-zinc-900">Authentication Secret</h3>
                   </div>
 
                   <Alert className="bg-blue-50 border-blue-200">
@@ -696,17 +640,26 @@ git push -u origin main`}
                   </div>
 
                   {/* Footer */}
-                  <div className="mt-8 flex items-center justify-end border-t border-zinc-200 pt-6">
+                  <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
+                    <button
+                      onClick={goToPreviousStep}
+                      className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
+                      style={{ borderRadius: '6px' }}
+                    >
+                      Back
+                    </button>
                     <div className="flex items-center gap-3">
                       <button
                         onClick={goToNextStep}
-                        className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                        className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                        style={{ borderRadius: '6px' }}
                       >
                         Skip this step
                       </button>
                       <button
                         onClick={goToNextStep}
-                        className="inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                        style={{ borderRadius: '6px' }}
                       >
                         I&apos;ve completed this step
                         <ArrowRight className="w-4 h-4" />
@@ -722,7 +675,7 @@ git push -u origin main`}
                 <div>
                   {/* Header section with gradient background */}
                   <div className="border-b border-zinc-100 px-6 py-5" style={{ background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <h2 className="text-xl font-semibold text-zinc-900">OpenAI Configuration</h2>
+                    <h2 className="text-2xl font-semibold text-zinc-900">OpenAI Configuration</h2>
                     <p className="mt-1 text-sm text-zinc-500">
                       Enable AI-powered features like the /assist chat interface. You can skip this step if you don&apos;t need AI features.
                     </p>
@@ -740,16 +693,16 @@ git push -u origin main`}
 
                   {/* Step 1 */}
                   <div className="flex items-center gap-3">
-                    <div className="flex w-8 h-8 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
+                    <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       1
                     </div>
-                    <h3 className="font-semibold text-zinc-900">Create a FREE OpenAI account</h3>
+                    <h3 className="text-base font-semibold text-zinc-900">Create a FREE OpenAI account</h3>
                   </div>
 
                   <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
                     <ol className="space-y-2.5">
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           1
                         </span>
                         <span className="text-zinc-500">
@@ -760,19 +713,19 @@ git push -u origin main`}
                         </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           2
                         </span>
                         <span className="text-zinc-500">Click <strong className="text-zinc-700">&quot;Create new secret key&quot;</strong></span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           3
                         </span>
                         <span className="text-zinc-500">Copy the key immediately (it won&apos;t be shown again)</span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           4
                         </span>
                         <span className="text-zinc-500">Paste it below</span>
@@ -796,17 +749,26 @@ git push -u origin main`}
                   </div>
 
                   {/* Footer */}
-                  <div className="mt-8 flex items-center justify-end border-t border-zinc-200 pt-6">
+                  <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
+                    <button
+                      onClick={goToPreviousStep}
+                      className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
+                      style={{ borderRadius: '6px' }}
+                    >
+                      Back
+                    </button>
                     <div className="flex items-center gap-3">
                       <button
                         onClick={goToNextStep}
-                        className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                        className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                        style={{ borderRadius: '6px' }}
                       >
                         Skip this step
                       </button>
                       <button
                         onClick={goToNextStep}
-                        className="inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                        style={{ borderRadius: '6px' }}
                       >
                         I&apos;ve completed this step
                         <ArrowRight className="w-4 h-4" />
@@ -822,7 +784,7 @@ git push -u origin main`}
                 <div>
                   {/* Header section with gradient background */}
                   <div className="border-b border-zinc-100 px-6 py-5" style={{ background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <h2 className="text-xl font-semibold text-zinc-900">Resend Configuration</h2>
+                    <h2 className="text-2xl font-semibold text-zinc-900">Resend Configuration</h2>
                     <p className="mt-1 text-sm text-zinc-500">
                       Enable email sending and the <strong>Mail Stream</strong> module. Resend lets you send transactional emails and track their delivery status in real-time.
                     </p>
@@ -832,16 +794,16 @@ git push -u origin main`}
                   <div className="p-6 space-y-6">
                   {/* Step 1: API Key */}
                   <div className="flex items-center gap-3">
-                    <div className="flex w-8 h-8 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
+                    <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       1
                     </div>
-                    <h3 className="font-semibold text-zinc-900">Get your Resend API Key</h3>
+                    <h3 className="text-base font-semibold text-zinc-900">Get your Resend API Key</h3>
                   </div>
 
                   <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
                     <ol className="space-y-2.5">
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           1
                         </span>
                         <span className="text-zinc-500">
@@ -852,7 +814,7 @@ git push -u origin main`}
                         </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           2
                         </span>
                         <span className="text-zinc-500">Click <strong className="text-zinc-700">Create API Key</strong> and copy the key</span>
@@ -884,10 +846,10 @@ git push -u origin main`}
 
                   {/* Step 2: Webhook Setup */}
                   <div className="flex items-center gap-3">
-                    <div className="flex w-8 h-8 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
+                    <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       2
                     </div>
-                    <h3 className="font-semibold text-zinc-900">Set up Webhook for Mail Stream Module</h3>
+                    <h3 className="text-base font-semibold text-zinc-900">Set up Webhook for Mail Stream Module</h3>
                   </div>
 
                   <Alert className="bg-blue-50 border-blue-200">
@@ -902,7 +864,7 @@ git push -u origin main`}
                   <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
                     <ol className="space-y-2.5">
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           1
                         </span>
                         <span className="text-zinc-500">
@@ -913,13 +875,13 @@ git push -u origin main`}
                         </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           2
                         </span>
                         <span className="text-zinc-500">Click <strong className="text-zinc-700">Add Webhook</strong></span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           3
                         </span>
                         <div className="flex-1">
@@ -932,13 +894,13 @@ git push -u origin main`}
                         </div>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           4
                         </span>
                         <span className="text-zinc-500">Select the events you want to track (recommended: <strong className="text-zinc-700">all events</strong>)</span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           5
                         </span>
                         <span className="text-zinc-500">Click <strong className="text-zinc-700">Create</strong> to save the webhook</span>
@@ -948,10 +910,10 @@ git push -u origin main`}
 
                   {/* Step 3: Signing Secret */}
                   <div className="flex items-center gap-3">
-                    <div className="flex w-8 h-8 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
+                    <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       3
                     </div>
-                    <h3 className="font-semibold text-zinc-900">Copy the Webhook Signing Secret</h3>
+                    <h3 className="text-base font-semibold text-zinc-900">Copy the Webhook Signing Secret</h3>
                   </div>
 
                   <Alert className="bg-amber-50 border-amber-200">
@@ -966,19 +928,19 @@ git push -u origin main`}
                   <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
                     <ol className="space-y-2.5">
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           1
                         </span>
                         <span className="text-zinc-500">After creating the webhook, click on it to view details</span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           2
                         </span>
                         <span className="text-zinc-500">Copy the <strong className="text-zinc-700">Signing Secret</strong> (starts with <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">whsec_</code>)</span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           3
                         </span>
                         <span className="text-zinc-500">Paste it below</span>
@@ -1009,17 +971,26 @@ git push -u origin main`}
                   </div>
 
                   {/* Footer */}
-                  <div className="mt-8 flex items-center justify-end border-t border-zinc-200 pt-6">
+                  <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
+                    <button
+                      onClick={goToPreviousStep}
+                      className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
+                      style={{ borderRadius: '6px' }}
+                    >
+                      Back
+                    </button>
                     <div className="flex items-center gap-3">
                       <button
                         onClick={goToNextStep}
-                        className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                        className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                        style={{ borderRadius: '6px' }}
                       >
                         Skip this step
                       </button>
                       <button
                         onClick={goToNextStep}
-                        className="inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                        style={{ borderRadius: '6px' }}
                       >
                         I&apos;ve completed this step
                         <ArrowRight className="w-4 h-4" />
@@ -1035,7 +1006,7 @@ git push -u origin main`}
                 <div>
                   {/* Header section with gradient background */}
                   <div className="border-b border-zinc-100 px-6 py-5" style={{ background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <h2 className="text-xl font-semibold text-zinc-900">Vercel Deployment</h2>
+                    <h2 className="text-2xl font-semibold text-zinc-900">Vercel Deployment</h2>
                     <p className="mt-1 text-sm text-zinc-500">
                       Deploy your app to the cloud with Vercel. You can skip this for local development only.
                     </p>
@@ -1055,16 +1026,16 @@ git push -u origin main`}
 
                   {/* Step 1 */}
                   <div className="flex items-center gap-3">
-                    <div className="flex w-8 h-8 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
+                    <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       1
                     </div>
-                    <h3 className="font-semibold text-zinc-900">Create a FREE Vercel Hobby account</h3>
+                    <h3 className="text-base font-semibold text-zinc-900">Create a FREE Vercel Hobby account</h3>
                   </div>
 
                   <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
                     <ol className="space-y-2.5">
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           1
                         </span>
                         <span className="text-zinc-500">
@@ -1075,7 +1046,7 @@ git push -u origin main`}
                         </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           2
                         </span>
                         <span className="text-zinc-500">
@@ -1083,7 +1054,7 @@ git push -u origin main`}
                         </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           3
                         </span>
                         <span className="text-zinc-500">
@@ -1091,7 +1062,7 @@ git push -u origin main`}
                         </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           4
                         </span>
                         <span className="text-zinc-500">
@@ -1099,7 +1070,7 @@ git push -u origin main`}
                         </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-5 h-5 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           5
                         </span>
                         <span className="text-zinc-500">Add environment variables in Vercel dashboard</span>
@@ -1126,316 +1097,29 @@ git push -u origin main`}
                   </Alert>
 
                   {/* Footer */}
-                  <div className="mt-8 flex items-center justify-end border-t border-zinc-200 pt-6">
+                  <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
+                    <button
+                      onClick={goToPreviousStep}
+                      className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
+                      style={{ borderRadius: '6px' }}
+                    >
+                      Back
+                    </button>
                     <div className="flex items-center gap-3">
                       <button
                         onClick={goToNextStep}
-                        className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                        className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                        style={{ borderRadius: '6px' }}
                       >
                         Skip this step
                       </button>
                       <button
                         onClick={goToNextStep}
-                        className="inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                        style={{ borderRadius: '6px' }}
                       >
                         I&apos;ve completed this step
                         <ArrowRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                </div>
-              )}
-
-              {/* Personal Tab */}
-              {currentTab === "personal" && (
-                <div>
-                  {/* Header section with gradient background */}
-                  <div className="border-b border-zinc-100 px-6 py-5" style={{ background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <h2 className="text-xl font-semibold text-zinc-900">Personal Details</h2>
-                    <p className="mt-1 text-sm text-zinc-500">
-                      Tell us about yourself. This information is optional and stored securely in your database.
-                    </p>
-                  </div>
-
-                  {/* Content section */}
-                  <div className="p-6 space-y-6">
-                  <Alert className="bg-gray-50 border-gray-200">
-                    <User className="w-4 h-4 text-gray-600" />
-                    <AlertTitle className="text-gray-800">Optional</AlertTitle>
-                    <AlertDescription className="text-gray-700">
-                      Personal details are optional. Skip this step if you prefer not to share this information.
-                    </AlertDescription>
-                  </Alert>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name" className="text-sm font-medium text-gray-900">Name</Label>
-                      <Input
-                        id="name"
-                        placeholder="Your full name"
-                        value={formData.name}
-                        onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="text-sm font-medium text-gray-900">Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="your@email.com"
-                        value={formData.email}
-                        onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="title" className="text-sm font-medium text-gray-900">Title</Label>
-                    <Input
-                      id="title"
-                      placeholder="Your job title"
-                      value={formData.title}
-                      onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="company" className="text-sm font-medium text-gray-900">Company Name</Label>
-                    <Input
-                      id="company"
-                      placeholder="Your company name"
-                      value={formData.companyName}
-                      onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="country" className="text-sm font-medium text-gray-900">Country</Label>
-                      <Select
-                        value={formData.country}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, country: value, city: "" }))}
-                      >
-                        <SelectTrigger id="country">
-                          <SelectValue placeholder="Select country" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="australia">Australia</SelectItem>
-                          <SelectItem value="canada">Canada</SelectItem>
-                          <SelectItem value="germany">Germany</SelectItem>
-                          <SelectItem value="france">France</SelectItem>
-                          <SelectItem value="india">India</SelectItem>
-                          <SelectItem value="israel">Israel</SelectItem>
-                          <SelectItem value="japan">Japan</SelectItem>
-                          <SelectItem value="netherlands">Netherlands</SelectItem>
-                          <SelectItem value="singapore">Singapore</SelectItem>
-                          <SelectItem value="south-africa">South Africa</SelectItem>
-                          <SelectItem value="spain">Spain</SelectItem>
-                          <SelectItem value="uk">United Kingdom</SelectItem>
-                          <SelectItem value="usa">United States</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="city" className="text-sm font-medium text-gray-900">City</Label>
-                      <Select
-                        value={formData.city}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, city: value }))}
-                        disabled={!formData.country}
-                      >
-                        <SelectTrigger id="city">
-                          <SelectValue placeholder={formData.country ? "Select city" : "Select country first"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {formData.country === "australia" && (
-                            <>
-                              <SelectItem value="sydney">Sydney</SelectItem>
-                              <SelectItem value="melbourne">Melbourne</SelectItem>
-                              <SelectItem value="brisbane">Brisbane</SelectItem>
-                              <SelectItem value="perth">Perth</SelectItem>
-                            </>
-                          )}
-                          {formData.country === "canada" && (
-                            <>
-                              <SelectItem value="toronto">Toronto</SelectItem>
-                              <SelectItem value="vancouver">Vancouver</SelectItem>
-                              <SelectItem value="montreal">Montreal</SelectItem>
-                              <SelectItem value="calgary">Calgary</SelectItem>
-                            </>
-                          )}
-                          {formData.country === "germany" && (
-                            <>
-                              <SelectItem value="berlin">Berlin</SelectItem>
-                              <SelectItem value="munich">Munich</SelectItem>
-                              <SelectItem value="frankfurt">Frankfurt</SelectItem>
-                              <SelectItem value="hamburg">Hamburg</SelectItem>
-                            </>
-                          )}
-                          {formData.country === "france" && (
-                            <>
-                              <SelectItem value="paris">Paris</SelectItem>
-                              <SelectItem value="lyon">Lyon</SelectItem>
-                              <SelectItem value="marseille">Marseille</SelectItem>
-                              <SelectItem value="toulouse">Toulouse</SelectItem>
-                            </>
-                          )}
-                          {formData.country === "india" && (
-                            <>
-                              <SelectItem value="mumbai">Mumbai</SelectItem>
-                              <SelectItem value="delhi">Delhi</SelectItem>
-                              <SelectItem value="bangalore">Bangalore</SelectItem>
-                              <SelectItem value="hyderabad">Hyderabad</SelectItem>
-                            </>
-                          )}
-                          {formData.country === "israel" && (
-                            <>
-                              <SelectItem value="tel-aviv">Tel Aviv</SelectItem>
-                              <SelectItem value="jerusalem">Jerusalem</SelectItem>
-                              <SelectItem value="haifa">Haifa</SelectItem>
-                              <SelectItem value="herzliya">Herzliya</SelectItem>
-                            </>
-                          )}
-                          {formData.country === "japan" && (
-                            <>
-                              <SelectItem value="tokyo">Tokyo</SelectItem>
-                              <SelectItem value="osaka">Osaka</SelectItem>
-                              <SelectItem value="kyoto">Kyoto</SelectItem>
-                              <SelectItem value="yokohama">Yokohama</SelectItem>
-                            </>
-                          )}
-                          {formData.country === "netherlands" && (
-                            <>
-                              <SelectItem value="amsterdam">Amsterdam</SelectItem>
-                              <SelectItem value="rotterdam">Rotterdam</SelectItem>
-                              <SelectItem value="the-hague">The Hague</SelectItem>
-                              <SelectItem value="utrecht">Utrecht</SelectItem>
-                            </>
-                          )}
-                          {formData.country === "singapore" && (
-                            <>
-                              <SelectItem value="singapore-central">Central</SelectItem>
-                              <SelectItem value="singapore-east">East</SelectItem>
-                              <SelectItem value="singapore-west">West</SelectItem>
-                              <SelectItem value="singapore-north">North</SelectItem>
-                            </>
-                          )}
-                          {formData.country === "south-africa" && (
-                            <>
-                              <SelectItem value="johannesburg">Johannesburg</SelectItem>
-                              <SelectItem value="cape-town">Cape Town</SelectItem>
-                              <SelectItem value="durban">Durban</SelectItem>
-                              <SelectItem value="pretoria">Pretoria</SelectItem>
-                            </>
-                          )}
-                          {formData.country === "spain" && (
-                            <>
-                              <SelectItem value="madrid">Madrid</SelectItem>
-                              <SelectItem value="barcelona">Barcelona</SelectItem>
-                              <SelectItem value="valencia">Valencia</SelectItem>
-                              <SelectItem value="seville">Seville</SelectItem>
-                            </>
-                          )}
-                          {formData.country === "uk" && (
-                            <>
-                              <SelectItem value="london">London</SelectItem>
-                              <SelectItem value="manchester">Manchester</SelectItem>
-                              <SelectItem value="birmingham">Birmingham</SelectItem>
-                              <SelectItem value="edinburgh">Edinburgh</SelectItem>
-                            </>
-                          )}
-                          {formData.country === "usa" && (
-                            <>
-                              <SelectItem value="new-york">New York</SelectItem>
-                              <SelectItem value="san-francisco">San Francisco</SelectItem>
-                              <SelectItem value="los-angeles">Los Angeles</SelectItem>
-                              <SelectItem value="chicago">Chicago</SelectItem>
-                              <SelectItem value="austin">Austin</SelectItem>
-                              <SelectItem value="seattle">Seattle</SelectItem>
-                            </>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="linkedin" className="text-sm font-medium text-gray-900">LinkedIn URL</Label>
-                    <Input
-                      id="linkedin"
-                      placeholder="https://linkedin.com/in/yourprofile"
-                      value={formData.linkedinUrl}
-                      onChange={(e) => setFormData(prev => ({ ...prev, linkedinUrl: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="timezone" className="text-sm font-medium text-gray-900">Timezone</Label>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="text-xs max-w-xs">Your timezone is used for scheduling features like automatic backups.</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                    <Select
-                      value={formData.timezone}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, timezone: value }))}
-                    >
-                      <SelectTrigger id="timezone">
-                        <SelectValue placeholder="Select timezone" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {COMMON_TIMEZONES.map((tz) => (
-                          <SelectItem key={tz.value} value={tz.value}>
-                            {tz.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Footer */}
-                  <div className="mt-8 flex items-center justify-end border-t border-zinc-200 pt-6">
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={goToNextStep}
-                        className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
-                      >
-                        Skip this step
-                      </button>
-                      <button
-                        onClick={async () => {
-                          // Save preferences to database
-                          if (formData.name || formData.email || formData.timezone) {
-                            setIsSavingPreferences(true)
-                            try {
-                              await fetch('/api/user-preferences', {
-                                method: 'PUT',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                  name: formData.name || null,
-                                  email: formData.email || null,
-                                  title: formData.title || null,
-                                  company_name: formData.companyName || null,
-                                  country: formData.country || null,
-                                  city: formData.city || null,
-                                  linkedin_url: formData.linkedinUrl || null,
-                                  timezone: formData.timezone,
-                                }),
-                              })
-                            } catch (error) {
-                              console.error('Failed to save preferences:', error)
-                            } finally {
-                              setIsSavingPreferences(false)
-                            }
-                          }
-                          goToNextStep()
-                        }}
-                        className="inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
-                        disabled={isSavingPreferences}
-                      >
-                        {isSavingPreferences ? 'Saving...' : "I've completed this step"}
-                        {!isSavingPreferences && <ArrowRight className="w-4 h-4" />}
                       </button>
                     </div>
                   </div>
@@ -1448,7 +1132,7 @@ git push -u origin main`}
                 <div>
                   {/* Header section with gradient background */}
                   <div className="border-b border-zinc-100 px-6 py-5" style={{ background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <h2 className="text-xl font-semibold text-zinc-900">Download &amp; Finish</h2>
+                    <h2 className="text-2xl font-semibold text-zinc-900">Download &amp; Finish</h2>
                     <p className="mt-1 text-sm text-zinc-500">
                       Your environment configuration is ready. Download the files and place them in your project root directory.
                     </p>
@@ -1567,12 +1251,20 @@ git push -u origin main`}
                   </Alert>
 
                   {/* Footer */}
-                  <div className="mt-8 flex items-center justify-end border-t border-zinc-200 pt-6">
+                  <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
+                    <button
+                      onClick={goToPreviousStep}
+                      className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
+                      style={{ borderRadius: '6px' }}
+                    >
+                      Back
+                    </button>
                     <div className="flex items-center gap-3">
                       <button
                         onClick={handleDownloadEnvFile}
                         disabled={!isSupabaseComplete}
-                        className="inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
+                        style={{ borderRadius: '6px' }}
                       >
                         Finish Setup
                         <ArrowRight className="w-4 h-4" />

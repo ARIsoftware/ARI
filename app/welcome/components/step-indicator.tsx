@@ -13,7 +13,6 @@ const STEPS = [
   { id: "openai", label: "OpenAI" },
   { id: "resend", label: "Resend" },
   { id: "vercel", label: "Vercel" },
-  { id: "personal", label: "Personal" },
   { id: "download", label: "Download" },
 ]
 
@@ -49,13 +48,6 @@ const VercelIcon = ({ className }: { className?: string }) => (
   </svg>
 )
 
-const PersonalIcon = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-)
-
 const DownloadIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -70,7 +62,6 @@ const STEP_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
   openai: OpenAIIcon,
   resend: ResendIcon,
   vercel: VercelIcon,
-  personal: PersonalIcon,
   download: DownloadIcon,
 }
 
@@ -92,15 +83,15 @@ export function StepIndicator({ currentStep, onStepClick }: StepIndicatorProps) 
                 className={cn(
                   "relative flex items-center justify-center rounded-full transition-all",
                   isActive
-                    ? "w-14 h-14 bg-zinc-900 text-white ring-4 ring-zinc-200"
-                    : "w-12 h-12 bg-zinc-200 text-zinc-500"
+                    ? "w-16 h-16 bg-zinc-900 text-white ring-4 ring-zinc-200"
+                    : "w-14 h-14 bg-zinc-200 text-zinc-500"
                 )}
               >
-                <IconComponent className={isActive ? "w-6 h-6" : "w-5 h-5"} />
+                <IconComponent className={isActive ? "w-7 h-7" : "w-6 h-6"} />
               </div>
               <span
                 className={cn(
-                  "text-xs font-medium whitespace-nowrap",
+                  "text-sm font-medium whitespace-nowrap",
                   isActive ? "text-zinc-900" : "text-zinc-500"
                 )}
               >
