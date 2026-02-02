@@ -1,4 +1,7 @@
 import type { Metadata } from "next"
+import { Geist } from 'next/font/google'
+
+const geist = Geist({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: "Welcome",
@@ -34,7 +37,7 @@ export default function WelcomeLayout({
   children: React.ReactNode
 }) {
   return (
-    <div style={lightThemeStyles} className="light">
+    <div style={lightThemeStyles} className={`light ${geist.className}`}>
       {children}
     </div>
   )
