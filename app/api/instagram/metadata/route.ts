@@ -1,6 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-helpers";
 
+// Validate URL is a legitimate Instagram URL to prevent SSRF attacks
+function isValidInstagramUrl(urlString: string): boolean {
+  try {
+    const url = new URL(urlString);
+    // Only allow HTTPS
+    if (url.protocol !== "https:") {
+      return false;
+    }
+    // Only allow instagram.com domain
+    const allowedHosts = ["instagram.com", "www.instagram.com"];
+    if (!allowedHosts.includes(url.hostname)) {
+      return false;
+    }
+    // Must be a post URL pattern
+    if (!url.pathname.match(/^\/p\/[A-Za-z0-9_-]+\/?$/) &&
+        !url.pathname.match(/^\/reel\/[A-Za-z0-9_-]+\/?$/)) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { user } = await getAuthenticatedUser();
@@ -13,6 +37,11 @@ export async function POST(req: NextRequest) {
 
     if (!url) {
       return NextResponse.json({ error: "URL is required" }, { status: 400 });
+    }
+
+    // Validate URL to prevent SSRF attacks
+    if (!isValidInstagramUrl(url)) {
+      return NextResponse.json({ error: "Invalid Instagram URL" }, { status: 400 });
     }
 
     // Try multiple approaches to get Instagram metadata
