@@ -180,10 +180,10 @@ export default function WelcomePage() {
             setCompletedLines((prev) => [...prev, text])
             setCurrentLineText("")
 
-            // Show continue button after a short delay
+            // Show continue button after matching delay
             const continueTimeout = setTimeout(() => {
               setShowContinue(true)
-            }, 500)
+            }, 1300)
             timeouts.push(continueTimeout)
           }, 0)
           timeouts.push(timeout)
@@ -296,7 +296,7 @@ export default function WelcomePage() {
         style={{ fontFamily: 'Geist, sans-serif', padding: '70px 0 0 70px' }}
       >
         {/* Typed lines */}
-        <div className="space-y-6">
+        <div>
           {allLines.map((line, index) => {
             const isFirstLine = index === 0
             const isCurrentLine = index === allLines.length - 1 && isTyping
@@ -304,8 +304,8 @@ export default function WelcomePage() {
             return (
               <p
                 key={index}
-                className={isFirstLine ? "text-6xl font-bold text-black mb-8" : "text-2xl text-black"}
-                style={isFirstLine ? { marginBottom: '32px' } : {}}
+                className={isFirstLine ? "text-6xl font-bold text-black" : "text-2xl text-black"}
+                style={isFirstLine ? { marginBottom: '32px' } : { marginTop: '45px' }}
               >
                 {line}
                 {isCurrentLine && (
