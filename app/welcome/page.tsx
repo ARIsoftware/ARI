@@ -1,18 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Image from "next/image"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { Progress } from "@/components/ui/progress"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Switch } from "@/components/ui/switch"
 import {
   Database,
   Zap,
@@ -22,13 +17,11 @@ import {
   Info,
   ExternalLink,
   CheckCircle,
-  Triangle,
   Shield,
   Check,
   X,
   Github,
-  GitFork,
-  Terminal
+  ArrowRight
 } from "lucide-react"
 import {
   Select,
@@ -37,6 +30,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { StepIndicator } from "./components/step-indicator"
+import { CodeBlock } from "./components/code-block"
 
 interface OnboardingData {
   // GitHub (tracking)
@@ -100,15 +95,14 @@ const COMMON_TIMEZONES = [
   { value: 'Africa/Johannesburg', label: 'Johannesburg' },
 ]
 
+const STEP_ORDER = ["github", "supabase", "openai", "resend", "vercel", "personal", "download"]
+
 export default function WelcomePage() {
   const [completedLines, setCompletedLines] = useState<string[]>([])
   const [currentLineText, setCurrentLineText] = useState("")
   const [currentLineIndex, setCurrentLineIndex] = useState(-1)
   const [isTyping, setIsTyping] = useState(false)
-  const [textOpacity, setTextOpacity] = useState(1)
-  const [showBackground, setShowBackground] = useState(false)
   const [showContinue, setShowContinue] = useState(false)
-  const [showIntro, setShowIntro] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
 
   const [currentTab, setCurrentTab] = useState("github")
@@ -151,13 +145,13 @@ export default function WelcomePage() {
   const [isSavingPreferences, setIsSavingPreferences] = useState(false)
 
   const sequence = [
-    { delay: 300, text: "HELLO." },
-    { delay: 300, text: "I am very happy that we can meet." },
-    { delay: 300, text: "I am ARI. I am software." },
-    { delay: 300, text: "However, I am not like other software." },
-    { delay: 300, text: "I am free. Free to grow. Ever expandable. No limits." },
-    { delay: 300, text: "I am open source." },
-    { delay: 300, text: "I am yours." },
+    { delay: 1300, text: "Hello." },
+    { delay: 1300, text: "I am very happy that we can meet." },
+    { delay: 1300, text: "I am ARI. I am software." },
+    { delay: 1300, text: "However, I am not like other software." },
+    { delay: 1300, text: "I am free. Free to grow. Ever expandable. No limits." },
+    { delay: 1300, text: "I am open source." },
+    { delay: 1300, text: "I am yours." },
   ]
 
   useEffect(() => {
@@ -186,7 +180,7 @@ export default function WelcomePage() {
             setCompletedLines((prev) => [...prev, text])
             setCurrentLineText("")
 
-            // Show continue link after a short delay
+            // Show continue button after a short delay
             const continueTimeout = setTimeout(() => {
               setShowContinue(true)
             }, 500)
@@ -218,18 +212,6 @@ export default function WelcomePage() {
   const allLines = [...completedLines]
   if (currentLineText) {
     allLines.push(currentLineText)
-  }
-
-  // Calculate progress
-  const getProgress = () => {
-    let completed = 0
-    if (formData.githubSetupComplete) completed++
-    if (formData.supabaseUrl && formData.supabaseAnonKey && formData.supabaseSecretKey && formData.databaseUrl && formData.betterAuthSecret) completed++
-    if (formData.openaiApiKey) completed++
-    if (formData.resendApiKey) completed++
-    if (formData.vercelSetupComplete) completed++
-    if (formData.name || formData.email) completed++
-    return Math.round((completed / 6) * 100)
   }
 
   const generateEnvFileContent = () => {
@@ -291,1229 +273,1218 @@ export default function WelcomePage() {
   }
 
   const handleContinue = () => {
-    setShowContinue(false)
-    setTextOpacity(0)
-    setTimeout(() => {
-      setShowBackground(true)
-      setShowIntro(true)
-    }, 2000)
+    setShowOnboarding(true)
+  }
+
+  const goToPreviousStep = () => {
+    const idx = STEP_ORDER.indexOf(currentTab)
+    if (idx > 0) setCurrentTab(STEP_ORDER[idx - 1])
+  }
+
+  const goToNextStep = () => {
+    const idx = STEP_ORDER.indexOf(currentTab)
+    if (idx < STEP_ORDER.length - 1) setCurrentTab(STEP_ORDER[idx + 1])
   }
 
   const isSupabaseComplete = formData.supabaseUrl && formData.supabaseAnonKey && formData.supabaseSecretKey && formData.databaseUrl && formData.betterAuthSecret
 
-  return (
-    <div className="min-h-screen bg-white relative overflow-hidden">
-      {/* Text content */}
+  // Intro/typing animation screen
+  if (!showOnboarding) {
+    return (
       <div
-        className="absolute top-[70px] left-[70px] space-y-8 transition-opacity transition-duration-[2000ms] z-10"
-        style={{ opacity: textOpacity, fontFamily: 'Geist, sans-serif' }}
+        className="min-h-screen bg-[#f9fafe]"
+        style={{ fontFamily: 'Geist, sans-serif', padding: '70px 0 0 70px' }}
       >
-        {allLines.map((line, index) => {
-          const isCurrentLine = index === allLines.length - 1 && isTyping
-          const isComplete = index < completedLines.length
-          const hasPeriod = line.endsWith(".")
-          const textWithoutPeriod = hasPeriod ? line.slice(0, -1) : line
-          const isFirstLine = index === 0
+        {/* Typed lines */}
+        <div className="space-y-6">
+          {allLines.map((line, index) => {
+            const isFirstLine = index === 0
+            const isCurrentLine = index === allLines.length - 1 && isTyping
 
-          return (
-            <div
-              key={index}
-              className="text-black"
-              style={isFirstLine ? { fontSize: '50px', fontWeight: 500 } : { fontSize: '24px', fontWeight: 500 }}
-            >
-              {textWithoutPeriod}
-              {hasPeriod && (
-                <>
-                  {isCurrentLine || !isComplete ? (
-                    <span className="animate-blink">.</span>
-                  ) : (
-                    <span>.</span>
-                  )}
-                </>
-              )}
-              {!hasPeriod && isCurrentLine && (
-                <span className="animate-blink">.</span>
-              )}
-            </div>
-          )
-        })}
+            return (
+              <p
+                key={index}
+                className={isFirstLine ? "text-6xl font-bold text-black mb-8" : "text-2xl text-black"}
+                style={isFirstLine ? { marginBottom: '32px' } : {}}
+              >
+                {line}
+                {isCurrentLine && (
+                  <span className="animate-blink">|</span>
+                )}
+              </p>
+            )
+          })}
+        </div>
 
-        {/* Continue link */}
+        {/* Continue button */}
         {showContinue && (
-          <button
-            onClick={handleContinue}
-            className="mt-8 text-black hover:underline cursor-pointer transition-opacity duration-500"
-            style={{ opacity: showContinue ? 1 : 0, fontSize: '24px', fontWeight: 500 }}
-          >
-            continue
-          </button>
+          <div className="mt-12">
+            <Button
+              onClick={handleContinue}
+              className="bg-gray-900 hover:bg-gray-800 text-white px-6 py-3 rounded-lg text-base"
+            >
+              Let&apos;s get setup
+            </Button>
+          </div>
         )}
       </div>
+    )
+  }
 
-      {/* Background image */}
-      {showBackground && (
-        <div className="absolute inset-0">
-          <Image
-            src="/welcome.png"
-            alt="Welcome background"
-            fill
-            className="object-cover"
-          />
-        </div>
-      )}
-
-      {/* Intro Screen */}
-      {showIntro && !showOnboarding && (
-        <div
-          className="absolute inset-0 flex items-start justify-center z-20 transition-opacity duration-500 p-4 pt-12 overflow-y-auto"
-          style={{ opacity: showIntro ? 1 : 0 }}
-        >
-          <Card className="w-full max-w-2xl border border-gray-200" style={{ fontFamily: 'Geist, sans-serif' }}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-2xl font-medium text-black">Welcome! Let&apos;s get you set up</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-5 text-sm">
-              <p className="text-gray-500 leading-relaxed">
-                Step into a productivity workspace that adjusts to your style, not the other way around. ARI gives you premier personal productivity with full data control and extendability, all in a self-hosted environment built for mastery and modular growth. This is your software, fully programmable and AI native, designed to grow with you as your needs evolve.
-              </p>
-
-              <div>
-                <h3 className="font-medium text-black mb-1">Build and automate with ease, No coding required</h3>
-                <p className="text-gray-500 leading-relaxed">
-                  Whether you are crafting custom workflows or integrating multiple AI agents to tackle complex tasks, ARI&apos;s modular design and powerful API gateway make it easy to design exactly what you want. You get robust tools to create your own modules with ease, connect external services, and automate processes without friction, so your projects move faster and smarter.
-                </p>
-              </div>
-
-              <div>
-                <h3 className="font-medium text-black mb-1">Your Productivity Unlocked</h3>
-                <p className="text-gray-500 leading-relaxed">
-                  With ARI you take command of the software that runs your life. Set up collaborative multi-agent systems, harness AI models through a single endpoint, and compose extensible workspaces that reflect how you think and work. ARI is your productivity and life superpower. ARI helps you do your best work and live your best life.
-                </p>
-              </div>
-
-              <div className="pt-2 flex justify-center">
-                <Button
-                  onClick={() => setShowOnboarding(true)}
-                  className="px-8"
-                >
-                  Let&apos;s Go!
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Onboarding Wizard */}
-      {showOnboarding && (
-        <TooltipProvider>
-          {/* Background image for onboarding */}
-          <div className="absolute inset-0">
-            <Image
-              src="/welcome.png"
-              alt="Welcome background"
-              fill
-              className="object-cover"
-            />
+  // Setup wizard screen
+  return (
+    <TooltipProvider>
+      <div
+        className="min-h-screen bg-[#f9fafe] overflow-y-auto flex items-start justify-center p-8 pt-12"
+        style={{ fontFamily: 'Geist, sans-serif' }}
+      >
+        <div className="w-full max-w-4xl">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-4xl font-normal tracking-tight text-gray-900 mb-4">
+              Configure ARI
+            </h1>
+            <p className="text-base leading-relaxed text-gray-600">
+              Configure your environment to get ARI running. This step is about preparing your local setup so the application can run smoothly. Nothing here is difficult, but it does require a bit of care and attention to detail. This entire setup process should take around 10 to 20 minutes, depending on your system and familiarity with the tools involved.
+            </p>
           </div>
-          <div className="absolute inset-0 z-20 overflow-y-auto flex items-start justify-center p-8 pt-12" style={{ fontFamily: 'Geist, sans-serif' }}>
-            <Card className="w-full max-w-4xl shadow-lg border border-border/50">
-              <CardContent className="p-8 space-y-6">
-                {/* Header */}
-                <div>
-                  <h1 className="text-3xl font-semibold tracking-tight text-foreground mb-3">Welcome! Let&apos;s get you set up</h1>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    Configure your environment to get ARI running. This step is about preparing your local setup so the application can run smoothly. Nothing here is difficult, but it does require a bit of care and attention to detail. This entire setup process should take around 10 to 20 minutes, depending on your system and familiarity with the tools involved.
-                  </p>
-                </div>
 
-                {/* Progress bar */}
-                <div>
-                  <div className="flex justify-between items-center mb-2 text-sm">
-                    <span className="font-medium text-foreground">Setup progress</span>
-                    <span className="tabular-nums text-muted-foreground">{getProgress()}%</span>
+          {/* Step Indicator */}
+          <StepIndicator currentStep={currentTab} onStepClick={setCurrentTab} />
+
+          {/* Content Card */}
+          <Card className="w-full bg-white border border-gray-200 rounded-2xl shadow-sm">
+            <CardContent className="p-8">
+              {/* GitHub Tab */}
+              {currentTab === "github" && (
+                <div className="space-y-6">
+                  {/* Header section */}
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0">
+                      <Github className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900">GitHub Setup</h2>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Create a GitHub repository for your ARI instance. This enables version control, easy deployment to Vercel, and the ability to receive updates.
+                      </p>
+                    </div>
                   </div>
-                  <Progress value={getProgress()} className="h-2" />
-                </div>
 
-                {/* Tabs */}
-                <Tabs value={currentTab} onValueChange={setCurrentTab} className="w-full">
-                  <TabsList className="mb-6 grid w-full grid-cols-7 bg-muted/50 rounded-lg p-1">
-                    <TabsTrigger
-                      value="github"
-                      className="text-sm rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                    >
-                      GitHub
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="supabase"
-                      className="text-sm rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                    >
-                      Supabase
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="openai"
-                      className="text-sm rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                    >
-                      OpenAI
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="resend"
-                      className="text-sm rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                    >
-                      Resend
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="vercel"
-                      className="text-sm rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                    >
-                      Vercel
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="personal"
-                      className="text-sm rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                    >
-                      Personal
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="download"
-                      className="text-sm rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm"
-                    >
-                      Download
-                    </TabsTrigger>
-                  </TabsList>
-
-                  {/* Tab 1: GitHub */}
-                  <TabsContent value="github" className="space-y-6 mt-0">
-                    {/* Header section */}
-                    <div className="flex items-start gap-4 p-4 bg-muted/30 rounded-lg">
-                      <div className="rounded-lg bg-gray-900 p-3">
-                        <Github className="h-6 w-6 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <h2 className="mb-1 text-lg font-semibold text-foreground">GitHub Setup</h2>
-                        <p className="text-sm text-muted-foreground">
-                          Create a GitHub repository for your ARI instance. This enables version control, easy deployment to Vercel, and the ability to receive updates.
-                        </p>
-                      </div>
+                  {/* Step 1: Create repo */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
+                      1
                     </div>
+                    <h3 className="text-base font-semibold text-gray-900">Create a new repository</h3>
+                  </div>
 
-                    {/* Step 1: Create repo */}
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
-                        1
-                      </div>
-                      <h3 className="text-base font-semibold text-foreground">Create a new repository</h3>
-                    </div>
-
-                    <div className="p-4 bg-muted/30 rounded-lg">
-                      <ol className="space-y-3">
-                        <li className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                            1
-                          </span>
-                          <div className="flex-1 pt-0.5 text-sm">
-                            <span className="text-foreground">Go to </span>
-                            <a href="https://github.com/new" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-accent hover:underline">
-                              github.com/new
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          </div>
-                        </li>
-                        <li className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                            2
-                          </span>
-                          <div className="flex-1 pt-0.5 text-sm text-foreground">
-                            Name your repository (e.g., <code className="bg-muted px-1 rounded text-xs">ari</code> or <code className="bg-muted px-1 rounded text-xs">my-ari</code>)
-                          </div>
-                        </li>
-                        <li className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                            3
-                          </span>
-                          <p className="flex-1 pt-0.5 text-sm text-foreground">Set it to <strong>Private</strong> (recommended) and click <strong>Create repository</strong></p>
-                        </li>
-                      </ol>
-                    </div>
-
-                    {/* Step 2: Push code */}
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
-                        2
-                      </div>
-                      <h3 className="text-base font-semibold text-foreground">Push your code</h3>
-                    </div>
-
-                    <div className="p-4 bg-muted/30 rounded-lg space-y-3">
-                      <p className="text-sm text-foreground">In your project folder, run these commands:</p>
-                      <div className="bg-gray-900 text-gray-100 p-3 rounded-md space-y-1">
-                        <code className="text-xs block" style={{ fontFamily: 'Geist Mono, monospace' }}>
-                          git init
-                        </code>
-                        <code className="text-xs block" style={{ fontFamily: 'Geist Mono, monospace' }}>
-                          git add .
-                        </code>
-                        <code className="text-xs block" style={{ fontFamily: 'Geist Mono, monospace' }}>
-                          git commit -m &quot;Initial commit&quot;
-                        </code>
-                        <code className="text-xs block" style={{ fontFamily: 'Geist Mono, monospace' }}>
-                          git branch -M main
-                        </code>
-                        <code className="text-xs block" style={{ fontFamily: 'Geist Mono, monospace' }}>
-                          git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
-                        </code>
-                        <code className="text-xs block" style={{ fontFamily: 'Geist Mono, monospace' }}>
-                          git push -u origin main
-                        </code>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Replace YOUR_USERNAME and YOUR_REPO with your GitHub username and repository name
-                      </p>
-                    </div>
-
-                    {/* Confirmation */}
-                    <div className="flex items-center space-x-2 pt-2">
-                      <Switch
-                        id="github-setup"
-                        checked={formData.githubSetupComplete}
-                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, githubSetupComplete: checked }))}
-                      />
-                      <Label htmlFor="github-setup">I&apos;ve pushed my code to GitHub</Label>
-                    </div>
-
-                    {/* Footer */}
-                    <div className="flex items-center justify-between pt-4">
-                      <Button variant="outline" size="sm" className="gap-2 text-xs" asChild>
-                        <a href="https://github.com/new" target="_blank" rel="noopener noreferrer">
-                          <Github className="h-3.5 w-3.5" />
-                          Create Repository
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      </Button>
-                      <Button onClick={() => setCurrentTab("supabase")} className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90">
-                        Continue to Supabase
-                        <CheckCircle className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TabsContent>
-
-                  {/* Tab 2: Supabase */}
-                  <TabsContent value="supabase" className="space-y-6 mt-0">
-                    {/* Header section */}
-                    <div className="flex items-start gap-4 p-4 bg-muted/30 rounded-lg">
-                      <div className="rounded-lg bg-accent/10 p-3">
-                        <Database className="h-6 w-6 text-accent" />
-                      </div>
-                      <div className="flex-1">
-                        <h2 className="mb-1 text-lg font-semibold text-foreground">Database &amp; Authentication</h2>
-                        <p className="text-sm text-muted-foreground">
-                          Configure your PostgreSQL database connection and authentication. You&apos;ll need API keys, the database connection string, and we&apos;ll generate a secure auth secret for you.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Step header */}
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
-                        1
-                      </div>
-                      <h3 className="text-base font-semibold text-foreground">Create a FREE Supabase account</h3>
-                    </div>
-
-                    {/* Instructions */}
-                    <div className="p-4 bg-muted/30 rounded-lg">
-                      <ol className="space-y-3">
-                        <li className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                            1
-                          </span>
-                          <div className="flex-1 pt-0.5 text-sm">
-                            <span className="text-foreground">Go to </span>
-                            <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-accent hover:underline">
-                              supabase.com
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                            <span className="text-foreground"> and create a free account</span>
-                          </div>
-                        </li>
-                        <li className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                            2
-                          </span>
-                          <p className="flex-1 pt-0.5 text-sm text-foreground">Create a new project (free tier)</p>
-                        </li>
-                        <li className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                            3
-                          </span>
-                          <div className="flex-1 pt-0.5 text-sm">
-                            <span className="text-foreground">Go to </span>
-                            <a href="https://supabase.com/dashboard/project/_/settings/api" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-accent hover:underline">
-                              Project Settings → API
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          </div>
-                        </li>
-                        <li className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                            4
-                          </span>
-                          <p className="flex-1 pt-0.5 text-sm text-foreground">Copy each key below</p>
-                        </li>
-                      </ol>
-                    </div>
-
-                    {/* Form fields */}
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Label htmlFor="supabaseUrl" className="text-sm font-medium text-foreground">Project URL</Label>
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <Info className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="text-xs max-w-xs">Your Supabase project URL (e.g., https://xxxxx.supabase.co)</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                        <Input
-                          id="supabaseUrl"
-                          value={formData.supabaseUrl}
-                          onChange={(e) => setFormData(prev => ({ ...prev, supabaseUrl: e.target.value }))}
-                          placeholder="https://xxxxx.supabase.co"
-                          className="text-sm"
-                          style={{ fontFamily: 'Geist Mono, monospace' }}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Label htmlFor="supabaseAnonKey" className="text-sm font-medium text-foreground">Anon/Public Key</Label>
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <Info className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="text-xs max-w-xs">Also called &quot;anon&quot; or &quot;publishable&quot; key. Safe to use in browser.</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                        <Input
-                          id="supabaseAnonKey"
-                          value={formData.supabaseAnonKey}
-                          onChange={(e) => setFormData(prev => ({ ...prev, supabaseAnonKey: e.target.value }))}
-                          placeholder="eyJhbGci ..."
-                          className="text-sm"
-                          style={{ fontFamily: 'Geist Mono, monospace' }}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Label htmlFor="supabaseSecretKey" className="text-sm font-medium text-foreground">Service Role Secret</Label>
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <Info className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="text-xs max-w-xs">Server-side only key that bypasses Row Level Security. Keep this secret!</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                        <Input
-                          id="supabaseSecretKey"
-                          value={formData.supabaseSecretKey}
-                          onChange={(e) => setFormData(prev => ({ ...prev, supabaseSecretKey: e.target.value }))}
-                          placeholder="eyJhbGci ..."
-                          className="text-sm"
-                          style={{ fontFamily: 'Geist Mono, monospace' }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Step 2: Database Connection */}
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
-                        2
-                      </div>
-                      <h3 className="text-base font-semibold text-foreground">Get your Database Connection String</h3>
-                    </div>
-
-                    <div className="p-4 bg-muted/30 rounded-lg">
-                      <ol className="space-y-3">
-                        <li className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                            1
-                          </span>
-                          <div className="flex-1 pt-0.5 text-sm">
-                            <span className="text-foreground">Go to </span>
-                            <a href="https://supabase.com/dashboard/project/_/settings/database" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-accent hover:underline">
-                              Project Settings → Database
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          </div>
-                        </li>
-                        <li className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                            2
-                          </span>
-                          <p className="flex-1 pt-0.5 text-sm text-foreground">Scroll to <strong>Connection string</strong> section</p>
-                        </li>
-                        <li className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                            3
-                          </span>
-                          <p className="flex-1 pt-0.5 text-sm text-foreground">Select <strong>URI</strong> tab and copy the connection string</p>
-                        </li>
-                        <li className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                            4
-                          </span>
-                          <p className="flex-1 pt-0.5 text-sm text-foreground">Replace <code className="bg-muted px-1 rounded text-xs">[YOUR-PASSWORD]</code> with your database password</p>
-                        </li>
-                      </ol>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Label htmlFor="databaseUrl" className="text-sm font-medium text-foreground">Database Connection String</Label>
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <Info className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="text-xs max-w-xs">PostgreSQL connection string used by the authentication system. Make sure to include your password!</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                        <Input
-                          id="databaseUrl"
-                          value={formData.databaseUrl}
-                          onChange={(e) => setFormData(prev => ({ ...prev, databaseUrl: e.target.value }))}
-                          placeholder="postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres"
-                          className="text-sm"
-                          style={{ fontFamily: 'Geist Mono, monospace' }}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          This is different from the API keys above. It&apos;s used for direct database access.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Step 3: Auth Secret */}
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
-                        3
-                      </div>
-                      <h3 className="text-base font-semibold text-foreground">Authentication Secret</h3>
-                    </div>
-
-                    <Alert className="bg-blue-50 border-blue-200">
-                      <Shield className="w-4 h-4 text-blue-600" />
-                      <AlertTitle className="text-blue-800">Auto-generated for you</AlertTitle>
-                      <AlertDescription className="text-blue-700">
-                        This secret is used to sign authentication sessions. We&apos;ve generated a secure random value for you.
-                        You can regenerate it if needed, but make sure to use the same value across all environments.
-                      </AlertDescription>
-                    </Alert>
-
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Label htmlFor="betterAuthSecret" className="text-sm font-medium text-foreground">Auth Secret</Label>
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <Info className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="text-xs max-w-xs">Used to sign and verify authentication sessions. Keep this secret and consistent across deployments!</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                        <div className="flex gap-2">
-                          <Input
-                            id="betterAuthSecret"
-                            value={formData.betterAuthSecret}
-                            onChange={(e) => setFormData(prev => ({ ...prev, betterAuthSecret: e.target.value }))}
-                            placeholder="Generating..."
-                            className="text-sm flex-1"
-                            style={{ fontFamily: 'Geist Mono, monospace' }}
-                            readOnly
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setFormData(prev => ({ ...prev, betterAuthSecret: generateAuthSecret() }))}
-                          >
-                            Regenerate
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Footer */}
-                      <div className="flex items-center justify-between pt-4">
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" onClick={() => setCurrentTab("github")}>
-                            Back
-                          </Button>
-                          <Button variant="outline" size="sm" className="gap-2 text-xs" asChild>
-                            <a href="https://supabase.com/docs/guides/database/connecting-to-postgres" target="_blank" rel="noopener noreferrer">
-                              <Info className="h-3.5 w-3.5" />
-                              Database Docs
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          </Button>
-                        </div>
-                        <Button onClick={() => setCurrentTab("openai")} className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90">
-                          Continue
-                          <CheckCircle className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  {/* Tab 2: OpenAI */}
-                  <TabsContent value="openai" className="space-y-4 mt-4">
-                    <Alert className="bg-purple-50 border-purple-200">
-                      <Zap className="w-4 h-4" />
-                      <AlertTitle>OpenAI Configuration (Optional)</AlertTitle>
-                      <AlertDescription>
-                        Enable AI-powered features like the /assist chat interface.
-                        You can skip this step if you don&apos;t need AI features.
-                      </AlertDescription>
-                    </Alert>
-
-                    <div className="space-y-3">
-                      <h3 className="font-semibold text-sm flex items-center gap-2">
-                        <Badge variant="outline">Step 1</Badge>
-                        Create a FREE OpenAI account
-                      </h3>
-
-                      <ol className="text-sm space-y-2 ml-4 list-decimal list-inside text-muted-foreground">
-                        <li>
-                          Visit{" "}
-                          <a
-                            href="https://platform.openai.com/api-keys"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline inline-flex items-center gap-1"
-                          >
-                            OpenAI Platform
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                          {" "}(includes free credits)
-                        </li>
-                        <li>Click &quot;Create new secret key&quot;</li>
-                        <li>Copy the key immediately (it won&apos;t be shown again)</li>
-                        <li>Paste it below</li>
-                      </ol>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="openaiApiKey">OpenAI API Key</Label>
-                      <Textarea
-                        id="openaiApiKey"
-                        value={formData.openaiApiKey}
-                        onChange={(e) => setFormData(prev => ({ ...prev, openaiApiKey: e.target.value }))}
-                        placeholder="sk-proj-..."
-                        className="text-xs min-h-[80px]"
-                        style={{ fontFamily: 'Geist Mono, monospace' }}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Your key should start with &quot;sk-proj-&quot; or &quot;sk-&quot;
-                      </p>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={() => setCurrentTab("supabase")}
-                        className="flex-1"
-                      >
-                        Back
-                      </Button>
-                      <Button
-                        onClick={() => setCurrentTab("resend")}
-                        className="flex-1"
-                      >
-                        {formData.openaiApiKey.trim() ? "Continue" : "Skip"} to Resend
-                      </Button>
-                    </div>
-                  </TabsContent>
-
-                  {/* Tab 3: Resend */}
-                  <TabsContent value="resend" className="space-y-6 mt-0">
-                    {/* Header section */}
-                    <div className="flex items-start gap-4 p-4 bg-muted/30 rounded-lg">
-                      <div className="rounded-lg bg-green-100 p-3">
-                        <Mail className="h-6 w-6 text-green-700" />
-                      </div>
-                      <div className="flex-1">
-                        <h2 className="mb-1 text-lg font-semibold text-foreground">Resend Configuration (Optional)</h2>
-                        <p className="text-sm text-muted-foreground">
-                          Enable email sending and the <strong>Mail Stream</strong> module. Resend lets you send transactional emails and track their delivery status in real-time.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Step 1: API Key */}
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
-                        1
-                      </div>
-                      <h3 className="text-base font-semibold text-foreground">Get your Resend API Key</h3>
-                    </div>
-
-                    <div className="p-4 bg-muted/30 rounded-lg">
-                      <ol className="space-y-3">
-                        <li className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                            1
-                          </span>
-                          <div className="flex-1 pt-0.5 text-sm">
-                            <span className="text-foreground">Go to </span>
-                            <a href="https://resend.com/api-keys" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-accent hover:underline">
-                              Resend Dashboard → API Keys
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                            <span className="text-muted-foreground"> (3,000 emails/month free)</span>
-                          </div>
-                        </li>
-                        <li className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                            2
-                          </span>
-                          <p className="flex-1 pt-0.5 text-sm text-foreground">Click <strong>Create API Key</strong> and copy the key</p>
-                        </li>
-                      </ol>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="resendApiKey" className="text-sm font-medium text-foreground">Resend API Key</Label>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Info className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs max-w-xs">Your Resend API key for sending emails (starts with re_)</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <Input
-                        id="resendApiKey"
-                        value={formData.resendApiKey}
-                        onChange={(e) => setFormData(prev => ({ ...prev, resendApiKey: e.target.value }))}
-                        placeholder="re_..."
-                        className="text-sm"
-                        style={{ fontFamily: 'Geist Mono, monospace' }}
-                      />
-                    </div>
-
-                    {/* Step 2: Webhook Setup */}
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
-                        2
-                      </div>
-                      <h3 className="text-base font-semibold text-foreground">Set up Webhook for Mail Stream Module</h3>
-                    </div>
-
-                    <Alert className="bg-blue-50 border-blue-200">
-                      <Info className="w-4 h-4 text-blue-600" />
-                      <AlertTitle className="text-blue-800">Why set up a webhook?</AlertTitle>
-                      <AlertDescription className="text-blue-700">
-                        The <strong>Mail Stream</strong> module shows you a real-time log of all emails sent from ARI, including their delivery status (sent, delivered, bounced, etc.).
-                        Resend sends this status information to your app via webhooks. Without a webhook, Mail Stream won&apos;t receive email events.
-                      </AlertDescription>
-                    </Alert>
-
-                    <div className="p-4 bg-muted/30 rounded-lg">
-                      <ol className="space-y-3">
-                        <li className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                            1
-                          </span>
-                          <div className="flex-1 pt-0.5 text-sm">
-                            <span className="text-foreground">Go to </span>
-                            <a href="https://resend.com/webhooks" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-accent hover:underline">
-                              Resend Dashboard → Webhooks
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          </div>
-                        </li>
-                        <li className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                            2
-                          </span>
-                          <p className="flex-1 pt-0.5 text-sm text-foreground">Click <strong>Add Webhook</strong></p>
-                        </li>
-                        <li className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                            3
-                          </span>
-                          <div className="flex-1 pt-0.5 text-sm">
-                            <p className="text-foreground mb-2">Enter your webhook endpoint URL:</p>
-                            <code className="block bg-gray-900 text-gray-100 px-3 py-2 rounded text-xs" style={{ fontFamily: 'Geist Mono, monospace' }}>
-                              https://YOUR-DOMAIN/api/modules/mail-stream/webhook
-                            </code>
-                            <p className="text-xs text-muted-foreground mt-1">Replace YOUR-DOMAIN with your actual domain</p>
-                          </div>
-                        </li>
-                        <li className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                            4
-                          </span>
-                          <p className="flex-1 pt-0.5 text-sm text-foreground">Select the events you want to track (recommended: <strong>all events</strong>)</p>
-                        </li>
-                        <li className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                            5
-                          </span>
-                          <p className="flex-1 pt-0.5 text-sm text-foreground">Click <strong>Create</strong> to save the webhook</p>
-                        </li>
-                      </ol>
-                    </div>
-
-                    {/* Step 3: Signing Secret */}
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
-                        3
-                      </div>
-                      <h3 className="text-base font-semibold text-foreground">Copy the Webhook Signing Secret</h3>
-                    </div>
-
-                    <Alert className="bg-amber-50 border-amber-200">
-                      <Shield className="w-4 h-4 text-amber-600" />
-                      <AlertTitle className="text-amber-800">Security: Signing Secret</AlertTitle>
-                      <AlertDescription className="text-amber-700">
-                        The signing secret verifies that webhook requests genuinely come from Resend, not from malicious actors.
-                        ARI uses this secret to validate each incoming webhook before processing it.
-                      </AlertDescription>
-                    </Alert>
-
-                    <div className="p-4 bg-muted/30 rounded-lg">
-                      <ol className="space-y-3">
-                        <li className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                            1
-                          </span>
-                          <p className="flex-1 pt-0.5 text-sm text-foreground">After creating the webhook, click on it to view details</p>
-                        </li>
-                        <li className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                            2
-                          </span>
-                          <p className="flex-1 pt-0.5 text-sm text-foreground">Copy the <strong>Signing Secret</strong> (starts with <code className="bg-muted px-1 rounded text-xs">whsec_</code>)</p>
-                        </li>
-                        <li className="flex items-start gap-3">
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground">
-                            3
-                          </span>
-                          <p className="flex-1 pt-0.5 text-sm text-foreground">Paste it below</p>
-                        </li>
-                      </ol>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="resendWebhookSecret" className="text-sm font-medium text-foreground">Webhook Signing Secret</Label>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Info className="h-4 w-4 text-muted-foreground hover:text-foreground" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p className="text-xs max-w-xs">Used to verify webhook signatures (starts with whsec_)</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <Input
-                        id="resendWebhookSecret"
-                        value={formData.resendWebhookSecret}
-                        onChange={(e) => setFormData(prev => ({ ...prev, resendWebhookSecret: e.target.value }))}
-                        placeholder="whsec_..."
-                        className="text-sm"
-                        style={{ fontFamily: 'Geist Mono, monospace' }}
-                      />
-                    </div>
-
-                    {/* Vercel Env Vars Reminder */}
-                    <Alert>
-                      <Info className="w-4 h-4" />
-                      <AlertTitle>Don&apos;t forget Vercel!</AlertTitle>
-                      <AlertDescription>
-                        After downloading your <code className="bg-muted px-1 rounded text-xs">.env.local</code> file, you&apos;ll also need to add <code className="bg-muted px-1 rounded text-xs">RESEND_API_KEY</code> and <code className="bg-muted px-1 rounded text-xs">RESEND_WEBHOOK_SECRET</code> to your{" "}
-                        <a
-                          href="https://vercel.com/docs/environment-variables"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-accent hover:underline inline-flex items-center gap-1"
-                        >
-                          Vercel Environment Variables
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                        {" "}for production.
-                      </AlertDescription>
-                    </Alert>
-
-                    {/* Footer */}
-                    <div className="flex items-center justify-between pt-4">
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={() => setCurrentTab("openai")}>
-                          Back
-                        </Button>
-                        <Button variant="outline" size="sm" className="gap-2 text-xs" asChild>
-                          <a href="https://resend.com/docs/dashboard/webhooks/introduction" target="_blank" rel="noopener noreferrer">
-                            <Info className="h-3.5 w-3.5" />
-                            Webhook Docs
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <ol className="space-y-3">
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          1
+                        </span>
+                        <div className="flex-1 pt-0.5 text-sm">
+                          <span className="text-gray-900">Go to </span>
+                          <a href="https://github.com/new" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-gray-900 hover:underline">
+                            github.com/new
                             <ExternalLink className="h-3 w-3" />
                           </a>
-                        </Button>
-                      </div>
-                      <Button onClick={() => setCurrentTab("vercel")} className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90">
-                        {formData.resendApiKey.trim() ? "Continue" : "Skip"} to Vercel
-                        <CheckCircle className="h-4 w-4" />
-                      </Button>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          2
+                        </span>
+                        <div className="flex-1 pt-0.5 text-sm text-gray-900">
+                          Name your repository (e.g., <code className="bg-gray-200 px-1 rounded text-xs">ari</code> or <code className="bg-gray-200 px-1 rounded text-xs">my-ari</code>)
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          3
+                        </span>
+                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Set it to <strong>Private</strong> (recommended) and click <strong>Create repository</strong></p>
+                      </li>
+                    </ol>
+                  </div>
+
+                  {/* Step 2: Push code */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
+                      2
                     </div>
-                  </TabsContent>
+                    <h3 className="text-base font-semibold text-gray-900">Push your code</h3>
+                  </div>
 
-                  {/* Tab 4: Vercel */}
-                  <TabsContent value="vercel" className="space-y-4 mt-4">
-                    <Alert className="bg-gray-50 border-gray-200">
-                      <Triangle className="w-4 h-4" />
-                      <AlertTitle>Vercel Deployment (Optional)</AlertTitle>
-                      <AlertDescription>
-                        Deploy your app to the cloud with Vercel. You can skip this for local development only.
-                      </AlertDescription>
-                    </Alert>
+                  <div className="space-y-3">
+                    <p className="text-sm text-gray-900">In your project folder, run these commands:</p>
+                    <CodeBlock
+                      language="bash"
+                      code={`git init
+git add .
+git commit -m "Initial commit"
+git branch -M main
+git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
+git push -u origin main`}
+                    />
+                    <p className="text-xs text-gray-500">
+                      Replace <code className="bg-gray-200 px-1 rounded text-xs">YOUR_USERNAME</code> and <code className="bg-gray-200 px-1 rounded text-xs">YOUR_REPO</code> with your GitHub username and repository name
+                    </p>
+                  </div>
 
-                    <div className="space-y-3">
-                      <h3 className="font-semibold text-sm flex items-center gap-2">
-                        <Badge variant="outline">Step 1</Badge>
-                        Create a FREE Vercel Hobby account
-                      </h3>
-
-                      <ol className="text-sm space-y-2 ml-4 list-decimal list-inside text-muted-foreground">
-                        <li>
-                          Go to{" "}
-                          <a
-                            href="https://vercel.com/signup"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline inline-flex items-center gap-1"
-                          >
-                            vercel.com/signup
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                          {" "}and create a free account
-                        </li>
-                        <li>
-                          Install Vercel CLI:{" "}
-                          <code className="bg-gray-100 px-1 rounded text-xs" style={{ fontFamily: 'Geist Mono, monospace' }}>npm install -g vercel</code>
-                        </li>
-                        <li>
-                          Run{" "}
-                          <code className="bg-gray-100 px-1 rounded text-xs" style={{ fontFamily: 'Geist Mono, monospace' }}>vercel login</code>
-                          {" "}in your terminal
-                        </li>
-                        <li>
-                          Run{" "}
-                          <code className="bg-gray-100 px-1 rounded text-xs" style={{ fontFamily: 'Geist Mono, monospace' }}>vercel link</code>
-                          {" "}to connect your project
-                        </li>
-                        <li>Add environment variables in Vercel dashboard</li>
-                      </ol>
-                    </div>
-
-                    <Alert>
-                      <Info className="w-4 h-4" />
-                      <AlertDescription>
-                        After downloading your .env.local file, you can run{" "}
-                        <code className="bg-gray-100 px-1 rounded text-xs" style={{ fontFamily: 'Geist Mono, monospace' }}>vercel env pull</code>
-                        {" "}to sync your environment variables.{" "}
-                        <a
-                          href="https://vercel.com/docs/cli"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline inline-flex items-center gap-1"
-                        >
-                          Learn more
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      </AlertDescription>
-                    </Alert>
-
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        id="vercel-setup"
-                        checked={formData.vercelSetupComplete}
-                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, vercelSetupComplete: checked }))}
-                      />
-                      <Label htmlFor="vercel-setup">I&apos;ve set up Vercel</Label>
-                    </div>
-
-                    <div className="flex gap-2">
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
+                    <Button
+                      variant="outline"
+                      onClick={goToPreviousStep}
+                      className="border-gray-300"
+                      disabled
+                    >
+                      Back
+                    </Button>
+                    <div className="flex items-center gap-3">
                       <Button
                         variant="outline"
-                        onClick={() => setCurrentTab("resend")}
-                        className="flex-1"
+                        onClick={goToNextStep}
+                        className="border-gray-300"
                       >
-                        Back
+                        Skip this step
                       </Button>
                       <Button
-                        onClick={() => setCurrentTab("personal")}
-                        className="flex-1"
+                        onClick={goToNextStep}
+                        className="bg-gray-900 hover:bg-gray-800 text-white gap-2"
                       >
-                        Continue to Personal Details
+                        I&apos;ve completed this step
+                        <ArrowRight className="h-4 w-4" />
                       </Button>
                     </div>
-                  </TabsContent>
+                  </div>
+                </div>
+              )}
 
-                  {/* Tab 5: Personal Details */}
-                  <TabsContent value="personal" className="space-y-4 mt-4">
-                    <Alert>
-                      <User className="w-4 h-4" />
-                      <AlertTitle>Personal Details (Optional)</AlertTitle>
-                      <AlertDescription>
-                        Tell us about yourself. This information is optional and stored securely in your database.
-                      </AlertDescription>
-                    </Alert>
+              {/* Supabase Tab */}
+              {currentTab === "supabase" && (
+                <div className="space-y-6">
+                  {/* Header section */}
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0">
+                      <Database className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900">Database &amp; Authentication</h2>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Configure your PostgreSQL database connection and authentication. You&apos;ll need API keys, the database connection string, and we&apos;ll generate a secure auth secret for you.
+                      </p>
+                    </div>
+                  </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="name">Name</Label>
-                        <Input
-                          id="name"
-                          placeholder="Your full name"
-                          value={formData.name}
-                          onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          placeholder="your@email.com"
-                          value={formData.email}
-                          onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                        />
-                      </div>
+                  {/* Step 1 */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
+                      1
                     </div>
+                    <h3 className="text-base font-semibold text-gray-900">Create a FREE Supabase account</h3>
+                  </div>
+
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <ol className="space-y-3">
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          1
+                        </span>
+                        <div className="flex-1 pt-0.5 text-sm">
+                          <span className="text-gray-900">Go to </span>
+                          <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-gray-900 hover:underline">
+                            supabase.com
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                          <span className="text-gray-900"> and create a free account</span>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          2
+                        </span>
+                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Create a new project (free tier)</p>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          3
+                        </span>
+                        <div className="flex-1 pt-0.5 text-sm">
+                          <span className="text-gray-900">Go to </span>
+                          <a href="https://supabase.com/dashboard/project/_/settings/api" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-gray-900 hover:underline">
+                            Project Settings &rarr; API
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          4
+                        </span>
+                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Copy each key below</p>
+                      </li>
+                    </ol>
+                  </div>
+
+                  {/* Form fields */}
+                  <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="title">Title</Label>
-                      <Input
-                        id="title"
-                        placeholder="Your job title"
-                        value={formData.title}
-                        onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="company">Company Name</Label>
-                      <Input
-                        id="company"
-                        placeholder="Your company name"
-                        value={formData.companyName}
-                        onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="country">Country</Label>
-                        <Select
-                          value={formData.country}
-                          onValueChange={(value) => setFormData(prev => ({ ...prev, country: value, city: "" }))}
-                        >
-                          <SelectTrigger id="country">
-                            <SelectValue placeholder="Select country" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="australia">Australia</SelectItem>
-                            <SelectItem value="canada">Canada</SelectItem>
-                            <SelectItem value="germany">Germany</SelectItem>
-                            <SelectItem value="france">France</SelectItem>
-                            <SelectItem value="india">India</SelectItem>
-                            <SelectItem value="israel">Israel</SelectItem>
-                            <SelectItem value="japan">Japan</SelectItem>
-                            <SelectItem value="netherlands">Netherlands</SelectItem>
-                            <SelectItem value="singapore">Singapore</SelectItem>
-                            <SelectItem value="south-africa">South Africa</SelectItem>
-                            <SelectItem value="spain">Spain</SelectItem>
-                            <SelectItem value="uk">United Kingdom</SelectItem>
-                            <SelectItem value="usa">United States</SelectItem>
-                          </SelectContent>
-                        </Select>
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="supabaseUrl" className="text-sm font-medium text-gray-900">Project URL</Label>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs max-w-xs">Your Supabase project URL (e.g., https://xxxxx.supabase.co)</p>
+                          </TooltipContent>
+                        </Tooltip>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="city">City</Label>
-                        <Select
-                          value={formData.city}
-                          onValueChange={(value) => setFormData(prev => ({ ...prev, city: value }))}
-                          disabled={!formData.country}
-                        >
-                          <SelectTrigger id="city">
-                            <SelectValue placeholder={formData.country ? "Select city" : "Select country first"} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {formData.country === "australia" && (
-                              <>
-                                <SelectItem value="sydney">Sydney</SelectItem>
-                                <SelectItem value="melbourne">Melbourne</SelectItem>
-                                <SelectItem value="brisbane">Brisbane</SelectItem>
-                                <SelectItem value="perth">Perth</SelectItem>
-                              </>
-                            )}
-                            {formData.country === "canada" && (
-                              <>
-                                <SelectItem value="toronto">Toronto</SelectItem>
-                                <SelectItem value="vancouver">Vancouver</SelectItem>
-                                <SelectItem value="montreal">Montreal</SelectItem>
-                                <SelectItem value="calgary">Calgary</SelectItem>
-                              </>
-                            )}
-                            {formData.country === "germany" && (
-                              <>
-                                <SelectItem value="berlin">Berlin</SelectItem>
-                                <SelectItem value="munich">Munich</SelectItem>
-                                <SelectItem value="frankfurt">Frankfurt</SelectItem>
-                                <SelectItem value="hamburg">Hamburg</SelectItem>
-                              </>
-                            )}
-                            {formData.country === "france" && (
-                              <>
-                                <SelectItem value="paris">Paris</SelectItem>
-                                <SelectItem value="lyon">Lyon</SelectItem>
-                                <SelectItem value="marseille">Marseille</SelectItem>
-                                <SelectItem value="toulouse">Toulouse</SelectItem>
-                              </>
-                            )}
-                            {formData.country === "india" && (
-                              <>
-                                <SelectItem value="mumbai">Mumbai</SelectItem>
-                                <SelectItem value="delhi">Delhi</SelectItem>
-                                <SelectItem value="bangalore">Bangalore</SelectItem>
-                                <SelectItem value="hyderabad">Hyderabad</SelectItem>
-                              </>
-                            )}
-                            {formData.country === "israel" && (
-                              <>
-                                <SelectItem value="tel-aviv">Tel Aviv</SelectItem>
-                                <SelectItem value="jerusalem">Jerusalem</SelectItem>
-                                <SelectItem value="haifa">Haifa</SelectItem>
-                                <SelectItem value="herzliya">Herzliya</SelectItem>
-                              </>
-                            )}
-                            {formData.country === "japan" && (
-                              <>
-                                <SelectItem value="tokyo">Tokyo</SelectItem>
-                                <SelectItem value="osaka">Osaka</SelectItem>
-                                <SelectItem value="kyoto">Kyoto</SelectItem>
-                                <SelectItem value="yokohama">Yokohama</SelectItem>
-                              </>
-                            )}
-                            {formData.country === "netherlands" && (
-                              <>
-                                <SelectItem value="amsterdam">Amsterdam</SelectItem>
-                                <SelectItem value="rotterdam">Rotterdam</SelectItem>
-                                <SelectItem value="the-hague">The Hague</SelectItem>
-                                <SelectItem value="utrecht">Utrecht</SelectItem>
-                              </>
-                            )}
-                            {formData.country === "singapore" && (
-                              <>
-                                <SelectItem value="singapore-central">Central</SelectItem>
-                                <SelectItem value="singapore-east">East</SelectItem>
-                                <SelectItem value="singapore-west">West</SelectItem>
-                                <SelectItem value="singapore-north">North</SelectItem>
-                              </>
-                            )}
-                            {formData.country === "south-africa" && (
-                              <>
-                                <SelectItem value="johannesburg">Johannesburg</SelectItem>
-                                <SelectItem value="cape-town">Cape Town</SelectItem>
-                                <SelectItem value="durban">Durban</SelectItem>
-                                <SelectItem value="pretoria">Pretoria</SelectItem>
-                              </>
-                            )}
-                            {formData.country === "spain" && (
-                              <>
-                                <SelectItem value="madrid">Madrid</SelectItem>
-                                <SelectItem value="barcelona">Barcelona</SelectItem>
-                                <SelectItem value="valencia">Valencia</SelectItem>
-                                <SelectItem value="seville">Seville</SelectItem>
-                              </>
-                            )}
-                            {formData.country === "uk" && (
-                              <>
-                                <SelectItem value="london">London</SelectItem>
-                                <SelectItem value="manchester">Manchester</SelectItem>
-                                <SelectItem value="birmingham">Birmingham</SelectItem>
-                                <SelectItem value="edinburgh">Edinburgh</SelectItem>
-                              </>
-                            )}
-                            {formData.country === "usa" && (
-                              <>
-                                <SelectItem value="new-york">New York</SelectItem>
-                                <SelectItem value="san-francisco">San Francisco</SelectItem>
-                                <SelectItem value="los-angeles">Los Angeles</SelectItem>
-                                <SelectItem value="chicago">Chicago</SelectItem>
-                                <SelectItem value="austin">Austin</SelectItem>
-                                <SelectItem value="seattle">Seattle</SelectItem>
-                              </>
-                            )}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="linkedin">LinkedIn URL</Label>
                       <Input
-                        id="linkedin"
-                        placeholder="https://linkedin.com/in/yourprofile"
-                        value={formData.linkedinUrl}
-                        onChange={(e) => setFormData(prev => ({ ...prev, linkedinUrl: e.target.value }))}
+                        id="supabaseUrl"
+                        value={formData.supabaseUrl}
+                        onChange={(e) => setFormData(prev => ({ ...prev, supabaseUrl: e.target.value }))}
+                        placeholder="https://xxxxx.supabase.co"
+                        className="text-sm"
+                        style={{ fontFamily: 'Geist Mono, monospace' }}
                       />
                     </div>
 
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Label htmlFor="timezone">Timezone</Label>
+                        <Label htmlFor="supabaseAnonKey" className="text-sm font-medium text-gray-900">Anon/Public Key</Label>
                         <Tooltip>
                           <TooltipTrigger>
-                            <Info className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                            <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p className="text-xs max-w-xs">Your timezone is used for scheduling features like automatic backups.</p>
+                            <p className="text-xs max-w-xs">Also called &quot;anon&quot; or &quot;publishable&quot; key. Safe to use in browser.</p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
-                      <Select
-                        value={formData.timezone}
-                        onValueChange={(value) => setFormData(prev => ({ ...prev, timezone: value }))}
+                      <Input
+                        id="supabaseAnonKey"
+                        value={formData.supabaseAnonKey}
+                        onChange={(e) => setFormData(prev => ({ ...prev, supabaseAnonKey: e.target.value }))}
+                        placeholder="eyJhbGci ..."
+                        className="text-sm"
+                        style={{ fontFamily: 'Geist Mono, monospace' }}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="supabaseSecretKey" className="text-sm font-medium text-gray-900">Service Role Secret</Label>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs max-w-xs">Server-side only key that bypasses Row Level Security. Keep this secret!</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        id="supabaseSecretKey"
+                        value={formData.supabaseSecretKey}
+                        onChange={(e) => setFormData(prev => ({ ...prev, supabaseSecretKey: e.target.value }))}
+                        placeholder="eyJhbGci ..."
+                        className="text-sm"
+                        style={{ fontFamily: 'Geist Mono, monospace' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Step 2: Database Connection */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
+                      2
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-900">Get your Database Connection String</h3>
+                  </div>
+
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <ol className="space-y-3">
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          1
+                        </span>
+                        <div className="flex-1 pt-0.5 text-sm">
+                          <span className="text-gray-900">Go to </span>
+                          <a href="https://supabase.com/dashboard/project/_/settings/database" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-gray-900 hover:underline">
+                            Project Settings &rarr; Database
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          2
+                        </span>
+                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Scroll to <strong>Connection string</strong> section</p>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          3
+                        </span>
+                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Select <strong>URI</strong> tab and copy the connection string</p>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          4
+                        </span>
+                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Replace <code className="bg-gray-200 px-1 rounded text-xs">[YOUR-PASSWORD]</code> with your database password</p>
+                      </li>
+                    </ol>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="databaseUrl" className="text-sm font-medium text-gray-900">Database Connection String</Label>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs max-w-xs">PostgreSQL connection string used by the authentication system. Make sure to include your password!</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        id="databaseUrl"
+                        value={formData.databaseUrl}
+                        onChange={(e) => setFormData(prev => ({ ...prev, databaseUrl: e.target.value }))}
+                        placeholder="postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres"
+                        className="text-sm"
+                        style={{ fontFamily: 'Geist Mono, monospace' }}
+                      />
+                      <p className="text-xs text-gray-500">
+                        This is different from the API keys above. It&apos;s used for direct database access.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Step 3: Auth Secret */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
+                      3
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-900">Authentication Secret</h3>
+                  </div>
+
+                  <Alert className="bg-blue-50 border-blue-200">
+                    <Shield className="w-4 h-4 text-blue-600" />
+                    <AlertTitle className="text-blue-800">Auto-generated for you</AlertTitle>
+                    <AlertDescription className="text-blue-700">
+                      This secret is used to sign authentication sessions. We&apos;ve generated a secure random value for you.
+                      You can regenerate it if needed, but make sure to use the same value across all environments.
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="betterAuthSecret" className="text-sm font-medium text-gray-900">Auth Secret</Label>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-xs max-w-xs">Used to sign and verify authentication sessions. Keep this secret and consistent across deployments!</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          id="betterAuthSecret"
+                          value={formData.betterAuthSecret}
+                          onChange={(e) => setFormData(prev => ({ ...prev, betterAuthSecret: e.target.value }))}
+                          placeholder="Generating..."
+                          className="text-sm flex-1"
+                          style={{ fontFamily: 'Geist Mono, monospace' }}
+                          readOnly
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setFormData(prev => ({ ...prev, betterAuthSecret: generateAuthSecret() }))}
+                          className="border-gray-300"
+                        >
+                          Regenerate
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
+                    <Button
+                      variant="outline"
+                      onClick={goToPreviousStep}
+                      className="border-gray-300"
+                    >
+                      Back
+                    </Button>
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={goToNextStep}
+                        className="border-gray-300"
                       >
-                        <SelectTrigger id="timezone">
-                          <SelectValue placeholder="Select timezone" />
+                        Skip this step
+                      </Button>
+                      <Button
+                        onClick={goToNextStep}
+                        className="bg-gray-900 hover:bg-gray-800 text-white gap-2"
+                      >
+                        I&apos;ve completed this step
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* OpenAI Tab */}
+              {currentTab === "openai" && (
+                <div className="space-y-6">
+                  {/* Header section */}
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0">
+                      <Zap className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900">OpenAI Configuration</h2>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Enable AI-powered features like the /assist chat interface. You can skip this step if you don&apos;t need AI features.
+                      </p>
+                    </div>
+                  </div>
+
+                  <Alert className="bg-purple-50 border-purple-200">
+                    <Zap className="w-4 h-4 text-purple-600" />
+                    <AlertTitle className="text-purple-800">Optional</AlertTitle>
+                    <AlertDescription className="text-purple-700">
+                      OpenAI integration is optional. Skip this step if you don&apos;t need AI-powered features.
+                    </AlertDescription>
+                  </Alert>
+
+                  {/* Step 1 */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
+                      1
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-900">Create a FREE OpenAI account</h3>
+                  </div>
+
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <ol className="space-y-3">
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          1
+                        </span>
+                        <div className="flex-1 pt-0.5 text-sm">
+                          <span className="text-gray-900">Visit </span>
+                          <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-gray-900 hover:underline">
+                            OpenAI Platform
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                          <span className="text-gray-500"> (includes free credits)</span>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          2
+                        </span>
+                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Click <strong>&quot;Create new secret key&quot;</strong></p>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          3
+                        </span>
+                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Copy the key immediately (it won&apos;t be shown again)</p>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          4
+                        </span>
+                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Paste it below</p>
+                      </li>
+                    </ol>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="openaiApiKey" className="text-sm font-medium text-gray-900">OpenAI API Key</Label>
+                    <Textarea
+                      id="openaiApiKey"
+                      value={formData.openaiApiKey}
+                      onChange={(e) => setFormData(prev => ({ ...prev, openaiApiKey: e.target.value }))}
+                      placeholder="sk-proj-..."
+                      className="text-sm min-h-[80px]"
+                      style={{ fontFamily: 'Geist Mono, monospace' }}
+                    />
+                    <p className="text-xs text-gray-500">
+                      Your key should start with &quot;sk-proj-&quot; or &quot;sk-&quot;
+                    </p>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
+                    <Button
+                      variant="outline"
+                      onClick={goToPreviousStep}
+                      className="border-gray-300"
+                    >
+                      Back
+                    </Button>
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={goToNextStep}
+                        className="border-gray-300"
+                      >
+                        Skip this step
+                      </Button>
+                      <Button
+                        onClick={goToNextStep}
+                        className="bg-gray-900 hover:bg-gray-800 text-white gap-2"
+                      >
+                        I&apos;ve completed this step
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Resend Tab */}
+              {currentTab === "resend" && (
+                <div className="space-y-6">
+                  {/* Header section */}
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0">
+                      <Mail className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900">Resend Configuration</h2>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Enable email sending and the <strong>Mail Stream</strong> module. Resend lets you send transactional emails and track their delivery status in real-time.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Step 1: API Key */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
+                      1
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-900">Get your Resend API Key</h3>
+                  </div>
+
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <ol className="space-y-3">
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          1
+                        </span>
+                        <div className="flex-1 pt-0.5 text-sm">
+                          <span className="text-gray-900">Go to </span>
+                          <a href="https://resend.com/api-keys" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-gray-900 hover:underline">
+                            Resend Dashboard &rarr; API Keys
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                          <span className="text-gray-500"> (3,000 emails/month free)</span>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          2
+                        </span>
+                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Click <strong>Create API Key</strong> and copy the key</p>
+                      </li>
+                    </ol>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="resendApiKey" className="text-sm font-medium text-gray-900">Resend API Key</Label>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-xs max-w-xs">Your Resend API key for sending emails (starts with re_)</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <Input
+                      id="resendApiKey"
+                      value={formData.resendApiKey}
+                      onChange={(e) => setFormData(prev => ({ ...prev, resendApiKey: e.target.value }))}
+                      placeholder="re_..."
+                      className="text-sm"
+                      style={{ fontFamily: 'Geist Mono, monospace' }}
+                    />
+                  </div>
+
+                  {/* Step 2: Webhook Setup */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
+                      2
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-900">Set up Webhook for Mail Stream Module</h3>
+                  </div>
+
+                  <Alert className="bg-blue-50 border-blue-200">
+                    <Info className="w-4 h-4 text-blue-600" />
+                    <AlertTitle className="text-blue-800">Why set up a webhook?</AlertTitle>
+                    <AlertDescription className="text-blue-700">
+                      The <strong>Mail Stream</strong> module shows you a real-time log of all emails sent from ARI, including their delivery status (sent, delivered, bounced, etc.).
+                      Resend sends this status information to your app via webhooks. Without a webhook, Mail Stream won&apos;t receive email events.
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <ol className="space-y-3">
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          1
+                        </span>
+                        <div className="flex-1 pt-0.5 text-sm">
+                          <span className="text-gray-900">Go to </span>
+                          <a href="https://resend.com/webhooks" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-gray-900 hover:underline">
+                            Resend Dashboard &rarr; Webhooks
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          2
+                        </span>
+                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Click <strong>Add Webhook</strong></p>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          3
+                        </span>
+                        <div className="flex-1 pt-0.5 text-sm">
+                          <p className="text-gray-900 mb-2">Enter your webhook endpoint URL:</p>
+                          <CodeBlock
+                            language="url"
+                            code="https://YOUR-DOMAIN/api/modules/mail-stream/webhook"
+                          />
+                          <p className="text-xs text-gray-500 mt-2">Replace YOUR-DOMAIN with your actual domain</p>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          4
+                        </span>
+                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Select the events you want to track (recommended: <strong>all events</strong>)</p>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          5
+                        </span>
+                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Click <strong>Create</strong> to save the webhook</p>
+                      </li>
+                    </ol>
+                  </div>
+
+                  {/* Step 3: Signing Secret */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
+                      3
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-900">Copy the Webhook Signing Secret</h3>
+                  </div>
+
+                  <Alert className="bg-amber-50 border-amber-200">
+                    <Shield className="w-4 h-4 text-amber-600" />
+                    <AlertTitle className="text-amber-800">Security: Signing Secret</AlertTitle>
+                    <AlertDescription className="text-amber-700">
+                      The signing secret verifies that webhook requests genuinely come from Resend, not from malicious actors.
+                      ARI uses this secret to validate each incoming webhook before processing it.
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <ol className="space-y-3">
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          1
+                        </span>
+                        <p className="flex-1 pt-0.5 text-sm text-gray-900">After creating the webhook, click on it to view details</p>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          2
+                        </span>
+                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Copy the <strong>Signing Secret</strong> (starts with <code className="bg-gray-200 px-1 rounded text-xs">whsec_</code>)</p>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          3
+                        </span>
+                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Paste it below</p>
+                      </li>
+                    </ol>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="resendWebhookSecret" className="text-sm font-medium text-gray-900">Webhook Signing Secret</Label>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-xs max-w-xs">Used to verify webhook signatures (starts with whsec_)</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <Input
+                      id="resendWebhookSecret"
+                      value={formData.resendWebhookSecret}
+                      onChange={(e) => setFormData(prev => ({ ...prev, resendWebhookSecret: e.target.value }))}
+                      placeholder="whsec_..."
+                      className="text-sm"
+                      style={{ fontFamily: 'Geist Mono, monospace' }}
+                    />
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
+                    <Button
+                      variant="outline"
+                      onClick={goToPreviousStep}
+                      className="border-gray-300"
+                    >
+                      Back
+                    </Button>
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={goToNextStep}
+                        className="border-gray-300"
+                      >
+                        Skip this step
+                      </Button>
+                      <Button
+                        onClick={goToNextStep}
+                        className="bg-gray-900 hover:bg-gray-800 text-white gap-2"
+                      >
+                        I&apos;ve completed this step
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Vercel Tab */}
+              {currentTab === "vercel" && (
+                <div className="space-y-6">
+                  {/* Header section */}
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0">
+                      <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6 text-white">
+                        <path d="M24 22.525H0l12-21.05 12 21.05z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900">Vercel Deployment</h2>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Deploy your app to the cloud with Vercel. You can skip this for local development only.
+                      </p>
+                    </div>
+                  </div>
+
+                  <Alert className="bg-gray-50 border-gray-200">
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
+                      <path d="M24 22.525H0l12-21.05 12 21.05z" />
+                    </svg>
+                    <AlertTitle className="text-gray-800">Optional</AlertTitle>
+                    <AlertDescription className="text-gray-700">
+                      Vercel deployment is optional. Skip this step if you only want to run ARI locally.
+                    </AlertDescription>
+                  </Alert>
+
+                  {/* Step 1 */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-xs font-semibold text-white">
+                      1
+                    </div>
+                    <h3 className="text-base font-semibold text-gray-900">Create a FREE Vercel Hobby account</h3>
+                  </div>
+
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <ol className="space-y-3">
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          1
+                        </span>
+                        <div className="flex-1 pt-0.5 text-sm">
+                          <span className="text-gray-900">Go to </span>
+                          <a href="https://vercel.com/signup" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-gray-900 hover:underline">
+                            vercel.com/signup
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                          <span className="text-gray-900"> and create a free account</span>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          2
+                        </span>
+                        <div className="flex-1 pt-0.5 text-sm text-gray-900">
+                          Install Vercel CLI: <code className="bg-gray-200 px-1 rounded text-xs" style={{ fontFamily: 'Geist Mono, monospace' }}>npm install -g vercel</code>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          3
+                        </span>
+                        <div className="flex-1 pt-0.5 text-sm text-gray-900">
+                          Run <code className="bg-gray-200 px-1 rounded text-xs" style={{ fontFamily: 'Geist Mono, monospace' }}>vercel login</code> in your terminal
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          4
+                        </span>
+                        <div className="flex-1 pt-0.5 text-sm text-gray-900">
+                          Run <code className="bg-gray-200 px-1 rounded text-xs" style={{ fontFamily: 'Geist Mono, monospace' }}>vercel link</code> to connect your project
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gray-200 text-xs font-medium text-gray-600">
+                          5
+                        </span>
+                        <p className="flex-1 pt-0.5 text-sm text-gray-900">Add environment variables in Vercel dashboard</p>
+                      </li>
+                    </ol>
+                  </div>
+
+                  <Alert>
+                    <Info className="w-4 h-4" />
+                    <AlertDescription className="text-gray-700">
+                      After downloading your .env.local file, you can run{" "}
+                      <code className="bg-gray-200 px-1 rounded text-xs" style={{ fontFamily: 'Geist Mono, monospace' }}>vercel env pull</code>
+                      {" "}to sync your environment variables.{" "}
+                      <a
+                        href="https://vercel.com/docs/cli"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gray-900 hover:underline inline-flex items-center gap-1"
+                      >
+                        Learn more
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </AlertDescription>
+                  </Alert>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
+                    <Button
+                      variant="outline"
+                      onClick={goToPreviousStep}
+                      className="border-gray-300"
+                    >
+                      Back
+                    </Button>
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="outline"
+                        onClick={goToNextStep}
+                        className="border-gray-300"
+                      >
+                        Skip this step
+                      </Button>
+                      <Button
+                        onClick={goToNextStep}
+                        className="bg-gray-900 hover:bg-gray-800 text-white gap-2"
+                      >
+                        I&apos;ve completed this step
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Personal Tab */}
+              {currentTab === "personal" && (
+                <div className="space-y-6">
+                  {/* Header section */}
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0">
+                      <User className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900">Personal Details</h2>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Tell us about yourself. This information is optional and stored securely in your database.
+                      </p>
+                    </div>
+                  </div>
+
+                  <Alert className="bg-gray-50 border-gray-200">
+                    <User className="w-4 h-4 text-gray-600" />
+                    <AlertTitle className="text-gray-800">Optional</AlertTitle>
+                    <AlertDescription className="text-gray-700">
+                      Personal details are optional. Skip this step if you prefer not to share this information.
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name" className="text-sm font-medium text-gray-900">Name</Label>
+                      <Input
+                        id="name"
+                        placeholder="Your full name"
+                        value={formData.name}
+                        onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-sm font-medium text-gray-900">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="your@email.com"
+                        value={formData.email}
+                        onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="title" className="text-sm font-medium text-gray-900">Title</Label>
+                    <Input
+                      id="title"
+                      placeholder="Your job title"
+                      value={formData.title}
+                      onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="company" className="text-sm font-medium text-gray-900">Company Name</Label>
+                    <Input
+                      id="company"
+                      placeholder="Your company name"
+                      value={formData.companyName}
+                      onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="country" className="text-sm font-medium text-gray-900">Country</Label>
+                      <Select
+                        value={formData.country}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, country: value, city: "" }))}
+                      >
+                        <SelectTrigger id="country">
+                          <SelectValue placeholder="Select country" />
                         </SelectTrigger>
                         <SelectContent>
-                          {COMMON_TIMEZONES.map((tz) => (
-                            <SelectItem key={tz.value} value={tz.value}>
-                              {tz.label}
-                            </SelectItem>
-                          ))}
+                          <SelectItem value="australia">Australia</SelectItem>
+                          <SelectItem value="canada">Canada</SelectItem>
+                          <SelectItem value="germany">Germany</SelectItem>
+                          <SelectItem value="france">France</SelectItem>
+                          <SelectItem value="india">India</SelectItem>
+                          <SelectItem value="israel">Israel</SelectItem>
+                          <SelectItem value="japan">Japan</SelectItem>
+                          <SelectItem value="netherlands">Netherlands</SelectItem>
+                          <SelectItem value="singapore">Singapore</SelectItem>
+                          <SelectItem value="south-africa">South Africa</SelectItem>
+                          <SelectItem value="spain">Spain</SelectItem>
+                          <SelectItem value="uk">United Kingdom</SelectItem>
+                          <SelectItem value="usa">United States</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="city" className="text-sm font-medium text-gray-900">City</Label>
+                      <Select
+                        value={formData.city}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, city: value }))}
+                        disabled={!formData.country}
+                      >
+                        <SelectTrigger id="city">
+                          <SelectValue placeholder={formData.country ? "Select city" : "Select country first"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {formData.country === "australia" && (
+                            <>
+                              <SelectItem value="sydney">Sydney</SelectItem>
+                              <SelectItem value="melbourne">Melbourne</SelectItem>
+                              <SelectItem value="brisbane">Brisbane</SelectItem>
+                              <SelectItem value="perth">Perth</SelectItem>
+                            </>
+                          )}
+                          {formData.country === "canada" && (
+                            <>
+                              <SelectItem value="toronto">Toronto</SelectItem>
+                              <SelectItem value="vancouver">Vancouver</SelectItem>
+                              <SelectItem value="montreal">Montreal</SelectItem>
+                              <SelectItem value="calgary">Calgary</SelectItem>
+                            </>
+                          )}
+                          {formData.country === "germany" && (
+                            <>
+                              <SelectItem value="berlin">Berlin</SelectItem>
+                              <SelectItem value="munich">Munich</SelectItem>
+                              <SelectItem value="frankfurt">Frankfurt</SelectItem>
+                              <SelectItem value="hamburg">Hamburg</SelectItem>
+                            </>
+                          )}
+                          {formData.country === "france" && (
+                            <>
+                              <SelectItem value="paris">Paris</SelectItem>
+                              <SelectItem value="lyon">Lyon</SelectItem>
+                              <SelectItem value="marseille">Marseille</SelectItem>
+                              <SelectItem value="toulouse">Toulouse</SelectItem>
+                            </>
+                          )}
+                          {formData.country === "india" && (
+                            <>
+                              <SelectItem value="mumbai">Mumbai</SelectItem>
+                              <SelectItem value="delhi">Delhi</SelectItem>
+                              <SelectItem value="bangalore">Bangalore</SelectItem>
+                              <SelectItem value="hyderabad">Hyderabad</SelectItem>
+                            </>
+                          )}
+                          {formData.country === "israel" && (
+                            <>
+                              <SelectItem value="tel-aviv">Tel Aviv</SelectItem>
+                              <SelectItem value="jerusalem">Jerusalem</SelectItem>
+                              <SelectItem value="haifa">Haifa</SelectItem>
+                              <SelectItem value="herzliya">Herzliya</SelectItem>
+                            </>
+                          )}
+                          {formData.country === "japan" && (
+                            <>
+                              <SelectItem value="tokyo">Tokyo</SelectItem>
+                              <SelectItem value="osaka">Osaka</SelectItem>
+                              <SelectItem value="kyoto">Kyoto</SelectItem>
+                              <SelectItem value="yokohama">Yokohama</SelectItem>
+                            </>
+                          )}
+                          {formData.country === "netherlands" && (
+                            <>
+                              <SelectItem value="amsterdam">Amsterdam</SelectItem>
+                              <SelectItem value="rotterdam">Rotterdam</SelectItem>
+                              <SelectItem value="the-hague">The Hague</SelectItem>
+                              <SelectItem value="utrecht">Utrecht</SelectItem>
+                            </>
+                          )}
+                          {formData.country === "singapore" && (
+                            <>
+                              <SelectItem value="singapore-central">Central</SelectItem>
+                              <SelectItem value="singapore-east">East</SelectItem>
+                              <SelectItem value="singapore-west">West</SelectItem>
+                              <SelectItem value="singapore-north">North</SelectItem>
+                            </>
+                          )}
+                          {formData.country === "south-africa" && (
+                            <>
+                              <SelectItem value="johannesburg">Johannesburg</SelectItem>
+                              <SelectItem value="cape-town">Cape Town</SelectItem>
+                              <SelectItem value="durban">Durban</SelectItem>
+                              <SelectItem value="pretoria">Pretoria</SelectItem>
+                            </>
+                          )}
+                          {formData.country === "spain" && (
+                            <>
+                              <SelectItem value="madrid">Madrid</SelectItem>
+                              <SelectItem value="barcelona">Barcelona</SelectItem>
+                              <SelectItem value="valencia">Valencia</SelectItem>
+                              <SelectItem value="seville">Seville</SelectItem>
+                            </>
+                          )}
+                          {formData.country === "uk" && (
+                            <>
+                              <SelectItem value="london">London</SelectItem>
+                              <SelectItem value="manchester">Manchester</SelectItem>
+                              <SelectItem value="birmingham">Birmingham</SelectItem>
+                              <SelectItem value="edinburgh">Edinburgh</SelectItem>
+                            </>
+                          )}
+                          {formData.country === "usa" && (
+                            <>
+                              <SelectItem value="new-york">New York</SelectItem>
+                              <SelectItem value="san-francisco">San Francisco</SelectItem>
+                              <SelectItem value="los-angeles">Los Angeles</SelectItem>
+                              <SelectItem value="chicago">Chicago</SelectItem>
+                              <SelectItem value="austin">Austin</SelectItem>
+                              <SelectItem value="seattle">Seattle</SelectItem>
+                            </>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="linkedin" className="text-sm font-medium text-gray-900">LinkedIn URL</Label>
+                    <Input
+                      id="linkedin"
+                      placeholder="https://linkedin.com/in/yourprofile"
+                      value={formData.linkedinUrl}
+                      onChange={(e) => setFormData(prev => ({ ...prev, linkedinUrl: e.target.value }))}
+                    />
+                  </div>
 
-                    <div className="flex gap-2">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="timezone" className="text-sm font-medium text-gray-900">Timezone</Label>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="text-xs max-w-xs">Your timezone is used for scheduling features like automatic backups.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <Select
+                      value={formData.timezone}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, timezone: value }))}
+                    >
+                      <SelectTrigger id="timezone">
+                        <SelectValue placeholder="Select timezone" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COMMON_TIMEZONES.map((tz) => (
+                          <SelectItem key={tz.value} value={tz.value}>
+                            {tz.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
+                    <Button
+                      variant="outline"
+                      onClick={goToPreviousStep}
+                      className="border-gray-300"
+                    >
+                      Back
+                    </Button>
+                    <div className="flex items-center gap-3">
                       <Button
                         variant="outline"
-                        onClick={() => setCurrentTab("vercel")}
-                        className="flex-1"
+                        onClick={goToNextStep}
+                        className="border-gray-300"
                       >
-                        Back
+                        Skip this step
                       </Button>
                       <Button
                         onClick={async () => {
@@ -1541,146 +1512,171 @@ export default function WelcomePage() {
                               setIsSavingPreferences(false)
                             }
                           }
-                          setCurrentTab("download")
+                          goToNextStep()
                         }}
-                        className="flex-1"
+                        className="bg-gray-900 hover:bg-gray-800 text-white gap-2"
                         disabled={isSavingPreferences}
                       >
-                        {isSavingPreferences ? 'Saving...' : 'Continue to Download'}
+                        {isSavingPreferences ? 'Saving...' : "I've completed this step"}
+                        {!isSavingPreferences && <ArrowRight className="h-4 w-4" />}
                       </Button>
                     </div>
-                  </TabsContent>
+                  </div>
+                </div>
+              )}
 
-                  {/* Tab 6: Download */}
-                  <TabsContent value="download" className="space-y-4 mt-4">
-                    <Alert className="bg-green-50 border-green-200">
-                      <CheckCircle className="w-4 h-4" />
-                      <AlertTitle>Setup Complete!</AlertTitle>
-                      <AlertDescription>
-                        Your environment configuration is ready. Download the files and place them
-                        in your project root directory.
-                      </AlertDescription>
-                    </Alert>
+              {/* Download Tab */}
+              {currentTab === "download" && (
+                <div className="space-y-6">
+                  {/* Header section */}
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0">
+                      <Download className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-gray-900">Download &amp; Finish</h2>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Your environment configuration is ready. Download the files and place them in your project root directory.
+                      </p>
+                    </div>
+                  </div>
 
-                    {/* Summary */}
-                    <div className="space-y-2">
-                      <h3 className="font-semibold text-sm">Configuration Summary</h3>
-                      <div className="space-y-1 text-sm">
-                        {/* Required configurations */}
-                        <div className="flex items-center gap-2">
-                          {formData.databaseUrl ?
-                            <Check className="w-4 h-4 text-green-500" /> :
-                            <X className="w-4 h-4 text-red-500" />
-                          }
-                          <span className={!formData.databaseUrl ? "text-red-600" : ""}>
-                            Database: {formData.databaseUrl ? "Configured" : "Required - please complete"}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {formData.betterAuthSecret ?
-                            <Check className="w-4 h-4 text-green-500" /> :
-                            <X className="w-4 h-4 text-red-500" />
-                          }
-                          <span className={!formData.betterAuthSecret ? "text-red-600" : ""}>
-                            Auth Secret: {formData.betterAuthSecret ? "Generated" : "Required"}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {formData.supabaseUrl && formData.supabaseSecretKey ?
-                            <Check className="w-4 h-4 text-green-500" /> :
-                            <X className="w-4 h-4 text-red-500" />
-                          }
-                          <span className={!(formData.supabaseUrl && formData.supabaseSecretKey) ? "text-red-600" : ""}>
-                            Supabase API: {formData.supabaseUrl && formData.supabaseSecretKey ? "Configured" : "Required - please complete"}
-                          </span>
-                        </div>
-                        {/* Optional configurations */}
-                        <div className="flex items-center gap-2">
-                          {formData.openaiApiKey ?
-                            <Check className="w-4 h-4 text-green-500" /> :
-                            <X className="w-4 h-4 text-gray-400" />
-                          }
-                          <span className="text-muted-foreground">
-                            OpenAI: {formData.openaiApiKey ? "Configured" : "Skipped"}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {formData.resendApiKey ?
-                            <Check className="w-4 h-4 text-green-500" /> :
-                            <X className="w-4 h-4 text-gray-400" />
-                          }
-                          <span className="text-muted-foreground">
-                            Resend: {formData.resendApiKey ? "Configured" : "Skipped"}
-                          </span>
-                        </div>
+                  <Alert className="bg-green-50 border-green-200">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <AlertTitle className="text-green-800">Setup Complete!</AlertTitle>
+                    <AlertDescription className="text-green-700">
+                      Your environment configuration is ready. Download the files and place them
+                      in your project root directory.
+                    </AlertDescription>
+                  </Alert>
+
+                  {/* Summary */}
+                  <div className="space-y-2">
+                    <h3 className="text-base font-semibold text-gray-900">Configuration Summary</h3>
+                    <div className="space-y-1 text-sm">
+                      {/* Required configurations */}
+                      <div className="flex items-center gap-2">
+                        {formData.databaseUrl ?
+                          <Check className="w-4 h-4 text-green-500" /> :
+                          <X className="w-4 h-4 text-red-500" />
+                        }
+                        <span className={!formData.databaseUrl ? "text-red-600" : "text-gray-900"}>
+                          Database: {formData.databaseUrl ? "Configured" : "Required - please complete"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {formData.betterAuthSecret ?
+                          <Check className="w-4 h-4 text-green-500" /> :
+                          <X className="w-4 h-4 text-red-500" />
+                        }
+                        <span className={!formData.betterAuthSecret ? "text-red-600" : "text-gray-900"}>
+                          Auth Secret: {formData.betterAuthSecret ? "Generated" : "Required"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {formData.supabaseUrl && formData.supabaseSecretKey ?
+                          <Check className="w-4 h-4 text-green-500" /> :
+                          <X className="w-4 h-4 text-red-500" />
+                        }
+                        <span className={!(formData.supabaseUrl && formData.supabaseSecretKey) ? "text-red-600" : "text-gray-900"}>
+                          Supabase API: {formData.supabaseUrl && formData.supabaseSecretKey ? "Configured" : "Required - please complete"}
+                        </span>
+                      </div>
+                      {/* Optional configurations */}
+                      <div className="flex items-center gap-2">
+                        {formData.openaiApiKey ?
+                          <Check className="w-4 h-4 text-green-500" /> :
+                          <X className="w-4 h-4 text-gray-400" />
+                        }
+                        <span className="text-gray-500">
+                          OpenAI: {formData.openaiApiKey ? "Configured" : "Skipped"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {formData.resendApiKey ?
+                          <Check className="w-4 h-4 text-green-500" /> :
+                          <X className="w-4 h-4 text-gray-400" />
+                        }
+                        <span className="text-gray-500">
+                          Resend: {formData.resendApiKey ? "Configured" : "Skipped"}
+                        </span>
                       </div>
                     </div>
+                  </div>
 
-                    {/* .env.local preview */}
-                    <div className="space-y-2">
-                      <h3 className="font-semibold text-sm flex items-center gap-2">
-                        <Badge variant="outline">File 1</Badge>
-                        .env.local
-                      </h3>
-                      <div className="bg-gray-900 text-gray-100 p-4 rounded-md overflow-x-auto max-h-48">
-                        <pre className="text-xs whitespace-pre-wrap" style={{ fontFamily: 'Geist Mono, monospace' }}>
-                          {generateEnvFileContent()}
-                        </pre>
-                      </div>
-                    </div>
+                  {/* .env.local preview */}
+                  <div className="space-y-2">
+                    <h3 className="text-base font-semibold text-gray-900">.env.local</h3>
+                    <CodeBlock
+                      language="env"
+                      code={generateEnvFileContent()}
+                    />
+                  </div>
 
-                    {/* Next steps */}
-                    <Alert>
-                      <Info className="w-4 h-4" />
-                      <AlertTitle>Next Steps</AlertTitle>
-                      <AlertDescription>
-                        <ol className="list-decimal list-inside space-y-1 text-sm mt-2">
-                          <li>Download the file(s) using the button(s) below</li>
-                          <li>Place them in your project root directory (next to package.json)</li>
-                          <li>Restart your development server</li>
-                          <li>Your application is ready to use!</li>
-                        </ol>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          <strong>For production:</strong> Update <code className="bg-muted px-1 rounded">BETTER_AUTH_URL</code> to your production domain in Vercel environment variables.
-                        </p>
-                      </AlertDescription>
-                    </Alert>
+                  {/* Next steps */}
+                  <Alert>
+                    <Info className="w-4 h-4" />
+                    <AlertTitle className="text-gray-800">Next Steps</AlertTitle>
+                    <AlertDescription className="text-gray-700">
+                      <ol className="list-decimal list-inside space-y-1 text-sm mt-2">
+                        <li>Download the file(s) using the button(s) below</li>
+                        <li>Place them in your project root directory (next to package.json)</li>
+                        <li>Restart your development server</li>
+                        <li>Your application is ready to use!</li>
+                      </ol>
+                      <p className="mt-2 text-xs text-gray-500">
+                        <strong>For production:</strong> Update <code className="bg-gray-200 px-1 rounded">BETTER_AUTH_URL</code> to your production domain in Vercel environment variables.
+                      </p>
+                    </AlertDescription>
+                  </Alert>
 
-                    {/* Download button */}
-                    <Button
-                      onClick={handleDownloadEnvFile}
-                      disabled={!isSupabaseComplete}
-                      className="w-full bg-green-600 hover:bg-green-700"
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Download .env.local
-                    </Button>
+                  {/* Download button */}
+                  <Button
+                    onClick={handleDownloadEnvFile}
+                    disabled={!isSupabaseComplete}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download .env.local
+                  </Button>
 
-                    {/* Security warning */}
-                    <Alert variant="destructive">
-                      <Shield className="w-4 h-4" />
-                      <AlertTitle>Security Warning</AlertTitle>
-                      <AlertDescription className="text-xs">
-                        Your keys are stored in browser memory only and will be lost when you
-                        close this page. The .env.local file should NEVER be committed to git.
-                        Make sure it&apos;s listed in your .gitignore file.
-                      </AlertDescription>
-                    </Alert>
+                  {/* Security warning */}
+                  <Alert variant="destructive">
+                    <Shield className="w-4 h-4" />
+                    <AlertTitle>Security Warning</AlertTitle>
+                    <AlertDescription className="text-xs">
+                      Your keys are stored in browser memory only and will be lost when you
+                      close this page. The .env.local file should NEVER be committed to git.
+                      Make sure it&apos;s listed in your .gitignore file.
+                    </AlertDescription>
+                  </Alert>
 
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-100">
                     <Button
                       variant="outline"
-                      onClick={() => setCurrentTab("personal")}
-                      className="w-full"
+                      onClick={goToPreviousStep}
+                      className="border-gray-300"
                     >
-                      Back to Personal Details
+                      Back
                     </Button>
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
-          </div>
-        </TooltipProvider>
-      )}
-    </div>
+                    <div className="flex items-center gap-3">
+                      <Button
+                        onClick={handleDownloadEnvFile}
+                        disabled={!isSupabaseComplete}
+                        className="bg-gray-900 hover:bg-gray-800 text-white gap-2"
+                      >
+                        Finish Setup
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </TooltipProvider>
   )
 }
