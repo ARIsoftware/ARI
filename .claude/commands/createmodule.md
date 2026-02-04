@@ -76,26 +76,39 @@ When approved, create the module following this order:
    - Import tables from `@/lib/db/schema`
    - Use `toSnakeCase()` from `@/lib/api-helpers` for responses
    - See `modules-core/hello-world/api/data/route.ts` as the reference
-5. **Create database migration** in `database/schema.sql` if tables needed
+5. **Register API routes in MODULE_API_ROUTES** (REQUIRED if module has API routes):
+   - Edit `/app/api/modules/[module]/[[...path]]/route.ts`
+   - Add your module to the `MODULE_API_ROUTES` object with all API endpoints
+   - **This step is NOT auto-generated** - Next.js/Turbopack cannot resolve dynamic imports at runtime
+   - Example:
+     ```typescript
+     'my-module': {
+       'data': () => import('@/modules/my-module/api/data/route'),
+       'settings': () => import('@/modules/my-module/api/settings/route'),
+       'data/[id]': () => import('@/modules/my-module/api/data/[id]/route'), // For dynamic routes
+     },
+     ```
+   - See existing modules in that file for patterns (hello-world, tasks, etc.)
+6. **Create database migration** in `database/schema.sql` if tables needed
    - Use `mcp__plugin_pg_pg-aiguide__semantic_search_postgres_docs` to verify best practices for data types, indexes, and constraints
    - Use `TEXT` type for `user_id` (matches Better Auth)
    - Do NOT add `auth.uid()` RLS policies (Better Auth doesn't use this)
-6. **Add Drizzle schema definition** to `/lib/db/schema/schema.ts` (REQUIRED for API routes to work)
+7. **Add Drizzle schema definition** to `/lib/db/schema/schema.ts` (REQUIRED for API routes to work)
    - See existing table definitions in that file for examples
    - Use `text("user_id")` for the user_id column
-7. **Update types** in `types/index.ts`
-8. **Create TanStack Query hooks** in `/lib/hooks/use-[module-name].ts` (see below)
-9. **Run `npm run generate-module-registry`** to register the new module
-10. **If public routes needed** (webhooks, external API access):
+8. **Update types** in `types/index.ts`
+9. **Create TanStack Query hooks** in `/lib/hooks/use-[module-name].ts` (see below)
+10. **Run `npm run generate-module-registry`** to register the new module (pages only - API routes were registered in step 5)
+11. **If public routes needed** (webhooks, external API access):
     - Add `publicRoutes` array to module.json with security configuration
     - Create route handler using `createPublicRouteHandler` wrapper
     - Document the required environment variable for the secret
     - See `/docs/MODULES.md` section 7.5 for detailed guidance
-11. **Update backup expected tables list** in `/app/api/backup/verify/route.ts`
+12. **Update backup expected tables list** in `/app/api/backup/verify/route.ts`
     - Add any new table names to the `COMPLETE_TABLE_LIST` array (around line 24)
     - This ensures the backup verification system knows about the new tables
-12. Ask the user for permission to execute the .sql file, or ask if they want to run the .SQL statements themselves.
-13. If the user needs to take any action to complete the setup of the module (run a .sql file, restart the dev server etc), please clearly indicate the actions they need to take with clear instructions.
+13. Ask the user for permission to execute the .sql file, or ask if they want to run the .SQL statements themselves.
+14. If the user needs to take any action to complete the setup of the module (run a .sql file, restart the dev server etc), please clearly indicate the actions they need to take with clear instructions.
 
 ## Data Fetching Best Practices
 
@@ -313,6 +326,7 @@ If the module requires an onboarding/setup screen, follow the **Hello World modu
 Before marking complete, verify:
 - [ ] module.json is valid and complete
 - [ ] All API routes use `withRLS()` helper (NOT Supabase client) - see hello-world/api/data/route.ts
+- [ ] **If module has API routes**: Routes registered in `MODULE_API_ROUTES` in `/app/api/modules/[module]/[[...path]]/route.ts`
 - [ ] Drizzle schema added to `/lib/db/schema/schema.ts` (required for API routes)
 - [ ] Database schema.sql created (for reference/manual setup)
 - [ ] TanStack Query hooks created in `/lib/hooks/use-[module-name].ts`
@@ -342,5 +356,5 @@ Before marking complete, verify:
 - **API routes must use Drizzle + withRLS()** - NOT Supabase client
 - **Do NOT use `auth.uid()` in database RLS policies** - Better Auth doesn't support this
 - User isolation is enforced at the **application level** via `withRLS()` helper
-- The module registry auto-generates on `npm run dev` or `npm run build`
+- **API route registration is MANUAL**: The `generate-module-registry` script only auto-generates page routes. API routes MUST be manually registered in `MODULE_API_ROUTES` in `/app/api/modules/[module]/[[...path]]/route.ts` - this is a Next.js/Turbopack limitation.
 - **Module Portability**: Always use `@/modules/` alias for imports (NOT `@/modules-custom/` or `@/modules-core/`). This allows modules to be moved between directories without code changes. The alias resolves `modules-custom` first, then `modules-core`.
