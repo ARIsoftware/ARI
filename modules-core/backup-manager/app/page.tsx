@@ -238,7 +238,7 @@ export default function BackupManagerPage() {
       {/* Header */}
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Backup Manager</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Database Backup Manager</h1>
           <p className="text-sm text-muted-foreground">
             Manage your database backups and restore points.
           </p>
@@ -310,6 +310,15 @@ export default function BackupManagerPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Backup Responsibility Warning */}
+      <Alert variant="destructive" className="bg-red-50 border-red-200">
+        <AlertCircle className="h-4 w-4 text-red-600" />
+        <AlertTitle className="text-red-800">Your Responsibility</AlertTitle>
+        <AlertDescription className="text-red-700">
+          You are responsible for setting up and maintaining a reliable backup process for your data. This includes ensuring backups run regularly, are stored securely, and can be successfully restored when needed. We recommend having multiple, redundant file and database backups so you don&apos;t need to rely on one vendor. If backups are missing, outdated, or unusable, any resulting data loss is your responsibility.
+        </AlertDescription>
+      </Alert>
 
       {/* Backup List */}
       <Card>
