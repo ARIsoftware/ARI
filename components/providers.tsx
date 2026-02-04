@@ -50,6 +50,7 @@ type AuthContext = {
   session: Session | null
   isLoading: boolean
   // Keep supabase client for realtime subscriptions
+  // Can be null when Supabase is not configured (setup mode)
   supabase: ReturnType<typeof createSupabaseClient>
 }
 
