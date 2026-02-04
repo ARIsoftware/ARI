@@ -437,6 +437,9 @@ export default function SettingsPage(): React.ReactElement {
                     <TabsTrigger value="backups">Backups</TabsTrigger>
                   </TabsList>
                   <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => window.location.href = "/welcome"}>
+                      Rerun Setup
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => window.location.href = "/debug"}>
                       <Sparkles className="mr-2 h-4 w-4" />
                       Run Diagnostics

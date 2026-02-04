@@ -13,8 +13,7 @@ export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: "ARI",
-  description: "Secure task management application",
-  generator: "v0.dev",
+  description: "ARI.Software",
   robots: {
     index: false,
     follow: false,
