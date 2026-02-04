@@ -5,8 +5,12 @@ import type { NextRequest } from 'next/server'
 // This is regenerated on build/dev via generate-module-registry script
 import moduleManifest from '@/lib/generated/module-manifest.json'
 
+// Check if setup is complete (DATABASE_URL configured)
+const isSetupComplete = !!process.env.DATABASE_URL
+
 const protectedRoutes = [
   "/",
+  "/welcome",  // Protected when setup is complete (requires auth to rerun wizard)
   "/tasks",
   "/dashboard",
   "/daily-fitness",
@@ -44,6 +48,30 @@ const modulePublicRoutes: string[] = (moduleManifest.publicRoutes || []).map(
 const publicRoutes = [...staticPublicRoutes, ...modulePublicRoutes]
 
 export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl
+
+  // SETUP MODE: If DATABASE_URL is not configured, redirect to welcome wizard
+  // Only allow /welcome and /api/auth (for post-setup login)
+  if (!isSetupComplete) {
+    const isSetupAllowed = pathname === "/welcome" ||
+                           pathname.startsWith("/welcome/") ||
+                           pathname.startsWith("/api/auth")
+
+    if (!isSetupAllowed) {
+      return NextResponse.redirect(new URL("/welcome", req.url))
+    }
+
+    // Allow setup routes without auth - just add security headers
+    const setupResponse = NextResponse.next({ request: req })
+    setupResponse.headers.set("X-Robots-Tag", "noindex, nofollow")
+    setupResponse.headers.set("X-Frame-Options", "DENY")
+    setupResponse.headers.set("X-Content-Type-Options", "nosniff")
+    setupResponse.headers.set("X-XSS-Protection", "1; mode=block")
+    setupResponse.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
+    return setupResponse
+  }
+
+  // NORMAL MODE: Setup complete, existing auth logic below
   let response = NextResponse.next({
     request: req,
   })
@@ -94,8 +122,6 @@ export async function middleware(req: NextRequest) {
     "Permissions-Policy",
     "camera=(), microphone=(), geolocation=()"
   )
-
-  const { pathname } = req.nextUrl
 
   // Allow public routes without any auth checks
   if (publicRoutes.some(route => pathname.startsWith(route))) {

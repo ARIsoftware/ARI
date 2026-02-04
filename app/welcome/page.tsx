@@ -298,9 +298,12 @@ export default function WelcomePage() {
                 <div>
                   {/* Header section with gradient background */}
                   <div className="border-b border-zinc-100 px-6 py-5" style={{ background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <h2 className="text-2xl font-semibold text-zinc-900">GitHub Setup</h2>
+                    <div className="flex items-center gap-2.5">
+                      <h2 className="text-2xl font-semibold text-zinc-900">GitHub Setup</h2>
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-600 text-white">FREE</span>
+                    </div>
                     <p className="mt-1 text-sm text-zinc-500">
-                      Create a GitHub repository for your ARI instance. This enables version control, easy deployment to Vercel, and the ability to receive updates.
+                      Create a GitHub repository for your ARI instance. This enables version control, easy deployment to Vercel, and the ability to receive updates. GitHub offers a free tier. Please check their website for details.
                     </p>
                   </div>
 
@@ -397,9 +400,12 @@ git push -u origin main`}
                 <div>
                   {/* Header section with gradient background */}
                   <div className="border-b border-zinc-100 px-6 py-5" style={{ background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <h2 className="text-2xl font-semibold text-zinc-900">Database &amp; Authentication</h2>
+                    <div className="flex items-center gap-2.5">
+                      <h2 className="text-2xl font-semibold text-zinc-900">Database &amp; Authentication</h2>
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-600 text-white">FREE</span>
+                    </div>
                     <p className="mt-1 text-sm text-zinc-500">
-                      Configure your PostgreSQL database connection and authentication. You&apos;ll need API keys, the database connection string, and we&apos;ll generate a secure auth secret for you.
+                      Configure your PostgreSQL database connection and authentication. You&apos;ll need API keys, the database connection string, and we&apos;ll generate a secure auth secret for you. Supabase offers a free tier. Please check their website for details.
                     </p>
                   </div>
 
@@ -678,7 +684,10 @@ git push -u origin main`}
                 <div>
                   {/* Header section with gradient background */}
                   <div className="border-b border-zinc-100 px-6 py-5" style={{ background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <h2 className="text-2xl font-semibold text-zinc-900">OpenAI Configuration</h2>
+                    <div className="flex items-center gap-2.5">
+                      <h2 className="text-2xl font-semibold text-zinc-900">OpenAI Configuration</h2>
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-600 text-white">OPTIONAL</span>
+                    </div>
                     <p className="mt-1 text-sm text-zinc-500">
                       Enable AI-powered features like the /assist chat interface. You can skip this step if you don&apos;t need AI features.
                     </p>
@@ -787,9 +796,13 @@ git push -u origin main`}
                 <div>
                   {/* Header section with gradient background */}
                   <div className="border-b border-zinc-100 px-6 py-5" style={{ background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <h2 className="text-2xl font-semibold text-zinc-900">Resend Configuration</h2>
+                    <div className="flex items-center gap-2.5">
+                      <h2 className="text-2xl font-semibold text-zinc-900">Resend Configuration</h2>
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-600 text-white">FREE</span>
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-600 text-white">OPTIONAL</span>
+                    </div>
                     <p className="mt-1 text-sm text-zinc-500">
-                      Enable email sending and the <strong>Mail Stream</strong> module. Resend lets you send transactional emails and track their delivery status in real-time.
+                      Enable email sending and the <strong>Mail Stream</strong> module. Resend lets you send transactional emails and track their delivery status in real-time. Resend offers a free tier. Please check their website for details.
                     </p>
                   </div>
 
@@ -1009,9 +1022,12 @@ git push -u origin main`}
                 <div>
                   {/* Header section with gradient background */}
                   <div className="border-b border-zinc-100 px-6 py-5" style={{ background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <h2 className="text-2xl font-semibold text-zinc-900">Vercel Deployment</h2>
+                    <div className="flex items-center gap-2.5">
+                      <h2 className="text-2xl font-semibold text-zinc-900">Vercel Deployment</h2>
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-600 text-white">FREE</span>
+                    </div>
                     <p className="mt-1 text-sm text-zinc-500">
-                      Deploy your app to the cloud with Vercel. You can skip this for local development only.
+                      Deploy your app to the cloud with Vercel. You can skip this for local development only. Vercel offers a free tier. Please check their website for details.
                     </p>
                   </div>
 
@@ -1269,8 +1285,8 @@ git push -u origin main`}
                         className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
                         style={{ borderRadius: '6px' }}
                       >
-                        Finish Setup
-                        <ArrowRight className="w-4 h-4" />
+                        I have completed all steps
+                        <Check className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
