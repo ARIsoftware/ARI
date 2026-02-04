@@ -12,8 +12,8 @@ const STEPS = [
   { id: "supabase", label: "Supabase" },
   { id: "openai", label: "OpenAI" },
   { id: "resend", label: "Resend" },
+  { id: "download", label: "Local Environment" },
   { id: "vercel", label: "Vercel" },
-  { id: "download", label: "Download" },
 ]
 
 // Icon components that accept className for dynamic sizing

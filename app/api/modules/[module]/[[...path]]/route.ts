@@ -148,6 +148,16 @@ const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
     '': () => import('@/modules/daily-fitness/api/route'), // GET/POST/PUT/DELETE for fitness tasks
     'stats': () => import('@/modules/daily-fitness/api/stats/route'), // GET for fitness stats
     'sample': () => import('@/modules/daily-fitness/api/sample/route') // POST for sample tasks
+  },
+  'backup-manager': {
+    'settings': () => import('@/modules/backup-manager/api/settings/route'), // GET/PUT for backup settings
+    'list': () => import('@/modules/backup-manager/api/list/route'), // GET for backup list
+    'create': () => import('@/modules/backup-manager/api/create/route'), // POST for create backup
+    'status': () => import('@/modules/backup-manager/api/status/route'), // GET for scheduling status
+    'scheduled': () => import('@/modules/backup-manager/api/scheduled/route'), // GET for scheduled backup (cron)
+    'download/[id]': () => import('@/modules/backup-manager/api/download/[id]/route'), // GET for download backup
+    'delete/[id]': () => import('@/modules/backup-manager/api/delete/[id]/route'), // DELETE for delete backup
+    'restore/[id]': () => import('@/modules/backup-manager/api/restore/[id]/route') // POST for restore backup
   }
 }
 
