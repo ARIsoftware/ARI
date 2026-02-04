@@ -49,7 +49,7 @@ const generateAuthSecret = () => {
   return btoa(String.fromCharCode(...array))
 }
 
-const STEP_ORDER = ["github", "supabase", "openai", "resend", "vercel", "download"]
+const STEP_ORDER = ["github", "supabase", "openai", "resend", "download", "vercel"]
 
 export default function WelcomePage() {
   const [completedLines, setCompletedLines] = useState<string[]>([])
@@ -283,7 +283,7 @@ export default function WelcomePage() {
             <h1 className="text-4xl font-light tracking-tight text-zinc-900 mb-3">
               Configure ARI
             </h1>
-            <p className="text-zinc-500" style={{ lineHeight: '26px', fontSize: '16px', fontWeight: 300 }}>
+            <p className="text-black" style={{ lineHeight: '26px', fontSize: '16px', fontWeight: 300 }}>
               Configure your environment to get ARI running. This step is about preparing your local setup so the application can run smoothly. Nothing here is difficult, but it does require a bit of care and attention to detail. This entire setup process should take around 10 to 20 minutes, depending on your system and familiarity with the tools involved.
             </p>
           </div>
@@ -302,7 +302,7 @@ export default function WelcomePage() {
                       <h2 className="text-2xl font-semibold text-zinc-900">GitHub Setup</h2>
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-600 text-white">FREE</span>
                     </div>
-                    <p className="mt-1 text-sm text-zinc-500">
+                    <p className="mt-1 text-base text-black" style={{ lineHeight: '1.6' }}>
                       Create a GitHub repository for your ARI instance. This enables version control, easy deployment to Vercel, and the ability to receive updates. GitHub offers a free tier. Please check their website for details.
                     </p>
                   </div>
@@ -317,27 +317,27 @@ export default function WelcomePage() {
                           <div className="mt-2 h-full w-px bg-zinc-200" />
                         </div>
                         <div className="flex-1 pb-8">
-                          <h3 className="mb-3 text-base font-semibold text-zinc-900">Create a new repository</h3>
+                          <h3 className="mb-3 font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Create a new repository</h3>
                           <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
-                            <ol className="space-y-2.5">
-                              <li className="flex items-start gap-3 text-sm">
+                            <ol className="space-y-3">
+                              <li className="flex items-start gap-3 text-base" style={{ lineHeight: '1.6' }}>
                                 <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>1</span>
-                                <span className="text-zinc-500">
+                                <span className="text-black">
                                   Go to <a href="https://github.com/new" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
                                     github.com/new
                                     <ExternalLink className="h-3 w-3" />
                                   </a>
                                 </span>
                               </li>
-                              <li className="flex items-start gap-3 text-sm">
+                              <li className="flex items-start gap-3 text-base" style={{ lineHeight: '1.6' }}>
                                 <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>2</span>
-                                <span className="text-zinc-500">
-                                  Name your repository (e.g., <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">ari</code> or <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">my-ari</code>)
+                                <span className="text-black">
+                                  Name your repository (e.g., <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-sm font-mono text-zinc-700">ari</code> or <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-sm font-mono text-zinc-700">my-ari</code>)
                                 </span>
                               </li>
-                              <li className="flex items-start gap-3 text-sm">
+                              <li className="flex items-start gap-3 text-base" style={{ lineHeight: '1.6' }}>
                                 <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>3</span>
-                                <span className="text-zinc-500">
+                                <span className="text-black">
                                   Set it to <strong className="text-zinc-700">Private</strong> (recommended) and click <strong className="text-zinc-700">Create repository</strong>
                                 </span>
                               </li>
@@ -352,18 +352,18 @@ export default function WelcomePage() {
                           <div className="flex w-10 h-10 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-sm font-semibold">2</div>
                         </div>
                         <div className="flex-1">
-                          <h3 className="mb-3 text-base font-semibold text-zinc-900">Push your code</h3>
-                          <p className="mb-3 text-sm text-zinc-500">In your project folder, run these commands one line at a time:</p>
+                          <h3 className="mb-3 font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Push your code</h3>
+                          <p className="mb-3 text-base text-black" style={{ lineHeight: '1.6' }}>In your project folder, run these commands one line at a time:</p>
                           <CodeBlock
                             language="bash"
                             code={`git init
 git add .
-git commit -m "Initial commit"
+git commit -m "Hello ARI.Software!"
 git branch -M main
 git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
 git push -u origin main`}
                           />
-                          <p className="mt-3 text-xs text-zinc-500">
+                          <p className="mt-3 text-sm text-black" style={{ lineHeight: '1.6' }}>
                             Replace <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-zinc-600">YOUR_USERNAME</code> and <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-zinc-600">YOUR_REPO</code> with your GitHub username and repository name
                           </p>
                         </div>
@@ -404,7 +404,7 @@ git push -u origin main`}
                       <h2 className="text-2xl font-semibold text-zinc-900">Database &amp; Authentication</h2>
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-600 text-white">FREE</span>
                     </div>
-                    <p className="mt-1 text-sm text-zinc-500">
+                    <p className="mt-1 text-sm text-black">
                       Configure your PostgreSQL database connection and authentication. You&apos;ll need API keys, the database connection string, and we&apos;ll generate a secure auth secret for you. Supabase offers a free tier. Please check their website for details.
                     </p>
                   </div>
@@ -416,7 +416,7 @@ git push -u origin main`}
                     <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       1
                     </div>
-                    <h3 className="text-base font-semibold text-zinc-900">Create a FREE Supabase account</h3>
+                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Create a FREE Supabase account</h3>
                   </div>
 
                   <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
@@ -425,7 +425,7 @@ git push -u origin main`}
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           1
                         </span>
-                        <span className="text-zinc-500">
+                        <span className="text-black">
                           Go to <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
                             supabase.com
                             <ExternalLink className="h-3 w-3" />
@@ -436,13 +436,13 @@ git push -u origin main`}
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           2
                         </span>
-                        <span className="text-zinc-500">Create a new project (free tier)</span>
+                        <span className="text-black">Create a new project (free tier)</span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           3
                         </span>
-                        <span className="text-zinc-500">
+                        <span className="text-black">
                           Go to <a href="https://supabase.com/dashboard/project/_/settings/api" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
                             Project Settings &rarr; API
                             <ExternalLink className="h-3 w-3" />
@@ -453,7 +453,7 @@ git push -u origin main`}
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           4
                         </span>
-                        <span className="text-zinc-500">Copy each key below</span>
+                        <span className="text-black">Copy each key below</span>
                       </li>
                     </ol>
                   </div>
@@ -532,7 +532,7 @@ git push -u origin main`}
                     <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       2
                     </div>
-                    <h3 className="text-base font-semibold text-zinc-900">Get your Database Connection String</h3>
+                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Get your Database Connection String</h3>
                   </div>
 
                   <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
@@ -541,7 +541,7 @@ git push -u origin main`}
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           1
                         </span>
-                        <span className="text-zinc-500">
+                        <span className="text-black">
                           Go to <a href="https://supabase.com/dashboard/project/_/settings/database" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
                             Project Settings &rarr; Database
                             <ExternalLink className="h-3 w-3" />
@@ -552,19 +552,19 @@ git push -u origin main`}
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           2
                         </span>
-                        <span className="text-zinc-500">Scroll to <strong className="text-zinc-700">Connection string</strong> section</span>
+                        <span className="text-black">Scroll to <strong className="text-zinc-700">Connection string</strong> section</span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           3
                         </span>
-                        <span className="text-zinc-500">Select <strong className="text-zinc-700">URI</strong> tab and copy the connection string</span>
+                        <span className="text-black">Select <strong className="text-zinc-700">URI</strong> tab and copy the connection string</span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           4
                         </span>
-                        <span className="text-zinc-500">Replace <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">[YOUR-PASSWORD]</code> with your database password</span>
+                        <span className="text-black">Replace <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">[YOUR-PASSWORD]</code> with your database password</span>
                       </li>
                     </ol>
                   </div>
@@ -601,7 +601,7 @@ git push -u origin main`}
                     <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       3
                     </div>
-                    <h3 className="text-base font-semibold text-zinc-900">Authentication Secret</h3>
+                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Authentication Secret</h3>
                   </div>
 
                   <Alert className="bg-blue-50 border-blue-200">
@@ -648,6 +648,17 @@ git push -u origin main`}
                     </div>
                   </div>
 
+                  {/* Backup Warning */}
+                  <Alert variant="destructive" className="bg-red-50 border-red-200">
+                    <Shield className="w-4 h-4 text-red-600" />
+                    <AlertTitle className="text-red-800">Important: Database Backups</AlertTitle>
+                    <AlertDescription className="text-red-700">
+                      Supabase free tier does not include automated daily backups. You are responsible for setting up your own backup solution.
+                      Learn more about <a href="https://supabase.com/docs/guides/platform/backups" target="_blank" rel="noopener noreferrer" className="font-medium underline hover:no-underline">Supabase backups</a>.
+                      The <strong>Backup Manager</strong> module in ARI can help you set up daily backups.
+                    </AlertDescription>
+                  </Alert>
+
                   {/* Footer */}
                   <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
                     <button
@@ -688,7 +699,7 @@ git push -u origin main`}
                       <h2 className="text-2xl font-semibold text-zinc-900">OpenAI Configuration</h2>
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-600 text-white">OPTIONAL</span>
                     </div>
-                    <p className="mt-1 text-sm text-zinc-500">
+                    <p className="mt-1 text-sm text-black">
                       Enable AI-powered features like the /assist chat interface. You can skip this step if you don&apos;t need AI features.
                     </p>
                   </div>
@@ -699,7 +710,7 @@ git push -u origin main`}
                     <Zap className="w-4 h-4 text-purple-600" />
                     <AlertTitle className="text-purple-800">Optional</AlertTitle>
                     <AlertDescription className="text-purple-700">
-                      OpenAI integration is optional. Skip this step if you don&apos;t need AI-powered features.
+                      OpenAI integration is optional. Skip this step if you don&apos;t need AI-powered chat features.
                     </AlertDescription>
                   </Alert>
 
@@ -708,7 +719,7 @@ git push -u origin main`}
                     <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       1
                     </div>
-                    <h3 className="text-base font-semibold text-zinc-900">Create a FREE OpenAI account</h3>
+                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Create a FREE OpenAI account</h3>
                   </div>
 
                   <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
@@ -717,7 +728,7 @@ git push -u origin main`}
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           1
                         </span>
-                        <span className="text-zinc-500">
+                        <span className="text-black">
                           Visit <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
                             OpenAI Platform
                             <ExternalLink className="h-3 w-3" />
@@ -728,19 +739,19 @@ git push -u origin main`}
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           2
                         </span>
-                        <span className="text-zinc-500">Click <strong className="text-zinc-700">&quot;Create new secret key&quot;</strong></span>
+                        <span className="text-black">Click <strong className="text-zinc-700">&quot;Create new secret key&quot;</strong></span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           3
                         </span>
-                        <span className="text-zinc-500">Copy the key immediately (it won&apos;t be shown again)</span>
+                        <span className="text-black">Copy the key immediately (it won&apos;t be shown again)</span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           4
                         </span>
-                        <span className="text-zinc-500">Paste it below</span>
+                        <span className="text-black">Paste it below</span>
                       </li>
                     </ol>
                   </div>
@@ -801,7 +812,7 @@ git push -u origin main`}
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-600 text-white">FREE</span>
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-600 text-white">OPTIONAL</span>
                     </div>
-                    <p className="mt-1 text-sm text-zinc-500">
+                    <p className="mt-1 text-sm text-black">
                       Enable email sending and the <strong>Mail Stream</strong> module. Resend lets you send transactional emails and track their delivery status in real-time. Resend offers a free tier. Please check their website for details.
                     </p>
                   </div>
@@ -813,7 +824,7 @@ git push -u origin main`}
                     <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       1
                     </div>
-                    <h3 className="text-base font-semibold text-zinc-900">Get your Resend API Key</h3>
+                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Get your Resend API Key</h3>
                   </div>
 
                   <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
@@ -822,7 +833,7 @@ git push -u origin main`}
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           1
                         </span>
-                        <span className="text-zinc-500">
+                        <span className="text-black">
                           Go to <a href="https://resend.com/api-keys" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
                             Resend Dashboard &rarr; API Keys
                             <ExternalLink className="h-3 w-3" />
@@ -833,7 +844,7 @@ git push -u origin main`}
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           2
                         </span>
-                        <span className="text-zinc-500">Click <strong className="text-zinc-700">Create API Key</strong> and copy the key</span>
+                        <span className="text-black">Click <strong className="text-zinc-700">Create API Key</strong> and copy the key</span>
                       </li>
                     </ol>
                   </div>
@@ -865,7 +876,7 @@ git push -u origin main`}
                     <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       2
                     </div>
-                    <h3 className="text-base font-semibold text-zinc-900">Set up Webhook for Mail Stream Module</h3>
+                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Set up Webhook for Mail Stream Module</h3>
                   </div>
 
                   <Alert className="bg-blue-50 border-blue-200">
@@ -883,7 +894,7 @@ git push -u origin main`}
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           1
                         </span>
-                        <span className="text-zinc-500">
+                        <span className="text-black">
                           Go to <a href="https://resend.com/webhooks" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
                             Resend Dashboard &rarr; Webhooks
                             <ExternalLink className="h-3 w-3" />
@@ -894,32 +905,32 @@ git push -u origin main`}
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           2
                         </span>
-                        <span className="text-zinc-500">Click <strong className="text-zinc-700">Add Webhook</strong></span>
+                        <span className="text-black">Click <strong className="text-zinc-700">Add Webhook</strong></span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           3
                         </span>
                         <div className="flex-1">
-                          <span className="text-zinc-500 block mb-2">Enter your webhook endpoint URL:</span>
+                          <span className="text-black block mb-2">Enter your webhook endpoint URL:</span>
                           <CodeBlock
                             language="url"
                             code="https://YOUR-DOMAIN/api/modules/mail-stream/webhook"
                           />
-                          <p className="text-xs text-zinc-500 mt-2">Replace YOUR-DOMAIN with your actual domain</p>
+                          <p className="text-xs text-black mt-2">Replace YOUR-DOMAIN with your actual domain</p>
                         </div>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           4
                         </span>
-                        <span className="text-zinc-500">Select the events you want to track (recommended: <strong className="text-zinc-700">all events</strong>)</span>
+                        <span className="text-black">Select the events you want to track (recommended: <strong className="text-zinc-700">all events</strong>)</span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           5
                         </span>
-                        <span className="text-zinc-500">Click <strong className="text-zinc-700">Create</strong> to save the webhook</span>
+                        <span className="text-black">Click <strong className="text-zinc-700">Create</strong> to save the webhook</span>
                       </li>
                     </ol>
                   </div>
@@ -929,7 +940,7 @@ git push -u origin main`}
                     <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       3
                     </div>
-                    <h3 className="text-base font-semibold text-zinc-900">Copy the Webhook Signing Secret</h3>
+                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Copy the Webhook Signing Secret</h3>
                   </div>
 
                   <Alert className="bg-amber-50 border-amber-200">
@@ -947,19 +958,19 @@ git push -u origin main`}
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           1
                         </span>
-                        <span className="text-zinc-500">After creating the webhook, click on it to view details</span>
+                        <span className="text-black">After creating the webhook, click on it to view details</span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           2
                         </span>
-                        <span className="text-zinc-500">Copy the <strong className="text-zinc-700">Signing Secret</strong> (starts with <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">whsec_</code>)</span>
+                        <span className="text-black">Copy the <strong className="text-zinc-700">Signing Secret</strong> (starts with <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">whsec_</code>)</span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           3
                         </span>
-                        <span className="text-zinc-500">Paste it below</span>
+                        <span className="text-black">Paste it below</span>
                       </li>
                     </ol>
                   </div>
@@ -1026,7 +1037,7 @@ git push -u origin main`}
                       <h2 className="text-2xl font-semibold text-zinc-900">Vercel Deployment</h2>
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-600 text-white">FREE</span>
                     </div>
-                    <p className="mt-1 text-sm text-zinc-500">
+                    <p className="mt-1 text-sm text-black">
                       Deploy your app to the cloud with Vercel. You can skip this for local development only. Vercel offers a free tier. Please check their website for details.
                     </p>
                   </div>
@@ -1048,7 +1059,7 @@ git push -u origin main`}
                     <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       1
                     </div>
-                    <h3 className="text-base font-semibold text-zinc-900">Create a FREE Vercel Hobby account</h3>
+                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Create a FREE Vercel Hobby account</h3>
                   </div>
 
                   <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
@@ -1057,7 +1068,7 @@ git push -u origin main`}
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           1
                         </span>
-                        <span className="text-zinc-500">
+                        <span className="text-black">
                           Go to <a href="https://vercel.com/signup" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
                             vercel.com/signup
                             <ExternalLink className="h-3 w-3" />
@@ -1068,7 +1079,7 @@ git push -u origin main`}
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           2
                         </span>
-                        <span className="text-zinc-500">
+                        <span className="text-black">
                           Install Vercel CLI: <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">npm install -g vercel</code>
                         </span>
                       </li>
@@ -1076,7 +1087,7 @@ git push -u origin main`}
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           3
                         </span>
-                        <span className="text-zinc-500">
+                        <span className="text-black">
                           Run <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">vercel login</code> in your terminal
                         </span>
                       </li>
@@ -1084,7 +1095,7 @@ git push -u origin main`}
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           4
                         </span>
-                        <span className="text-zinc-500">
+                        <span className="text-black">
                           Run <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">vercel link</code> to connect your project
                         </span>
                       </li>
@@ -1092,7 +1103,7 @@ git push -u origin main`}
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           5
                         </span>
-                        <span className="text-zinc-500">Add environment variables in Vercel dashboard</span>
+                        <span className="text-black">Add environment variables in Vercel dashboard</span>
                       </li>
                     </ol>
                   </div>
@@ -1151,8 +1162,8 @@ git push -u origin main`}
                 <div>
                   {/* Header section with gradient background */}
                   <div className="border-b border-zinc-100 px-6 py-5" style={{ background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <h2 className="text-2xl font-semibold text-zinc-900">Download &amp; Finish</h2>
-                    <p className="mt-1 text-sm text-zinc-500">
+                    <h2 className="text-2xl font-semibold text-zinc-900">Download .env.local file</h2>
+                    <p className="mt-1 text-sm text-black">
                       Your environment configuration is ready. Download the files and place them in your project root directory.
                     </p>
                   </div>
@@ -1161,10 +1172,11 @@ git push -u origin main`}
                   <div className="p-6 space-y-6">
                   <Alert className="bg-green-50 border-green-200">
                     <CheckCircle className="w-4 h-4 text-green-600" />
-                    <AlertTitle className="text-green-800">Setup Complete!</AlertTitle>
+                    <AlertTitle className="text-green-800">What is .env.local?</AlertTitle>
                     <AlertDescription className="text-green-700">
-                      Your environment configuration is ready. Download the files and place them
-                      in your project root directory.
+                      The <strong>.env.local</strong> file stores your environment variables (API keys, database credentials, secrets) for local development.
+                      This file is automatically ignored by Git, keeping your sensitive data private.
+                      Place it in your project root directory (next to the package.json file).
                     </AlertDescription>
                   </Alert>
 
