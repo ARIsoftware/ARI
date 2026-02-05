@@ -150,19 +150,57 @@ function isValidTableName(tableName: string, validTables: string[]): boolean {
   return validTables.includes(tableName) && /^[a-z_][a-z0-9_]*$/i.test(tableName)
 }
 
-// Get table schema information using SQL query
-async function getTableSchema(client: any, tableName: string, validTables: string[]) {
-  // Security: Validate tableName against whitelist before using in SQL
-  if (!isValidTableName(tableName, validTables)) {
-    logger.warn(`Invalid table name rejected: ${tableName}`)
-    return []
+// Discover all table schemas upfront in a single query
+// This is more efficient and reliable than per-table queries
+async function discoverAllSchemas(client: any, tables: string[]): Promise<Record<string, any[]>> {
+  const allSchemas: Record<string, any[]> = {}
+
+  // Initialize empty arrays for all tables
+  for (const table of tables) {
+    allSchemas[table] = []
   }
 
   try {
-    // Query information_schema directly using SQL
-    // Note: tableName is validated against whitelist above
+    // METHOD 1: Try dedicated get_all_table_columns() RPC (most reliable)
+    logger.info('Attempting schema discovery via get_all_table_columns() RPC...')
+    try {
+      const { data, error } = await client.rpc('get_all_table_columns')
+      if (!error && data && Array.isArray(data) && data.length > 0) {
+        logger.info(`✅ Got all schemas via get_all_table_columns: ${data.length} columns total`)
+
+        // Organize by table
+        for (const row of data) {
+          const tableName = row.table_name
+          if (tables.includes(tableName)) {
+            if (!allSchemas[tableName]) {
+              allSchemas[tableName] = []
+            }
+            allSchemas[tableName].push({
+              column_name: row.column_name,
+              data_type: row.data_type,
+              is_nullable: row.is_nullable,
+              column_default: row.column_default,
+              character_maximum_length: row.character_maximum_length,
+              ordinal_position: row.ordinal_position
+            })
+          }
+        }
+
+        const tablesWithSchema = Object.entries(allSchemas).filter(([_, cols]) => cols.length > 0).length
+        logger.info(`Schema discovery complete: ${tablesWithSchema}/${tables.length} tables have schema`)
+        return allSchemas
+      } else if (error) {
+        logger.warn('get_all_table_columns RPC failed:', error.message || error)
+      }
+    } catch (rpcError: any) {
+      logger.warn('get_all_table_columns RPC not available:', rpcError.message)
+    }
+
+    // METHOD 2: Try exec_sql RPC with information_schema query
+    logger.info('Attempting schema discovery via exec_sql RPC...')
     const query = `
       SELECT
+        table_name,
         column_name,
         data_type,
         is_nullable,
@@ -171,118 +209,162 @@ async function getTableSchema(client: any, tableName: string, validTables: strin
         ordinal_position
       FROM information_schema.columns
       WHERE table_schema = 'public'
-        AND table_name = '${tableName}'
-      ORDER BY ordinal_position;
+      ORDER BY table_name, ordinal_position
     `
 
-    // Use try-catch instead of .catch() on promise for clearer error handling
-    let data = null
-    let error = null
     try {
       const result = await client.rpc('exec_sql', { query })
-      data = result.data
-      error = result.error
-    } catch (rpcError: any) {
-      logger.warn(`RPC call failed for schema of ${tableName}:`, rpcError.message)
-    }
+      if (!result.error && result.data && Array.isArray(result.data) && result.data.length > 0) {
+        logger.info(`✅ Got all schemas via exec_sql: ${result.data.length} columns total`)
 
-    if (!error && data && Array.isArray(data) && data.length > 0) {
-      logger.info(`Got schema for ${tableName} via RPC: ${data.length} columns`)
-      return data
-    }
-
-    // Fallback: Get a sample row and infer types
-    logger.info(`RPC unavailable for ${tableName}, using sample row fallback`)
-    const { data: sampleData } = await client
-      .from(tableName)
-      .select('*')
-      .limit(1)
-      .single()
-
-    if (sampleData) {
-      // Build basic schema from sample data
-      const schema = Object.entries(sampleData).map(([columnName, value], index) => {
-        let dataType = 'text'
-        let isNullable = value === null ? 'YES' : 'NO'
-
-        if (value === null) {
-          dataType = 'text'
-        } else if (typeof value === 'boolean') {
-          dataType = 'boolean'
-        } else if (typeof value === 'number') {
-          dataType = Number.isInteger(value) ? 'integer' : 'numeric'
-        } else if (typeof value === 'string') {
-          // Check if it's a UUID
-          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
-            dataType = 'uuid'
-          } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
-            dataType = 'timestamp with time zone'
-          } else if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-            dataType = 'date'
-          } else {
-            dataType = 'text'
+        for (const row of result.data) {
+          const tableName = row.table_name
+          if (tables.includes(tableName)) {
+            if (!allSchemas[tableName]) {
+              allSchemas[tableName] = []
+            }
+            allSchemas[tableName].push({
+              column_name: row.column_name,
+              data_type: row.data_type,
+              is_nullable: row.is_nullable,
+              column_default: row.column_default,
+              character_maximum_length: row.character_maximum_length,
+              ordinal_position: row.ordinal_position
+            })
           }
-        } else if (Array.isArray(value)) {
-          dataType = 'array'  // Use lowercase to match PostgreSQL
-        } else if (typeof value === 'object') {
-          dataType = 'jsonb'
         }
 
-        return {
-          column_name: columnName,
-          data_type: dataType,
-          is_nullable: isNullable,
-          column_default: columnName === 'id' ? 'gen_random_uuid()' : (columnName.includes('created_at') || columnName.includes('updated_at') ? 'now()' : null),
-          character_maximum_length: null,
-          ordinal_position: index + 1
-        }
-      })
-
-      logger.info(`Inferred schema for ${tableName}: ${schema.length} columns`)
-      return schema
+        const tablesWithSchema = Object.entries(allSchemas).filter(([_, cols]) => cols.length > 0).length
+        logger.info(`Schema discovery complete: ${tablesWithSchema}/${tables.length} tables have schema`)
+        return allSchemas
+      } else if (result.error) {
+        logger.warn('exec_sql for schemas failed:', result.error.message || result.error)
+      }
+    } catch (rpcError: any) {
+      logger.warn('exec_sql RPC call failed for schemas:', rpcError.message)
     }
 
-    logger.warn(`Could not get schema for table ${tableName} - no sample data available`)
-    return []
-  } catch (error) {
-    logger.error(`Error getting schema for table ${tableName}:`, error)
-    return []
+    // METHOD 3: Fallback warning - schema discovery failed
+    logger.warn('⚠️ Schema discovery failed - empty tables will not have CREATE TABLE statements')
+    logger.warn('Run /migrations/backup_system_functions.sql in Supabase to enable full schema discovery')
+
+    return allSchemas
+  } catch (error: any) {
+    logger.error('Critical error in schema discovery:', error)
+    return allSchemas
   }
 }
 
+// Get schema for a single table (uses cached schemas or falls back to sample row)
+function getTableSchemaFromCache(
+  tableName: string,
+  cachedSchemas: Record<string, any[]>,
+  sampleData: any[] | null
+): any[] {
+  // First check cached schemas from bulk discovery
+  if (cachedSchemas[tableName] && cachedSchemas[tableName].length > 0) {
+    return cachedSchemas[tableName]
+  }
+
+  // Fallback: infer from sample data if available
+  if (sampleData && sampleData.length > 0) {
+    const sample = sampleData[0]
+    const schema = Object.entries(sample).map(([columnName, value], index) => {
+      let dataType = 'text'
+
+      if (value === null) {
+        dataType = 'text'
+      } else if (typeof value === 'boolean') {
+        dataType = 'boolean'
+      } else if (typeof value === 'number') {
+        dataType = Number.isInteger(value) ? 'integer' : 'numeric'
+      } else if (typeof value === 'string') {
+        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
+          dataType = 'uuid'
+        } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+          dataType = 'timestamp with time zone'
+        } else if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          dataType = 'date'
+        } else {
+          dataType = 'text'
+        }
+      } else if (Array.isArray(value)) {
+        dataType = 'array'
+      } else if (typeof value === 'object') {
+        dataType = 'jsonb'
+      }
+
+      return {
+        column_name: columnName,
+        data_type: dataType,
+        is_nullable: 'YES',
+        column_default: columnName === 'id' ? 'gen_random_uuid()' :
+          (columnName.includes('created_at') || columnName.includes('updated_at') ? 'now()' : null),
+        character_maximum_length: null,
+        ordinal_position: index + 1
+      }
+    })
+
+    logger.info(`Inferred schema for ${tableName} from sample data: ${schema.length} columns`)
+    return schema
+  }
+
+  // No schema available
+  return []
+}
+
 // Get primary key constraints
-async function getTableConstraints(client: any, tableName: string) {
+async function getTableConstraints(client: any, tableName: string, validTables: string[]) {
+  // Security: Validate tableName against whitelist before using in SQL
+  if (!isValidTableName(tableName, validTables)) {
+    logger.warn(`Invalid table name rejected for constraints: ${tableName}`)
+    return { primaryKeys: [], uniqueKeys: [], foreignKeys: [] }
+  }
+
   try {
-    // Get primary key via RPC (may not be available)
-    let pkData = null
+    // Query information_schema via exec_sql RPC (Supabase doesn't expose information_schema via .from())
+    const constraintsQuery = `
+      SELECT constraint_name, constraint_type
+      FROM information_schema.table_constraints
+      WHERE table_schema = 'public'
+        AND table_name = '${tableName}'
+    `
+
+    const keyColumnsQuery = `
+      SELECT column_name, constraint_name
+      FROM information_schema.key_column_usage
+      WHERE table_schema = 'public'
+        AND table_name = '${tableName}'
+    `
+
+    let constraints: any[] = []
+    let keyColumns: any[] = []
+
+    // Try exec_sql RPC for constraints
     try {
-      const pkResult = await client.rpc('get_table_pk', { table_name: tableName })
-      pkData = pkResult.data
+      const constraintsResult = await client.rpc('exec_sql', { query: constraintsQuery })
+      if (!constraintsResult.error && constraintsResult.data) {
+        constraints = constraintsResult.data
+      }
+    } catch (rpcError: any) {
+      logger.info(`exec_sql not available for constraints on ${tableName}, skipping constraint discovery`)
+    }
+
+    // Try exec_sql RPC for key columns
+    try {
+      const keyColumnsResult = await client.rpc('exec_sql', { query: keyColumnsQuery })
+      if (!keyColumnsResult.error && keyColumnsResult.data) {
+        keyColumns = keyColumnsResult.data
+      }
     } catch {
-      // RPC not available, will use fallback below
+      // Already logged above
     }
 
-    // Fallback: query information_schema for constraints
-    const { data, error } = await client
-      .from('information_schema.table_constraints')
-      .select('constraint_name, constraint_type')
-      .eq('table_schema', 'public')
-      .eq('table_name', tableName)
-
-    if (error) {
-      logger.warn(`Could not get constraints for ${tableName}:`, error)
-      return { primaryKeys: [], uniqueKeys: [], foreignKeys: [] }
+    // If no constraints found via RPC, try to infer primary key from column names
+    if (constraints.length === 0) {
+      // Common convention: 'id' column is usually the primary key
+      return { primaryKeys: ['id'], uniqueKeys: [], foreignKeys: [] }
     }
-
-    // Get key column usage
-    const { data: keyData } = await client
-      .from('information_schema.key_column_usage')
-      .select('column_name, constraint_name')
-      .eq('table_schema', 'public')
-      .eq('table_name', tableName)
-
-    const constraints = data || []
-    const keyColumns = keyData || []
 
     const primaryKeys = constraints
       .filter((c: any) => c.constraint_type === 'PRIMARY KEY')
@@ -302,7 +384,7 @@ async function getTableConstraints(client: any, tableName: string) {
     return { primaryKeys, uniqueKeys, foreignKeys: [] }
   } catch (error) {
     logger.warn(`Could not get constraints for ${tableName}:`, error)
-    return { primaryKeys: [], uniqueKeys: [], foreignKeys: [] }
+    return { primaryKeys: ['id'], uniqueKeys: [], foreignKeys: [] }
   }
 }
 
@@ -432,6 +514,12 @@ export async function POST(req: NextRequest) {
       logger.warn('Discovery warnings:', warnings)
     }
 
+    // Discover all schemas upfront in a single query (more efficient and reliable)
+    logger.info('Discovering all table schemas upfront...')
+    const cachedSchemas = await discoverAllSchemas(client, tables)
+    const tablesWithCachedSchema = Object.entries(cachedSchemas).filter(([_, cols]) => cols.length > 0).length
+    logger.info(`Cached schemas for ${tablesWithCachedSchema}/${tables.length} tables`)
+
     const backupData: any = {}
     const tableSchemas: any = {}
     const tableConstraints: any = {}
@@ -439,60 +527,64 @@ export async function POST(req: NextRequest) {
     let totalRows = 0
     let errors: string[] = [...warnings]
 
-    // Use chunked fetching for large tables
+    // Process each table
     for (const table of tables) {
       try {
-        // Get table schema first (pass tables list for validation)
-        const schema = await getTableSchema(client, table, tables)
-        logger.info(`Schema for ${table}:`, schema?.length || 0, 'columns')
-        tableSchemas[table] = schema
-
-        // Get table constraints
-        const constraints = await getTableConstraints(client, table)
-        logger.info(`Constraints for ${table}:`, constraints)
-        tableConstraints[table] = constraints
-        
-        // Fetch data in chunks to avoid memory issues
+        // Fetch data first (we may need it for schema inference)
         const chunkSize = 1000
         let offset = 0
         let allData: any[] = []
         let hasMore = true
-        
+
         while (hasMore) {
-          const { data, error, count } = await client
+          const { data, error } = await client
             .from(table)
             .select('*', { count: 'exact' })
             .range(offset, offset + chunkSize - 1)
             .order('created_at', { ascending: true, nullsFirst: true })
-          
+
           if (error) {
             // Some tables might not have created_at, try without ordering
             const { data: unorderedData, error: unorderedError } = await client
               .from(table)
               .select('*')
               .range(offset, offset + chunkSize - 1)
-            
+
             if (unorderedError) {
               logger.warn(`Could not export ${table}:`, unorderedError)
               errors.push(`Warning: Could not export table ${table}`)
               hasMore = false
               continue
             }
-            
+
             allData = allData.concat(unorderedData || [])
             hasMore = (unorderedData?.length || 0) === chunkSize
           } else {
             allData = allData.concat(data || [])
             hasMore = (data?.length || 0) === chunkSize
           }
-          
+
           offset += chunkSize
         }
-        
+
         backupData[table] = allData
         checksums[table] = calculateChecksum(allData)
         totalRows += allData.length
-        
+
+        // Get schema from cache, or infer from data
+        const schema = getTableSchemaFromCache(table, cachedSchemas, allData)
+        if (schema.length > 0) {
+          logger.info(`Schema for ${table}: ${schema.length} columns`)
+        } else {
+          logger.warn(`No schema available for ${table} (empty table with no cached schema)`)
+        }
+        tableSchemas[table] = schema
+
+        // Get table constraints (pass tables list for validation)
+        const constraints = await getTableConstraints(client, table, tables)
+        logger.info(`Constraints for ${table}:`, constraints)
+        tableConstraints[table] = constraints
+
         logger.info(`Exported ${table}: ${allData.length} rows`)
       } catch (tableError: any) {
         logger.error(`Error exporting table ${table}:`, tableError)
