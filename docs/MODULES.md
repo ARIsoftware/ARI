@@ -206,10 +206,6 @@ These are the ONLY places where code/configuration must exist outside the module
 | `/app/api/modules/[module]/[[...path]]/route.ts` | API route imports in `MODULE_API_ROUTES` | If module has API |
 | `/lib/db/schema/schema.ts` | Drizzle table definition (see [Database Integration](#6-database-integration)) | If module has DB table |
 | `/app/debug/page.tsx` (~line 274) | Module ID to `registeredModules` array | Always |
-| `/app/debug/page.tsx` (~line 595) | Increment `expectedTables` count | If module has DB table |
-| `/app/api/backup/export/route.ts` | Table name to `COMPLETE_TABLE_LIST` | If module has DB table |
-| `/app/api/backup/verify/route.ts` | Table name to `COMPLETE_TABLE_LIST` | If module has DB table |
-| `/CLAUDE.md` | Table to Expected Tables list + update count | If module has DB table |
 
 **Developer must be informed**: When creating documentation or explaining module creation, always clearly list these external registration points.
 
@@ -507,45 +503,19 @@ Modules can add a quick access icon to the global top navigation bar:
 - [ ] **4.8 Update debug page**
 
   Edit `/app/debug/page.tsx`:
-  1. Add module ID to `registeredModules` array (~line 274):
-     ```typescript
-     const registeredModules = [
-       // ... existing modules
-       'my-module',
-     ]
-     ```
-  2. If module has DB table, increment `expectedTables` count (~line 595):
-     ```typescript
-     const expectedTables = 25 // Increment this number
-     ```
+  - Add module ID to `registeredModules` array (~line 274):
+    ```typescript
+    const registeredModules = [
+      // ... existing modules
+      'my-module',
+    ]
+    ```
 
-- [ ] **4.9 Update backup system** (if module has DB table)
-
-  Edit `/app/api/backup/export/route.ts` - add to `COMPLETE_TABLE_LIST`:
-  ```typescript
-  const COMPLETE_TABLE_LIST = [
-    // ... existing tables
-    'my_module_data',
-  ]
-  ```
-
-  Edit `/app/api/backup/verify/route.ts` - add to `COMPLETE_TABLE_LIST`:
-  ```typescript
-  const COMPLETE_TABLE_LIST = [
-    // ... existing tables
-    'my_module_data',
-  ]
-  ```
-
-- [ ] **4.10 Update CLAUDE.md** (if module has DB table)
-
-  Add table to "Expected Tables" section and update the count.
-
-- [ ] **4.11 Apply database migrations** (if needed)
+- [ ] **4.9 Apply database migrations** (if needed)
 
   Copy SQL from `modules/my-module/database/schema.sql` to Supabase SQL Editor and run.
 
-- [ ] **4.12 Test the module** - See [QA Verification Steps](#9-qa-verification-steps)
+- [ ] **4.10 Test the module** - See [QA Verification Steps](#11-qa-verification-steps)
 
 ---
 
@@ -857,23 +827,13 @@ import type { Item } from '@/modules-core/module-id/types'
 #### Step 5.6.4: Update Debug Page
 
 - [ ] Add module ID to `registeredModules` array in `/app/debug/page.tsx` (~line 274)
-- [ ] Increment `expectedTables` count in `/app/debug/page.tsx` (~line 595)
 - [ ] Run debug tests to verify module is recognized
 
-#### Step 5.6.5: Update Backup System
-
-- [ ] Add table name to `COMPLETE_TABLE_LIST` in `/app/api/backup/export/route.ts`
-- [ ] Add table name to `COMPLETE_TABLE_LIST` in `/app/api/backup/verify/route.ts`
-- [ ] Update expected table count in `CLAUDE.md` (Expected Tables section)
-- [ ] Add table to the numbered list in `CLAUDE.md`
-- [ ] Test backup export includes module data
-
-#### Step 5.6.6: Register Module (Steps 4.6 - 4.10)
+#### Step 5.6.5: Register Module (Steps 4.6 - 4.8)
 
 - [ ] Register page in MODULE_PAGES
 - [ ] Register API routes (if applicable)
 - [ ] Update debug page
-- [ ] Update backup system (if DB table)
 - [ ] Update CLAUDE.md (if DB table)
 
 ### Phase 7: Cleanup
@@ -1021,8 +981,6 @@ Closes #[issue-number]
 - [ ] README.md created
 - [ ] Module registry regenerated
 - [ ] Debug page updated
-- [ ] Backup system updated
-- [ ] CLAUDE.md updated
 - [ ] Old imports updated
 - [ ] Static menu entry removed
 - [ ] Old files deleted
