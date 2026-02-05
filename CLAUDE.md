@@ -484,45 +484,18 @@ User-friendly interface with:
 |--------|-------|-------------|--------------|--------|
 | **RPC Function** | Fast | 100% | Requires migration | ✅ Optimal |
 | **Raw SQL** | Fast | 95% | `exec_sql()` function | ⚠️ Fallback |
-| **Individual Validation** | Slow | 90% | None | ⚠️ Manual |
-| **Hardcoded List** | Instant | 80% | None | 🚨 Critical |
+| **Information Schema** | Medium | 90% | None | ⚠️ Manual |
 
 **If using fallback**: The system still works but may not discover new tables automatically. Run `/migrations/backup_system_functions.sql` for optimal performance.
 
-### Expected Tables (33 as of February 2026)
-1. `tasks` - Task management
-2. `fitness_database` - Fitness tasks
-3. `contacts` - Contact management
-4. `fitness_completion_history` - Fitness tracking
-5. `hyrox_station_records` - HYROX performance
-6. `hyrox_workouts` - HYROX training
-7. `hyrox_workout_stations` - HYROX station data
-8. `northstar` - Goal tracking
-9. `motivation_content` - Motivational content
-10. `shipments` - Shipment tracking
-11. `journal` - Journal entries
-12. `notepad` - Note-taking
-13. `notepad_revisions` - Note history
-14. `user_feature_preferences` - Feature toggles
-15. `winter_arc_goals` - Winter Arc goals
-16. `contribution_graph` - Activity tracking
-17. `hello_world_entries` - Module demo data
-18. `module_migrations` - Module version tracking
-19. `module_settings` - Module configuration
-20. `major_projects` - Major Projects / Delulu Projects management
-21. `quotes` - Quotes module data
-22. `travel` - South Africa trip tasks and packing list
-23. `travel_activities` - South Africa trip activities (stays and events)
-24. `ohtani_grid_cells` - Ohtani module grid data
-25. `gratitude_entries` - Daily gratitude journal entries
-26. `knowledge_articles` - Knowledge Manager articles with tags
-27. `knowledge_collections` - Knowledge Manager collections/folders
-28. `mail_stream_events` - Mail Stream module webhook events from Resend
-29. `mail_stream_settings` - Mail Stream module retention settings
-30. `documents` - Documents module file metadata
-31. `document_folders` - Documents module folder structure
-32. `document_tags` - Documents module tags
-33. `document_tag_assignments` - Documents module file-tag relationships
+### Dynamic Table Discovery
+
+Tables are discovered dynamically from the database using PostgreSQL's `information_schema.tables`. This approach:
+- **Automatically includes new tables** when modules are added
+- **No manual maintenance required** - no hardcoded lists to update
+- **Always accurate** - the database knows what tables it has
+
+System tables (like `spatial_ref_sys`, `schema_migrations`, etc.) are automatically excluded via the `EXCLUDED_TABLES` blocklist.
 
 ### Usage Guide
 
@@ -559,7 +532,7 @@ User-friendly interface with:
 ### Validation Checklist
 
 Before trusting your backup system, verify:
-- ✅ All 19 tables discovered (check `/debug` or Preview)
+- ✅ Tables discovered successfully (check `/debug` or Preview Backup)
 - ✅ Discovery method is "RPC Function" (optimal) or "Raw SQL" (acceptable)
 - ✅ No critical warnings displayed
 - ✅ Export includes correct row counts
@@ -569,13 +542,11 @@ Before trusting your backup system, verify:
 
 **Friendly Warnings** (system still works):
 - "Using Method 2 (raw SQL) - consider running migration"
-- "Using Method 3 (fallback) - RPC functions not available"
-- "Found new tables not in known list" - Update expected table list
+- "Using Method 3 (information_schema) - RPC functions not available"
 
 **Critical Warnings** (needs attention):
-- "CRITICAL: All discovery methods failed - using hardcoded list"
-- "Missing expected tables" - Some tables not accessible
-- "Only found X/19 tables" - Database access issues
+- "CRITICAL: All discovery methods failed" - Check database connection
+- "No tables discovered" - Run `/migrations/backup_system_functions.sql`
 
 ### Files Modified/Created (October 2025)
 
