@@ -12,6 +12,7 @@ import type { ThemeSettings, ThemeColors, CustomTheme, ThemePreset, SidebarView 
 import { THEME_PRESETS, DEFAULT_THEME_ID, getThemeById } from './presets'
 import { FONTS, DEFAULT_FONT_ID, getFontById, getFontFamily } from './fonts'
 import { CSS_VAR_MAP } from './types'
+import { authClient } from '@/lib/auth-client'
 
 interface ThemeContextValue {
   // Theme state
@@ -84,6 +85,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
+  // Get auth session to check if user is authenticated
+  const { data: sessionData, isPending: isAuthPending } = authClient.useSession()
+
   // Get current theme object (check for customization first)
   const currentTheme: ThemePreset | CustomTheme | null =
     customThemes.find((t) => t.basePresetId === activeThemeId) ??
@@ -93,7 +97,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const isDarkMode = currentTheme?.category === 'dark'
 
-  // Load from cache immediately, then fetch from API
+  // Load from cache and handle migrations immediately on mount
   useEffect(() => {
     // Try to load from localStorage cache first (for instant load)
     const cached = localStorage.getItem(THEME_CACHE_KEY)
@@ -153,6 +157,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setActiveFont(mappedFont)
       applyFont(mappedFont)
     }
+  }, [])
+
+  // Fetch from API only when authenticated
+  useEffect(() => {
+    // Wait until auth state is determined
+    if (isAuthPending) return
+
+    // Not authenticated - skip API call and use cached/default
+    if (!sessionData?.session) {
+      setIsAuthenticated(false)
+      setIsLoading(false)
+      return
+    }
 
     // Fetch from API
     fetch('/api/theme')
@@ -183,13 +200,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(THEME_CACHE_KEY, JSON.stringify(settings))
       })
       .catch(() => {
-        // Not authenticated or error - use cached/default
+        // Error - use cached/default
         setIsAuthenticated(false)
       })
       .finally(() => {
         setIsLoading(false)
       })
-  }, [])
+  }, [isAuthPending, sessionData])
 
   // Save settings to API and cache
   const saveSettings = useCallback(
