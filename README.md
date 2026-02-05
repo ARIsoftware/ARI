@@ -6,6 +6,8 @@ Open Source. Self-Hosted. Full Data Control. Fully Extendable. AI Native. Dozens
 
 Engineered for those who want complete command over the software that runs their life. The first AI-enabled No Code workspace that can be completely customized to your workflow and grows with you. Build entirely new modules in minutes. Where mastery, modularity, and AI work in your favour so you can do your best work and live your best life.
 
+https://ari.software
+
 ---
 
 ## Prerequisites
