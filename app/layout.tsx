@@ -77,7 +77,7 @@ export default async function RootLayout({
         <meta name="robots" content="noindex, nofollow" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#000000" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="ARI" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
