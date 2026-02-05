@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -23,14 +24,21 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import { Download, Trash2, RotateCcw, Loader2 } from 'lucide-react'
-import { useBackupList, useDeleteBackup, downloadBackup, restoreBackup } from '../hooks/use-backup-manager'
+import { useBackupList, useDeleteBackup, useDownloadBackup, restoreBackup } from '../hooks/use-backup-manager'
 import { formatBytes, getTimeUntilExpiration } from '../lib/retention'
 import type { BackupMetadata } from '../types'
 
 export function BackupList() {
+  const router = useRouter()
   const { toast } = useToast()
   const { data: backups = [], isLoading, error } = useBackupList()
   const deleteBackup = useDeleteBackup()
+  const { downloadBackup, cleanup } = useDownloadBackup()
+
+  // Cleanup download on unmount
+  useEffect(() => {
+    return () => cleanup()
+  }, [cleanup])
 
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [restoreId, setRestoreId] = useState<string | null>(null)
@@ -86,8 +94,8 @@ export function BackupList() {
         title: 'Restore complete',
         description: result.message,
       })
-      // Reload the page after restore
-      setTimeout(() => window.location.reload(), 2000)
+      // Refresh the page data after restore
+      setTimeout(() => router.refresh(), 2000)
     } catch (err) {
       toast({
         variant: 'destructive',

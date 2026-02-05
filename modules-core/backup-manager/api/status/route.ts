@@ -6,6 +6,7 @@ import { moduleSettings } from '@/lib/db/schema/schema'
 import { getSchedulingMode, getNextBackupTime } from '../../lib/scheduler'
 import type { BackupManagerSettings, SchedulingStatus } from '../../types'
 import { DEFAULT_BACKUP_SETTINGS } from '../../types'
+import { logger } from '@/lib/logger'
 
 // Create service role client
 function getServiceSupabase() {
@@ -48,13 +49,17 @@ export async function GET() {
 
     // Get user timezone from user_preferences
     const supabase = getServiceSupabase()
-    const { data: prefs } = await supabase
-      .from('user_preferences')
-      .select('timezone')
-      .eq('user_id', user.id)
-      .single()
-
-    const timezone = prefs?.timezone || 'UTC'
+    let timezone = 'UTC'
+    try {
+      const { data: prefs } = await supabase
+        .from('user_preferences')
+        .select('timezone')
+        .eq('user_id', user.id)
+        .single()
+      timezone = prefs?.timezone || 'UTC'
+    } catch {
+      logger.info('[Backup Status] Could not fetch timezone, using UTC')
+    }
 
     // Determine scheduling mode
     const schedulingMode = getSchedulingMode()
@@ -66,7 +71,7 @@ export async function GET() {
       schedulingMode,
       scheduledTime: `12:00 PM ${timezone}`,
       limitation: schedulingMode === 'app-triggered'
-        ? 'Backups only run when the app is accessed'
+        ? 'Backups only run when the app is accessed.'
         : null,
       lastBackupAt: settings.lastBackupAt,
       nextBackupAt: settings.enabled ? nextBackupTime.toISOString() : null,
@@ -74,7 +79,8 @@ export async function GET() {
 
     return NextResponse.json(status)
   } catch (error) {
-    console.error('Failed to get backup status:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Failed to get backup status'
+    logger.error(`[Backup Status] Error: ${errorMessage}`)
     return NextResponse.json(
       { error: 'Failed to get backup status' },
       { status: 500 }

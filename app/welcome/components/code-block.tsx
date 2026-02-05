@@ -18,15 +18,15 @@ export function CodeBlock({ code, language = "bash" }: CodeBlockProps) {
   }
 
   return (
-    <div className="rounded-lg overflow-hidden border border-gray-800">
+    <div className="rounded-xl overflow-hidden border border-zinc-200 bg-zinc-50">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-[#2a2a2a]">
-        <span className="text-xs text-gray-400" style={{ fontFamily: 'Geist Mono, monospace' }}>
+      <div className="flex items-center justify-between px-4 py-2.5 bg-zinc-100 border-b border-zinc-200">
+        <span className="text-xs text-zinc-500 font-medium" style={{ fontFamily: 'Geist Mono, monospace' }}>
           {language}
         </span>
         <button
           onClick={handleCopy}
-          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors"
+          className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-900 transition-colors"
         >
           {copied ? (
             <>
@@ -42,8 +42,8 @@ export function CodeBlock({ code, language = "bash" }: CodeBlockProps) {
         </button>
       </div>
       {/* Code content */}
-      <div className="bg-[#1a1a1a] p-4">
-        <pre className="text-sm text-gray-100 whitespace-pre-wrap" style={{ fontFamily: 'Geist Mono, monospace' }}>
+      <div className="bg-zinc-50 p-4">
+        <pre className="text-sm text-zinc-800 whitespace-pre-wrap" style={{ fontFamily: 'Geist Mono, monospace' }}>
           {code}
         </pre>
       </div>

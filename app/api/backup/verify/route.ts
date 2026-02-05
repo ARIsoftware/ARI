@@ -20,56 +20,14 @@ const getServiceSupabase = () => {
   })
 }
 
-// Known complete table list (should match export route)
-const COMPLETE_TABLE_LIST = [
-  // Better Auth tables
-  'user',
-  'session',
-  'account',
-  'verification',
-  // Application tables
-  'tasks',
-  'fitness_database',
-  'contacts',
-  'fitness_completion_history',
-  'hyrox_station_records',
-  'hyrox_workouts',
-  'hyrox_workout_stations',
-  'northstar',
-  'motivation_content',
-  'shipments',
-  'journal',
-  'notepad',
-  'notepad_revisions',
-  'user_feature_preferences',
-  'winter_arc_goals',
-  'contribution_graph',
-  'hello_world_entries',
-  'module_migrations',
-  'module_settings',
-  'major_projects',
-  'quotes',
-  'travel',
-  'travel_activities',
-  'ohtani_grid_cells',
-  'gratitude_entries',
-  'knowledge_articles',
-  'knowledge_collections',
-  'ari_launch_entries',
-  'memento_settings',
-  'memento_milestones',
-  'memento_eras',
-  'mail_stream_events',
-  'mail_stream_settings',
-  // User preferences & Backup manager tables
-  'user_preferences',
-  'backup_metadata',
-  // Documents module tables
-  'documents',
-  'document_folders',
-  'document_tags',
-  'document_tag_assignments',
-]
+// Tables to exclude from backups (system/internal tables)
+const EXCLUDED_TABLES = new Set([
+  'spatial_ref_sys',
+  'schema_migrations',
+  'pg_stat_statements',
+  'geography_columns',
+  'geometry_columns',
+])
 
 interface TableInfo {
   name: string
@@ -83,7 +41,7 @@ async function testDiscoveryMethods(client: any) {
   const results = {
     method1_rpc_function: { success: false, tables: [] as string[], error: null as string | null },
     method2_raw_sql: { success: false, tables: [] as string[], error: null as string | null },
-    method3_individual: { success: false, tables: [] as string[], error: null as string | null }
+    method3_information_schema: { success: false, tables: [] as string[], error: null as string | null }
   }
 
   // Test Method 1: RPC function
@@ -91,7 +49,9 @@ async function testDiscoveryMethods(client: any) {
     const { data, error } = await client.rpc('get_all_user_tables')
     if (!error && data && Array.isArray(data) && data.length > 0) {
       results.method1_rpc_function.success = true
-      results.method1_rpc_function.tables = data.map((row: any) => row.table_name)
+      results.method1_rpc_function.tables = data
+        .map((row: any) => row.table_name)
+        .filter((name: string) => name && !EXCLUDED_TABLES.has(name))
     } else {
       results.method1_rpc_function.error = error?.message || 'No data returned'
     }
@@ -99,7 +59,7 @@ async function testDiscoveryMethods(client: any) {
     results.method1_rpc_function.error = error.message
   }
 
-  // Test Method 2: Raw SQL
+  // Test Method 2: Raw SQL via exec_sql
   try {
     const query = `
       SELECT table_name
@@ -109,10 +69,21 @@ async function testDiscoveryMethods(client: any) {
         AND table_name NOT IN ('spatial_ref_sys', 'schema_migrations', 'pg_stat_statements')
       ORDER BY table_name;
     `
-    const { data, error } = await client.rpc('exec_sql', { query })
+    let data = null
+    let error = null
+    try {
+      const result = await client.rpc('exec_sql', { query })
+      data = result.data
+      error = result.error
+    } catch (rpcError: any) {
+      error = rpcError
+    }
+
     if (!error && data && Array.isArray(data) && data.length > 0) {
       results.method2_raw_sql.success = true
-      results.method2_raw_sql.tables = data.map((row: any) => row.table_name)
+      results.method2_raw_sql.tables = data
+        .map((row: any) => row.table_name)
+        .filter((name: string) => name && !EXCLUDED_TABLES.has(name))
     } else {
       results.method2_raw_sql.error = error?.message || 'No data returned'
     }
@@ -120,24 +91,24 @@ async function testDiscoveryMethods(client: any) {
     results.method2_raw_sql.error = error.message
   }
 
-  // Test Method 3: Individual validation
-  const validatedTables: string[] = []
-  for (const table of COMPLETE_TABLE_LIST) {
-    try {
-      const { error } = await client.from(table).select('id').limit(1)
-      if (!error) {
-        validatedTables.push(table)
-      }
-    } catch {
-      // Table not accessible
-    }
-  }
+  // Test Method 3: Direct information_schema query
+  try {
+    const { data, error } = await client
+      .from('information_schema.tables')
+      .select('table_name')
+      .eq('table_schema', 'public')
+      .eq('table_type', 'BASE TABLE')
 
-  if (validatedTables.length > 0) {
-    results.method3_individual.success = true
-    results.method3_individual.tables = validatedTables
-  } else {
-    results.method3_individual.error = 'No tables could be validated'
+    if (!error && data && data.length > 0) {
+      results.method3_information_schema.success = true
+      results.method3_information_schema.tables = data
+        .map((row: any) => row.table_name)
+        .filter((name: string) => name && !EXCLUDED_TABLES.has(name))
+    } else {
+      results.method3_information_schema.error = error?.message || 'No data returned'
+    }
+  } catch (error: any) {
+    results.method3_information_schema.error = error.message
   }
 
   return results
@@ -162,7 +133,7 @@ async function getRowCounts(client: any, tables: string[]): Promise<Record<strin
       }
     }
   } catch (error: any) {
-    logger.warn('RPC row count function not available:', error.message)
+    logger.info('[Backup Verify] RPC row count function not available, using fallback')
   }
 
   // Fallback: count individually
@@ -177,7 +148,7 @@ async function getRowCounts(client: any, tables: string[]): Promise<Record<strin
       } else {
         rowCounts[table] = 0
       }
-    } catch (error) {
+    } catch {
       rowCounts[table] = 0
     }
   }
@@ -197,7 +168,7 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    logger.info(`Backup verification requested by user: ${user.id}`)
+    logger.info(`[Backup Verify] Verification requested by user: ${user.id}`)
 
     // Get service client
     const client = getServiceSupabase()
@@ -205,41 +176,35 @@ export async function GET(req: NextRequest) {
     // Test all discovery methods
     const discoveryResults = await testDiscoveryMethods(client)
 
-    // Determine which method works best
-    let primaryMethod = 'hardcoded_fallback'
+    // Determine which method works best - trust the database, not a hardcoded list
+    let primaryMethod = 'none'
     let discoveredTables: string[] = []
     const warnings: string[] = []
 
     if (discoveryResults.method1_rpc_function.success) {
       primaryMethod = 'rpc_function'
       discoveredTables = discoveryResults.method1_rpc_function.tables
+      logger.info(`[Backup Verify] Method 1 (RPC) found ${discoveredTables.length} tables`)
     } else if (discoveryResults.method2_raw_sql.success) {
       primaryMethod = 'raw_sql'
       discoveredTables = discoveryResults.method2_raw_sql.tables
-      warnings.push('RPC function not available - using raw SQL fallback')
-    } else if (discoveryResults.method3_individual.success) {
-      primaryMethod = 'individual_validation'
-      discoveredTables = discoveryResults.method3_individual.tables
-      warnings.push('RPC functions not available - using individual table validation')
+      warnings.push('RPC function not available - using raw SQL fallback. Consider running the migration.')
+      logger.info(`[Backup Verify] Method 2 (raw SQL) found ${discoveredTables.length} tables`)
+    } else if (discoveryResults.method3_information_schema.success) {
+      primaryMethod = 'information_schema'
+      discoveredTables = discoveryResults.method3_information_schema.tables
+      warnings.push('RPC functions not available - using information_schema query')
+      logger.info(`[Backup Verify] Method 3 (information_schema) found ${discoveredTables.length} tables`)
     } else {
-      primaryMethod = 'hardcoded_fallback'
-      discoveredTables = COMPLETE_TABLE_LIST
-      warnings.push('CRITICAL: All discovery methods failed - using hardcoded list')
-    }
-
-    // Check for missing or extra tables
-    const missing = COMPLETE_TABLE_LIST.filter(t => !discoveredTables.includes(t))
-    const extra = discoveredTables.filter(t => !COMPLETE_TABLE_LIST.includes(t))
-
-    if (missing.length > 0) {
-      warnings.push(`Missing expected tables: ${missing.join(', ')}`)
-    }
-    if (extra.length > 0) {
-      warnings.push(`Found new tables not in known list: ${extra.join(', ')}`)
+      primaryMethod = 'none'
+      warnings.push('CRITICAL: All discovery methods failed. Run /migrations/backup_system_functions.sql')
+      logger.error('[Backup Verify] All discovery methods failed!')
     }
 
     // Get row counts for all tables
-    const rowCounts = await getRowCounts(client, discoveredTables)
+    const rowCounts = discoveredTables.length > 0
+      ? await getRowCounts(client, discoveredTables)
+      : {}
 
     // Build detailed table info
     const tableInfo: TableInfo[] = discoveredTables.map(tableName => ({
@@ -251,25 +216,28 @@ export async function GET(req: NextRequest) {
     const totalRows = Object.values(rowCounts).reduce((sum, count) => sum + count, 0)
 
     // Determine overall status
-    const status = warnings.some(w => w.includes('CRITICAL')) ? 'critical' :
+    const status = discoveredTables.length === 0 ? 'critical' :
+                   warnings.some(w => w.includes('CRITICAL')) ? 'critical' :
                    warnings.length > 0 ? 'warning' : 'ok'
+
+    logger.info(`[Backup Verify] Complete: ${discoveredTables.length} tables, ${totalRows} rows, status: ${status}`)
 
     return NextResponse.json({
       status,
       discoveryMethod: primaryMethod,
       tablesFound: discoveredTables.length,
-      expectedTables: COMPLETE_TABLE_LIST.length,
+      expectedTables: discoveredTables.length, // Trust what we discovered
       totalRows,
       tables: tableInfo,
       warnings,
-      missingTables: missing,
-      extraTables: extra,
+      missingTables: [], // No hardcoded list to compare against
+      extraTables: [], // No hardcoded list to compare against
       discoveryResults,
       timestamp: new Date().toISOString()
     })
 
   } catch (error: any) {
-    logger.error('Verification error:', error)
+    logger.error('[Backup Verify] Error:', error)
     return NextResponse.json(
       {
         status: 'error',

@@ -1,7 +1,12 @@
 import type { Metadata } from "next"
-import { Geist } from 'next/font/google'
+import { Montserrat } from 'next/font/google'
 
-const geist = Geist({ subsets: ['latin'] })
+const montserrat = Montserrat({
+  subsets: ['latin'],
+  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
+  style: ['normal', 'italic'],
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: "Welcome",
@@ -37,7 +42,7 @@ export default function WelcomeLayout({
   children: React.ReactNode
 }) {
   return (
-    <div style={lightThemeStyles} className={`light ${geist.className}`}>
+    <div style={lightThemeStyles} className={`light ${montserrat.className}`}>
       {children}
     </div>
   )
