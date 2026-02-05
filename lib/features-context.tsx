@@ -1,6 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { authClient } from '@/lib/auth-client'
 
 interface FeaturesContextType {
   features: Record<string, boolean>
@@ -22,9 +23,23 @@ export function FeaturesProvider({ children, initialFeatures }: FeaturesProvider
   // If we have initial features, no loading needed
   const [loading, setLoading] = useState(!initialFeatures)
 
+  // Get auth session to check if user is authenticated
+  const { data: sessionData, isPending: isAuthPending } = authClient.useSession()
+
   useEffect(() => {
     // Skip client-side fetch if we already have server-side features
     if (initialFeatures) {
+      return
+    }
+
+    // Wait until auth state is determined
+    if (isAuthPending) {
+      return
+    }
+
+    // Skip API call if not authenticated
+    if (!sessionData?.session) {
+      setLoading(false)
       return
     }
 
@@ -47,7 +62,7 @@ export function FeaturesProvider({ children, initialFeatures }: FeaturesProvider
     }
 
     loadFeatures()
-  }, [initialFeatures])
+  }, [initialFeatures, isAuthPending, sessionData])
 
   const isFeatureEnabled = (featureName: string): boolean => {
     // Default to true if no preference is set
