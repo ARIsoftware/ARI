@@ -23,87 +23,47 @@ const getServiceSupabase = () => {
 }
 
 // Dynamic table discovery with 3-tier approach
+// Tables to exclude from backups (system/internal tables)
+const EXCLUDED_TABLES = new Set([
+  'spatial_ref_sys',
+  'schema_migrations',
+  'pg_stat_statements',
+  'geography_columns',
+  'geometry_columns',
+])
+
 async function discoverTables(client: any): Promise<{ tables: string[], method: string, warnings: string[] }> {
   const warnings: string[] = []
-  const COMPLETE_TABLE_LIST = [
-    // Better Auth tables
-    'user',
-    'session',
-    'account',
-    'verification',
-    // Application tables
-    'tasks',
-    'fitness_database',
-    'contacts',
-    'fitness_completion_history',
-    'hyrox_station_records',
-    'hyrox_workouts',
-    'hyrox_workout_stations',
-    'northstar',
-    'motivation_content',
-    'shipments',
-    'journal',
-    'notepad',
-    'notepad_revisions',
-    'user_feature_preferences',
-    'winter_arc_goals',
-    'contribution_graph',
-    'hello_world_entries',
-    'module_migrations',
-    'module_settings',
-    'major_projects',
-    'quotes',
-    'travel',
-    'travel_activities',
-    'ohtani_grid_cells',
-    'gratitude_entries',
-    'knowledge_articles',
-    'knowledge_collections',
-    'ari_launch_entries',
-    'memento_settings',
-    'memento_milestones',
-    'memento_eras',
-    'mail_stream_events',
-    'mail_stream_settings',
-    // User preferences & Backup manager tables
-    'user_preferences',
-    'backup_metadata',
-  ];
 
   try {
-    logger.info('Starting table discovery (3-tier approach)...');
+    logger.info('Starting table discovery (3-tier approach)...')
 
     // METHOD 1: Try RPC function get_all_user_tables() (most reliable)
     try {
-      logger.info('Attempting Method 1: RPC function get_all_user_tables()');
-      const { data, error } = await client.rpc('get_all_user_tables');
+      logger.info('Attempting Method 1: RPC function get_all_user_tables()')
+      const { data, error } = await client.rpc('get_all_user_tables')
 
       if (!error && data && Array.isArray(data) && data.length > 0) {
-        const tables = data.map((row: any) => row.table_name).filter(Boolean);
-        logger.info(`✅ Method 1 succeeded: Found ${tables.length} tables via RPC function`);
+        const tables = data
+          .map((row: any) => row.table_name)
+          .filter((name: string) => name && !EXCLUDED_TABLES.has(name))
+        logger.info(`✅ Method 1 succeeded: Found ${tables.length} tables via RPC function`)
 
-        // Validate against known list
-        const missing = COMPLETE_TABLE_LIST.filter(t => !tables.includes(t));
-        const extra = tables.filter(t => !COMPLETE_TABLE_LIST.includes(t));
-
-        if (missing.length > 0) {
-          warnings.push(`Missing expected tables: ${missing.join(', ')}`);
-        }
-        if (extra.length > 0) {
-          warnings.push(`Found new tables not in known list: ${extra.join(', ')}`);
-        }
-
-        return { tables, method: 'rpc_function', warnings };
+        return { tables, method: 'rpc_function', warnings }
       }
 
-      logger.warn('Method 1 failed or returned no results:', error);
+      if (error) {
+        logger.warn('Method 1 failed:', error.message || error)
+      } else {
+        logger.warn('Method 1 returned no results')
+      }
     } catch (rpcError: any) {
-      logger.warn('Method 1 (RPC) failed:', rpcError.message);
+      logger.warn('Method 1 (RPC) failed:', rpcError.message)
     }
 
     // METHOD 2: Try raw SQL via exec_sql RPC function
     try {
-      logger.info('Attempting Method 2: Raw SQL via exec_sql()');
+      logger.info('Attempting Method 2: Raw SQL via exec_sql()')
       const query = `
         SELECT table_name
         FROM information_schema.tables
@@ -111,71 +71,77 @@ async function discoverTables(client: any): Promise<{ tables: string[], method: 
           AND table_type = 'BASE TABLE'
           AND table_name NOT IN ('spatial_ref_sys', 'schema_migrations', 'pg_stat_statements')
         ORDER BY table_name;
-      `;
+      `
 
-      const { data, error } = await client.rpc('exec_sql', { query });
+      let data = null
+      let error = null
+      try {
+        const result = await client.rpc('exec_sql', { query })
+        data = result.data
+        error = result.error
+      } catch (rpcError: any) {
+        error = rpcError
+      }
 
       if (!error && data && Array.isArray(data) && data.length > 0) {
-        const tables = data.map((row: any) => row.table_name).filter(Boolean);
-        logger.info(`✅ Method 2 succeeded: Found ${tables.length} tables via raw SQL`);
+        const tables = data
+          .map((row: any) => row.table_name)
+          .filter((name: string) => name && !EXCLUDED_TABLES.has(name))
+        logger.info(`✅ Method 2 succeeded: Found ${tables.length} tables via raw SQL`)
 
-        warnings.push('Using Method 2 (raw SQL) - consider running migration for RPC functions');
+        warnings.push('Using Method 2 (raw SQL) - consider running migration for RPC functions')
 
-        // Validate against known list
-        const missing = COMPLETE_TABLE_LIST.filter(t => !tables.includes(t));
-        if (missing.length > 0) {
-          warnings.push(`Missing expected tables: ${missing.join(', ')}`);
-        }
-
-        return { tables, method: 'raw_sql', warnings };
+        return { tables, method: 'raw_sql', warnings }
       }
 
-      logger.warn('Method 2 failed or returned no results:', error);
+      if (error) {
+        logger.warn('Method 2 failed:', error.message || error)
+      } else {
+        logger.warn('Method 2 returned no results')
+      }
     } catch (sqlError: any) {
-      logger.warn('Method 2 (raw SQL) failed:', sqlError.message);
+      logger.warn('Method 2 (raw SQL) failed:', sqlError.message)
     }
 
-    // METHOD 3: Validate each known table individually (fallback)
-    logger.info('Attempting Method 3: Validating each known table individually');
-    const existingTables: string[] = [];
+    // METHOD 3: Query information_schema directly via Supabase
+    try {
+      logger.info('Attempting Method 3: Direct information_schema query')
 
-    for (const table of COMPLETE_TABLE_LIST) {
-      try {
-        const { error } = await client
-          .from(table)
-          .select('id')
-          .limit(1);
+      // Use a simpler approach - query a known table to get all table names
+      const { data: schemaData, error: schemaError } = await client
+        .from('information_schema.tables')
+        .select('table_name')
+        .eq('table_schema', 'public')
+        .eq('table_type', 'BASE TABLE')
 
-        if (!error) {
-          existingTables.push(table);
-        }
-      } catch (tableError) {
-        // Table doesn't exist or not accessible
-      }
-    }
+      if (!schemaError && schemaData && schemaData.length > 0) {
+        const tables = schemaData
+          .map((row: any) => row.table_name)
+          .filter((name: string) => name && !EXCLUDED_TABLES.has(name))
+        logger.info(`✅ Method 3 succeeded: Found ${tables.length} tables via information_schema`)
 
-    if (existingTables.length > 0) {
-      logger.info(`✅ Method 3 succeeded: Found ${existingTables.length} tables via individual validation`);
-      warnings.push('Using Method 3 (fallback) - RPC functions not available. Run /migrations/backup_system_functions.sql');
+        warnings.push('Using Method 3 (information_schema) - RPC functions not available')
 
-      const missing = COMPLETE_TABLE_LIST.filter(t => !existingTables.includes(t));
-      if (missing.length > 0) {
-        warnings.push(`Could not access tables: ${missing.join(', ')}`);
+        return { tables, method: 'information_schema', warnings }
       }
 
-      return { tables: existingTables, method: 'individual_validation', warnings };
+      if (schemaError) {
+        logger.warn('Method 3 failed:', schemaError.message || schemaError)
+      }
+    } catch (schemaQueryError: any) {
+      logger.warn('Method 3 (information_schema) failed:', schemaQueryError.message)
     }
 
-    // All methods failed - return complete hardcoded list with critical warning
-    logger.error('❌ All discovery methods failed! Using complete hardcoded list.');
-    warnings.push('CRITICAL: All discovery methods failed. Using hardcoded table list. Some tables may be missing from backup!');
+    // All methods failed - do not use hardcoded fallback lists
+    logger.error('❌ All discovery methods failed!')
+    warnings.push('CRITICAL: All discovery methods failed. No tables found.')
 
-    return { tables: COMPLETE_TABLE_LIST, method: 'hardcoded_fallback', warnings };
+    return { tables: [], method: 'none', warnings }
 
   } catch (error: any) {
     logger.error('Critical error in table discovery:', error)
-    warnings.push(`Critical error during discovery: ${error.message}`);
-    return { tables: COMPLETE_TABLE_LIST, method: 'hardcoded_fallback', warnings };
+    warnings.push(`Critical error during discovery: ${error.message}`)
+    return { tables: [], method: 'error', warnings }
   }
 }
 
@@ -209,15 +175,24 @@ async function getTableSchema(client: any, tableName: string, validTables: strin
       ORDER BY ordinal_position;
     `
 
-    const { data, error } = await client.rpc('exec_sql', { query }).catch(() => ({ data: null, error: null }))
+    // Use try-catch instead of .catch() on promise for clearer error handling
+    let data = null
+    let error = null
+    try {
+      const result = await client.rpc('exec_sql', { query })
+      data = result.data
+      error = result.error
+    } catch (rpcError: any) {
+      logger.warn(`RPC call failed for schema of ${tableName}:`, rpcError.message)
+    }
 
-    if (data && Array.isArray(data) && data.length > 0) {
+    if (!error && data && Array.isArray(data) && data.length > 0) {
       logger.info(`Got schema for ${tableName} via RPC: ${data.length} columns`)
       return data
     }
 
     // Fallback: Get a sample row and infer types
-    logger.warn(`RPC failed for ${tableName}, using sample row fallback`)
+    logger.info(`RPC unavailable for ${tableName}, using sample row fallback`)
     const { data: sampleData } = await client
       .from(tableName)
       .select('*')
@@ -278,8 +253,14 @@ async function getTableSchema(client: any, tableName: string, validTables: strin
 // Get primary key constraints
 async function getTableConstraints(client: any, tableName: string) {
   try {
-    // Get primary key
-    const { data: pkData } = await client.rpc('get_table_pk', { table_name: tableName }).catch(() => ({ data: null }))
+    // Get primary key via RPC (may not be available)
+    let pkData = null
+    try {
+      const pkResult = await client.rpc('get_table_pk', { table_name: tableName })
+      pkData = pkResult.data
+    } catch {
+      // RPC not available, will use fallback below
+    }
 
     // Fallback: query information_schema for constraints
     const { data, error } = await client
