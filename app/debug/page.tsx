@@ -635,57 +635,42 @@ export default function DatabaseTestPage() {
       console.error('❌ Table discovery test failed:', error)
     }
 
-    // Test 3: Table Count Verification
-    updateBackupResult('Table Count Verification', { status: 'testing' })
+    // Test 3: Table Discovery Results
+    updateBackupResult('Table Discovery Results', { status: 'testing' })
     try {
       const response = await fetch('/api/backup/verify')
       const result = await response.json()
 
-      const expectedTables = 35 // Updated: added memento_settings, memento_milestones, memento_eras tables
       const foundTables = result.tablesFound
 
-      if (foundTables === expectedTables) {
-        updateBackupResult('Table Count Verification', {
+      if (foundTables > 0) {
+        updateBackupResult('Table Discovery Results', {
           status: 'success',
-          message: `All ${expectedTables} expected tables found`,
+          message: `Discovered ${foundTables} tables (dynamic discovery)`,
           data: {
             found: foundTables,
-            expected: expectedTables,
-            tables: result.tables.map((t: any) => t.name)
+            tables: result.tables.map((t: any) => t.name),
+            hint: 'Tables are discovered dynamically from the database'
           }
         })
-        console.log('✅ All tables found')
-      } else if (foundTables > expectedTables) {
-        updateBackupResult('Table Count Verification', {
-          status: 'warning',
-          message: `Found ${foundTables} tables (${foundTables - expectedTables} more than expected)`,
-          data: {
-            found: foundTables,
-            expected: expectedTables,
-            extraTables: result.extraTables,
-            hint: 'New tables detected - update known tables list'
-          }
-        })
-        console.log('⚠️ Extra tables found:', result.extraTables)
+        console.log('✅ Table discovery successful:', foundTables, 'tables')
       } else {
-        updateBackupResult('Table Count Verification', {
+        updateBackupResult('Table Discovery Results', {
           status: 'error',
-          message: `Only found ${foundTables}/${expectedTables} tables`,
+          message: 'No tables discovered - all discovery methods failed',
           data: {
-            found: foundTables,
-            expected: expectedTables,
-            missing: result.missingTables,
-            hint: 'Some tables are missing or inaccessible'
+            found: 0,
+            hint: 'Check database connection and run /migrations/backup_system_functions.sql'
           }
         })
-        console.error('❌ Missing tables:', result.missingTables)
+        console.error('❌ No tables discovered')
       }
     } catch (error: any) {
-      updateBackupResult('Table Count Verification', {
+      updateBackupResult('Table Discovery Results', {
         status: 'error',
         error: error.message
       })
-      console.error('❌ Table count verification failed:', error)
+      console.error('❌ Table discovery failed:', error)
     }
 
     // Test 4: Row Count Summary

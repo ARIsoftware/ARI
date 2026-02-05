@@ -104,11 +104,8 @@ When approved, create the module following this order:
     - Create route handler using `createPublicRouteHandler` wrapper
     - Document the required environment variable for the secret
     - See `/docs/MODULES.md` section 7.5 for detailed guidance
-12. **Update backup expected tables list** in `/app/api/backup/verify/route.ts`
-    - Add any new table names to the `COMPLETE_TABLE_LIST` array (around line 24)
-    - This ensures the backup verification system knows about the new tables
-13. Ask the user for permission to execute the .sql file, or ask if they want to run the .SQL statements themselves.
-14. If the user needs to take any action to complete the setup of the module (run a .sql file, restart the dev server etc), please clearly indicate the actions they need to take with clear instructions.
+12. Ask the user for permission to execute the .sql file, or ask if they want to run the .SQL statements themselves.
+13. If the user needs to take any action to complete the setup of the module (run a .sql file, restart the dev server etc), please clearly indicate the actions they need to take with clear instructions.
 
 ## Data Fetching Best Practices
 
