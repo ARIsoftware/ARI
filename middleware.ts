@@ -137,7 +137,15 @@ export async function middleware(req: NextRequest) {
     const hasSession = hasSessionCookie(req.cookies)
 
     if (!hasSession) {
-      // No session cookie - redirect to sign-in
+      // For API routes, return JSON 401 instead of redirecting to HTML page
+      // This prevents "Unexpected token '<'" errors when client fetches expect JSON
+      if (pathname.startsWith('/api')) {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        )
+      }
+      // For page routes, redirect to sign-in
       return NextResponse.redirect(new URL('/sign-in', req.url))
     }
 
