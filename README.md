@@ -8,7 +8,20 @@ Engineered for those who want complete command over the software that runs their
 
 https://ari.software
 
+
+## Quick Start
+
+If your local environment is setup already, ARI can be run using the following commands in your Terminal:
+
+```bash
+git clone https://github.com/ARIsoftware/ARI.git .
+pnpm install
+pnpm next dev --turbo
+Navigate to: http://localhost:3000/
+```
 ---
+
+Here are the full step by step instructions to set up your local environment to run ARI. Below you will find installations instructions for macOS, Windows and Linux.
 
 ## Prerequisites
 
@@ -19,8 +32,6 @@ https://ari.software
 5. Supabase CLI Database management
 
 ---
-
-Below you will find installations instructions for macOS, Windows and Linux.
 
 ## Get Started (macOS)
 
@@ -74,10 +85,10 @@ For database management:
 brew install supabase/tap/supabase
 ```
 
-### 7. Clone the Repository & Install Dependencies
+### 7. Clone the Repository & Install Dependencies (If you don't have the files already):
 
 ```bash
-git clone https://github.com/your-username/ARI.git
+git clone https://github.com/ARIsoftware/ARI.git
 cd ARI
 pnpm install
 ```
@@ -96,7 +107,7 @@ pnpm next dev --turbo
 
 ### 9. Open in Browser
 
-Navigate to: **http://localhost:3000/**
+Navigate to: http://localhost:3000/
 
 ---
 
@@ -172,10 +183,10 @@ Or using npm (requires Node.js 20+):
 npm install -g supabase
 ```
 
-### 7. Clone the Repository & Install Dependencies
+### 7. Clone the Repository & Install Dependencies (If you don't have the files already):
 
 ```powershell
-git clone https://github.com/your-username/ARI.git
+git clone https://github.com/ARIsoftware/ARI.git
 cd ARI
 pnpm install
 ```
@@ -194,7 +205,7 @@ pnpm next dev --turbo
 
 ### 9. Open in Browser
 
-Navigate to: **http://localhost:3000/**
+Navigate to: http://localhost:3000/
 
 ---
 
@@ -265,10 +276,10 @@ Or using Homebrew for Linux:
 brew install supabase/tap/supabase
 ```
 
-### 7. Clone the Repository & Install Dependencies
+### 7. Clone the Repository & Install Dependencies (If you don't have the files already):
 
 ```bash
-git clone https://github.com/your-username/ARI.git
+git clone https://github.com/ARIsoftware/ARI.git
 cd ARI
 pnpm install
 ```
@@ -287,10 +298,10 @@ pnpm next dev --turbo
 
 ### 9. Open in Browser
 
-Navigate to: **http://localhost:3000/**
+Navigate to: http://localhost:3000/
 
 
-## 📚 Need Help?
+## 🤝 Need Help?
 
 Reach out to us at hello@ari.software
 
