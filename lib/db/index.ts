@@ -10,6 +10,13 @@ const pool = new Pool({
   connectionTimeoutMillis: 10000,
 })
 
+// Handle pool errors gracefully to prevent uncaught exceptions
+// These typically occur when Supabase's PgBouncer drops idle connections
+pool.on('error', (err) => {
+  console.warn('[DB Pool] Unexpected connection error (will auto-recover):', err.message)
+  // Don't crash - the pool will create new connections as needed
+})
+
 // Type for the Drizzle database instance
 export type DrizzleDb = ReturnType<typeof drizzle>
 

@@ -468,7 +468,7 @@ User-friendly interface with:
 **Tests**:
 1. **Backup Endpoint Accessibility** - Verifies `/api/backup/verify` is accessible
 2. **Table Discovery Test** - Which method is working (RPC / SQL / Manual / Hardcoded)
-3. **Table Count Verification** - Confirms all 19 expected tables are found
+3. **Table Discovery Results** - Shows number of tables discovered dynamically
 4. **Row Count Summary** - Shows total rows and per-table breakdown
 5. **System Warnings** - Displays any warnings or issues
 6. **Export Endpoint Test** - Verifies export endpoint is accessible

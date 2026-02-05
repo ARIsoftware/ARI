@@ -519,10 +519,6 @@ export const myTableRelations = relations(myTable, ({one}) => ({
 }))
 ```
 
-### Step 5: Update Backup Table List
-
-Add the new table to the expected tables list in `CLAUDE.md` backup documentation.
-
 ---
 
 ## 9. Drizzle Kit Commands
