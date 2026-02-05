@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from 'react'
 import type { ModuleMetadata } from './module-types'
+import { authClient } from '@/lib/auth-client'
 
 /**
  * Hook to fetch all enabled modules for the current user
@@ -40,7 +41,22 @@ export function useModules() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Get auth session to check if user is authenticated
+  const { data: sessionData, isPending: isAuthPending } = authClient.useSession()
+
   useEffect(() => {
+    // Skip API call if not authenticated or still checking auth
+    if (isAuthPending) {
+      return
+    }
+
+    if (!sessionData?.session) {
+      // Not authenticated - use empty modules
+      setModules([])
+      setLoading(false)
+      return
+    }
+
     async function fetchModules() {
       try {
         setLoading(true)
@@ -64,7 +80,7 @@ export function useModules() {
     }
 
     fetchModules()
-  }, [])
+  }, [isAuthPending, sessionData])
 
   return { modules, loading, error }
 }
@@ -93,8 +109,23 @@ export function useModule(moduleId: string | null) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Get auth session to check if user is authenticated
+  const { data: sessionData, isPending: isAuthPending } = authClient.useSession()
+
   useEffect(() => {
     if (!moduleId) {
+      setModule(null)
+      setLoading(false)
+      return
+    }
+
+    // Skip API call if not authenticated or still checking auth
+    if (isAuthPending) {
+      return
+    }
+
+    if (!sessionData?.session) {
+      // Not authenticated - return null module
       setModule(null)
       setLoading(false)
       return
@@ -125,7 +156,7 @@ export function useModule(moduleId: string | null) {
     }
 
     fetchModule()
-  }, [moduleId])
+  }, [moduleId, isAuthPending, sessionData])
 
   return { module, loading, error }
 }

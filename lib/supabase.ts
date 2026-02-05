@@ -1,15 +1,29 @@
-import { createClient } from "@supabase/supabase-js"
+import { createClient, SupabaseClient } from "@supabase/supabase-js"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  realtime: {
-    params: {
-      eventsPerSecond: 10,
+// Singleton instance to prevent multiple GoTrueClient warnings
+let supabaseInstance: SupabaseClient | null = null
+
+function getSupabaseClient(): SupabaseClient {
+  if (supabaseInstance) {
+    return supabaseInstance
+  }
+
+  supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
+    realtime: {
+      params: {
+        eventsPerSecond: 10,
+      },
     },
-  },
-})
+  })
+
+  return supabaseInstance
+}
+
+// Export getter instead of direct instance to ensure singleton
+export const supabase = getSupabaseClient()
 
 // Create a function to get authenticated supabase client
 // NOTE: This function is now deprecated - use API routes instead
@@ -17,7 +31,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 export const getAuthenticatedSupabase = async () => {
   // Fallback to regular client with anon key
   // All database operations should now go through API routes
-  return supabase
+  return getSupabaseClient()
 }
 
 export type Task = {
