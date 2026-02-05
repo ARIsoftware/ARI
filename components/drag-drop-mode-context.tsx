@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react"
+import { authClient } from "@/lib/auth-client"
 
 interface DragDropModeContextType {
   isDragMode: boolean
@@ -22,6 +23,9 @@ export function DragDropModeProvider({ children }: { children: React.ReactNode }
   const [pendingIconOrder, setPendingIconOrder] = useState<Record<string, number> | null>(null)
   const [iconOrder, setIconOrder] = useState<Record<string, number> | null>(null)
 
+  // Get auth session to check if user is authenticated
+  const { data: sessionData, isPending: isAuthPending } = authClient.useSession()
+
   // Use ref to access pendingOrder in saveOrder without stale closure
   const pendingOrderRef = useRef<Record<string, number> | null>(null)
   pendingOrderRef.current = pendingOrder
@@ -30,8 +34,11 @@ export function DragDropModeProvider({ children }: { children: React.ReactNode }
   const pendingIconOrderRef = useRef<Record<string, number> | null>(null)
   pendingIconOrderRef.current = pendingIconOrder
 
-  // Load icon order on mount
+  // Load icon order on mount (only if authenticated)
   useEffect(() => {
+    // Skip API call if not authenticated or still checking auth
+    if (isAuthPending || !sessionData?.session) return
+
     fetch("/api/modules/order")
       .then(response => {
         if (response.ok) return response.json()
@@ -45,7 +52,7 @@ export function DragDropModeProvider({ children }: { children: React.ReactNode }
       .catch(error => {
         console.error("[DragDrop] Failed to load icon order:", error)
       })
-  }, [])
+  }, [isAuthPending, sessionData])
 
   // Keyboard shortcut: Cmd+D to toggle drag mode
   useEffect(() => {
