@@ -37,7 +37,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const enabledModules = useEnabledModulesFromContext()
 
   // Drag and drop mode
-  const { isDragMode, setPendingOrder } = useDragDropMode()
+  const { isDragMode, setPendingOrder, moduleOrder } = useDragDropMode()
 
   // Theme settings for sidebar view
   const { sidebarView } = useTheme()
@@ -109,10 +109,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   }, [activeSubmenuModule?.id])
 
   // Sort modules by menuPriority (lower first), then alphabetically
+  // Use moduleOrder from context if available (overrides server-side menuPriority)
   const sortModules = (modules: typeof enabledModules) => {
     return [...modules].sort((a, b) => {
-      const priorityA = a.menuPriority ?? 50
-      const priorityB = b.menuPriority ?? 50
+      // Prefer locally saved moduleOrder, fallback to server-side menuPriority
+      const priorityA = moduleOrder?.[a.id] ?? a.menuPriority ?? 50
+      const priorityB = moduleOrder?.[b.id] ?? b.menuPriority ?? 50
 
       if (priorityA !== priorityB) {
         return priorityA - priorityB
@@ -291,7 +293,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {/* Modules container - groups are draggable units */}
         {isDragMode ? (
           /* Drag mode: Groups as draggable units */
-          <div ref={sidebarRef} className="swapy-container">
+          <div ref={sidebarRef} className="swapy-container flex flex-col gap-2 min-h-0 overflow-auto pb-4">
             {/* Main position render items */}
             {mainRenderItems.map((item) => {
               const itemId = item.type === 'group' ? `group-${item.title}` : item.module.id

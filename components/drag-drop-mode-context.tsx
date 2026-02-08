@@ -12,6 +12,7 @@ interface DragDropModeContextType {
   pendingIconOrder: Record<string, number> | null
   setPendingIconOrder: (order: Record<string, number> | null) => void
   iconOrder: Record<string, number> | null
+  moduleOrder: Record<string, number> | null
   saveOrder: () => Promise<void>
 }
 
@@ -22,6 +23,7 @@ export function DragDropModeProvider({ children }: { children: React.ReactNode }
   const [pendingOrder, setPendingOrder] = useState<Record<string, number> | null>(null)
   const [pendingIconOrder, setPendingIconOrder] = useState<Record<string, number> | null>(null)
   const [iconOrder, setIconOrder] = useState<Record<string, number> | null>(null)
+  const [moduleOrder, setModuleOrder] = useState<Record<string, number> | null>(null)
 
   // Get auth session to check if user is authenticated
   const { data: sessionData, isPending: isAuthPending } = authClient.useSession()
@@ -34,7 +36,7 @@ export function DragDropModeProvider({ children }: { children: React.ReactNode }
   const pendingIconOrderRef = useRef<Record<string, number> | null>(null)
   pendingIconOrderRef.current = pendingIconOrder
 
-  // Load icon order on mount (only if authenticated)
+  // Load icon order and module order on mount (only if authenticated)
   useEffect(() => {
     // Skip API call if not authenticated or still checking auth
     if (isAuthPending || !sessionData?.session) return
@@ -42,15 +44,18 @@ export function DragDropModeProvider({ children }: { children: React.ReactNode }
     fetch("/api/modules/order")
       .then(response => {
         if (response.ok) return response.json()
-        throw new Error("Failed to fetch icon order")
+        throw new Error("Failed to fetch orders")
       })
       .then(data => {
         if (data.iconOrder) {
           setIconOrder(data.iconOrder)
         }
+        if (data.moduleOrder) {
+          setModuleOrder(data.moduleOrder)
+        }
       })
       .catch(error => {
-        console.error("[DragDrop] Failed to load icon order:", error)
+        console.error("[DragDrop] Failed to load orders:", error)
       })
   }, [isAuthPending, sessionData])
 
@@ -104,7 +109,10 @@ export function DragDropModeProvider({ children }: { children: React.ReactNode }
           throw new Error("Failed to save order")
         }
         console.log("[DragDrop] Orders saved successfully")
-        // Update local icon order state if we saved icon order
+        // Update local order states after successful save
+        if (moduleOrderToSave) {
+          setModuleOrder(moduleOrderToSave)
+        }
         if (iconOrderToSave) {
           setIconOrder(iconOrderToSave)
         }
@@ -125,6 +133,7 @@ export function DragDropModeProvider({ children }: { children: React.ReactNode }
         pendingIconOrder,
         setPendingIconOrder,
         iconOrder,
+        moduleOrder,
         saveOrder,
       }}
     >
