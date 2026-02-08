@@ -33,17 +33,30 @@ export async function GET() {
   try {
     const supabase = createDbClient()
 
-    // Fetch icon order from the special "__topbar_icons__" module_id
-    const { data: iconSettings } = await supabase
+    // Fetch all module settings for this user
+    const { data: allSettings } = await supabase
       .from('module_settings')
-      .select('settings')
+      .select('module_id, settings')
       .eq('user_id', user.id)
-      .eq('module_id', TOPBAR_ICONS_MODULE_ID)
-      .single()
 
+    // Extract icon order from the special "__topbar_icons__" module_id
+    const iconSettings = allSettings?.find(s => s.module_id === TOPBAR_ICONS_MODULE_ID)
     const iconOrder = iconSettings?.settings?.iconOrder || null
 
-    return NextResponse.json({ iconOrder })
+    // Build module order from all module settings that have menuPriority
+    const moduleOrder: Record<string, number> = {}
+    if (allSettings) {
+      for (const setting of allSettings) {
+        if (setting.module_id !== TOPBAR_ICONS_MODULE_ID && setting.settings?.menuPriority !== undefined) {
+          moduleOrder[setting.module_id] = setting.settings.menuPriority
+        }
+      }
+    }
+
+    return NextResponse.json({
+      iconOrder,
+      moduleOrder: Object.keys(moduleOrder).length > 0 ? moduleOrder : null
+    })
   } catch (error) {
     console.error('[API /modules/order GET] Error:', error)
     return NextResponse.json(

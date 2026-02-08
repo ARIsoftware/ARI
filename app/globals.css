@@ -273,9 +273,10 @@
   border-radius: 8px;
 }
 
-/* Disable overflow on sidebar content during drag mode */
+/* Allow vertical scrolling in sidebar during drag mode */
 .drag-mode-active [data-sidebar="content"] {
-  overflow: visible !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
 }
 
 /* Disable links and hover effects in drag mode */

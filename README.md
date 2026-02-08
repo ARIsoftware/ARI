@@ -11,7 +11,7 @@ https://ari.software
 
 ## Quick Start
 
-If your local environment is setup already, ARI can be run using the following commands in your Terminal:
+If your local environment is setup already, ARI can be run using the following commands in your terminal:
 
 ```bash
 git clone https://github.com/ARIsoftware/ARI.git .
