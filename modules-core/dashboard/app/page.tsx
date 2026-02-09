@@ -116,9 +116,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Task Analytics Chart */}
-          <TaskAnalyticsChart token={session?.access_token || null} />
-
           {/* Quick Stats Section */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
@@ -293,6 +290,9 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
+
+          {/* Task Analytics Chart */}
+          <TaskAnalyticsChart token={session?.access_token || null} />
         </div>
 
         {/* Right Sidebar - Recent Activity */}
