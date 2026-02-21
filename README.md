@@ -19,6 +19,17 @@ pnpm install
 pnpm next dev --turbo
 Navigate to: http://localhost:3000/
 ```
+
+## Automated Setup (macOS)
+
+Install ARI and all its dependencies with a single command:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://ari.software/install)"
+```
+
+This interactive wizard will install Homebrew, Git, Node.js, pnpm, and Supabase CLI, then clone and set up ARI for you.
+
 ---
 
 Here are the full step by step instructions to set up your local environment to run ARI. Below you will find installations instructions for macOS, Windows and Linux.
