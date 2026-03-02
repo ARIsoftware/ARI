@@ -9,17 +9,6 @@ Engineered for those who want complete command over the software that runs their
 https://ari.software
 
 
-## Quick Start
-
-If your local environment is setup already, ARI can be run using the following commands in your terminal:
-
-```bash
-git clone https://github.com/ARIsoftware/ARI.git .
-pnpm install
-pnpm next dev --turbo
-Navigate to: http://localhost:3000/
-```
-
 ## Automated Setup (macOS)
 
 Install ARI and all its dependencies with a single command:
@@ -28,11 +17,11 @@ Install ARI and all its dependencies with a single command:
 /bin/bash -c "$(curl -fsSL https://ari.software/install)"
 ```
 
-This interactive wizard will install Homebrew, Git, Node.js, pnpm, and Supabase CLI, then clone and set up ARI for you.
+This interactive wizard will setup your environment with the tools needed to run ARI. (Homebrew, Git, Node.js, PNPM, Supabase, etc., and then it will install ARI for you.
 
----
+## Manual Setup (macOS, Windows, Linux)
 
-Here are the full step by step instructions to set up your local environment to run ARI. Below you will find installations instructions for macOS, Windows and Linux.
+Here are the full step by step instructions to set up your local environment to run ARI. Below you will find installations instructions for macOS, Windows and Linux. If you have run the automated setup script, you do not need to complete these steps.
 
 ## Prerequisites
 

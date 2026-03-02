@@ -97,15 +97,21 @@ fi
 # ── Hand off to install.js ───────────────────────────────────────────────────
 INSTALL_JS="/tmp/ari-install-$$.js"
 INSTALL_URL="https://raw.githubusercontent.com/ARIsoftware/ARI/main/scripts/install.js"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOCAL_JS="$SCRIPT_DIR/install.js"
 
 info "Downloading installer…"
-if ! curl -fsSL "$INSTALL_URL" -o "$INSTALL_JS"; then
-  err "Failed to download install.js. Check your network connection."
+if curl -fsSL "$INSTALL_URL" -o "$INSTALL_JS" 2>/dev/null; then
+  ok "Installer downloaded"
+elif [[ -f "$LOCAL_JS" ]]; then
+  cp "$LOCAL_JS" "$INSTALL_JS"
+  ok "Using local installer (${LOCAL_JS})"
+else
+  err "Failed to download install.js and no local copy found."
   rm -f "$INSTALL_JS"
   exit 1
 fi
 
-ok "Installer downloaded"
 echo ""
 node "$INSTALL_JS"
 EXIT_CODE=$?
