@@ -9,15 +9,21 @@ Engineered for those who want complete command over the software that runs their
 https://ari.software
 
 
-## Automated Setup (macOS)
+## Automated Setup
 
 Install ARI and all its dependencies with a single command:
 
+**macOS / Linux:**
 ```bash
 /bin/bash -c "$(curl -fsSL https://ari.software/install)"
 ```
 
-This interactive wizard will setup your environment with the tools needed to run ARI. (Homebrew, Git, Node.js, PNPM, Supabase, etc., and then it will install ARI for you.
+**Windows** (PowerShell):
+```powershell
+irm https://ari.software/install-win | iex
+```
+
+This interactive wizard will detect your platform and set up your environment with the tools needed to run ARI (Git, Node.js, pnpm, Supabase CLI, etc.), then clone and install ARI for you.
 
 ## Manual Setup (macOS, Windows, Linux)
 
