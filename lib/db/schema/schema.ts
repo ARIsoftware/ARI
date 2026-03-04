@@ -308,7 +308,7 @@ export const hyroxWorkouts = pgTable("hyrox_workouts", {
 	pgPolicy("hyrox_workouts_insert", { as: "permissive", for: "insert", to: ["public"] }),
 	pgPolicy("hyrox_workouts_select", { as: "permissive", for: "select", to: ["public"] }),
 	pgPolicy("hyrox_workouts_update", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("noam_email_access", { as: "permissive", for: "all", to: ["authenticated"] }),
+	pgPolicy("authenticated_access", { as: "permissive", for: "all", to: ["authenticated"] }),
 ]);
 
 export const hyroxWorkoutStations = pgTable("hyrox_workout_stations", {
