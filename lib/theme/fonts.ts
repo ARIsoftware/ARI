@@ -58,6 +58,11 @@ export const FONTS: FontOption[] = [
     name: 'Fira Code',
     family: '"Fira Code", monospace',
   },
+  {
+    id: 'crimson-pro',
+    name: 'Crimson Pro',
+    family: '"Crimson Pro", serif',
+  },
 ]
 
 // Default font ID
