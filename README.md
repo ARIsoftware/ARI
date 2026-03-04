@@ -99,12 +99,6 @@ pnpm install
 pnpm run dev
 ```
 
-Or to enable Next.js Turbopack (for faster local development):
-
-```bash
-pnpm next dev --turbo
-```
-
 ### 9. Open in Browser
 
 Navigate to: http://localhost:3000/
@@ -197,12 +191,6 @@ pnpm install
 pnpm run dev
 ```
 
-Or to enable Next.js Turbopack (for faster local development):
-
-```powershell
-pnpm next dev --turbo
-```
-
 ### 9. Open in Browser
 
 Navigate to: http://localhost:3000/
@@ -288,12 +276,6 @@ pnpm install
 
 ```bash
 pnpm run dev
-```
-
-Or to enable Next.js Turbopack (for faster local development):
-
-```bash
-pnpm next dev --turbo
 ```
 
 ### 9. Open in Browser
