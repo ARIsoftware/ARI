@@ -4,7 +4,7 @@
   "name": "Gratitude",
   "description": "Daily gratitude journal to reflect on positive moments and appreciate life",
   "version": "1.0.0",
-  "author": "ARI Team",
+  "author": "ARI Team <ari@ari.software>",
   "icon": "Heart",
   "enabled": true,
   "fullscreen": false,

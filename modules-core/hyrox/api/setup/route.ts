@@ -229,7 +229,7 @@ async function createHyroxTables() {
       return {
         success: false,
         message: 'HYROX tables do not exist',
-        instructions: 'Please run the SQL script manually in your Supabase dashboard: the migrations folder',
+        instructions: 'Please run the SQL script manually in your Supabase dashboard from the migrations folder',
         tables: {
           hyrox_workouts: !workoutsError,
           hyrox_workout_stations: !stationsError,
