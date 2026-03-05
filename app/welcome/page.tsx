@@ -181,6 +181,12 @@ export default function WelcomePage() {
     lines.push("ALLOW_BACKUP_OPERATIONS=true")
     lines.push("")
 
+    lines.push("## Optionally restrict Access to specific IP addresses.")
+    lines.push("## Example: ALLOWED_IPS=1.1.1.1,8.8.8.8")
+    lines.push("## 127.0.0.1 and localhost and ::1 are always allowed.")
+    lines.push("ALLOWED_IPS=")
+    lines.push("")
+
     lines.push("# Top Bar Customization (optional)")
     lines.push("# NEXT_PUBLIC_TOP_BAR_MESSAGE=\"Custom Message\"")
     lines.push("# NEXT_PUBLIC_TOP_BAR_COLOR=\"#c00\"")
