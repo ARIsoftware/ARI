@@ -545,6 +545,25 @@ export const travelActivities = pgTable("travel_activities", {
 	check("travel_activities_activity_type_check", sql`(activity_type)::text = ANY ((ARRAY['stay'::character varying, 'event'::character varying])::text[])`),
 ]);
 
+export const travelFlights = pgTable("travel_flights", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	userId: uuid("user_id").notNull(),
+	title: varchar({ length: 500 }).notNull(),
+	duration: varchar({ length: 20 }).notNull(),
+	legs: jsonb().notNull().default([]),
+	transferTimes: jsonb("transfer_times").default([]),
+	sortOrder: integer("sort_order").notNull().default(0),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+}, (table) => [
+	index("idx_travel_flights_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
+	index("idx_travel_flights_sort_order").using("btree", table.sortOrder.asc().nullsLast().op("int4_ops")),
+	pgPolicy("Users can view their own travel flights", { as: "permissive", for: "select", to: ["public"] }),
+	pgPolicy("Users can insert their own travel flights", { as: "permissive", for: "insert", to: ["public"] }),
+	pgPolicy("Users can update their own travel flights", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("Users can delete their own travel flights", { as: "permissive", for: "delete", to: ["public"] }),
+]);
+
 export const ohtaniGridCells = pgTable("ohtani_grid_cells", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	userId: uuid("user_id").notNull(),

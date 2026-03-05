@@ -2,113 +2,7 @@
 
 import { Plane } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-
-interface FlightLeg {
-  departureTime: string
-  departureLocation: string
-  departureCode: string
-  arrivalTime: string
-  arrivalDayOffset?: string
-  arrivalLocation: string
-  arrivalCode: string
-  operator: string
-  flightNumber: string
-  aircraft: string
-  travelClass: string
-}
-
-interface Flight {
-  title: string
-  duration: string
-  legs: FlightLeg[]
-  transferTimes?: string[]
-}
-
-const flights: Flight[] = [
-  {
-    title: 'Toronto to Cape Town',
-    duration: '24h05',
-    legs: [
-      {
-        departureTime: '10:45 p.m.',
-        departureLocation: 'Toronto, Pearson International Airport',
-        departureCode: 'YYZ',
-        arrivalTime: '12:10 p.m.',
-        arrivalDayOffset: '+1',
-        arrivalLocation: 'Paris, Paris-Charles de Gaulle airport',
-        arrivalCode: 'CDG',
-        operator: 'Air France',
-        flightNumber: 'KL2443',
-        aircraft: 'Boeing 777-200',
-        travelClass: 'Economy Class'
-      },
-      {
-        departureTime: '5:00 p.m.',
-        departureLocation: 'Paris, Paris-Charles de Gaulle airport',
-        departureCode: 'CDG',
-        arrivalTime: '5:50 a.m.',
-        arrivalDayOffset: '+2',
-        arrivalLocation: 'Cape Town, Cape Town International Airport',
-        arrivalCode: 'CPT',
-        operator: 'Air France',
-        flightNumber: 'KL2150',
-        aircraft: 'Airbus A350-900',
-        travelClass: 'Economy Class'
-      }
-    ],
-    transferTimes: ['4h50']
-  },
-  {
-    title: 'Cape Town to Paris',
-    duration: '15h40',
-    legs: [
-      {
-        departureTime: '3:20 p.m.',
-        departureLocation: 'Cape Town, Cape Town International Airport',
-        departureCode: 'CPT',
-        arrivalTime: '5:25 p.m.',
-        arrivalLocation: 'Johannesburg, O.R. Tambo International Airport',
-        arrivalCode: 'JNB',
-        operator: 'South African Airlink',
-        flightNumber: 'AF7139',
-        aircraft: 'Embraer 190',
-        travelClass: 'M'
-      },
-      {
-        departureTime: '7:20 p.m.',
-        departureLocation: 'Johannesburg, O.R. Tambo International Airport',
-        departureCode: 'JNB',
-        arrivalTime: '6:00 a.m.',
-        arrivalDayOffset: '+1',
-        arrivalLocation: 'Paris, Paris-Charles de Gaulle airport',
-        arrivalCode: 'CDG',
-        operator: 'Air France',
-        flightNumber: 'AF995',
-        aircraft: 'Airbus A350-900',
-        travelClass: 'Economy Class'
-      }
-    ],
-    transferTimes: ['1h55']
-  },
-  {
-    title: 'Paris to Toronto',
-    duration: '8h25',
-    legs: [
-      {
-        departureTime: '6:10 p.m.',
-        departureLocation: 'Paris, Paris-Charles de Gaulle airport',
-        departureCode: 'CDG',
-        arrivalTime: '8:35 p.m.',
-        arrivalLocation: 'Toronto, Pearson International Airport',
-        arrivalCode: 'YYZ',
-        operator: 'Air France',
-        flightNumber: 'AF358',
-        aircraft: 'Boeing 777-200',
-        travelClass: 'Economy Class'
-      }
-    ]
-  }
-]
+import type { Flight, FlightLeg } from '../types'
 
 function FlightLegDisplay({ leg, isLast }: { leg: FlightLeg; isLast: boolean }) {
   return (
@@ -163,11 +57,11 @@ function TransferTime({ duration }: { duration: string }) {
   )
 }
 
-export default function FlightCards() {
+export default function FlightCards({ flights }: { flights: Flight[] }) {
   return (
     <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-      {flights.map((flight, flightIndex) => (
-        <Card key={flightIndex} className="overflow-hidden">
+      {flights.map((flight) => (
+        <Card key={flight.id} className="overflow-hidden">
           <CardHeader className="pb-2 px-3 sm:px-6">
             <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold">
               <Plane className="w-4 h-4 shrink-0" />
@@ -184,8 +78,8 @@ export default function FlightCards() {
                   leg={leg}
                   isLast={legIndex === flight.legs.length - 1}
                 />
-                {flight.transferTimes && flight.transferTimes[legIndex] && (
-                  <TransferTime duration={flight.transferTimes[legIndex]} />
+                {flight.transfer_times && flight.transfer_times[legIndex] && (
+                  <TransferTime duration={flight.transfer_times[legIndex]} />
                 )}
               </div>
             ))}

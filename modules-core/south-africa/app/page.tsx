@@ -9,7 +9,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { createDbClient } from '@/lib/db-supabase'
 import SouthAfricaClient from './south-africa-client'
-import type { TravelTask, Activity } from '../types'
+import type { TravelTask, Activity, Flight } from '../types'
 
 async function getServerData() {
   // Get current user via Better Auth
@@ -18,14 +18,14 @@ async function getServerData() {
   })
 
   if (!session?.user) {
-    return { tasks: [], activities: [] }
+    return { tasks: [], activities: [], flights: [] }
   }
 
   const supabase = createDbClient()
 
-  // Fetch tasks and activities in parallel
+  // Fetch tasks, activities, and flights in parallel
   // Filter by user_id since we're using service role client
-  const [tasksResult, activitiesResult] = await Promise.all([
+  const [tasksResult, activitiesResult, flightsResult] = await Promise.all([
     supabase
       .from('travel')
       .select('*')
@@ -35,22 +35,29 @@ async function getServerData() {
       .from('travel_activities')
       .select('*')
       .eq('user_id', session.user.id)
-      .order('start_date', { ascending: true })
+      .order('start_date', { ascending: true }),
+    supabase
+      .from('travel_flights')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .order('sort_order', { ascending: true })
   ])
 
   return {
     tasks: (tasksResult.data || []) as TravelTask[],
-    activities: (activitiesResult.data || []) as Activity[]
+    activities: (activitiesResult.data || []) as Activity[],
+    flights: (flightsResult.data || []) as Flight[]
   }
 }
 
 export default async function SouthAfricaPage() {
-  const { tasks, activities } = await getServerData()
+  const { tasks, activities, flights } = await getServerData()
 
   return (
     <SouthAfricaClient
       initialTasks={tasks}
       initialActivities={activities}
+      initialFlights={flights}
     />
   )
 }

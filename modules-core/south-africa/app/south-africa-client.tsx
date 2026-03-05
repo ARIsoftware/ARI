@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import type { TravelTask, Activity } from '../types'
+import type { TravelTask, Activity, Flight } from '../types'
 import SouthAfricaMap from './south-africa-map'
 import ActivityList from './activity-list'
 import FlightCards from './flight-cards'
@@ -39,6 +39,7 @@ type Category = 'todo' | 'packing_list' | 'morning_routine'
 interface SouthAfricaClientProps {
   initialTasks: TravelTask[]
   initialActivities: Activity[]
+  initialFlights: Flight[]
 }
 
 interface TaskSectionProps {
@@ -161,7 +162,7 @@ function TaskSection({
   )
 }
 
-export default function SouthAfricaClient({ initialTasks, initialActivities }: SouthAfricaClientProps) {
+export default function SouthAfricaClient({ initialTasks, initialActivities, initialFlights }: SouthAfricaClientProps) {
   const { session } = useSupabase()
 
   const [tasks, setTasks] = useState<TravelTask[]>(initialTasks)
@@ -448,7 +449,7 @@ export default function SouthAfricaClient({ initialTasks, initialActivities }: S
         <SouthAfricaMap activities={activities} />
 
         {/* Flight Cards */}
-        <FlightCards />
+        <FlightCards flights={initialFlights} />
 
         {/* Error Display */}
         {error && (
@@ -526,7 +527,7 @@ export default function SouthAfricaClient({ initialTasks, initialActivities }: S
                 id="title"
                 value={activityForm.title}
                 onChange={(e) => setActivityForm({ ...activityForm, title: e.target.value })}
-                placeholder="e.g., Hout Bay Airbnb"
+                placeholder="e.g., Paris Airbnb"
                 required
                 className="h-9 sm:h-10"
               />

@@ -49,6 +49,42 @@ export interface GetTasksResponse {
 }
 
 /**
+ * FlightLeg
+ *
+ * Represents a single leg within a flight itinerary
+ */
+export interface FlightLeg {
+  departureTime: string
+  departureLocation: string
+  departureCode: string
+  arrivalTime: string
+  arrivalDayOffset?: string
+  arrivalLocation: string
+  arrivalCode: string
+  operator: string
+  flightNumber: string
+  aircraft: string
+  travelClass: string
+}
+
+/**
+ * Flight
+ *
+ * Represents a row in the travel_flights table
+ */
+export interface Flight {
+  id: string
+  user_id: string
+  title: string
+  duration: string
+  legs: FlightLeg[]
+  transfer_times: string[]
+  sort_order: number
+  created_at: string
+  updated_at?: string
+}
+
+/**
  * API Error Response
  */
 export interface ApiErrorResponse {
