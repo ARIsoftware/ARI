@@ -13,6 +13,8 @@
 terraform/
 infra/
 deploy/
+*.key
+*.pem
 
 # Databases
 *.db

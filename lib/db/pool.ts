@@ -10,7 +10,7 @@ function createPool(): Pool | null {
     return null
   }
 
-  return new Pool({
+  const p = new Pool({
     connectionString: process.env.DATABASE_URL,
     max: Number.parseInt(process.env.DATABASE_POOL_MAX || "20", 10),
     idleTimeoutMillis: 20000,
@@ -18,18 +18,18 @@ function createPool(): Pool | null {
     allowExitOnIdle: true,
     ssl: { rejectUnauthorized: false },
   })
+
+  p.on("error", (err) => {
+    console.warn("[DB Pool] Unexpected connection error (will auto-recover):", err.message)
+  })
+
+  return p
 }
 
 const pool = globalThis.__ariPgPool ?? createPool()
 
 if (process.env.NODE_ENV !== "production") {
   globalThis.__ariPgPool = pool
-}
-
-if (pool) {
-  pool.on("error", (err) => {
-    console.warn("[DB Pool] Unexpected connection error (will auto-recover):", err.message)
-  })
 }
 
 export { pool }
