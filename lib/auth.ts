@@ -53,6 +53,14 @@ export const auth = betterAuth({
       lastName: { type: "string", required: false },
     },
   },
+  // Cache session in a signed cookie to avoid DB hits on every get-session call
+  // This prevents 429s when many tabs are open simultaneously
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60, // 5 minutes
+    },
+  },
   // Rate limiting to prevent brute force attacks
   rateLimit: {
     enabled: true,
@@ -70,7 +78,7 @@ export const auth = betterAuth({
       },
       "/get-session": {
         window: 60,
-        max: 60, // Session checks are read-only, allow more
+        max: 200, // Session checks are read-only, safe to allow many (handles 25+ tabs)
       },
     },
   },
