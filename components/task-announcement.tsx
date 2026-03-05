@@ -218,6 +218,7 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
           </Tooltip>
         )
       case "icon-notepad":
+        if (!modules.some(m => m.id === 'notepad')) return null
         return <NotepadTopBarIcon isDragMode={isDragMode} />
       case "icon-focus":
         return <FocusTimerTopBarIcon isDragMode={isDragMode} />
