@@ -23,6 +23,7 @@ const DIM_BLUE = '\x1b[34m';
 const GREEN = '\x1b[1;32m';
 const YELLOW = '\x1b[1;33m';
 const RED = '\x1b[1;31m';
+const CYAN = '\x1b[1;36m';
 const DIM = '\x1b[2m';
 const BOLD = '\x1b[1m';
 const RESET = '\x1b[0m';
@@ -31,7 +32,7 @@ const SHOW_CURSOR = '\x1b[?25h';
 
 const SYM_CHECK = `${GREEN}✔${RESET}`;
 const SYM_CROSS = `${RED}✘${RESET}`;
-const SYM_ARROW = `${BLUE}→${RESET}`;
+const SYM_ARROW = `${DIM}○${RESET}`;
 const SYM_DASH = `${DIM}–${RESET}`;
 const SYM_WARN = `${YELLOW}⚠${RESET}`;
 
@@ -157,20 +158,30 @@ function stripAnsi(s) {
 
 function showWelcome() {
   console.log('');
-  drawBox([
-    '',
-    blue('A R I   I N S T A L L E R'),
-    '',
-    dim('Premier Personal Productivity'),
-    '',
-  ]);
+  console.log(`  ${CYAN}╔═══╗   ╔════╗   ═╗${RESET}`);
+  console.log(`  ${CYAN}║   ║   ║    ║    ║${RESET}`);
+  console.log(`  ${CYAN}╠═══╣   ╠════╝    ║${RESET}`);
+  console.log(`  ${CYAN}║   ║   ║  ╚═╗    ║${RESET}`);
+  console.log(`  ${CYAN}╩   ╩   ╩    ╩   ═╩═${RESET}`);
   console.log('');
-  console.log(`  This installer will set up:`);
-  console.log(`    ${SYM_ARROW} Git ${dim('— version control')}`);
-  console.log(`    ${SYM_ARROW} pnpm ${dim('— package manager')}`);
-  console.log(`    ${SYM_ARROW} Vercel CLI ${dim('— deployment (optional)')}`);
-  console.log(`    ${SYM_ARROW} Supabase CLI ${dim('— database tools')}`);
-  console.log(`    ${SYM_ARROW} ARI ${dim('— clone repo & install dependencies')}`);
+
+  console.log(`  ${DIM}P R E M I E R   P E R S O N A L   P R O D U C T I V I T Y${RESET}`);
+  console.log('');
+  console.log(`  Platform: ${bold(platformLabel())}`);
+  console.log('');
+  console.log(`  Welcome to ARI. This installer will set up everything you need to run ARI:`);
+  console.log('');
+  console.log(`    ${SYM_ARROW}  ${bold('Git')}  ${dim('— version control')}`);
+  console.log('');
+  console.log(`    ${SYM_ARROW}  ${bold('pnpm')}  ${dim('— package manager')}`);
+  console.log('');
+  console.log(`    ${SYM_ARROW}  ${bold('Vercel CLI')}  ${dim('— deployment (optional)')}`);
+  console.log('');
+  console.log(`    ${SYM_ARROW}  ${bold('Supabase CLI')}  ${dim('— database tools')}`);
+  console.log('');
+  console.log(`    ${SYM_ARROW}  ${bold('Claude Code')}  ${dim('— AI coding assistant')}`);
+  console.log('');
+  console.log(`    ${SYM_ARROW}  ${bold('ARI')}  ${dim('— clone repo & install dependencies')}`);
   console.log('');
 }
 
@@ -179,6 +190,29 @@ function showStepHeader(current, total, title) {
   hr();
   console.log(`  ${blue(`Step ${current} of ${total}:`)} ${bold(title)}`);
   hr();
+}
+
+// ── Platform Detection ──────────────────────────────────────────────────────
+
+const PLATFORM = process.env.ARI_PLATFORM || os.platform();   // darwin | linux | win32
+const PKG_MGR  = process.env.ARI_PKG_MGR  || (PLATFORM === 'darwin' ? 'brew' : 'npm');
+
+function platformLabel() {
+  if (PLATFORM === 'darwin') return 'macOS';
+  if (PLATFORM === 'linux')  return `Linux (${PKG_MGR})`;
+  if (PLATFORM === 'win32')  return 'Windows';
+  return PLATFORM;
+}
+
+function getInstallCmd(cmds) {
+  if (typeof cmds === 'string') return cmds;                   // universal command
+  if (PLATFORM === 'win32' && cmds.win32) return cmds.win32;
+  if (PLATFORM === 'darwin' && cmds.darwin) return cmds.darwin;
+  if (PLATFORM === 'linux') {
+    if (cmds.linux && cmds.linux[PKG_MGR]) return cmds.linux[PKG_MGR];
+    if (cmds.linux && cmds.linux.npm) return cmds.linux.npm;   // npm fallback
+  }
+  return cmds.fallback || cmds.darwin || null;
 }
 
 // ── Detection Functions ─────────────────────────────────────────────────────
@@ -231,6 +265,11 @@ function detectSupabaseCli() {
   return { installed: !!out, version: out ? parseVersion(out) : null };
 }
 
+function detectClaudeCode() {
+  const out = run('claude --version');
+  return { installed: !!out, version: out ? parseVersion(out) : null };
+}
+
 // ── Tool Definitions ────────────────────────────────────────────────────────
 
 const TOOLS = [
@@ -238,7 +277,16 @@ const TOOLS = [
     id: 'git',
     name: 'Git',
     required: true,
-    installCmd: 'brew install git',
+    installCmds: {
+      darwin: 'brew install git',
+      linux: {
+        apt: 'sudo apt-get install -y git',
+        dnf: 'sudo dnf install -y git',
+        pacman: 'sudo pacman -S --noconfirm git',
+        zypper: 'sudo zypper install -y git',
+      },
+      win32: 'winget install -e --id Git.Git --accept-source-agreements --accept-package-agreements',
+    },
     detect: detectGit,
     description: 'Version control system for managing source code.',
   },
@@ -246,7 +294,10 @@ const TOOLS = [
     id: 'pnpm',
     name: 'pnpm',
     required: true,
-    installCmd: 'brew install pnpm',
+    installCmds: {
+      darwin: 'brew install pnpm',
+      fallback: 'npm install -g pnpm',
+    },
     detect: detectPnpm,
     description: 'Fast, disk space efficient package manager used by ARI.',
   },
@@ -254,7 +305,7 @@ const TOOLS = [
     id: 'vercel',
     name: 'Vercel CLI',
     required: false,
-    installCmd: 'npm install -g vercel',
+    installCmds: 'npm install -g vercel',
     detect: detectVercelCli,
     description: 'Deploy and manage ARI on Vercel hosting.',
   },
@@ -262,9 +313,23 @@ const TOOLS = [
     id: 'supabase',
     name: 'Supabase CLI',
     required: true,
-    installCmd: 'brew install supabase/tap/supabase',
+    installCmds: {
+      darwin: 'brew install supabase/tap/supabase',
+      fallback: 'npm install -g supabase',
+    },
     detect: detectSupabaseCli,
     description: 'Database management tools for Supabase PostgreSQL.',
+  },
+  {
+    id: 'claude-code',
+    name: 'Claude Code',
+    required: true,
+    installCmds: {
+      darwin: 'brew install --cask claude-code',
+      fallback: 'npm install -g @anthropic-ai/claude-code',
+    },
+    detect: detectClaudeCode,
+    description: 'AI-powered coding assistant for building and customizing ARI.',
   },
 ];
 
@@ -289,6 +354,13 @@ async function installTools() {
     console.log(`  ${dim(tool.description)}`);
     console.log('');
 
+    const cmd = getInstallCmd(tool.installCmds);
+    if (!cmd) {
+      console.log(`  ${SYM_WARN} ${yellow(`No install method for ${tool.name} on ${platformLabel()}.`)}`);
+      results.push({ ...tool, status: 'skipped', version: null });
+      continue;
+    }
+
     const label = tool.required
       ? `Install ${tool.name}?`
       : `Install ${tool.name}? ${dim('(optional)')}`;
@@ -309,7 +381,7 @@ async function installTools() {
     spinner.start(`Installing ${tool.name}…`);
 
     try {
-      await runAsync(tool.installCmd);
+      await runAsync(cmd);
       const after = tool.detect();
       spinner.success(`${tool.name} ${after.version ? `v${after.version}` : ''} installed`);
       results.push({ ...tool, status: 'installed', version: after.version });
@@ -318,7 +390,7 @@ async function installTools() {
       console.log(`  ${dim(err.message.split('\n').slice(0, 3).join('\n  '))}`);
       console.log('');
       console.log(`  ${dim('You can try running this manually:')}`);
-      console.log(`  ${DIM_BLUE}${tool.installCmd}${RESET}`);
+      console.log(`  ${DIM_BLUE}${cmd}${RESET}`);
       results.push({ ...tool, status: 'failed', version: null });
     }
   }
@@ -326,15 +398,15 @@ async function installTools() {
   return results;
 }
 
-// ── Clone & Setup ARI ───────────────────────────────────────────────────────
+// ── Setup ARI ───────────────────────────────────────────────────────
 
 async function cloneAndSetup() {
   console.log('');
   hr();
-  console.log(`  ${blue('Clone & Setup ARI')}`);
+  console.log(`  ${blue('Setup ARI')}`);
   hr();
 
-  const defaultDir = path.join(os.homedir(), 'ARI');
+  const defaultDir = process.cwd();
   const answer = await askQuestion(`  Where would you like to install ARI? ${dim(`[${defaultDir}]`)} `);
   let targetDir = answer || defaultDir;
 
@@ -427,13 +499,29 @@ function runVerification(ariResult) {
 
   const checks = [];
 
-  // Homebrew
-  const brew = detectBrew();
-  checks.push({
-    name: 'Homebrew',
-    ok: brew.installed,
-    detail: brew.installed ? `v${brew.version}` : 'not found',
-  });
+  // Package manager (platform-specific)
+  if (PLATFORM === 'darwin') {
+    const brew = detectBrew();
+    checks.push({
+      name: 'Homebrew',
+      ok: brew.installed,
+      detail: brew.installed ? `v${brew.version}` : 'not found',
+    });
+  } else if (PLATFORM === 'linux') {
+    const hasPkgMgr = !!run(`command -v ${PKG_MGR}`);
+    checks.push({
+      name: `Package manager (${PKG_MGR})`,
+      ok: hasPkgMgr,
+      detail: hasPkgMgr ? 'available' : 'not found',
+    });
+  } else if (PLATFORM === 'win32') {
+    const hasWinget = !!run('winget --version');
+    checks.push({
+      name: 'winget',
+      ok: hasWinget,
+      detail: hasWinget ? 'available' : 'not found',
+    });
+  }
 
   // Git
   const git = detectGit();
@@ -568,10 +656,10 @@ function showCompletion(ariResult) {
 // ── Main ────────────────────────────────────────────────────────────────────
 
 async function main() {
-  // Belt-and-suspenders macOS check (install.sh checks too)
-  if (os.platform() !== 'darwin') {
-    console.log(`\n  ${SYM_CROSS} ${red('This installer is for macOS only.')}`);
-    console.log(`  See the README for other platforms: https://github.com/ARIsoftware/ARI#readme\n`);
+  // Platform check
+  if (!['darwin', 'linux', 'win32'].includes(PLATFORM)) {
+    console.log(`\n  ${SYM_CROSS} ${red(`Unsupported platform: ${PLATFORM}`)}`);
+    console.log(`  See the README for setup instructions: https://github.com/ARIsoftware/ARI#readme\n`);
     process.exit(1);
   }
 
