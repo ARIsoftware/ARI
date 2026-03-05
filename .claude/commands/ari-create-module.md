@@ -459,6 +459,16 @@ const openCreate = () => {
 
 **NEVER close the dialog before the server confirms success.** If validation fails (client or server), the dialog stays open so the user can fix their input without re-entering everything.
 
+## Code Review & Simplification
+
+Before running the QA checklist, review ALL generated code for the new module. Spawn three review agents in parallel using the Agent tool:
+
+1. **Code Reuse Agent** — Find duplicate code, shared logic opportunities, and unnecessary abstractions across the module's files
+2. **Code Quality Agent** — Identify quality issues, inconsistencies with existing codebase patterns, and readability problems
+3. **Efficiency Agent** — Spot performance issues, unnecessary operations, redundant re-renders, and memory concerns
+
+After all three agents report back, apply fixes to the module code. Then proceed to the QA checklist.
+
 ## Quality Assurance Checklist
 
 Before marking complete, verify:
