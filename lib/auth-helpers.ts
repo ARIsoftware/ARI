@@ -38,9 +38,9 @@ export async function getAuthenticatedUser() {
     return { user: null, session: null, supabase: null, withRLS: null }
   }
 
-  // Create database client (service role, bypasses RLS)
+  // Lazy Supabase client — only created if accessed (most callers only use withRLS)
   // @deprecated - use withRLS() instead for new code
-  const supabase = createDbClient()
+  let _supabase: ReturnType<typeof createDbClient> | null = null
 
   return {
     user: {
@@ -58,7 +58,10 @@ export async function getAuthenticatedUser() {
       access_token: session.session.token, // Map to old property name
       user: session.user,
     },
-    supabase,
+    get supabase() {
+      if (!_supabase) _supabase = createDbClient()
+      return _supabase
+    },
     /**
      * Execute DB operations with RLS enforced for this user.
      * All queries will be filtered to only return this user's data.
