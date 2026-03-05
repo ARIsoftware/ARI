@@ -20,8 +20,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getEnabledModule } from '@/lib/modules/module-registry'
-import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { cookies } from 'next/headers'
 import moduleManifest from '@/lib/generated/module-manifest.json'
 
 /**
@@ -182,20 +181,16 @@ async function handleRequest(
     const isPublic = isPublicRoute(module, apiPath, method)
 
     if (!isPublic) {
-      const { user } = await getAuthenticatedUser()
-      if (!user) {
+      // Lightweight cookie check — avoids a DB round-trip here.
+      // The actual auth verification + module-enabled check happens
+      // inside each module handler via getAuthenticatedUser().
+      const cookieStore = await cookies()
+      const sessionCookie = cookieStore.get('better-auth.session_token')
+        || cookieStore.get('__Secure-better-auth.session_token')
+      if (!sessionCookie) {
         return NextResponse.json(
           { error: 'Unauthorized' },
           { status: 401 }
-        )
-      }
-
-      // For non-public routes, validate module exists and is enabled for current user
-      const moduleInfo = await getEnabledModule(module, user.id)
-      if (!moduleInfo) {
-        return NextResponse.json(
-          { error: 'Module not found or not enabled' },
-          { status: 404 }
         )
       }
     }

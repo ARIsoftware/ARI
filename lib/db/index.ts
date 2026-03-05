@@ -7,6 +7,24 @@ import { pool } from './pool'
 export type DrizzleDb = NodePgDatabase<Record<string, never>>
 
 /**
+ * Wrap a pg client to strip prepared statement names from queries.
+ * PgBouncer in transaction mode rotates backend connections between transactions,
+ * so named prepared statements from a previous transaction may not exist on the
+ * new connection. Stripping the `name` property forces pg to use unnamed statements.
+ */
+function pgBouncerCompat(client: PoolClient): PoolClient {
+  const originalQuery = client.query.bind(client)
+  client.query = function patchedQuery(...args: any[]) {
+    // query(config, values?, callback?) — config is an object with `name`
+    if (args[0] && typeof args[0] === 'object' && 'name' in args[0]) {
+      args[0] = { ...args[0], name: undefined }
+    }
+    return (originalQuery as any)(...args)
+  } as any
+  return client
+}
+
+/**
  * Execute database operations with RLS user context.
  *
  * CRITICAL: This sets the user context for RLS policies.
@@ -42,7 +60,8 @@ export async function withUserContext<T>(
     throw new Error('Database pool not initialized')
   }
 
-  const client = await pool.connect()
+  const rawClient = await pool.connect()
+  const client = pgBouncerCompat(rawClient)
 
   try {
     // Begin transaction - SET LOCAL only lasts within transaction
@@ -105,7 +124,8 @@ export async function withAdminDb<T>(
     throw new Error('Database pool not initialized')
   }
 
-  const client = await pool.connect()
+  const rawClient = await pool.connect()
+  const client = pgBouncerCompat(rawClient)
 
   try {
     const db = drizzle(client as PoolClient)

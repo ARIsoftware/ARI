@@ -12,9 +12,10 @@ function createPool(): Pool | null {
 
   return new Pool({
     connectionString: process.env.DATABASE_URL,
-    max: Number.parseInt(process.env.DATABASE_POOL_MAX || "5", 10),
+    max: Number.parseInt(process.env.DATABASE_POOL_MAX || "20", 10),
     idleTimeoutMillis: 20000,
     connectionTimeoutMillis: 10000,
+    allowExitOnIdle: true,
     ssl: { rejectUnauthorized: false },
   })
 }
