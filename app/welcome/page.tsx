@@ -168,11 +168,9 @@ export default function WelcomePage() {
     lines.push("BETTER_AUTH_URL=http://localhost:3000")
     lines.push("")
 
-    lines.push("# Database Configuration (Required)")
+    lines.push("## PRODUCTION SUPABASE")
     lines.push(`DATABASE_URL=${formData.databaseUrl}`)
-    lines.push("")
-
-    lines.push("# Supabase Configuration")
+    lines.push("DATABASE_POOL_MAX=3")
     lines.push(`NEXT_PUBLIC_SUPABASE_URL=${formData.supabaseUrl}`)
     lines.push(`NEXT_PUBLIC_SUPABASE_ANON_KEY=${formData.supabaseAnonKey}`)
     lines.push(`SUPABASE_SECRET_KEY=${formData.supabaseSecretKey}`)
