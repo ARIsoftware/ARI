@@ -21,6 +21,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getEnabledModule } from '@/lib/modules/module-registry'
+import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import moduleManifest from '@/lib/generated/module-manifest.json'
 
 /**
@@ -181,8 +182,16 @@ async function handleRequest(
     const isPublic = isPublicRoute(module, apiPath, method)
 
     if (!isPublic) {
+      const { user } = await getAuthenticatedUser()
+      if (!user) {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        )
+      }
+
       // For non-public routes, validate module exists and is enabled for current user
-      const moduleInfo = await getEnabledModule(module)
+      const moduleInfo = await getEnabledModule(module, user.id)
       if (!moduleInfo) {
         return NextResponse.json(
           { error: 'Module not found or not enabled' },

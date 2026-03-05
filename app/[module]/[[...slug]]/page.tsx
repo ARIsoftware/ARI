@@ -13,8 +13,9 @@
  * fully dynamic imports at build time.
  */
 
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { getEnabledModule } from '@/lib/modules/module-registry'
+import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { ErrorBoundary, ModuleErrorFallback } from '@/components/error-boundary'
 import { AppSidebar } from '@/components/app-sidebar'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
@@ -56,8 +57,15 @@ export default async function ModuleCatchAllPage({
 
   console.log(`[Module Route] Attempting to load page: ${pagePath}`)
 
+  // If a stale/invalid cookie exists, middleware may let this through.
+  // Do a real session check here so expired sessions redirect to sign-in instead of 404.
+  const { user } = await getAuthenticatedUser()
+  if (!user) {
+    redirect('/sign-in')
+  }
+
   // Server-side validation - check if module exists and is enabled
-  const moduleInfo = await getEnabledModule(module)
+  const moduleInfo = await getEnabledModule(module, user.id)
 
   console.log(`[Module Route] moduleInfo result:`, moduleInfo ? `Found (${moduleInfo.name})` : 'null')
 

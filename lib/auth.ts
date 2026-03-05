@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth"
 import { nextCookies } from "better-auth/next-js"
-import { Pool } from "pg"
 import { hash as argon2Hash, verify as argon2Verify } from "@node-rs/argon2"
+import { pool } from "@/lib/db/pool"
 
 // Build trusted origins
 const trustedOrigins: string[] = []
@@ -25,15 +25,6 @@ if (process.env.NODE_ENV !== 'production') {
     "http://localhost:3003"
   )
 }
-
-// Create auth instance - only if env vars are available (not during build)
-// The auth-helpers.ts checks for missing env vars and returns early
-const pool = process.env.DATABASE_URL
-  ? new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false },
-    })
-  : null
 
 export const auth = betterAuth({
   database: pool as any, // Will be null during build, but auth-helpers catches this

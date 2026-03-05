@@ -1,24 +1,10 @@
 import { drizzle } from 'drizzle-orm/node-postgres'
-import { Pool, type PoolClient } from 'pg'
-
-// Connection pool for serverless environment
-// Uses Supabase connection pooler (port 6543) for optimal performance
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
-})
-
-// Handle pool errors gracefully to prevent uncaught exceptions
-// These typically occur when Supabase's PgBouncer drops idle connections
-pool.on('error', (err) => {
-  console.warn('[DB Pool] Unexpected connection error (will auto-recover):', err.message)
-  // Don't crash - the pool will create new connections as needed
-})
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
+import { type PoolClient } from 'pg'
+import { pool } from './pool'
 
 // Type for the Drizzle database instance
-export type DrizzleDb = ReturnType<typeof drizzle>
+export type DrizzleDb = NodePgDatabase<Record<string, never>>
 
 /**
  * Execute database operations with RLS user context.
@@ -52,6 +38,10 @@ export async function withUserContext<T>(
   userId: string,
   operation: (db: DrizzleDb) => Promise<T>
 ): Promise<T> {
+  if (!pool) {
+    throw new Error('Database pool not initialized')
+  }
+
   const client = await pool.connect()
 
   try {
@@ -111,6 +101,10 @@ export async function withUserContext<T>(
 export async function withAdminDb<T>(
   operation: (db: DrizzleDb) => Promise<T>
 ): Promise<T> {
+  if (!pool) {
+    throw new Error('Database pool not initialized')
+  }
+
   const client = await pool.connect()
 
   try {
@@ -128,6 +122,10 @@ export async function withAdminDb<T>(
  * @deprecated Prefer withUserContext() or withAdminDb() for most use cases.
  */
 export async function getPoolClient(): Promise<PoolClient> {
+  if (!pool) {
+    throw new Error('Database pool not initialized')
+  }
+
   return pool.connect() as Promise<PoolClient>
 }
 
@@ -136,5 +134,7 @@ export async function getPoolClient(): Promise<PoolClient> {
  * Call this during application shutdown.
  */
 export async function closePool(): Promise<void> {
-  await pool.end()
+  if (pool) {
+    await pool.end()
+  }
 }
