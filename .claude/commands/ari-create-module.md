@@ -75,6 +75,8 @@ When approved, create the module following this order:
    - Use `withRLS((db) => db.select()...)` for all database operations
    - Import tables from `@/lib/db/schema`
    - Use `toSnakeCase()` from `@/lib/api-helpers` for responses
+   - **Drizzle `numeric()` columns return STRINGS** - convert to `Number()` in GET responses before sending to client (see "Drizzle Numeric Column Handling" section below)
+   - **Zod schemas MUST have human-readable error messages** on every constraint (see "Zod Validation Rules" section below)
    - See `modules-core/hello-world/api/data/route.ts` as the reference
 5. **Register API routes in MODULE_API_ROUTES** (REQUIRED if module has API routes):
    - Edit `/app/api/modules/[module]/[[...path]]/route.ts`
@@ -130,10 +132,10 @@ See `/lib/hooks/use-ari-launch.ts` or `/lib/hooks/use-tasks.ts` for examples.
 ### Optimistic Updates Pattern
 
 All mutations should implement optimistic updates:
-1. Close modals immediately after user clicks save (don't wait for `onSuccess`)
+1. **Do NOT close dialogs before server confirms** - only close in `onSuccess` callback (see "Dialog & Form Validation Pattern" below)
 2. Update cache in `onMutate` so UI reflects changes instantly
 3. Rollback in `onError` if the server request fails
-4. Show toast notification on error
+4. Show toast notification on error with the actual error message from the server
 
 ### Don't Block on Session
 
@@ -318,6 +320,145 @@ If the module requires an onboarding/setup screen, follow the **Hello World modu
 - **Hooks**: `modules-core/hello-world/hooks/use-hello-world.ts` (useHelloWorldSettings, useUpdateHelloWorldSettings)
 - **Types**: `modules-core/hello-world/types/index.ts`
 
+## Drizzle Numeric Column Handling
+
+**CRITICAL**: Drizzle ORM returns `numeric()` / `decimal()` columns as **strings**, not numbers. This WILL crash any code that calls `.toFixed()`, does arithmetic, or passes values to charts/sorting.
+
+**Rule**: Always convert numeric columns to `Number()` in the API GET response before sending to the client. Do this once in the API layer so every UI consumer gets proper numbers.
+
+```typescript
+// In GET route - after fetching from DB, before returning response:
+const normalized = rows.map((r) => ({
+  ...r,
+  // Convert every numeric() column to a real number
+  battingAvg: Number(r.battingAvg),
+  percentage: Number(r.percentage),
+  score: Number(r.score),
+}))
+
+return NextResponse.json({ items: toSnakeCase(normalized) })
+```
+
+**Also applies to POST/PATCH `.returning()`** - if your create/update route uses `.returning()` and sends the result back, those numeric columns will also be strings. Normalize them before responding.
+
+**When to watch out**: Any Drizzle schema column defined with `numeric()`, `decimal()`, or `real()`. Integer columns (`integer()`) are fine - they return as numbers.
+
+**Design tip**: If a column only needs whole numbers or simple decimals (no precision requirements), prefer `integer()` or `doublePrecision()` over `numeric()` to avoid this issue entirely. Use `numeric(precision, scale)` only when exact decimal precision matters (e.g., currency, batting averages).
+
+## Zod Validation Rules
+
+**Every Zod constraint MUST have a human-readable error message.** Never use bare `.min()` / `.max()` without a message - the default errors are cryptic and unhelpful.
+
+```typescript
+// WRONG - cryptic default errors like "Number must be less than or equal to 1"
+z.number().min(0).max(1)
+z.string().min(1).max(100)
+
+// RIGHT - clear, user-friendly messages
+z.number().min(0, 'AVG must be between 0 and 1.000').max(1, 'AVG must be between 0 and 1.000')
+z.string().min(1, 'Name is required').max(100, 'Name must be 100 characters or less')
+```
+
+**API routes must return Zod issue details** so the client can display them. This pattern is already used in the codebase:
+```typescript
+const parseResult = Schema.safeParse(body)
+if (!parseResult.success) {
+  return NextResponse.json({ error: 'Validation failed', details: parseResult.error.issues }, { status: 400 })
+}
+```
+
+**In mutation hooks**, surface the Zod details from the API response so the user sees specific errors:
+
+```typescript
+mutationFn: async (data: CreateRequest): Promise<Item> => {
+  const res = await fetch('/api/modules/my-module/items', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    const details = err.details?.map((d: any) => d.message).join(', ')
+    throw new Error(details || err.error || 'Failed to create item')
+  }
+  const json = await res.json()
+  return json.item
+},
+```
+
+## Dialog & Form Validation Pattern
+
+**All create/edit dialogs MUST implement inline validation with red outlines.** Never rely only on toast messages for validation errors.
+
+### Required Pattern:
+
+1. **Client-side validation function** that mirrors the Zod schema:
+```typescript
+type FieldErrors = Record<string, string>
+
+function validateForm(form: CreateRequest): FieldErrors {
+  const errors: FieldErrors = {}
+  if (!form.name.trim()) errors.name = 'Name is required'
+  if (form.score < 0 || form.score > 100) errors.score = 'Must be 0-100'
+  // ... mirror all Zod rules
+  return errors
+}
+```
+
+2. **Error state in the component**:
+```typescript
+const [errors, setErrors] = useState<FieldErrors>({})
+```
+
+3. **Validate on submit, show inline errors**:
+```typescript
+const handleSave = () => {
+  const fieldErrors = validateForm(form)
+  setErrors(fieldErrors)
+  if (Object.keys(fieldErrors).length > 0) return // Stop - don't close dialog
+
+  // Only close on success, NOT before the API call
+  createMutation.mutate(form, {
+    onSuccess: () => setDialogOpen(false),
+    onError: (err) => toast({ variant: 'destructive', title: 'Failed to create item', description: err.message }),
+  })
+}
+```
+
+4. **Red outlines on invalid fields**:
+```typescript
+const inputClass = (field: string) =>
+  errors[field] ? 'border-red-500 focus-visible:ring-red-500' : ''
+
+const selectTriggerClass = (field: string) =>
+  errors[field] ? 'border-red-500 ring-red-500' : ''
+```
+
+5. **Error messages below fields**:
+```tsx
+<Input className={inputClass('name')} value={form.name} onChange={(e) => updateField('name', e.target.value)} />
+{errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
+```
+
+6. **Clear errors as user fixes them**:
+```typescript
+const updateField = (field: keyof CreateRequest, value: any) => {
+  setForm((prev) => ({ ...prev, [field]: value }))
+  if (errors[field]) setErrors((prev) => { const next = { ...prev }; delete next[field]; return next })
+}
+```
+
+7. **Reset errors when opening dialog**:
+```typescript
+const openCreate = () => {
+  setForm(emptyForm)
+  setErrors({})
+  setDialogOpen(true)
+}
+```
+
+**NEVER close the dialog before the server confirms success.** If validation fails (client or server), the dialog stays open so the user can fix their input without re-entering everything.
+
 ## Quality Assurance Checklist
 
 Before marking complete, verify:
@@ -330,6 +471,11 @@ Before marking complete, verify:
 - [ ] **All imports use `@/modules/` alias** (NOT `@/modules-custom/` or `@/modules-core/`)
 - [ ] Page uses TanStack Query hooks (not manual useState/useEffect/fetch)
 - [ ] Optimistic updates implemented for all mutations
+- [ ] **If tables use `numeric()` columns**: API GET routes convert them to `Number()` before responding
+- [ ] **All Zod constraints have human-readable error messages** (no bare `.min()` / `.max()`)
+- [ ] **Mutation hooks surface API error details** (parse `err.details` from Zod validation responses)
+- [ ] **All create/edit dialogs have inline validation** (red outlines + error text below fields)
+- [ ] **Dialogs only close on `onSuccess`** (never before API confirms - user must not lose form data on error)
 - [ ] Page does NOT block on session check (no "Authenticating..." spinner)
 - [ ] **Page does NOT include layout wrappers** (no SidebarProvider, AppSidebar, DarkModeProvider, SidebarInset, or header with breadcrumbs - these are already provided by the module routing system)
 - [ ] Component uses proper theming (Tailwind classes, not hardcoded colors)

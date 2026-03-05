@@ -20,9 +20,9 @@ export async function GET(request: NextRequest) {
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
 
-    // Get task creation data (RLS automatically filters by user_id)
-    const taskCreationData = await withRLS((db) =>
-      db.select({ createdAt: tasks.createdAt })
+    // Get both creation and completion data in a single connection
+    const { taskCreationData, taskCompletionData } = await withRLS(async (db) => {
+      const creation = await db.select({ createdAt: tasks.createdAt })
         .from(tasks)
         .where(
           and(
@@ -30,11 +30,8 @@ export async function GET(request: NextRequest) {
             lte(tasks.createdAt, endDate.toISOString())
           )
         )
-    )
 
-    // Get task completion data (RLS automatically filters by user_id)
-    const taskCompletionData = await withRLS((db) =>
-      db.select({ updatedAt: tasks.updatedAt, completed: tasks.completed })
+      const completion = await db.select({ updatedAt: tasks.updatedAt, completed: tasks.completed })
         .from(tasks)
         .where(
           and(
@@ -43,7 +40,9 @@ export async function GET(request: NextRequest) {
             lte(tasks.updatedAt, endDate.toISOString())
           )
         )
-    )
+
+      return { taskCreationData: creation, taskCompletionData: completion }
+    })
 
     // Process data into daily counts
     const dailyData: Record<string, { date: string; tasksCreated: number; tasksCompleted: number }> = {}
