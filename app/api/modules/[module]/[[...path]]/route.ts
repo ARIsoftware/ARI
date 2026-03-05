@@ -149,6 +149,12 @@ const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
     'stats': () => import('@/modules/daily-fitness/api/stats/route'), // GET for fitness stats
     'sample': () => import('@/modules/daily-fitness/api/sample/route') // POST for sample tasks
   },
+  'baseball': {
+    'teams': () => import('@/modules/baseball/api/teams/route'),
+    'teams/[id]': () => import('@/modules/baseball/api/teams/[id]/route'),
+    'players': () => import('@/modules/baseball/api/players/route'),
+    'players/[id]': () => import('@/modules/baseball/api/players/[id]/route'),
+  },
   'backup-manager': {
     'settings': () => import('@/modules/backup-manager/api/settings/route'), // GET/PUT for backup settings
     'list': () => import('@/modules/backup-manager/api/list/route'), // GET for backup list

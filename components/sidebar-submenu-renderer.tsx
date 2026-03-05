@@ -15,6 +15,7 @@ import HelloWorldSubmenu from '@/modules/hello-world/components/sidebar-submenu'
 import MailStreamSubmenu from '@/modules/mail-stream/components/sidebar-submenu'
 import BackupManagerSubmenu from '@/modules/backup-manager/components/sidebar-submenu'
 import DocumentsSubmenu from '@/modules/documents/components/sidebar-submenu'
+import BaseballSubmenu from '@/modules/baseball/components/sidebar-submenu'
 
 /**
  * Props passed to module submenu components
@@ -35,6 +36,7 @@ const SUBMENU_COMPONENTS: Record<string, React.ComponentType<ModuleSubmenuProps>
   'mail-stream': MailStreamSubmenu,
   'backup-manager': BackupManagerSubmenu,
   'documents': DocumentsSubmenu,
+  'baseball': BaseballSubmenu,
 }
 
 interface SubmenuRendererProps {
