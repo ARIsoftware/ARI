@@ -1,0 +1,34 @@
+# If you want Claude Code to be very safe by default, you can block it from touching
+# sensitive files and folders. This is a smart move, especially since you're working
+# with API keys, Supabase, and deployment configs.
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+*.p12
+
+# Infrastructure
+terraform/
+infra/
+deploy/
+
+# Databases
+*.db
+*.sqlite
+
+# Node secrets
+.npmrc
+
+# Credentials
+credentials/
+secrets/
+
+# Git
+.git/
+
+# Build output
+dist/
+build/
+.next/
