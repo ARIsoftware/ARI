@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from 'react'
 import type { ModuleMetadata } from './module-types'
-import { authClient } from '@/lib/auth-client'
+import { useAuth } from '@/components/providers'
 
 /**
  * Hook to fetch all enabled modules for the current user
@@ -41,16 +41,16 @@ export function useModules() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Get auth session to check if user is authenticated
-  const { data: sessionData, isPending: isAuthPending } = authClient.useSession()
+  // Get auth state from the top-level provider (no extra session call)
+  const { session, isLoading: isAuthLoading } = useAuth()
 
   useEffect(() => {
     // Skip API call if not authenticated or still checking auth
-    if (isAuthPending) {
+    if (isAuthLoading) {
       return
     }
 
-    if (!sessionData?.session) {
+    if (!session) {
       // Not authenticated - use empty modules
       setModules([])
       setLoading(false)
@@ -80,7 +80,7 @@ export function useModules() {
     }
 
     fetchModules()
-  }, [isAuthPending, sessionData])
+  }, [isAuthLoading, session])
 
   return { modules, loading, error }
 }
@@ -109,8 +109,8 @@ export function useModule(moduleId: string | null) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Get auth session to check if user is authenticated
-  const { data: sessionData, isPending: isAuthPending } = authClient.useSession()
+  // Get auth state from the top-level provider (no extra session call)
+  const { session, isLoading: isAuthLoading } = useAuth()
 
   useEffect(() => {
     if (!moduleId) {
@@ -120,11 +120,11 @@ export function useModule(moduleId: string | null) {
     }
 
     // Skip API call if not authenticated or still checking auth
-    if (isAuthPending) {
+    if (isAuthLoading) {
       return
     }
 
-    if (!sessionData?.session) {
+    if (!session) {
       // Not authenticated - return null module
       setModule(null)
       setLoading(false)
@@ -156,7 +156,7 @@ export function useModule(moduleId: string | null) {
     }
 
     fetchModule()
-  }, [moduleId, isAuthPending, sessionData])
+  }, [moduleId, isAuthLoading, session])
 
   return { module, loading, error }
 }
