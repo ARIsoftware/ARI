@@ -71,6 +71,40 @@ export async function middleware(req: NextRequest) {
     return setupResponse
   }
 
+  // IP/HOSTNAME ALLOWLIST: Restrict access if ALLOWED_IPS is configured
+  const allowedIpsEnv = process.env.ALLOWED_IPS?.trim()
+  if (allowedIpsEnv) {
+    const entries = allowedIpsEnv.split(',').map(e => e.trim()).filter(Boolean)
+    const allowedIPs = new Set(entries.filter(e => /^[\d.:a-fA-F]+$/.test(e)))
+    const allowedHostnames = new Set(entries.filter(e => !/^[\d.:a-fA-F]+$/.test(e)))
+
+    // Always allow loopback
+    allowedIPs.add('127.0.0.1')
+    allowedIPs.add('::1')
+    allowedHostnames.add('localhost')
+
+    // Determine client IP
+    const clientIP =
+      req.headers.get('cf-connecting-ip') ||
+      req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      req.headers.get('x-real-ip')
+
+    // Get hostname from Host header (strip port)
+    const host = req.headers.get('host')?.split(':')[0] || ''
+
+    if (clientIP) {
+      const ipAllowed = allowedIPs.has(clientIP)
+      const hostAllowed = allowedHostnames.has(host)
+
+      if (!ipAllowed && !hostAllowed) {
+        return new NextResponse('Access Denied - IP Address Not Authorized in ALLOWED_IPS.', {
+          status: 403,
+        })
+      }
+    }
+    // If no client IP header found, allow (likely direct/localhost access)
+  }
+
   // NORMAL MODE: Setup complete, existing auth logic below
   let response = NextResponse.next({
     request: req,
