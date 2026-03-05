@@ -2,163 +2,35 @@
  * Module React Hooks
  *
  * Client-side React hooks for accessing module data.
- * These hooks fetch module metadata via API routes.
+ * These hooks read from the ModulesProvider context (server-side pre-fetched),
+ * eliminating redundant client-side /api/modules fetches.
  */
 
 'use client'
 
-import { useEffect, useState } from 'react'
 import type { ModuleMetadata } from './module-types'
-import { useAuth } from '@/components/providers'
+import { useEnabledModulesFromContext } from './context'
 
 /**
- * Hook to fetch all enabled modules for the current user
+ * Hook to get all enabled modules for the current user
  *
  * @returns Object with modules array, loading state, and error
- *
- * @example
- * ```tsx
- * function Sidebar() {
- *   const { modules, loading, error } = useModules()
- *
- *   if (loading) return <div>Loading...</div>
- *   if (error) return <div>Error: {error}</div>
- *
- *   return (
- *     <nav>
- *       {modules.map(module => (
- *         <Link key={module.id} href={`/${module.id}`}>
- *           {module.name}
- *         </Link>
- *       ))}
- *     </nav>
- *   )
- * }
- * ```
  */
 export function useModules() {
-  const [modules, setModules] = useState<ModuleMetadata[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  // Get auth state from the top-level provider (no extra session call)
-  const { session, isLoading: isAuthLoading } = useAuth()
-
-  useEffect(() => {
-    // Skip API call if not authenticated or still checking auth
-    if (isAuthLoading) {
-      return
-    }
-
-    if (!session) {
-      // Not authenticated - use empty modules
-      setModules([])
-      setLoading(false)
-      return
-    }
-
-    async function fetchModules() {
-      try {
-        setLoading(true)
-        setError(null)
-
-        const response = await fetch('/api/modules')
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch modules')
-        }
-
-        const data = await response.json()
-        setModules(data.modules || [])
-      } catch (err: any) {
-        console.error('[useModules] Error:', err)
-        setError(err.message || 'Failed to load modules')
-        setModules([])
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchModules()
-  }, [isAuthLoading, session])
-
-  return { modules, loading, error }
+  const modules = useEnabledModulesFromContext()
+  return { modules, loading: false, error: null }
 }
 
 /**
- * Hook to fetch a specific module by ID
+ * Hook to get a specific module by ID
  *
  * @param moduleId - The module ID to fetch
  * @returns Object with module metadata, loading state, and error
- *
- * @example
- * ```tsx
- * function ModuleSettings({ moduleId }: { moduleId: string }) {
- *   const { module, loading, error } = useModule(moduleId)
- *
- *   if (loading) return <div>Loading...</div>
- *   if (error) return <div>Error: {error}</div>
- *   if (!module) return <div>Module not found</div>
- *
- *   return <div>Version: {module.version}</div>
- * }
- * ```
  */
 export function useModule(moduleId: string | null) {
-  const [module, setModule] = useState<ModuleMetadata | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  // Get auth state from the top-level provider (no extra session call)
-  const { session, isLoading: isAuthLoading } = useAuth()
-
-  useEffect(() => {
-    if (!moduleId) {
-      setModule(null)
-      setLoading(false)
-      return
-    }
-
-    // Skip API call if not authenticated or still checking auth
-    if (isAuthLoading) {
-      return
-    }
-
-    if (!session) {
-      // Not authenticated - return null module
-      setModule(null)
-      setLoading(false)
-      return
-    }
-
-    async function fetchModule() {
-      try {
-        setLoading(true)
-        setError(null)
-
-        // Fetch all enabled modules and filter by ID
-        const response = await fetch('/api/modules')
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch modules')
-        }
-
-        const data = await response.json()
-        const foundModule = data.modules?.find((m: ModuleMetadata) => m.id === moduleId) || null
-        setModule(foundModule)
-      } catch (err: any) {
-        console.error(`[useModule] Error fetching ${moduleId}:`, err)
-        setError(err.message || 'Failed to load module')
-        setModule(null)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchModule()
-  }, [moduleId, isAuthLoading, session])
-
-  return { module, loading, error }
+  const modules = useEnabledModulesFromContext()
+  const module = moduleId ? modules.find(m => m.id === moduleId) ?? null : null
+  return { module, loading: false, error: null }
 }
 
 /**
