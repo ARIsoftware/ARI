@@ -116,12 +116,12 @@ export function Providers({
 
   return (
     <Context.Provider value={{ user, session, isLoading: isPending, supabase }}>
-      <ThemeProvider>
+      <ThemeProvider isAuthenticated={!!session} isAuthLoading={isPending}>
         <ModulesProvider modules={modules} enabledModules={enabledModules}>
-          <FeaturesProvider initialFeatures={initialFeatures}>
+          <FeaturesProvider initialFeatures={initialFeatures} isAuthenticated={!!session} isAuthLoading={isPending}>
             <MusicPlayerProvider>
               <CommandPaletteProvider>
-                <DragDropModeProvider>
+                <DragDropModeProvider isAuthenticated={!!session} isAuthLoading={isPending}>
                   {children}
                   <Toaster />
                   {/* Only show exercise reminder when user is authenticated */}

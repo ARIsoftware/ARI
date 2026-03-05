@@ -12,7 +12,6 @@ import type { ThemeSettings, ThemeColors, CustomTheme, ThemePreset, SidebarView 
 import { THEME_PRESETS, DEFAULT_THEME_ID, getThemeById } from './presets'
 import { FONTS, DEFAULT_FONT_ID, getFontById, getFontFamily } from './fonts'
 import { CSS_VAR_MAP } from './types'
-import { authClient } from '@/lib/auth-client'
 
 interface ThemeContextValue {
   // Theme state
@@ -77,16 +76,13 @@ function applyDarkModeClass(isDark: boolean, themeId?: string) {
   }
 }
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
+export function ThemeProvider({ children, isAuthenticated: isAuthProp, isAuthLoading }: { children: ReactNode; isAuthenticated: boolean; isAuthLoading: boolean }) {
   const [activeThemeId, setActiveThemeId] = useState(DEFAULT_THEME_ID)
   const [activeFont, setActiveFont] = useState(DEFAULT_FONT_ID)
   const [customThemes, setCustomThemes] = useState<CustomTheme[]>([])
   const [sidebarView, setSidebarViewState] = useState<SidebarView>('default')
   const [isLoading, setIsLoading] = useState(true)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-
-  // Get auth session to check if user is authenticated
-  const { data: sessionData, isPending: isAuthPending } = authClient.useSession()
+  const [isAuthenticatedState, setIsAuthenticatedState] = useState(false)
 
   // Get current theme object (check for customization first)
   const currentTheme: ThemePreset | CustomTheme | null =
@@ -162,11 +158,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Fetch from API only when authenticated
   useEffect(() => {
     // Wait until auth state is determined
-    if (isAuthPending) return
+    if (isAuthLoading) return
 
     // Not authenticated - skip API call and use cached/default
-    if (!sessionData?.session) {
-      setIsAuthenticated(false)
+    if (!isAuthProp) {
+      setIsAuthenticatedState(false)
       setIsLoading(false)
       return
     }
@@ -175,7 +171,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     fetch('/api/theme')
       .then((res) => {
         if (res.ok) {
-          setIsAuthenticated(true)
+          setIsAuthenticatedState(true)
           return res.json()
         }
         throw new Error('Not authenticated')
@@ -201,12 +197,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         // Error - use cached/default
-        setIsAuthenticated(false)
+        setIsAuthenticatedState(false)
       })
       .finally(() => {
         setIsLoading(false)
       })
-  }, [isAuthPending, sessionData])
+  }, [isAuthLoading, isAuthProp])
 
   // Save settings to API and cache
   const saveSettings = useCallback(
@@ -218,7 +214,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(THEME_CACHE_KEY, JSON.stringify(updated))
 
       // Save to API if authenticated
-      if (isAuthenticated) {
+      if (isAuthenticatedState) {
         try {
           await fetch('/api/theme', {
             method: 'PUT',
@@ -230,7 +226,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         }
       }
     },
-    [isAuthenticated]
+    [isAuthenticatedState]
   )
 
   // Set theme

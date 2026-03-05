@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react"
-import { authClient } from "@/lib/auth-client"
 
 interface DragDropModeContextType {
   isDragMode: boolean
@@ -18,15 +17,12 @@ interface DragDropModeContextType {
 
 const DragDropModeContext = createContext<DragDropModeContextType | null>(null)
 
-export function DragDropModeProvider({ children }: { children: React.ReactNode }) {
+export function DragDropModeProvider({ children, isAuthenticated, isAuthLoading }: { children: React.ReactNode; isAuthenticated: boolean; isAuthLoading: boolean }) {
   const [isDragMode, setIsDragMode] = useState(false)
   const [pendingOrder, setPendingOrder] = useState<Record<string, number> | null>(null)
   const [pendingIconOrder, setPendingIconOrder] = useState<Record<string, number> | null>(null)
   const [iconOrder, setIconOrder] = useState<Record<string, number> | null>(null)
   const [moduleOrder, setModuleOrder] = useState<Record<string, number> | null>(null)
-
-  // Get auth session to check if user is authenticated
-  const { data: sessionData, isPending: isAuthPending } = authClient.useSession()
 
   // Use ref to access pendingOrder in saveOrder without stale closure
   const pendingOrderRef = useRef<Record<string, number> | null>(null)
@@ -39,7 +35,7 @@ export function DragDropModeProvider({ children }: { children: React.ReactNode }
   // Load icon order and module order on mount (only if authenticated)
   useEffect(() => {
     // Skip API call if not authenticated or still checking auth
-    if (isAuthPending || !sessionData?.session) return
+    if (isAuthLoading || !isAuthenticated) return
 
     fetch("/api/modules/order")
       .then(response => {
@@ -57,7 +53,7 @@ export function DragDropModeProvider({ children }: { children: React.ReactNode }
       .catch(error => {
         console.error("[DragDrop] Failed to load orders:", error)
       })
-  }, [isAuthPending, sessionData])
+  }, [isAuthLoading, isAuthenticated])
 
   // Keyboard shortcut: Cmd+D to toggle drag mode
   useEffect(() => {

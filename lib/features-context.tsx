@@ -1,7 +1,6 @@
 "use client"
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { authClient } from '@/lib/auth-client'
 
 interface FeaturesContextType {
   features: Record<string, boolean>
@@ -15,16 +14,15 @@ interface FeaturesProviderProps {
   children: ReactNode
   /** Pre-fetched features from server-side */
   initialFeatures?: Record<string, boolean>
+  isAuthenticated: boolean
+  isAuthLoading: boolean
 }
 
-export function FeaturesProvider({ children, initialFeatures }: FeaturesProviderProps) {
+export function FeaturesProvider({ children, initialFeatures, isAuthenticated, isAuthLoading }: FeaturesProviderProps) {
   // Use initial features if provided (server-side), otherwise start empty
   const [features, setFeatures] = useState<Record<string, boolean>>(initialFeatures || {})
   // If we have initial features, no loading needed
   const [loading, setLoading] = useState(!initialFeatures)
-
-  // Get auth session to check if user is authenticated
-  const { data: sessionData, isPending: isAuthPending } = authClient.useSession()
 
   useEffect(() => {
     // Skip client-side fetch if we already have server-side features
@@ -33,12 +31,12 @@ export function FeaturesProvider({ children, initialFeatures }: FeaturesProvider
     }
 
     // Wait until auth state is determined
-    if (isAuthPending) {
+    if (isAuthLoading) {
       return
     }
 
     // Skip API call if not authenticated
-    if (!sessionData?.session) {
+    if (!isAuthenticated) {
       setLoading(false)
       return
     }
@@ -62,7 +60,7 @@ export function FeaturesProvider({ children, initialFeatures }: FeaturesProvider
     }
 
     loadFeatures()
-  }, [initialFeatures, isAuthPending, sessionData])
+  }, [initialFeatures, isAuthLoading, isAuthenticated])
 
   const isFeatureEnabled = (featureName: string): boolean => {
     // Default to true if no preference is set
