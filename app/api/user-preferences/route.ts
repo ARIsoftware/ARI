@@ -23,7 +23,7 @@ function getServiceSupabase() {
 // Validation schema for user preferences
 const userPreferencesSchema = z.object({
   name: z.string().max(255).optional().nullable(),
-  email: z.string().email().max(255).optional().nullable(),
+  email: z.string().max(255).optional().nullable(),
   title: z.string().max(255).optional().nullable(),
   company_name: z.string().max(255).optional().nullable(),
   country: z.string().max(100).optional().nullable(),
