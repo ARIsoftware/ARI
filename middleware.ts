@@ -36,7 +36,8 @@ const protectedRoutes = [
 ]
 
 // Static public routes (non-module)
-const staticPublicRoutes = ["/sign-in", "/auth", "/api/auth"]
+const staticPublicRoutes = ["/sign-in", "/auth", "/api/auth", "/api/health", "/database-error"]
+// Note: /api/health also covers /api/health/domain and /api/health/resend via startsWith matching
 
 // Get dynamic public routes from module manifest
 // These are module API routes that have publicRoutes configured in module.json

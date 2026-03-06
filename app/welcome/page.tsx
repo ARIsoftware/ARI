@@ -75,7 +75,7 @@ const generateAuthSecret = () => {
   return btoa(String.fromCharCode(...array))
 }
 
-const STEP_ORDER = ["personal", "github", "supabase", "openai", "resend", "download", "vercel"]
+const STEP_ORDER = ["personal", "github", "supabase", "claude-code", "openai", "resend", "download", "vercel"]
 // Hidden: "local-env" step removed from flow since install script handles it. Content preserved below.
 
 export default function WelcomePage() {
@@ -1297,6 +1297,122 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                       Learn more about <a href="https://supabase.com/docs/guides/platform/backups" target="_blank" rel="noopener noreferrer" className="font-medium underline hover:no-underline">Supabase backups</a>.
                     </AlertDescription>
                   </Alert>
+
+                  {/* Footer */}
+                  <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
+                    <button
+                      onClick={goToPreviousStep}
+                      className="inline-flex items-center justify-center px-4 py-2 text-base font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
+                      style={{ borderRadius: '6px' }}
+                    >
+                      Back
+                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={goToNextStep}
+                        className="inline-flex items-center justify-center px-4 py-2 text-base font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                        style={{ borderRadius: '6px' }}
+                      >
+                        Skip this step
+                      </button>
+                      <button
+                        onClick={goToNextStep}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                        style={{ borderRadius: '6px' }}
+                      >
+                        I&apos;ve completed this step
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                </div>
+              )}
+
+              {/* Claude Code Tab */}
+              {currentTab === "claude-code" && (
+                <div>
+                  {/* Header section with gradient background */}
+                  <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
+                    <div className="flex items-center gap-2.5">
+                      <h2 className="text-2xl font-semibold text-zinc-900">Claude Code</h2>
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-600 text-white">RECOMMENDED</span>
+                    </div>
+                    <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
+                      Claude Code is an agentic coding tool by Anthropic that lives in your terminal. It was already installed by the install script — now you just need to set up your account.
+                    </p>
+                  </div>
+
+                  {/* Content section */}
+                  <div className="space-y-6" style={{ padding: '25px' }}>
+                  <Alert className="bg-orange-50 border-orange-200">
+                    <Zap className="w-4 h-4 text-orange-600" />
+                    <AlertTitle className="text-orange-800">Recommended</AlertTitle>
+                    <AlertDescription className="text-orange-700">
+                      Claude Code makes it easy to build new modules, fix bugs, and extend ARI using natural language. You can skip this step, but it&apos;s highly recommended.
+                    </AlertDescription>
+                  </Alert>
+
+                  {/* Step 1 */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
+                      1
+                    </div>
+                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Create an Anthropic account</h3>
+                  </div>
+
+                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
+                    <ol className="space-y-2.5">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                          1
+                        </span>
+                        <span className="text-black">
+                          Go to <a href="https://claude.ai" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
+                            claude.ai
+                            <ExternalLink className="h-3 w-3" />
+                          </a> and create a free account (or sign in if you already have one)
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                          2
+                        </span>
+                        <span className="text-black">
+                          Subscribe to the <strong className="text-zinc-700">Max plan</strong> ($100/mo) for the best Claude Code experience, or use the <strong className="text-zinc-700">Pro plan</strong> ($20/mo) for lighter usage
+                        </span>
+                      </li>
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                          3
+                        </span>
+                        <span className="text-black">
+                          Alternatively, you can use an <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
+                            Anthropic API key
+                            <ExternalLink className="h-3 w-3" />
+                          </a> with pay-as-you-go billing
+                        </span>
+                      </li>
+                    </ol>
+                  </div>
+
+                  {/* Step 2 */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
+                      2
+                    </div>
+                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Connect Claude Code to your account</h3>
+                  </div>
+
+                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
+                    <p className="text-sm text-black mb-3">
+                      Claude Code was already installed by the install script. Open your terminal in the ARI project folder and run:
+                    </p>
+                    <CodeBlock language="bash" code="claude" />
+                    <p className="text-sm text-black mt-3">
+                      This will open a browser window to authenticate. Sign in with the same account you created above, and Claude Code will be ready to use.
+                    </p>
+                  </div>
 
                   {/* Footer */}
                   <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
