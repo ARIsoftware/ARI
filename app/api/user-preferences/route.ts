@@ -1,24 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
-
-// Create service role client
-function getServiceSupabase() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY
-
-  if (!supabaseUrl || !supabaseSecretKey) {
-    throw new Error('Missing Supabase environment variables')
-  }
-
-  return createClient(supabaseUrl, supabaseSecretKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  })
-}
 
 // Validation schema for user preferences
 const userPreferencesSchema = z.object({
@@ -32,60 +14,61 @@ const userPreferencesSchema = z.object({
   timezone: z.string().max(50).optional(),
 })
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (error && typeof error === 'object' && 'message' in error) {
+    const msg = (error as Record<string, unknown>).message
+    return typeof msg === 'string' ? msg : JSON.stringify(msg)
+  }
+  return String(error)
+}
+
+/** Supabase REST API returns 404 for missing tables (not PostgreSQL 42P01) */
+function isTableNotFound(status: number, errorCode?: string): boolean {
+  return status === 404 || errorCode === '42P01'
+}
+
+const TABLE_MISSING_MSG = 'The user_preferences table does not exist. Please run the migration at /migrations/user_preferences.sql'
+
+const DEFAULT_PREFS = (userId: string, email: string) => ({
+  id: null,
+  user_id: userId,
+  name: null,
+  email,
+  title: null,
+  company_name: null,
+  country: null,
+  city: null,
+  linkedin_url: null,
+  timezone: 'UTC',
+})
+
 export async function GET() {
   try {
-    const { user } = await getAuthenticatedUser()
+    const { user, supabase } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !supabase) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = getServiceSupabase()
-
-    // Fetch user preferences
-    const { data: prefs, error } = await supabase
+    const result = await supabase
       .from('user_preferences')
       .select('*')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
 
-    if (error && error.code !== 'PGRST116') {
-      // PGRST116 is "no rows returned" - that's OK, return defaults
-      if (error.code === '42P01') {
-        // Table doesn't exist yet
-        return NextResponse.json({
-          id: null,
-          user_id: user.id,
-          name: null,
-          email: user.email,
-          title: null,
-          company_name: null,
-          country: null,
-          city: null,
-          linkedin_url: null,
-          timezone: 'UTC',
-        })
+    if (result.error) {
+      if (isTableNotFound(result.status, result.error.code)) {
+        return NextResponse.json(DEFAULT_PREFS(user.id, user.email))
       }
-      throw error
+      throw result.error
     }
 
-    // Return preferences or defaults
-    return NextResponse.json(prefs || {
-      id: null,
-      user_id: user.id,
-      name: null,
-      email: user.email,
-      title: null,
-      company_name: null,
-      country: null,
-      city: null,
-      linkedin_url: null,
-      timezone: 'UTC',
-    })
+    return NextResponse.json(result.data || DEFAULT_PREFS(user.id, user.email))
   } catch (error) {
     console.error('Failed to fetch user preferences:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch user preferences' },
+      { error: 'Failed to fetch user preferences', message: getErrorMessage(error) },
       { status: 500 }
     )
   }
@@ -93,15 +76,14 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { user } = await getAuthenticatedUser()
+    const { user, supabase } = await getAuthenticatedUser()
 
-    if (!user) {
+    if (!user || !supabase) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const body = await request.json()
 
-    // Validate the input
     const validationResult = userPreferencesSchema.safeParse(body)
     if (!validationResult.success) {
       return NextResponse.json(
@@ -112,58 +94,36 @@ export async function PUT(request: NextRequest) {
 
     const validatedData = validationResult.data
 
-    const supabase = getServiceSupabase()
-
-    // Check if preferences exist
-    const { data: existing } = await supabase
+    const result = await supabase
       .from('user_preferences')
-      .select('id')
-      .eq('user_id', user.id)
-      .maybeSingle()
-
-    const now = new Date().toISOString()
-
-    if (existing) {
-      // Update existing preferences
-      const { data: updated, error } = await supabase
-        .from('user_preferences')
-        .update({
-          ...validatedData,
-          updated_at: now,
-        })
-        .eq('user_id', user.id)
-        .select()
-        .single()
-
-      if (error) throw error
-      return NextResponse.json(updated)
-    } else {
-      // Insert new preferences
-      const { data: created, error } = await supabase
-        .from('user_preferences')
-        .insert({
+      .upsert(
+        {
           user_id: user.id,
           ...validatedData,
-          created_at: now,
-          updated_at: now,
-        })
-        .select()
-        .single()
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' }
+      )
+      .select()
 
-      if (error) throw error
-      return NextResponse.json(created)
+    if (result.error || isTableNotFound(result.status, result.error?.code)) {
+      if (isTableNotFound(result.status, result.error?.code)) {
+        return NextResponse.json(
+          { error: 'Table not found', message: TABLE_MISSING_MSG },
+          { status: 500 }
+        )
+      }
+      return NextResponse.json(
+        { error: 'Failed to save user preferences', message: result.error?.message || result.statusText || 'Unknown error' },
+        { status: 500 }
+      )
     }
-  } catch (error: unknown) {
-    const err = error as Record<string, unknown> | null
-    const errMsg = (err && typeof err === 'object' && 'message' in err)
-      ? String(err.message)
-      : String(error)
-    const errCode = (err && typeof err === 'object' && 'code' in err) ? String(err.code) : undefined
-    const errHint = (err && typeof err === 'object' && 'hint' in err) ? String(err.hint) : undefined
-    const errDetail = (err && typeof err === 'object' && 'details' in err) ? String(err.details) : undefined
-    console.error('Failed to save user preferences:', { message: errMsg, code: errCode, hint: errHint, details: errDetail })
+
+    return NextResponse.json(result.data?.[0] ?? result.data)
+  } catch (error) {
+    console.error('Failed to save user preferences:', error)
     return NextResponse.json(
-      { error: 'Failed to save user preferences', message: errMsg, code: errCode, hint: errHint, details: errDetail },
+      { error: 'Failed to save user preferences', message: getErrorMessage(error) },
       { status: 500 }
     )
   }
