@@ -922,73 +922,84 @@ export default function WelcomePage() {
                   {/* Header section with gradient background */}
                   <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
                     <div className="flex items-center gap-2.5">
-                      <h2 className="text-2xl font-semibold text-zinc-900">GitHub Setup</h2>
+                      <h2 className="text-2xl font-semibold text-zinc-900">Create Your Private Repository</h2>
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-600 text-white">FREE</span>
                     </div>
                     <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
-                      Create a GitHub repository for your ARI instance. This enables version control, easy deployment to Vercel, and the ability to receive updates. GitHub offers a free tier. Please check their website for details.
+                      Set up your own private GitHub repository. Your code pushes here, while you can still pull updates from the official ARI repo.
                     </p>
                   </div>
 
                   {/* Content section */}
                   <div style={{ padding: '25px' }}>
                     <div className="space-y-2">
-                      {/* Step 1: Create repo */}
+                      {/* Step 1: Authenticate */}
                       <div className="relative flex gap-4">
                         <div className="flex flex-col items-center">
                           <div className="flex w-10 h-10 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-sm font-semibold">1</div>
                           <div className="mt-2 h-full w-px bg-zinc-200" />
                         </div>
                         <div className="flex-1 pb-8">
-                          <h3 className="mb-3 font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Create a new repository</h3>
-                          <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
-                            <ol className="space-y-3">
-                              <li className="flex items-start gap-3 text-base" style={{ lineHeight: '1.6' }}>
-                                <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>1</span>
-                                <span className="text-black">
-                                  Go to <a href="https://github.com/new" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
-                                    github.com/new
-                                    <ExternalLink className="h-3 w-3" />
-                                  </a>
-                                </span>
-                              </li>
-                              <li className="flex items-start gap-3 text-base" style={{ lineHeight: '1.6' }}>
-                                <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>2</span>
-                                <span className="text-black">
-                                  Name your repository (e.g., <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-sm font-mono text-zinc-700">ari</code> or <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-sm font-mono text-zinc-700">my-ari</code>)
-                                </span>
-                              </li>
-                              <li className="flex items-start gap-3 text-base" style={{ lineHeight: '1.6' }}>
-                                <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>3</span>
-                                <span className="text-black">
-                                  Set it to <strong className="text-zinc-700">Private</strong> (recommended) and click <strong className="text-zinc-700">Create repository</strong>
-                                </span>
-                              </li>
-                            </ol>
-                          </div>
+                          <h3 className="mb-3 font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Authenticate with GitHub</h3>
+                          <p className="mb-3 text-base text-black" style={{ lineHeight: '1.6' }}>If you haven&apos;t already, log in to GitHub via the CLI:</p>
+                          <CodeBlock
+                            language="bash"
+                            code={`gh auth login`}
+                          />
                         </div>
                       </div>
 
-                      {/* Step 2: Push code */}
+                      {/* Step 2: Create private repo */}
                       <div className="relative flex gap-4">
                         <div className="flex flex-col items-center">
                           <div className="flex w-10 h-10 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-sm font-semibold">2</div>
+                          <div className="mt-2 h-full w-px bg-zinc-200" />
                         </div>
-                        <div className="flex-1">
-                          <h3 className="mb-3 font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Push your code</h3>
-                          <p className="mb-3 text-base text-black" style={{ lineHeight: '1.6' }}>In your project folder, run these commands one line at a time:</p>
+                        <div className="flex-1 pb-8">
+                          <h3 className="mb-3 font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Create your private repository</h3>
+                          <p className="mb-3 text-base text-black" style={{ lineHeight: '1.6' }}>From your ARI project folder, run:</p>
                           <CodeBlock
                             language="bash"
-                            code={`git init
-git add .
-git commit -m "Hello ARI.Software!"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
-git push -u origin main`}
+                            code={`gh repo create my-ari --private --source=. --remote=origin --push`}
                           />
                           <p className="mt-3 text-sm text-black" style={{ lineHeight: '1.6' }}>
-                            Replace <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-zinc-600">YOUR_USERNAME</code> and <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-zinc-600">YOUR_REPO</code> with your GitHub username and repository name
+                            Replace <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-zinc-600">my-ari</code> with whatever you&apos;d like to name your repo.
                           </p>
+                        </div>
+                      </div>
+
+                      {/* Step 3: Verify */}
+                      <div className="relative flex gap-4">
+                        <div className="flex flex-col items-center">
+                          <div className="flex w-10 h-10 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-sm font-semibold">3</div>
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="mb-3 font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Verify your setup</h3>
+                          <p className="mb-3 text-base text-black" style={{ lineHeight: '1.6' }}>Check that both remotes are configured:</p>
+                          <CodeBlock
+                            language="bash"
+                            code={`git remote -v`}
+                          />
+                          <p className="mt-3 mb-2 text-sm text-black" style={{ lineHeight: '1.6' }}>You should see both remotes:</p>
+                          <CodeBlock
+                            language="text"
+                            code={`origin    https://github.com/you/my-ari.git (fetch)
+origin    https://github.com/you/my-ari.git (push)
+upstream  https://github.com/ARIsoftware/ARI.git (fetch)
+upstream  https://github.com/ARIsoftware/ARI.git (push)`}
+                          />
+
+                          {/* Explanation box */}
+                          <div className="mt-4 rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
+                            <ul className="space-y-2 text-base" style={{ lineHeight: '1.6' }}>
+                              <li className="text-black">
+                                <strong className="text-zinc-700">origin</strong> = your private repo (your changes go here)
+                              </li>
+                              <li className="text-black">
+                                <strong className="text-zinc-700">upstream</strong> = official ARI repo (pull updates from here with <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-sm font-mono text-zinc-700">/ari-update</code>)
+                              </li>
+                            </ul>
+                          </div>
                         </div>
                       </div>
                     </div>

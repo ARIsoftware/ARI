@@ -173,6 +173,8 @@ function showWelcome() {
   console.log('');
   console.log(`    ${SYM_ARROW}  ${bold('Git')}  ${dim('— version control')}`);
   console.log('');
+  console.log(`    ${SYM_ARROW}  ${bold('GitHub CLI')}  ${dim('— repository management')}`);
+  console.log('');
   console.log(`    ${SYM_ARROW}  ${bold('pnpm')}  ${dim('— package manager')}`);
   console.log('');
   console.log(`    ${SYM_ARROW}  ${bold('Vercel CLI')}  ${dim('— deployment (optional)')}`);
@@ -270,6 +272,11 @@ function detectClaudeCode() {
   return { installed: !!out, version: out ? parseVersion(out) : null };
 }
 
+function detectGhCli() {
+  const out = run('gh --version');
+  return { installed: !!out, version: out ? parseVersion(out) : null };
+}
+
 // ── Tool Definitions ────────────────────────────────────────────────────────
 
 const TOOLS = [
@@ -289,6 +296,22 @@ const TOOLS = [
     },
     detect: detectGit,
     description: 'Version control system for managing source code.',
+  },
+  {
+    id: 'gh',
+    name: 'GitHub CLI',
+    required: true,
+    installCmds: {
+      darwin: 'brew install gh',
+      linux: {
+        apt: 'sudo apt-get install -y gh',
+        dnf: 'sudo dnf install -y gh',
+        pacman: 'sudo pacman -S --noconfirm github-cli',
+      },
+      win32: 'winget install -e --id GitHub.cli',
+    },
+    detect: detectGhCli,
+    description: 'GitHub CLI for creating and managing your private repository.',
   },
   {
     id: 'pnpm',
@@ -457,6 +480,8 @@ async function cloneAndSetup() {
 
   try {
     await runAsync(`git clone https://github.com/ARIsoftware/ARI.git "${targetDir}"`);
+    // Rename origin to upstream (public ARI repo) so user can add their own origin later
+    await runAsync(`cd "${targetDir}" && git remote rename origin upstream`);
     spinner.success(`ARI cloned to ${dim(targetDir)}`);
   } catch (err) {
     spinner.error('Failed to clone ARI repository');
@@ -529,6 +554,14 @@ function runVerification(ariResult) {
     name: 'Git',
     ok: git.installed,
     detail: git.installed ? `v${git.version}` : 'not found',
+  });
+
+  // GitHub CLI
+  const gh = detectGhCli();
+  checks.push({
+    name: 'GitHub CLI',
+    ok: gh.installed,
+    detail: gh.installed ? `v${gh.version}` : 'not found',
   });
 
   // Node.js
