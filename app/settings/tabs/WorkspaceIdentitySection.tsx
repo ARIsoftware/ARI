@@ -80,6 +80,41 @@ export function WorkspaceIdentitySection(): React.ReactElement {
             linkedin_url: data.linkedin_url || '',
             timezone: data.timezone || 'UTC',
           }
+
+          // If DB returned empty data, check localStorage for unsaved welcome profile
+          const isEmpty = !prefs.name && !prefs.title && !prefs.company_name && !prefs.country && !prefs.city && !prefs.linkedin_url
+          if (isEmpty) {
+            try {
+              const stored = localStorage.getItem('ari_welcome_profile')
+              if (stored) {
+                const welcomeData = JSON.parse(stored)
+                const merged = {
+                  name: welcomeData.name || prefs.name,
+                  email: welcomeData.email || prefs.email,
+                  title: welcomeData.title || prefs.title,
+                  company_name: welcomeData.company_name || prefs.company_name,
+                  country: welcomeData.country || prefs.country,
+                  city: welcomeData.city || prefs.city,
+                  linkedin_url: welcomeData.linkedin_url || prefs.linkedin_url,
+                  timezone: welcomeData.timezone || prefs.timezone,
+                }
+                setFormData(merged)
+                setOriginalData(merged)
+
+                // Sync to DB and clear localStorage
+                fetch('/api/user-preferences', {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: stored,
+                }).then(res => {
+                  if (res.ok) localStorage.removeItem('ari_welcome_profile')
+                }).catch(() => {})
+
+                return
+              }
+            } catch {}
+          }
+
           setFormData(prefs)
           setOriginalData(prefs)
         }
