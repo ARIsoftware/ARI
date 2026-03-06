@@ -91,7 +91,7 @@ When approved, create the module following this order:
      },
      ```
    - See existing modules in that file for patterns (hello-world, tasks, etc.)
-6. **Create database migration** in `database/schema.sql` if tables needed
+6. **Create database schema** in `[module-folder]/database/schema.sql` if tables needed (this path is git-tracked so the module is fully portable as a self-contained folder)
    - Use `mcp__plugin_pg_pg-aiguide__semantic_search_postgres_docs` to verify best practices for data types, indexes, and constraints
    - Use `TEXT` type for `user_id` (matches Better Auth)
    - Do NOT add `auth.uid()` RLS policies (Better Auth doesn't use this)
@@ -476,7 +476,7 @@ Before marking complete, verify:
 - [ ] All API routes use `withRLS()` helper (NOT Supabase client) - see hello-world/api/data/route.ts
 - [ ] **If module has API routes**: Routes registered in `MODULE_API_ROUTES` in `/app/api/modules/[module]/[[...path]]/route.ts`
 - [ ] Drizzle schema added to `/lib/db/schema/schema.ts` (required for API routes)
-- [ ] Database schema.sql created (for reference/manual setup)
+- [ ] Database `database/schema.sql` created inside the module folder (git-tracked, keeps module self-contained)
 - [ ] TanStack Query hooks created in `/lib/hooks/use-[module-name].ts`
 - [ ] **All imports use `@/modules/` alias** (NOT `@/modules-custom/` or `@/modules-core/`)
 - [ ] Page uses TanStack Query hooks (not manual useState/useEffect/fetch)
