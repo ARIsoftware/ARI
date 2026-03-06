@@ -153,10 +153,12 @@ export async function PUT(request: NextRequest) {
       if (error) throw error
       return NextResponse.json(created)
     }
-  } catch (error) {
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : String(error)
+    const errDetail = typeof error === 'object' && error !== null && 'details' in error ? (error as Record<string, unknown>).details : undefined
     console.error('Failed to save user preferences:', error)
     return NextResponse.json(
-      { error: 'Failed to save user preferences' },
+      { error: 'Failed to save user preferences', message: errMsg, details: errDetail },
       { status: 500 }
     )
   }
