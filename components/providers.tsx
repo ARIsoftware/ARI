@@ -119,11 +119,12 @@ export function Providers({
     if (!user) return
     const stored = localStorage.getItem('ari_welcome_profile')
     if (!stored) return
-    localStorage.removeItem('ari_welcome_profile')
     fetch('/api/user-preferences', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: stored,
+    }).then(res => {
+      if (res.ok) localStorage.removeItem('ari_welcome_profile')
     }).catch(err => console.error('Failed to persist welcome profile:', err))
   }, [user])
 

@@ -115,6 +115,45 @@ export default function WelcomePage() {
   })
   const [profileSaved, setProfileSaved] = useState(false)
 
+  // Prefill profile from DB if available, then overlay with any localStorage edits
+  useEffect(() => {
+    async function loadProfile() {
+      let dbData: Record<string, string> | null = null
+      try {
+        const res = await fetch('/api/user-preferences')
+        if (res.ok) {
+          dbData = await res.json()
+        }
+      } catch {}
+
+      // Check localStorage for in-progress edits
+      let localData: Record<string, string> | null = null
+      try {
+        const stored = localStorage.getItem('ari_welcome_profile')
+        if (stored) localData = JSON.parse(stored)
+      } catch {}
+
+      // Merge: localStorage edits take priority over DB data
+      const merged = {
+        name: localData?.name || dbData?.name || '',
+        email: localData?.email || dbData?.email || '',
+        title: localData?.title || dbData?.title || '',
+        company_name: localData?.company_name || dbData?.company_name || '',
+        country: localData?.country || dbData?.country || '',
+        city: localData?.city || dbData?.city || '',
+        linkedin_url: localData?.linkedin_url || dbData?.linkedin_url || '',
+        timezone: localData?.timezone || dbData?.timezone || 'UTC',
+      }
+
+      const hasData = Object.values(merged).some(v => v && v !== 'UTC')
+      if (hasData) {
+        setProfileData(merged)
+        if (localData) setProfileSaved(true)
+      }
+    }
+    loadProfile()
+  }, [])
+
   const handleProfileChange = (field: string, value: string) => {
     setProfileData(prev => ({ ...prev, [field]: value }))
     setProfileSaved(false)
@@ -299,6 +338,19 @@ export default function WelcomePage() {
   const goToNextStep = () => {
     const idx = STEP_ORDER.indexOf(currentTab)
     if (idx < STEP_ORDER.length - 1) setCurrentTab(STEP_ORDER[idx + 1])
+  }
+
+  // Sync welcome profile from localStorage to DB (called after Supabase step is complete)
+  const syncProfileToDb = () => {
+    const stored = localStorage.getItem('ari_welcome_profile')
+    if (!stored) return
+    fetch('/api/user-preferences', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: stored,
+    }).then(res => {
+      if (res.ok) localStorage.removeItem('ari_welcome_profile')
+    }).catch(err => console.error('Failed to sync profile to DB:', err))
   }
 
   const isSupabaseComplete = formData.supabaseUrl && formData.supabaseAnonKey && formData.supabaseSecretKey && formData.databaseUrl && formData.betterAuthSecret
@@ -1265,7 +1317,7 @@ git push -u origin main`}
                         Skip this step
                       </button>
                       <button
-                        onClick={goToNextStep}
+                        onClick={() => { syncProfileToDb(); goToNextStep() }}
                         className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
                         style={{ borderRadius: '6px' }}
                       >
