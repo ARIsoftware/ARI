@@ -8,7 +8,7 @@ interface StepIndicatorProps {
 }
 
 const STEPS = [
-  { id: "local-env", label: "Setup" },
+  { id: "personal", label: "Personal" },
   { id: "github", label: "GitHub" },
   { id: "supabase", label: "Supabase" },
   { id: "openai", label: "OpenAI" },
@@ -57,15 +57,15 @@ const DownloadIcon = ({ className }: { className?: string }) => (
   </svg>
 )
 
-const TerminalIcon = ({ className }: { className?: string }) => (
+const PersonIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <polyline points="4 17 10 11 4 5" />
-    <line x1="12" x2="20" y1="19" y2="19" />
+    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+    <circle cx="12" cy="7" r="4" />
   </svg>
 )
 
 const STEP_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  "local-env": TerminalIcon,
+  "personal": PersonIcon,
   github: GithubIcon,
   supabase: SupabaseIcon,
   openai: OpenAIIcon,

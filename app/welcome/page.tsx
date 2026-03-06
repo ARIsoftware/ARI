@@ -18,8 +18,34 @@ import {
   X,
   ArrowRight
 } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { StepIndicator } from "./components/step-indicator"
 import { CodeBlock } from "./components/code-block"
+
+// Common timezones (shared with settings page)
+const COMMON_TIMEZONES = [
+  { value: 'UTC', label: 'UTC (Coordinated Universal Time)' },
+  { value: 'America/New_York', label: 'Eastern Time (US & Canada)' },
+  { value: 'America/Chicago', label: 'Central Time (US & Canada)' },
+  { value: 'America/Denver', label: 'Mountain Time (US & Canada)' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (US & Canada)' },
+  { value: 'America/Toronto', label: 'Toronto' },
+  { value: 'America/Vancouver', label: 'Vancouver' },
+  { value: 'Europe/London', label: 'London' },
+  { value: 'Europe/Paris', label: 'Paris' },
+  { value: 'Europe/Berlin', label: 'Berlin' },
+  { value: 'Europe/Amsterdam', label: 'Amsterdam' },
+  { value: 'Asia/Tokyo', label: 'Tokyo' },
+  { value: 'Asia/Singapore', label: 'Singapore' },
+  { value: 'Asia/Hong_Kong', label: 'Hong Kong' },
+  { value: 'Asia/Shanghai', label: 'Shanghai' },
+  { value: 'Asia/Dubai', label: 'Dubai' },
+  { value: 'Asia/Jerusalem', label: 'Jerusalem' },
+  { value: 'Australia/Sydney', label: 'Sydney' },
+  { value: 'Australia/Melbourne', label: 'Melbourne' },
+  { value: 'Pacific/Auckland', label: 'Auckland' },
+  { value: 'Africa/Johannesburg', label: 'Johannesburg' },
+]
 
 interface OnboardingData {
   // GitHub (tracking)
@@ -49,7 +75,8 @@ const generateAuthSecret = () => {
   return btoa(String.fromCharCode(...array))
 }
 
-const STEP_ORDER = ["local-env", "github", "supabase", "openai", "resend", "download", "vercel"]
+const STEP_ORDER = ["personal", "github", "supabase", "openai", "resend", "download", "vercel"]
+// Hidden: "local-env" step removed from flow since install script handles it. Content preserved below.
 
 export default function WelcomePage() {
   const [completedLines, setCompletedLines] = useState<string[]>([])
@@ -59,7 +86,7 @@ export default function WelcomePage() {
   const [showContinue, setShowContinue] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
 
-  const [currentTab, setCurrentTab] = useState("local-env")
+  const [currentTab, setCurrentTab] = useState("personal")
   const [selectedOS, setSelectedOS] = useState<"mac" | "windows" | "linux" | null>(null)
 
   const [formData, setFormData] = useState<OnboardingData>({
@@ -74,6 +101,43 @@ export default function WelcomePage() {
     resendWebhookSecret: "",
     vercelSetupComplete: false,
   })
+
+  // Personal profile state (matches /settings profile fields)
+  const [profileData, setProfileData] = useState({
+    name: '',
+    email: '',
+    title: '',
+    company_name: '',
+    country: '',
+    city: '',
+    linkedin_url: '',
+    timezone: 'UTC',
+  })
+  const [profileSaved, setProfileSaved] = useState(false)
+
+  const handleProfileChange = (field: string, value: string) => {
+    setProfileData(prev => ({ ...prev, [field]: value }))
+    setProfileSaved(false)
+  }
+
+  const handleProfileSave = () => {
+    // Save to localStorage — persisted to DB on first authenticated page load
+    try {
+      localStorage.setItem('ari_welcome_profile', JSON.stringify({
+        name: profileData.name || null,
+        email: profileData.email || null,
+        title: profileData.title || null,
+        company_name: profileData.company_name || null,
+        country: profileData.country || null,
+        city: profileData.city || null,
+        linkedin_url: profileData.linkedin_url || null,
+        timezone: profileData.timezone,
+      }))
+      setProfileSaved(true)
+    } catch (error) {
+      console.error('Failed to save profile to localStorage:', error)
+    }
+  }
 
   // Generate BETTER_AUTH_SECRET on mount
   useEffect(() => {
@@ -308,7 +372,170 @@ export default function WelcomePage() {
 
           {/* Content Card */}
           <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
-              {/* Local Environment Tab */}
+              {/* Personal Profile Tab */}
+              {currentTab === "personal" && (
+                <div>
+                  {/* Header section with gradient background */}
+                  <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
+                    <div className="flex items-center gap-2.5">
+                      <h2 className="text-2xl font-semibold text-zinc-900">Your Profile</h2>
+                    </div>
+                    <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
+                      Tell us a bit about yourself. This information is stored securely in your database and can be updated anytime in Settings.
+                    </p>
+                  </div>
+
+                  {/* Content section */}
+                  <div style={{ padding: '25px' }}>
+                    <div className="space-y-5">
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="welcome-name" className="text-zinc-900 font-medium">Name</Label>
+                          <Input
+                            id="welcome-name"
+                            value={profileData.name}
+                            onChange={(e) => handleProfileChange('name', e.target.value)}
+                            placeholder="Your full name"
+                            className="border-zinc-200"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="welcome-email" className="text-zinc-900 font-medium">Email</Label>
+                          <Input
+                            id="welcome-email"
+                            type="email"
+                            value={profileData.email}
+                            onChange={(e) => handleProfileChange('email', e.target.value)}
+                            placeholder="your@email.com"
+                            className="border-zinc-200"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="welcome-title" className="text-zinc-900 font-medium">Title</Label>
+                        <Input
+                          id="welcome-title"
+                          value={profileData.title}
+                          onChange={(e) => handleProfileChange('title', e.target.value)}
+                          placeholder="Your job title"
+                          className="border-zinc-200"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="welcome-company" className="text-zinc-900 font-medium">Company Name</Label>
+                        <Input
+                          id="welcome-company"
+                          value={profileData.company_name}
+                          onChange={(e) => handleProfileChange('company_name', e.target.value)}
+                          placeholder="Your company name"
+                          className="border-zinc-200"
+                        />
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="welcome-country" className="text-zinc-900 font-medium">Country</Label>
+                          <Input
+                            id="welcome-country"
+                            value={profileData.country}
+                            onChange={(e) => handleProfileChange('country', e.target.value)}
+                            placeholder="Your country"
+                            className="border-zinc-200"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="welcome-city" className="text-zinc-900 font-medium">City</Label>
+                          <Input
+                            id="welcome-city"
+                            value={profileData.city}
+                            onChange={(e) => handleProfileChange('city', e.target.value)}
+                            placeholder="Your city"
+                            className="border-zinc-200"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="welcome-linkedin" className="text-zinc-900 font-medium">LinkedIn URL</Label>
+                        <Input
+                          id="welcome-linkedin"
+                          value={profileData.linkedin_url}
+                          onChange={(e) => handleProfileChange('linkedin_url', e.target.value)}
+                          placeholder="https://linkedin.com/in/yourprofile"
+                          className="border-zinc-200"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="welcome-timezone" className="text-zinc-900 font-medium">Timezone</Label>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Info className="h-4 w-4 text-zinc-400 hover:text-zinc-600" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs max-w-xs">Your timezone is used for scheduling features like automatic backups.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                        <Select
+                          value={profileData.timezone}
+                          onValueChange={(value) => handleProfileChange('timezone', value)}
+                        >
+                          <SelectTrigger id="welcome-timezone" className="border-zinc-200">
+                            <SelectValue placeholder="Select timezone" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {COMMON_TIMEZONES.map((tz) => (
+                              <SelectItem key={tz.value} value={tz.value}>
+                                {tz.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
+                      <div>
+                        {profileSaved && (
+                          <span className="flex items-center gap-1 text-sm text-green-600">
+                            <Check className="h-4 w-4" />
+                            Saved
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={goToNextStep}
+                          className="inline-flex items-center justify-center px-4 py-2 text-base font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                          style={{ borderRadius: '6px' }}
+                        >
+                          Skip this step
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleProfileSave()
+                            goToNextStep()
+                          }}
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                          style={{ borderRadius: '6px' }}
+                        >
+                          Save & Continue
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Local Environment Tab (hidden from step flow - install script handles this) */}
               {currentTab === "local-env" && (
                 <div>
                   {/* Header section with gradient background */}
