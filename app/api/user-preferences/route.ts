@@ -119,7 +119,7 @@ export async function PUT(request: NextRequest) {
       .from('user_preferences')
       .select('id')
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
 
     const now = new Date().toISOString()
 
@@ -154,11 +154,16 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json(created)
     }
   } catch (error: unknown) {
-    const errMsg = error instanceof Error ? error.message : String(error)
-    const errDetail = typeof error === 'object' && error !== null && 'details' in error ? (error as Record<string, unknown>).details : undefined
-    console.error('Failed to save user preferences:', error)
+    const err = error as Record<string, unknown> | null
+    const errMsg = (err && typeof err === 'object' && 'message' in err)
+      ? String(err.message)
+      : String(error)
+    const errCode = (err && typeof err === 'object' && 'code' in err) ? String(err.code) : undefined
+    const errHint = (err && typeof err === 'object' && 'hint' in err) ? String(err.hint) : undefined
+    const errDetail = (err && typeof err === 'object' && 'details' in err) ? String(err.details) : undefined
+    console.error('Failed to save user preferences:', { message: errMsg, code: errCode, hint: errHint, details: errDetail })
     return NextResponse.json(
-      { error: 'Failed to save user preferences', message: errMsg, details: errDetail },
+      { error: 'Failed to save user preferences', message: errMsg, code: errCode, hint: errHint, details: errDetail },
       { status: 500 }
     )
   }
