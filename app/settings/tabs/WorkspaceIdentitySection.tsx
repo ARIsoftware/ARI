@@ -52,6 +52,7 @@ export function WorkspaceIdentitySection(): React.ReactElement {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof UserPreferencesData, string>>>({})
   const [formData, setFormData] = useState<UserPreferencesData>({
     name: '',
     email: '',
@@ -136,9 +137,27 @@ export function WorkspaceIdentitySection(): React.ReactElement {
 
   const handleChange = (field: keyof UserPreferencesData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
+    // Clear error for field when user edits it
+    if (fieldErrors[field]) {
+      setFieldErrors(prev => { const next = { ...prev }; delete next[field]; return next })
+    }
+  }
+
+  const validateForm = (): boolean => {
+    const errors: Partial<Record<keyof UserPreferencesData, string>> = {}
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'Please enter a valid email address'
+    }
+    if (formData.linkedin_url && !formData.linkedin_url.startsWith('http')) {
+      errors.linkedin_url = 'Please enter a valid URL starting with https://'
+    }
+    setFieldErrors(errors)
+    return Object.keys(errors).length === 0
   }
 
   const handleSave = async () => {
+    if (!validateForm()) return
+
     setIsSaving(true)
     try {
       const response = await fetch('/api/user-preferences', {
@@ -157,7 +176,8 @@ export function WorkspaceIdentitySection(): React.ReactElement {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to save preferences')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || 'Failed to save preferences')
       }
 
       setOriginalData(formData)
@@ -171,7 +191,7 @@ export function WorkspaceIdentitySection(): React.ReactElement {
       toast({
         variant: 'destructive',
         title: 'Failed to save',
-        description: 'There was an error saving your preferences.',
+        description: error instanceof Error ? error.message : 'There was an error saving your preferences.',
       })
     } finally {
       setIsSaving(false)
@@ -225,7 +245,9 @@ export function WorkspaceIdentitySection(): React.ReactElement {
                 value={formData.email}
                 onChange={(e) => handleChange('email', e.target.value)}
                 placeholder="your@email.com"
+                className={fieldErrors.email ? 'border-red-500 focus-visible:ring-red-500' : ''}
               />
+              {fieldErrors.email && <p className="text-sm text-red-500">{fieldErrors.email}</p>}
             </div>
           </div>
 
@@ -277,7 +299,9 @@ export function WorkspaceIdentitySection(): React.ReactElement {
               value={formData.linkedin_url}
               onChange={(e) => handleChange('linkedin_url', e.target.value)}
               placeholder="https://linkedin.com/in/yourprofile"
+              className={fieldErrors.linkedin_url ? 'border-red-500 focus-visible:ring-red-500' : ''}
             />
+            {fieldErrors.linkedin_url && <p className="text-sm text-red-500">{fieldErrors.linkedin_url}</p>}
           </div>
 
           <div className="space-y-2">
