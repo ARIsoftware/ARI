@@ -114,6 +114,19 @@ export function Providers({
     user: user,
   } : null
 
+  // Persist welcome profile from localStorage to DB on first authenticated load
+  useEffect(() => {
+    if (!user) return
+    const stored = localStorage.getItem('ari_welcome_profile')
+    if (!stored) return
+    localStorage.removeItem('ari_welcome_profile')
+    fetch('/api/user-preferences', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: stored,
+    }).catch(err => console.error('Failed to persist welcome profile:', err))
+  }, [user])
+
   return (
     <Context.Provider value={{ user, session, isLoading: isPending, supabase }}>
       <ThemeProvider isAuthenticated={!!session} isAuthLoading={isPending}>
