@@ -340,18 +340,6 @@ export default function WelcomePage() {
     if (idx < STEP_ORDER.length - 1) setCurrentTab(STEP_ORDER[idx + 1])
   }
 
-  // Sync welcome profile from localStorage to DB (called after Supabase step is complete)
-  const syncProfileToDb = () => {
-    const stored = localStorage.getItem('ari_welcome_profile')
-    if (!stored) return
-    fetch('/api/user-preferences', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: stored,
-    }).then(res => {
-      if (res.ok) localStorage.removeItem('ari_welcome_profile')
-    }).catch(err => console.error('Failed to sync profile to DB:', err))
-  }
 
   const isSupabaseComplete = formData.supabaseUrl && formData.supabaseAnonKey && formData.supabaseSecretKey && formData.databaseUrl && formData.betterAuthSecret
 
@@ -1317,7 +1305,7 @@ git push -u origin main`}
                         Skip this step
                       </button>
                       <button
-                        onClick={() => { syncProfileToDb(); goToNextStep() }}
+                        onClick={goToNextStep}
                         className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
                         style={{ borderRadius: '6px' }}
                       >
