@@ -86,6 +86,33 @@ export default function DatabaseTestPage() {
     }
     warnings: string[]
   } | null>(null)
+  const [healthChecks, setHealthChecks] = useState<{
+    database: 'loading' | 'ok' | 'error'
+    domain: { status: 'loading' | 'ok'; hostname: string }
+    resend: 'loading' | 'ok' | 'error' | 'not_set'
+  }>({ database: 'loading', domain: { status: 'loading', hostname: '' }, resend: 'loading' })
+
+  // Auto-run health checks on mount (all in parallel)
+  useEffect(() => {
+    // Domain is just the current origin — no API call needed
+    const origin = window.location.origin
+    setHealthChecks(prev => ({ ...prev, domain: { status: 'ok', hostname: origin } }))
+
+    async function runHealthChecks() {
+      const [dbResult, resendResult] = await Promise.allSettled([
+        fetch('/api/health').then(r => r.json()),
+        fetch('/api/health/resend').then(r => r.json()),
+      ])
+
+      setHealthChecks(prev => ({
+        ...prev,
+        database: dbResult.status === 'fulfilled' && dbResult.value.checks?.database?.status === 'ok' ? 'ok' : 'error',
+        resend: resendResult.status === 'fulfilled' ? resendResult.value.status : 'error',
+      }))
+    }
+    runHealthChecks()
+  }, [])
+
   const [isRunning, setIsRunning] = useState(false)
   const [isRunningSecurityTests, setIsRunningSecurityTests] = useState(false)
   const [isRunningModuleTests, setIsRunningModuleTests] = useState(false)
@@ -1760,6 +1787,55 @@ export default function DatabaseTestPage() {
       <div className="mb-8">
         <h1 className="text-4xl font-bold tracking-tight">Test Dashboard</h1>
         <p className="text-muted-foreground mt-2">Comprehensive system testing and diagnostics</p>
+      </div>
+
+      {/* System Status */}
+      <div className="mb-8 flex flex-wrap gap-4">
+        {/* Database */}
+        <div className="flex items-center gap-2.5 rounded-lg border px-4 py-2.5">
+          <div className={`w-2.5 h-2.5 rounded-full ${
+            healthChecks.database === 'loading' ? 'bg-gray-300 animate-pulse' :
+            healthChecks.database === 'ok' ? 'bg-green-500' : 'bg-red-500'
+          }`} />
+          <span className="text-sm font-medium">Database</span>
+          <span className={`text-xs ${
+            healthChecks.database === 'loading' ? 'text-gray-400' :
+            healthChecks.database === 'ok' ? 'text-green-600' : 'text-red-600'
+          }`}>
+            {healthChecks.database === 'loading' ? 'Checking...' :
+             healthChecks.database === 'ok' ? 'Connected' : 'Error'}
+          </span>
+        </div>
+
+        {/* Domain */}
+        <div className="flex items-center gap-2.5 rounded-lg border px-4 py-2.5">
+          <div className={`w-2.5 h-2.5 rounded-full ${
+            healthChecks.domain.status === 'loading' ? 'bg-gray-300 animate-pulse' : 'bg-green-500'
+          }`} />
+          <span className="text-sm font-medium">Domain</span>
+          <span className="text-xs text-green-600">
+            {healthChecks.domain.hostname || 'Checking...'}
+          </span>
+        </div>
+
+        {/* Resend */}
+        <div className="flex items-center gap-2.5 rounded-lg border px-4 py-2.5">
+          <div className={`w-2.5 h-2.5 rounded-full ${
+            healthChecks.resend === 'loading' ? 'bg-gray-300 animate-pulse' :
+            healthChecks.resend === 'ok' ? 'bg-green-500' :
+            healthChecks.resend === 'not_set' ? 'bg-gray-400' : 'bg-red-500'
+          }`} />
+          <span className="text-sm font-medium">Resend</span>
+          <span className={`text-xs ${
+            healthChecks.resend === 'loading' ? 'text-gray-400' :
+            healthChecks.resend === 'ok' ? 'text-green-600' :
+            healthChecks.resend === 'not_set' ? 'text-gray-400' : 'text-red-600'
+          }`}>
+            {healthChecks.resend === 'loading' ? 'Checking...' :
+             healthChecks.resend === 'ok' ? 'Connected' :
+             healthChecks.resend === 'not_set' ? 'Not configured' : 'Error'}
+          </span>
+        </div>
       </div>
 
       {/* Tabs */}
