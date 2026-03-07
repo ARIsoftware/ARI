@@ -1,0 +1,36 @@
+{
+  "id": "documents",
+  "group": "Storage",
+  "name": "Documents",
+  "description": "Secure file storage with multi-provider support (Supabase, R2, S3)",
+  "version": "1.0.0",
+  "author": "ARI",
+  "icon": "FileBox",
+  "enabled": true,
+  "fullscreen": false,
+  "menuPriority": 45,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": false
+  },
+  "routes": [
+    {
+      "path": "/documents",
+      "label": "Documents",
+      "icon": "FileBox",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": ["documents", "document_folders", "document_tags", "document_tag_assignments"],
+    "migrations": "./database"
+  },
+  "submenu": {
+    "component": "./components/sidebar-submenu.tsx"
+  }
+}
