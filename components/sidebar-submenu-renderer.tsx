@@ -1,19 +1,14 @@
 'use client'
 
+import React, { Suspense } from 'react'
 import type { ModuleMetadata } from '@/lib/modules/module-types'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Loader2 } from 'lucide-react'
 import {
   SidebarMenuButton,
   SidebarGroup,
   SidebarGroupContent,
 } from '@/components/ui/sidebar'
-
-// Static imports for submenu components
-// IMPORTANT: Use @/modules/ alias (not @/modules-core/ or @/modules-custom/)
-// so modules can be moved between directories without code changes
-import HelloWorldSubmenu from '@/modules/hello-world/components/sidebar-submenu'
-import MailStreamSubmenu from '@/modules/mail-stream/components/sidebar-submenu'
-import BackupManagerSubmenu from '@/modules/backup-manager/components/sidebar-submenu'
+import { MODULE_SUBMENUS } from '@/lib/generated/module-submenu-registry'
 
 /**
  * Props passed to module submenu components
@@ -25,14 +20,16 @@ export interface ModuleSubmenuProps {
   module: ModuleMetadata
 }
 
-/**
- * Registry of submenu components
- * Add new modules here as they implement submenus
- */
-const SUBMENU_COMPONENTS: Record<string, React.ComponentType<ModuleSubmenuProps>> = {
-  'hello-world': HelloWorldSubmenu,
-  'mail-stream': MailStreamSubmenu,
-  'backup-manager': BackupManagerSubmenu,
+// Module-level cache so lazy components survive unmount/remount cycles
+const lazyCache = new Map<string, React.LazyExoticComponent<React.ComponentType<ModuleSubmenuProps>>>()
+
+function getLazySubmenu(moduleId: string) {
+  if (lazyCache.has(moduleId)) return lazyCache.get(moduleId)!
+  const loader = MODULE_SUBMENUS[moduleId]
+  if (!loader) return null
+  const lazy = React.lazy(loader)
+  lazyCache.set(moduleId, lazy)
+  return lazy
 }
 
 interface SubmenuRendererProps {
@@ -42,7 +39,7 @@ interface SubmenuRendererProps {
 }
 
 export function SubmenuRenderer({ moduleId, module, onBack }: SubmenuRendererProps) {
-  const SubmenuComponent = SUBMENU_COMPONENTS[moduleId]
+  const LazySubmenu = getLazySubmenu(moduleId)
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -58,8 +55,14 @@ export function SubmenuRenderer({ moduleId, module, onBack }: SubmenuRendererPro
 
       {/* Submenu Content */}
       <div className="flex-1 overflow-auto">
-        {SubmenuComponent ? (
-          <SubmenuComponent moduleId={moduleId} module={module} />
+        {LazySubmenu ? (
+          <Suspense fallback={
+            <div className="flex items-center justify-center p-4">
+              <Loader2 className="size-4 animate-spin text-muted-foreground" />
+            </div>
+          }>
+            <LazySubmenu moduleId={moduleId} module={module} />
+          </Suspense>
         ) : (
           <div className="p-4 text-sm text-muted-foreground">Submenu component not found</div>
         )}
