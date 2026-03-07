@@ -17,8 +17,11 @@ import { Switch } from "@/components/ui/switch"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TopBar } from "@/components/top-bar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Input } from "@/components/ui/input"
 import {
   AlertCircle,
+  CheckCircle2,
+  KeyRound,
   Package,
   Loader2,
   Save,
@@ -31,10 +34,86 @@ export default function ModulesPage() {
   const [modulesLoading, setModulesLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
+  // License state
+  const [licenseKey, setLicenseKey] = useState("")
+  const [licenseLoading, setLicenseLoading] = useState(true)
+  const [licenseActivating, setLicenseActivating] = useState(false)
+  const [licenseStatus, setLicenseStatus] = useState<{
+    active: boolean
+    masked_key?: string
+    customer_email?: string
+    expires_at?: string
+    status?: string
+  } | null>(null)
+  const [licenseError, setLicenseError] = useState<string | null>(null)
+
   // Track original enabled states (from server)
   const [originalStates, setOriginalStates] = useState<Record<string, boolean>>({})
   // Track current toggle states (local, may differ from server)
   const [toggleStates, setToggleStates] = useState<Record<string, boolean>>({})
+
+  // Load license status
+  useEffect(() => {
+    async function loadLicenseStatus() {
+      try {
+        const response = await fetch('/api/license/status')
+        if (response.ok) {
+          const data = await response.json()
+          setLicenseStatus(data)
+        }
+      } catch (error) {
+        console.error('Error loading license status:', error)
+      } finally {
+        setLicenseLoading(false)
+      }
+    }
+    loadLicenseStatus()
+  }, [])
+
+  const activateLicense = async () => {
+    if (!licenseKey.trim()) return
+    setLicenseActivating(true)
+    setLicenseError(null)
+
+    try {
+      const response = await fetch('/api/license/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: licenseKey.trim() }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setLicenseError(data.error || 'Failed to validate license key')
+        return
+      }
+
+      // Refresh license status
+      const statusResponse = await fetch('/api/license/status')
+      if (statusResponse.ok) {
+        setLicenseStatus(await statusResponse.json())
+      }
+      setLicenseKey("")
+    } catch (error) {
+      console.error('Error activating license:', error)
+      setLicenseError('Failed to activate license. Please try again.')
+    } finally {
+      setLicenseActivating(false)
+    }
+  }
+
+  const deactivateLicense = async () => {
+    try {
+      const response = await fetch('/api/license/status', { method: 'DELETE' })
+      if (response.ok) {
+        setLicenseStatus({ active: false })
+        setLicenseError(null)
+      }
+    } catch (error) {
+      console.error('Error deactivating license:', error)
+    }
+  }
 
   // Load all modules (not just enabled) for settings management
   useEffect(() => {
@@ -156,6 +235,99 @@ export default function ModulesPage() {
                 </Alert>
               )}
 
+              {/* License Activation Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <KeyRound className="h-5 w-5 text-amber-500" />
+                    {licenseStatus?.active ? 'License Active' : 'Activate Your License'}
+                  </CardTitle>
+                  {!licenseStatus?.active && (
+                    <CardDescription>
+                      Enter your license key to unlock all premium modules
+                    </CardDescription>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  {licenseLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Checking license status...
+                    </div>
+                  ) : licenseStatus?.active ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-green-600">
+                        <CheckCircle2 className="h-5 w-5" />
+                        <span className="text-sm font-medium">License is active</span>
+                      </div>
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        <p>Key: <code className="px-1 py-0.5 bg-muted rounded text-xs">{licenseStatus.masked_key}</code></p>
+                        {licenseStatus.customer_email && (
+                          <p>Email: {licenseStatus.customer_email}</p>
+                        )}
+                        {licenseStatus.expires_at && (
+                          <p>Expires: {new Date(licenseStatus.expires_at).toLocaleDateString()}</p>
+                        )}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                        onClick={deactivateLicense}
+                      >
+                        Deactivate
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="XXXX-XXXX-XXXX-XXXX"
+                            value={licenseKey}
+                            onChange={(e) => {
+                              setLicenseKey(e.target.value)
+                              setLicenseError(null)
+                            }}
+                            onKeyDown={(e) => e.key === 'Enter' && activateLicense()}
+                            className="pl-9"
+                          />
+                        </div>
+                        <Button
+                          onClick={activateLicense}
+                          disabled={licenseActivating || !licenseKey.trim()}
+                        >
+                          {licenseActivating ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Validating...
+                            </>
+                          ) : (
+                            'Activate'
+                          )}
+                        </Button>
+                      </div>
+                      {licenseError && (
+                        <p className="text-sm text-destructive">{licenseError}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Your license key was sent to your email after purchase.{' '}
+                        <a
+                          href="https://ari.software"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline hover:text-foreground"
+                        >
+                          Need a license key?
+                        </a>
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Modules Card */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-lg">

@@ -66,6 +66,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# modules (kept local, not tracked in git)
+/modules-core/
+/modules-custom/
+
 # auto-generated module registry
 /lib/generated/
 
