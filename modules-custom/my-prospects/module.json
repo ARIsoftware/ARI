@@ -1,0 +1,36 @@
+{
+  "id": "my-prospects",
+  "group": "Recruiting",
+  "name": "My Prospects",
+  "description": "Personal recruiting database for tracking basketball prospects",
+  "version": "1.0.0",
+  "author": "ARI",
+  "icon": "Target",
+  "enabled": true,
+  "fullscreen": false,
+  "menuPriority": 50,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": false
+  },
+  "routes": [
+    {
+      "path": "/my-prospects",
+      "label": "My Prospects",
+      "icon": "Target",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": ["prospects"],
+    "migrations": "./database/migrations"
+  },
+  "submenu": {
+    "component": "./components/sidebar-submenu.tsx"
+  }
+}
