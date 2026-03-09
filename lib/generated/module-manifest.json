@@ -1,6 +1,47 @@
 {
-  "generatedAt": "2026-03-07T02:05:18.831Z",
+  "generatedAt": "2026-03-09T20:24:42.209Z",
   "modules": [
+    {
+      "id": "my-prospects",
+      "group": "Recruiting",
+      "name": "My Prospects",
+      "description": "Personal recruiting database for tracking basketball prospects",
+      "version": "1.0.0",
+      "author": "ARI",
+      "icon": "Target",
+      "enabled": true,
+      "fullscreen": false,
+      "menuPriority": 50,
+      "permissions": {
+        "database": true,
+        "api": true,
+        "dashboard": false
+      },
+      "routes": [
+        {
+          "path": "/my-prospects",
+          "label": "My Prospects",
+          "icon": "Target",
+          "sidebarPosition": "main"
+        }
+      ],
+      "dependencies": {
+        "modules": [],
+        "coreFeatures": []
+      },
+      "database": {
+        "tables": [
+          "prospects"
+        ],
+        "migrations": "./database/migrations"
+      },
+      "submenu": {
+        "component": "./components/sidebar-submenu.tsx"
+      },
+      "path": "/Users/noam/Documents/github/ARI/modules-custom/my-prospects",
+      "sourceDir": "modules-custom",
+      "isOverridden": false
+    },
     {
       "id": "ari-launch",
       "name": "ARI Launch",
@@ -104,48 +145,6 @@
         "component": "./components/sidebar-submenu.tsx"
       },
       "path": "/Users/noam/Documents/github/ARI/modules-core/backup-manager",
-      "sourceDir": "modules-core",
-      "isOverridden": false
-    },
-    {
-      "id": "baseball",
-      "group": "Sports",
-      "name": "Baseball",
-      "description": "Track baseball players, teams, and batting statistics",
-      "version": "1.0.0",
-      "author": "ARI",
-      "icon": "Trophy",
-      "enabled": true,
-      "fullscreen": false,
-      "menuPriority": 50,
-      "permissions": {
-        "database": true,
-        "api": true,
-        "dashboard": false
-      },
-      "routes": [
-        {
-          "path": "/baseball",
-          "label": "Baseball",
-          "icon": "Trophy",
-          "sidebarPosition": "main"
-        }
-      ],
-      "dependencies": {
-        "modules": [],
-        "coreFeatures": []
-      },
-      "database": {
-        "tables": [
-          "baseball_teams",
-          "baseball_players"
-        ],
-        "migrations": "./database/migrations"
-      },
-      "submenu": {
-        "component": "./components/sidebar-submenu.tsx"
-      },
-      "path": "/Users/noam/Documents/github/ARI/modules-core/baseball",
       "sourceDir": "modules-core",
       "isOverridden": false
     },
