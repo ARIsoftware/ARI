@@ -78,7 +78,7 @@ export const auth = betterAuth({
       },
       "/get-session": {
         window: 60,
-        max: 200, // Session checks are read-only, safe to allow many (handles 25+ tabs)
+        max: 500, // Session checks are read-only and cookie-cached, safe to allow many
       },
     },
   },
