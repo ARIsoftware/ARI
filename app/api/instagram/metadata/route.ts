@@ -1,27 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-helpers";
 
-// Validate URL is a legitimate Instagram URL to prevent SSRF attacks
-function isValidInstagramUrl(urlString: string): boolean {
+// Parse and validate URL is a legitimate Instagram URL to prevent SSRF attacks
+function parseValidInstagramUrl(urlString: string): URL | null {
   try {
     const url = new URL(urlString);
     // Only allow HTTPS
     if (url.protocol !== "https:") {
-      return false;
+      return null;
     }
     // Only allow instagram.com domain
     const allowedHosts = ["instagram.com", "www.instagram.com"];
     if (!allowedHosts.includes(url.hostname)) {
-      return false;
+      return null;
     }
     // Must be a post URL pattern
     if (!url.pathname.match(/^\/p\/[A-Za-z0-9_-]+\/?$/) &&
         !url.pathname.match(/^\/reel\/[A-Za-z0-9_-]+\/?$/)) {
-      return false;
+      return null;
     }
-    return true;
+    return url;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -39,8 +39,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "URL is required" }, { status: 400 });
     }
 
-    // Validate URL to prevent SSRF attacks
-    if (!isValidInstagramUrl(url)) {
+    // Parse and validate URL to prevent SSRF attacks
+    const validatedUrl = parseValidInstagramUrl(url);
+    if (!validatedUrl) {
       return NextResponse.json({ error: "Invalid Instagram URL" }, { status: 400 });
     }
 
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
     try {
       // Method 1: Try Instagram's oEmbed API (most reliable)
       try {
-        const oembedUrl = `https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(url)}&access_token=&fields=thumbnail_url,title,author_name`;
+        const oembedUrl = `https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(validatedUrl.toString())}&access_token=&fields=thumbnail_url,title,author_name`;
 
         // Try without access token first (sometimes works for public posts)
         const oembedResponse = await fetch(oembedUrl);
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
 
         for (const userAgent of userAgents) {
           try {
-            const response = await fetch(url, {
+            const response = await fetch(validatedUrl, {
               headers: {
                 "User-Agent": userAgent,
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
@@ -115,7 +116,7 @@ export async function POST(req: NextRequest) {
 
       // Method 3: Try Instagram embed URL
       if (!metadata.thumbnail) {
-        const embedUrl = url.replace(/\/$/, "") + "/embed/captioned/";
+        const embedUrl = validatedUrl.toString().replace(/\/$/, "") + "/embed/captioned/";
         try {
           const embedResponse = await fetch(embedUrl, {
             headers: {
@@ -142,7 +143,7 @@ export async function POST(req: NextRequest) {
 
     // Method 4: Generate a placeholder thumbnail based on post ID
     if (!metadata.thumbnail) {
-      const postIdMatch = url.match(/\/p\/([A-Za-z0-9_-]+)/);
+      const postIdMatch = validatedUrl.pathname.match(/\/p\/([A-Za-z0-9_-]+)/);
       if (postIdMatch) {
         // Create a consistent placeholder based on the post ID
         metadata.thumbnail = `https://via.placeholder.com/400x400/E4405F/FFFFFF?text=IG+Post`;
