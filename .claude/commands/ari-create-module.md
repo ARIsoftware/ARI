@@ -467,7 +467,16 @@ Before running the QA checklist, review ALL generated code for the new module. S
 2. **Code Quality Agent** — Identify quality issues, inconsistencies with existing codebase patterns, and readability problems
 3. **Efficiency Agent** — Spot performance issues, unnecessary operations, redundant re-renders, and memory concerns
 
-After all three agents report back, apply fixes to the module code. Then proceed to the QA checklist.
+After all three agents report back, apply fixes to the module code. Then apply these simplification rules to all generated files:
+
+- **No nested ternaries** — use switch statements or if/else chains for multiple conditions
+- **Clarity over brevity** — prefer explicit, readable code over dense one-liners
+- **Reduce nesting** — flatten deeply nested logic with early returns or guard clauses
+- **Remove obvious comments** — delete comments that just restate what the code does
+- **Clean up imports** — remove unused imports, sort them logically
+- **Consistent naming** — ensure all variables, functions, and components follow codebase conventions
+
+Then proceed to the QA checklist.
 
 ## Quality Assurance Checklist
 
