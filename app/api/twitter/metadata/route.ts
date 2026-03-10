@@ -1,26 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth-helpers";
 
-// Validate URL is a legitimate Twitter/X URL to prevent SSRF attacks
-function isValidTwitterUrl(urlString: string): boolean {
+// Parse and validate URL is a legitimate Twitter/X URL to prevent SSRF attacks
+function parseValidTwitterUrl(urlString: string): URL | null {
   try {
     const url = new URL(urlString);
     // Only allow HTTPS
     if (url.protocol !== "https:") {
-      return false;
+      return null;
     }
     // Only allow twitter.com and x.com domains
     const allowedHosts = ["twitter.com", "www.twitter.com", "x.com", "www.x.com"];
     if (!allowedHosts.includes(url.hostname)) {
-      return false;
+      return null;
     }
     // Must be a tweet/status URL pattern
     if (!url.pathname.match(/^\/[A-Za-z0-9_]+\/status\/\d+\/?$/)) {
-      return false;
+      return null;
     }
-    return true;
+    return url;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -38,8 +38,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "URL is required" }, { status: 400 });
     }
 
-    // Validate URL to prevent SSRF attacks
-    if (!isValidTwitterUrl(url)) {
+    // Parse and validate URL to prevent SSRF attacks
+    const validatedUrl = parseValidTwitterUrl(url);
+    if (!validatedUrl) {
       return NextResponse.json({ error: "Invalid Twitter/X URL" }, { status: 400 });
     }
 
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
 
       for (const userAgent of userAgents) {
         try {
-          const response = await fetch(url, {
+          const response = await fetch(validatedUrl, {
             headers: {
               "User-Agent": userAgent,
               "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
