@@ -24,9 +24,11 @@ import {
   KeyRound,
   Package,
   Loader2,
+  Plus,
   Save,
   X,
 } from "lucide-react"
+import { LICENSE_CACHE_KEY, LIBRARY_CACHE_KEY } from "@/lib/license-helpers"
 
 export default function ModulesPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
@@ -44,6 +46,7 @@ export default function ModulesPage() {
     customer_email?: string
     expires_at?: string
     status?: string
+    env_key?: string
   } | null>(null)
   const [licenseError, setLicenseError] = useState<string | null>(null)
 
@@ -52,14 +55,34 @@ export default function ModulesPage() {
   // Track current toggle states (local, may differ from server)
   const [toggleStates, setToggleStates] = useState<Record<string, boolean>>({})
 
-  // Load license status
+  // Load license status (with 5-minute cache + env var pre-fill)
   useEffect(() => {
+    const CACHE_TTL = 5 * 60 * 1000
+
     async function loadLicenseStatus() {
+      // Check cache first
+      try {
+        const cached = sessionStorage.getItem(LICENSE_CACHE_KEY)
+        if (cached) {
+          const { data, timestamp } = JSON.parse(cached)
+          if (Date.now() - timestamp < CACHE_TTL) {
+            setLicenseStatus(data)
+            if (!data.active && data.env_key) setLicenseKey(data.env_key)
+            setLicenseLoading(false)
+            return
+          }
+        }
+      } catch { /* ignore cache errors */ }
+
       try {
         const response = await fetch('/api/license/status')
         if (response.ok) {
           const data = await response.json()
           setLicenseStatus(data)
+          if (!data.active && data.env_key) setLicenseKey(data.env_key)
+          try {
+            sessionStorage.setItem(LICENSE_CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }))
+          } catch { /* ignore */ }
         }
       } catch (error) {
         console.error('Error loading license status:', error)
@@ -92,9 +115,13 @@ export default function ModulesPage() {
       // Refresh license status
       const statusResponse = await fetch('/api/license/status')
       if (statusResponse.ok) {
-        setLicenseStatus(await statusResponse.json())
+        const statusData = await statusResponse.json()
+        setLicenseStatus(statusData)
+        try { sessionStorage.setItem(LICENSE_CACHE_KEY, JSON.stringify({ data: statusData, timestamp: Date.now() })) } catch { /* ignore */ }
       }
       setLicenseKey("")
+      // Invalidate library cache so it re-fetches with new license
+      try { sessionStorage.removeItem(LIBRARY_CACHE_KEY) } catch { /* ignore */ }
     } catch (error) {
       console.error('Error activating license:', error)
       setLicenseError('Failed to activate license. Please try again.')
@@ -109,6 +136,10 @@ export default function ModulesPage() {
       if (response.ok) {
         setLicenseStatus({ active: false })
         setLicenseError(null)
+        try {
+          sessionStorage.removeItem(LICENSE_CACHE_KEY)
+          sessionStorage.removeItem(LIBRARY_CACHE_KEY)
+        } catch { /* ignore */ }
       }
     } catch (error) {
       console.error('Error deactivating license:', error)
@@ -220,12 +251,24 @@ export default function ModulesPage() {
 
           <main className="flex-1 bg-background">
             <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8 lg:px-8 pb-24">
-              <div className="flex flex-col gap-3">
-                <Badge className="w-fit text-sm font-medium">Extend your app functionality</Badge>
-                <h1 className="text-3xl font-semibold tracking-tight text-foreground">Modules</h1>
-                <p className="max-w-2xl text-sm text-muted-foreground">
-                  Enable or disable installed modules to extend your app functionality. <br /><span className="text-red-600">Note: Always assess third-party modules to ensure they are trustworthy and secure.</span>
-                </p>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-3">
+                  <Badge className="w-fit text-sm font-medium">Extend your app functionality</Badge>
+                  <h1 className="text-3xl font-semibold tracking-tight text-foreground">Modules</h1>
+                  <p className="max-w-2xl text-sm text-muted-foreground">
+                    Enable or disable installed modules to extend your app functionality. <br /><span className="text-red-600">Note: Always assess third-party modules to ensure they are trustworthy and secure.</span>
+                  </p>
+                </div>
+                <a
+                  href="/module-library"
+                  className="group relative mt-6 inline-flex items-center gap-2.5 overflow-hidden rounded-xl border border-emerald-700 bg-[#148962] px-8 py-4 text-base font-semibold text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:shadow-emerald-900/20 hover:scale-[1.03] active:scale-[0.98] shrink-0 animate-pulse-custom"
+                >
+                  <span className="absolute inset-0 overflow-hidden rounded-xl">
+                    <span className="absolute inset-0 -translate-x-full animate-shine bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+                  </span>
+                  <Plus className="h-5 w-5 transition-transform duration-300 group-hover:rotate-90" />
+                  <span className="relative">Get More Modules</span>
+                </a>
               </div>
 
               {message && (
@@ -433,7 +476,7 @@ export default function ModulesPage() {
 
           {/* Sticky Save Bar */}
           {hasChanges && (
-            <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-white shadow-lg">
+            <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background shadow-lg">
               <div className="mx-auto max-w-6xl px-6 py-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">

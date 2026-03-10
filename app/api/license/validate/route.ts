@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { createDbClient } from '@/lib/db-supabase'
+import { LICENSE_MODULE_ID } from '@/lib/license-helpers'
 import { z } from 'zod'
-
-const LICENSE_MODULE_ID = "__license__"
 const POLAR_ORGANIZATION_ID = "b1e4ddc2-774b-4bfb-aedd-5ffb0f67e8e3"
 
 const ValidateSchema = z.object({
