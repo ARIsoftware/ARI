@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { getLicenseKey, MODULES_API_BASE, buildClientInfo } from '@/lib/license-helpers'
 import { z } from 'zod'
-import { writeFile, mkdir, rm } from 'fs/promises'
+import { writeFile, mkdir, rm, readdir, cp } from 'fs/promises'
 import { join } from 'path'
 import { exec } from 'child_process'
 import { promisify } from 'util'
@@ -72,18 +72,46 @@ export async function POST(request: NextRequest) {
 
     const zipBuffer = Buffer.from(await zipResponse.arrayBuffer())
 
-    // Save to temp file and extract to modules-core
+    // Save to temp file and extract
     const tempPath = join(tmpdir(), `ari-module-${moduleName}-${Date.now()}.zip`)
+    const tempExtractDir = join(tmpdir(), `ari-module-extract-${moduleName}-${Date.now()}`)
     const targetDir = join(process.cwd(), 'modules-core', moduleName)
 
     try {
       await writeFile(tempPath, zipBuffer)
+      await mkdir(tempExtractDir, { recursive: true })
+
+      // Extract to temp directory first to handle nested directory structure
+      await execAsync(`unzip -o "${tempPath}" -d "${tempExtractDir}"`)
+
+      // Check if the zip contained a single top-level directory (e.g., baseball/baseball/)
+      const extractedEntries = await readdir(tempExtractDir, { withFileTypes: true })
+      const dirs = extractedEntries.filter(e => e.isDirectory())
+      const files = extractedEntries.filter(e => e.isFile())
+
+      let sourceDir: string
+
+      if (dirs.length === 1 && files.length === 0) {
+        // Single top-level directory — use its contents to avoid nesting
+        sourceDir = join(tempExtractDir, dirs[0].name)
+      } else {
+        // Contents are already flat — use the extract dir directly
+        sourceDir = tempExtractDir
+      }
+
+      // Move contents to the target directory
+      await rm(targetDir, { recursive: true, force: true })
       await mkdir(targetDir, { recursive: true })
-      await execAsync(`unzip -o "${tempPath}" -d "${targetDir}"`)
+
+      const sourceEntries = await readdir(sourceDir)
+      await Promise.all(sourceEntries.map(entry =>
+        cp(join(sourceDir, entry), join(targetDir, entry), { recursive: true })
+      ))
     } catch (extractError) {
       // Clean up partial extraction on failure
       await rm(targetDir, { recursive: true, force: true }).catch(() => {})
       await rm(tempPath, { force: true }).catch(() => {})
+      await rm(tempExtractDir, { recursive: true, force: true }).catch(() => {})
       console.error('[API /modules/download] Extract failed:', extractError)
       return NextResponse.json(
         { error: 'Failed to extract module package' },
@@ -91,8 +119,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Clean up temp file
-    await rm(tempPath, { force: true })
+    // Clean up temp files
+    await rm(tempPath, { force: true }).catch(() => {})
+    await rm(tempExtractDir, { recursive: true, force: true }).catch(() => {})
 
     return NextResponse.json({
       success: true,
