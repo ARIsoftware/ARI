@@ -85,7 +85,10 @@ export async function POST(request: NextRequest) {
       await execAsync(`unzip -o "${tempPath}" -d "${tempExtractDir}"`)
 
       // Check if the zip contained a single top-level directory (e.g., baseball/baseball/)
-      const extractedEntries = await readdir(tempExtractDir, { withFileTypes: true })
+      // Filter out macOS/zip artifacts that shouldn't affect the detection
+      const JUNK_ENTRIES = new Set(['__MACOSX', '.DS_Store'])
+      const extractedEntries = (await readdir(tempExtractDir, { withFileTypes: true }))
+        .filter(e => !JUNK_ENTRIES.has(e.name))
       const dirs = extractedEntries.filter(e => e.isDirectory())
       const files = extractedEntries.filter(e => e.isFile())
 
@@ -97,6 +100,11 @@ export async function POST(request: NextRequest) {
       } else {
         // Contents are already flat — use the extract dir directly
         sourceDir = tempExtractDir
+      }
+
+      // Clean up junk from the source before copying
+      for (const junk of JUNK_ENTRIES) {
+        await rm(join(tempExtractDir, junk), { recursive: true, force: true }).catch(() => {})
       }
 
       // Move contents to the target directory
