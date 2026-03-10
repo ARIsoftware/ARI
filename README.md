@@ -289,6 +289,88 @@ pnpm run dev
 Navigate to: http://localhost:3000/
 
 
+## Module Library & Backend API
+
+ARI connects to a backend API for module discovery, license validation, and module downloads. The backend is open source and stored in a separate repository: [ARIsoftware/ARI-Modules](https://github.com/ARIsoftware/ARI-Modules).
+
+**Base URL:** `https://api.ari.software`
+
+### Endpoints
+
+Both endpoints accept `POST` requests with `Content-Type: application/json`.
+
+#### `POST /modules/library`
+
+Returns the module catalog and license validation status.
+
+```json
+{
+  "license_key": "XXXXX-XXXXX-XXXXX",
+  "client_info": {
+    "ari_version": "1.0.0",
+    "platform": "darwin",
+    "timestamp": "2026-03-09T12:00:00Z"
+  }
+}
+```
+
+Response:
+
+```json
+{
+  "valid_license": true,
+  "modules": [
+    {
+      "name": "module-name",
+      "title": "Module Title",
+      "description": "What this module does",
+      "access": "free",
+      "latest_version": "1.0.0",
+      "download_enabled": true,
+      "locked": false
+    }
+  ]
+}
+```
+
+#### `POST /modules/download`
+
+Returns a presigned download URL (expires in 120 seconds). The downloaded `.zip` file is extracted to `modules-core/{module-name}/`.
+
+```json
+{
+  "module": "module-name",
+  "version": "1.0.0",
+  "license_key": "XXXXX-XXXXX-XXXXX",
+  "client_info": {
+    "ari_version": "1.0.0"
+  }
+}
+```
+
+Response:
+
+```json
+{
+  "ok": true,
+  "download_url": "https://..."
+}
+```
+
+### License Key
+
+Users can activate a license key in the UI on the Modules or Module Library page. Alternatively, set the `ARI_LICENSE_KEY` environment variable in `.env.local` (or Vercel environment variables) to pre-fill the license key automatically.
+
+### Rate Limits
+
+- 60 requests/minute per IP
+- 10 downloads/minute per license key
+- 10 license validation attempts/minute per IP
+
+For full API documentation, see `FRONTEND_INTEGRATION.md` in the [ARI-Modules](https://github.com/ARIsoftware/ARI-Modules) repository.
+
+---
+
 ## 🤝 Need Help?
 
 Reach out to us at hello@ari.software

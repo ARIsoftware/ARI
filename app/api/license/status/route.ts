@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { createDbClient } from '@/lib/db-supabase'
-
-const LICENSE_MODULE_ID = "__license__"
+import { LICENSE_MODULE_ID } from '@/lib/license-helpers'
 
 function maskKey(key: string): string {
   if (key.length <= 4) return key
@@ -29,7 +28,9 @@ export async function GET() {
       .single()
 
     if (error || !data?.settings?.key) {
-      return NextResponse.json({ active: false })
+      // If no DB license, check for env var license key
+      const envKey = process.env.ARI_LICENSE_KEY
+      return NextResponse.json({ active: false, ...(envKey ? { env_key: envKey } : {}) })
     }
 
     const settings = data.settings

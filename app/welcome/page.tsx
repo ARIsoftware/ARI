@@ -284,6 +284,11 @@ export default function WelcomePage() {
     lines.push("ALLOW_BACKUP_OPERATIONS=true")
     lines.push("")
 
+    lines.push("## Optional: Pre-fill the license key for module activation.")
+    lines.push("## If set, users won't need to manually enter it in the UI.")
+    lines.push("ARI_LICENSE_KEY=")
+    lines.push("")
+
     lines.push("## Optionally restrict Access to specific IP addresses.")
     lines.push("## Example: ALLOWED_IPS=1.1.1.1,8.8.8.8")
     lines.push("## 127.0.0.1 and localhost and ::1 are always allowed.")
