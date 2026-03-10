@@ -374,4 +374,3 @@ For full API documentation, see `FRONTEND_INTEGRATION.md` in the [ARI-Modules](h
 ## 🤝 Need Help?
 
 Reach out to us at hello@ari.software
-
