@@ -10,7 +10,7 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
 } from "@/components/ui/breadcrumb"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -21,20 +21,104 @@ import { Input } from "@/components/ui/input"
 import {
   AlertCircle,
   CheckCircle2,
+  Download,
+  Grid3X3,
   KeyRound,
-  Package,
+  LayoutList,
   Loader2,
+  Lock,
+  Package,
   Plus,
   Save,
   X,
 } from "lucide-react"
-import { LICENSE_CACHE_KEY, LIBRARY_CACHE_KEY } from "@/lib/license-helpers"
+import { LICENSE_CACHE_KEY, LIBRARY_CACHE_KEY, CACHE_TTL } from "@/lib/license-helpers"
+
+// Icon mapping for library modules (external API doesn't provide icons)
+const MODULE_ICONS: Record<string, string> = {
+  "tasks": "CheckSquare",
+  "dashboard": "BarChart3",
+  "contacts": "Users",
+  "notepad": "StickyNote",
+  "daily-fitness": "Dumbbell",
+  "world-clock": "Clock",
+  "northstar": "Compass",
+  "assist": "Bot",
+  "hyrox": "Timer",
+  "knowledge-manager": "BookOpen",
+  "documents": "FileText",
+  "motivation": "Flame",
+  "gratitude": "Heart",
+  "quotes": "Quote",
+  "shipments": "Package",
+  "mail-stream": "Mail",
+  "major-projects": "FolderKanban",
+  "memento": "Camera",
+  "my-prospects": "Target",
+  "radar": "Radar",
+}
+
+interface LibraryModule {
+  name: string
+  title: string
+  description: string
+  access: "free" | "commercial"
+  latest_version: string
+  download_enabled: boolean
+  locked: boolean
+}
+
+function getCached<T>(key: string): T | null {
+  try {
+    const cached = sessionStorage.getItem(key)
+    if (!cached) return null
+    const { data, timestamp } = JSON.parse(cached)
+    if (Date.now() - timestamp > CACHE_TTL) {
+      sessionStorage.removeItem(key)
+      return null
+    }
+    return data
+  } catch { return null }
+}
+
+function setCache(key: string, data: unknown) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }))
+  } catch { /* ignore storage errors */ }
+}
+
+type UnifiedModule = {
+  id: string
+  name: string
+  description: string
+  icon: string
+  version: string
+  author?: string
+  status: "installed" | "downloadable" | "locked"
+  // Installed module fields
+  isEnabled?: boolean
+  path?: string
+  isOverridden?: boolean
+  isCustomModule?: boolean
+  routes?: any[]
+  // Library module fields
+  access?: "free" | "commercial"
+  libraryModule?: LibraryModule
+}
 
 export default function ModulesPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
-  const [allModules, setAllModules] = useState<any[]>([])
+  const [installedModules, setInstalledModules] = useState<any[]>([])
+  const [libraryModules, setLibraryModules] = useState<LibraryModule[]>([])
   const [modulesLoading, setModulesLoading] = useState(true)
+  const [libraryLoading, setLibraryLoading] = useState(true)
+  const [libraryError, setLibraryError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [viewMode, setViewMode] = useState<"card" | "list">("list")
+
+  // Download state
+  const [downloading, setDownloading] = useState<string | null>(null)
+  const [downloadResult, setDownloadResult] = useState<{ module: string, type: 'success' | 'error', message: string } | null>(null)
 
   // License state
   const [licenseKey, setLicenseKey] = useState("")
@@ -55,24 +139,16 @@ export default function ModulesPage() {
   // Track current toggle states (local, may differ from server)
   const [toggleStates, setToggleStates] = useState<Record<string, boolean>>({})
 
-  // Load license status (with 5-minute cache + env var pre-fill)
+  // Load license status
   useEffect(() => {
-    const CACHE_TTL = 5 * 60 * 1000
-
     async function loadLicenseStatus() {
-      // Check cache first
-      try {
-        const cached = sessionStorage.getItem(LICENSE_CACHE_KEY)
-        if (cached) {
-          const { data, timestamp } = JSON.parse(cached)
-          if (Date.now() - timestamp < CACHE_TTL) {
-            setLicenseStatus(data)
-            if (!data.active && data.env_key) setLicenseKey(data.env_key)
-            setLicenseLoading(false)
-            return
-          }
-        }
-      } catch { /* ignore cache errors */ }
+      const cached = getCached<typeof licenseStatus>(LICENSE_CACHE_KEY)
+      if (cached) {
+        setLicenseStatus(cached)
+        if (!cached.active && cached.env_key) setLicenseKey(cached.env_key)
+        setLicenseLoading(false)
+        return
+      }
 
       try {
         const response = await fetch('/api/license/status')
@@ -80,9 +156,7 @@ export default function ModulesPage() {
           const data = await response.json()
           setLicenseStatus(data)
           if (!data.active && data.env_key) setLicenseKey(data.env_key)
-          try {
-            sessionStorage.setItem(LICENSE_CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }))
-          } catch { /* ignore */ }
+          setCache(LICENSE_CACHE_KEY, data)
         }
       } catch (error) {
         console.error('Error loading license status:', error)
@@ -117,11 +191,13 @@ export default function ModulesPage() {
       if (statusResponse.ok) {
         const statusData = await statusResponse.json()
         setLicenseStatus(statusData)
-        try { sessionStorage.setItem(LICENSE_CACHE_KEY, JSON.stringify({ data: statusData, timestamp: Date.now() })) } catch { /* ignore */ }
+        setCache(LICENSE_CACHE_KEY, statusData)
       }
       setLicenseKey("")
-      // Invalidate library cache so it re-fetches with new license
-      try { sessionStorage.removeItem(LIBRARY_CACHE_KEY) } catch { /* ignore */ }
+
+      // Refresh library with new license (bypass cache)
+      sessionStorage.removeItem(LIBRARY_CACHE_KEY)
+      await loadLibrary(false)
     } catch (error) {
       console.error('Error activating license:', error)
       setLicenseError('Failed to activate license. Please try again.')
@@ -140,43 +216,123 @@ export default function ModulesPage() {
           sessionStorage.removeItem(LICENSE_CACHE_KEY)
           sessionStorage.removeItem(LIBRARY_CACHE_KEY)
         } catch { /* ignore */ }
+        // Refresh library without license
+        await loadLibrary(false)
       }
     } catch (error) {
       console.error('Error deactivating license:', error)
     }
   }
 
-  // Load all modules (not just enabled) for settings management
-  useEffect(() => {
-    async function loadAllModules() {
-      try {
-        setModulesLoading(true)
-        // This endpoint needs to return ALL modules, not just enabled
-        const response = await fetch('/api/modules/all')
-        if (response.ok) {
-          const data = await response.json()
-          // Sort modules alphabetically by name
-          const sortedModules = (data.modules || []).sort((a: any, b: any) =>
-            a.name.localeCompare(b.name)
-          )
-          setAllModules(sortedModules)
+  // Load installed modules
+  const loadInstalledModules = async () => {
+    try {
+      setModulesLoading(true)
+      const response = await fetch('/api/modules/all')
+      if (response.ok) {
+        const data = await response.json()
+        const modules = data.modules || []
+        setInstalledModules(modules)
 
-          // Initialize both original and toggle states from server data
-          const initialStates: Record<string, boolean> = {}
-          sortedModules.forEach((module: any) => {
-            initialStates[module.id] = module.isEnabled
-          })
-          setOriginalStates(initialStates)
-          setToggleStates(initialStates)
-        }
-      } catch (error) {
-        console.error('Error loading all modules:', error)
-      } finally {
-        setModulesLoading(false)
+        const initialStates: Record<string, boolean> = {}
+        modules.forEach((module: any) => {
+          initialStates[module.id] = module.isEnabled
+        })
+        setOriginalStates(initialStates)
+        setToggleStates(initialStates)
+      }
+    } catch (error) {
+      console.error('Error loading installed modules:', error)
+    } finally {
+      setModulesLoading(false)
+    }
+  }
+
+  // Load library modules
+  const loadLibrary = async (useCache = true) => {
+    if (useCache) {
+      const cached = getCached<{ modules: LibraryModule[], valid_license: boolean }>(LIBRARY_CACHE_KEY)
+      if (cached) {
+        setLibraryModules(cached.modules || [])
+        setLibraryLoading(false)
+        return
       }
     }
-    loadAllModules()
+
+    try {
+      setLibraryLoading(true)
+      setLibraryError(null)
+      const response = await fetch('/api/modules/library')
+      if (response.ok) {
+        const data = await response.json()
+        setLibraryModules(data.modules || [])
+        setCache(LIBRARY_CACHE_KEY, data)
+      } else {
+        const err = await response.json().catch(() => ({}))
+        setLibraryError(err.error || 'Failed to load module library')
+      }
+    } catch (error) {
+      console.error('Error loading module library:', error)
+      setLibraryError('Failed to connect to module library')
+    } finally {
+      setLibraryLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadInstalledModules()
+    loadLibrary()
   }, [])
+
+  // Build unified module list
+  const unifiedModules = useMemo((): UnifiedModule[] => {
+    const installedIds = new Set(installedModules.map((m: any) => m.id))
+
+    // Map installed modules
+    const installed: UnifiedModule[] = installedModules.map((m: any) => {
+      const libraryMatch = libraryModules.find(lm => lm.name === m.id)
+      return {
+        id: m.id,
+        name: m.name,
+        description: m.description,
+        icon: m.icon,
+        version: m.version,
+        author: m.author,
+        status: "installed" as const,
+        isEnabled: m.isEnabled,
+        path: m.path,
+        isOverridden: m.isOverridden,
+        isCustomModule: m.path?.includes('/modules-custom/'),
+        routes: m.routes,
+        access: libraryMatch?.access,
+      }
+    })
+
+    // Library-only modules (not installed)
+    const libraryOnly: UnifiedModule[] = libraryModules
+      .filter(lm => !installedIds.has(lm.name))
+      .map(lm => ({
+        id: lm.name,
+        name: lm.title,
+        description: lm.description,
+        icon: MODULE_ICONS[lm.name] || "Package",
+        version: lm.latest_version,
+        status: (lm.download_enabled ? "downloadable" : "locked") as "downloadable" | "locked",
+        access: lm.access,
+        libraryModule: lm,
+      }))
+
+    // Sort: installed first (alphabetical), then downloadable (alphabetical), then locked (alphabetical)
+    const statusOrder = { installed: 0, downloadable: 1, locked: 2 }
+    return [...installed, ...libraryOnly].sort((a, b) => {
+      const orderDiff = statusOrder[a.status] - statusOrder[b.status]
+      if (orderDiff !== 0) return orderDiff
+      return a.name.localeCompare(b.name)
+    })
+  }, [installedModules, libraryModules])
+
+  const totalCount = unifiedModules.length
+  const isLoading = modulesLoading || libraryLoading
 
   // Compute pending changes
   const pendingChanges = useMemo(() => {
@@ -187,23 +343,19 @@ export default function ModulesPage() {
 
   const hasChanges = pendingChanges.length > 0
 
-  // Toggle module locally (no API call)
   const toggleModule = (moduleId: string) => {
     setToggleStates(prev => ({
       ...prev,
       [moduleId]: !prev[moduleId]
     }))
-    // Clear any previous messages when user makes changes
     setMessage(null)
   }
 
-  // Discard all pending changes
   const discardChanges = () => {
     setToggleStates(originalStates)
     setMessage(null)
   }
 
-  // Save all pending changes
   const saveChanges = async () => {
     setIsSaving(true)
     setMessage(null)
@@ -211,9 +363,7 @@ export default function ModulesPage() {
     try {
       const response = await fetch('/api/modules/batch', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           changes: pendingChanges.map(([moduleId, enabled]) => ({ moduleId, enabled }))
         })
@@ -224,13 +374,150 @@ export default function ModulesPage() {
         throw new Error(data.error || 'Failed to save changes')
       }
 
-      // Reload page to update sidebar navigation
       window.location.reload()
     } catch (error) {
       console.error('Error saving module changes:', error)
       setMessage({ type: 'error', text: 'Failed to save changes. Please try again.' })
       setIsSaving(false)
     }
+  }
+
+  const downloadModule = async (mod: UnifiedModule) => {
+    if (!mod.libraryModule) return
+    setDownloading(mod.id)
+    setDownloadResult(null)
+
+    try {
+      const response = await fetch('/api/modules/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          module: mod.libraryModule.name,
+          version: mod.libraryModule.latest_version,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setDownloadResult({ module: mod.id, type: 'error', message: data.error || 'Download failed' })
+        return
+      }
+
+      setDownloadResult({
+        module: mod.id,
+        type: 'success',
+        message: `${mod.name} v${mod.libraryModule.latest_version} installed successfully`,
+      })
+
+      // Re-fetch both APIs to reflect the newly installed module
+      sessionStorage.removeItem(LIBRARY_CACHE_KEY)
+      await Promise.all([loadInstalledModules(), loadLibrary(false)])
+    } catch (error) {
+      console.error('Error downloading module:', error)
+      setDownloadResult({ module: mod.id, type: 'error', message: 'Failed to download module' })
+    } finally {
+      setDownloading(null)
+    }
+  }
+
+  const renderModuleAction = (mod: UnifiedModule) => {
+    if (mod.status === "installed") {
+      const isEnabled = toggleStates[mod.id] ?? mod.isEnabled
+      const hasChanged = originalStates[mod.id] !== toggleStates[mod.id]
+      const isOverridden = mod.isOverridden === true
+
+      return (
+        <div className={`flex items-center gap-3 ${isOverridden ? 'opacity-30' : ''}`}>
+          <span className={`text-sm font-medium ${hasChanged ? 'text-amber-600' : 'text-muted-foreground'}`}>
+            {isEnabled ? 'On' : 'Off'}
+          </span>
+          <Switch
+            checked={isEnabled}
+            onCheckedChange={() => toggleModule(mod.id)}
+            disabled={isOverridden}
+          />
+        </div>
+      )
+    }
+
+    if (mod.status === "downloadable") {
+      const isDownloading = downloading === mod.id
+      return (
+        <Button
+          size="sm"
+          className="bg-[#148962] hover:bg-[#117a56] text-white"
+          disabled={isDownloading}
+          onClick={() => downloadModule(mod)}
+        >
+          {isDownloading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Installing...
+            </>
+          ) : (
+            <>
+              <Plus className="mr-2 h-4 w-4" />
+              Install
+            </>
+          )}
+        </Button>
+      )
+    }
+
+    // Locked
+    return (
+      <Button
+        size="sm"
+        variant="outline"
+        className="text-muted-foreground border-muted cursor-default hover:bg-transparent hover:text-muted-foreground"
+        disabled
+      >
+        <Lock className="mr-2 h-4 w-4" />
+        Locked
+      </Button>
+    )
+  }
+
+  const AccessBadge = ({ access }: { access?: string }) => {
+    if (!access) return null
+    const isFree = access === "free"
+    return (
+      <Badge
+        variant="outline"
+        className={`text-[10px] px-1.5 py-0 ${isFree ? 'border-green-500/40 text-green-600' : 'border-amber-500/40 text-amber-600'}`}
+      >
+        {isFree ? 'FREE' : 'PREMIUM'}
+      </Badge>
+    )
+  }
+
+  const renderAccessBadge = (mod: UnifiedModule) => {
+    if (mod.status === "installed") {
+      let badgeColor = '#000000'
+      let badgeText = 'CORE MODULE'
+      if (mod.isOverridden) {
+        badgeColor = '#dc2626'
+        badgeText = 'OVERRIDDEN'
+      } else if (mod.isCustomModule) {
+        badgeColor = '#07be07'
+        badgeText = 'USER MODULE'
+      }
+
+      return (
+        <div className="flex items-center gap-1.5">
+          <Badge
+            className="text-[10px] px-1.5 py-0 text-white"
+            style={{ backgroundColor: badgeColor }}
+          >
+            {badgeText}
+          </Badge>
+          <AccessBadge access={mod.access} />
+        </div>
+      )
+    }
+
+    return <AccessBadge access={mod.access} />
   }
 
   return (
@@ -251,24 +538,14 @@ export default function ModulesPage() {
 
           <main className="flex-1 bg-background">
             <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8 lg:px-8 pb-24">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex flex-col gap-3">
-                  <Badge className="w-fit text-sm font-medium">Extend your app functionality</Badge>
-                  <h1 className="text-3xl font-semibold tracking-tight text-foreground">Modules</h1>
-                  <p className="max-w-2xl text-sm text-muted-foreground">
-                    Enable or disable installed modules to extend your app functionality. <br /><span className="text-red-600">Note: Always assess third-party modules to ensure they are trustworthy and secure.</span>
-                  </p>
-                </div>
-                <a
-                  href="/module-library"
-                  className="group relative mt-6 inline-flex items-center gap-2.5 overflow-hidden rounded-xl border border-emerald-700 bg-[#148962] px-8 py-4 text-base font-semibold text-white shadow-lg transition-all duration-300 hover:shadow-xl hover:shadow-emerald-900/20 hover:scale-[1.03] active:scale-[0.98] shrink-0 animate-pulse-custom"
-                >
-                  <span className="absolute inset-0 overflow-hidden rounded-xl">
-                    <span className="absolute inset-0 -translate-x-full animate-shine bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-                  </span>
-                  <Plus className="h-5 w-5 transition-transform duration-300 group-hover:rotate-90" />
-                  <span className="relative">Get More Modules</span>
-                </a>
+              {/* Header */}
+              <div className="flex flex-col gap-3">
+                <Badge className="w-fit text-sm font-medium bg-[#148962] hover:bg-[#117a56] text-white">Browse & Install</Badge>
+                <h1 className="text-3xl font-semibold tracking-tight text-foreground">Module Library</h1>
+                <p className="max-w-2xl text-sm text-muted-foreground">
+                  Discover, install, and manage modules to extend your app. Free modules can be downloaded instantly. Premium modules require a license key.
+                  <br /><span className="text-red-600">Note: Always assess third-party modules to ensure they are trustworthy and secure.</span>
+                </p>
               </div>
 
               {message && (
@@ -354,7 +631,7 @@ export default function ModulesPage() {
                       {licenseError && (
                         <p className="text-sm text-destructive">{licenseError}</p>
                       )}
-                      <p className="text-xs text-muted-foreground">
+                      <p className="mt-[20px]" style={{ color: '#222', fontSize: '.85rem' }}>
                         Your license key was sent to your email after purchase.{' '}
                         <a
                           href="https://ari.software"
@@ -370,107 +647,154 @@ export default function ModulesPage() {
                 </CardContent>
               </Card>
 
-              {/* Modules Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Package className="h-5 w-5 text-purple-500" />
-                    Modules
-                  </CardTitle>
-                  <CardDescription>
-                    Toggle modules on or off below, then click "Save Changes" to apply.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {modulesLoading ? (
-                    <div className="text-center py-8">
-                      <p className="text-sm text-muted-foreground">Loading modules...</p>
-                    </div>
-                  ) : allModules.length === 0 ? (
-                    <div className="text-center py-8">
-                      <Package className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-                      <p className="text-sm text-muted-foreground">
-                        No modules installed. Place custom modules in the <code className="px-1 py-0.5 bg-muted rounded text-xs">/modules-custom</code> directory.
-                      </p>
-                    </div>
+              {/* Download Result Banner */}
+              {downloadResult && (
+                <div className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-sm ${
+                  downloadResult.type === 'success'
+                    ? 'border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200'
+                    : 'border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200'
+                }`}>
+                  {downloadResult.type === 'success' ? (
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
                   ) : (
-                    allModules.map((module) => {
-                      const Icon = getLucideIcon(module.icon)
-                      const isEnabled = toggleStates[module.id] ?? module.isEnabled
-                      const hasChanged = originalStates[module.id] !== toggleStates[module.id]
-                      const isCustomModule = module.path?.includes('/modules-custom/')
-                      const isOverridden = module.isOverridden === true
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                  )}
+                  {downloadResult.message}
+                  <button
+                    className="ml-auto"
+                    onClick={() => setDownloadResult(null)}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
 
-                      // Determine badge color and text
-                      let badgeColor = '#000000' // CORE MODULE (black)
-                      let badgeText = 'CORE MODULE'
-                      if (isOverridden) {
-                        badgeColor = '#dc2626' // OVERRIDDEN (red)
-                        badgeText = 'OVERRIDDEN'
-                      } else if (isCustomModule) {
-                        badgeColor = '#07be07' // USER MODULE (green)
-                        badgeText = 'USER MODULE'
-                      }
+              {/* View Toggle Bar */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  {isLoading ? 'Loading...' : `${totalCount} module${totalCount !== 1 ? 's' : ''}`}
+                </span>
+                <div className="flex items-center gap-1 rounded-lg border p-1">
+                  <button
+                    onClick={() => setViewMode("card")}
+                    className={`rounded-md p-1.5 transition-colors ${viewMode === "card" ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                  >
+                    <Grid3X3 className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode("list")}
+                    className={`rounded-md p-1.5 transition-colors ${viewMode === "list" ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                  >
+                    <LayoutList className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
 
-                      return (
-                        <div
-                          key={`${module.id}-${module.path}`}
-                          className={`flex items-start justify-between rounded-lg border p-4 transition-colors ${
-                            hasChanged ? 'border-amber-400 bg-amber-50/50' : ''
-                          }`}
-                        >
-                          <div className="pr-4 flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <Icon className="h-5 w-5 text-blue-600" />
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <p className="text-sm font-medium">{module.name}</p>
-                                  <Badge
-                                    className="text-[10px] px-1.5 py-0 text-white"
-                                    style={{ backgroundColor: badgeColor }}
-                                  >
-                                    {badgeText}
+              {/* Modules */}
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Loading modules...</p>
+                </div>
+              ) : unifiedModules.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <Package className="h-8 w-8 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">No modules found</p>
+                </div>
+              ) : viewMode === "card" ? (
+                /* Card View */
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {unifiedModules.map((mod) => {
+                    const Icon = getLucideIcon(mod.icon)
+                    const hasChanged = mod.status === "installed" && originalStates[mod.id] !== toggleStates[mod.id]
+
+                    return (
+                      <Card
+                        key={mod.id}
+                        className={`flex flex-col transition-colors ${
+                          hasChanged ? 'border-amber-400 bg-amber-50/50 dark:bg-amber-950/20' : 'hover:border-foreground/20'
+                        } ${mod.status === "locked" ? 'opacity-60' : ''}`}
+                      >
+                        <CardHeader className="flex-1 pb-3">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                              <Icon className="h-5 w-5 text-foreground" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <CardTitle className="text-sm font-semibold">{mod.name}</CardTitle>
+                                {hasChanged && (
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500 text-amber-600">
+                                    UNSAVED
                                   </Badge>
-                                  {hasChanged && (
-                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500 text-amber-600">
-                                      UNSAVED
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="text-xs text-muted-foreground">v{module.version} by {module.author}</p>
-                                <p className="text-xs text-muted-foreground">ID: {module.id}</p>
-                                {module.routes && module.routes.length > 0 && (
-                                  <p className="text-xs text-muted-foreground">
-                                    Routes: {module.routes.map((r: any) => r.path).join(', ')}
-                                  </p>
                                 )}
-                                <p className="text-xs text-muted-foreground">Path: /{isCustomModule ? 'modules-custom' : 'modules-core'}/{module.path?.split('/').pop()}</p>
+                              </div>
+                              <div className="flex items-center gap-1.5 mt-1">
+                                {renderAccessBadge(mod)}
+                                <span className="text-[10px] text-muted-foreground">v{mod.version}</span>
                               </div>
                             </div>
-                            <p className="text-sm text-muted-foreground">{module.description}</p>
                           </div>
-                          <div className={`flex items-center gap-3 ${isOverridden ? 'opacity-30' : ''}`}>
-                            <span className={`text-sm font-medium ${hasChanged ? 'text-amber-600' : 'text-muted-foreground'}`}>
-                              {isEnabled ? 'On' : 'Off'}
-                            </span>
-                            <Switch
-                              checked={isEnabled}
-                              onCheckedChange={() => toggleModule(module.id)}
-                              disabled={isOverridden}
-                            />
-                          </div>
+                          <CardDescription className="text-xs mt-2 leading-relaxed">
+                            {mod.description}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          {renderModuleAction(mod)}
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
+              ) : (
+                /* List View */
+                <div className="flex flex-col gap-2">
+                  {unifiedModules.map((mod) => {
+                    const Icon = getLucideIcon(mod.icon)
+                    const hasChanged = mod.status === "installed" && originalStates[mod.id] !== toggleStates[mod.id]
+
+                    return (
+                      <div
+                        key={mod.id}
+                        className={`flex items-center gap-4 rounded-lg border p-4 transition-colors ${
+                          hasChanged ? 'border-amber-400 bg-amber-50/50 dark:bg-amber-950/20' : ''
+                        } ${mod.status === "locked" ? 'opacity-60' : ''}`}
+                      >
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                          <Icon className="h-5 w-5 text-foreground" />
                         </div>
-                      )
-                    })
-                  )}
-                </CardContent>
-                <CardFooter className="border-t bg-muted/60">
-                  <div className="flex w-full items-center text-sm text-muted-foreground">
-                    <AlertCircle className="mr-2 h-4 w-4" />
-                    <span>Disabled modules won't appear in navigation.</span>
-                  </div>
-                </CardFooter>
-              </Card>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-semibold">{mod.name}</p>
+                            {renderAccessBadge(mod)}
+                            <span className="text-[10px] text-muted-foreground">v{mod.version}</span>
+                            {hasChanged && (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500 text-amber-600">
+                                UNSAVED
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">{mod.description}</p>
+                        </div>
+                        <div className="shrink-0">
+                          {renderModuleAction(mod)}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Library error with retry */}
+              {libraryError && !libraryLoading && (
+                <div className="flex flex-col items-center justify-center py-8 gap-3">
+                  <AlertCircle className="h-6 w-6 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">{libraryError}</p>
+                  <Button variant="outline" size="sm" onClick={() => loadLibrary(false)}>
+                    Retry
+                  </Button>
+                </div>
+              )}
             </div>
           </main>
 
