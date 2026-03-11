@@ -1,0 +1,33 @@
+{
+  "id": "shipments",
+  "group": "Shipments",
+  "name": "Shipment Tracker",
+  "description": "Track packages, deliveries, and shipments with status updates and delivery dates",
+  "version": "1.0.0",
+  "author": "ARI Team <ari@ari.software>",
+  "icon": "Package",
+  "enabled": true,
+  "fullscreen": false,
+  "menuPriority": 50,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": false
+  },
+  "routes": [
+    {
+      "path": "/shipments",
+      "label": "Shipment Tracker",
+      "icon": "Package",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": ["shipments"],
+    "migrations": null
+  }
+}

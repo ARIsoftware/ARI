@@ -1,0 +1,37 @@
+{
+  "id": "winter-arc",
+  "group": "Winter Arc",
+  "name": "Winter Arc",
+  "description": "Winter Arc 2026 transformation journal - track your personal growth journey",
+  "version": "1.0.0",
+  "author": "ARI Team <ari@ari.software>",
+  "icon": "Snowflake",
+  "enabled": true,
+  "fullscreen": false,
+  "menuPriority": 11,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": false
+  },
+  "routes": [
+    {
+      "path": "/winter-arc",
+      "label": "Winter Arc",
+      "icon": "Snowflake",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": ["winter_arc_goals"],
+    "migrations": "./database/migrations"
+  },
+  "dashboard": {
+    "widgets": false,
+    "widgetComponents": []
+  }
+}

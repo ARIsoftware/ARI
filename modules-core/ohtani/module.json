@@ -1,0 +1,33 @@
+{
+  "id": "ohtani",
+  "group": "Welcome!",
+  "name": "Ohtani",
+  "description": "A 9x9 grid module for personal organization and planning",
+  "version": "1.0.0",
+  "author": "ARI Team <ari@ari.software>",
+  "icon": "Grid3x3",
+  "enabled": true,
+  "fullscreen": false,
+  "menuPriority": 2,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": false
+  },
+  "routes": [
+    {
+      "path": "/ohtani",
+      "label": "Ohtani",
+      "icon": "Grid3x3",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": ["ohtani_grid_cells"],
+    "migrations": "./database/migrations"
+  }
+}

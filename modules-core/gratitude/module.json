@@ -1,0 +1,40 @@
+{
+  "id": "gratitude",
+  "group": "Gratitude",
+  "name": "Gratitude",
+  "description": "Daily gratitude journal to reflect on positive moments and appreciate life",
+  "version": "1.0.0",
+  "author": "ARI Team <ari@ari.software>",
+  "icon": "Heart",
+  "enabled": true,
+  "fullscreen": false,
+  "menuPriority": 10,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": false
+  },
+  "routes": [
+    {
+      "path": "/gratitude",
+      "label": "Gratitude",
+      "icon": "Heart",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": ["gratitude_entries"],
+    "migrations": "./database/migrations"
+  },
+  "dashboard": {
+    "widgets": false,
+    "widgetComponents": []
+  },
+  "settings": {
+    "panel": null
+  }
+}

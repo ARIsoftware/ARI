@@ -1,0 +1,25 @@
+{
+  "id": "assist",
+  "group": "Assist",
+  "name": "AI Assistant",
+  "description": "ChatGPT-powered AI assistant for conversational help and guidance",
+  "version": "1.0.0",
+  "author": "ARI Team <ari@ari.software>",
+  "icon": "Bot",
+  "enabled": true,
+  "fullscreen": false,
+  "menuPriority": 50,
+  "routes": [
+    {
+      "path": "/assist",
+      "label": "AI Assistant",
+      "icon": "Bot",
+      "sidebarPosition": "main"
+    }
+  ],
+  "features": {
+    "chatInterface": true,
+    "streamingResponses": true,
+    "conversationHistory": true
+  }
+}

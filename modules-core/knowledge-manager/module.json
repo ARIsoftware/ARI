@@ -1,0 +1,32 @@
+{
+  "id": "knowledge-manager",
+  "name": "Knowledge Manager",
+  "description": "Organize and manage your knowledge articles with tags for easy categorization and retrieval",
+  "version": "1.0.0",
+  "author": "ARI",
+  "icon": "BookOpen",
+  "enabled": true,
+  "fullscreen": false,
+  "menuPriority": 30,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": false
+  },
+  "routes": [
+    {
+      "path": "/knowledge-manager",
+      "label": "Knowledge Manager",
+      "icon": "BookOpen",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": ["knowledge_articles"],
+    "migrations": "./database/migrations"
+  }
+}

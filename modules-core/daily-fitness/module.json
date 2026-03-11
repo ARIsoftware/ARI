@@ -1,0 +1,36 @@
+{
+  "id": "daily-fitness",
+  "group": "Daily Fitness",
+  "name": "Daily Fitness",
+  "description": "Track and manage daily fitness exercises with drag-and-drop organization",
+  "version": "1.0.0",
+  "author": "ARI Team <ari@ari.software>",
+  "icon": "Dumbbell",
+  "enabled": true,
+  "fullscreen": false,
+  "menuPriority": 50,
+  "routes": [
+    {
+      "path": "/daily-fitness",
+      "label": "Daily Fitness",
+      "icon": "Dumbbell",
+      "sidebarPosition": "main"
+    },
+    {
+      "path": "/daily-fitness/add",
+      "label": "Add Exercise",
+      "sidebarPosition": "hidden"
+    },
+    {
+      "path": "/daily-fitness/edit/[id]",
+      "label": "Edit Exercise",
+      "sidebarPosition": "hidden"
+    }
+  ],
+  "features": {
+    "fitnessTracking": true,
+    "dragAndDrop": true,
+    "kanbanView": true,
+    "youtubeIntegration": true
+  }
+}

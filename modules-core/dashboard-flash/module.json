@@ -1,0 +1,29 @@
+{
+  "id": "dashboard-flash",
+  "group": "Overview",
+  "name": "Dashboard Flash",
+  "description": "An elegant, magazine-style dashboard that tells the story of your day at a glance",
+  "version": "1.0.0",
+  "author": "ARI",
+  "icon": "Zap",
+  "enabled": true,
+  "fullscreen": false,
+  "menuPriority": 1,
+  "permissions": {
+    "database": false,
+    "api": false,
+    "dashboard": true
+  },
+  "routes": [
+    {
+      "path": "/dashboard-flash",
+      "label": "Dashboard Flash",
+      "icon": "Zap",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  }
+}

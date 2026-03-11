@@ -1,0 +1,129 @@
+/**
+ * Example Public Webhook Route Handler
+ *
+ * This is a TEMPLATE file showing how to implement a public (unauthenticated)
+ * webhook endpoint with proper security validation.
+ *
+ * To use this template:
+ * 1. Copy this file to your module: modules/your-module/api/webhook/route.ts
+ * 2. Add publicRoutes to your module.json (see example below)
+ * 3. Set the required environment variable
+ * 4. Register the route in MODULE_API_ROUTES
+ * 5. Run `npm run generate-module-registry`
+ *
+ * Example module.json publicRoutes configuration:
+ * ```json
+ * {
+ *   "publicRoutes": [
+ *     {
+ *       "path": "webhook",
+ *       "methods": ["POST"],
+ *       "security": {
+ *         "type": "webhook_signature",
+ *         "secretEnvVar": "MY_WEBHOOK_SECRET",
+ *         "rateLimit": 100
+ *       },
+ *       "description": "Receives webhook events from external service"
+ *     }
+ *   ]
+ * }
+ * ```
+ */
+
+import { NextResponse } from 'next/server'
+import { createPublicRouteHandler, createPublicHealthCheck } from '@/lib/modules/public-route-handler'
+import type { PublicRouteSecurity } from '@/lib/modules/module-types'
+
+/**
+ * Security configuration - MUST match module.json publicRoutes entry
+ */
+const securityConfig: PublicRouteSecurity = {
+  type: 'webhook_signature',
+  secretEnvVar: 'MY_WEBHOOK_SECRET', // Set this in your .env file
+  rateLimit: 100 // Max 100 requests per minute
+}
+
+/**
+ * Define your webhook payload type
+ */
+interface WebhookPayload {
+  type: string
+  data: {
+    id: string
+    [key: string]: any
+  }
+  created_at: string
+}
+
+/**
+ * POST handler - Receives webhook from external service
+ *
+ * Security validation happens automatically via createPublicRouteHandler:
+ * - Signature verification (Svix, Stripe, or GitHub format)
+ * - Rate limiting
+ * - Replay attack protection (timestamp validation)
+ *
+ * If validation fails, the handler returns an appropriate error response
+ * and your handler code is never executed.
+ */
+export const POST = createPublicRouteHandler(securityConfig, async (request, context) => {
+  try {
+    // Security already validated at this point!
+    // context.rawBody contains the raw request body (string)
+
+    // Parse the webhook payload
+    const payload: WebhookPayload = JSON.parse(context.rawBody)
+
+    // Log the event for debugging (remove in production if too verbose)
+    console.log(`[Webhook] Received event: ${payload.type}`)
+
+    // Process the webhook based on event type
+    switch (payload.type) {
+      case 'item.created':
+        // Handle item creation event
+        console.log(`[Webhook] Item created: ${payload.data.id}`)
+        break
+
+      case 'item.updated':
+        // Handle item update event
+        console.log(`[Webhook] Item updated: ${payload.data.id}`)
+        break
+
+      case 'item.deleted':
+        // Handle item deletion event
+        console.log(`[Webhook] Item deleted: ${payload.data.id}`)
+        break
+
+      default:
+        // Log unhandled event types for monitoring
+        console.log(`[Webhook] Unhandled event type: ${payload.type}`)
+    }
+
+    // Return success - webhook providers expect 2xx response
+    return NextResponse.json({ received: true })
+
+  } catch (error: any) {
+    // Log error for debugging
+    console.error('[Webhook] Processing error:', error)
+
+    // Return 500 - webhook provider may retry
+    return NextResponse.json(
+      { error: 'Failed to process webhook', details: error.message },
+      { status: 500 }
+    )
+  }
+})
+
+/**
+ * GET handler - Health check endpoint
+ *
+ * This allows external services and monitoring tools to verify
+ * the webhook endpoint is responsive without sending actual events.
+ *
+ * Note: GET requests bypass signature validation by default
+ * since they're just health checks with no payload.
+ */
+export const GET = createPublicHealthCheck(
+  '/api/modules/hello-world/webhook',
+  'Example webhook receiver for Hello World module'
+)
