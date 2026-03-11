@@ -111,3 +111,6 @@ logs/
 /playwright-report/
 /playwright/.cache/
 /test-results/
+
+# Auto-generated module registry files
+lib/generated/
