@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "generate-module-registry": "node scripts/generate-module-registry.js",
-    "prebuild": "npm run generate-module-registry",
+    "prebuild": "git submodule update --init --recursive && npm run generate-module-registry",
     "build": "next build",
     "predev": "npm run generate-module-registry",
     "dev": "next dev",
