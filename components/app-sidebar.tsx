@@ -268,7 +268,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // Otherwise show the main menu
   return (
     <Sidebar {...props} className={isDragMode ? "drag-mode-active" : ""}>
-      <SidebarContent>
+      <SidebarContent className="-mt-3.5">
         {/* Core navigation groups - not draggable */}
         {filteredNavMain.map((item) => (
           <SidebarGroup key={item.title}>
