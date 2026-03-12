@@ -4,6 +4,7 @@ import { getLicenseKey, MODULES_API_BASE, buildClientInfo } from '@/lib/license-
 import { z } from 'zod'
 import { writeFile, mkdir, rm, readdir, cp } from 'fs/promises'
 import { join, dirname } from 'path'
+import { getGitHubConfig, commitModuleToGitHub } from '@/lib/modules/github-sync'
 import { tmpdir } from 'os'
 import { inflateRawSync } from 'zlib'
 
@@ -174,6 +175,26 @@ export async function POST(request: NextRequest) {
     // Clean up temp files
     await rm(tempExtractDir, { recursive: true, force: true }).catch(() => {})
 
+    // On Vercel, auto-sync to GitHub in the same request (targetDir still exists)
+    let githubSync = null
+    if (isVercel) {
+      const ghConfig = getGitHubConfig()
+      if (ghConfig) {
+        try {
+          const result = await commitModuleToGitHub(moduleName, targetDir, ghConfig)
+          githubSync = {
+            success: true,
+            commitSha: result.commitSha,
+            filesCommitted: result.filesCommitted,
+            message: result.message,
+          }
+        } catch (err: any) {
+          console.error('[API /modules/download] GitHub sync failed:', err)
+          githubSync = { success: false, error: err.message }
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       module: moduleName,
@@ -181,6 +202,7 @@ export async function POST(request: NextRequest) {
       installed_to: isVercel ? targetDir : `modules-core/${moduleName}`,
       moduleDir: targetDir,
       vercel: isVercel,
+      githubSync,
     })
   } catch (error) {
     console.error('[API /modules/download] Error:', error)
