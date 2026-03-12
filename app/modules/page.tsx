@@ -143,6 +143,7 @@ export default function ModulesPage() {
     moduleName: string
     moduleDir: string
     vercel?: boolean
+    githubSync?: { success: boolean; commitSha?: string; error?: string; message?: string } | null
   } | null>(null)
   const [githubSyncEnabled, setGithubSyncEnabled] = useState(true)
   const [githubConfigured, setGithubConfigured] = useState<boolean | null>(null)
@@ -448,6 +449,7 @@ export default function ModulesPage() {
         moduleName: mod.name,
         moduleDir: data.moduleDir || `modules-core/${mod.id}`,
         vercel: data.vercel,
+        githubSync: data.githubSync || null,
       })
       setSyncResult(null)
 
@@ -468,6 +470,13 @@ export default function ModulesPage() {
   }
 
   const handleInstallDone = async () => {
+    // If already synced server-side (Vercel auto-sync), skip client-side github-sync call
+    if (installSuccess?.githubSync?.success) {
+      try { await fetch('/api/modules/refresh', { method: 'POST' }) } catch {}
+      setInstallSuccess(null)
+      return
+    }
+
     // On Vercel without GitHub configured, warn user
     if (installSuccess?.vercel && !githubConfigured) {
       setSyncResult({ type: 'error', message: 'GitHub is not configured. This module will not persist after the next Vercel deployment. Configure GITHUB_TOKEN to save modules permanently.' })
@@ -900,62 +909,97 @@ export default function ModulesPage() {
               </DialogHeader>
 
               <div className="space-y-4">
-                {/* GitHub Sync Option */}
-                <div className={`rounded-lg border p-4 ${!githubConfigured ? 'opacity-60' : ''}`}>
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={githubSyncEnabled && !!githubConfigured}
-                      onChange={(e) => setGithubSyncEnabled(e.target.checked)}
-                      disabled={!githubConfigured || !!installSuccess?.vercel}
-                      className="mt-1 h-4 w-4 rounded border-gray-300"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <Github className="h-4 w-4" />
-                        <span className="text-sm font-medium">Save to GitHub</span>
-                        {installSuccess?.vercel && (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">Required</Badge>
-                        )}
-                      </div>
-                      {githubConfigured ? (
+                {/* GitHub Sync Section — three states */}
+                {installSuccess?.githubSync?.success === true ? (
+                  /* Server-side sync succeeded (Vercel auto-sync) */
+                  <div className="rounded-lg border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30 p-4">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Github className="h-4 w-4" />
+                          <span className="text-sm font-medium">Saved to GitHub</span>
+                        </div>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Commit module files to{' '}
-                          <code className="px-1 py-0.5 bg-muted rounded text-[11px]">
-                            {githubConfig?.owner}/{githubConfig?.repo}
-                          </code>
-                          {installSuccess?.vercel
-                            ? '. This is required on Vercel — modules are not persisted without a GitHub commit.'
-                            : ' for backup and version control.'
-                          }
+                          {installSuccess.githubSync.message || 'Module committed successfully.'}
                         </p>
-                      ) : (
-                        <div className="mt-1 space-y-1">
-                          <p className="text-xs text-muted-foreground">
+                      </div>
+                    </div>
+                  </div>
+                ) : installSuccess?.githubSync?.success === false ? (
+                  /* Server-side sync failed */
+                  <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30 p-4">
+                    <div className="flex items-center gap-3">
+                      <AlertCircle className="h-5 w-5 text-red-600 shrink-0" />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Github className="h-4 w-4" />
+                          <span className="text-sm font-medium">GitHub Sync Failed</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {installSuccess.githubSync.error || 'Failed to commit module to GitHub.'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* No server-side sync (localhost or Vercel without GitHub) — show checkbox */
+                  <div className={`rounded-lg border p-4 ${!githubConfigured ? 'opacity-60' : ''}`}>
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={githubSyncEnabled && !!githubConfigured}
+                        onChange={(e) => setGithubSyncEnabled(e.target.checked)}
+                        disabled={!githubConfigured || !!installSuccess?.vercel}
+                        className="mt-1 h-4 w-4 rounded border-gray-300"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <Github className="h-4 w-4" />
+                          <span className="text-sm font-medium">Save to GitHub</span>
+                          {installSuccess?.vercel && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">Required</Badge>
+                          )}
+                        </div>
+                        {githubConfigured ? (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Commit module files to{' '}
+                            <code className="px-1 py-0.5 bg-muted rounded text-[11px]">
+                              {githubConfig?.owner}/{githubConfig?.repo}
+                            </code>
                             {installSuccess?.vercel
-                              ? 'GitHub sync is required on Vercel to persist modules. Without it, this module will be lost on the next deployment.'
-                              : 'To keep this module permanently, save it to GitHub. Otherwise it will be removed the next time your app rebuilds from GitHub.'
+                              ? '. This is required on Vercel — modules are not persisted without a GitHub commit.'
+                              : ' for backup and version control.'
                             }
                           </p>
-                          <p className="text-xs text-muted-foreground">
-                            Set <code className="px-1 py-0.5 bg-muted rounded text-[11px]">GITHUB_TOKEN</code> and repo details in your environment variables to enable.{' '}
-                            <a
-                              href="https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:underline inline-flex items-center gap-1"
-                            >
-                              Learn how
-                              <ExternalLink className="h-3 w-3" />
-                            </a>
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </label>
-                </div>
+                        ) : (
+                          <div className="mt-1 space-y-1">
+                            <p className="text-xs text-muted-foreground">
+                              {installSuccess?.vercel
+                                ? 'GitHub sync is required on Vercel to persist modules. Without it, this module will be lost on the next deployment.'
+                                : 'To keep this module permanently, save it to GitHub. Otherwise it will be removed the next time your app rebuilds from GitHub.'
+                              }
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Set <code className="px-1 py-0.5 bg-muted rounded text-[11px]">GITHUB_TOKEN</code> and repo details in your environment variables to enable.{' '}
+                              <a
+                                href="https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline inline-flex items-center gap-1"
+                              >
+                                Learn how
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+                )}
 
-                {/* Sync Result */}
+                {/* Sync Result (for client-side sync attempts) */}
                 {syncResult && (
                   <Alert variant={syncResult.type === 'error' ? 'destructive' : 'default'}>
                     {syncResult.type === 'success' ? (
@@ -967,21 +1011,36 @@ export default function ModulesPage() {
                   </Alert>
                 )}
 
-                {/* Done Button */}
-                <Button
-                  className="w-full"
-                  onClick={handleInstallDone}
-                  disabled={syncing}
-                >
-                  {syncing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Syncing to GitHub...
-                    </>
-                  ) : (
-                    'Done'
-                  )}
-                </Button>
+                {/* Action Button */}
+                {installSuccess?.githubSync?.success === false ? (
+                  <Button
+                    className="w-full"
+                    variant="destructive"
+                    onClick={() => {
+                      const moduleId = installSuccess?.moduleId
+                      setInstallSuccess(null)
+                      const mod = moduleId ? unifiedModules.find(m => m.id === moduleId) : null
+                      if (mod) downloadModule(mod)
+                    }}
+                  >
+                    Retry Install
+                  </Button>
+                ) : (
+                  <Button
+                    className="w-full"
+                    onClick={handleInstallDone}
+                    disabled={syncing}
+                  >
+                    {syncing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Syncing to GitHub...
+                      </>
+                    ) : (
+                      'Done'
+                    )}
+                  </Button>
+                )}
               </div>
             </DialogContent>
           </Dialog>

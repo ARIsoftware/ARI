@@ -6,7 +6,7 @@ This documentation reflects the current state of the ARI application as of Decem
 ARI is a Next.js 15 (React 19) application using Better Auth for authentication and Supabase PostgreSQL for database operations.
 
 ## Tech Stack
-- **Framework**: Next.js 15.2.4 with React 19
+- **Framework**: Next.js 16 with React 19
 - **Authentication**: Better Auth (email/password with Argon2 hashing)
 - **Database**: Supabase PostgreSQL (with application-level security)
 - **ORM**: Drizzle ORM (with RLS support via `withRLS()`)
