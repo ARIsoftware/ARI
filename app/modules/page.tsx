@@ -17,7 +17,6 @@ import { Switch } from "@/components/ui/switch"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TopBar } from "@/components/top-bar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import {
   AlertCircle,
@@ -898,56 +897,49 @@ export default function ModulesPage() {
             </div>
           </main>
 
-          {/* Install Success Dialog */}
-          <Dialog open={!!installSuccess} onOpenChange={(open) => { if (!open && !syncing) setInstallSuccess(null) }}>
-            <DialogContent className="max-w-md">
-              <div className="flex flex-col items-center text-center pt-2 pb-1">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
-                  <CheckCircle2 className="h-9 w-9 text-green-600" />
+          {/* Install Success Full-Screen Overlay */}
+          {!!installSuccess && (
+            <div className="fixed inset-0 z-50 bg-background flex items-center justify-center">
+              <div className="flex flex-col items-center text-center w-full max-w-md px-6">
+                {/* Large green checkmark */}
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30 ring-4 ring-green-200/50 dark:ring-green-800/30 shadow-lg mb-6">
+                  <CheckCircle2 className="h-10 w-10 text-green-600" />
                 </div>
-                <DialogHeader className="items-center space-y-1.5">
-                  <DialogTitle className="text-xl">&ldquo;{installSuccess?.moduleName}&rdquo; Installed</DialogTitle>
-                  <DialogDescription>Module is ready to use.</DialogDescription>
-                </DialogHeader>
-              </div>
 
-              <div className="space-y-4 pt-2">
-                {/* GitHub Sync Section — three states */}
-                {installSuccess?.githubSync?.success === true ? (
-                  /* Server-side sync succeeded (Vercel auto-sync) */
-                  <div className="rounded-lg border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30 p-4">
+                {/* Title and subtitle */}
+                <h1 className="text-3xl font-bold tracking-tight mb-2">Module Installed</h1>
+                <p className="text-muted-foreground mb-8">Your installation was successful</p>
+
+                {/* Status card */}
+                <div className="w-full rounded-lg border p-4 space-y-3 mb-8">
+                  {/* GitHub Sync Section — three states */}
+                  {installSuccess?.githubSync?.success === true ? (
                     <div className="flex items-center gap-3">
                       <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
-                      <div>
+                      <div className="text-left">
                         <div className="flex items-center gap-2">
                           <Github className="h-4 w-4" />
                           <span className="text-sm font-medium">Saved to GitHub</span>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="text-xs text-muted-foreground mt-0.5">
                           {installSuccess.githubSync.message || 'Module committed successfully.'}
                         </p>
                       </div>
                     </div>
-                  </div>
-                ) : installSuccess?.githubSync?.success === false ? (
-                  /* Server-side sync failed */
-                  <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30 p-4">
+                  ) : installSuccess?.githubSync?.success === false ? (
                     <div className="flex items-center gap-3">
                       <AlertCircle className="h-5 w-5 text-red-600 shrink-0" />
-                      <div>
+                      <div className="text-left">
                         <div className="flex items-center gap-2">
                           <Github className="h-4 w-4" />
                           <span className="text-sm font-medium">GitHub Sync Failed</span>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="text-xs text-muted-foreground mt-0.5">
                           {installSuccess.githubSync.error || 'Failed to commit module to GitHub.'}
                         </p>
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  /* No server-side sync (localhost or Vercel without GitHub) — show checkbox */
-                  <div className={`rounded-lg border p-4 ${!githubConfigured ? 'opacity-60' : ''}`}>
+                  ) : (
                     <label className="flex items-start gap-3 cursor-pointer">
                       <input
                         type="checkbox"
@@ -956,7 +948,7 @@ export default function ModulesPage() {
                         disabled={!githubConfigured || !!installSuccess?.vercel}
                         className="mt-1 h-4 w-4 rounded border-gray-300"
                       />
-                      <div className="flex-1">
+                      <div className="flex-1 text-left">
                         <div className="flex items-center gap-2">
                           <Github className="h-4 w-4" />
                           <span className="text-sm font-medium">Save to GitHub</span>
@@ -999,20 +991,38 @@ export default function ModulesPage() {
                         )}
                       </div>
                     </label>
-                  </div>
-                )}
+                  )}
+
+                  {/* Vercel rebuilding notice */}
+                  {installSuccess?.vercel && installSuccess?.githubSync?.success === true && (
+                    <div className="flex items-center gap-3">
+                      <div className="h-5 w-5 shrink-0 flex items-center justify-center">
+                        <div className="h-2.5 w-2.5 rounded-full bg-blue-500 animate-pulse" />
+                      </div>
+                      <p className="text-xs text-muted-foreground text-left">
+                        Vercel is rebuilding. Module will be ready once Vercel rebuild has completed.
+                      </p>
+                    </div>
+                  )}
+                </div>
 
                 {/* Sync Result (for client-side sync attempts) */}
                 {syncResult && (
-                  <Alert variant={syncResult.type === 'error' ? 'destructive' : 'default'}>
-                    {syncResult.type === 'success' ? (
-                      <CheckCircle2 className="h-4 w-4" />
-                    ) : (
-                      <AlertCircle className="h-4 w-4" />
-                    )}
-                    <AlertDescription className="text-xs">{syncResult.message}</AlertDescription>
-                  </Alert>
+                  <div className="w-full mb-6">
+                    <Alert variant={syncResult.type === 'error' ? 'destructive' : 'default'}>
+                      {syncResult.type === 'success' ? (
+                        <CheckCircle2 className="h-4 w-4" />
+                      ) : (
+                        <AlertCircle className="h-4 w-4" />
+                      )}
+                      <AlertDescription className="text-xs">{syncResult.message}</AlertDescription>
+                    </Alert>
+                  </div>
                 )}
+
+                {/* Separator and close text */}
+                <div className="w-full border-t mb-4" />
+                <p className="text-sm text-muted-foreground mb-4">You can close this window.</p>
 
                 {/* Action Button */}
                 {installSuccess?.githubSync?.success === false ? (
@@ -1030,7 +1040,7 @@ export default function ModulesPage() {
                   </Button>
                 ) : (
                   <Button
-                    className="w-full"
+                    className="w-full bg-foreground text-background hover:bg-foreground/90"
                     onClick={handleInstallDone}
                     disabled={syncing}
                   >
@@ -1040,13 +1050,13 @@ export default function ModulesPage() {
                         Syncing to GitHub...
                       </>
                     ) : (
-                      'Done'
+                      'Close Window'
                     )}
                   </Button>
                 )}
               </div>
-            </DialogContent>
-          </Dialog>
+            </div>
+          )}
 
           {/* Sticky Save Bar */}
           {hasChanges && (

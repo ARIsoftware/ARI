@@ -4,10 +4,11 @@ import { createDbClient } from '@/lib/db-supabase'
 import { LICENSE_MODULE_ID } from '@/lib/license-helpers'
 
 function maskKey(key: string): string {
-  if (key.length <= 4) return key
+  if (key.length <= 15) return key
+  const first = key.slice(0, 11)
   const lastFour = key.slice(-4)
-  const masked = key.slice(0, -4).replace(/[A-Za-z0-9]/g, 'X')
-  return masked + lastFour
+  const middle = key.slice(11, -4).replace(/[A-Za-z0-9]/g, 'X')
+  return first + middle + lastFour
 }
 
 export async function GET() {
