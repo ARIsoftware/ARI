@@ -87,7 +87,11 @@ export async function POST(request: NextRequest) {
     // Validate moduleDir is within expected directories
     const resolvedDir = path.resolve(moduleDir)
     const cwd = process.cwd()
-    if (!resolvedDir.startsWith(path.join(cwd, 'modules-core')) && !resolvedDir.startsWith(path.join(cwd, 'modules-custom'))) {
+    const isVercel = !!process.env.VERCEL
+    const isInModulesDir = resolvedDir.startsWith(path.join(cwd, 'modules-core')) || resolvedDir.startsWith(path.join(cwd, 'modules-custom'))
+    const isInTmp = isVercel && resolvedDir.startsWith('/tmp/ari-modules/')
+
+    if (!isInModulesDir && !isInTmp) {
       return NextResponse.json({ error: 'Invalid module directory' }, { status: 400 })
     }
 
@@ -98,7 +102,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the relative path from project root for the commit
-    const relativeModuleDir = path.relative(cwd, resolvedDir)
+    // On Vercel with /tmp paths, map to modules-core/<moduleId>
+    const relativeModuleDir = isInTmp
+      ? `modules-core/${moduleId}`
+      : path.relative(cwd, resolvedDir)
 
     // Step 1: Get current HEAD
     const ref = await githubApi(`/git/ref/heads/${config.branch}`, config)

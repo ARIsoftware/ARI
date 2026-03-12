@@ -142,6 +142,7 @@ export default function ModulesPage() {
     moduleId: string
     moduleName: string
     moduleDir: string
+    vercel?: boolean
   } | null>(null)
   const [githubSyncEnabled, setGithubSyncEnabled] = useState(true)
   const [githubConfigured, setGithubConfigured] = useState<boolean | null>(null)
@@ -446,8 +447,14 @@ export default function ModulesPage() {
         moduleId: mod.id,
         moduleName: mod.name,
         moduleDir: data.moduleDir || `modules-core/${mod.id}`,
+        vercel: data.vercel,
       })
       setSyncResult(null)
+
+      // On Vercel, GitHub sync is required to persist the module
+      if (data.vercel) {
+        setGithubSyncEnabled(true)
+      }
 
       // Re-fetch both APIs to reflect the newly installed module
       sessionStorage.removeItem(LIBRARY_CACHE_KEY)
@@ -461,6 +468,12 @@ export default function ModulesPage() {
   }
 
   const handleInstallDone = async () => {
+    // On Vercel without GitHub configured, warn user
+    if (installSuccess?.vercel && !githubConfigured) {
+      setSyncResult({ type: 'error', message: 'GitHub is not configured. This module will not persist after the next Vercel deployment. Configure GITHUB_TOKEN to save modules permanently.' })
+      return
+    }
+
     if (githubSyncEnabled && githubConfigured && installSuccess) {
       setSyncing(true)
       setSyncResult(null)
@@ -894,13 +907,16 @@ export default function ModulesPage() {
                       type="checkbox"
                       checked={githubSyncEnabled && !!githubConfigured}
                       onChange={(e) => setGithubSyncEnabled(e.target.checked)}
-                      disabled={!githubConfigured}
+                      disabled={!githubConfigured || !!installSuccess?.vercel}
                       className="mt-1 h-4 w-4 rounded border-gray-300"
                     />
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <Github className="h-4 w-4" />
                         <span className="text-sm font-medium">Save to GitHub</span>
+                        {installSuccess?.vercel && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">Required</Badge>
+                        )}
                       </div>
                       {githubConfigured ? (
                         <p className="text-xs text-muted-foreground mt-1">
@@ -908,12 +924,18 @@ export default function ModulesPage() {
                           <code className="px-1 py-0.5 bg-muted rounded text-[11px]">
                             {githubConfig?.owner}/{githubConfig?.repo}
                           </code>
-                          {' '}for backup and version control.
+                          {installSuccess?.vercel
+                            ? '. This is required on Vercel — modules are not persisted without a GitHub commit.'
+                            : ' for backup and version control.'
+                          }
                         </p>
                       ) : (
                         <div className="mt-1 space-y-1">
                           <p className="text-xs text-muted-foreground">
-                            To keep this module permanently, save it to GitHub. Otherwise it will be removed the next time your app rebuilds from GitHub.
+                            {installSuccess?.vercel
+                              ? 'GitHub sync is required on Vercel to persist modules. Without it, this module will be lost on the next deployment.'
+                              : 'To keep this module permanently, save it to GitHub. Otherwise it will be removed the next time your app rebuilds from GitHub.'
+                            }
                           </p>
                           <p className="text-xs text-muted-foreground">
                             Set <code className="px-1 py-0.5 bg-muted rounded text-[11px]">GITHUB_TOKEN</code> and repo details in your environment variables to enable.{' '}

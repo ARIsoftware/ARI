@@ -73,9 +73,12 @@ export async function POST(request: NextRequest) {
     const zipBuffer = Buffer.from(await zipResponse.arrayBuffer())
 
     // Save to temp file and extract
+    const isVercel = !!process.env.VERCEL
     const tempPath = join(tmpdir(), `ari-module-${moduleName}-${Date.now()}.zip`)
     const tempExtractDir = join(tmpdir(), `ari-module-extract-${moduleName}-${Date.now()}`)
-    const targetDir = join(process.cwd(), 'modules-core', moduleName)
+    const targetDir = isVercel
+      ? join(tmpdir(), 'ari-modules', moduleName)
+      : join(process.cwd(), 'modules-core', moduleName)
 
     try {
       await writeFile(tempPath, zipBuffer)
@@ -135,7 +138,9 @@ export async function POST(request: NextRequest) {
       success: true,
       module: moduleName,
       version,
-      installed_to: `modules-core/${moduleName}`,
+      installed_to: isVercel ? targetDir : `modules-core/${moduleName}`,
+      moduleDir: targetDir,
+      vercel: isVercel,
     })
   } catch (error) {
     console.error('[API /modules/download] Error:', error)
