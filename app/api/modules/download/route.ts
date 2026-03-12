@@ -10,25 +10,44 @@ import { inflateRawSync } from 'zlib'
 
 /**
  * Pure Node.js ZIP extractor using built-in zlib.
- * Parses ZIP local file headers and extracts entries to a target directory.
+ * Uses the central directory (at end of file) for reliable metadata,
+ * which correctly handles ZIPs with data descriptors (bit 3 flag).
  */
 async function extractZip(zipBuffer: Buffer, targetDir: string): Promise<void> {
   const JUNK_PREFIXES = ['__MACOSX/', '__MACOSX']
-  let offset = 0
 
-  while (offset < zipBuffer.length - 4) {
-    const sig = zipBuffer.readUInt32LE(offset)
-    if (sig !== 0x04034b50) break // Not a local file header
+  // Find End of Central Directory record by scanning backwards for signature 0x06054b50
+  let eocdOffset = -1
+  for (let i = zipBuffer.length - 22; i >= 0; i--) {
+    if (zipBuffer.readUInt32LE(i) === 0x06054b50) {
+      eocdOffset = i
+      break
+    }
+  }
+  if (eocdOffset === -1) {
+    throw new Error('Invalid ZIP: End of Central Directory record not found')
+  }
 
-    const compressionMethod = zipBuffer.readUInt16LE(offset + 8)
-    const compressedSize = zipBuffer.readUInt32LE(offset + 18)
-    const uncompressedSize = zipBuffer.readUInt32LE(offset + 22)
-    const fileNameLen = zipBuffer.readUInt16LE(offset + 26)
-    const extraLen = zipBuffer.readUInt16LE(offset + 28)
-    const fileName = zipBuffer.toString('utf-8', offset + 30, offset + 30 + fileNameLen)
-    const dataStart = offset + 30 + fileNameLen + extraLen
+  const entryCount = zipBuffer.readUInt16LE(eocdOffset + 10)
+  const cdOffset = zipBuffer.readUInt32LE(eocdOffset + 16)
 
-    offset = dataStart + compressedSize
+  // Parse central directory entries
+  let cdPos = cdOffset
+  for (let i = 0; i < entryCount; i++) {
+    if (zipBuffer.readUInt32LE(cdPos) !== 0x02014b50) {
+      throw new Error(`Invalid ZIP: expected central directory entry at offset ${cdPos}`)
+    }
+
+    const compressionMethod = zipBuffer.readUInt16LE(cdPos + 10)
+    const compressedSize = zipBuffer.readUInt32LE(cdPos + 20)
+    const fileNameLen = zipBuffer.readUInt16LE(cdPos + 28)
+    const extraLen = zipBuffer.readUInt16LE(cdPos + 30)
+    const commentLen = zipBuffer.readUInt16LE(cdPos + 32)
+    const localHeaderOffset = zipBuffer.readUInt32LE(cdPos + 42)
+    const fileName = zipBuffer.toString('utf-8', cdPos + 46, cdPos + 46 + fileNameLen)
+
+    // Advance to next central directory entry
+    cdPos += 46 + fileNameLen + extraLen + commentLen
 
     // Skip junk entries
     if (JUNK_PREFIXES.some(p => fileName.startsWith(p)) || fileName === '.DS_Store' || fileName.includes('/.DS_Store')) {
@@ -43,15 +62,18 @@ async function extractZip(zipBuffer: Buffer, targetDir: string): Promise<void> {
       continue
     }
 
+    // Calculate data start from local file header (extra field length can differ from central dir)
+    const localFileNameLen = zipBuffer.readUInt16LE(localHeaderOffset + 26)
+    const localExtraLen = zipBuffer.readUInt16LE(localHeaderOffset + 28)
+    const dataStart = localHeaderOffset + 30 + localFileNameLen + localExtraLen
+
     // File entry
     await mkdir(dirname(filePath), { recursive: true })
 
     let data: Buffer
     if (compressionMethod === 0) {
-      // Stored (no compression)
       data = zipBuffer.subarray(dataStart, dataStart + compressedSize)
     } else if (compressionMethod === 8) {
-      // Deflated
       const compressed = zipBuffer.subarray(dataStart, dataStart + compressedSize)
       data = inflateRawSync(compressed)
     } else {
