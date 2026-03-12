@@ -3,12 +3,64 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { getLicenseKey, MODULES_API_BASE, buildClientInfo } from '@/lib/license-helpers'
 import { z } from 'zod'
 import { writeFile, mkdir, rm, readdir, cp } from 'fs/promises'
-import { join } from 'path'
-import { exec } from 'child_process'
-import { promisify } from 'util'
+import { join, dirname } from 'path'
 import { tmpdir } from 'os'
+import { inflateRawSync } from 'zlib'
 
-const execAsync = promisify(exec)
+/**
+ * Pure Node.js ZIP extractor using built-in zlib.
+ * Parses ZIP local file headers and extracts entries to a target directory.
+ */
+async function extractZip(zipBuffer: Buffer, targetDir: string): Promise<void> {
+  const JUNK_PREFIXES = ['__MACOSX/', '__MACOSX']
+  let offset = 0
+
+  while (offset < zipBuffer.length - 4) {
+    const sig = zipBuffer.readUInt32LE(offset)
+    if (sig !== 0x04034b50) break // Not a local file header
+
+    const compressionMethod = zipBuffer.readUInt16LE(offset + 8)
+    const compressedSize = zipBuffer.readUInt32LE(offset + 18)
+    const uncompressedSize = zipBuffer.readUInt32LE(offset + 22)
+    const fileNameLen = zipBuffer.readUInt16LE(offset + 26)
+    const extraLen = zipBuffer.readUInt16LE(offset + 28)
+    const fileName = zipBuffer.toString('utf-8', offset + 30, offset + 30 + fileNameLen)
+    const dataStart = offset + 30 + fileNameLen + extraLen
+
+    offset = dataStart + compressedSize
+
+    // Skip junk entries
+    if (JUNK_PREFIXES.some(p => fileName.startsWith(p)) || fileName === '.DS_Store' || fileName.includes('/.DS_Store')) {
+      continue
+    }
+
+    const filePath = join(targetDir, fileName)
+
+    // Directory entry
+    if (fileName.endsWith('/')) {
+      await mkdir(filePath, { recursive: true })
+      continue
+    }
+
+    // File entry
+    await mkdir(dirname(filePath), { recursive: true })
+
+    let data: Buffer
+    if (compressionMethod === 0) {
+      // Stored (no compression)
+      data = zipBuffer.subarray(dataStart, dataStart + compressedSize)
+    } else if (compressionMethod === 8) {
+      // Deflated
+      const compressed = zipBuffer.subarray(dataStart, dataStart + compressedSize)
+      data = inflateRawSync(compressed)
+    } else {
+      console.warn(`[ZIP] Skipping ${fileName}: unsupported compression method ${compressionMethod}`)
+      continue
+    }
+
+    await writeFile(filePath, data)
+  }
+}
 
 const DownloadSchema = z.object({
   module: z.string().regex(/^[a-z0-9-]{1,64}$/),
@@ -74,24 +126,19 @@ export async function POST(request: NextRequest) {
 
     // Save to temp file and extract
     const isVercel = !!process.env.VERCEL
-    const tempPath = join(tmpdir(), `ari-module-${moduleName}-${Date.now()}.zip`)
     const tempExtractDir = join(tmpdir(), `ari-module-extract-${moduleName}-${Date.now()}`)
     const targetDir = isVercel
       ? join(tmpdir(), 'ari-modules', moduleName)
       : join(process.cwd(), 'modules-core', moduleName)
 
     try {
-      await writeFile(tempPath, zipBuffer)
       await mkdir(tempExtractDir, { recursive: true })
 
-      // Extract to temp directory first to handle nested directory structure
-      await execAsync(`unzip -o "${tempPath}" -d "${tempExtractDir}"`)
+      // Extract zip using pure Node.js (no CLI dependency)
+      await extractZip(zipBuffer, tempExtractDir)
 
       // Check if the zip contained a single top-level directory (e.g., baseball/baseball/)
-      // Filter out macOS/zip artifacts that shouldn't affect the detection
-      const JUNK_ENTRIES = new Set(['__MACOSX', '.DS_Store'])
       const extractedEntries = (await readdir(tempExtractDir, { withFileTypes: true }))
-        .filter(e => !JUNK_ENTRIES.has(e.name))
       const dirs = extractedEntries.filter(e => e.isDirectory())
       const files = extractedEntries.filter(e => e.isFile())
 
@@ -105,11 +152,6 @@ export async function POST(request: NextRequest) {
         sourceDir = tempExtractDir
       }
 
-      // Clean up junk from the source before copying
-      for (const junk of JUNK_ENTRIES) {
-        await rm(join(tempExtractDir, junk), { recursive: true, force: true }).catch(() => {})
-      }
-
       // Move contents to the target directory
       await rm(targetDir, { recursive: true, force: true })
       await mkdir(targetDir, { recursive: true })
@@ -121,7 +163,6 @@ export async function POST(request: NextRequest) {
     } catch (extractError) {
       // Clean up partial extraction on failure
       await rm(targetDir, { recursive: true, force: true }).catch(() => {})
-      await rm(tempPath, { force: true }).catch(() => {})
       await rm(tempExtractDir, { recursive: true, force: true }).catch(() => {})
       console.error('[API /modules/download] Extract failed:', extractError)
       return NextResponse.json(
@@ -131,7 +172,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Clean up temp files
-    await rm(tempPath, { force: true }).catch(() => {})
     await rm(tempExtractDir, { recursive: true, force: true }).catch(() => {})
 
     return NextResponse.json({
