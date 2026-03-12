@@ -14,8 +14,8 @@ const STEPS = [
   { id: "claude-code", label: "Claude Code" },
   { id: "openai", label: "OpenAI" },
   { id: "resend", label: "Resend" },
-  { id: "download", label: "Download" },
   { id: "vercel", label: "Vercel" },
+  { id: "download", label: "Install" },
 ]
 
 // Icon components that accept className for dynamic sizing

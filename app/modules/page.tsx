@@ -17,11 +17,14 @@ import { Switch } from "@/components/ui/switch"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TopBar } from "@/components/top-bar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import {
   AlertCircle,
   CheckCircle2,
   Download,
+  ExternalLink,
+  Github,
   Grid3X3,
   KeyRound,
   LayoutList,
@@ -133,6 +136,18 @@ export default function ModulesPage() {
     env_key?: string
   } | null>(null)
   const [licenseError, setLicenseError] = useState<string | null>(null)
+
+  // Install success screen state
+  const [installSuccess, setInstallSuccess] = useState<{
+    moduleId: string
+    moduleName: string
+    moduleDir: string
+  } | null>(null)
+  const [githubSyncEnabled, setGithubSyncEnabled] = useState(true)
+  const [githubConfigured, setGithubConfigured] = useState<boolean | null>(null)
+  const [githubConfig, setGithubConfig] = useState<{ owner?: string; repo?: string; branch?: string } | null>(null)
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   // Track original enabled states (from server)
   const [originalStates, setOriginalStates] = useState<Record<string, boolean>>({})
@@ -279,6 +294,25 @@ export default function ModulesPage() {
     }
   }
 
+  // Check GitHub configuration
+  useEffect(() => {
+    async function checkGitHub() {
+      try {
+        const response = await fetch('/api/modules/github-sync')
+        if (response.ok) {
+          const data = await response.json()
+          setGithubConfigured(data.configured)
+          if (data.configured) {
+            setGithubConfig({ owner: data.owner, repo: data.repo, branch: data.branch })
+          }
+        }
+      } catch {
+        setGithubConfigured(false)
+      }
+    }
+    checkGitHub()
+  }, [])
+
   useEffect(() => {
     loadInstalledModules()
     loadLibrary()
@@ -404,11 +438,16 @@ export default function ModulesPage() {
         return
       }
 
-      setDownloadResult({
-        module: mod.id,
-        type: 'success',
-        message: `${mod.name} v${mod.libraryModule.latest_version} installed successfully`,
+      // Clear download banner — the success modal replaces it
+      setDownloadResult(null)
+
+      // Show install success screen
+      setInstallSuccess({
+        moduleId: mod.id,
+        moduleName: mod.name,
+        moduleDir: data.moduleDir || `modules-core/${mod.id}`,
       })
+      setSyncResult(null)
 
       // Re-fetch both APIs to reflect the newly installed module
       sessionStorage.removeItem(LIBRARY_CACHE_KEY)
@@ -419,6 +458,40 @@ export default function ModulesPage() {
     } finally {
       setDownloading(null)
     }
+  }
+
+  const handleInstallDone = async () => {
+    if (githubSyncEnabled && githubConfigured && installSuccess) {
+      setSyncing(true)
+      setSyncResult(null)
+      try {
+        const response = await fetch('/api/modules/github-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            moduleId: installSuccess.moduleId,
+            moduleDir: installSuccess.moduleDir,
+          }),
+        })
+        const data = await response.json()
+        if (!response.ok) {
+          setSyncResult({ type: 'error', message: data.error || 'Failed to sync to GitHub' })
+          return // Keep modal open so user can see the error
+        }
+        setSyncResult({ type: 'success', message: data.message })
+      } catch {
+        setSyncResult({ type: 'error', message: 'Failed to connect to GitHub' })
+        return // Keep modal open so user can see the error
+      } finally {
+        setSyncing(false)
+      }
+    }
+    // Trigger registry refresh
+    try {
+      await fetch('/api/modules/refresh', { method: 'POST' })
+    } catch { /* ignore refresh errors */ }
+
+    setInstallSuccess(null)
   }
 
   const renderModuleAction = (mod: UnifiedModule) => {
@@ -797,6 +870,99 @@ export default function ModulesPage() {
               )}
             </div>
           </main>
+
+          {/* Install Success Dialog */}
+          <Dialog open={!!installSuccess} onOpenChange={(open) => { if (!open && !syncing) setInstallSuccess(null) }}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div>
+                    <DialogTitle>Module Installed!</DialogTitle>
+                    <DialogDescription>{installSuccess?.moduleName} is ready to use.</DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                {/* GitHub Sync Option */}
+                <div className={`rounded-lg border p-4 ${!githubConfigured ? 'opacity-60' : ''}`}>
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={githubSyncEnabled && !!githubConfigured}
+                      onChange={(e) => setGithubSyncEnabled(e.target.checked)}
+                      disabled={!githubConfigured}
+                      className="mt-1 h-4 w-4 rounded border-gray-300"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <Github className="h-4 w-4" />
+                        <span className="text-sm font-medium">Save to GitHub</span>
+                      </div>
+                      {githubConfigured ? (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Commit module files to{' '}
+                          <code className="px-1 py-0.5 bg-muted rounded text-[11px]">
+                            {githubConfig?.owner}/{githubConfig?.repo}
+                          </code>
+                          {' '}for backup and version control.
+                        </p>
+                      ) : (
+                        <div className="mt-1 space-y-1">
+                          <p className="text-xs text-muted-foreground">
+                            To keep this module permanently, save it to GitHub. Otherwise it will be removed the next time your app rebuilds from GitHub.
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Set <code className="px-1 py-0.5 bg-muted rounded text-[11px]">GITHUB_TOKEN</code> and repo details in your environment variables to enable.{' '}
+                            <a
+                              href="https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline inline-flex items-center gap-1"
+                            >
+                              Learn how
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </label>
+                </div>
+
+                {/* Sync Result */}
+                {syncResult && (
+                  <Alert variant={syncResult.type === 'error' ? 'destructive' : 'default'}>
+                    {syncResult.type === 'success' ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4" />
+                    )}
+                    <AlertDescription className="text-xs">{syncResult.message}</AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Done Button */}
+                <Button
+                  className="w-full"
+                  onClick={handleInstallDone}
+                  disabled={syncing}
+                >
+                  {syncing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Syncing to GitHub...
+                    </>
+                  ) : (
+                    'Done'
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
 
           {/* Sticky Save Bar */}
           {hasChanges && (

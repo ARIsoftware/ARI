@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
+  AlertCircle,
   Zap,
   Download,
   Info,
@@ -50,6 +51,10 @@ const COMMON_TIMEZONES = [
 interface OnboardingData {
   // GitHub (tracking)
   githubSetupComplete: boolean
+  // GitHub Sync (optional)
+  githubToken: string
+  githubRepoOwner: string
+  githubRepoName: string
   // Supabase (required)
   supabaseUrl: string
   supabaseAnonKey: string
@@ -75,7 +80,7 @@ const generateAuthSecret = () => {
   return btoa(String.fromCharCode(...array))
 }
 
-const STEP_ORDER = ["personal", "github", "supabase", "claude-code", "openai", "resend", "download", "vercel"]
+const STEP_ORDER = ["personal", "github", "supabase", "claude-code", "openai", "resend", "vercel", "download"]
 // Hidden: "local-env" step removed from flow since install script handles it. Content preserved below.
 
 export default function WelcomePage() {
@@ -91,6 +96,9 @@ export default function WelcomePage() {
 
   const [formData, setFormData] = useState<OnboardingData>({
     githubSetupComplete: false,
+    githubToken: "",
+    githubRepoOwner: "",
+    githubRepoName: "",
     supabaseUrl: "",
     supabaseAnonKey: "",
     supabaseSecretKey: "",
@@ -315,11 +323,45 @@ export default function WelcomePage() {
       lines.push("")
     }
 
+    if (formData.githubToken.trim()) {
+      lines.push("# GitHub Sync (for auto-committing installed modules)")
+      lines.push(`GITHUB_TOKEN=${formData.githubToken}`)
+      if (formData.githubRepoOwner.trim()) {
+        lines.push(`GITHUB_REPO_OWNER=${formData.githubRepoOwner}`)
+      }
+      if (formData.githubRepoName.trim()) {
+        lines.push(`GITHUB_REPO_NAME=${formData.githubRepoName}`)
+      }
+      lines.push("")
+    }
+
     return lines.join("\n")
   }
 
-  const handleDownloadEnvFile = () => {
+  const [envSaveStatus, setEnvSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+
+  const handleDownloadEnvFile = async () => {
     const content = generateEnvFileContent()
+
+    // Try saving directly to the project root via API
+    setEnvSaveStatus('saving')
+    try {
+      const response = await fetch('/api/onboarding/save-env', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      })
+      if (response.ok) {
+        setEnvSaveStatus('saved')
+        return
+      }
+      // Fall through to browser download on error
+    } catch {
+      // Fall through to browser download
+    }
+
+    // Fallback: trigger browser download
+    setEnvSaveStatus('idle')
     const blob = new Blob([content], { type: "text/plain" })
     const url = URL.createObjectURL(blob)
     const link = document.createElement("a")
@@ -977,8 +1019,9 @@ export default function WelcomePage() {
                       <div className="relative flex gap-4">
                         <div className="flex flex-col items-center">
                           <div className="flex w-10 h-10 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-sm font-semibold">3</div>
+                          <div className="mt-2 h-full w-px bg-zinc-200" />
                         </div>
-                        <div className="flex-1">
+                        <div className="flex-1 pb-8">
                           <h3 className="mb-3 font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Verify your setup</h3>
                           <p className="mb-3 text-base text-black" style={{ lineHeight: '1.6' }}>Check that both remotes are configured:</p>
                           <CodeBlock
@@ -1004,6 +1047,78 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                                 <strong className="text-zinc-700">upstream</strong> = official ARI repo (pull updates from here with <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-sm font-mono text-zinc-700">/ari-update</code>)
                               </li>
                             </ul>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Step 4: GitHub Token */}
+                      <div className="relative flex gap-4">
+                        <div className="flex flex-col items-center">
+                          <div className="flex w-10 h-10 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-sm font-semibold">4</div>
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="mb-3 font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Enable GitHub Sync <span className="text-sm font-normal text-zinc-500">(optional)</span></h3>
+                          <p className="mb-4 text-base text-black" style={{ lineHeight: '1.6' }}>
+                            When you install new modules from the Module Library, ARI can automatically commit them to your repo so they persist across rebuilds. To enable this, create a Personal Access Token and paste it below.
+                          </p>
+
+                          <div className="mb-4 rounded-xl border border-zinc-200 p-4 space-y-3">
+                            <p className="text-sm font-semibold text-zinc-900">How to create the token:</p>
+                            <ol className="list-decimal list-inside space-y-2 text-sm text-black" style={{ lineHeight: '1.6' }}>
+                              <li>
+                                Go to{' '}
+                                <a
+                                  href="https://github.com/settings/tokens?type=beta"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline"
+                                >
+                                  github.com/settings/tokens
+                                </a>
+                                {' '}and click <strong>Generate new token</strong>
+                              </li>
+                              <li>Set <strong>Token name</strong> to something like <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-zinc-600 text-xs">ARI Module Sync</code></li>
+                              <li>Set <strong>Expiration</strong> to your preference (or no expiration)</li>
+                              <li>Under <strong>Repository access</strong>, select <strong>Only select repositories</strong> and choose your ARI repo</li>
+                              <li>Click <strong>Repository permissions</strong>, find <strong>Contents</strong>, and set it to <strong>Read and write</strong></li>
+                              <li>Click <strong>Generate token</strong> and copy it</li>
+                            </ol>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="githubToken" className="text-sm font-medium text-gray-900">Personal Access Token</Label>
+                              <Input
+                                id="githubToken"
+                                value={formData.githubToken}
+                                onChange={(e) => setFormData(prev => ({ ...prev, githubToken: e.target.value }))}
+                                placeholder="github_pat_xxxxxxxxxxxx"
+                                className="text-sm"
+                                style={{ fontFamily: 'Geist Mono, monospace' }}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="githubRepoOwner" className="text-sm font-medium text-gray-900">Repository Owner</Label>
+                              <Input
+                                id="githubRepoOwner"
+                                value={formData.githubRepoOwner}
+                                onChange={(e) => setFormData(prev => ({ ...prev, githubRepoOwner: e.target.value }))}
+                                placeholder="your-github-username"
+                                className="text-sm"
+                                style={{ fontFamily: 'Geist Mono, monospace' }}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="githubRepoName" className="text-sm font-medium text-gray-900">Repository Name</Label>
+                              <Input
+                                id="githubRepoName"
+                                value={formData.githubRepoName}
+                                onChange={(e) => setFormData(prev => ({ ...prev, githubRepoName: e.target.value }))}
+                                placeholder="my-ari"
+                                className="text-sm"
+                                style={{ fontFamily: 'Geist Mono, monospace' }}
+                              />
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1935,25 +2050,16 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                 <div>
                   {/* Header section with gradient background */}
                   <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <h2 className="text-2xl font-semibold text-zinc-900">Download .env.local file</h2>
+                    <h2 className="text-2xl font-semibold text-zinc-900">Install</h2>
                     <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
-                      Your environment configuration is ready. Download the files and place them in your project root directory.
+                      Your environment configuration is ready. Save it to your project to finish setup.
                     </p>
                   </div>
 
                   {/* Content section */}
                   <div className="space-y-6" style={{ padding: '25px' }}>
-                  <Alert className="bg-green-50 border-green-200">
-                    <CheckCircle className="w-4 h-4 text-green-600" />
-                    <AlertTitle className="text-green-800">What is .env.local?</AlertTitle>
-                    <AlertDescription className="text-green-700">
-                      The <strong>.env.local</strong> file stores your environment variables (API keys, database credentials, secrets) for local development.
-                      This file is automatically ignored by Git, keeping your sensitive data private.
-                      Place it in your project root directory (next to the package.json file).
-                    </AlertDescription>
-                  </Alert>
 
-                  {/* Summary */}
+                  {/* Configuration Summary */}
                   <div className="space-y-2">
                     <h3 className="text-base font-semibold text-gray-900">Configuration Summary</h3>
                     <div className="space-y-1 text-sm">
@@ -2004,17 +2110,61 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                           Resend: {formData.resendApiKey ? "Configured" : "Skipped"}
                         </span>
                       </div>
+                      <div className="flex items-center gap-2">
+                        {formData.githubToken ?
+                          <Check className="w-4 h-4 text-green-500" /> :
+                          <X className="w-4 h-4 text-gray-400" />
+                        }
+                        <span className="text-gray-500">
+                          GitHub Sync: {formData.githubToken ? "Configured" : "Skipped"}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* .env.local preview */}
-                  <div className="space-y-2">
-                    <h3 className="text-base font-semibold text-gray-900">.env.local</h3>
-                    <CodeBlock
-                      language="env"
-                      code={generateEnvFileContent()}
-                    />
-                  </div>
+                  {/* .env.local preview (collapsed) */}
+                  <details className="group">
+                    <summary className="cursor-pointer text-sm text-blue-600 hover:text-blue-800 hover:underline list-none">
+                      View generated .env.local file
+                    </summary>
+                    <div className="mt-3">
+                      <CodeBlock
+                        language="env"
+                        code={generateEnvFileContent()}
+                      />
+                    </div>
+                  </details>
+
+                  {/* Save button */}
+                  <Button
+                    onClick={handleDownloadEnvFile}
+                    disabled={!isSupabaseComplete || envSaveStatus === 'saving'}
+                    className="w-full rounded-lg bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {envSaveStatus === 'saving' ? (
+                      <>Saving...</>
+                    ) : envSaveStatus === 'saved' ? (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        Saved .env.local to project root
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4 mr-2" />
+                        Save .env.local
+                      </>
+                    )}
+                  </Button>
+
+                  {/* What is .env.local */}
+                  <Alert className="bg-green-50 border-green-200">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <AlertTitle className="text-green-800">What is .env.local?</AlertTitle>
+                    <AlertDescription className="text-green-700">
+                      The <strong>.env.local</strong> file stores your environment variables (API keys, database credentials, secrets) for local development.
+                      This file is automatically ignored by Git, keeping your sensitive data private.
+                    </AlertDescription>
+                  </Alert>
 
                   {/* Next steps */}
                   <Alert>
@@ -2022,35 +2172,13 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                     <AlertTitle className="text-gray-800">Next Steps</AlertTitle>
                     <AlertDescription className="text-gray-700">
                       <ol className="list-decimal list-inside space-y-1 text-sm mt-2">
-                        <li>Download the file(s) using the button(s) below</li>
-                        <li>Place them in your project root directory (next to package.json)</li>
+                        <li>Click the save button above to generate your .env.local file</li>
                         <li>Restart your development server</li>
                         <li>Your application is ready to use!</li>
                       </ol>
                       <p className="mt-2 text-xs text-gray-500">
                         <strong>For production:</strong> Update <code className="bg-gray-200 px-1 rounded">BETTER_AUTH_URL</code> to your production domain in Vercel environment variables.
                       </p>
-                    </AlertDescription>
-                  </Alert>
-
-                  {/* Download button */}
-                  <Button
-                    onClick={handleDownloadEnvFile}
-                    disabled={!isSupabaseComplete}
-                    className="w-full rounded-lg bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Download .env.local
-                  </Button>
-
-                  {/* Security warning */}
-                  <Alert variant="destructive">
-                    <Shield className="w-4 h-4" />
-                    <AlertTitle>Security Warning</AlertTitle>
-                    <AlertDescription className="text-xs">
-                      Your keys are stored in browser memory only and will be lost when you
-                      close this page. The .env.local file should NEVER be committed to git.
-                      Make sure it&apos;s listed in your .gitignore file.
                     </AlertDescription>
                   </Alert>
 

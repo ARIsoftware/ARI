@@ -19,9 +19,9 @@ These tools help ensure database tables follow PostgreSQL conventions and best p
 
 ## Questions to Ask
 
-Ask the user the following questions ONE AT A TIME, waiting for each answer before continuing:
+Ask the user the following questions ONE AT A TIME, waiting for each answer before continuing. When asking each question, prefix it with "ARI:" instead of numbering them (e.g., "ARI: What is the name of the module?").
 
-1. **Module Name**: What is the name of the module? (e.g., "Habit Tracker")
+1. **Module Name**: What is the name of the module? (e.g., "Habit Tracker", "Recipe Book", "Budget Manager")
 2. **Description**: Please describe this module in detail. What is the purpose of the module? What features does it need? What data will be stored in the database?
 3. **Navigation**: Should it appear in the sidebar? If so, what should the page name be?
 4. **Submenu**: Does the module have any subpages which require a submenu?
