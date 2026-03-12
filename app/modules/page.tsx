@@ -37,6 +37,11 @@ import {
 } from "lucide-react"
 import { LICENSE_CACHE_KEY, LIBRARY_CACHE_KEY, CACHE_TTL } from "@/lib/license-helpers"
 
+// Strip HTML tags from module names for safe display
+function sanitizeDisplayName(name: string): string {
+  return name.replace(/<[^>]*>?/g, '').trim() || 'Unknown'
+}
+
 // Icon mapping for library modules (external API doesn't provide icons)
 const MODULE_ICONS: Record<string, string> = {
   "tasks": "CheckSquare",
@@ -446,7 +451,7 @@ export default function ModulesPage() {
       // Show install success screen
       setInstallSuccess({
         moduleId: mod.id,
-        moduleName: mod.name,
+        moduleName: sanitizeDisplayName(mod.name),
         moduleDir: data.moduleDir || `modules-core/${mod.id}`,
         vercel: data.vercel,
         githubSync: data.githubSync || null,
@@ -896,19 +901,17 @@ export default function ModulesPage() {
           {/* Install Success Dialog */}
           <Dialog open={!!installSuccess} onOpenChange={(open) => { if (!open && !syncing) setInstallSuccess(null) }}>
             <DialogContent className="max-w-md">
-              <DialogHeader>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  </div>
-                  <div>
-                    <DialogTitle>Module Installed!</DialogTitle>
-                    <DialogDescription>{installSuccess?.moduleName} is ready to use.</DialogDescription>
-                  </div>
+              <div className="flex flex-col items-center text-center pt-2 pb-1">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30 mb-4">
+                  <CheckCircle2 className="h-9 w-9 text-green-600" />
                 </div>
-              </DialogHeader>
+                <DialogHeader className="items-center space-y-1.5">
+                  <DialogTitle className="text-xl">&ldquo;{installSuccess?.moduleName}&rdquo; Installed</DialogTitle>
+                  <DialogDescription>Module is ready to use.</DialogDescription>
+                </DialogHeader>
+              </div>
 
-              <div className="space-y-4">
+              <div className="space-y-4 pt-2">
                 {/* GitHub Sync Section — three states */}
                 {installSuccess?.githubSync?.success === true ? (
                   /* Server-side sync succeeded (Vercel auto-sync) */
