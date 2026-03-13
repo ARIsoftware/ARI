@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { getLicenseKey, MODULES_API_BASE, buildClientInfo } from '@/lib/license-helpers'
 import { z } from 'zod'
-import { writeFile, mkdir, rm, readdir, cp } from 'fs/promises'
+import { writeFile, mkdir, rm, readdir, cp, readFile } from 'fs/promises'
 import { join, dirname } from 'path'
 import { getGitHubConfig, commitModuleToGitHub } from '@/lib/modules/github-sync'
 import { tmpdir } from 'os'
@@ -217,6 +217,63 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Collect SQL migration files from the module's database/ directory
+    let sqlMigrations: Array<{ name: string; sql: string }> | null = null
+    try {
+      const dbDir = join(targetDir, 'database')
+      const dbEntries = await readdir(dbDir, { withFileTypes: true }).catch(() => null)
+
+      if (dbEntries) {
+        const migrations: Array<{ name: string; sql: string }> = []
+        const addedNames = new Set<string>()
+
+        // Read schema.sql first (if present)
+        try {
+          const sql = await readFile(join(dbDir, 'schema.sql'), 'utf-8')
+          migrations.push({ name: 'schema', sql })
+          addedNames.add('schema')
+        } catch { /* no schema.sql — fine */ }
+
+        // Read migrations/ subdirectory (if present)
+        const hasMigrationsDir = dbEntries.some(e => e.name === 'migrations' && e.isDirectory())
+        if (hasMigrationsDir) {
+          const migrationsDir = join(dbDir, 'migrations')
+          const migrationFiles = (await readdir(migrationsDir)).filter(f => f.endsWith('.sql')).sort()
+          const results = await Promise.all(
+            migrationFiles.map(file =>
+              readFile(join(migrationsDir, file), 'utf-8').then(sql => ({ name: file.replace(/\.sql$/, ''), sql }))
+            )
+          )
+          for (const m of results) {
+            migrations.push(m)
+            addedNames.add(m.name)
+          }
+        }
+
+        // Read loose .sql files in database/ (excluding schema.sql, sample-data.sql)
+        const looseSqlFiles = dbEntries
+          .filter(e => e.isFile() && e.name.endsWith('.sql') && e.name !== 'schema.sql' && e.name !== 'sample-data.sql')
+          .map(e => e.name)
+          .sort()
+        if (looseSqlFiles.length > 0) {
+          const results = await Promise.all(
+            looseSqlFiles
+              .filter(file => !addedNames.has(file.replace(/\.sql$/, '')))
+              .map(file =>
+                readFile(join(dbDir, file), 'utf-8').then(sql => ({ name: file.replace(/\.sql$/, ''), sql }))
+              )
+          )
+          migrations.push(...results)
+        }
+
+        if (migrations.length > 0) {
+          sqlMigrations = migrations
+        }
+      }
+    } catch (err) {
+      console.warn('[API /modules/download] Failed to collect SQL migrations:', err)
+    }
+
     return NextResponse.json({
       success: true,
       module: moduleName,
@@ -225,6 +282,7 @@ export async function POST(request: NextRequest) {
       moduleDir: targetDir,
       vercel: isVercel,
       githubSync,
+      sqlMigrations,
     })
   } catch (error) {
     console.error('[API /modules/download] Error:', error)
