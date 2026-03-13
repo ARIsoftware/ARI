@@ -17,6 +17,7 @@ import { Switch } from "@/components/ui/switch"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TopBar } from "@/components/top-bar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import {
   AlertCircle,
@@ -154,6 +155,8 @@ export default function ModulesPage() {
   const [githubConfig, setGithubConfig] = useState<{ owner?: string; repo?: string; branch?: string } | null>(null)
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [isVercel, setIsVercel] = useState(false)
+  const [showVercelGithubWarning, setShowVercelGithubWarning] = useState(false)
 
   // Track original enabled states (from server)
   const [originalStates, setOriginalStates] = useState<Record<string, boolean>>({})
@@ -308,6 +311,7 @@ export default function ModulesPage() {
         if (response.ok) {
           const data = await response.json()
           setGithubConfigured(data.configured)
+          if (data.isVercel) setIsVercel(true)
           if (data.configured) {
             setGithubConfig({ owner: data.owner, repo: data.repo, branch: data.branch })
           }
@@ -424,6 +428,13 @@ export default function ModulesPage() {
 
   const downloadModule = async (mod: UnifiedModule) => {
     if (!mod.libraryModule) return
+
+    // On Vercel without GitHub configured, show warning instead of proceeding
+    if (isVercel && githubConfigured === false) {
+      setShowVercelGithubWarning(true)
+      return
+    }
+
     setDownloading(mod.id)
     setDownloadResult(null)
 
@@ -921,7 +932,7 @@ export default function ModulesPage() {
                           <Github className="h-4 w-4" />
                           <span className="text-sm font-medium">Saved to GitHub</span>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">
+                        <p className="text-sm text-muted-foreground mt-0.5">
                           {installSuccess.githubSync.message || 'Module committed successfully.'}
                         </p>
                       </div>
@@ -999,9 +1010,14 @@ export default function ModulesPage() {
                       <div className="h-5 w-5 shrink-0 flex items-center justify-center">
                         <div className="h-2.5 w-2.5 rounded-full bg-blue-500 animate-pulse" />
                       </div>
-                      <p className="text-xs text-muted-foreground text-left">
-                        Vercel is rebuilding. Module will be ready once Vercel rebuild has completed.
-                      </p>
+                      <div className="text-left">
+                        <p className="text-sm text-muted-foreground">
+                          Vercel is rebuilding. Module will be ready once Vercel rebuild has completed.
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-0.5">
+                          Estimated time 1 to 2 minutes.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1057,6 +1073,44 @@ export default function ModulesPage() {
               </div>
             </div>
           )}
+
+          {/* Vercel GitHub Warning */}
+          <AlertDialog open={showVercelGithubWarning} onOpenChange={setShowVercelGithubWarning}>
+            <AlertDialogContent className="max-w-md">
+              <AlertDialogHeader>
+                <AlertDialogTitle>GitHub Token Required</AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-3">
+                    <p>
+                      Module installation on Vercel requires a GitHub token. Without it, modules cannot be installed because Vercel&apos;s filesystem is read-only.
+                    </p>
+                    <p>
+                      To enable module installation, add these environment variables in your Vercel project settings:
+                    </p>
+                    <div className="rounded-md bg-muted p-3 space-y-1 text-xs font-mono">
+                      <p>GITHUB_TOKEN</p>
+                      <p>GITHUB_REPO_OWNER</p>
+                      <p>GITHUB_REPO_NAME</p>
+                    </div>
+                    <p>
+                      <a
+                        href="https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline inline-flex items-center gap-1"
+                      >
+                        Learn how to create a GitHub token
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </p>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Close</AlertDialogCancel>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {/* Sticky Save Bar */}
           {hasChanges && (

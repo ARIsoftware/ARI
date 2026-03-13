@@ -1,0 +1,33 @@
+{
+  "id": "exercise-reminder",
+  "group": "Wellness",
+  "name": "Exercise Reminder",
+  "description": "Configurable hourly exercise break reminder with countdown timer",
+  "version": "1.0.0",
+  "author": "ARI",
+  "icon": "Activity",
+  "enabled": true,
+  "fullscreen": false,
+  "menuPriority": 20,
+  "permissions": {
+    "database": false,
+    "api": true,
+    "dashboard": false
+  },
+  "routes": [
+    {
+      "path": "/exercise-reminder",
+      "label": "Exercise Reminder",
+      "icon": "Activity",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "dashboard": {
+    "widgets": false,
+    "widgetComponents": []
+  }
+}

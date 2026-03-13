@@ -66,8 +66,10 @@ export async function GET() {
   }
 
   const config = getGitHubConfig()
+  const isVercel = !!process.env.VERCEL
   return NextResponse.json({
     configured: !!config,
+    isVercel,
     ...(config ? {
       owner: config.owner,
       repo: config.repo,
