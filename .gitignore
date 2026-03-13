@@ -26,6 +26,13 @@ Desktop.ini
 # Markdown Reports
 *-report.md
 
+# Security audits and migration plans
+*AUDIT*.md
+*RLS_MIGRATION*.md
+*_MIGRATION.md
+*_MIGRATION_*.md
+FIX_PLAN.md
+
 # IDE/Editor
 .idea/
 .vscode/
