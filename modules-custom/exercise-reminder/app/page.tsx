@@ -47,8 +47,8 @@ export default function ExerciseReminderPage() {
       if (value.length > 200) fieldErrors.message = 'Message must be 200 characters or less'
     }
     if (field === 'countdownDuration' && typeof value === 'number') {
-      if (!Number.isInteger(value) || value < 2 || value > 30) {
-        fieldErrors.countdownDuration = 'Must be a whole number between 2 and 30'
+      if (!Number.isInteger(value) || value < 3 || value > 30) {
+        fieldErrors.countdownDuration = 'Must be a whole number between 3 and 30'
       }
     }
     if (field === 'triggerMinute' && typeof value === 'number') {
@@ -163,11 +163,11 @@ export default function ExerciseReminderPage() {
           {/* Countdown Duration */}
           <div className="space-y-2">
             <Label htmlFor="countdownDuration">Countdown Duration (minutes)</Label>
-            <p className="text-sm text-muted-foreground">How long before the DONE button activates (2–30)</p>
+            <p className="text-sm text-muted-foreground">How long before the DONE button activates (3–30)</p>
             <Input
               id="countdownDuration"
               type="number"
-              min={2}
+              min={3}
               max={30}
               value={countdownInput}
               onChange={(e) => {

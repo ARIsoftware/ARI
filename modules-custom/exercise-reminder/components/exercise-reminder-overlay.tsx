@@ -9,7 +9,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { X } from "lucide-react"
 import { useExerciseReminderSettings } from "@/modules/exercise-reminder/hooks/use-exercise-reminder"
 import { DEFAULT_SETTINGS } from "@/modules/exercise-reminder/types"
 
@@ -56,7 +55,7 @@ export function ExerciseReminderOverlay() {
       const hours = now.getHours()
 
       const diff = (minutes - triggerMinute + 60) % 60
-      if (diff <= 2) {
+      if (diff <= 1) {
         const timeKey = `${hours}:${triggerMinute}`
         if (lastNotificationRef.current !== timeKey) {
           lastNotificationRef.current = timeKey
@@ -103,21 +102,15 @@ export function ExerciseReminderOverlay() {
       setOpen(newOpen)
     }}>
       <DialogContent
-        className="sm:max-w-2xl bg-background border-[3px] border-primary rounded-[15px]"
+        className={`sm:max-w-2xl bg-background border-[3px] border-primary rounded-[15px] ${
+          !(isTestMode || dismissable) ? '[&>button]:hidden' : ''
+        }`}
         onPointerDownOutside={(e) => { if (!canClose) e.preventDefault() }}
         onEscapeKeyDown={(e) => { if (!canClose) e.preventDefault() }}
       >
         <DialogHeader className="sr-only">
           <DialogTitle>Exercise Reminder</DialogTitle>
         </DialogHeader>
-        {(isTestMode || dismissable) && (
-          <button
-            onClick={() => setOpen(false)}
-            className="absolute right-4 top-4 text-muted-foreground/60 hover:text-foreground transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        )}
         <div className="flex flex-col items-center justify-center py-12 px-8">
           <h2 className="text-4xl font-bold mb-4 text-primary">
             Get Moving

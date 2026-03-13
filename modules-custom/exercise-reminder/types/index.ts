@@ -9,7 +9,7 @@ export interface ExerciseReminderSettings {
 export const DEFAULT_SETTINGS: ExerciseReminderSettings = {
   enabled: true,
   message: 'Time for your 10 minute exercise break!',
-  countdownDuration: 2,
+  countdownDuration: 3,
   triggerMinute: 50,
   dismissable: false,
 }

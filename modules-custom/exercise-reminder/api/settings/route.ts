@@ -7,7 +7,7 @@ import { eq, sql } from 'drizzle-orm'
 const SettingsSchema = z.object({
   enabled: z.boolean().optional(),
   message: z.string().min(1, 'Message cannot be empty').max(200, 'Message must be 200 characters or less').optional(),
-  countdownDuration: z.number().int('Duration must be a whole number').min(2, 'Duration must be between 2 and 30 minutes').max(30, 'Duration must be between 2 and 30 minutes').optional(),
+  countdownDuration: z.number().int('Duration must be a whole number').min(3, 'Duration must be between 3 and 30 minutes').max(30, 'Duration must be between 3 and 30 minutes').optional(),
   triggerMinute: z.number().int('Trigger minute must be a whole number').min(0, 'Trigger minute must be between 0 and 59').max(59, 'Trigger minute must be between 0 and 59').optional(),
   dismissable: z.boolean().optional(),
 })
