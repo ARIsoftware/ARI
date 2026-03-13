@@ -22,10 +22,12 @@ import { Input } from "@/components/ui/input"
 import {
   AlertCircle,
   CheckCircle2,
+  Database,
   Download,
   ExternalLink,
   Github,
   Grid3X3,
+  Info,
   KeyRound,
   LayoutList,
   Loader2,
@@ -149,6 +151,11 @@ export default function ModulesPage() {
     moduleDir: string
     vercel?: boolean
     githubSync?: { success: boolean; commitSha?: string; error?: string; message?: string } | null
+    migrationResult?: {
+      status: 'running' | 'success' | 'skipped' | 'failed' | 'none'
+      results?: Array<{ name: string; status: string; error?: string }>
+      error?: string
+    }
   } | null>(null)
   const [githubSyncEnabled, setGithubSyncEnabled] = useState(true)
   const [githubConfigured, setGithubConfigured] = useState<boolean | null>(null)
@@ -458,6 +465,8 @@ export default function ModulesPage() {
       // Clear download banner — the success modal replaces it
       setDownloadResult(null)
 
+      const hasMigrations = data.sqlMigrations && data.sqlMigrations.length > 0
+
       // Show install success screen
       setInstallSuccess({
         moduleId: mod.id,
@@ -465,8 +474,48 @@ export default function ModulesPage() {
         moduleDir: data.moduleDir || `modules-core/${mod.id}`,
         vercel: data.vercel,
         githubSync: data.githubSync || null,
+        migrationResult: hasMigrations
+          ? { status: 'running' }
+          : { status: 'none' },
       })
       setSyncResult(null)
+
+      // Auto-run database migrations if present
+      if (hasMigrations) {
+        try {
+          const migrateResponse = await fetch('/api/modules/migrate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              moduleId: mod.id,
+              migrations: data.sqlMigrations,
+            }),
+          })
+          const migrateData = await migrateResponse.json()
+
+          if (!migrateResponse.ok) {
+            setInstallSuccess(prev => prev ? {
+              ...prev,
+              migrationResult: { status: 'failed', error: migrateData.error || 'Migration request failed' },
+            } : null)
+          } else {
+            const allSkipped = migrateData.results?.every((r: any) => r.status === 'skipped')
+            setInstallSuccess(prev => prev ? {
+              ...prev,
+              migrationResult: {
+                status: migrateData.success ? (allSkipped ? 'skipped' : 'success') : 'failed',
+                results: migrateData.results,
+                error: migrateData.results?.find((r: any) => r.status === 'failed')?.error,
+              },
+            } : null)
+          }
+        } catch (err: any) {
+          setInstallSuccess(prev => prev ? {
+            ...prev,
+            migrationResult: { status: 'failed', error: 'Failed to connect to migration endpoint' },
+          } : null)
+        }
+      }
 
       // On Vercel, GitHub sync is required to persist the module
       if (data.vercel) {
@@ -1002,6 +1051,50 @@ export default function ModulesPage() {
                         )}
                       </div>
                     </label>
+                  )}
+
+                  {/* Database Migration Section */}
+                  {installSuccess?.migrationResult?.status && installSuccess.migrationResult.status !== 'none' && (
+                    <div className="flex items-center gap-3">
+                      {installSuccess.migrationResult.status === 'running' ? (
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground shrink-0" />
+                      ) : installSuccess.migrationResult.status === 'success' ? (
+                        <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                      ) : installSuccess.migrationResult.status === 'skipped' ? (
+                        <Info className="h-5 w-5 text-blue-500 shrink-0" />
+                      ) : installSuccess.migrationResult.status === 'failed' ? (
+                        <AlertCircle className="h-5 w-5 text-red-600 shrink-0" />
+                      ) : null}
+                      <div className="text-left">
+                        <div className="flex items-center gap-2">
+                          <Database className="h-4 w-4" />
+                          <span className="text-sm font-medium">
+                            {installSuccess.migrationResult.status === 'running'
+                              ? 'Running database migrations...'
+                              : installSuccess.migrationResult.status === 'success'
+                              ? 'Database updated'
+                              : installSuccess.migrationResult.status === 'skipped'
+                              ? 'Database already up to date'
+                              : installSuccess.migrationResult.status === 'failed'
+                              ? 'Database migration failed'
+                              : ''}
+                          </span>
+                        </div>
+                        {installSuccess.migrationResult.status === 'success' && installSuccess.migrationResult.results && (() => {
+                          const appliedCount = installSuccess.migrationResult!.results!.filter(r => r.status === 'applied').length
+                          return (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {appliedCount} migration{appliedCount !== 1 ? 's' : ''} applied
+                            </p>
+                          )
+                        })()}
+                        {installSuccess.migrationResult.status === 'failed' && installSuccess.migrationResult.error && (
+                          <p className="text-xs text-red-600 mt-0.5">
+                            {installSuccess.migrationResult.error}
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   )}
 
                   {/* Vercel rebuilding notice */}
