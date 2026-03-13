@@ -56,6 +56,40 @@ export function collectFiles(dir: string, basePath: string = ''): { path: string
   return files
 }
 
+/** Get current HEAD SHA and base tree SHA for a branch. */
+async function getHeadAndTree(config: GitHubConfig) {
+  const ref = await githubApi(`/git/ref/heads/${config.branch}`, config)
+  const currentSha = ref.object.sha
+  const currentCommit = await githubApi(`/git/commits/${currentSha}`, config)
+  return { currentSha, baseTreeSha: currentCommit.tree.sha }
+}
+
+/** Create a new tree, commit it, and update the branch ref. Returns the new commit SHA. */
+async function commitTree(
+  config: GitHubConfig,
+  baseTreeSha: string,
+  treeEntries: any[],
+  parentSha: string,
+  message: string
+): Promise<string> {
+  const newTree = await githubApi('/git/trees', config, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ base_tree: baseTreeSha, tree: treeEntries }),
+  })
+  const newCommit = await githubApi('/git/commits', config, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, tree: newTree.sha, parents: [parentSha] }),
+  })
+  await githubApi(`/git/refs/heads/${config.branch}`, config, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sha: newCommit.sha }),
+  })
+  return newCommit.sha
+}
+
 /**
  * Commit module files to GitHub.
  * @param moduleId - The module identifier (e.g., "baseball")
@@ -74,16 +108,9 @@ export async function commitModuleToGitHub(
   }
 
   const commitPath = `modules-core/${moduleId}`
+  const { currentSha, baseTreeSha } = await getHeadAndTree(config)
 
-  // Step 1: Get current HEAD
-  const ref = await githubApi(`/git/ref/heads/${config.branch}`, config)
-  const currentSha = ref.object.sha
-
-  // Step 2: Get the current commit to find the base tree
-  const currentCommit = await githubApi(`/git/commits/${currentSha}`, config)
-  const baseTreeSha = currentCommit.tree.sha
-
-  // Step 3: Create blobs for each file
+  // Create blobs for each file
   const treeEntries = await Promise.all(
     files.map(async (file) => {
       const blob = await githubApi('/git/blobs', config, {
@@ -100,34 +127,50 @@ export async function commitModuleToGitHub(
     })
   )
 
-  // Step 4: Create new tree
-  const newTree = await githubApi('/git/trees', config, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ base_tree: baseTreeSha, tree: treeEntries }),
-  })
-
-  // Step 5: Create commit
-  const newCommit = await githubApi('/git/commits', config, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      message: `Add module: ${moduleId}`,
-      tree: newTree.sha,
-      parents: [currentSha],
-    }),
-  })
-
-  // Step 6: Update branch ref
-  await githubApi(`/git/refs/heads/${config.branch}`, config, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sha: newCommit.sha }),
-  })
+  const commitSha = await commitTree(config, baseTreeSha, treeEntries, currentSha, `Add module: ${moduleId}`)
 
   return {
-    commitSha: newCommit.sha,
+    commitSha,
     filesCommitted: files.length,
     message: `Module "${moduleId}" committed to ${config.owner}/${config.repo}@${config.branch}`,
+  }
+}
+
+/**
+ * Delete a module's files from GitHub by creating a commit that removes them.
+ * Uses the Git Trees API with `sha: null` entries to mark files for deletion.
+ */
+export async function deleteModuleFromGitHub(
+  moduleId: string,
+  config: GitHubConfig
+): Promise<{ commitSha: string; filesDeleted: number; message: string }> {
+  const commitPath = `modules-core/${moduleId}/`
+  const { currentSha, baseTreeSha } = await getHeadAndTree(config)
+
+  // Fetch full repo tree to find module files
+  const fullTree = await githubApi(`/git/trees/${baseTreeSha}?recursive=1`, config)
+  const moduleFiles = fullTree.tree.filter(
+    (entry: { path: string; type: string }) =>
+      entry.path.startsWith(commitPath) && entry.type === 'blob'
+  )
+
+  if (moduleFiles.length === 0) {
+    throw new Error(`No files found for module "${moduleId}" in GitHub`)
+  }
+
+  // Create tree entries with sha: null to delete each file
+  const treeEntries = moduleFiles.map((file: { path: string }) => ({
+    path: file.path,
+    mode: '100644' as const,
+    type: 'blob' as const,
+    sha: null,
+  }))
+
+  const commitSha = await commitTree(config, baseTreeSha, treeEntries, currentSha, `Remove module: ${moduleId}`)
+
+  return {
+    commitSha,
+    filesDeleted: moduleFiles.length,
+    message: `Module "${moduleId}" removed from ${config.owner}/${config.repo}@${config.branch}`,
   }
 }
