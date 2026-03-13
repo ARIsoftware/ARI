@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { authClient } from "@/lib/auth-client"
 import { createSupabaseClient } from "@/lib/supabase-auth"
 import { Toaster } from "@/components/ui/toaster"
-import { ExerciseReminder } from "@/components/exercise-reminder"
+import { ExerciseReminderOverlay } from "@/modules/exercise-reminder/components/exercise-reminder-overlay"
 import { MusicPlayerProvider } from "@/components/youtube-music-player"
 import { FeaturesProvider } from "@/lib/features-context"
 import { ModulesProvider } from "@/lib/modules/context"
@@ -138,8 +138,7 @@ export function Providers({
                 <DragDropModeProvider isAuthenticated={!!session} isAuthLoading={isPending}>
                   {children}
                   <Toaster />
-                  {/* Only show exercise reminder when user is authenticated */}
-                  {user && <ExerciseReminder />}
+                  {user && <ExerciseReminderOverlay />}
                   {/* Background backup trigger for app-triggered mode */}
                   {user && <BackupTrigger />}
                 </DragDropModeProvider>
