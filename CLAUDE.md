@@ -1,15 +1,16 @@
 # ARI Application - Claude Memory & Setup Documentation
 
-This documentation reflects the current state of the ARI application as of December 2025, including Better Auth authentication and the module system.
+This documentation reflects the current state of the ARI application, including Better Auth authentication and the module system.
 
 ## Overview
-ARI is a Next.js 15 (React 19) application using Better Auth for authentication and Supabase PostgreSQL for database operations.
+ARI is a Next.js 16 (React 19) application using Better Auth for authentication and Supabase PostgreSQL for database operations.
 
 ## Tech Stack
 - **Framework**: Next.js 16 with React 19
 - **Authentication**: Better Auth (email/password with Argon2 hashing)
 - **Database**: Supabase PostgreSQL (with application-level security)
 - **ORM**: Drizzle ORM (with RLS support via `withRLS()`)
+- **Data Fetching**: TanStack Query (React Query) for client-side data fetching with optimistic updates
 - **Styling**: Tailwind CSS + Shadcn/ui components
 - **Font**: DM Sans
 - **Deployment**: Vercel-ready
@@ -46,7 +47,14 @@ export const auth = betterAuth({
       lastName: { type: "string", required: false },
     }
   },
-  rateLimit: { enabled: true, window: 60, max: 10 },
+  rateLimit: {
+    enabled: true, window: 60, max: 30,
+    customRules: {
+      "/sign-in/*": { window: 60, max: 5 },
+      "/sign-up/*": { window: 300, max: 3 },
+      "/get-session": { window: 60, max: 500 },
+    }
+  },
   plugins: [nextCookies()]
 })
 ```
@@ -68,7 +76,7 @@ export async function getAuthenticatedUser() {
 
 ##### `/components/providers.tsx`
 - Global context provider using `authClient.useSession()`
-- Exposes `useSupabase()` hook (legacy name) and `useAuth()` for components
+- Exposes `useSupabase()` hook (legacy) and `useAuth()` hook (preferred for new code) — both return the same context
 - Note: Does NOT provide direct database access - use API routes instead
 
 ##### `/middleware.ts`
@@ -88,12 +96,31 @@ export async function getAuthenticatedUser() {
 ## Database Schema
 
 ### Main Tables
-- **`tasks`**: Main tasks table with user isolation via RLS and priority scoring
-- **`ari-fitness-database`**: Fitness tracking with RLS
-- **`northstar_entries`**: Goal tracking entries
-- **`contacts`**: User contacts management
-- **`hyrox_workouts`**: HYROX training data
-- **`hyrox_workout_stations`**: HYROX station performance
+
+All table definitions are centralized in `/lib/db/schema/schema.ts` using Drizzle ORM. Key tables include:
+
+- **`tasks`**: Task management with priority scoring
+- **`fitness_database`**: Daily fitness tracking
+- **`contacts`**: Contact management
+- **`northstar`**: Goal tracking
+- **`journal`**: Journal entries
+- **`hyrox_workouts`**, **`hyrox_workout_stations`**, **`hyrox_station_records`**: HYROX training
+- **`shipments`**: Shipment tracking
+- **`quotes`**: Quotes collection
+- **`major_projects`**: Project tracking
+- **`motivation_content`**: Motivation board content
+- **`documents`**, **`document_folders`**, **`document_tags`**, **`document_tag_assignments`**: Document management
+- **`travel`**, **`travel_activities`**, **`travel_flights`**: Travel planning
+- **`gratitude_entries`**: Gratitude journal
+- **`contribution_graph`**: Activity contribution tracking
+- **`mail_stream_events`**, **`mail_stream_settings`**: Mail stream module
+- **`memento_settings`**, **`memento_milestones`**, **`memento_eras`**: Life timeline
+- **`ari_launch_entries`**: ARI Launch module
+- **`module_settings`**: Per-user module preferences (JSONB)
+- **`module_migrations`**: Module migration tracking
+- **`user_preferences`**, **`user_feature_preferences`**: User settings
+- **`backup_metadata`**: Backup system metadata
+- **`user`**, **`session`**, **`account`**, **`verification`**: Better Auth system tables
 
 ### Security Implementation
 User data isolation is enforced at the application level using Drizzle ORM with RLS:
@@ -237,49 +264,44 @@ END $$;
 ### Key Directories
 ```
 /app                    # Next.js app router pages
-  /dashboard           # Main dashboard
-  /tasks              # Task management
-  /radar              # Task priority radar visualization
-  /contacts           # Contact management
-  /daily-fitness      # Fitness tracking
-  /hyrox             # HYROX training
-  /northstar         # Goal tracking
-  /sign-in           # Authentication
-  /profile           # User profile
-  /api                # API routes
-    /tasks            # Task CRUD operations
-      /priorities     # Priority scoring endpoints
+  /sign-in             # Authentication
+  /profile             # User profile
+  /settings            # App settings
+  /api                 # API routes
+    /auth/[...all]     # Better Auth handler
+    /modules/[module]  # Module API router
+    /backup            # Backup export/import/verify
 
 /components            # React components
-  /ui                # Shadcn/ui components
-  /auth              # Authentication components
-  /providers.tsx     # Global providers
-  /app-sidebar.tsx   # Main navigation
-  /radar-task-dots.tsx  # Radar chart task visualization
-  /task-priority-modal.tsx  # Priority editing modal
+  /ui                  # Shadcn/ui components
+  /auth                # Authentication components
+  /providers.tsx       # Global providers (useAuth/useSupabase hooks)
+  /app-sidebar.tsx     # Main navigation
+  /query-provider.tsx  # TanStack Query provider
 
-/lib                  # Utilities and helpers
-  /auth.ts           # Better Auth server configuration
-  /auth-client.ts    # Better Auth client for React
-  /auth-helpers.ts   # getAuthenticatedUser() helper
-  /db.ts             # Drizzle ORM with RLS support
-  /db-supabase.ts    # Supabase client (legacy)
-  /tasks.ts          # Task operations
-  /contacts.ts       # Contact operations
-  /fitness-stats.ts  # Fitness analytics
-  /priority-utils.ts # Priority scoring calculations
-  /api-helpers.ts    # API validation helpers
+/lib                   # Utilities and helpers
+  /auth.ts             # Better Auth server configuration
+  /auth-client.ts      # Better Auth client for React
+  /auth-helpers.ts     # getAuthenticatedUser() helper
+  /db/schema/          # Drizzle ORM schema definitions
+  /db-supabase.ts      # Supabase client (legacy)
+  /api-helpers.ts      # API validation helpers
+  /hooks/              # TanStack Query hooks (use-tasks.ts, use-contacts.ts, etc.)
+  /modules/            # Module system infrastructure
+  /generated/          # Auto-generated module registry
 
-/middleware.ts        # Route protection
+/middleware.ts          # Route protection & security headers
 
-/modules-core          # Core modules (self-contained features)
-  /[module-id]/       # Each module folder
-    module.json       # Module manifest (see /docs/MODULES.md)
-    /app/page.tsx     # Module main page
-    /api/             # Module API routes
-    /components/      # Module components
+/modules-core           # Core modules (self-contained features)
+  /[module-id]/         # Each module folder
+    module.json         # Module manifest (see /docs/MODULES.md)
+    /app/page.tsx       # Module main page
+    /api/               # Module API routes
+    /components/        # Module components
+    /hooks/             # Module-specific TanStack Query hooks
+    /database/          # SQL schema files
 
-/lib/modules          # Module system infrastructure
+/modules-custom         # User-created modules (same structure as modules-core)
 ```
 
 ### Module Top Bar Icons
@@ -353,7 +375,7 @@ npm start
 - All routes protected by middleware using Better Auth sessions
 - Sessions stored in HTTP-only cookies (not localStorage)
 - Passwords hashed with Argon2id (OWASP recommended)
-- Rate limiting on auth endpoints (5 sign-in attempts/minute)
+- Rate limiting on auth endpoints (5 sign-in attempts/minute, 3 sign-up attempts/5 minutes)
 - HTTPS required in production
 
 ### Database
@@ -383,181 +405,15 @@ npm start
 - Confirm `withRLS()` queries filter by user correctly
 - Monitor error logs
 
-## Recent Updates
+## Backup System
 
-### Better Auth Migration (December 2025)
-Successfully migrated from Supabase Auth to Better Auth:
-- Replaced Supabase Auth with Better Auth for authentication
-- Implemented Argon2id password hashing (OWASP recommended)
-- Added built-in rate limiting on auth endpoints
-- Sessions stored in HTTP-only cookies for security
-- Created backward-compatible `getAuthenticatedUser()` helper
-- Added Drizzle ORM with `withRLS()` for database operations
-- See `/docs/BETTERAUTH-MIGRATION-PLAN.md` for migration details
+Comprehensive database backup and restore system with dynamic table discovery. Managed via `/settings` > Backups tab or the backup-manager module.
 
-### Priority Radar Feature (September 2025)
-Added comprehensive task priority visualization system:
-- Interactive radar chart at `/radar` route
-- 5-axis priority scoring: Impact, Severity, Timeliness, Effort, Strategic Fit
-- Automatic priority score calculation using weighted Euclidean distance
-- Task database schema extended with priority columns
-- Real-time priority editing with modal interface
-- Color-coded urgency indicators based on due dates
-
-## Backup System Architecture (v2.1)
-
-### Overview
-Comprehensive database backup and restore system with 3-tier table discovery, ensuring ALL database tables are always exported.
-
-### Key Components
-
-#### 1. Database Functions (`/migrations/backup_system_functions.sql`)
-Three PostgreSQL functions for reliable table discovery:
-- `get_all_user_tables()`: Returns all public schema tables with metadata
-- `get_table_row_counts()`: Returns actual row counts for each table
-- `exec_sql(text)`: Executes raw SQL for backup operations
-
-**Setup**: Run this SQL file once in Supabase SQL Editor for optimal performance.
-
-#### 2. Export API (`/app/api/backup/export/route.ts`)
-**3-Tier Discovery Approach** (with automatic fallbacks):
-1. **Method 1 (Optimal)**: RPC function `get_all_user_tables()` - Fast, reliable, accurate
-2. **Method 2 (Fallback)**: Raw SQL via `exec_sql()` - Works without migration
-3. **Method 3 (Manual)**: Individual table validation - Always works
-
-**Features**:
-- Automatically discovers ALL tables (including future tables)
-- Exports complete database as executable SQL file
-- Includes table schemas, constraints, indexes
-- Generates checksums for data integrity verification
-- Tracks discovery method used and provides warnings
-- Version 2.1 includes discovery metadata in exports
-
-**Export includes**:
-- All 19+ tables (auto-discovered)
-- Complete schemas with data types and constraints
-- All data with proper SQL escaping
-- Primary keys, unique constraints, indexes
-- Checksums for integrity verification
-
-#### 3. Verification Endpoint (`/app/api/backup/verify/route.ts`)
-**Purpose**: Preview what will be backed up BEFORE exporting
-
-**Returns**:
-- Discovery method used (rpc_function / raw_sql / individual_validation / hardcoded_fallback)
-- Number of tables found vs expected
-- Total row count across all tables
-- Detailed table list with row counts
-- Warnings if using fallback methods
-- Missing or extra tables detected
-
-**Access**: Any authenticated user can verify (no admin required)
-
-#### 4. Settings UI (`/app/settings/page.tsx` - Backups tab)
-User-friendly interface with:
-- **Preview Backup** button - Shows what will be exported before downloading
-- **Export Database** button - Downloads complete SQL backup
-- **Import Database** - Restores from previous backup (with confirmation)
-- Discovery method display - Shows which method was used
-- Friendly warnings - Clear messages if fallback methods used
-- Post-export statistics - Shows tables exported, rows, and method used
-
-#### 5. Debug Page Tests (`/app/debug/page.tsx`)
-**4th diagnostic card**: "Backup System Tests"
-
-**Tests**:
-1. **Backup Endpoint Accessibility** - Verifies `/api/backup/verify` is accessible
-2. **Table Discovery Test** - Which method is working (RPC / SQL / Manual / Hardcoded)
-3. **Table Discovery Results** - Shows number of tables discovered dynamically
-4. **Row Count Summary** - Shows total rows and per-table breakdown
-5. **System Warnings** - Displays any warnings or issues
-6. **Export Endpoint Test** - Verifies export endpoint is accessible
-
-**Results Display**:
-- Color-coded status (green=ok, yellow=warning, red=error)
-- Clear recommendations (e.g., "Run migration for optimal performance")
-- Detailed data breakdown for debugging
-
-### Table Discovery Methods Explained
-
-| Method | Speed | Reliability | Requirements | Status |
-|--------|-------|-------------|--------------|--------|
-| **RPC Function** | Fast | 100% | Requires migration | ✅ Optimal |
-| **Raw SQL** | Fast | 95% | `exec_sql()` function | ⚠️ Fallback |
-| **Information Schema** | Medium | 90% | None | ⚠️ Manual |
-
-**If using fallback**: The system still works but may not discover new tables automatically. Run `/migrations/backup_system_functions.sql` for optimal performance.
-
-### Dynamic Table Discovery
-
-Tables are discovered dynamically from the database using PostgreSQL's `information_schema.tables`. This approach:
-- **Automatically includes new tables** when modules are added
-- **No manual maintenance required** - no hardcoded lists to update
-- **Always accurate** - the database knows what tables it has
-
-System tables (like `spatial_ref_sys`, `schema_migrations`, etc.) are automatically excluded via the `EXCLUDED_TABLES` blocklist.
-
-### Usage Guide
-
-#### First Time Setup
-1. Navigate to Supabase SQL Editor
-2. Copy and paste contents of `/migrations/backup_system_functions.sql`
-3. Execute the SQL (creates 3 functions with proper permissions)
-4. Go to `/settings` > Backups tab > Click "Preview Backup"
-5. Verify discovery method shows "RPC Function (optimal)"
-
-#### Regular Backups
-1. Go to `/settings` > Backups tab
-2. Click "Preview Backup" to verify system status
-3. Review tables and row counts
-4. Click "Export Database" to download SQL file
-5. Store backup file securely (includes timestamp in filename)
-
-#### Verification via Debug Page
-1. Go to `/debug` page
-2. Click "Run Backup Tests" in 4th card
-3. Review all 6 test results
-4. Green = working perfectly
-5. Yellow = working but could be optimized
-6. Red = needs attention
-
-#### Restoring from Backup
-1. Go to `/settings` > Backups tab
-2. Select SQL file to import
-3. System validates file structure
-4. Confirm import (warns about data replacement)
-5. Import executes in transaction (rolls back on error)
-6. Page refreshes after successful import
-
-### Validation Checklist
-
-Before trusting your backup system, verify:
-- ✅ Tables discovered successfully (check `/debug` or Preview Backup)
-- ✅ Discovery method is "RPC Function" (optimal) or "Raw SQL" (acceptable)
-- ✅ No critical warnings displayed
-- ✅ Export includes correct row counts
-- ✅ Can successfully import exported backup
-
-### Warnings and Error Messages
-
-**Friendly Warnings** (system still works):
-- "Using Method 2 (raw SQL) - consider running migration"
-- "Using Method 3 (information_schema) - RPC functions not available"
-
-**Critical Warnings** (needs attention):
-- "CRITICAL: All discovery methods failed" - Check database connection
-- "No tables discovered" - Run `/migrations/backup_system_functions.sql`
-
-### Files Modified/Created (October 2025)
-
-**New Files**:
-- `/migrations/backup_system_functions.sql` - Database functions (run manually)
-- `/app/api/backup/verify/route.ts` - Verification endpoint
-
-**Modified Files**:
-- `/app/api/backup/export/route.ts` - 3-tier discovery, v2.1 metadata
-- `/app/settings/page.tsx` - Preview button, warnings, discovery method display
-- `/app/debug/page.tsx` - Added 4th card for backup system tests
+- **Export**: `/app/api/backup/export/route.ts` — auto-discovers all tables via `information_schema`, exports as executable SQL with checksums
+- **Import**: `/app/api/backup/import/route.ts` — restores from SQL backup with transaction rollback on error
+- **Verify**: `/app/api/backup/verify/route.ts` — preview what will be backed up before exporting
+- **Setup**: Run `/migrations/backup_system_functions.sql` once in Supabase SQL Editor for optimal RPC-based table discovery
+- **Debug**: `/debug` page includes backup system diagnostic tests
 
 ## Troubleshooting
 
@@ -585,6 +441,6 @@ Before trusting your backup system, verify:
 
 - Never start a server. I will start them, usually on port 3000.
 - Never edit a database directly, instead provide .sql files which I can manually run.
-- Please always ensure eny new page or API or feature alwats follows all the patterns from the existing codebase including authentication, RLS, and theming support!
+- Please always ensure any new page or API or feature always follows all the patterns from the existing codebase including authentication, RLS, and theming support!
 
 ---
