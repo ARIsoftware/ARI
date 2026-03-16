@@ -22,11 +22,20 @@ These tools help ensure database tables follow PostgreSQL conventions and best p
 Ask the user the following questions ONE AT A TIME, waiting for each answer before continuing. When asking each question, prefix it with "ARI:" instead of numbering them (e.g., "ARI: What is the name of the module?").
 
 1. **Module Name**: What is the name of the module? (e.g., "Habit Tracker", "Recipe Book", "Budget Manager")
-2. **Description**: Please describe this module in detail. What is the purpose of the module? What features does it need? What data will be stored in the database?
-3. **Navigation**: Should it appear in the sidebar? If so, what should the page name be?
-4. **Submenu**: Does the module have any subpages which require a submenu?
-5. **Top Bar**: Should it have a quick-access icon in the top bar?
-6. **Onboarding**: Does this module need an onboarding/setup screen to collect initial configuration from the user? (e.g., asking for birthdate, preferences, API keys, etc.)
+2. **v0 Import**: Do you have v0.dev-generated code to use as the starting UI for this module?
+   If yes, paste the code directly into the chat, or provide file path(s) to downloaded .tsx files.
+   If no, we'll design the UI from scratch.
+3. **Description**: Please describe this module in detail. What is the purpose of the module? What features does it need? What data will be stored in the database?
+4. **Navigation**: Should it appear in the sidebar? If so, what should the page name be?
+5. **Submenu**: Does the module have any subpages which require a submenu?
+6. **Top Bar**: Should it have a quick-access icon in the top bar?
+7. **Onboarding**: Does this module need an onboarding/setup screen to collect initial configuration from the user? (e.g., asking for birthdate, preferences, API keys, etc.)
+
+If the user provides v0 code:
+- Read and analyze all provided v0 code files
+- Summarize what the v0 UI does: components, data model, interactions, CRUD operations
+- Rephrase the Description question (Q3) as a confirmation: "ARI: Based on the v0 code, this module appears to [summary]. Is this accurate? Any changes or additions needed?"
+- When v0 code is provided, skip UI layout clarifying questions (e.g., "list view, cards, calendar?") since the UI is already defined. Focus clarifying questions on data/business logic instead.
 
 Then ask follow-up clarifying questions based on their answers. You can ask any clarifying questions. Here are some examples of clarifying questions:
 
@@ -58,11 +67,62 @@ After collecting answers:
 1. Ask any additional clarifying questions if required.
 2. Present a detailed summary with your understandings and then ask for explicit approval to proceed.
 
+## v0 Code Integration
+
+If the user provided v0.dev code, perform the following analysis and preparation before
+starting the Implementation Steps. Present findings to the user for confirmation.
+
+### v0 Code Analysis
+
+Analyze all provided v0 code and extract:
+1. **Component hierarchy** — identify the main page component vs. sub-components
+2. **Data model** — what entities/data structures are implied by mock/static data arrays
+3. **shadcn imports** — list all `@/components/ui/*` imports used
+4. **External dependencies** — any npm imports beyond react, next, @/components/ui/*, @/lib/*, lucide-react
+5. **CRUD operations** — what create/read/update/delete actions are implied by buttons and handlers
+6. **State classification** — which useState calls are "data state" (→ becomes TanStack Query) vs. "UI state" (→ stays as useState, e.g. dialog open/close, form inputs)
+
+### Dependency Resolution
+
+1. List all `@/components/ui/*` imports found in the v0 code
+2. Check which components exist in `components/ui/` directory (use `ls components/ui/`)
+3. Report any missing components to the user
+4. With user approval, install missing components: `npx shadcn@latest add [component1] [component2] ...`
+5. Check for non-standard npm package imports and install with `npm install` if needed
+6. Note: if v0 imports `recharts` directly, prefer ARI's existing `@/components/ui/chart` wrapper
+
+### Code Restructuring Rules
+
+When transforming v0 output into module structure:
+- The main/root component becomes `app/page.tsx` with `export default function`
+- Extract sub-components into separate files in `components/` directory
+- Remove any v0 layout wrappers (`<html>`, `<body>`, root divs with font/theme setup)
+- Ensure `'use client'` directive is present
+- Preserve ALL Tailwind classes and visual styling exactly as-is
+- If a shadcn component is already installed in ARI with customizations, keep ARI's version — do NOT overwrite with v0's version
+- Replace mock/static data with placeholder comments (e.g., `// TODO: wire to TanStack Query`) during initial restructuring
+
+### Data Layer Derivation
+
+Reverse-engineer the database schema from v0's mock data:
+- Each mock data array → a database table
+- Each object key → a column
+- Type inference: strings → TEXT, numbers → INTEGER or NUMERIC, dates → TIMESTAMPTZ, booleans → BOOLEAN
+- Status/category fields with fixed string values → suggest CHECK constraint or enum
+- Always include `user_id TEXT` and standard timestamps (`created_at`, `updated_at`)
+- Use the pg-aiguide MCP tools to validate the derived schema design
+
+Present the derived data model to the user for confirmation before building API routes.
+
 ## Implementation Steps
 
 When approved, create the module following this order:
 
 1. **Copy template structure** from `modules-core/hello-world/`
+   - **If v0 code was provided:** Copy the template for module.json, API, hooks, types, and database structure only. Do NOT use hello-world's `app/page.tsx` — the v0 code will replace it.
+1.5. **If v0 code was provided — Install dependencies:**
+   - Follow the Dependency Resolution steps from the "v0 Code Integration" section
+   - Install any missing shadcn components and npm packages before proceeding
 2. **Update module.json** with:
    - Correct id, name, description
    - Proper icon and route
@@ -70,6 +130,7 @@ When approved, create the module following this order:
    - submenu configuration if requested (see Submenu section below)
    - Required dependencies
 3. **Create/update page component** in `app/page.tsx`
+   - **If v0 code was provided:** Use the v0 component as the base for `app/page.tsx`. Apply the Code Restructuring Rules from the "v0 Code Integration" section. Extract sub-components to `components/` directory.
 4. **Create API routes** if needed:
    - Use `const { user, withRLS } = await getAuthenticatedUser()` (NOT supabase client)
    - Use `withRLS((db) => db.select()...)` for all database operations
@@ -78,6 +139,7 @@ When approved, create the module following this order:
    - **Drizzle `numeric()` columns return STRINGS** - convert to `Number()` in GET responses before sending to client (see "Drizzle Numeric Column Handling" section below)
    - **Zod schemas MUST have human-readable error messages** on every constraint (see "Zod Validation Rules" section below)
    - See `modules-core/hello-world/api/data/route.ts` as the reference
+   - **If v0 code was provided:** Use the derived data model from the "v0 Code Integration" analysis to inform API route data shapes. Build routes that serve data in the same shape the v0 components already expect (matching the mock data structure).
 5. **Register API routes in MODULE_API_ROUTES** (REQUIRED if module has API routes):
    - Edit `/app/api/modules/[module]/[[...path]]/route.ts`
    - Add your module to the `MODULE_API_ROUTES` object with all API endpoints
@@ -99,7 +161,16 @@ When approved, create the module following this order:
    - See existing table definitions in that file for examples
    - Use `text("user_id")` for the user_id column
 8. **Update types** in `types/index.ts`
+   - **If v0 code was provided:** Derive TypeScript interfaces from the v0 mock data structures identified during analysis.
 9. **Create TanStack Query hooks** in `/lib/hooks/use-[module-name].ts` (see below)
+9.5. **If v0 code was provided — Wire components to real data:**
+   - Replace all static/mock data arrays with TanStack Query hook calls (e.g., `useModuleEntries()`)
+   - Replace mock event handlers with real mutation calls (e.g., `createEntry.mutate(...)`)
+   - Add loading states using `isLoading` from `useQuery`
+   - Add error handling with toast notifications
+   - Add optimistic updates following the patterns in "Optimistic Updates Pattern" section
+   - Ensure dialogs follow the "Dialog & Form Validation Pattern" section
+   - Verify no hardcoded mock data remains in any component
 10. **Run `npm run generate-module-registry`** to register the new module (pages only - API routes were registered in step 5)
 11. **If public routes needed** (webhooks, external API access):
     - Add `publicRoutes` array to module.json with security configuration
@@ -509,6 +580,13 @@ Before marking complete, verify:
 - [ ] **If onboarding exists**: Conditional render shows onboarding when `!settings?.onboardingCompleted`
 - [ ] **If onboarding exists**: Centered card UI follows Hello World pattern
 - [ ] **If onboarding exists**: Removed Hello World demo-specific code (`showOnboardingDemo` state, "Skip to Module Demo" button, "View Onboarding Demo" button)
+- [ ] **If v0 import used**: All mock/static data replaced with TanStack Query hooks
+- [ ] **If v0 import used**: No hardcoded data arrays remain in components
+- [ ] **If v0 import used**: All event handlers wired to real mutations
+- [ ] **If v0 import used**: All missing shadcn components installed (no import errors)
+- [ ] **If v0 import used**: Any non-standard npm dependencies installed
+- [ ] **If v0 import used**: v0 layout wrappers removed (no extra html/body wrappers)
+- [ ] **If v0 import used**: Component has default export and 'use client' directive
 
 ## Important Reminders
 
@@ -520,3 +598,4 @@ Before marking complete, verify:
 - User isolation is enforced at the **application level** via `withRLS()` helper
 - **API route registration is MANUAL**: The `generate-module-registry` script only auto-generates page routes. API routes MUST be manually registered in `MODULE_API_ROUTES` in `/app/api/modules/[module]/[[...path]]/route.ts` - this is a Next.js/Turbopack limitation.
 - **Module Portability**: Always use `@/modules/` alias for imports (NOT `@/modules-custom/` or `@/modules-core/`). This allows modules to be moved between directories without code changes. The alias resolves `modules-custom` first, then `modules-core`.
+- **v0 code is a visual starting point only**: Always build proper API routes, hooks, and database schema. Never leave mock data in production components.
