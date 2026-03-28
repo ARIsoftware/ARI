@@ -62,6 +62,9 @@ interface OnboardingData {
   databaseUrl: string
   // Better Auth (required)
   betterAuthSecret: string
+  // Admin Account (optional first-run bootstrap)
+  adminEmail: string
+  adminPassword: string
   // OpenAI (optional)
   openaiApiKey: string
   // Resend (optional)
@@ -80,7 +83,7 @@ const generateAuthSecret = () => {
   return btoa(String.fromCharCode(...array))
 }
 
-const STEP_ORDER = ["personal", "github", "supabase", "claude-code", "openai", "resend", "vercel", "download"]
+const STEP_ORDER = ["personal", "account", "github", "supabase", "claude-code", "openai", "resend", "vercel", "download"]
 // Hidden: "local-env" step removed from flow since install script handles it. Content preserved below.
 
 export default function WelcomePage() {
@@ -104,6 +107,8 @@ export default function WelcomePage() {
     supabaseSecretKey: "",
     databaseUrl: "",
     betterAuthSecret: "",
+    adminEmail: "",
+    adminPassword: "",
     openaiApiKey: "",
     resendApiKey: "",
     resendWebhookSecret: "",
@@ -122,6 +127,8 @@ export default function WelcomePage() {
     timezone: 'UTC',
   })
   const [profileSaved, setProfileSaved] = useState(false)
+  const [adminConfirmPassword, setAdminConfirmPassword] = useState("")
+  const [adminPasswordError, setAdminPasswordError] = useState("")
 
   // Prefill profile from DB if available, then overlay with any localStorage edits
   useEffect(() => {
@@ -308,6 +315,15 @@ export default function WelcomePage() {
     lines.push("# NEXT_PUBLIC_TOP_BAR_COLOR=\"#c00\"")
     lines.push("")
 
+    if (formData.adminEmail.trim() && formData.adminPassword.trim()) {
+      lines.push("# Initial Admin Account (First-Run Bootstrap)")
+      lines.push("# These credentials are used ONLY to create your admin account when the user table is empty.")
+      lines.push("# After your account is created on first run, you can safely delete these two lines.")
+      lines.push(`ARI_FIRST_RUN_ADMIN_EMAIL=${formData.adminEmail}`)
+      lines.push(`ARI_FIRST_RUN_ADMIN_PASSWORD=${formData.adminPassword}`)
+      lines.push("")
+    }
+
     if (formData.openaiApiKey.trim()) {
       lines.push("# OpenAI API Integration")
       lines.push(`OPENAI_API_KEY=${formData.openaiApiKey}`)
@@ -343,25 +359,7 @@ export default function WelcomePage() {
   const handleDownloadEnvFile = async () => {
     const content = generateEnvFileContent()
 
-    // Try saving directly to the project root via API
-    setEnvSaveStatus('saving')
-    try {
-      const response = await fetch('/api/onboarding/save-env', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
-      })
-      if (response.ok) {
-        setEnvSaveStatus('saved')
-        return
-      }
-      // Fall through to browser download on error
-    } catch {
-      // Fall through to browser download
-    }
-
-    // Fallback: trigger browser download
-    setEnvSaveStatus('idle')
+    // Trigger browser download to the user's default downloads folder
     const blob = new Blob([content], { type: "text/plain" })
     const url = URL.createObjectURL(blob)
     const link = document.createElement("a")
@@ -371,6 +369,7 @@ export default function WelcomePage() {
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
+    setEnvSaveStatus('saved')
   }
 
   const handleContinue = () => {
@@ -608,6 +607,140 @@ export default function WelcomePage() {
                         <button
                           onClick={() => {
                             handleProfileSave()
+                            goToNextStep()
+                          }}
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                          style={{ borderRadius: '6px' }}
+                        >
+                          Save & Continue
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Account Tab */}
+              {currentTab === "account" && (
+                <div>
+                  {/* Header section with gradient background */}
+                  <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
+                    <div className="flex items-center gap-2.5">
+                      <h2 className="text-2xl font-semibold text-zinc-900">Admin Account</h2>
+                    </div>
+                    <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
+                      Set up your sign-in credentials. These will be saved to your environment file and used to create your admin account on first run.
+                    </p>
+                  </div>
+
+                  {/* Content section */}
+                  <div style={{ padding: '25px' }}>
+                    <div className="space-y-5">
+                      <div className="space-y-2">
+                        <Label htmlFor="admin-email" className="text-zinc-900 font-medium">Email</Label>
+                        <Input
+                          id="admin-email"
+                          type="email"
+                          value={formData.adminEmail || profileData.email}
+                          onChange={(e) => setFormData(prev => ({ ...prev, adminEmail: e.target.value }))}
+                          placeholder="admin@example.com"
+                          className="border-zinc-200"
+                        />
+                        <p className="text-xs text-zinc-500">This will be your sign-in email address.</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="admin-password" className="text-zinc-900 font-medium">Password</Label>
+                        <Input
+                          id="admin-password"
+                          type="password"
+                          value={formData.adminPassword}
+                          onChange={(e) => {
+                            setFormData(prev => ({ ...prev, adminPassword: e.target.value }))
+                            setAdminPasswordError("")
+                          }}
+                          placeholder="Enter a strong password"
+                          className="border-zinc-200"
+                          minLength={18}
+                        />
+                        <p className="text-xs text-zinc-500">Minimum 18 characters required.</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="admin-confirm-password" className="text-zinc-900 font-medium">Confirm Password</Label>
+                        <Input
+                          id="admin-confirm-password"
+                          type="password"
+                          value={adminConfirmPassword}
+                          onChange={(e) => {
+                            setAdminConfirmPassword(e.target.value)
+                            setAdminPasswordError("")
+                          }}
+                          placeholder="Confirm your password"
+                          className="border-zinc-200"
+                        />
+                      </div>
+
+                      {adminPasswordError && (
+                        <Alert variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>{adminPasswordError}</AlertDescription>
+                        </Alert>
+                      )}
+
+                      <Alert className="bg-blue-50 border-blue-200">
+                        <Info className="w-4 h-4 text-blue-600" />
+                        <AlertDescription className="text-blue-700 text-sm">
+                          Your credentials are saved to <code className="bg-blue-100 px-1 rounded">.env.local</code> and used only to create your account when the database has no users.
+                          After your account is created, you can safely remove these lines from the file.
+                        </AlertDescription>
+                      </Alert>
+
+                      <Alert className="bg-slate-50 border-slate-200">
+                        <Shield className="w-4 h-4 text-slate-600" />
+                        <AlertDescription className="text-slate-700 text-sm">
+                          Two-factor authentication (Google Authenticator) is available. You can enable it after first login in <strong>Settings &gt; Security</strong>.
+                        </AlertDescription>
+                      </Alert>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
+                      <button
+                        onClick={goToPreviousStep}
+                        className="inline-flex items-center justify-center px-4 py-2 text-base font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
+                        style={{ borderRadius: '6px' }}
+                      >
+                        Back
+                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={goToNextStep}
+                          className="inline-flex items-center justify-center px-4 py-2 text-base font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                          style={{ borderRadius: '6px' }}
+                        >
+                          Skip this step
+                        </button>
+                        <button
+                          onClick={() => {
+                            const effectiveEmail = formData.adminEmail || profileData.email
+                            // Validate only if user has entered credentials
+                            if (effectiveEmail && formData.adminPassword) {
+                              if (formData.adminPassword.length < 18) {
+                                setAdminPasswordError("Password must be at least 18 characters.")
+                                return
+                              }
+                              if (formData.adminPassword !== adminConfirmPassword) {
+                                setAdminPasswordError("Passwords do not match.")
+                                return
+                              }
+                            }
+                            // Persist the effective email to formData
+                            if (!formData.adminEmail && profileData.email) {
+                              setFormData(prev => ({ ...prev, adminEmail: profileData.email }))
+                            }
+                            setAdminPasswordError("")
                             goToNextStep()
                           }}
                           className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
@@ -2093,6 +2226,15 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                       </div>
                       {/* Optional configurations */}
                       <div className="flex items-center gap-2">
+                        {formData.adminEmail && formData.adminPassword ?
+                          <Check className="w-4 h-4 text-green-500" /> :
+                          <X className="w-4 h-4 text-gray-400" />
+                        }
+                        <span className="text-gray-500">
+                          Admin Account: {formData.adminEmail && formData.adminPassword ? "Configured" : "Skipped"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
                         {formData.openaiApiKey ?
                           <Check className="w-4 h-4 text-green-500" /> :
                           <X className="w-4 h-4 text-gray-400" />
@@ -2146,7 +2288,7 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                     ) : envSaveStatus === 'saved' ? (
                       <>
                         <Check className="w-4 h-4 mr-2" />
-                        Saved .env.local to project root
+                        Downloaded .env.local
                       </>
                     ) : (
                       <>
@@ -2172,7 +2314,8 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                     <AlertTitle className="text-gray-800">Next Steps</AlertTitle>
                     <AlertDescription className="text-gray-700">
                       <ol className="list-decimal list-inside space-y-1 text-sm mt-2">
-                        <li>Click the save button above to generate your .env.local file</li>
+                        <li>Click the download button above to generate your .env.local file</li>
+                        <li>Move the file to your project root directory</li>
                         <li>Restart your development server</li>
                         <li>Your application is ready to use!</li>
                       </ol>

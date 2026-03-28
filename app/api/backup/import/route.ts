@@ -4,6 +4,7 @@ import { isProductionSafeOperation } from '@/lib/admin-helpers'
 import { createClient } from "@supabase/supabase-js"
 import { logger } from '@/lib/logger'
 import crypto from "crypto"
+import { safeErrorResponse } from '@/lib/api-error'
 
 // Create service role client for full database access
 const getServiceSupabase = () => {
@@ -352,10 +353,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     logger.error('Import error:', error)
     return NextResponse.json(
-      { 
-        error: error.message || 'Failed to import database',
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      },
+      { error: safeErrorResponse(error) },
       { status: 500 }
     )
   }

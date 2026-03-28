@@ -1,5 +1,6 @@
 import { getTaskContext, formatTaskContextForAI } from '@/lib/task-context'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { safeErrorResponse } from '@/lib/api-error'
 
 export async function POST(req: Request) {
   try {
@@ -85,7 +86,7 @@ You can answer questions about their tasks, provide insights about their product
   } catch (error) {
     console.error('Chat API Error:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error', details: error.message }),
+      JSON.stringify({ error: safeErrorResponse(error) }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }

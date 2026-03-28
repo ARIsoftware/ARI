@@ -5,14 +5,12 @@ import { usePathname } from 'next/navigation'
 import { authClient } from "@/lib/auth-client"
 import { createSupabaseClient } from "@/lib/supabase-auth"
 import { Toaster } from "@/components/ui/toaster"
-import { ExerciseReminderOverlay } from "@/modules/exercise-reminder/components/exercise-reminder-overlay"
 import { MusicPlayerProvider } from "@/components/youtube-music-player"
 import { FeaturesProvider } from "@/lib/features-context"
 import { ModulesProvider } from "@/lib/modules/context"
 import { CommandPaletteProvider } from "@/components/command-palette"
 import { DragDropModeProvider } from "@/components/drag-drop-mode-context"
 import { ThemeProvider } from "@/lib/theme/theme-context"
-import { BackupTrigger } from "@/modules-core/backup-manager/components/backup-trigger"
 import type { ModuleMetadata } from '@/lib/modules/module-types'
 
 // Define types matching Better Auth session structure
@@ -138,9 +136,6 @@ export function Providers({
                 <DragDropModeProvider isAuthenticated={!!session} isAuthLoading={isPending}>
                   {children}
                   <Toaster />
-                  {user && <ExerciseReminderOverlay />}
-                  {/* Background backup trigger for app-triggered mode */}
-                  {user && <BackupTrigger />}
                 </DragDropModeProvider>
               </CommandPaletteProvider>
             </MusicPlayerProvider>

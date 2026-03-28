@@ -9,6 +9,8 @@ import { NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { moduleSettings } from '@/lib/db/schema'
 import { getModules, getEnabledModule } from '@/lib/modules/module-registry'
+import { safeErrorResponse } from '@/lib/api-error'
+import { eq } from 'drizzle-orm'
 
 export async function GET() {
   try {
@@ -24,9 +26,9 @@ export async function GET() {
     // Get all modules
     const allModules = await getModules()
 
-    // Get user's module settings (RLS filters automatically)
+    // Get user's module settings
     const settings = await withRLS((db) =>
-      db.select().from(moduleSettings)
+      db.select().from(moduleSettings).where(eq(moduleSettings.userId, user.id))
     )
 
     // Check specific modules
@@ -60,8 +62,7 @@ export async function GET() {
   } catch (error: any) {
     console.error('[Debug] Module status error:', error)
     return NextResponse.json({
-      error: error.message,
-      stack: error.stack
+      error: safeErrorResponse(error)
     }, { status: 500 })
   }
 }

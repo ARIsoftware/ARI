@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server"
+import { getAuthenticatedUser } from "@/lib/auth-helpers"
 
 export const dynamic = "force-dynamic"
 
 export async function GET() {
+  const { user } = await getAuthenticatedUser()
+
+  if (!user) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+  }
+
   const apiKey = process.env.RESEND_API_KEY
 
   if (!apiKey) {

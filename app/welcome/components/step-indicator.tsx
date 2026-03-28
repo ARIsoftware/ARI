@@ -9,6 +9,7 @@ interface StepIndicatorProps {
 
 const STEPS = [
   { id: "personal", label: "Personal" },
+  { id: "account", label: "Account" },
   { id: "github", label: "GitHub" },
   { id: "supabase", label: "Supabase" },
   { id: "claude-code", label: "Claude Code" },
@@ -72,8 +73,15 @@ const PersonIcon = ({ className }: { className?: string }) => (
   </svg>
 )
 
+const ShieldIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+  </svg>
+)
+
 const STEP_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "personal": PersonIcon,
+  account: ShieldIcon,
   github: GithubIcon,
   supabase: SupabaseIcon,
   "claude-code": ClaudeCodeIcon,

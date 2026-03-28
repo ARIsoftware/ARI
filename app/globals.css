@@ -8,6 +8,9 @@
 
 /* Hide topbar when app is installed as standalone PWA */
 @media (display-mode: standalone) {
+  :root {
+    --topbar-height: 0px;
+  }
   .topbar {
     display: none;
   }
@@ -15,6 +18,7 @@
 
 @layer base {
   :root {
+    --topbar-height: 45px;
     --font-family: "Overpass Mono", monospace;
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
@@ -207,8 +211,20 @@
   font-size: 14px;
 }
 
-.bg-sidebar {
-  margin-top: 0;
+/* Offset the fixed sidebar below the topbar */
+.peer > div.fixed {
+  top: var(--topbar-height) !important;
+  height: calc(100svh - var(--topbar-height)) !important;
+}
+
+/* Also adjust the sidebar spacer div height */
+.peer > div.relative {
+  height: calc(100svh - var(--topbar-height));
+}
+
+/* Add top spacing inside sidebar so first item isn't flush against top */
+[data-sidebar="sidebar"] > [data-sidebar="content"]:first-child {
+  padding-top: 16px;
 }
 
 .taskdone {

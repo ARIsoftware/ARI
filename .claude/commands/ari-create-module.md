@@ -8,6 +8,29 @@ Before doing anything:
 3. Confirm `modules-core/hello-world` exists. If not, inform the user that this template module is missing.
 4. Confirm we are at the repo root and that `modules-custom` exists. If not, create it.
 
+## Security Requirements
+
+**Security is absolutely paramount.** Every module must be secure by default. No exceptions.
+
+### Database Security
+- **All Supabase tables MUST have Row Level Security (RLS) policies enabled.** A table without RLS is an open table — any authenticated user can read/write any row.
+- RLS policies must enforce `user_id` isolation so users can only access their own data.
+- Since Better Auth does not use `auth.uid()`, RLS policies should use application-level enforcement via the `withRLS()` helper. However, if creating raw SQL policies, ensure they restrict access appropriately.
+- Never create tables with RLS disabled, even for "temporary" or "simple" modules.
+
+### API Security
+- **Every API route MUST call `getAuthenticatedUser()` and verify the user exists** before doing anything else. Unauthenticated requests must be rejected immediately.
+- **All database operations MUST use `withRLS()`** — never use the raw Supabase client or unscoped Drizzle queries.
+- **All user input MUST be validated with Zod schemas** before use. Never trust client-provided data.
+- Never expose internal error details (stack traces, SQL errors) to the client. Return generic error messages.
+- **Public/webhook routes** require secret-based validation (HMAC signatures, bearer tokens, etc.). See `/docs/MODULES.md` section 7.5.
+
+### General Security Principles
+- Never store secrets, API keys, or credentials in code or client-accessible files. Use environment variables.
+- Never log sensitive data (passwords, tokens, PII) in API routes.
+- Always use parameterized queries (Drizzle handles this) — never interpolate user input into SQL.
+- If a module accepts file uploads, validate file types and sizes server-side.
+
 ## MCP Server Tools
 
 This project has the `pg-aiguide` MCP server configured (via `.mcp.json`) which provides PostgreSQL documentation and best practices. When creating database schemas:
@@ -19,17 +42,14 @@ These tools help ensure database tables follow PostgreSQL conventions and best p
 
 ## Questions to Ask
 
-Ask the user the following questions ONE AT A TIME, waiting for each answer before continuing. When asking each question, prefix it with "ARI:" instead of numbering them (e.g., "ARI: What is the name of the module?").
+Ask the user the following questions ONE AT A TIME, waiting for each answer before continuing. When asking each question, prefix it with "ARI:" instead of numbering them (e.g., "ARI: What is the name of the module?"). Do not ask about v0 generated code, unless the user mentions is.
 
 1. **Module Name**: What is the name of the module? (e.g., "Habit Tracker", "Recipe Book", "Budget Manager")
-2. **v0 Import**: Do you have v0.dev-generated code to use as the starting UI for this module?
-   If yes, paste the code directly into the chat, or provide file path(s) to downloaded .tsx files.
-   If no, we'll design the UI from scratch.
-3. **Description**: Please describe this module in detail. What is the purpose of the module? What features does it need? What data will be stored in the database?
-4. **Navigation**: Should it appear in the sidebar? If so, what should the page name be?
-5. **Submenu**: Does the module have any subpages which require a submenu?
-6. **Top Bar**: Should it have a quick-access icon in the top bar?
-7. **Onboarding**: Does this module need an onboarding/setup screen to collect initial configuration from the user? (e.g., asking for birthdate, preferences, API keys, etc.)
+2. **Description**: Please describe this module in detail. What is the purpose of the module? What features does it need? What data will be stored in the database?
+3. **Navigation**: Should it appear in the sidebar? If so, what should the page name be?
+4. **Submenu**: Does the module have any subpages which require a submenu?
+5. **Top Bar**: Should it have a quick-access icon in the top bar?
+6. **Onboarding**: Does this module need an onboarding/setup screen to collect initial configuration from the user? (e.g., asking for birthdate, preferences, API keys, etc.)
 
 If the user provides v0 code:
 - Read and analyze all provided v0 code files
@@ -131,6 +151,20 @@ When approved, create the module following this order:
    - Required dependencies
 3. **Create/update page component** in `app/page.tsx`
    - **If v0 code was provided:** Use the v0 component as the base for `app/page.tsx`. Apply the Code Restructuring Rules from the "v0 Code Integration" section. Extract sub-components to `components/` directory.
+   - **Random Quote under title**: Every module page MUST include a random quote displayed under the page title when the Quotes module is enabled. Follow the Hello World pattern:
+     1. Import `useModuleEnabled` from `@/lib/modules/module-hooks` and `useEffect`
+     2. Check if quotes is enabled: `const { enabled: quotesEnabled, loading: quotesLoading } = useModuleEnabled('quotes')`
+     3. Add state: `const [randomQuote, setRandomQuote] = useState<{ quote: string; author?: string } | null>(null)`
+     4. Fetch a random quote in `useEffect` when `quotesEnabled && !quotesLoading` (fetch from `/api/modules/quotes/quotes`, pick random)
+     5. Display below the `<h1>` title:
+        ```tsx
+        {quotesEnabled && randomQuote && (
+          <p className="text-sm text-[#aa2020] mt-1">
+            {randomQuote.quote}
+          </p>
+        )}
+        ```
+     See `modules-core/hello-world/app/page.tsx` for the complete implementation.
 4. **Create API routes** if needed:
    - Use `const { user, withRLS } = await getAuthenticatedUser()` (NOT supabase client)
    - Use `withRLS((db) => db.select()...)` for all database operations
@@ -156,7 +190,9 @@ When approved, create the module following this order:
 6. **Create database schema** in `[module-folder]/database/schema.sql` if tables needed (this path is git-tracked so the module is fully portable as a self-contained folder)
    - Use `mcp__plugin_pg_pg-aiguide__semantic_search_postgres_docs` to verify best practices for data types, indexes, and constraints
    - Use `TEXT` type for `user_id` (matches Better Auth)
-   - Do NOT add `auth.uid()` RLS policies (Better Auth doesn't use this)
+   - **MUST include `ALTER TABLE [table_name] ENABLE ROW LEVEL SECURITY;`** for every table
+   - **MUST include RLS policies** that restrict SELECT/INSERT/UPDATE/DELETE to rows matching the authenticated user's `user_id`
+   - Do NOT add `auth.uid()` RLS policies (Better Auth doesn't use this) — use application-level enforcement via `withRLS()`
 7. **Add Drizzle schema definition** to `/lib/db/schema/schema.ts` (REQUIRED for API routes to work)
    - See existing table definitions in that file for examples
    - Use `text("user_id")` for the user_id column
@@ -552,6 +588,11 @@ Then proceed to the QA checklist.
 ## Quality Assurance Checklist
 
 Before marking complete, verify:
+- [ ] **SECURITY: All API routes authenticate via `getAuthenticatedUser()` and reject unauthenticated requests**
+- [ ] **SECURITY: All database operations use `withRLS()` — no raw/unscoped queries**
+- [ ] **SECURITY: All user input validated with Zod before use**
+- [ ] **SECURITY: Database tables have RLS enabled** (verify in schema.sql: `ALTER TABLE ... ENABLE ROW LEVEL SECURITY`)
+- [ ] **SECURITY: No secrets, credentials, or sensitive data hardcoded or logged**
 - [ ] module.json is valid and complete
 - [ ] All API routes use `withRLS()` helper (NOT Supabase client) - see hello-world/api/data/route.ts
 - [ ] **If module has API routes**: Routes registered in `MODULE_API_ROUTES` in `/app/api/modules/[module]/[[...path]]/route.ts`
@@ -566,6 +607,7 @@ Before marking complete, verify:
 - [ ] **Mutation hooks surface API error details** (parse `err.details` from Zod validation responses)
 - [ ] **All create/edit dialogs have inline validation** (red outlines + error text below fields)
 - [ ] **Dialogs only close on `onSuccess`** (never before API confirms - user must not lose form data on error)
+- [ ] **Random quote displayed under page title** when Quotes module is enabled (follows Hello World pattern)
 - [ ] Page does NOT block on session check (no "Authenticating..." spinner)
 - [ ] **Page does NOT include layout wrappers** (no SidebarProvider, AppSidebar, DarkModeProvider, SidebarInset, or header with breadcrumbs - these are already provided by the module routing system)
 - [ ] Component uses proper theming (Tailwind classes, not hardcoded colors)

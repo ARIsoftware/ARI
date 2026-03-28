@@ -19,9 +19,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // RLS automatically filters by user_id
     const data = await withRLS((db) =>
-      db.select().from(contributionGraph).orderBy(asc(contributionGraph.boxIndex))
+      db.select().from(contributionGraph).where(eq(contributionGraph.userId, user.id)).orderBy(asc(contributionGraph.boxIndex))
     )
 
     return NextResponse.json(toSnakeCase(data) || [])
@@ -46,11 +45,12 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // Check if entry exists (RLS filters automatically)
+    // Check if entry exists for this user
     const existing = await withRLS((db) =>
       db.select({ id: contributionGraph.id })
         .from(contributionGraph)
         .where(and(
+          eq(contributionGraph.userId, user.id),
           eq(contributionGraph.goalId, goal_id),
           eq(contributionGraph.boxIndex, box_index)
         ))
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
             color,
             updatedAt: sql`timezone('utc'::text, now())`
           })
-          .where(eq(contributionGraph.id, existing[0].id))
+          .where(and(eq(contributionGraph.id, existing[0].id), eq(contributionGraph.userId, user.id)))
           .returning()
       )
       data = updated[0]

@@ -19,6 +19,7 @@ const MODULE_DIRECTORIES = ['modules-custom', 'modules-core'];
 const OUTPUT_FILE = path.join(process.cwd(), 'lib/generated/module-pages-registry.ts');
 const SUBMENU_OUTPUT_FILE = path.join(process.cwd(), 'lib/generated/module-submenu-registry.ts');
 const API_REGISTRY_FILE = path.join(process.cwd(), 'lib/generated/module-api-registry.ts');
+const TOPBAR_REGISTRY_FILE = path.join(process.cwd(), 'lib/generated/module-topbar-registry.ts');
 const MANIFEST_FILE = path.join(process.cwd(), 'lib/generated/module-manifest.json');
 
 // Ensure output directory exists
@@ -45,19 +46,7 @@ function scanPagesRecursively(appDir, relativePath = '') {
     const entryRelative = relativePath ? `${relativePath}/${entry.name}` : entry.name;
 
     if (entry.isDirectory()) {
-      // Handle [param] dynamic route folders - register the parent path
-      if (entry.name.startsWith('[') && entry.name.endsWith(']')) {
-        // Check if there's a page inside the dynamic folder
-        const dynamicPageTsx = path.join(entryPath, 'page.tsx');
-        const dynamicPageJsx = path.join(entryPath, 'page.jsx');
-        if (fs.existsSync(dynamicPageTsx) || fs.existsSync(dynamicPageJsx)) {
-          // Register the parent path (e.g., 'edit' for 'edit/[id]/page.tsx')
-          // The component will use useParams() to get the dynamic segment
-          pages.push({ path: relativePath, isDynamic: true, dynamicFolder: entry.name });
-        }
-        continue;
-      }
-      // Recursively scan subdirectories
+      // Recursively scan subdirectories (including [param] dynamic route folders)
       pages.push(...scanPagesRecursively(entryPath, entryRelative));
     } else if (entry.name === 'page.tsx' || entry.name === 'page.jsx') {
       // Found a page file
@@ -111,14 +100,16 @@ function scanModulesDirectory(dirName) {
       continue;
     }
 
-    // Check if app/page.tsx or app/page.jsx exists (main page required)
-    if (!fs.existsSync(pagePathTsx) && !fs.existsSync(pagePathJsx)) {
+    // Scan for pages if app directory exists
+    let subRoutes = [];
+    if (fs.existsSync(pagePathTsx) || fs.existsSync(pagePathJsx)) {
+      subRoutes = scanPagesRecursively(appDir);
+    } else if (manifest.routes && manifest.routes.length > 0) {
+      // Module declares routes but has no app/page.tsx - skip it
       console.warn(`⚠️  Skipping ${dirName}/${moduleFolder}: No app/page.tsx found`);
       continue;
     }
-
-    // Scan for all pages (including sub-routes)
-    const subRoutes = scanPagesRecursively(appDir);
+    // Modules with no routes and no pages are valid (e.g., top-bar-only modules)
 
     modules.push({ id: manifest.id, dirName, folder: moduleFolder, subRoutes, manifest });
   }
@@ -154,11 +145,94 @@ function scanAllModules() {
   return moduleMap;
 }
 
+const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+
+/**
+ * Read a route file and detect which HTTP methods it exports.
+ */
+function detectExportedMethods(filePath) {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    return HTTP_METHODS.filter(method =>
+      new RegExp(`export\\s+(async\\s+)?function\\s+${method}\\b`).test(content)
+    );
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Discover all core API routes under app/api/.
+ * Returns array of { path, fullPath, methods }.
+ */
+function discoverCoreApiRoutes() {
+  const apiDir = path.join(process.cwd(), 'app', 'api');
+  const routePaths = scanApiRoutesRecursively(apiDir);
+
+  return routePaths
+    .filter(p => {
+      // Exclude auth catch-all (Better Auth) and module proxy route
+      if (p === 'auth/[...all]') return false;
+      if (p === 'modules/[module]/[[...path]]') return false;
+      return true;
+    })
+    .map(routePath => {
+      const routeFile = path.join(apiDir, routePath, 'route.ts');
+      const routeFileJs = path.join(apiDir, routePath, 'route.js');
+      const actualFile = fs.existsSync(routeFile) ? routeFile : routeFileJs;
+      const methods = detectExportedMethods(actualFile);
+
+      return {
+        path: routePath || '(root)',
+        fullPath: `/api/${routePath}`,
+        methods: methods.length > 0 ? methods : ['unknown'],
+      };
+    })
+    .sort((a, b) => a.fullPath.localeCompare(b.fullPath));
+}
+
+/**
+ * Discover all module API routes with their HTTP methods.
+ * Reuses the pre-scanned moduleApiMap to avoid double directory traversal.
+ * Returns array of { path, fullPath, moduleId, methods }.
+ */
+function discoverModuleApiRoutes(moduleMap, moduleApiMap) {
+  const routes = [];
+
+  for (const [id, { dirName, folder }] of moduleMap) {
+    const apiData = moduleApiMap.get(id);
+    if (!apiData) continue;
+
+    const apiDir = path.join(process.cwd(), dirName, folder, 'api');
+    for (const routePath of apiData.apiRoutes) {
+      const routeFile = routePath
+        ? path.join(apiDir, routePath, 'route.ts')
+        : path.join(apiDir, 'route.ts');
+      const routeFileJs = routeFile.replace('.ts', '.js');
+      const actualFile = fs.existsSync(routeFile) ? routeFile : routeFileJs;
+      const methods = detectExportedMethods(actualFile);
+
+      const fullPath = routePath
+        ? `/api/modules/${id}/${routePath}`
+        : `/api/modules/${id}`;
+
+      routes.push({
+        path: routePath || '(root)',
+        fullPath,
+        moduleId: id,
+        methods: methods.length > 0 ? methods : ['unknown'],
+      });
+    }
+  }
+
+  return routes.sort((a, b) => a.fullPath.localeCompare(b.fullPath));
+}
+
 /**
  * Generate JSON manifest with full module metadata
  * This is used by module-loader.ts at runtime to avoid filesystem scanning
  */
-function generateManifest(moduleMap) {
+function generateManifest(moduleMap, moduleApiMap) {
   const modules = [];
 
   // Track which module IDs have been added (for override detection)
@@ -222,10 +296,18 @@ function generateManifest(moduleMap) {
     }
   }
 
+  // Discover all core API routes under app/api/
+  const coreApiRoutes = discoverCoreApiRoutes();
+
+  // Discover all module API routes with methods
+  const moduleApiRoutes = discoverModuleApiRoutes(moduleMap, moduleApiMap);
+
   return {
     generatedAt: new Date().toISOString(),
     modules,
-    publicRoutes
+    publicRoutes,
+    coreApiRoutes,
+    moduleApiRoutes
   };
 }
 
@@ -238,20 +320,9 @@ function generateRegistry(moduleMap) {
   const allImports = [];
   for (const [id, { folder, subRoutes }] of entries) {
     for (const route of subRoutes) {
-      // Handle both string routes and dynamic route objects
-      if (typeof route === 'object' && route.isDynamic) {
-        // Dynamic route like edit/[id] - register parent path
-        const routeKey = route.path ? `${id}/${route.path}` : id;
-        const importPath = route.path
-          ? `@/modules/${folder}/app/${route.path}/${route.dynamicFolder}/page`
-          : `@/modules/${folder}/app/${route.dynamicFolder}/page`;
-        allImports.push(`  '${routeKey}': () => import('${importPath}'),`);
-      } else {
-        // Static route
-        const routeKey = route ? `${id}/${route}` : id;
-        const importPath = route ? `@/modules/${folder}/app/${route}/page` : `@/modules/${folder}/app/page`;
-        allImports.push(`  '${routeKey}': () => import('${importPath}'),`);
-      }
+      const routeKey = route ? `${id}/${route}` : id;
+      const importPath = route ? `@/modules/${folder}/app/${route}/page` : `@/modules/${folder}/app/page`;
+      allImports.push(`  '${routeKey}': () => import('${importPath}'),`);
     }
   }
 
@@ -379,6 +450,51 @@ function scanApiRoutesRecursively(apiDir, relativePath = '') {
 }
 
 /**
+ * Generate top bar icon component registry for modules that declare topBarIcon.component
+ */
+function generateTopBarRegistry(moduleMap) {
+  const entries = [];
+
+  for (const [id, { dirName, folder, manifest }] of moduleMap) {
+    if (!manifest.topBarIcon || !manifest.topBarIcon.component) continue;
+
+    const modulePath = path.join(process.cwd(), dirName, folder);
+    const componentRelative = manifest.topBarIcon.component.replace(/^\.\//, '');
+    const componentAbsolute = path.join(modulePath, componentRelative);
+
+    if (!fs.existsSync(componentAbsolute)) {
+      console.warn(`⚠️  ${id}: topBarIcon component not found at ${componentRelative}`);
+      continue;
+    }
+
+    const importSuffix = componentRelative.replace(/\.(tsx?|jsx?)$/, '');
+    entries.push({ id, folder, importPath: `@/modules/${folder}/${importSuffix}` });
+  }
+
+  entries.sort((a, b) => a.id.localeCompare(b.id));
+
+  const imports = entries.map(e => `  '${e.id}': () => import('${e.importPath}'),`).join('\n');
+
+  return `/**
+ * Auto-Generated Module Top Bar Icon Registry
+ *
+ * DO NOT EDIT THIS FILE MANUALLY!
+ * Generated by: scripts/generate-module-registry.js
+ * Generated at: ${new Date().toISOString()}
+ *
+ * To regenerate: npm run generate-module-registry
+ */
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type TopBarIconLoader = () => Promise<any>
+
+export const MODULE_TOPBAR_ICONS: Record<string, TopBarIconLoader> = {
+${imports}
+}
+`;
+}
+
+/**
  * Build API route map from existing moduleMap (avoids re-reading module.json files)
  * Returns Map of moduleId -> { folder, apiRoutes: string[] }
  */
@@ -460,6 +576,12 @@ function main() {
   fs.writeFileSync(SUBMENU_OUTPUT_FILE, submenuRegistry, 'utf-8');
   console.log('✅ Submenu registry generated at:', SUBMENU_OUTPUT_FILE);
 
+  // Generate top bar icon registry
+  console.log('📝 Generating top bar icon registry...');
+  const topbarRegistry = generateTopBarRegistry(moduleMap);
+  fs.writeFileSync(TOPBAR_REGISTRY_FILE, topbarRegistry, 'utf-8');
+  console.log('✅ Top bar icon registry generated at:', TOPBAR_REGISTRY_FILE);
+
   // Generate API route registry
   console.log('📝 Generating API route registry...');
   const moduleApiMap = buildApiMapFromModules(moduleMap);
@@ -469,7 +591,7 @@ function main() {
 
   // Generate JSON manifest (for runtime use without filesystem scanning)
   console.log('📝 Generating module manifest...');
-  const manifest = generateManifest(moduleMap);
+  const manifest = generateManifest(moduleMap, moduleApiMap);
   fs.writeFileSync(MANIFEST_FILE, JSON.stringify(manifest, null, 2), 'utf-8');
   console.log('✅ Manifest generated at:', MANIFEST_FILE);
 

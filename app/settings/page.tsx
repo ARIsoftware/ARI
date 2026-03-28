@@ -501,6 +501,7 @@ export default function SettingsPage(): React.ReactElement {
                     revokingAllSessions={revokingAllSessions}
                     onRevokeSession={handleRevokeSession}
                     onRevokeAllSessions={handleRevokeAllSessions}
+                    twoFactorEnabled={!!(session?.user as any)?.twoFactorEnabled}
                   />
                 </TabsContent>
 

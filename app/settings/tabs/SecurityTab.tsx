@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2, LogOut, Monitor, ShieldCheck, Smartphone } from "lucide-react"
 import { parseUserAgent, formatRelativeTime } from "@/lib/utils"
+import { TwoFactorSetup } from "./TwoFactorSetup"
 import type { Session } from "../types"
 
 interface SecurityTabProps {
@@ -16,6 +17,7 @@ interface SecurityTabProps {
   revokingAllSessions: boolean
   onRevokeSession: (token: string) => void
   onRevokeAllSessions: () => void
+  twoFactorEnabled?: boolean
 }
 
 export function SecurityTab({
@@ -26,6 +28,7 @@ export function SecurityTab({
   revokingAllSessions,
   onRevokeSession,
   onRevokeAllSessions,
+  twoFactorEnabled = false,
 }: SecurityTabProps): React.ReactElement {
   const router = useRouter()
 
@@ -158,6 +161,7 @@ export function SecurityTab({
             </div>
           </CardContent>
         </Card>
+        <TwoFactorSetup twoFactorEnabled={twoFactorEnabled} />
       </div>
     </div>
   )

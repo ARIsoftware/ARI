@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, type ComponentType } from "react"
 import { useRouter } from "next/navigation"
 import {
   ArrowUpRight,
@@ -11,14 +11,12 @@ import {
   User,
   Play,
   Pause,
-  Clock,
   X
 } from "lucide-react"
-import { FocusTimerTopBarIcon } from "@/components/focus-timer-top-bar-icon"
-import { NotepadTopBarIcon } from "@/modules/notepad/components/notepad-top-bar-icon"
 import { ThemePickerDropdown } from "@/components/theme-picker-dropdown"
 import { useModules } from "@/lib/modules/module-hooks"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
+import { MODULE_TOPBAR_ICONS } from "@/lib/generated/module-topbar-registry"
 import {
   Tooltip,
   TooltipContent,
@@ -27,7 +25,11 @@ import {
 } from "@/components/ui/tooltip"
 import { DM_Sans } from "next/font/google"
 import { Announcement, AnnouncementTag, AnnouncementTitle } from "@/components/ui/kibo-ui/announcement"
-import { getLastCompletedTask, truncateTaskName } from "@/modules/tasks/lib/get-last-completed-task"
+
+function truncateTaskName(taskName: string, maxLength: number = 50): string {
+  if (taskName.length <= maxLength) return taskName
+  return taskName.substring(0, maxLength) + "..."
+}
 import { useIsMobile } from "@/components/ui/use-mobile"
 import { useSupabase } from "@/components/providers"
 import { authClient } from "@/lib/auth-client"
@@ -42,19 +44,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-// Import focus timer state
-let globalTimerState = {
-  isActive: false,
-  timeRemaining: 0,
-  listeners: [] as Array<(isActive: boolean, timeRemaining: number) => void>
-}
+import { getGlobalTimerState } from "@/lib/focus-timer-state"
 
-// Make sure we're using the same global state as the focus timer
-if (typeof window !== 'undefined' && (window as any).globalTimerState) {
-  globalTimerState = (window as any).globalTimerState
-} else if (typeof window !== 'undefined') {
-  (window as any).globalTimerState = globalTimerState
-}
+const globalTimerState = getGlobalTimerState()
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -67,8 +59,6 @@ const BUILTIN_ICONS = [
   { id: "icon-command", label: "Command" },
   { id: "icon-settings", label: "Settings" },
   { id: "icon-modules", label: "Modules" },
-  { id: "icon-notepad", label: "Notepad" },
-  { id: "icon-focus", label: "Focus Timer" },
   { id: "icon-music", label: "Music" },
   { id: "icon-logout", label: "Logout" },
 ] as const
@@ -86,9 +76,37 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const swapyRef = useRef<any>(null)
 
-  // Filter modules that have topBarIcon configured with an icon (not component-based)
-  // Component-based topBarIcons (like notepad) are handled as built-in icons
-  const moduleIcons = modules.filter(m => m.topBarIcon && m.topBarIcon.icon && !m.topBarIcon.component)
+  // Filter modules that have topBarIcon configured
+  const moduleIcons = modules.filter(m => m.topBarIcon && (m.topBarIcon.icon || m.topBarIcon.component))
+
+  // Track dynamically loaded top bar icon components from the registry
+  const [loadedTopBarComponents, setLoadedTopBarComponents] = useState<Record<string, ComponentType<any>>>({})
+  const loadingRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    // Load component-based top bar icons from the registry
+    const componentModules = modules.filter(m => m.topBarIcon?.component && m.id in MODULE_TOPBAR_ICONS)
+    const toLoad = componentModules.filter(m => !loadingRef.current.has(m.id))
+    if (toLoad.length === 0) return
+
+    toLoad.forEach(m => loadingRef.current.add(m.id))
+
+    Promise.all(
+      toLoad.map(m =>
+        MODULE_TOPBAR_ICONS[m.id]()
+          .then((mod: any) => ({ id: m.id, component: mod.default as ComponentType<any> | undefined }))
+          .catch(() => ({ id: m.id, component: undefined }))
+      )
+    ).then(results => {
+      const loaded: Record<string, ComponentType<any>> = {}
+      for (const { id, component } of results) {
+        if (component) loaded[id] = component
+      }
+      if (Object.keys(loaded).length > 0) {
+        setLoadedTopBarComponents(prev => ({ ...prev, ...loaded }))
+      }
+    })
+  }, [modules])
 
   // Build all icons list with their IDs
   const allIcons = [
@@ -217,11 +235,6 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
             </TooltipContent>
           </Tooltip>
         )
-      case "icon-notepad":
-        if (!modules.some(m => m.id === 'notepad')) return null
-        return <NotepadTopBarIcon isDragMode={isDragMode} />
-      case "icon-focus":
-        return <FocusTimerTopBarIcon isDragMode={isDragMode} />
       case "icon-music":
         return (
           <Tooltip>
@@ -277,9 +290,17 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
             <div key={icon.id} data-swapy-slot={icon.id}>
               <div data-swapy-item={icon.id}>
                 {icon.type === "module" ? (
-                  // Module icon
+                  // Module icon - either component-based or lucide icon
                   (() => {
                     const module = icon.module
+                    // Component-based top bar icon (loaded from registry)
+                    if (module.topBarIcon!.component) {
+                      const TopBarComponent = loadedTopBarComponents[module.id]
+                      if (!TopBarComponent) return null
+                      return <TopBarComponent isDragMode={isDragMode} />
+                    }
+                    // Lucide icon-based top bar icon
+                    if (!module.topBarIcon!.icon || !module.topBarIcon!.route) return null
                     const Icon = getLucideIcon(module.topBarIcon!.icon)
                     return module.topBarIcon!.tooltip ? (
                       <Tooltip>
@@ -288,7 +309,7 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
                             variant="ghost"
                             size="icon"
                             className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
-                            onClick={isDragMode ? undefined : () => router.push(module.topBarIcon!.route)}
+                            onClick={isDragMode ? undefined : () => router.push(module.topBarIcon!.route!)}
                           >
                             <Icon className="h-5 w-5" />
                           </Button>
@@ -302,7 +323,7 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
                         variant="ghost"
                         size="icon"
                         className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
-                        onClick={isDragMode ? undefined : () => router.push(module.topBarIcon!.route)}
+                        onClick={isDragMode ? undefined : () => router.push(module.topBarIcon!.route!)}
                       >
                         <Icon className="h-5 w-5" />
                       </Button>
@@ -372,17 +393,29 @@ export function TaskAnnouncement() {
   const { session, supabase } = useSupabase()
   const user = session?.user
   const { isDragMode, setDragMode, saveOrder } = useDragDropMode()
+  const { modules } = useModules()
+  const isTasksEnabled = modules.some(m => m.id === 'tasks')
 
   useEffect(() => {
-    // Load initial task
-    loadLastTask()
+    // Load last completed task
+    const abortController = new AbortController()
+    if (session?.access_token && isTasksEnabled) {
+      fetch('/api/modules/tasks/last-completed', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+        signal: abortController.signal,
+      })
+        .then(res => res.ok ? res.json() : null)
+        .then(task => { if (task && !abortController.signal.aborted) setLastTask(task) })
+        .catch(() => {})
+        .finally(() => { if (!abortController.signal.aborted) setLoading(false) })
+    } else {
+      setLoading(false)
+    }
 
     // Set up focus timer listener
     const listener = (isActive: boolean, timeRemaining: number) => {
       if (!isActive && timeRemaining === 0 && focusTimer.isActive) {
-        // Timer just completed
         setFocusTimer({ isActive: false, timeRemaining: 0, isComplete: true })
-        // Auto-dismiss completion message after 5 seconds
         setTimeout(() => {
           setFocusTimer({ isActive: false, timeRemaining: 0, isComplete: false })
         }, 5000)
@@ -392,14 +425,11 @@ export function TaskAnnouncement() {
     }
     globalTimerState.listeners.push(listener)
 
-    // Note: Realtime subscription removed - using TanStack Query refetch pattern instead
-    // The task announcement will update when the user navigates or on window focus
-
     return () => {
-      // Clean up focus timer listener
+      abortController.abort()
       globalTimerState.listeners = globalTimerState.listeners.filter(l => l !== listener)
     }
-  }, [user?.id, session?.access_token])
+  }, [user?.id, session?.access_token, isTasksEnabled])
 
   // Run the countdown interval when timer is active
   // This is the main timer that decrements every second
@@ -425,18 +455,6 @@ export function TaskAnnouncement() {
 
     return () => clearInterval(interval)
   }, [focusTimer.isActive])
-
-  const loadLastTask = async () => {
-    if (!session?.access_token) {
-      setLoading(false)
-      return
-    }
-    
-    const tokenFn = async () => session?.access_token || null
-    const task = await getLastCompletedTask(tokenFn)
-    setLastTask(task)
-    setLoading(false)
-  }
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)

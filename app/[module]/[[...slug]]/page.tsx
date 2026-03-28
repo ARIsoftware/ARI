@@ -75,14 +75,23 @@ export default async function ModuleCatchAllPage({
     notFound()
   }
 
-  // Check if we have a page loader for this path (try full path first, then module root)
+  // Look up the page loader - first try exact match, then match dynamic [param] patterns
   let pageLoader = MODULE_PAGES[pagePath]
 
-  // If no specific page for this path, fall back to module root (for modules without sub-routes)
-  if (!pageLoader && slug.length > 0) {
-    console.log(`[Module Route] No page loader for ${pagePath}, checking module root`)
-    // Only fall back if there's no specific route - this handles legacy behavior
-    // but allows sub-routes to be explicitly registered
+  if (!pageLoader) {
+    // Find a registry key with dynamic segments (e.g., "tasks/edit/[id]") that matches the URL
+    const pathParts = pagePath.split('/')
+    for (const key of Object.keys(MODULE_PAGES)) {
+      const keyParts = key.split('/')
+      if (keyParts.length !== pathParts.length) continue
+      const matches = keyParts.every((part, i) =>
+        part === pathParts[i] || (part.startsWith('[') && part.endsWith(']'))
+      )
+      if (matches) {
+        pageLoader = MODULE_PAGES[key]
+        break
+      }
+    }
   }
 
   console.log(`[Module Route] Page loader exists for ${pagePath}:`, !!pageLoader)

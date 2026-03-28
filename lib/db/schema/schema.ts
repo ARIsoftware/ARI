@@ -12,13 +12,10 @@ export const notepadRevisions = pgTable("notepad_revisions", {
 }, (table) => [
 	index("idx_notepad_revisions_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
 	index("idx_notepad_revisions_user_revision").using("btree", table.userId.asc().nullsLast().op("int4_ops"), table.revisionNumber.desc().nullsFirst().op("int4_ops")),
-	pgPolicy("Users can delete own notepad revisions", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("Users can insert own notepad revisions", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("Users can view own notepad revisions", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("notepad_revisions_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("notepad_revisions_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("notepad_revisions_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("notepad_revisions_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("notepad_revisions_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("notepad_revisions_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("notepad_revisions_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("notepad_revisions_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 ]);
 
 export const fitnessDatabase = pgTable("fitness_database", {
@@ -37,18 +34,14 @@ export const fitnessDatabase = pgTable("fitness_database", {
 	orderIndex: integer("order_index").default(0),
 	completionCount: integer("completion_count").default(0),
 	youtubeUrl: text("youtube_url"),
-	userId: uuid("user_id").default(sql`auth.uid()`).notNull(),
+	userId: uuid("user_id").notNull(),
 }, (table) => [
 	index("idx_fitness_database_completion_count").using("btree", table.completionCount.asc().nullsLast().op("int4_ops")),
 	index("idx_fitness_database_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
-	pgPolicy("Users can delete their own fitness tasks", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("Users can insert their own fitness tasks", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("Users can update their own fitness tasks", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can view their own fitness tasks", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("fitness_database_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("fitness_database_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("fitness_database_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("fitness_database_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("fitness_database_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("fitness_database_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("fitness_database_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("fitness_database_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 	check("fitness_database_priority_check", sql`priority = ANY (ARRAY['Low'::text, 'Medium'::text, 'High'::text])`),
 	check("fitness_database_status_check", sql`status = ANY (ARRAY['Pending'::text, 'In Progress'::text, 'Completed'::text])`),
 ]);
@@ -69,14 +62,10 @@ export const gratitudeEntries = pgTable("gratitude_entries", {
 	index("idx_gratitude_entries_user_date").using("btree", table.userId.asc().nullsLast().op("date_ops"), table.entryDate.desc().nullsFirst().op("uuid_ops")),
 	index("idx_gratitude_entries_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
 	unique("gratitude_entries_user_id_entry_date_key").on(table.userId, table.entryDate),
-	pgPolicy("Users can delete their own gratitude entries", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("Users can insert their own gratitude entries", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("Users can update their own gratitude entries", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can view their own gratitude entries", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("gratitude_entries_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("gratitude_entries_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("gratitude_entries_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("gratitude_entries_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("gratitude_entries_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("gratitude_entries_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("gratitude_entries_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("gratitude_entries_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 ]);
 
 export const northstar = pgTable("northstar", {
@@ -89,21 +78,17 @@ export const northstar = pgTable("northstar", {
 	progress: integer().default(0),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
-	userId: uuid("user_id").default(sql`auth.uid()`).notNull(),
+	userId: uuid("user_id").notNull(),
 	displayPriority: integer("display_priority").default(3),
 }, (table) => [
 	index("idx_goals_category").using("btree", table.category.asc().nullsLast().op("text_ops")),
 	index("idx_goals_priority").using("btree", table.priority.asc().nullsLast().op("text_ops")),
 	index("idx_goals_progress").using("btree", table.progress.asc().nullsLast().op("int4_ops")),
 	index("idx_goals_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
-	pgPolicy("Users can delete their own goals", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("Users can insert their own goals", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("Users can update their own goals", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can view their own goals", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("northstar_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("northstar_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("northstar_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("northstar_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("northstar_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("northstar_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("northstar_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("northstar_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 	check("goals_priority_check", sql`priority = ANY (ARRAY['low'::text, 'medium'::text, 'high'::text])`),
 	check("goals_progress_check", sql`(progress >= 0) AND (progress <= 100)`),
 	check("northstar_display_priority_check", sql`(display_priority >= 1) AND (display_priority <= 5)`),
@@ -125,7 +110,7 @@ export const tasks = pgTable("tasks", {
 	orderIndex: integer("order_index").default(0),
 	completionCount: integer("completion_count").default(0),
 	userEmail: text("user_email"),
-	userId: uuid("user_id").default(sql`auth.uid()`).notNull(),
+	userId: uuid("user_id").notNull(),
 	impact: integer().default(3),
 	severity: integer().default(3),
 	timeliness: integer().default(3),
@@ -146,18 +131,10 @@ export const tasks = pgTable("tasks", {
 	index("idx_tasks_priority_score").using("btree", table.priorityScore.asc().nullsLast().op("numeric_ops")),
 	index("idx_tasks_project_id").using("btree", table.projectId.asc().nullsLast().op("uuid_ops")),
 	index("idx_tasks_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
-	pgPolicy("Users can delete their own completion history", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id = auth.uid())` }),
-	pgPolicy("Users can delete their own fitness history", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("Users can insert their own completion history", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("Users can insert their own fitness history", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("Users can update their own completion history", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can update their own fitness history", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can view their own completion history", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("Users can view their own fitness history", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("fitness_completion_history_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("fitness_completion_history_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("fitness_completion_history_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("fitness_completion_history_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("tasks_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("tasks_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("tasks_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("tasks_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 ]);
 
 export const motivationContent = pgTable("motivation_content", {
@@ -175,14 +152,10 @@ export const motivationContent = pgTable("motivation_content", {
 	index("idx_motivation_content_created_at").using("btree", table.createdAt.desc().nullsFirst().op("timestamptz_ops")),
 	index("idx_motivation_content_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
 	index("idx_motivation_content_user_position").using("btree", table.userId.asc().nullsLast().op("int4_ops"), table.position.asc().nullsLast().op("uuid_ops")),
-	pgPolicy("Users can create own motivation content", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(auth.uid() = user_id)`  }),
-	pgPolicy("Users can delete own motivation content", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("Users can update own motivation content", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can view own motivation content", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("motivation_content_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("motivation_content_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("motivation_content_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("motivation_content_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("motivation_content_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("motivation_content_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("motivation_content_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("motivation_content_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 	check("motivation_content_type_check", sql`type = ANY (ARRAY['youtube'::text, 'instagram'::text, 'photo'::text, 'twitter'::text])`),
 ]);
 
@@ -195,14 +168,10 @@ export const notepad = pgTable("notepad", {
 }, (table) => [
 	index("idx_notepad_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
 	unique("notepad_user_id_key").on(table.userId),
-	pgPolicy("Users can delete own notepad", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("Users can insert own notepad", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("Users can update own notepad", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can view own notepad", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("notepad_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("notepad_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("notepad_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("notepad_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("notepad_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("notepad_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("notepad_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("notepad_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 ]);
 
 export const moduleMigrations = pgTable("module_migrations", {
@@ -214,8 +183,7 @@ export const moduleMigrations = pgTable("module_migrations", {
 }, (table) => [
 	index("idx_module_migrations_module_id").using("btree", table.moduleId.asc().nullsLast().op("text_ops")),
 	unique("module_migrations_module_id_migration_name_key").on(table.moduleId, table.migrationName),
-	pgPolicy("All users can view module migrations", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
-	pgPolicy("Service role can manage migrations", { as: "permissive", for: "all", to: ["service_role"] }),
+	pgPolicy("module_migrations_rls_all", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
 ]);
 
 export const shipments = pgTable("shipments", {
@@ -232,14 +200,10 @@ export const shipments = pgTable("shipments", {
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [
 	index("idx_shipments_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
-	pgPolicy("Users can create own shipments", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(auth.uid() = user_id)`  }),
-	pgPolicy("Users can delete own shipments", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("Users can update own shipments", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can view own shipments", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("shipments_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("shipments_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("shipments_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("shipments_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("shipments_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("shipments_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("shipments_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("shipments_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 ]);
 
 export const moduleSettings = pgTable("module_settings", {
@@ -255,11 +219,10 @@ export const moduleSettings = pgTable("module_settings", {
 	index("idx_module_settings_user_enabled").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.enabled.asc().nullsLast().op("uuid_ops")),
 	index("idx_module_settings_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
 	unique("module_settings_user_id_module_id_key").on(table.userId, table.moduleId),
-	pgPolicy("Users can manage their own module settings", { as: "permissive", for: "all", to: ["public"], using: sql`(auth.uid() = user_id)`, withCheck: sql`(auth.uid() = user_id)`  }),
-	pgPolicy("module_settings_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("module_settings_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("module_settings_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("module_settings_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("module_settings_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("module_settings_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("module_settings_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("module_settings_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 ]);
 
 export const contacts = pgTable("contacts", {
@@ -281,11 +244,10 @@ export const contacts = pgTable("contacts", {
 	index("idx_contacts_category").using("btree", table.category.asc().nullsLast().op("text_ops")),
 	index("idx_contacts_name").using("btree", table.name.asc().nullsLast().op("text_ops")),
 	index("idx_contacts_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
-	pgPolicy("Users can view their own contacts", { as: "permissive", for: "select", to: ["public"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("contacts_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("contacts_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("contacts_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("contacts_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("contacts_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("contacts_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("contacts_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("contacts_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 ]);
 
 export const hyroxWorkouts = pgTable("hyrox_workouts", {
@@ -295,20 +257,14 @@ export const hyroxWorkouts = pgTable("hyrox_workouts", {
 	startedAt: timestamp("started_at", { withTimezone: true, mode: 'string' }).default(sql`timezone('utc'::text, now())`),
 	completedAt: timestamp("completed_at", { withTimezone: true, mode: 'string' }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`timezone('utc'::text, now())`),
-	userId: uuid("user_id").default(sql`auth.uid()`).notNull(),
+	userId: uuid("user_id").notNull(),
 }, (table) => [
 	index("idx_hyrox_workouts_completed").using("btree", table.completed.asc().nullsLast().op("bool_ops")),
 	index("idx_hyrox_workouts_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
-	pgPolicy("Users can delete their own hyrox workouts", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("Users can insert their own hyrox workouts", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("Users can update their own hyrox workouts", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can view their own Hyrox workouts", { as: "permissive", for: "all", to: ["public"] }),
-	pgPolicy("Users can view their own hyrox workouts", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("hyrox_workouts_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("hyrox_workouts_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("hyrox_workouts_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("hyrox_workouts_update", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("authenticated_access", { as: "permissive", for: "all", to: ["authenticated"] }),
+	pgPolicy("hyrox_workouts_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("hyrox_workouts_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("hyrox_workouts_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("hyrox_workouts_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 ]);
 
 export const hyroxWorkoutStations = pgTable("hyrox_workout_stations", {
@@ -320,23 +276,15 @@ export const hyroxWorkoutStations = pgTable("hyrox_workout_stations", {
 	completed: boolean().default(false),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).default(sql`timezone('utc'::text, now())`),
 	userIds: text("user_ids").array().default([""]),
-	userId: uuid("user_id").default(sql`auth.uid()`).notNull(),
+	userId: uuid("user_id").notNull(),
 }, (table) => [
 	index("idx_hyrox_workout_stations_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
 	index("idx_hyrox_workout_stations_user_ids").using("gin", table.userIds.asc().nullsLast().op("array_ops")),
 	index("idx_hyrox_workout_stations_workout_id").using("btree", table.workoutId.asc().nullsLast().op("uuid_ops")),
-	pgPolicy("Users can delete their own hyrox records", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id = auth.uid())` }),
-	pgPolicy("Users can delete their own hyrox station records", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("Users can insert their own hyrox records", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("Users can insert their own hyrox station records", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("Users can update their own hyrox records", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can update their own hyrox station records", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can view their own hyrox records", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("Users can view their own hyrox station records", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("hyrox_station_records_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("hyrox_station_records_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("hyrox_station_records_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("hyrox_station_records_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("hyrox_workout_stations_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("hyrox_workout_stations_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("hyrox_workout_stations_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("hyrox_workout_stations_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 	check("hyrox_station_records_station_type_check", sql`station_type = ANY (ARRAY['run'::text, 'exercise'::text])`),
 ]);
 
@@ -359,14 +307,10 @@ export const journal = pgTable("journal", {
 	index("idx_journal_created_at").using("btree", table.createdAt.desc().nullsFirst().op("timestamptz_ops")),
 	index("idx_journal_entry_type").using("btree", table.entryType.asc().nullsLast().op("text_ops")),
 	index("idx_journal_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
-	pgPolicy("Users can delete their own journal entries", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("Users can insert their own journal entries", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("Users can update their own journal entries", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can view their own journal entries", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("journal_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("journal_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("journal_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("journal_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("journal_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("journal_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("journal_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("journal_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 ]);
 
 export const userFeaturePreferences = pgTable("user_feature_preferences", {
@@ -379,14 +323,10 @@ export const userFeaturePreferences = pgTable("user_feature_preferences", {
 }, (table) => [
 	index("idx_user_feature_preferences_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
 	unique("user_feature_preferences_user_id_feature_name_key").on(table.userId, table.featureName),
-	pgPolicy("Users can delete their own feature preferences", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("Users can insert their own feature preferences", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("Users can update their own feature preferences", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can view their own feature preferences", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("user_feature_preferences_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("user_feature_preferences_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("user_feature_preferences_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("user_feature_preferences_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("user_feature_preferences_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("user_feature_preferences_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("user_feature_preferences_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("user_feature_preferences_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 ]);
 
 export const helloWorldEntries = pgTable("hello_world_entries", {
@@ -399,14 +339,10 @@ export const helloWorldEntries = pgTable("hello_world_entries", {
 	index("idx_hello_world_entries_created_at").using("btree", table.createdAt.desc().nullsFirst().op("timestamptz_ops")),
 	index("idx_hello_world_entries_user_created").using("btree", table.userId.asc().nullsLast().op("timestamptz_ops"), table.createdAt.desc().nullsFirst().op("uuid_ops")),
 	index("idx_hello_world_entries_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
-	pgPolicy("Users can delete their own hello world entries", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("Users can insert their own hello world entries", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("Users can update their own hello world entries", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can view their own hello world entries", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("hello_world_entries_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("hello_world_entries_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("hello_world_entries_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("hello_world_entries_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("hello_world_entries_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("hello_world_entries_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("hello_world_entries_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("hello_world_entries_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 ]);
 
 export const majorProjects = pgTable("major_projects", {
@@ -421,14 +357,10 @@ export const majorProjects = pgTable("major_projects", {
 	index("idx_major_projects_created_at").using("btree", table.createdAt.desc().nullsFirst().op("timestamptz_ops")),
 	index("idx_major_projects_due_date").using("btree", table.projectDueDate.asc().nullsLast().op("date_ops")),
 	index("idx_major_projects_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
-	pgPolicy("Users can delete their own projects", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("Users can insert their own projects", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("Users can update their own projects", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can view their own projects", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("major_projects_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("major_projects_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("major_projects_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("major_projects_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("major_projects_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("major_projects_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("major_projects_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("major_projects_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 ]);
 
 export const contributionGraph = pgTable("contribution_graph", {
@@ -444,14 +376,10 @@ export const contributionGraph = pgTable("contribution_graph", {
 	index("idx_contribution_graph_user_goal_box").using("btree", table.userId.asc().nullsLast().op("int4_ops"), table.goalId.asc().nullsLast().op("uuid_ops"), table.boxIndex.asc().nullsLast().op("uuid_ops")),
 	index("idx_contribution_graph_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
 	unique("contribution_graph_user_id_goal_id_box_index_key").on(table.userId, table.goalId, table.boxIndex),
-	pgPolicy("Users can delete own contribution graph", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("Users can insert own contribution graph", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("Users can update own contribution graph", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can view own contribution graph", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("contribution_graph_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("contribution_graph_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("contribution_graph_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("contribution_graph_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("contribution_graph_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("contribution_graph_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("contribution_graph_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("contribution_graph_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 	check("contribution_graph_box_index_check", sql`(box_index >= 0) AND (box_index < 18)`),
 	check("contribution_graph_color_check", sql`(color)::text = ANY ((ARRAY['light-grey'::character varying, 'dark-grey'::character varying, 'black'::character varying, 'green'::character varying, 'red'::character varying])::text[])`),
 ]);
@@ -465,14 +393,10 @@ export const winterArcGoals = pgTable("winter_arc_goals", {
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [
 	index("idx_winter_arc_goals_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
-	pgPolicy("Users can delete their own winter arc goals", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("Users can insert their own winter arc goals", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("Users can update their own winter arc goals", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can view their own winter arc goals", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("winter_arc_goals_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("winter_arc_goals_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("winter_arc_goals_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("winter_arc_goals_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("winter_arc_goals_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("winter_arc_goals_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("winter_arc_goals_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("winter_arc_goals_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 ]);
 
 export const quotes = pgTable("quotes", {
@@ -485,11 +409,10 @@ export const quotes = pgTable("quotes", {
 }, (table) => [
 	index("quotes_created_at_idx").using("btree", table.createdAt.desc().nullsFirst().op("timestamptz_ops")),
 	index("quotes_user_id_idx").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
-	pgPolicy("Users can view their own quotes", { as: "permissive", for: "select", to: ["public"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("quotes_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("quotes_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("quotes_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("quotes_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("quotes_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("quotes_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("quotes_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("quotes_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 ]);
 
 export const travel = pgTable("travel", {
@@ -507,14 +430,10 @@ export const travel = pgTable("travel", {
 	index("idx_travel_created_at").using("btree", table.createdAt.desc().nullsFirst().op("timestamptz_ops")),
 	index("idx_travel_user_category").using("btree", table.userId.asc().nullsLast().op("text_ops"), table.category.asc().nullsLast().op("text_ops")),
 	index("idx_travel_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
-	pgPolicy("Users can delete their own travel tasks", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("Users can insert their own travel tasks", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("Users can update their own travel tasks", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can view their own travel tasks", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("travel_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("travel_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("travel_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("travel_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("travel_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("travel_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("travel_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("travel_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 	check("travel_category_check", sql`(category)::text = ANY ((ARRAY['todo'::character varying, 'packing_list'::character varying, 'morning_routine'::character varying])::text[])`),
 ]);
 
@@ -534,14 +453,10 @@ export const travelActivities = pgTable("travel_activities", {
 	index("idx_travel_activities_start_date").using("btree", table.startDate.asc().nullsLast().op("date_ops")),
 	index("idx_travel_activities_type").using("btree", table.activityType.asc().nullsLast().op("text_ops")),
 	index("idx_travel_activities_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
-	pgPolicy("Users can delete their own travel activities", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("Users can insert their own travel activities", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("Users can update their own travel activities", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can view their own travel activities", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("travel_activities_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("travel_activities_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("travel_activities_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("travel_activities_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("travel_activities_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("travel_activities_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("travel_activities_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("travel_activities_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 	check("travel_activities_activity_type_check", sql`(activity_type)::text = ANY ((ARRAY['stay'::character varying, 'event'::character varying])::text[])`),
 ]);
 
@@ -558,10 +473,10 @@ export const travelFlights = pgTable("travel_flights", {
 }, (table) => [
 	index("idx_travel_flights_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
 	index("idx_travel_flights_sort_order").using("btree", table.sortOrder.asc().nullsLast().op("int4_ops")),
-	pgPolicy("Users can view their own travel flights", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("Users can insert their own travel flights", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("Users can update their own travel flights", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can delete their own travel flights", { as: "permissive", for: "delete", to: ["public"] }),
+	pgPolicy("travel_flights_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("travel_flights_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("travel_flights_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("travel_flights_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 ]);
 
 export const ohtaniGridCells = pgTable("ohtani_grid_cells", {
@@ -576,14 +491,10 @@ export const ohtaniGridCells = pgTable("ohtani_grid_cells", {
 	index("idx_ohtani_grid_cells_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
 	index("idx_ohtani_grid_cells_user_position").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.rowIndex.asc().nullsLast().op("uuid_ops"), table.colIndex.asc().nullsLast().op("uuid_ops")),
 	unique("ohtani_grid_cells_user_id_row_index_col_index_key").on(table.userId, table.rowIndex, table.colIndex),
-	pgPolicy("Users can delete their own ohtani grid cells", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("Users can insert their own ohtani grid cells", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("Users can update their own ohtani grid cells", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can view their own ohtani grid cells", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("ohtani_grid_cells_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("ohtani_grid_cells_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("ohtani_grid_cells_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("ohtani_grid_cells_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("ohtani_grid_cells_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("ohtani_grid_cells_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("ohtani_grid_cells_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("ohtani_grid_cells_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 	check("ohtani_grid_cells_col_index_check", sql`(col_index >= 0) AND (col_index <= 8)`),
 	check("ohtani_grid_cells_row_index_check", sql`(row_index >= 0) AND (row_index <= 8)`),
 ]);
@@ -598,13 +509,27 @@ export const user = pgTable("user", {
 	updatedAt: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
 	firstName: text(),
 	lastName: text(),
+	twoFactorEnabled: boolean().default(false),
 }, (table) => [
 	index("idx_user_email").using("btree", table.email.asc().nullsLast().op("text_ops")),
 	unique("user_email_key").on(table.email),
-	pgPolicy("Users can update own profile", { as: "permissive", for: "update", to: ["authenticated"], using: sql`(id = (auth.uid())::text)`, withCheck: sql`(id = (auth.uid())::text)`  }),
-	pgPolicy("Users can view own profile", { as: "permissive", for: "select", to: ["authenticated"] }),
-	pgPolicy("user_all_operations", { as: "permissive", for: "all", to: ["public"] }),
-	pgPolicy("user_select_own", { as: "permissive", for: "select", to: ["public"] }),
+	pgPolicy("user_rls_all", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
+]);
+
+export const twoFactor = pgTable("twoFactor", {
+	id: text().primaryKey().notNull(),
+	secret: text().notNull(),
+	backupCodes: text().notNull(),
+	userId: text().notNull(),
+}, (table) => [
+	index("idx_two_factor_secret").using("btree", table.secret.asc().nullsLast().op("text_ops")),
+	index("idx_two_factor_user_id").using("btree", table.userId.asc().nullsLast().op("text_ops")),
+	foreignKey({
+		columns: [table.userId],
+		foreignColumns: [user.id],
+		name: "twoFactor_userId_fkey"
+	}).onDelete("cascade"),
+	pgPolicy("twoFactor_rls_all", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
 ]);
 
 export const knowledgeArticles = pgTable("knowledge_articles", {
@@ -633,10 +558,10 @@ export const knowledgeArticles = pgTable("knowledge_articles", {
 			foreignColumns: [knowledgeCollections.id],
 			name: "knowledge_articles_collection_id_fkey"
 		}).onDelete("set null"),
-	pgPolicy("knowledge_articles_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id = (app.current_user_id())::uuid)` }),
-	pgPolicy("knowledge_articles_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("knowledge_articles_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("knowledge_articles_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("knowledge_articles_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("knowledge_articles_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("knowledge_articles_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("knowledge_articles_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 	check("knowledge_articles_status_check", sql`(status)::text = ANY ((ARRAY['draft'::character varying, 'published'::character varying])::text[])`),
 ]);
 
@@ -658,10 +583,7 @@ export const session = pgTable("session", {
 			name: "session_userId_fkey"
 		}).onDelete("cascade"),
 	unique("session_token_key").on(table.token),
-	pgPolicy("Users can delete own sessions", { as: "permissive", for: "delete", to: ["authenticated"], using: sql`("userId" = (auth.uid())::text)` }),
-	pgPolicy("Users can view own sessions", { as: "permissive", for: "select", to: ["authenticated"] }),
-	pgPolicy("session_all_operations", { as: "permissive", for: "all", to: ["public"] }),
-	pgPolicy("session_select_own", { as: "permissive", for: "select", to: ["public"] }),
+	pgPolicy("session_rls_all", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
 ]);
 
 export const account = pgTable("account", {
@@ -685,9 +607,7 @@ export const account = pgTable("account", {
 			foreignColumns: [user.id],
 			name: "account_userId_fkey"
 		}).onDelete("cascade"),
-	pgPolicy("Users can view own accounts", { as: "permissive", for: "select", to: ["authenticated"], using: sql`("userId" = (auth.uid())::text)` }),
-	pgPolicy("account_all_operations", { as: "permissive", for: "all", to: ["public"] }),
-	pgPolicy("account_select_own", { as: "permissive", for: "select", to: ["public"] }),
+	pgPolicy("account_rls_all", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
 ]);
 
 export const verification = pgTable("verification", {
@@ -698,7 +618,7 @@ export const verification = pgTable("verification", {
 	createdAt: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [
-	pgPolicy("verification_all_operations", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true`  }),
+	pgPolicy("verification_rls_all", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
 ]);
 
 export const knowledgeCollections = pgTable("knowledge_collections", {
@@ -712,10 +632,10 @@ export const knowledgeCollections = pgTable("knowledge_collections", {
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [
 	index("idx_knowledge_collections_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
-	pgPolicy("knowledge_collections_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id = (app.current_user_id())::uuid)` }),
-	pgPolicy("knowledge_collections_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("knowledge_collections_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("knowledge_collections_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("knowledge_collections_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("knowledge_collections_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("knowledge_collections_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("knowledge_collections_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 ]);
 
 export const hyroxStationRecords = pgTable("hyrox_station_records", {
@@ -731,10 +651,10 @@ export const hyroxStationRecords = pgTable("hyrox_station_records", {
 }, (table) => [
 	index("idx_hyrox_station_records_user_id").using("btree", table.userId.asc().nullsLast().op("text_ops")),
 	unique("hyrox_station_records_user_id_station_name_key").on(table.userId, table.stationName),
-	pgPolicy("hyrox_station_records_delete", { as: "permissive", for: "delete", to: ["public"] }),
-	pgPolicy("hyrox_station_records_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("hyrox_station_records_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("hyrox_station_records_update", { as: "permissive", for: "update", to: ["public"] }),
+	pgPolicy("hyrox_station_records_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("hyrox_station_records_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("hyrox_station_records_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("hyrox_station_records_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 	check("hyrox_station_records_station_type_check", sql`station_type = ANY (ARRAY['run'::text, 'exercise'::text])`),
 ]);
 
@@ -751,14 +671,10 @@ export const ariLaunchEntries = pgTable("ari_launch_entries", {
 	index("idx_ari_launch_entries_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
 	index("idx_ari_launch_entries_user_day").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.dayNumber.asc().nullsLast().op("int4_ops")),
 	index("idx_ari_launch_entries_order").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.dayNumber.asc().nullsLast().op("int4_ops"), table.orderIndex.asc().nullsLast().op("int4_ops")),
-	pgPolicy("Users can view their own ari_launch_entries", { as: "permissive", for: "select", to: ["public"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("Users can insert their own ari_launch_entries", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("Users can update their own ari_launch_entries", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("Users can delete their own ari_launch_entries", { as: "permissive", for: "delete", to: ["public"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("ari_launch_entries_select", { as: "permissive", for: "select", to: ["public"] }),
-	pgPolicy("ari_launch_entries_insert", { as: "permissive", for: "insert", to: ["public"] }),
-	pgPolicy("ari_launch_entries_update", { as: "permissive", for: "update", to: ["public"] }),
-	pgPolicy("ari_launch_entries_delete", { as: "permissive", for: "delete", to: ["public"] }),
+	pgPolicy("ari_launch_entries_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("ari_launch_entries_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("ari_launch_entries_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("ari_launch_entries_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
 	check("ari_launch_entries_day_number_check", sql`(day_number >= 1) AND (day_number <= 45)`),
 ]);
 
