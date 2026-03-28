@@ -23,8 +23,7 @@ interface Task {
 
 interface Contact {
   id: string
-  first_name: string
-  last_name: string
+  name: string
   created_at: string
 }
 
@@ -210,7 +209,7 @@ export function useDashboardRecentActivity(tasksEnabled: boolean, contactsEnable
                 id: `contact_added_${contact.id}`,
                 type: 'contact_added',
                 title: 'Contact Added',
-                description: `${contact.first_name} ${contact.last_name}`,
+                description: contact.name,
                 timestamp: contact.created_at,
               })
             })

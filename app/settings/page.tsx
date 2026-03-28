@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TopBar } from "@/components/top-bar"
-import { Check, Sparkles, TimerReset } from "lucide-react"
+import { Check, TimerReset } from "lucide-react"
 import {
   GeneralTab,
   ThemesTab,
@@ -29,7 +29,6 @@ import {
 import {
   type Session,
   type NotificationSettings,
-  type BetaFeatureSettings,
   type BackupStats,
   type BackupMessage,
   type ImportProgress,
@@ -50,12 +49,6 @@ export default function SettingsPage(): React.ReactElement {
   const [workspaceName, setWorkspaceName] = useState("Ari Operations")
   const [workspaceTagline, setWorkspaceTagline] = useState("Resilient workflows for focused teams")
   const [landingView, setLandingView] = useState("dashboard")
-  const [betaFeatures, setBetaFeatures] = useState<BetaFeatureSettings>({
-    smartPriorities: true,
-    predictiveScheduling: false,
-    aiMeetingNotes: false,
-  })
-
   // Notifications tab state
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
     taskReminders: true,
@@ -123,9 +116,6 @@ export default function SettingsPage(): React.ReactElement {
     }, 800)
   }
 
-  function toggleBetaFeature(key: keyof BetaFeatureSettings): void {
-    setBetaFeatures(prev => ({ ...prev, [key]: !prev[key] }))
-  }
 
   function toggleNotification(key: keyof NotificationSettings): void {
     setNotificationSettings(prev => ({ ...prev, [key]: !prev[key] }))
@@ -441,8 +431,7 @@ export default function SettingsPage(): React.ReactElement {
                       Rerun Setup
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => window.location.href = "/debug"}>
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      Run Diagnostics
+                      Debug
                     </Button>
                     <Button size="sm" onClick={handleSaveChanges} disabled={isSaving}>
                       {isSaving ? (
@@ -470,8 +459,6 @@ export default function SettingsPage(): React.ReactElement {
                     onWorkspaceTaglineChange={setWorkspaceTagline}
                     landingView={landingView}
                     onLandingViewChange={setLandingView}
-                    betaFeatures={betaFeatures}
-                    onBetaFeatureToggle={toggleBetaFeature}
                   />
                 </TabsContent>
 
