@@ -16,9 +16,7 @@ function createPool(): Pool | null {
     idleTimeoutMillis: 10000,
     connectionTimeoutMillis: 15000,
     allowExitOnIdle: true,
-    ssl: process.env.NODE_ENV === 'production'
-      ? true
-      : { rejectUnauthorized: false },
+    ssl: { rejectUnauthorized: false },
   })
 
   p.on("error", (err) => {
