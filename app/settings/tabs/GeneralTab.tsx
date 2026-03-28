@@ -5,12 +5,10 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Palette, Sparkles } from "lucide-react"
 import { WorkspaceIdentitySection } from "./WorkspaceIdentitySection"
-import type { BetaFeatureSettings } from "../types"
 
 interface GeneralTabProps {
   themePreference: string
@@ -21,8 +19,6 @@ interface GeneralTabProps {
   onWorkspaceTaglineChange: (value: string) => void
   landingView: string
   onLandingViewChange: (value: string) => void
-  betaFeatures: BetaFeatureSettings
-  onBetaFeatureToggle: (key: keyof BetaFeatureSettings) => void
 }
 
 export function GeneralTab({
@@ -34,8 +30,6 @@ export function GeneralTab({
   onWorkspaceTaglineChange,
   landingView,
   onLandingViewChange,
-  betaFeatures,
-  onBetaFeatureToggle,
 }: GeneralTabProps): React.ReactElement {
   return (
     <div className="space-y-6">
@@ -160,49 +154,6 @@ export function GeneralTab({
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Sparkles className="h-5 w-5 text-rose-500" />
-            Beta lab
-          </CardTitle>
-          <CardDescription>
-            Experiment with upcoming intelligence features before general release.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-start justify-between rounded-lg border p-4">
-            <div className="pr-4">
-              <p className="text-sm font-medium">Smart priorities</p>
-              <p className="text-sm text-muted-foreground">AI reorders tasks based on urgency, dependencies, and team load.</p>
-            </div>
-            <Switch
-              checked={betaFeatures.smartPriorities}
-              onCheckedChange={() => onBetaFeatureToggle("smartPriorities")}
-            />
-          </div>
-          <div className="flex items-start justify-between rounded-lg border p-4">
-            <div className="pr-4">
-              <p className="text-sm font-medium">Predictive scheduling</p>
-              <p className="text-sm text-muted-foreground">Auto-distribute open tasks across the week with sprint-friendly pacing.</p>
-            </div>
-            <Switch
-              checked={betaFeatures.predictiveScheduling}
-              onCheckedChange={() => onBetaFeatureToggle("predictiveScheduling")}
-            />
-          </div>
-          <div className="flex items-start justify-between rounded-lg border p-4">
-            <div className="pr-4">
-              <p className="text-sm font-medium">AI meeting notes</p>
-              <p className="text-sm text-muted-foreground">Attach transcripts, highlights, and follow-ups to meeting records.</p>
-            </div>
-            <Switch
-              checked={betaFeatures.aiMeetingNotes}
-              onCheckedChange={() => onBetaFeatureToggle("aiMeetingNotes")}
-            />
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

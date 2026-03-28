@@ -33,8 +33,7 @@ interface Quote {
 
 interface Contact {
   id: string
-  first_name: string
-  last_name: string
+  name: string
   created_at: string
 }
 
@@ -205,7 +204,7 @@ function useFlashRecentActivity(tasksEnabled: boolean, contactsEnabled: boolean)
                   id: `contact_${contact.id}`,
                   type: 'contact_added',
                   title: 'Contact Added',
-                  description: `${contact.first_name} ${contact.last_name}`,
+                  description: contact.name,
                   timestamp: contact.created_at,
                 })
               })

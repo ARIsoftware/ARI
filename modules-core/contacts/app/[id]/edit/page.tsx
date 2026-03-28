@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -37,15 +37,20 @@ interface ContactFormData {
   nextContactDate?: Date
 }
 
-export default function EditContactPage({ params }: { params: Promise<{ id: string }> }) {
+export default function EditContactPage() {
   const router = useRouter()
   const { toast } = useToast()
   const { session, supabase } = useSupabase()
-  const [loading, setLoading] = useState(true)
+
+  // Get params from URL - works with both direct routing and catch-all module routing
+  const routeParams = useParams()
+  const id = (routeParams.id as string) || (routeParams.slug as string[])?.[0] || 'new'
+
+  const [loading, setLoading] = useState(id !== 'new')
   const [saving, setSaving] = useState(false)
-  const [contactId, setContactId] = useState<string | null>(null)
-  const [isNewContact, setIsNewContact] = useState(false)
-  
+  const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({})
+  const isNewContact = id === 'new'
+
   const [formData, setFormData] = useState<ContactFormData>({
     name: "",
     email: "",
@@ -60,21 +65,10 @@ export default function EditContactPage({ params }: { params: Promise<{ id: stri
   })
 
   useEffect(() => {
-    const initializeParams = async () => {
-      const resolvedParams = await params
-      const id = resolvedParams.id
-      setContactId(id)
-      setIsNewContact(id === 'new')
-      
-      if (id !== 'new') {
-        loadContact(id)
-      } else {
-        setLoading(false)
-      }
+    if (id !== 'new') {
+      loadContact(id)
     }
-    
-    initializeParams()
-  }, [])
+  }, [id])
 
   const loadContact = async (id: string) => {
     try {
@@ -117,11 +111,20 @@ export default function EditContactPage({ params }: { params: Promise<{ id: stri
 
   const handleInputChange = (field: keyof ContactFormData, value: string | Date | undefined) => {
     setFormData(prev => ({ ...prev, [field]: value }))
+    if (fieldErrors[field]) {
+      setFieldErrors(prev => ({ ...prev, [field]: false }))
+    }
   }
 
   const handleSave = async () => {
     // Validate required fields
-    if (!formData.name || !formData.email || !formData.phone) {
+    const errors: Record<string, boolean> = {}
+    if (!formData.name) errors.name = true
+    if (!formData.email) errors.email = true
+    if (!formData.phone) errors.phone = true
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
       toast({
         title: "Validation Error",
         description: "Please fill in all required fields",
@@ -154,8 +157,8 @@ export default function EditContactPage({ params }: { params: Promise<{ id: stri
           title: "Success",
           description: "Contact created successfully",
         })
-      } else if (contactId) {
-        await updateContact(contactId, contactData, tokenFn)
+      } else if (id) {
+        await updateContact(id, contactData, tokenFn)
         toast({
           title: "Success",
           description: "Contact updated successfully",
@@ -232,6 +235,7 @@ export default function EditContactPage({ params }: { params: Promise<{ id: stri
                           value={formData.name}
                           onChange={(e) => handleInputChange("name", e.target.value)}
                           placeholder="Enter full name"
+                          className={fieldErrors.name ? "ring-2 ring-red-500 border-red-500" : ""}
                         />
                       </div>
                       <div className="space-y-2">
@@ -263,6 +267,7 @@ export default function EditContactPage({ params }: { params: Promise<{ id: stri
                           value={formData.email}
                           onChange={(e) => handleInputChange("email", e.target.value)}
                           placeholder="email@example.com"
+                          className={fieldErrors.email ? "ring-2 ring-red-500 border-red-500" : ""}
                         />
                       </div>
                       <div className="space-y-2">
@@ -273,6 +278,7 @@ export default function EditContactPage({ params }: { params: Promise<{ id: stri
                           value={formData.phone}
                           onChange={(e) => handleInputChange("phone", e.target.value)}
                           placeholder="+1 (555) 123-4567"
+                          className={fieldErrors.phone ? "ring-2 ring-red-500 border-red-500" : ""}
                         />
                       </div>
                     </div>
