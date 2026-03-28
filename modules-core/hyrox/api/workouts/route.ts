@@ -3,7 +3,7 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, validateQueryParams, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
 import { completeHyroxWorkoutSchema, paginationSchema } from '@/lib/validation'
 import { hyroxWorkouts } from '@/lib/db/schema'
-import { eq, desc, sql } from 'drizzle-orm'
+import { eq, desc, sql, and } from 'drizzle-orm'
 
 export async function GET(req: NextRequest) {
   try {
@@ -23,11 +23,10 @@ export async function GET(req: NextRequest) {
 
     const { limit } = queryValidation.data
 
-    // RLS automatically filters by user_id
     const data = await withRLS((db) =>
       db.select()
         .from(hyroxWorkouts)
-        .where(eq(hyroxWorkouts.completed, true))
+        .where(and(eq(hyroxWorkouts.userId, user.id), eq(hyroxWorkouts.completed, true)))
         .orderBy(desc(hyroxWorkouts.completedAt))
         .limit(limit)
     )
@@ -87,7 +86,6 @@ export async function PUT(req: NextRequest) {
 
     const { workoutId, totalTime } = validation.data
 
-    // RLS automatically ensures user can only update their own workouts
     const data = await withRLS((db) =>
       db.update(hyroxWorkouts)
         .set({
@@ -95,7 +93,7 @@ export async function PUT(req: NextRequest) {
           completed: true,
           completedAt: sql`timezone('utc'::text, now())`,
         })
-        .where(eq(hyroxWorkouts.id, workoutId))
+        .where(and(eq(hyroxWorkouts.id, workoutId), eq(hyroxWorkouts.userId, user.id)))
         .returning()
     )
 

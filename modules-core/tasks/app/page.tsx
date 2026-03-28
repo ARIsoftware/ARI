@@ -13,8 +13,7 @@ import { useState, useEffect, useMemo } from "react"
 import { toggleTaskCompletion, toggleTaskPin, reorderTasks, deleteTask, updateTask, type Task } from "../lib/utils"
 import { useTasks } from "../hooks/use-tasks"
 import { useQueryClient } from "@tanstack/react-query"
-import { getMajorProjects } from "@/modules/major-projects/lib/utils"
-import type { MajorProject } from "@/modules/major-projects/types"
+interface MajorProject { id: string; project_name: string; [key: string]: any }
 import { useFeatures } from "@/lib/features-context"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
@@ -143,7 +142,8 @@ export default function TasksPage() {
     const loadProjects = async () => {
       if (isFeatureEnabled('major-projects')) {
         try {
-          const projectsData = await getMajorProjects()
+          const res = await fetch('/api/modules/major-projects/data')
+          const projectsData = res.ok ? await res.json() : []
           setProjects(projectsData)
         } catch (error) {
           console.error('Failed to load projects:', error)

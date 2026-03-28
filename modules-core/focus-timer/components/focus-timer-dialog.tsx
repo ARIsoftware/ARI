@@ -4,22 +4,9 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Clock, StopCircle } from "lucide-react"
+import { getGlobalTimerState } from "@/lib/focus-timer-state"
 
-// Use global window object to ensure state is shared across components
-let globalTimerState = {
-  isActive: false,
-  timeRemaining: 0,
-  listeners: [] as Array<(isActive: boolean, timeRemaining: number) => void>
-}
-
-// Make sure we're using the same global state across components
-if (typeof window !== 'undefined') {
-  if ((window as any).globalTimerState) {
-    globalTimerState = (window as any).globalTimerState
-  } else {
-    (window as any).globalTimerState = globalTimerState
-  }
-}
+const globalTimerState = getGlobalTimerState()
 
 /**
  * Helper function to update global timer state and notify listeners
@@ -35,7 +22,6 @@ function updateGlobalState(isActive: boolean, timeRemaining: number, setIsTimerA
 
 /**
  * FocusTimerDialog - Controlled dialog component for selecting focus time
- * Used by both the FocusTimer button and FocusTimerTopBarIcon
  */
 export function FocusTimerDialog({
   open,
@@ -145,7 +131,7 @@ export function FocusTimerDialog({
 
 /**
  * FocusTimer - Button component that shows the focus timer dialog
- * Used in the tasks page header
+ * Can be used by other modules (e.g., tasks page header)
  */
 export function FocusTimer() {
   const [isSelectOpen, setIsSelectOpen] = useState(false)

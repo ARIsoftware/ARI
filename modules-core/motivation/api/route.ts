@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { createErrorResponse } from '@/lib/api-helpers'
 import { motivationContent } from '@/lib/db/schema'
-import { eq, asc, desc } from 'drizzle-orm'
+import { eq, asc, desc, and } from 'drizzle-orm'
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,10 +12,10 @@ export async function GET(request: NextRequest) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // RLS automatically filters by user_id
     const data = await withRLS((db) =>
       db.select()
         .from(motivationContent)
+        .where(eq(motivationContent.userId, user.id))
         .orderBy(asc(motivationContent.position), desc(motivationContent.createdAt))
     )
 
@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
     const maxPosResult = await withRLS((db) =>
       db.select({ position: motivationContent.position })
         .from(motivationContent)
+        .where(eq(motivationContent.userId, user.id))
         .orderBy(desc(motivationContent.position))
         .limit(1)
     )
@@ -89,7 +90,7 @@ export async function DELETE(request: NextRequest) {
 
     await withRLS((db) =>
       db.delete(motivationContent)
-        .where(eq(motivationContent.id, id))
+        .where(and(eq(motivationContent.id, id), eq(motivationContent.userId, user.id)))
     )
 
     return NextResponse.json({ success: true })

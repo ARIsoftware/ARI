@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     const includeDeleted = searchParams.get('include_deleted') === 'true'
 
     // Build conditions
-    const conditions = []
+    const conditions = [eq(documentFolders.userId, user.id)]
     if (!includeDeleted) {
       conditions.push(isNull(documentFolders.deletedAt))
     }
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
         count: count(documents.id),
       })
         .from(documents)
-        .where(isNull(documents.deletedAt))
+        .where(and(eq(documents.userId, user.id), isNull(documents.deletedAt)))
         .groupBy(documents.folderId)
     )
 
@@ -147,6 +147,7 @@ export async function POST(request: NextRequest) {
         db.select()
           .from(documentFolders)
           .where(and(
+            eq(documentFolders.userId, user.id),
             eq(documentFolders.id, parent_id),
             isNull(documentFolders.deletedAt)
           ))

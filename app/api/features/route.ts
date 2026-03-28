@@ -20,9 +20,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([])
     }
 
-    // Fetch user's feature preferences (RLS filters automatically)
     const data = await withRLS((db) =>
-      db.select().from(userFeaturePreferences)
+      db.select().from(userFeaturePreferences).where(eq(userFeaturePreferences.userId, user.id))
     )
 
     return NextResponse.json(toSnakeCase(data) || [])
@@ -46,11 +45,10 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // Check if preference exists (RLS filters automatically)
     const existing = await withRLS((db) =>
       db.select({ id: userFeaturePreferences.id })
         .from(userFeaturePreferences)
-        .where(eq(userFeaturePreferences.featureName, feature_name))
+        .where(and(eq(userFeaturePreferences.userId, user.id), eq(userFeaturePreferences.featureName, feature_name)))
         .limit(1)
     )
 

@@ -3,7 +3,7 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, validateQueryParams, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
 import { z } from 'zod'
 import { quotes } from '@/lib/db/schema'
-import { eq, desc, sql } from 'drizzle-orm'
+import { eq, desc, sql, and } from 'drizzle-orm'
 
 // Validation schemas
 const createQuoteSchema = z.object({
@@ -33,10 +33,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // RLS automatically filters by user_id
     const data = await withRLS((db) =>
       db.select()
         .from(quotes)
+        .where(eq(quotes.userId, user.id))
         .orderBy(desc(quotes.createdAt))
     )
 
@@ -94,14 +94,13 @@ export async function PUT(request: NextRequest) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // RLS automatically ensures user can only update their own quotes
     const data = await withRLS((db) =>
       db.update(quotes)
         .set({
           ...updates,
           updatedAt: sql`timezone('utc'::text, now())`
         })
-        .where(eq(quotes.id, id))
+        .where(and(eq(quotes.id, id), eq(quotes.userId, user.id)))
         .returning()
     )
 
@@ -133,9 +132,8 @@ export async function DELETE(request: NextRequest) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // RLS automatically ensures user can only delete their own quotes
     await withRLS((db) =>
-      db.delete(quotes).where(eq(quotes.id, id))
+      db.delete(quotes).where(and(eq(quotes.id, id), eq(quotes.userId, user.id)))
     )
 
     return NextResponse.json({ success: true })

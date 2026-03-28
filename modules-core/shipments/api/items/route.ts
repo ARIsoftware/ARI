@@ -3,7 +3,7 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
 import { createShipmentSchema, updateShipmentSchema } from '@/modules/shipments/lib/validation'
 import { shipments } from '@/lib/db/schema'
-import { eq, desc } from 'drizzle-orm'
+import { eq, desc, and } from 'drizzle-orm'
 
 /**
  * Shipments API - Consolidated Route
@@ -29,11 +29,11 @@ export async function GET(request: NextRequest) {
     const id = searchParams.get('id')
 
     if (id) {
-      // Fetch single shipment (RLS filters automatically)
+      // Fetch single shipment
       const data = await withRLS((db) =>
         db.select()
           .from(shipments)
-          .where(eq(shipments.id, id))
+          .where(and(eq(shipments.id, id), eq(shipments.userId, user.id)))
           .limit(1)
       )
 
@@ -43,9 +43,9 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json(toSnakeCase(data[0]))
     } else {
-      // Fetch all shipments (RLS filters automatically)
+      // Fetch all shipments
       const data = await withRLS((db) =>
-        db.select().from(shipments).orderBy(desc(shipments.createdAt))
+        db.select().from(shipments).where(eq(shipments.userId, user.id)).orderBy(desc(shipments.createdAt))
       )
 
       return NextResponse.json(toSnakeCase(data) || [])

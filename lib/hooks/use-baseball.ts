@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { BaseballPlayer, BaseballTeam, CreatePlayerRequest, CreateTeamRequest, UpdatePlayerRequest, UpdateTeamRequest } from '@/modules/baseball/types'
+import type { BaseballPlayer, BaseballTeam, CreatePlayerRequest, CreateTeamRequest, UpdatePlayerRequest, UpdateTeamRequest } from '@/modules-core/baseball/types'
 
 const PLAYERS_KEY = ['baseball-players']
 const TEAMS_KEY = ['baseball-teams']

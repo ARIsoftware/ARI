@@ -54,11 +54,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Query database for entry on this date (RLS filters automatically)
     const data = await withRLS((db) =>
       db.select()
         .from(gratitudeEntries)
-        .where(eq(gratitudeEntries.entryDate, date))
+        .where(and(eq(gratitudeEntries.userId, user.id), eq(gratitudeEntries.entryDate, date)))
         .limit(1)
     )
 
@@ -109,11 +108,11 @@ export async function POST(request: NextRequest) {
 
     const { entry_date, question1, question2, question3, question4, question5 } = parseResult.data
 
-    // Check if entry exists for this date (RLS filters automatically)
+    // Check if entry exists for this date
     const existing = await withRLS((db) =>
       db.select({ id: gratitudeEntries.id })
         .from(gratitudeEntries)
-        .where(eq(gratitudeEntries.entryDate, entry_date))
+        .where(and(eq(gratitudeEntries.userId, user.id), eq(gratitudeEntries.entryDate, entry_date)))
         .limit(1)
     )
 
@@ -130,7 +129,7 @@ export async function POST(request: NextRequest) {
             question5: question5 || null,
             updatedAt: sql`timezone('utc'::text, now())`
           })
-          .where(eq(gratitudeEntries.id, existing[0].id))
+          .where(and(eq(gratitudeEntries.id, existing[0].id), eq(gratitudeEntries.userId, user.id)))
           .returning()
       )
       entry = updated[0]

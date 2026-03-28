@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { createErrorResponse } from '@/lib/api-helpers'
 import { notepad, notepadRevisions } from '@/lib/db/schema'
-import { eq, desc, max, sql } from 'drizzle-orm'
+import { eq, desc, max, sql, and } from 'drizzle-orm'
 
 const MAX_CONTENT_LENGTH = 6000
 
@@ -14,10 +14,10 @@ export async function GET(request: NextRequest) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // RLS automatically filters by user_id
     const data = await withRLS((db) =>
       db.select({ content: notepad.content, updatedAt: notepad.updatedAt })
         .from(notepad)
+        .where(eq(notepad.userId, user.id))
         .limit(1)
     )
 
@@ -61,10 +61,12 @@ export async function POST(request: NextRequest) {
       withRLS((db) =>
         db.select({ maxRevision: max(notepadRevisions.revisionNumber) })
           .from(notepadRevisions)
+          .where(eq(notepadRevisions.userId, user.id))
       ),
       withRLS((db) =>
         db.select({ id: notepad.id })
           .from(notepad)
+          .where(eq(notepad.userId, user.id))
           .limit(1)
       )
     ])
@@ -89,7 +91,7 @@ export async function POST(request: NextRequest) {
                 content,
                 updatedAt: sql`timezone('utc'::text, now())`
               })
-              .where(eq(notepad.id, existingNotepad[0].id))
+              .where(and(eq(notepad.id, existingNotepad[0].id), eq(notepad.userId, user.id)))
           )
         : withRLS((db) =>
             db.insert(notepad)

@@ -81,10 +81,10 @@ export async function GET(req: NextRequest) {
       return createErrorResponse("Authentication required", 401)
     }
 
-    // RLS automatically filters by user_id
     const data = await withRLS((db) =>
       db.select()
         .from(hyroxStationRecords)
+        .where(eq(hyroxStationRecords.userId, user.id))
         .orderBy(asc(hyroxStationRecords.stationName))
     )
 
@@ -148,11 +148,11 @@ export async function PUT(req: NextRequest) {
 
     logger.info(`Updating station record: user=${user.id}, station=${stationName}, newTime=${newTime}`)
 
-    // First get the current record (RLS filters automatically)
+    // First get the current record
     const currentRecordData = await withRLS((db) =>
       db.select()
         .from(hyroxStationRecords)
-        .where(eq(hyroxStationRecords.stationName, stationName))
+        .where(and(eq(hyroxStationRecords.userId, user.id), eq(hyroxStationRecords.stationName, stationName)))
         .limit(1)
     )
 
@@ -191,7 +191,7 @@ export async function PUT(req: NextRequest) {
             bestTime: newTime,
             updatedAt: sql`timezone('utc'::text, now())`
           })
-          .where(eq(hyroxStationRecords.stationName, stationName))
+          .where(and(eq(hyroxStationRecords.userId, user.id), eq(hyroxStationRecords.stationName, stationName)))
           .returning()
       )
 

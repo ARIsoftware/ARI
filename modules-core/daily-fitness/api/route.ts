@@ -14,9 +14,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // RLS automatically filters by user_id
     const data = await withRLS((db) =>
-      db.select().from(fitnessDatabase).orderBy(asc(fitnessDatabase.orderIndex))
+      db.select().from(fitnessDatabase).where(eq(fitnessDatabase.userId, user.id)).orderBy(asc(fitnessDatabase.orderIndex))
     )
 
     return NextResponse.json(toSnakeCase(data) || [])
@@ -41,10 +40,11 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // Get the highest order_index for this user (RLS filters automatically)
+    // Get the highest order_index for this user
     const maxOrderData = await withRLS((db) =>
       db.select({ orderIndex: fitnessDatabase.orderIndex })
         .from(fitnessDatabase)
+        .where(eq(fitnessDatabase.userId, user.id))
         .orderBy(desc(fitnessDatabase.orderIndex))
         .limit(1)
     )

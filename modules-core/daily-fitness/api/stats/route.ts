@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { fitnessDatabase } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 
 export async function GET(request: Request) {
   try {
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
 
     // Get fitness task completion data (RLS automatically filters by user_id)
     const completions = await withRLS((db) =>
-      db.select().from(fitnessDatabase)
+      db.select().from(fitnessDatabase).where(eq(fitnessDatabase.userId, user.id))
     )
 
     // Calculate statistics

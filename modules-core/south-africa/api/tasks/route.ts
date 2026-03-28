@@ -48,9 +48,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // RLS automatically filters by user_id
     const tasks = await withRLS((db) =>
-      db.select().from(travel).orderBy(asc(travel.createdAt))
+      db.select().from(travel).where(eq(travel.userId, user.id)).orderBy(asc(travel.createdAt))
     )
 
     return NextResponse.json({

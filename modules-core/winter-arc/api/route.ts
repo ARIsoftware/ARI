@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
 import { winterArcGoals } from '@/lib/db/schema'
-import { asc } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,10 +12,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // RLS automatically filters by user_id
     const data = await withRLS((db) =>
       db.select()
         .from(winterArcGoals)
+        .where(eq(winterArcGoals.userId, user.id))
         .orderBy(asc(winterArcGoals.createdAt))
     )
 

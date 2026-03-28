@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { toSnakeCase } from '@/lib/api-helpers'
 import { travelFlights } from '@/lib/db/schema'
-import { asc } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 
 /**
  * GET Handler - Fetch all flights for the authenticated user
@@ -25,9 +25,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // RLS automatically filters by user_id
     const flights = await withRLS((db) =>
-      db.select().from(travelFlights).orderBy(asc(travelFlights.sortOrder))
+      db.select().from(travelFlights).where(eq(travelFlights.userId, user.id)).orderBy(asc(travelFlights.sortOrder))
     )
 
     return NextResponse.json({

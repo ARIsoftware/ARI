@@ -69,6 +69,10 @@ export interface ThemePreset {
   name: string
   category: ThemeCategory
   colors: ThemeColors
+  /** Optional default font applied when this theme is selected */
+  defaultFont?: string
+  /** Optional default font size (e.g. '12px') applied when this theme is selected */
+  defaultFontSize?: string
 }
 
 export interface CustomTheme extends ThemePreset {

@@ -4,7 +4,7 @@ import { toSnakeCase } from '@/lib/api-helpers'
 import { calculatePriorityScore } from '../../lib/priority-utils'
 import { z } from 'zod'
 import { tasks } from '@/lib/db/schema'
-import { eq, asc } from 'drizzle-orm'
+import { eq, asc, and } from 'drizzle-orm'
 
 // Force dynamic rendering - no caching
 export const dynamic = 'force-dynamic'
@@ -28,9 +28,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // Fetch all tasks with priority axes (RLS automatically filters by user_id)
     const data = await withRLS((db) =>
-      db.select().from(tasks).orderBy(asc(tasks.priorityScore))
+      db.select().from(tasks).where(eq(tasks.userId, user.id)).orderBy(asc(tasks.priorityScore))
     )
 
     return NextResponse.json(toSnakeCase(data))
@@ -63,7 +62,7 @@ export async function PUT(request: NextRequest) {
     // Calculate priority score
     const priorityScore = calculatePriorityScore(axes)
 
-    // Update task with new axes and calculated score (RLS ensures user can only update their own)
+    // Update task with new axes and calculated score
     const data = await withRLS((db) =>
       db.update(tasks)
         .set({
@@ -75,7 +74,7 @@ export async function PUT(request: NextRequest) {
           priorityScore: String(priorityScore),
           updatedAt: new Date().toISOString()
         })
-        .where(eq(tasks.id, taskId))
+        .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)))
         .returning()
     )
 
@@ -109,7 +108,7 @@ export async function POST(request: NextRequest) {
     // Recalculate priority scores for all specified tasks
     const updates = []
     for (const taskId of taskIds) {
-      // Fetch current task data (RLS filters automatically)
+      // Fetch current task data
       const taskData = await withRLS((db) =>
         db.select({
           impact: tasks.impact,
@@ -119,7 +118,7 @@ export async function POST(request: NextRequest) {
           strategicFit: tasks.strategicFit
         })
         .from(tasks)
-        .where(eq(tasks.id, taskId))
+        .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)))
         .limit(1)
       )
 
@@ -136,14 +135,13 @@ export async function POST(request: NextRequest) {
 
       const priorityScore = calculatePriorityScore(axes)
 
-      // Update task with new score (RLS ensures user can only update their own)
       await withRLS((db) =>
         db.update(tasks)
           .set({
             priorityScore: String(priorityScore),
             updatedAt: new Date().toISOString()
           })
-          .where(eq(tasks.id, taskId))
+          .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)))
       )
 
       updates.push({ taskId, priorityScore })

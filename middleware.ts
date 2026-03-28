@@ -7,6 +7,24 @@ import moduleManifest from '@/lib/generated/module-manifest.json'
 
 // Check if setup is complete (DATABASE_URL configured)
 const isSetupComplete = !!process.env.DATABASE_URL
+const isDev = process.env.NODE_ENV !== 'production'
+
+// Content Security Policy — computed once at startup
+const cspHeader = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://js.pusher.com https://stats.pusher.com https://sockjs-us3.pusher.com https://www.youtube.com https://youtube.com`,
+  "worker-src 'self' blob:",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com data:",
+  "img-src 'self' data: https: blob:",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://js.pusher.com https://sockjs-us3.pusher.com wss://ws-us3.pusher.com",
+  "frame-src 'self' https://www.youtube.com https://youtube.com",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "media-src 'self'"
+].join("; ")
 
 const protectedRoutes = [
   "/",
@@ -36,8 +54,7 @@ const protectedRoutes = [
 ]
 
 // Static public routes (non-module)
-const staticPublicRoutes = ["/sign-in", "/auth", "/api/auth", "/api/health", "/database-error"]
-// Note: /api/health also covers /api/health/domain and /api/health/resend via startsWith matching
+const staticPublicRoutes = ["/sign-in", "/auth", "/api/auth", "/database-error"]
 
 // Get dynamic public routes from module manifest
 // These are module API routes that have publicRoutes configured in module.json
@@ -106,6 +123,14 @@ export async function middleware(req: NextRequest) {
     // If no client IP header found, allow (likely direct/localhost access)
   }
 
+  // Block sign-up endpoint — only server-side bootstrap can create accounts
+  if (pathname.startsWith('/api/auth/sign-up')) {
+    return new NextResponse(JSON.stringify({ error: 'Sign-up is disabled' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
   // NORMAL MODE: Setup complete, existing auth logic below
   let response = NextResponse.next({
     request: req,
@@ -115,24 +140,7 @@ export async function middleware(req: NextRequest) {
   response.headers.set("X-Robots-Tag", "noindex, nofollow")
 
   // Content Security Policy
-  response.headers.set(
-    "Content-Security-Policy",
-    [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.pusher.com https://stats.pusher.com https://sockjs-us3.pusher.com https://www.youtube.com https://youtube.com",
-      "worker-src 'self' blob:",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com data:",
-      "img-src 'self' data: https: blob:",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://js.pusher.com https://sockjs-us3.pusher.com wss://ws-us3.pusher.com",
-      "frame-src 'self' https://www.youtube.com https://youtube.com",
-      "frame-ancestors 'none'",
-      "form-action 'self'",
-      "base-uri 'self'",
-      "object-src 'none'",
-      "media-src 'self'"
-    ].join("; ")
-  )
+  response.headers.set("Content-Security-Policy", cspHeader)
 
   // HTTP Strict Transport Security
   response.headers.set(

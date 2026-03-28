@@ -42,6 +42,8 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined)
 
 // Local storage key for caching theme settings (for instant load)
 const THEME_CACHE_KEY = 'ari-theme-cache'
+// Stores the user's explicitly chosen font (so theme defaults don't permanently override it)
+const USER_FONT_KEY = 'ari-user-font'
 
 // Apply theme colors to document
 function applyThemeColors(colors: ThemeColors) {
@@ -58,6 +60,16 @@ function applyThemeColors(colors: ThemeColors) {
 function applyFont(fontId: string) {
   const family = getFontFamily(fontId)
   document.documentElement.style.setProperty('--font-family', family)
+}
+
+// Apply or remove theme font size override on the root html element
+// Setting fontSize on <html> scales all rem-based sizes (Tailwind classes etc.)
+function applyFontSize(size: string | undefined) {
+  if (size) {
+    document.documentElement.style.fontSize = size
+  } else {
+    document.documentElement.style.fontSize = ''
+  }
 }
 
 // Apply dark mode class and theme identifier
@@ -240,7 +252,23 @@ export function ThemeProvider({ children, isAuthenticated: isAuthProp, isAuthLoa
       setActiveThemeId(themeId)
       applyThemeColors(theme.colors)
       applyDarkModeClass(theme.category === 'dark', themeId)
-      saveSettings({ activeThemeId: themeId })
+
+      // Apply theme font size override (or clear it)
+      applyFontSize(theme.defaultFontSize)
+
+      // Handle theme default fonts:
+      // - Theme with defaultFont: apply it (but remember user's manual choice)
+      // - Theme without defaultFont: restore user's manual choice
+      if (theme.defaultFont && getFontById(theme.defaultFont)) {
+        setActiveFont(theme.defaultFont)
+        applyFont(theme.defaultFont)
+        saveSettings({ activeThemeId: themeId, activeFont: theme.defaultFont })
+      } else {
+        const userFont = localStorage.getItem(USER_FONT_KEY) || DEFAULT_FONT_ID
+        setActiveFont(userFont)
+        applyFont(userFont)
+        saveSettings({ activeThemeId: themeId, activeFont: userFont })
+      }
 
       // Also update old localStorage for backward compat
       localStorage.setItem('theme', themeId)
@@ -258,6 +286,8 @@ export function ThemeProvider({ children, isAuthenticated: isAuthProp, isAuthLoa
       applyFont(fontId)
       saveSettings({ activeFont: fontId })
 
+      // Remember as the user's explicit choice (restored when switching away from theme-default fonts)
+      localStorage.setItem(USER_FONT_KEY, fontId)
       // Also update old localStorage for backward compat
       localStorage.setItem('ari-font-preference', font.name)
     },

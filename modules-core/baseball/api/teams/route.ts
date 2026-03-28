@@ -3,7 +3,7 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { toSnakeCase } from '@/lib/api-helpers'
 import { z } from 'zod'
 import { baseballTeams } from '@/lib/db/schema'
-import { eq, desc } from 'drizzle-orm'
+import { eq, desc, and } from 'drizzle-orm'
 
 const CreateTeamSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     }
 
     const teams = await withRLS((db) =>
-      db.select().from(baseballTeams).orderBy(desc(baseballTeams.createdAt))
+      db.select().from(baseballTeams).where(eq(baseballTeams.userId, user.id)).orderBy(desc(baseballTeams.createdAt))
     )
 
     return NextResponse.json({ teams: toSnakeCase(teams) || [] })
@@ -70,7 +70,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     await withRLS((db) =>
-      db.delete(baseballTeams).where(eq(baseballTeams.id, id))
+      db.delete(baseballTeams).where(and(eq(baseballTeams.id, id), eq(baseballTeams.userId, user.id)))
     )
 
     return NextResponse.json({ success: true })

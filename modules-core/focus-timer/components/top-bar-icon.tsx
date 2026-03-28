@@ -3,29 +3,20 @@
 import { useState, useEffect } from "react"
 import { Clock, StopCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { FocusTimerDialog } from "@/modules/tasks/components/focus-timer"
+import { FocusTimerDialog } from "@/modules/focus-timer/components/focus-timer-dialog"
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { getGlobalTimerState } from "@/lib/focus-timer-state"
 
-// Access the global timer state
-let globalTimerState = {
-  isActive: false,
-  timeRemaining: 0,
-  listeners: [] as Array<(isActive: boolean, timeRemaining: number) => void>
-}
-
-if (typeof window !== 'undefined' && (window as any).globalTimerState) {
-  globalTimerState = (window as any).globalTimerState
-}
+const globalTimerState = getGlobalTimerState()
 
 /**
  * FocusTimerTopBarIcon - Clock icon for the top bar that opens the focus timer dialog
- * Positioned to the left of the Play button in TopBarIcons
  */
-export function FocusTimerTopBarIcon({ isDragMode = false }: { isDragMode?: boolean }) {
+export default function FocusTimerTopBarIcon({ isDragMode = false }: { isDragMode?: boolean }) {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isTimerActive, setIsTimerActive] = useState(false)
 

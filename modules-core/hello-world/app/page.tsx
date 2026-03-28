@@ -27,7 +27,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '@/components/providers'
 import { useModuleEnabled } from '@/lib/modules/module-hooks'
 import { useToast } from '@/hooks/use-toast'
@@ -75,11 +75,19 @@ export default function HelloWorldPage() {
   const [showOnboardingDemo, setShowOnboardingDemo] = useState(true)
 
   // Load random quote when quotes module is enabled
-  useState(() => {
-    if (quotesEnabled && !quotesLoading) {
-      loadRandomQuote()
-    }
-  })
+  useEffect(() => {
+    if (!quotesEnabled || quotesLoading) return
+    let cancelled = false
+    fetch('/api/modules/quotes/quotes')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((quotes) => {
+        if (!cancelled && quotes.length > 0) {
+          setRandomQuote(quotes[Math.floor(Math.random() * quotes.length)])
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [quotesEnabled, quotesLoading])
 
   /**
    * Handle onboarding setup completion
@@ -104,24 +112,6 @@ export default function HelloWorldPage() {
         },
       }
     )
-  }
-
-  /**
-   * Fetch a random quote from the quotes module
-   */
-  const loadRandomQuote = async () => {
-    try {
-      const response = await fetch('/api/modules/quotes/quotes')
-      if (!response.ok) return
-
-      const quotes = await response.json()
-      if (quotes && quotes.length > 0) {
-        const randomIndex = Math.floor(Math.random() * quotes.length)
-        setRandomQuote(quotes[randomIndex])
-      }
-    } catch (err) {
-      console.error('Error loading quote:', err)
-    }
   }
 
   /**

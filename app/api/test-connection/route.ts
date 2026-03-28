@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { safeErrorResponse } from '@/lib/api-error'
 
 export async function GET() {
   // Require authentication for this diagnostic endpoint
@@ -44,9 +45,7 @@ export async function GET() {
   } catch (error: any) {
     return NextResponse.json({
       success: false,
-      error: error.message,
-      type: error.name,
-      url: supabaseUrl?.substring(0, 30) + '...'
+      error: safeErrorResponse(error),
     })
   }
 }

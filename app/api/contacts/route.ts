@@ -3,7 +3,7 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
 import { createContactSchema } from '@/lib/validation'
 import { contacts } from '@/lib/db/schema'
-import { asc } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 
 // GET /api/contacts - Fetch all contacts
 export async function GET(request: NextRequest) {
@@ -14,9 +14,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // RLS automatically filters by user_id
     const data = await withRLS((db) =>
-      db.select().from(contacts).orderBy(asc(contacts.name))
+      db.select().from(contacts).where(eq(contacts.userId, user.id)).orderBy(asc(contacts.name))
     )
 
     return NextResponse.json(toSnakeCase(data) || [])

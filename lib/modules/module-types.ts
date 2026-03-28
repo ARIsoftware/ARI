@@ -79,11 +79,13 @@ export interface ModuleSubmenuConfig {
  */
 export interface ModuleTopBarIcon {
   /** Lucide icon name (e.g., "Zap", "Bell", "CheckSquare") */
-  icon: string
+  icon?: string
   /** Route to navigate to when clicked (e.g., "/tasks") */
-  route: string
+  route?: string
   /** Optional tooltip text displayed on hover */
   tooltip?: string
+  /** Path to a custom component file (e.g., "./components/my-top-bar-icon.tsx") */
+  component?: string
 }
 
 /**

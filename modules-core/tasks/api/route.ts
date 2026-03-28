@@ -5,7 +5,7 @@ import { createTaskSchema, updateTaskSchema, uuidParamSchema } from '@/lib/valid
 import { calculatePriorityScore } from '../lib/priority-utils'
 import { z } from 'zod'
 import { tasks } from '@/lib/db/schema'
-import { desc, eq, asc, sql } from 'drizzle-orm'
+import { desc, eq, asc, sql, and } from 'drizzle-orm'
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,9 +15,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // RLS automatically filters by user_id via app.current_user_id()
     const data = await withRLS((db) =>
-      db.select().from(tasks).orderBy(asc(tasks.orderIndex))
+      db.select().from(tasks).where(eq(tasks.userId, user.id)).orderBy(asc(tasks.orderIndex))
     )
 
     // Transform camelCase to snake_case for backward compatibility
@@ -43,10 +42,11 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // Get the highest order_index for this user (RLS filters automatically)
+    // Get the highest order_index for this user
     const maxOrderData = await withRLS((db) =>
       db.select({ orderIndex: tasks.orderIndex })
         .from(tasks)
+        .where(eq(tasks.userId, user.id))
         .orderBy(desc(tasks.orderIndex))
         .limit(1)
     )
@@ -129,7 +129,7 @@ export async function PUT(request: NextRequest) {
         updates.timeliness !== undefined || updates.effort !== undefined ||
         updates.strategic_fit !== undefined) {
 
-      // Fetch current task to get existing axes values (RLS filters automatically)
+      // Fetch current task to get existing axes values
       const currentTaskData = await withRLS((db) =>
         db.select({
           impact: tasks.impact,
@@ -139,7 +139,7 @@ export async function PUT(request: NextRequest) {
           strategicFit: tasks.strategicFit
         })
         .from(tasks)
-        .where(eq(tasks.id, id))
+        .where(and(eq(tasks.id, id), eq(tasks.userId, user.id)))
         .limit(1)
       )
 
@@ -181,11 +181,10 @@ export async function PUT(request: NextRequest) {
     if (updates.monster_type !== undefined) updateData.monsterType = updates.monster_type
     if (updates.monster_colors !== undefined) updateData.monsterColors = updates.monster_colors
 
-    // RLS automatically ensures user can only update their own tasks
     const data = await withRLS((db) =>
       db.update(tasks)
         .set(updateData)
-        .where(eq(tasks.id, id))
+        .where(and(eq(tasks.id, id), eq(tasks.userId, user.id)))
         .returning()
     )
 
@@ -222,9 +221,8 @@ export async function DELETE(request: NextRequest) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // RLS automatically ensures user can only delete their own tasks
     await withRLS((db) =>
-      db.delete(tasks).where(eq(tasks.id, id))
+      db.delete(tasks).where(and(eq(tasks.id, id), eq(tasks.userId, user.id)))
     )
 
     return NextResponse.json({ success: true })

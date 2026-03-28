@@ -63,6 +63,11 @@ export const FONTS: FontOption[] = [
     name: 'Crimson Pro',
     family: '"Crimson Pro", serif',
   },
+  {
+    id: 'press-start-2p',
+    name: 'Press Start 2P',
+    family: '"Press Start 2P", monospace',
+  },
 ]
 
 // Default font ID

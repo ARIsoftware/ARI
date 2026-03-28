@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { getModules } from '@/lib/modules/module-registry'
 import { moduleSettings } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 
 /**
  * GET /api/modules/all
@@ -34,9 +35,8 @@ export async function GET(request: NextRequest) {
     // Log module list when /modules page is visited
     console.log(`[Modules] Viewing modules page - ${allModules.length} modules:`, allModules.map(m => m.id))
 
-    // Get user's module settings from database (RLS filters automatically)
     const settings = await withRLS((db) =>
-      db.select().from(moduleSettings)
+      db.select().from(moduleSettings).where(eq(moduleSettings.userId, user.id))
     )
 
     // Create a map of module_id -> enabled state

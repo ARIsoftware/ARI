@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getAuthenticatedUser } from '@/lib/auth-helpers'
 
 /**
  * GET /api/debug/auth-config
@@ -6,6 +7,12 @@ import { NextResponse } from 'next/server'
  * Does NOT expose secrets.
  */
 export async function GET() {
+  const { user } = await getAuthenticatedUser()
+
+  if (!user) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+  }
+
   try {
     const isProduction = process.env.NODE_ENV === 'production'
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
@@ -20,14 +27,13 @@ export async function GET() {
     const databaseConfigured = !!process.env.DATABASE_URL
 
     // Determine SSL status based on environment
-    // In production, SSL should be enabled
     const sslEnabled = isProduction
 
     // Check if production origin is configured
     const hasProductionOrigin = !!appUrl && !appUrl.includes('localhost')
 
     // Rate limiting is enabled in our auth config
-    const rateLimitEnabled = true // Hardcoded based on our auth.ts config
+    const rateLimitEnabled = true
 
     // Check trusted origins
     const trustedOrigins: string[] = []
@@ -53,8 +59,7 @@ export async function GET() {
         BETTER_AUTH_SECRET: secretConfigured ? 'Set (32+ chars)' : 'Missing or too short',
       }
     })
-  } catch (error) {
-    console.error('Error getting auth config:', error)
+  } catch {
     return NextResponse.json({ error: 'Failed to get auth config' }, { status: 500 })
   }
 }

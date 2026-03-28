@@ -15,11 +15,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const entryType = searchParams.get('entry_type') || 'winter_arc'
 
-    // RLS automatically filters by user_id
     const data = await withRLS((db) =>
       db.select()
         .from(journal)
-        .where(eq(journal.entryType, entryType))
+        .where(and(eq(journal.userId, user.id), eq(journal.entryType, entryType)))
         .orderBy(desc(journal.createdAt))
         .limit(1)
     )
@@ -42,11 +41,11 @@ export async function POST(request: NextRequest) {
 
     const entryType = entry.entry_type || 'winter_arc'
 
-    // Check if entry already exists for this user (RLS filters automatically)
+    // Check if entry already exists for this user
     const existingEntry = await withRLS((db) =>
       db.select({ id: journal.id })
         .from(journal)
-        .where(eq(journal.entryType, entryType))
+        .where(and(eq(journal.userId, user.id), eq(journal.entryType, entryType)))
         .limit(1)
     )
 
@@ -66,7 +65,7 @@ export async function POST(request: NextRequest) {
             dailyActions: entry.daily_actions,
             updatedAt: new Date().toISOString(),
           })
-          .where(eq(journal.id, existingEntry[0].id))
+          .where(and(eq(journal.id, existingEntry[0].id), eq(journal.userId, user.id)))
           .returning()
       )
 

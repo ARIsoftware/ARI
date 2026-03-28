@@ -20,8 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { useState, useEffect } from "react"
 import { getTasks, updateTask, type Task } from "@/modules/tasks/lib/utils"
 import { getGoals, type Goal } from "@/lib/goals"
-import { getMajorProjects } from "@/modules/major-projects/lib/utils"
-import type { MajorProject } from "@/modules/major-projects/types"
+interface MajorProject { id: string; project_name: string; [key: string]: any }
 import { useFeatures } from "@/lib/features-context"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
@@ -140,7 +139,8 @@ export default function EditTaskPage() {
         // Load projects if major-projects module is enabled
         if (isFeatureEnabled('major-projects')) {
           try {
-            const projectsData = await getMajorProjects()
+            const res = await fetch('/api/modules/major-projects/data')
+            const projectsData = res.ok ? await res.json() : []
             setProjects(projectsData)
           } catch (error) {
             console.error('Failed to load projects:', error)

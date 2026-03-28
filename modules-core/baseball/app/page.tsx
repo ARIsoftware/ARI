@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useToast } from '@/hooks/use-toast'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Loader2, Plus, Trash2, Pencil, Users } from 'lucide-react'
+import { useModuleEnabled } from '@/lib/modules/module-hooks'
 import {
   useBaseballPlayers,
   useBaseballTeams,
@@ -59,16 +60,33 @@ function validatePlayerForm(form: CreatePlayerRequest): FieldErrors {
 
 export default function BaseballPlayersPage() {
   const { toast } = useToast()
+  const { enabled: quotesEnabled, loading: quotesLoading } = useModuleEnabled('quotes')
   const { data: players = [], isLoading } = useBaseballPlayers()
   const { data: teams = [] } = useBaseballTeams()
   const createPlayer = useCreateBaseballPlayer()
   const updatePlayer = useUpdateBaseballPlayer()
   const deletePlayer = useDeleteBaseballPlayer()
 
+  const [randomQuote, setRandomQuote] = useState<{ quote: string; author?: string } | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<CreatePlayerRequest>(emptyForm)
   const [errors, setErrors] = useState<FieldErrors>({})
+
+  // Load random quote when quotes module is enabled
+  useEffect(() => {
+    if (!quotesEnabled || quotesLoading) return
+    let cancelled = false
+    fetch('/api/modules/quotes/quotes')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((quotes) => {
+        if (!cancelled && quotes.length > 0) {
+          setRandomQuote(quotes[Math.floor(Math.random() * quotes.length)])
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [quotesEnabled, quotesLoading])
 
   const openCreate = () => {
     setEditingId(null)
@@ -139,8 +157,15 @@ export default function BaseballPlayersPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-4xl font-medium">Players</h1>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-4xl font-medium">Players</h1>
+          {quotesEnabled && randomQuote && (
+            <p className="text-sm text-[#aa2020] mt-1">
+              {randomQuote.quote}
+            </p>
+          )}
+        </div>
         <Button onClick={openCreate}>
           <Plus className="w-4 h-4 mr-2" />
           Add Player

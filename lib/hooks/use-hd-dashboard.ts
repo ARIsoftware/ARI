@@ -1,5 +1,13 @@
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
-import type { WinterArcGoal } from '@/modules/winter-arc/lib/winter-arc-goals'
+
+interface WinterArcGoal {
+  id: string
+  user_id: string
+  title: string
+  completed: boolean
+  created_at: string
+  updated_at: string
+}
 
 interface Task {
   id: string

@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server"
 import { pool } from "@/lib/db/pool"
+import { getAuthenticatedUser } from "@/lib/auth-helpers"
+import { safeErrorResponse } from "@/lib/api-error"
 
 export const dynamic = "force-dynamic"
 
 export async function GET() {
+  const { user } = await getAuthenticatedUser()
+
+  if (!user) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+  }
+
   const checks: Record<string, { status: "ok" | "error"; message?: string }> = {}
 
   // Database check
@@ -19,7 +27,7 @@ export async function GET() {
   } catch (err) {
     checks.database = {
       status: "error",
-      message: err instanceof Error ? err.message : "Connection failed",
+      message: safeErrorResponse(err),
     }
   }
 

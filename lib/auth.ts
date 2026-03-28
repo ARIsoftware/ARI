@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth"
 import { nextCookies } from "better-auth/next-js"
+import { twoFactor } from "better-auth/plugins/two-factor"
 import { hash as argon2Hash, verify as argon2Verify } from "@node-rs/argon2"
 import { pool } from "@/lib/db/pool"
 
@@ -76,13 +77,22 @@ export const auth = betterAuth({
         window: 300, // 5 minute window
         max: 3, // Only 3 sign-up attempts per 5 minutes
       },
+      "/two-factor/verify-totp": {
+        window: 60,
+        max: 5, // Only 5 TOTP attempts per minute
+      },
       "/get-session": {
         window: 60,
         max: 500, // Session checks are read-only and cookie-cached, safe to allow many
       },
     },
   },
-  plugins: [nextCookies()],
+  plugins: [
+    twoFactor({
+      issuer: "ARI",
+    }),
+    nextCookies(),
+  ],
 })
 
 // Export types for use in components

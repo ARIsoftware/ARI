@@ -17,11 +17,11 @@ import { getStorageProvider } from '../../lib/providers'
 import type { DocumentsSettings, DocumentWithTags } from '../../types'
 import { DEFAULT_DOCUMENTS_SETTINGS } from '../../types'
 
-async function getSettings(withRLS: any): Promise<DocumentsSettings> {
+async function getSettings(withRLS: any, userId: string): Promise<DocumentsSettings> {
   const data = await withRLS((db: any) =>
     db.select({ settings: moduleSettings.settings })
       .from(moduleSettings)
-      .where(eq(moduleSettings.moduleId, 'documents'))
+      .where(and(eq(moduleSettings.userId, userId), eq(moduleSettings.moduleId, 'documents')))
       .limit(1)
   )
 
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     const includeDeleted = searchParams.get('include_deleted') === 'true'
 
     // Build conditions
-    const conditions = []
+    const conditions = [eq(documents.userId, user.id)]
 
     // Filter by folder (null means root)
     if (folderId === 'root' || folderId === '') {
@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get settings to check storage provider and limits
-    const settings = await getSettings(withRLS)
+    const settings = await getSettings(withRLS, user.id)
 
     if (!settings.onboardingCompleted) {
       return NextResponse.json(
@@ -232,6 +232,7 @@ export async function POST(request: NextRequest) {
         db.select()
           .from(documentFolders)
           .where(and(
+            eq(documentFolders.userId, user.id),
             eq(documentFolders.id, folderId),
             isNull(documentFolders.deletedAt)
           ))

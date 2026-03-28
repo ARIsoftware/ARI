@@ -3,19 +3,6 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { DM_Sans } from "next/font/google"
-import { TaskAnnouncement } from "@/components/task-announcement"
-import { AppSidebar } from "@/components/app-sidebar"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import { Separator } from "@/components/ui/separator"
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -36,11 +23,6 @@ import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { getContact, updateContact, createContact, type Contact } from "@/modules/contacts/lib/contacts"
 import { useSupabase } from "@/components/providers"
-
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-})
 
 interface ContactFormData {
   name: string
@@ -199,50 +181,17 @@ export default function EditContactPage({ params }: { params: Promise<{ id: stri
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50/50">
-        <TaskAnnouncement />
-        <SidebarProvider>
-          <AppSidebar />
-          <SidebarInset>
-            <div className="flex items-center justify-center h-96">
-              <div className="flex items-center gap-2">
-                <Loader2 className="w-6 h-6 animate-spin" />
-                <span>Loading contact...</span>
-              </div>
-            </div>
-          </SidebarInset>
-        </SidebarProvider>
+      <div className="flex items-center justify-center h-96">
+        <div className="flex items-center gap-2">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <span>Loading contact...</span>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
-      <TaskAnnouncement />
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-white px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="#">People</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbLink href="/contacts">All Contacts</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>{isNewContact ? "New Contact" : "Edit Contact"}</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </header>
-
-          <div className="flex flex-1 flex-col gap-6 p-6 overflow-visible">
+    <div className="flex flex-1 flex-col gap-6 p-6 overflow-visible">
             {/* Header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
@@ -447,9 +396,6 @@ export default function EditContactPage({ params }: { params: Promise<{ id: stri
                 </div>
               </div>
             </div>
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
     </div>
   )
 }
