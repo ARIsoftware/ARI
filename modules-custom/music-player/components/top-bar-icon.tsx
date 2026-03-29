@@ -8,12 +8,15 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { useMusicPlayerContextSafe } from "@/modules/music-player/components/music-player-context"
+import { useMusicPlayerContextOptional } from "@/modules/music-player/components/music-player-context"
 
 export default function MusicPlayerTopBarIcon({ isDragMode = false }: { isDragMode?: boolean }) {
   const router = useRouter()
-  const context = useMusicPlayerContextSafe()
-  const { isActive = false, isReady = false, currentSong = null, playlist = [], playNext = () => {}, pause = () => {}, resume = () => {} } = context ?? {}
+  const context = useMusicPlayerContextOptional()
+
+  if (!context) return null
+
+  const { isActive, isReady, currentSong, playlist, playNext, pause, resume } = context
 
   const dragItemClass = isDragMode
     ? "ring-1 ring-white/40 shadow-[0_0_8px_rgba(255,255,255,0.15)] rounded-lg"
