@@ -163,7 +163,16 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
     if (isDragMode) setDragIcons(sortedIcons)
   }, [isDragMode]) // Reset when entering drag mode
 
-  const dragIconIds = useMemo(() => dragIcons.map(i => i.id), [dragIcons])
+  const renderedDragIcons = useMemo(() => dragIcons.filter(icon => {
+    if (icon.type === "module" && icon.module.topBarIcon?.component) {
+      return !!loadedTopBarComponents[icon.module.id]
+    }
+    if (icon.type === "module") {
+      return !!(icon.module.topBarIcon?.icon && icon.module.topBarIcon?.route)
+    }
+    return true
+  }), [dragIcons, loadedTopBarComponents])
+  const dragIconIds = useMemo(() => renderedDragIcons.map(i => i.id), [renderedDragIcons])
 
   const handleIconDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
@@ -205,7 +214,7 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
               <Button
                 variant="ghost"
                 size="icon"
-                className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+                className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 hover:text-topbar-foreground ${dragItemClass}`}
                 onClick={isDragMode ? undefined : () => setCommandPaletteOpen(true)}
               >
                 <Command className="h-5 w-5" />
@@ -223,7 +232,7 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
               <Button
                 variant="ghost"
                 size="icon"
-                className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+                className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 hover:text-topbar-foreground ${dragItemClass}`}
                 onClick={isDragMode ? undefined : () => router.push("/settings")}
               >
                 <Settings className="h-5 w-5" />
@@ -241,7 +250,7 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
               <Button
                 variant="ghost"
                 size="icon"
-                className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+                className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 hover:text-topbar-foreground ${dragItemClass}`}
                 onClick={isDragMode ? undefined : () => router.push("/modules")}
               >
                 <Package className="h-5 w-5" />
@@ -259,7 +268,7 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
               <Button
                 variant="ghost"
                 size="icon"
-                className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+                className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 hover:text-topbar-foreground ${dragItemClass}`}
                 onClick={isDragMode ? undefined : handleSignOut}
               >
                 <LogOut className="h-5 w-5" />
@@ -292,7 +301,7 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
             <Button
               variant="ghost"
               size="icon"
-              className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+              className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 hover:text-topbar-foreground ${dragItemClass}`}
               onClick={isDragMode ? undefined : () => router.push(module.topBarIcon!.route!)}
             >
               <Icon className="h-5 w-5" />
@@ -306,7 +315,7 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
         <Button
           variant="ghost"
           size="icon"
-          className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+          className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 hover:text-topbar-foreground ${dragItemClass}`}
           onClick={isDragMode ? undefined : () => router.push(module.topBarIcon!.route!)}
         >
           <Icon className="h-5 w-5" />
@@ -324,7 +333,7 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleIconDragEnd}>
             <SortableContext items={dragIconIds} strategy={horizontalListSortingStrategy}>
               <div className="flex items-center gap-1">
-                {dragIcons.map((icon) => (
+                {renderedDragIcons.map((icon) => (
                   <SortableTopBarIcon key={icon.id} id={icon.id}>
                     {renderIconContent(icon)}
                   </SortableTopBarIcon>
@@ -527,6 +536,17 @@ export function TaskAnnouncement() {
     )
   }
 
+  // Determine background color class or inline style
+  const getBgStyle = () => {
+    return customColor !== '#000000'
+      ? { backgroundColor: customColor }
+      : {};
+  };
+
+  const getBgClass = () => {
+    return customColor === '#000000' ? 'bg-topbar text-topbar-foreground' : '';
+  };
+
   // Handle exit drag mode - optimistic UI, save in background
   const handleExitDragMode = () => {
     saveOrder() // Fire and forget - saves in background
@@ -536,13 +556,14 @@ export function TaskAnnouncement() {
   // Show drag mode UI
   if (isDragMode) {
     return (
-      <div className="topbar h-[45px] w-full relative z-50 flex items-center justify-between px-4 bg-blue-900">
+      <div className={`topbar h-[45px] w-full relative z-50 flex items-center justify-between px-4 overflow-visible ${getBgClass()}`} style={getBgStyle()}>
         <div className="flex-1" />
         <button
           onClick={handleExitDragMode}
-          className={`px-4 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/30 text-white font-normal transition-colors cursor-pointer ${dmSans.className}`}
+          className="px-4 py-1.5 rounded-full bg-topbar hover:brightness-110 border border-white/30 text-white font-normal transition-colors cursor-pointer translate-y-[20px] z-50 font-sans"
+          style={getBgStyle()}
         >
-          Drag items to reorder. Press here to save and exit.
+          Drag the highlighted items to reorder. Press here to SAVE and EXIT.
         </button>
         <div className="flex-1 flex justify-end">
           <TopBarIcons isDragMode={true} />
@@ -550,17 +571,6 @@ export function TaskAnnouncement() {
       </div>
     )
   }
-
-  // Determine background color class or inline style
-  const getBgStyle = () => {
-    return customColor !== '#000000'
-      ? { backgroundColor: customColor }
-      : {};
-  };
-
-  const getBgClass = () => {
-    return customColor === '#000000' ? 'bg-black' : '';
-  };
 
   // If custom message is set, show it instead of task completion
   if (customMessage) {
@@ -570,7 +580,7 @@ export function TaskAnnouncement() {
         style={getBgStyle()}
       >
         <div className="flex-1" />
-        <span className={`text-white font-medium ${dmSans.className}`}>
+        <span className={`text-topbar-foreground font-medium ${dmSans.className}`}>
           {customMessage}
         </span>
         <div className="flex-1 flex justify-end">
@@ -587,7 +597,7 @@ export function TaskAnnouncement() {
         style={getBgStyle()}
       >
         <div className="flex-1" />
-        <span className={`text-white font-medium ${dmSans.className}`}>ARI</span>
+        <span className={`text-topbar-foreground font-medium ${dmSans.className}`}>ARI</span>
         <div className="flex-1 flex justify-end">
           <TopBarIcons />
         </div>

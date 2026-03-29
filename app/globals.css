@@ -164,6 +164,11 @@
 }
 
 @layer base {
+  :root {
+    /* Topbar defaults to black with white text (matching existing behavior) */
+    --topbar-background: 0 0% 0%;
+    --topbar-foreground: 0 0% 100%;
+  }
   * {
     @apply border-border;
   }

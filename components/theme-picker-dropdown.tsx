@@ -44,7 +44,7 @@ export function ThemePickerDropdown({ isDragMode = false }: { isDragMode?: boole
       <Button
         variant="ghost"
         size="icon"
-        className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+        className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 hover:text-topbar-foreground ${dragItemClass}`}
       >
         <Palette className="h-5 w-5" />
       </Button>
@@ -58,7 +58,7 @@ export function ThemePickerDropdown({ isDragMode = false }: { isDragMode?: boole
           variant="ghost"
           size="icon"
           onClick={handleClick}
-          className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+          className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 hover:text-topbar-foreground ${dragItemClass}`}
         >
           <Palette className="h-5 w-5" />
         </Button>
