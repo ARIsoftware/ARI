@@ -169,7 +169,15 @@ function showWelcome() {
   console.log('');
   console.log(`  Platform: ${bold(platformLabel())}`);
   console.log('');
-  console.log(`  Welcome to ARI. This installer will set up everything you need to run ARI:`);
+  console.log(`  Welcome to ARI. Engineered for those who want complete command over the`);
+  console.log(`  software that runs their life. The first AI-enabled No Code workspace that`);
+  console.log(`  can be completely customized to your workflow and grows with you. Build`);
+  console.log(`  entirely new modules in minutes. Where mastery, modularity, and AI work in`);
+  console.log(`  your favour so you can do your best work and live your best life.`);
+  console.log('');
+  console.log(`  This installer will set up everything you need to run ARI. The installer is`);
+  console.log(`  open source as can be viewed on our Github repo.`);
+  console.log(`  Need help? https://ari.software/docs`);
   console.log('');
   console.log(`    ${SYM_ARROW}  ${bold('Git')}  ${dim('— version control')}`);
   console.log('');
@@ -712,7 +720,7 @@ async function main() {
 
   // Welcome screen
   showWelcome();
-  await pressEnter('Press ENTER to start');
+  await pressEnter('Ready to start? Press ENTER');
 
   // Install tools
   const toolResults = await installTools();
