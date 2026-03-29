@@ -630,14 +630,16 @@ Before marking complete, verify:
 - [ ] **If v0 import used**: v0 layout wrappers removed (no extra html/body wrappers)
 - [ ] **If v0 import used**: Component has default export and 'use client' directive
 
-## Important Reminders
+## Critical Rules
 
-- NEVER start the dev server - the user will do this
-- Never run a .sql statement without explicit approval.
-- Follow existing code patterns exactly - **use hello-world as the template**
-- **API routes must use Drizzle + withRLS()** - NOT Supabase client
-- **Do NOT use `auth.uid()` in database RLS policies** - Better Auth doesn't support this
-- User isolation is enforced at the **application level** via `withRLS()` helper
-- **API route registration is MANUAL**: The `generate-module-registry` script only auto-generates page routes. API routes MUST be manually registered in `MODULE_API_ROUTES` in `/app/api/modules/[module]/[[...path]]/route.ts` - this is a Next.js/Turbopack limitation.
-- **Module Portability**: Always use `@/modules/` alias for imports (NOT `@/modules-custom/` or `@/modules-core/`). This allows modules to be moved between directories without code changes. The alias resolves `modules-custom` first, then `modules-core`.
-- **v0 code is a visual starting point only**: Always build proper API routes, hooks, and database schema. Never leave mock data in production components.
+1. **Security is paramount.** Every module must be secure by default — no exceptions. All API routes must authenticate, all DB operations must use `withRLS()`, all input must be Zod-validated, all tables must have RLS enabled. See the Security Requirements section above for full details.
+2. **NEVER start the dev server** — the user will do this.
+3. **Never run a .sql statement without explicit approval.**
+4. **Follow existing code patterns exactly** — use hello-world as the template.
+5. **API routes must use Drizzle + withRLS()** — NOT Supabase client.
+6. **Do NOT use `auth.uid()` in database RLS policies** — Better Auth doesn't support this. User isolation is enforced at the application level via `withRLS()` helper.
+7. **API route registration is MANUAL**: The `generate-module-registry` script only auto-generates page routes. API routes MUST be manually registered in `MODULE_API_ROUTES` in `/app/api/modules/[module]/[[...path]]/route.ts` — this is a Next.js/Turbopack limitation.
+8. **Module Portability**: Always use `@/modules/` alias for imports (NOT `@/modules-custom/` or `@/modules-core/`). This allows modules to be moved between directories without code changes. The alias resolves `modules-custom` first, then `modules-core`.
+9. **v0 code is a visual starting point only**: Always build proper API routes, hooks, and database schema. Never leave mock data in production components.
+10. **Use the pg-aiguide MCP tools** when creating database schemas. These are configured in `.mcp.json` and must be used to validate data types, indexes, and constraints — do not skip this step.
+11. **Don't use PostgreSQL array casts in Drizzle's `sql` template literal** (e.g. `${value}::uuid[]`). Drizzle parameterizes values for safety, so the array gets passed as a bound parameter (`$1`) that PostgreSQL can't cast to a typed array. Instead, use Drizzle's query builder methods (e.g. individual `update().where()` calls with `Promise.all` for batch operations).
