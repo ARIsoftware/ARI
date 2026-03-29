@@ -210,10 +210,10 @@ export function Fish({ fish, index, onClick }: FishProps) {
   const startingXPercent = 15 + (idHash % 70)
 
   // Calculate fish properties based on priority
-  // Higher priority (lower score) = LARGER fish
+  // Higher priority (higher score) = LARGER fish
   // Base size: 35px minimum, up to 85px for highest priority
-  const baseSize = 35 + (1 - fish.priorityScore) * 50
-  const speed = 0.3 + (1 - fish.priorityScore) * 0.7
+  const baseSize = 35 + (fish.priorityScore / 10) * 50
+  const speed = 0.3 + (fish.priorityScore / 10) * 0.7
 
   // Adjust size based on fish type
   const sizeMultiplier = fishType === 'eel' ? 1.6 :

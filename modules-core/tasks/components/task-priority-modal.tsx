@@ -103,10 +103,10 @@ export function TaskPriorityModal({
           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
             <div>
               <p className="text-sm font-medium">Priority Score</p>
-              <p className="text-xs text-muted-foreground">Lower score = higher priority</p>
+              <p className="text-xs text-muted-foreground">Higher score = higher priority</p>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-2xl font-bold">{currentScore.toFixed(2)}</span>
+              <span className="text-2xl font-bold">{currentScore.toFixed(1)}</span>
               <Badge variant={
                 priorityLevel === 'critical' ? 'destructive' :
                 priorityLevel === 'high' ? 'default' :
@@ -168,7 +168,7 @@ export function TaskPriorityModal({
           <div className="p-3 bg-blue-50 rounded-lg">
             <p className="text-xs text-blue-700">
               <strong>Tip:</strong> Tasks with high impact, severity, and timeliness but low effort
-              will appear closer to the center of the radar chart (higher priority).
+              will have higher priority scores and appear closer to the center of the radar chart.
             </p>
           </div>
         </div>

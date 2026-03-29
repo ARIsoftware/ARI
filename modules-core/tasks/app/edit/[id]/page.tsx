@@ -524,7 +524,7 @@ export default function EditTaskPage() {
                           timeliness: formData.timeliness,
                           effort: formData.effort,
                           strategic_fit: formData.strategic_fit,
-                        }).toFixed(2)}
+                        }).toFixed(1)}
                       </span>
                       <Badge variant={
                         getTaskPriorityLevel(calculatePriorityScore({
@@ -560,7 +560,7 @@ export default function EditTaskPage() {
                       </Badge>
                     </div>
                   </CardTitle>
-                  <CardDescription>Lower score = higher priority</CardDescription>
+                  <CardDescription>Higher score = higher priority</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   {/* Impact */}
@@ -730,7 +730,7 @@ export default function EditTaskPage() {
                   <div className="p-3 bg-blue-50 rounded-lg">
                     <p className="text-xs text-blue-700">
                       <strong>Tip:</strong> Tasks with high impact, severity, and timeliness but low effort 
-                      will appear closer to the center of the radar chart (higher priority).
+                      will have higher priority scores and appear closer to the center of the radar chart.
                     </p>
                   </div>
 

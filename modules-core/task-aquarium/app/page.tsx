@@ -40,26 +40,24 @@ function transformTaskToFish(task: Task): FishData {
     strategic_fit: task.strategic_fit || 3,
   }
 
-  // Calculate priority score (0-~2.2, lower = higher priority)
-  const rawScore = task.priority_score || calculatePriorityScore(axes)
-  // Normalize to 0-1 range (clamp at 1)
-  const priorityScore = Math.min(rawScore / 2.2, 1)
+  // Calculate priority score (0-10, higher = higher priority)
+  const priorityScore = calculatePriorityScore(axes)
 
-  // Size: higher priority (lower score) = larger fish
+  // Size: higher priority (higher score) = larger fish
   // Base size: 35px minimum, up to 85px for highest priority
-  const size = 35 + (1 - priorityScore) * 50
+  const size = 35 + (priorityScore / 10) * 50
 
   // Speed: higher priority = faster (0.5-1.5 multiplier)
-  const speed = 0.5 + (1 - priorityScore) * 1
+  const speed = 0.5 + (priorityScore / 10) * 1
 
   // Use hash to add some randomness to vertical position
   const idHash = hashCode(task.id)
   const randomOffset = (idHash % 20) - 10 // -10 to +10 variation
 
   // Vertical position: higher priority = higher in tank (5-85% from top)
-  // Lower priorityScore = higher priority = lower Y value (higher in tank)
+  // Higher priorityScore = higher priority = lower Y value (higher in tank)
   // Add some random variation so fish don't stack at same level
-  const baseYPosition = 5 + priorityScore * 80
+  const baseYPosition = 5 + (1 - priorityScore / 10) * 80
   const yPosition = Math.max(5, Math.min(85, baseYPosition + randomOffset))
 
   // Color based on due date urgency
@@ -228,7 +226,7 @@ export default function TaskAquariumPage() {
   const fish = tasks.map(transformTaskToFish)
 
   // Sort fish by priority score to show priority order in legend
-  const sortedFish = [...fish].sort((a, b) => a.priorityScore - b.priorityScore)
+  const sortedFish = [...fish].sort((a, b) => b.priorityScore - a.priorityScore)
 
   if (authLoading) {
     return (
@@ -290,7 +288,7 @@ export default function TaskAquariumPage() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-orange-500">
-                  {fish.filter((f) => f.priorityScore < 0.3).length}
+                  {fish.filter((f) => f.priorityScore > 7).length}
                 </p>
                 <p className="text-xs text-muted-foreground">High priority</p>
               </div>
@@ -368,7 +366,7 @@ export default function TaskAquariumPage() {
                   {selectedFish.title}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {FISH_TYPE_NAMES[selectedFish.fishType]} · Priority: {selectedFish.priorityScore < 0.3 ? 'High' : selectedFish.priorityScore < 0.5 ? 'Medium-High' : selectedFish.priorityScore < 0.7 ? 'Medium' : 'Low'}
+                  {FISH_TYPE_NAMES[selectedFish.fishType]} · Priority: {selectedFish.priorityScore > 7 ? 'High' : selectedFish.priorityScore > 5 ? 'Medium-High' : selectedFish.priorityScore > 3 ? 'Medium' : 'Low'}
                 </p>
               </div>
             </div>

@@ -114,8 +114,8 @@ export default function RadarPage() {
       })
     }
     
-    // Sort by priority score (lower is higher priority)
-    filtered.sort((a, b) => (a.priority_score || 999) - (b.priority_score || 999))
+    // Sort by priority score (higher is higher priority)
+    filtered.sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0))
     
     setFilteredTasks(filtered)
   }, [tasks, filterStatus])
@@ -123,7 +123,7 @@ export default function RadarPage() {
   // Get top 5 incomplete tasks for priority display and radar dots
   const priorityTasks = tasks
     .filter(task => !task.completed) // Always exclude completed tasks
-    .sort((a, b) => (a.priority_score || 999) - (b.priority_score || 999))
+    .sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0))
     .slice(0, 5)
 
   const handleTaskClick = (task: Task) => {
@@ -258,7 +258,7 @@ export default function RadarPage() {
                 </CardContent>
                 <CardFooter className="flex-col gap-2 text-sm">
                   <div className="text-muted-foreground flex items-center gap-2 leading-none">
-                    Showing 5 highest priority tasks - closer to center = higher priority
+                    Showing 5 highest priority tasks — closer to center = higher priority
                   </div>
                   <div className="flex gap-4 mt-2">
                     <div className="flex items-center gap-1">
@@ -280,7 +280,7 @@ export default function RadarPage() {
               {/* Priority List */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Priority Tasks</CardTitle>
+                  <CardTitle>Top 5 Priority Tasks</CardTitle>
                   <CardDescription>
                     Top 5 priority tasks based on calculated scores
                   </CardDescription>
@@ -333,7 +333,7 @@ export default function RadarPage() {
                               </div>
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              Score: {typeof task.score === 'number' ? task.score.toFixed(2) : 'N/A'}
+                              Score: {typeof task.score === 'number' ? task.score.toFixed(1) : 'N/A'}
                             </div>
                           </div>
                         )

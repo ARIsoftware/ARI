@@ -256,9 +256,9 @@ export function useDashboardFlashData() {
       const bOverdue = bDue && bDue < now ? -1000 : 0
       const aDueToday = aDue && aDue.toDateString() === now.toDateString() ? -500 : 0
       const bDueToday = bDue && bDue.toDateString() === now.toDateString() ? -500 : 0
-      const aScore = (a.priority_score ?? 999) + aOverdue + aDueToday
-      const bScore = (b.priority_score ?? 999) + bOverdue + bDueToday
-      return aScore - bScore
+      const aScore = (a.priority_score ?? 0) + (aOverdue ? 1000 : 0) + (aDueToday ? 500 : 0)
+      const bScore = (b.priority_score ?? 0) + (bOverdue ? 1000 : 0) + (bDueToday ? 500 : 0)
+      return bScore - aScore
     })
     .slice(0, 5)
 
@@ -277,7 +277,7 @@ export function useDashboardFlashData() {
   // Top priority tasks (sorted by priority score)
   const priorityTasks = incompleteTasks
     .filter((t) => t.priority_score != null && t.priority_score > 0)
-    .sort((a, b) => (a.priority_score ?? 0) - (b.priority_score ?? 0))
+    .sort((a, b) => (b.priority_score ?? 0) - (a.priority_score ?? 0))
     .slice(0, 10)
 
   // Recent wins (last 8 completed)

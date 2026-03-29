@@ -62,7 +62,7 @@ export default function HDDashboardPage() {
   })
   const highPriorityTasks = incompleteTasks
     .filter((t: Task) => t.priority_score && t.priority_score > 0)
-    .sort((a: Task, b: Task) => (a.priority_score || 0) - (b.priority_score || 0))
+    .sort((a: Task, b: Task) => (b.priority_score || 0) - (a.priority_score || 0))
     .slice(0, 15)
   const pinnedTasks = incompleteTasks.filter((t: Task) => t.pinned)
 

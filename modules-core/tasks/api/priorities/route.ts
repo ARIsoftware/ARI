@@ -4,7 +4,7 @@ import { toSnakeCase } from '@/lib/api-helpers'
 import { calculatePriorityScore } from '../../lib/priority-utils'
 import { z } from 'zod'
 import { tasks } from '@/lib/db/schema'
-import { eq, asc, and } from 'drizzle-orm'
+import { eq, desc, and } from 'drizzle-orm'
 
 // Force dynamic rendering - no caching
 export const dynamic = 'force-dynamic'
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await withRLS((db) =>
-      db.select().from(tasks).where(eq(tasks.userId, user.id)).orderBy(asc(tasks.priorityScore))
+      db.select().from(tasks).where(eq(tasks.userId, user.id)).orderBy(desc(tasks.priorityScore))
     )
 
     return NextResponse.json(toSnakeCase(data))
