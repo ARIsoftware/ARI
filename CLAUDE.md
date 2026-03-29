@@ -283,7 +283,12 @@ END $$;
   /auth.ts             # Better Auth server configuration
   /auth-client.ts      # Better Auth client for React
   /auth-helpers.ts     # getAuthenticatedUser() helper
-  /db/schema/          # Drizzle ORM schema definitions
+  /db/schema/          # Drizzle ORM schema (auto-generated barrel + core)
+    core-schema.ts     # Hand-maintained: auth, system, shared tables
+    core-relations.ts  # Hand-maintained: auth relations
+    schema.ts          # AUTO-GENERATED barrel re-exporting core + module schemas
+    relations.ts       # AUTO-GENERATED barrel re-exporting core + module relations
+    index.ts           # Re-exports schema.ts + relations.ts
   /db-supabase.ts      # Supabase client (legacy)
   /api-helpers.ts      # API validation helpers
   /hooks/              # TanStack Query hooks (use-tasks.ts, use-contacts.ts, etc.)
@@ -299,7 +304,10 @@ END $$;
     /api/               # Module API routes
     /components/        # Module components
     /hooks/             # Module-specific TanStack Query hooks
-    /database/          # SQL schema files
+    /database/          # Database files
+      schema.sql        # SQL schema for reference/setup
+      schema.ts         # Drizzle table definitions (auto-included in barrel)
+      relations.ts      # Drizzle relations (optional, auto-included)
 
 /modules-custom         # User-created modules (same structure as modules-core)
 ```
