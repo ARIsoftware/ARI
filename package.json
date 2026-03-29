@@ -85,7 +85,6 @@
     "recharts": "2.15.4",
     "sonner": "latest",
     "svix": "^1.84.1",
-    "swapy": "^1.0.5",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "three": "^0.181.2",

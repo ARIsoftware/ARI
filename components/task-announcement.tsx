@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef, type ComponentType } from "react"
+import { useEffect, useState, useRef, useMemo, type ComponentType } from "react"
 import { useRouter } from "next/navigation"
 import {
   ArrowUpRight,
@@ -9,8 +9,6 @@ import {
   Package,
   LogOut,
   User,
-  Play,
-  Pause,
   X
 } from "lucide-react"
 import { ThemePickerDropdown } from "@/components/theme-picker-dropdown"
@@ -34,7 +32,6 @@ import { useIsMobile } from "@/components/ui/use-mobile"
 import { useSupabase } from "@/components/providers"
 import { authClient } from "@/lib/auth-client"
 import { useCommandPalette } from "@/components/command-palette"
-import { useMusicPlayer } from "@/components/youtube-music-player"
 import { useDragDropMode } from "@/components/drag-drop-mode-context"
 import { Button } from "@/components/ui/button"
 import {
@@ -44,6 +41,21 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import { getGlobalTimerState } from "@/lib/focus-timer-state"
 
 const globalTimerState = getGlobalTimerState()
@@ -59,22 +71,37 @@ const BUILTIN_ICONS = [
   { id: "icon-command", label: "Command" },
   { id: "icon-settings", label: "Settings" },
   { id: "icon-modules", label: "Modules" },
-  { id: "icon-music", label: "Music" },
   { id: "icon-logout", label: "Logout" },
 ] as const
+
+// Sortable wrapper for top bar icons in drag mode
+function SortableTopBarIcon({ id, children }: { id: string; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.7 : 1,
+    zIndex: isDragging ? 9999 : undefined,
+    cursor: 'grab',
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      {children}
+    </div>
+  )
+}
 
 // Icons component for the top bar
 function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
   const router = useRouter()
   const { session, supabase } = useSupabase()
   const { setOpen: setCommandPaletteOpen } = useCommandPalette()
-  const { isPlaying, isReady, togglePlayPause } = useMusicPlayer()
   const [mounted, setMounted] = useState(false)
   const user = session?.user
   const { modules } = useModules()
   const { iconOrder, setPendingIconOrder } = useDragDropMode()
-  const containerRef = useRef<HTMLDivElement>(null)
-  const swapyRef = useRef<any>(null)
 
   // Filter modules that have topBarIcon configured
   const moduleIcons = modules.filter(m => m.topBarIcon && (m.topBarIcon.icon || m.topBarIcon.component))
@@ -126,45 +153,35 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
     setMounted(true)
   }, [])
 
-  // Initialize Swapy when drag mode is active
+  // dnd-kit sensors and state for icon reordering
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  )
+
+  const [dragIcons, setDragIcons] = useState(sortedIcons)
   useEffect(() => {
-    if (isDragMode && containerRef.current && mounted) {
-      // Dynamic import of Swapy to avoid SSR issues
-      import("swapy").then(({ createSwapy }) => {
-        // Small delay to ensure DOM is ready
-        const timer = setTimeout(() => {
-          if (containerRef.current) {
-            swapyRef.current = createSwapy(containerRef.current, {
-              animation: "dynamic",
-              swapMode: "hover",
-            })
+    if (isDragMode) setDragIcons(sortedIcons)
+  }, [isDragMode]) // Reset when entering drag mode
 
-            swapyRef.current.onSwapEnd((event: any) => {
-              // Convert swap result to icon order mapping
-              const newOrder: Record<string, number> = {}
-              event.slotItemMap.asArray.forEach((item: any, index: number) => {
-                if (item.item) {
-                  newOrder[item.item] = (index + 1) * 10 // Priority 10, 20, 30, etc.
-                }
-              })
-              setPendingIconOrder(newOrder)
-            })
-          }
-        }, 100)
+  const dragIconIds = useMemo(() => dragIcons.map(i => i.id), [dragIcons])
 
-        return () => {
-          clearTimeout(timer)
-          swapyRef.current?.destroy()
-          swapyRef.current = null
-        }
-      })
-    }
+  const handleIconDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
 
-    return () => {
-      swapyRef.current?.destroy()
-      swapyRef.current = null
-    }
-  }, [isDragMode, mounted, setPendingIconOrder])
+    const oldIndex = dragIconIds.indexOf(active.id as string)
+    const newIndex = dragIconIds.indexOf(over.id as string)
+    if (oldIndex === -1 || newIndex === -1) return
+
+    const reordered = arrayMove(dragIcons, oldIndex, newIndex)
+    setDragIcons(reordered)
+
+    const newOrder: Record<string, number> = {}
+    reordered.forEach((item, index) => {
+      newOrder[item.id] = (index + 1) * 10
+    })
+    setPendingIconOrder(newOrder)
+  }
 
   const handleSignOut = async () => {
     await authClient.signOut()
@@ -235,29 +252,6 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
             </TooltipContent>
           </Tooltip>
         )
-      case "icon-music":
-        return (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
-                onClick={isDragMode ? undefined : togglePlayPause}
-                disabled={!isReady && !isDragMode}
-              >
-                {isPlaying ? (
-                  <Pause className="h-5 w-5" />
-                ) : (
-                  <Play className="h-5 w-5" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{isPlaying ? "Pause Music" : "Play Music"}</p>
-            </TooltipContent>
-          </Tooltip>
-        )
       case "icon-logout":
         return (
           <Tooltip>
@@ -281,62 +275,72 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
     }
   }
 
+  // Render a single icon's content (shared between drag and normal mode)
+  const renderIconContent = (icon: typeof sortedIcons[0]) => {
+    if (icon.type === "module") {
+      const module = icon.module
+      if (module.topBarIcon!.component) {
+        const TopBarComponent = loadedTopBarComponents[module.id]
+        if (!TopBarComponent) return null
+        return <TopBarComponent isDragMode={isDragMode} />
+      }
+      if (!module.topBarIcon!.icon || !module.topBarIcon!.route) return null
+      const Icon = getLucideIcon(module.topBarIcon!.icon)
+      return module.topBarIcon!.tooltip ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+              onClick={isDragMode ? undefined : () => router.push(module.topBarIcon!.route!)}
+            >
+              <Icon className="h-5 w-5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{module.topBarIcon!.tooltip}</p>
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+          onClick={isDragMode ? undefined : () => router.push(module.topBarIcon!.route!)}
+        >
+          <Icon className="h-5 w-5" />
+        </Button>
+      )
+    }
+    return renderBuiltinIcon(icon.builtinId)
+  }
+
   return (
     <TooltipProvider>
       <div className="flex items-center gap-1">
         {/* Draggable icons container */}
-        <div ref={containerRef} className="flex items-center gap-1">
-          {sortedIcons.map((icon) => (
-            <div key={icon.id} data-swapy-slot={icon.id}>
-              <div data-swapy-item={icon.id}>
-                {icon.type === "module" ? (
-                  // Module icon - either component-based or lucide icon
-                  (() => {
-                    const module = icon.module
-                    // Component-based top bar icon (loaded from registry)
-                    if (module.topBarIcon!.component) {
-                      const TopBarComponent = loadedTopBarComponents[module.id]
-                      if (!TopBarComponent) return null
-                      return <TopBarComponent isDragMode={isDragMode} />
-                    }
-                    // Lucide icon-based top bar icon
-                    if (!module.topBarIcon!.icon || !module.topBarIcon!.route) return null
-                    const Icon = getLucideIcon(module.topBarIcon!.icon)
-                    return module.topBarIcon!.tooltip ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
-                            onClick={isDragMode ? undefined : () => router.push(module.topBarIcon!.route!)}
-                          >
-                            <Icon className="h-5 w-5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{module.topBarIcon!.tooltip}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
-                        onClick={isDragMode ? undefined : () => router.push(module.topBarIcon!.route!)}
-                      >
-                        <Icon className="h-5 w-5" />
-                      </Button>
-                    )
-                  })()
-                ) : (
-                  // Built-in icon
-                  renderBuiltinIcon(icon.builtinId)
-                )}
+        {isDragMode ? (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleIconDragEnd}>
+            <SortableContext items={dragIconIds} strategy={horizontalListSortingStrategy}>
+              <div className="flex items-center gap-1">
+                {dragIcons.map((icon) => (
+                  <SortableTopBarIcon key={icon.id} id={icon.id}>
+                    {renderIconContent(icon)}
+                  </SortableTopBarIcon>
+                ))}
               </div>
-            </div>
-          ))}
-        </div>
+            </SortableContext>
+          </DndContext>
+        ) : (
+          <div className="flex items-center gap-1">
+            {sortedIcons.map((icon) => (
+              <div key={icon.id}>
+                {renderIconContent(icon)}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* User Avatar - NOT draggable, always at the end */}
         {mounted ? (
