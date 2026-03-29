@@ -415,7 +415,7 @@ export default function TasksPage() {
               <div>
                 <h1 className="text-3xl font-medium">Todo List</h1>
                 {user && (
-                  <p className="text-sm text-muted-foreground mt-1">Welcome back, {user.user_metadata?.first_name || user.email || "there"}!</p>
+                  <p className="text-sm text-muted-foreground mt-1" suppressHydrationWarning>Welcome back, {user.firstName || user.email || "there"}!</p>
                 )}
               </div>
               <div className="flex items-center gap-2">
