@@ -228,6 +228,13 @@ export function ThemeProvider({ children, isAuthenticated: isAuthProp, isAuthLoa
   const pendingSettingsRef = useRef<Partial<ThemeSettings> | null>(null)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Clear pending debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    }
+  }, [])
+
   const saveSettings = useCallback(
     (settings: Partial<ThemeSettings>) => {
       // Update cache immediately (instant UI)
@@ -239,7 +246,7 @@ export function ThemeProvider({ children, isAuthenticated: isAuthProp, isAuthLoa
       // Merge with any pending unsaved settings
       pendingSettingsRef.current = { ...pendingSettingsRef.current, ...settings }
 
-      // Debounce the API call — only the last change within 500ms hits the server
+      // Debounce the API call — only the last change within 1.5s hits the server
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
       saveTimerRef.current = setTimeout(() => {
         const toSave = pendingSettingsRef.current
@@ -251,7 +258,7 @@ export function ThemeProvider({ children, isAuthenticated: isAuthProp, isAuthLoa
             body: JSON.stringify(toSave),
           }).catch((e) => console.error('[Theme] Failed to save to API:', e))
         }
-      }, 500)
+      }, 2000)
     },
     [isAuthenticatedState]
   )
