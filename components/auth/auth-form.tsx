@@ -59,7 +59,11 @@ export function AuthForm({ mode }: AuthFormProps) {
       })
 
       if (res.error) {
-        setError(res.error.message || 'Sign in failed')
+        if (res.error.status === 429) {
+          setError("Too many login attempts. We've temporarily paused login attempts to keep your account safe. Please wait 5 minutes and try again.")
+        } else {
+          setError(res.error.message || 'Sign in failed')
+        }
         setLoading(false)
       } else if ((res.data as any)?.twoFactorRedirect) {
         // 2FA is required — show TOTP input

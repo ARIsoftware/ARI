@@ -58,32 +58,6 @@ export function KeybindingsTab(): React.ReactElement {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
-            <Terminal className="h-5 w-5 text-indigo-500" />
-            Claude Commands
-          </CardTitle>
-          <CardDescription>
-            Custom slash commands for Claude Code. Run these in the Claude Code CLI to automate common ARI tasks.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3">
-            <div>
-              <span className="text-sm font-medium text-slate-700">/ari-create-module</span>
-              <p className="text-xs text-slate-500 mt-0.5">Create a new custom module in the modules-custom directory</p>
-            </div>
-          </div>
-          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3">
-            <div>
-              <span className="text-sm font-medium text-slate-700">/ari-update</span>
-              <p className="text-xs text-slate-500 mt-0.5">Pull the latest ARI updates from the official upstream repository</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
             <Keyboard className="h-5 w-5 text-indigo-500" />
             Keyboard Shortcuts
           </CardTitle>
@@ -125,6 +99,32 @@ export function KeybindingsTab(): React.ReactElement {
                   <KeyCombo keys={binding.keys} />
                 </div>
               ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Terminal className="h-5 w-5 text-indigo-500" />
+            Claude Commands
+          </CardTitle>
+          <CardDescription>
+            Custom slash commands for Claude Code. Run these in the Claude Code CLI to automate common ARI tasks.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3">
+            <div>
+              <span className="text-sm font-medium text-slate-700">/ari-create-module</span>
+              <p className="text-xs text-slate-500 mt-0.5">Create a new custom module in the modules-custom directory</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3">
+            <div>
+              <span className="text-sm font-medium text-slate-700">/ari-update</span>
+              <p className="text-xs text-slate-500 mt-0.5">Pull the latest ARI updates from the official upstream repository</p>
             </div>
           </div>
         </CardContent>

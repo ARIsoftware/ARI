@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { authClient } from "@/lib/auth-client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,8 +13,19 @@ import { QRCodeSVG } from "qrcode.react"
 
 type SetupStep = "idle" | "password" | "qr" | "backup" | "enabled"
 
-export function TwoFactorSetup({ twoFactorEnabled }: { twoFactorEnabled: boolean }) {
-  const [step, setStep] = useState<SetupStep>(twoFactorEnabled ? "enabled" : "idle")
+export function TwoFactorSetup({ twoFactorEnabled: initialEnabled }: { twoFactorEnabled: boolean }) {
+  const [step, setStep] = useState<SetupStep>(initialEnabled ? "enabled" : "idle")
+
+  // Check 2FA status via fresh session fetch if the prop says disabled
+  // (Better Auth's cached useSession may not include twoFactorEnabled)
+  useEffect(() => {
+    if (initialEnabled) return
+    authClient.getSession().then((res) => {
+      if ((res.data?.user as any)?.twoFactorEnabled) {
+        setStep("enabled")
+      }
+    }).catch(() => {})
+  }, [initialEnabled])
   const [password, setPassword] = useState("")
   const [totpURI, setTotpURI] = useState("")
   const [secret, setSecret] = useState("")
@@ -120,6 +131,7 @@ export function TwoFactorSetup({ twoFactorEnabled }: { twoFactorEnabled: boolean
         </CardHeader>
         <CardContent>
           <Button onClick={() => setStep("password")} variant="outline">
+            <Shield className="mr-2 h-4 w-4" />
             Enable 2FA
           </Button>
         </CardContent>
@@ -306,17 +318,10 @@ export function TwoFactorSetup({ twoFactorEnabled }: { twoFactorEnabled: boolean
           Two-Factor Authentication
         </CardTitle>
         <CardDescription>
-          Your account is protected with two-factor authentication.
+          Your account is protected with two-factor authentication. You&apos;ll be asked for a verification code from your authenticator app when signing in.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="rounded-lg border border-emerald-500/40 bg-emerald-50 p-4 text-sm">
-          <p className="font-medium text-emerald-700">2FA is enabled</p>
-          <p className="mt-1 text-emerald-600">
-            You&apos;ll be asked for a verification code from your authenticator app when signing in.
-          </p>
-        </div>
-
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
@@ -345,7 +350,11 @@ export function TwoFactorSetup({ twoFactorEnabled }: { twoFactorEnabled: boolean
             </div>
           </div>
         ) : (
-          <Button variant="outline" onClick={() => setShowDisable(true)}>
+          <Button
+            variant="outline"
+            onClick={() => setShowDisable(true)}
+            className="border-[rgb(209,71,94)]/40 text-[rgb(209,71,94)] hover:bg-[rgb(209,71,94)]/10 hover:text-[rgb(209,71,94)]"
+          >
             <ShieldOff className="mr-2 h-4 w-4" />
             Disable 2FA
           </Button>
