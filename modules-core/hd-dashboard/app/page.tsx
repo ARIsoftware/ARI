@@ -6,7 +6,7 @@ import { Loader2, CheckSquare, Circle, AlertCircle, Clock, Target, Dumbbell, Tro
 import { useToast } from "@/hooks/use-toast"
 import { HDContributionGraph } from "../components/hd-contribution-graph"
 import { HDCardZoomModal } from "../components/hd-card-zoom-modal"
-import { useHDDashboardData, useToggleWinterArcGoal } from "@/lib/hooks/use-hd-dashboard"
+import { useHDDashboardData, useToggleWinterArcGoal } from "@/modules/hd-dashboard/hooks/use-hd-dashboard"
 import type { WinterArcGoal } from "@/modules/winter-arc/lib/winter-arc-goals"
 
 interface Task {

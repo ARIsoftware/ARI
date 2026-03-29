@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Loader2, BarChart3, ArrowUpDown } from 'lucide-react'
-import { useBaseballPlayers } from '@/lib/hooks/use-baseball'
+import { useBaseballPlayers } from '@/modules/baseball/hooks/use-baseball'
 import type { BaseballPlayer } from '../../types'
 
 type SortField = 'batting_avg' | 'home_runs' | 'rbi' | 'hits' | 'obp' | 'slg' | 'ops' | 'games' | 'at_bats'

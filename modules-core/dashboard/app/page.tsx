@@ -18,7 +18,7 @@ import {
   Info,
   Loader2,
 } from 'lucide-react'
-import { useDashboardData } from '@/lib/hooks/use-dashboard'
+import { useDashboardData } from '@/modules/dashboard/hooks/use-dashboard'
 import { TaskAnalyticsChart } from '@/modules/tasks/components/task-analytics-chart'
 import { RecentActivityFeed } from '../components/recent-activity-feed'
 import { useSupabase } from '@/components/providers'

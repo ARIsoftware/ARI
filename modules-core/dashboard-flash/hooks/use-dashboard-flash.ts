@@ -79,7 +79,7 @@ function useFlashTasks(enabled: boolean) {
   return useQuery({
     queryKey: ['dashboard-flash-tasks'],
     queryFn: async (): Promise<Task[]> => {
-      const res = await fetch('/api/tasks')
+      const res = await fetch('/api/modules/tasks')
       if (!res.ok) return []
       return res.json()
     },
@@ -130,7 +130,7 @@ function useFlashNotepad(enabled: boolean) {
   return useQuery({
     queryKey: ['dashboard-flash-notepad'],
     queryFn: async (): Promise<string> => {
-      const res = await fetch('/api/notepad')
+      const res = await fetch('/api/modules/notepad')
       if (!res.ok) return ''
       const data = await res.json()
       return data.content ?? ''

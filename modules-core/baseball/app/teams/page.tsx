@@ -14,7 +14,7 @@ import {
   useCreateBaseballTeam,
   useUpdateBaseballTeam,
   useDeleteBaseballTeam,
-} from '@/lib/hooks/use-baseball'
+} from '@/modules/baseball/hooks/use-baseball'
 import type { BaseballTeam, CreateTeamRequest } from '../../types'
 
 const LEAGUES = ['AL', 'NL']

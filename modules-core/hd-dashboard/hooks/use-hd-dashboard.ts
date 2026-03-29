@@ -68,7 +68,7 @@ export function useHDDashboardTasks() {
   return useQuery({
     queryKey: ['hd-dashboard-tasks'],
     queryFn: async (): Promise<Task[]> => {
-      const res = await fetch('/api/tasks')
+      const res = await fetch('/api/modules/tasks')
       if (!res.ok) {
         const error = await res.json()
         throw new Error(error.error || 'Failed to fetch tasks')
@@ -85,7 +85,7 @@ export function useHDDashboardNotepad() {
   return useQuery({
     queryKey: ['hd-dashboard-notepad'],
     queryFn: async (): Promise<NotepadData> => {
-      const res = await fetch('/api/notepad')
+      const res = await fetch('/api/modules/notepad')
       if (!res.ok) {
         return { content: '' }
       }

@@ -16,7 +16,7 @@ import {
   useCreateBaseballPlayer,
   useUpdateBaseballPlayer,
   useDeleteBaseballPlayer,
-} from '@/lib/hooks/use-baseball'
+} from '@/modules/baseball/hooks/use-baseball'
 import type { BaseballPlayer, CreatePlayerRequest } from '../types'
 
 const POSITIONS = ['C', 'P', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH', 'OF', 'IF', 'UT']

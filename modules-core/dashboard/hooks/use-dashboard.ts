@@ -78,7 +78,7 @@ export function useDashboardTasks(enabled: boolean) {
   return useQuery({
     queryKey: ['dashboard-tasks'],
     queryFn: async (): Promise<Task[]> => {
-      const res = await fetch('/api/tasks')
+      const res = await fetch('/api/modules/tasks')
       if (!res.ok) {
         throw new Error('Failed to fetch tasks')
       }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useAuth } from '@/components/providers'
-import { useDashboardFlashData } from '@/lib/hooks/use-dashboard-flash'
+import { useDashboardFlashData } from '@/modules/dashboard-flash/hooks/use-dashboard-flash'
 import {
   Zap,
   CheckCircle2,
