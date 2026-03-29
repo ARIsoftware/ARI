@@ -52,6 +52,20 @@ function pgBouncerCompat(client: PoolClient): PoolClient {
  * })
  * ```
  */
+/**
+ * Check if an error indicates a dead/stale connection (closed by PgBouncer
+ * while the pool still held a reference to it).
+ */
+function isStaleConnectionError(error: any): boolean {
+  const msg = error?.message || ''
+  return (
+    msg.includes('Connection terminated unexpectedly') ||
+    msg.includes('Connection terminated due to connection timeout') ||
+    msg.includes('connection is closed') ||
+    msg.includes('Client has encountered a connection error')
+  )
+}
+
 export async function withUserContext<T>(
   userId: string,
   operation: (db: DrizzleDb) => Promise<T>
@@ -60,42 +74,54 @@ export async function withUserContext<T>(
     throw new Error('Database pool not initialized')
   }
 
-  const rawClient = await pool.connect()
-  const client = pgBouncerCompat(rawClient)
+  const attempt = async (isRetry: boolean): Promise<T> => {
+    const rawClient = await pool.connect()
+    const client = pgBouncerCompat(rawClient)
 
-  try {
-    // Begin transaction - SET LOCAL only lasts within transaction
-    await client.query('BEGIN')
-
-    // Set user context for RLS policies
-    // app.current_user_id() function reads this value
-    // Note: SET doesn't support parameterized queries, so we escape manually
-    // Escape single quotes to prevent SQL injection
-    const escapedUserId = userId.replace(/'/g, "''")
-    await client.query(`SET LOCAL app.current_user_id = '${escapedUserId}'`)
-
-    // Create Drizzle instance for this connection
-    const db = drizzle(client as PoolClient)
-
-    // Execute the operation
-    const result = await operation(db)
-
-    // Commit transaction
-    await client.query('COMMIT')
-
-    return result
-  } catch (error) {
-    // Rollback on any error
     try {
-      await client.query('ROLLBACK')
-    } catch (rollbackError) {
-      console.error('Rollback failed:', rollbackError)
+      // Begin transaction - SET LOCAL only lasts within transaction
+      await client.query('BEGIN')
+
+      // Set user context for RLS policies
+      // app.current_user_id() function reads this value
+      // Note: SET doesn't support parameterized queries, so we escape manually
+      // Escape single quotes to prevent SQL injection
+      const escapedUserId = userId.replace(/'/g, "''")
+      await client.query(`SET LOCAL app.current_user_id = '${escapedUserId}'`)
+
+      // Create Drizzle instance for this connection
+      const db = drizzle(client as PoolClient)
+
+      // Execute the operation
+      const result = await operation(db)
+
+      // Commit transaction
+      await client.query('COMMIT')
+
+      return result
+    } catch (error) {
+      // Rollback on any error
+      try {
+        await client.query('ROLLBACK')
+      } catch (rollbackError) {
+        // Rollback will also fail on a dead connection — that's expected
+      }
+
+      // If this was a stale connection (killed by PgBouncer while idle),
+      // destroy it so the pool doesn't reuse it, then retry once.
+      if (!isRetry && isStaleConnectionError(error)) {
+        client.release(true) // true = destroy, don't return to pool
+        return attempt(true)
+      }
+
+      throw error
+    } finally {
+      // Always release the client back to the pool
+      client.release()
     }
-    throw error
-  } finally {
-    // Always release the client back to the pool
-    client.release()
   }
+
+  return attempt(false)
 }
 
 /**
