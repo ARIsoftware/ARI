@@ -635,7 +635,7 @@ Before marking complete, verify:
 ## Critical Rules
 
 1. **Security is paramount.** Every module must be secure by default — no exceptions. All API routes must authenticate, all DB operations must use `withRLS()`, all input must be Zod-validated, all tables must have RLS enabled. See the Security Requirements section above for full details.
-2. **ALL module code MUST be self-contained within the module directory.** Hooks, components, types, utilities — everything lives inside `modules-core/<id>/` or `modules-custom/<id>/`. NEVER place module-specific code in shared directories like `lib/hooks/`, `lib/`, or `components/`. A module must be deletable by removing its single folder. The ONLY exceptions are the required registration touchpoints: Drizzle schema in `/lib/db/schema/schema.ts`, API routes in `MODULE_API_ROUTES`, and submenu registration in `sidebar-submenu-renderer.tsx`.
+2. **ALL module code MUST be self-contained within the module directory.** Hooks, components, types, utilities — everything lives inside `modules-core/<id>/` or `modules-custom/<id>/`. NEVER place module-specific code in shared directories like `lib/hooks/`, `lib/`, or `components/`. A module must be installable by adding its single folder. A module must be deletable by removing its single folder. The ONLY exceptions are the required registration touchpoints: Drizzle schema in `/lib/db/schema/schema.ts`, API routes in `MODULE_API_ROUTES`, and submenu registration in `sidebar-submenu-renderer.tsx`.
 3. **NEVER start the dev server** — the user will do this.
 4. **Never run a .sql statement without explicit approval.**
 5. **Follow existing code patterns exactly** — use hello-world as the template.
