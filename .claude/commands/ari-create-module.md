@@ -50,6 +50,7 @@ Ask the user the following questions ONE AT A TIME, waiting for each answer befo
 4. **Submenu**: Does the module have any subpages which require a submenu?
 5. **Top Bar**: Should it have a quick-access icon in the top bar?
 6. **Onboarding**: Does this module need an onboarding/setup screen to collect initial configuration from the user? (e.g., asking for birthdate, preferences, API keys, etc.)
+7. **Dashboard Widget**: Should this module add a card or widget to the main Dashboard? If yes, describe what it should display (e.g., summary stat, chart, recent items list). There are two types: **stat cards** (small cards in the Quick Overview grid) and **widgets** (larger components in the content area below).
 
 If the user provides v0 code:
 - Read and analyze all provided v0 code files
@@ -148,6 +149,7 @@ When approved, create the module following this order:
    - Proper icon and route
    - topBarIcon if requested
    - submenu configuration if requested (see Submenu section below)
+   - Dashboard widget configuration if requested (see Dashboard Widgets section below)
    - Required dependencies
 3. **Create/update page component** in `app/page.tsx`
    - **If v0 code was provided:** Use the v0 component as the base for `app/page.tsx`. Apply the Code Restructuring Rules from the "v0 Code Integration" section. Extract sub-components to `components/` directory.
@@ -255,6 +257,36 @@ Do NOT add `if (!session) return <Loading />` at the start of the page component
 - API routes use cookies/headers for auth automatically
 
 See `/docs/MODULES.md` section 9 "Data Fetching with TanStack Query" for full documentation.
+
+## Dashboard Widgets Implementation
+
+If the user wants their module to contribute cards or widgets to the main Dashboard, configure the `dashboard` field in `module.json`:
+
+```json
+"dashboard": {
+  "widgets": true,
+  "statCards": ["./components/dashboard-stat-card.tsx"],
+  "widgetComponents": ["./components/dashboard-widget.tsx"]
+}
+```
+
+**Two types of dashboard components:**
+
+1. **`statCards`** — Small cards rendered in the "Quick Overview" grid row at the top of the dashboard (alongside System Status). Best for: summary counts, scores, single metrics.
+
+2. **`widgetComponents`** — Larger widgets rendered in the content area below the stats grid. Best for: charts, lists, multi-card sections.
+
+**Rules for dashboard components:**
+- Must be **self-contained**: fetch their own data via API calls, handle their own loading states
+- Must `export default` (dynamic imports expect a default export)
+- Must include `'use client'` directive
+- Use `@tanstack/react-query` for data fetching (useQuery)
+- Wrap content in Shadcn `<Card>` components to match dashboard styling
+- Include a "View All" or navigation button linking to the module's main page
+- See `modules-core/tasks/components/dashboard-stat-card.tsx` as a stat card reference
+- See `modules-core/daily-fitness/components/dashboard-widget.tsx` as a widget reference
+
+After creating dashboard components, run `npm run generate-module-registry` to register them in the auto-generated dashboard registry.
 
 ## Submenu Implementation
 
