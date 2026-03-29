@@ -11,7 +11,7 @@
 > - API routes use `withRLS()` helper instead of Supabase client
 > - Database RLS policies using `auth.uid()` do NOT work with Better Auth
 > - Client components use `useAuth()` instead of `useSupabase()`
-> - Module tables must be defined in `/lib/db/schema/schema.ts`
+> - Module tables must be defined in `database/schema.ts` within the module folder (auto-generated barrel re-exports them)
 
 ---
 
@@ -1060,12 +1060,13 @@ CREATE TRIGGER my_module_data_updated_at
 
 ### Step 2: Add Drizzle Schema Definition (REQUIRED)
 
-**This step is critical!** You must add your table definition to the Drizzle schema file so API routes can use it.
+**This step is critical!** Create a `database/schema.ts` file in your module with Drizzle table definitions. The generation script will automatically include it in the schema barrel.
 
-Edit `/lib/db/schema/schema.ts` and add your table:
+Create `modules-custom/my-module/database/schema.ts`:
 
 ```typescript
-// Add your table definition in /lib/db/schema/schema.ts
+import { pgTable, index, uuid, text, timestamp, varchar } from "drizzle-orm/pg-core"
+import { sql } from "drizzle-orm"
 
 export const myModuleData = pgTable("my_module_data", {
   id: uuid().defaultRandom().primaryKey().notNull(),
@@ -1080,10 +1081,23 @@ export const myModuleData = pgTable("my_module_data", {
 ]);
 ```
 
-**Then export from the schema index file** `/lib/db/schema/index.ts`:
+After creating the file, run `npm run generate-module-registry` to regenerate the schema barrel. Your table will be automatically exported from `@/lib/db/schema` and available to all code that imports from there.
+
+**If your module needs to reference core tables** (e.g., `user` for a foreign key), import from `@/lib/db/schema/core-schema`:
+
 ```typescript
-export * from './schema'
-// Your table is automatically exported since it's in schema.ts
+import { user } from "@/lib/db/schema/core-schema"
+```
+
+**If your module has relations**, create `database/relations.ts`:
+
+```typescript
+import { relations } from "drizzle-orm/relations";
+import { myModuleData, myModuleItems } from "@/lib/db/schema";
+
+export const myModuleDataRelations = relations(myModuleData, ({many}) => ({
+  items: many(myModuleItems),
+}));
 ```
 
 ### Migration Application Process
@@ -1091,8 +1105,9 @@ export * from './schema'
 1. Copy SQL from `modules/my-module/database/schema.sql`
 2. Open Supabase SQL Editor
 3. Paste and run the SQL to create the table
-4. Add the Drizzle schema definition to `/lib/db/schema/schema.ts`
-5. Verify the table works by testing your API routes
+4. Add the Drizzle schema definition to `modules/my-module/database/schema.ts`
+5. Run `npm run generate-module-registry` to regenerate the barrel
+6. Verify the table works by testing your API routes
 
 ### Register in module.json
 
@@ -1107,7 +1122,7 @@ export * from './schema'
 
 ### Reference: Hello World Schema
 
-See `/modules-core/hello-world/database/schema.sql` and the `helloWorldEntries` definition in `/lib/db/schema/schema.ts` for a complete working example.
+See `/modules-core/hello-world/database/schema.sql` and `/modules-core/hello-world/database/schema.ts` for a complete working example.
 
 ---
 
