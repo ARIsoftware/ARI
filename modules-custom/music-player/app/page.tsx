@@ -16,7 +16,7 @@ import {
   useMusicPlayerSettings,
   useUpdateMusicPlayerSettings,
 } from '@/modules/music-player/hooks/use-music-player'
-import { useMusicPlayerContext } from '@/modules/music-player/components/music-player-context'
+import { useMusicPlayerContextOptional } from '@/modules/music-player/components/music-player-context'
 import type { MusicPlaylistEntry } from '../types'
 
 function extractYouTubeId(url: string): string | null {
@@ -55,7 +55,10 @@ export default function MusicPlayerPage() {
   const { data: settings, isLoading: settingsLoading } = useMusicPlayerSettings()
   const updateSettings = useUpdateMusicPlayerSettings()
 
-  const { playSong, currentSong, isPlaying } = useMusicPlayerContext()
+  const musicPlayer = useMusicPlayerContextOptional()
+  const playSong = musicPlayer?.playSong
+  const currentSong = musicPlayer?.currentSong ?? null
+  const isPlaying = musicPlayer?.isPlaying ?? false
 
   const [youtubeUrl, setYoutubeUrl] = useState('')
   const [isAdding, setIsAdding] = useState(false)
@@ -318,7 +321,7 @@ export default function MusicPlayerPage() {
                   {/* Thumbnail */}
                   <div
                     className="relative aspect-video bg-muted cursor-pointer"
-                    onClick={() => playSong(song)}
+                    onClick={() => playSong?.(song)}
                   >
                     <img
                       src={`https://img.youtube.com/vi/${song.youtube_video_id}/hqdefault.jpg`}

@@ -46,7 +46,8 @@ export function useMusicPlayerContext() {
   return context
 }
 
-export function useMusicPlayerContextSafe() {
+/** Returns the music player context, or null if outside the provider (e.g. during SSR). */
+export function useMusicPlayerContextOptional() {
   return useContext(MusicPlayerContext)
 }
 
