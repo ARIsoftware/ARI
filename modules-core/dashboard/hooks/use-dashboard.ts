@@ -1,12 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
 
-interface FitnessStats {
-  averageCompletionsPerDay: number
-  mostCompletedTask: { title: string; count: number } | null
-  leastCompletedTask: { title: string; count: number } | null
-  totalCompletions: number
-}
-
 interface Quote {
   id: string
   quote: string
@@ -33,13 +26,6 @@ interface ActivityItem {
   title: string
   description: string
   timestamp: string
-}
-
-const DEFAULT_FITNESS_STATS: FitnessStats = {
-  averageCompletionsPerDay: 0,
-  mostCompletedTask: null,
-  leastCompletedTask: null,
-  totalCompletions: 0,
 }
 
 /**
@@ -69,57 +55,6 @@ export function useTasksModuleEnabled() {
     isEnabled: enabledModules?.has('tasks') ?? false,
     isLoading,
   }
-}
-
-/**
- * Hook to fetch tasks
- */
-export function useDashboardTasks(enabled: boolean) {
-  return useQuery({
-    queryKey: ['dashboard-tasks'],
-    queryFn: async (): Promise<Task[]> => {
-      const res = await fetch('/api/modules/tasks')
-      if (!res.ok) {
-        throw new Error('Failed to fetch tasks')
-      }
-      return res.json()
-    },
-    enabled,
-  })
-}
-
-/**
- * Hook to fetch contacts count
- */
-export function useDashboardContacts(enabled: boolean) {
-  return useQuery({
-    queryKey: ['dashboard-contacts'],
-    queryFn: async (): Promise<Contact[]> => {
-      const res = await fetch('/api/modules/contacts')
-      if (!res.ok) {
-        return []
-      }
-      return res.json()
-    },
-    enabled,
-  })
-}
-
-/**
- * Hook to fetch fitness stats
- */
-export function useDashboardFitnessStats(enabled: boolean) {
-  return useQuery({
-    queryKey: ['dashboard-fitness-stats'],
-    queryFn: async (): Promise<FitnessStats> => {
-      const res = await fetch('/api/fitness-stats')
-      if (!res.ok) {
-        return DEFAULT_FITNESS_STATS
-      }
-      return res.json()
-    },
-    enabled,
-  })
 }
 
 /**
@@ -231,18 +166,15 @@ export function useDashboardRecentActivity(tasksEnabled: boolean, contactsEnable
 
 /**
  * Combined hook for all Dashboard data
+ * Module-specific data (tasks, contacts, fitness) is now fetched by each module's own widget components.
  */
 export function useDashboardData() {
   const { data: enabledModules = new Set<string>(), isLoading: modulesLoading } = useEnabledModules()
 
   const tasksEnabled = enabledModules.has('tasks')
   const contactsEnabled = enabledModules.has('contacts')
-  const fitnessEnabled = enabledModules.has('daily-fitness')
   const quotesEnabled = enabledModules.has('quotes')
 
-  const tasksQuery = useDashboardTasks(tasksEnabled)
-  const contactsQuery = useDashboardContacts(contactsEnabled)
-  const fitnessQuery = useDashboardFitnessStats(fitnessEnabled)
   const quoteQuery = useDashboardQuote(quotesEnabled)
   const activityQuery = useDashboardRecentActivity(tasksEnabled, contactsEnabled)
 
@@ -251,23 +183,14 @@ export function useDashboardData() {
     enabledModules,
     tasksEnabled,
     contactsEnabled,
-    fitnessEnabled,
     quotesEnabled,
 
     // Data
-    tasks: tasksQuery.data ?? [],
-    taskCount: tasksQuery.data?.length ?? 0,
-    contacts: contactsQuery.data ?? [],
-    contactCount: contactsQuery.data?.length ?? 0,
-    fitnessStats: fitnessQuery.data ?? DEFAULT_FITNESS_STATS,
     quote: quoteQuery.data,
     recentActivity: activityQuery.data ?? [],
 
     // Loading states
     isLoading: modulesLoading,
-    isDataLoading: tasksQuery.isLoading || contactsQuery.isLoading,
-
-    // Errors
-    isError: tasksQuery.isError,
+    isDataLoading: activityQuery.isLoading,
   }
 }

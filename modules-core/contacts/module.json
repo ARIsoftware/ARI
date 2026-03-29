@@ -12,7 +12,7 @@
   "permissions": {
     "database": true,
     "api": true,
-    "dashboard": false
+    "dashboard": true
   },
   "routes": [
     {
@@ -31,7 +31,7 @@
     "migrations": "./database/migrations"
   },
   "dashboard": {
-    "widgets": false,
-    "widgetComponents": []
+    "widgets": true,
+    "statCards": ["./components/dashboard-stat-card.tsx"]
   }
 }

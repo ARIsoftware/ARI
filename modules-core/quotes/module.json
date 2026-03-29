@@ -31,7 +31,7 @@
     "migrations": "./database/migrations"
   },
   "dashboard": {
-    "widgets": true,
+    "widgets": false,
     "widgetComponents": ["./components/widget.tsx"]
   },
   "settings": {

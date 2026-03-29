@@ -32,5 +32,10 @@
     "dragAndDrop": true,
     "kanbanView": true,
     "youtubeIntegration": true
+  },
+  "dashboard": {
+    "widgets": true,
+    "statCards": ["./components/dashboard-stat-card.tsx"],
+    "widgetComponents": ["./components/dashboard-widget.tsx"]
   }
 }
