@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { authClient } from "@/lib/auth-client"
 import { createSupabaseClient } from "@/lib/supabase-auth"
 import { Toaster } from "@/components/ui/toaster"
-import { MusicPlayerContextProvider } from "@/modules/music-player/components/music-player-context"
+import { ModuleProviders } from "@/components/module-providers"
 import { FeaturesProvider } from "@/lib/features-context"
 import { ModulesProvider } from "@/lib/modules/context"
 import { CommandPaletteProvider } from "@/components/command-palette"
@@ -131,14 +131,14 @@ export function Providers({
       <ThemeProvider isAuthenticated={!!session} isAuthLoading={isPending}>
         <ModulesProvider modules={modules} enabledModules={enabledModules}>
           <FeaturesProvider initialFeatures={initialFeatures} isAuthenticated={!!session} isAuthLoading={isPending}>
-            <MusicPlayerContextProvider>
+            <ModuleProviders isAuthenticated={!!session}>
               <CommandPaletteProvider>
                 <DragDropModeProvider isAuthenticated={!!session} isAuthLoading={isPending}>
                   {children}
                   <Toaster />
                 </DragDropModeProvider>
               </CommandPaletteProvider>
-            </MusicPlayerContextProvider>
+            </ModuleProviders>
           </FeaturesProvider>
         </ModulesProvider>
       </ThemeProvider>
