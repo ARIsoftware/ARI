@@ -214,6 +214,7 @@ export function MusicPlayerContextProvider({ children }: { children: React.React
     if (window.youtubePlayer) {
       window.youtubePlayer.playVideo()
     }
+    setIsActive(true)
   }, [])
 
   const value = useMemo(() => ({

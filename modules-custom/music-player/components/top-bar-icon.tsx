@@ -12,7 +12,7 @@ import { useMusicPlayerContext } from "@/modules/music-player/components/music-p
 
 export default function MusicPlayerTopBarIcon({ isDragMode = false }: { isDragMode?: boolean }) {
   const router = useRouter()
-  const { isActive, isReady, playlist, playNext, pause, resume } = useMusicPlayerContext()
+  const { isActive, isReady, currentSong, playlist, playNext, pause, resume } = useMusicPlayerContext()
 
   const dragItemClass = isDragMode
     ? "ring-1 ring-white/40 shadow-[0_0_8px_rgba(255,255,255,0.15)] rounded-lg"
@@ -27,13 +27,13 @@ export default function MusicPlayerTopBarIcon({ isDragMode = false }: { isDragMo
     }
 
     if (isActive) {
-      // Currently playing -> pause
       pause()
-    } else {
-      // Not playing -> resume or start
+    } else if (currentSong) {
+      // Was paused, resume the current song
       resume()
-      // If resume doesn't work (nothing loaded yet), start from beginning
-      if (!isActive) playNext()
+    } else {
+      // Nothing loaded yet, start from beginning
+      playNext()
     }
   }
 

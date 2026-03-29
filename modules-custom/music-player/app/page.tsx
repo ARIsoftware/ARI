@@ -15,7 +15,7 @@ import {
   useReorderSongs,
   useMusicPlayerSettings,
   useUpdateMusicPlayerSettings,
-} from '@/lib/hooks/use-music-player'
+} from '@/modules/music-player/hooks/use-music-player'
 import { useMusicPlayerContext } from '@/modules/music-player/components/music-player-context'
 import type { MusicPlaylistEntry } from '../types'
 

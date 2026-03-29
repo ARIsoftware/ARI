@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { useMusicPlaylistSongs } from "@/lib/hooks/use-music-player"
+import { useMusicPlaylistSongs } from "@/modules/music-player/hooks/use-music-player"
 import { useMusicPlayerContext } from "./music-player-context"
 
 /**
