@@ -57,6 +57,8 @@ export const auth = betterAuth({
   // Cache session in a signed cookie to avoid DB hits on every get-session call
   // This prevents 429s when many tabs are open simultaneously
   session: {
+    expiresIn: 60 * 60 * 24 * 30, // 30 days
+    updateAge: 60 * 60 * 24,       // refresh session expiry every 1 day of activity
     cookieCache: {
       enabled: true,
       maxAge: 5 * 60, // 5 minutes
