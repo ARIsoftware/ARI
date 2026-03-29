@@ -153,12 +153,6 @@ export function SecurityTab({
                 Change
               </Button>
             </div>
-            <div className="rounded-lg border border-emerald-500/40 bg-emerald-50 p-4 text-sm">
-              <p className="font-medium text-emerald-700">Authentication: Better Auth</p>
-              <p className="mt-1 text-emerald-600">
-                Your account is secured with Better Auth using Argon2id password hashing.
-              </p>
-            </div>
           </CardContent>
         </Card>
         <TwoFactorSetup twoFactorEnabled={twoFactorEnabled} />

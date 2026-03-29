@@ -72,8 +72,8 @@ export const auth = betterAuth({
     // Stricter limits for sign-in endpoint
     customRules: {
       "/sign-in/*": {
-        window: 60,
-        max: 5, // Only 5 sign-in attempts per minute
+        window: 300, // 5 minute window
+        max: 5, // Only 5 sign-in attempts per 5 minutes
       },
       "/sign-up/*": {
         window: 300, // 5 minute window
