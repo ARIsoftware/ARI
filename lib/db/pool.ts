@@ -10,12 +10,25 @@ function createPool(): Pool | null {
     return null
   }
 
+  // In serverless (Vercel), each lambda gets its own pool.
+  // Many concurrent lambdas × large pool = connection exhaustion on Supabase.
+  const isProduction = process.env.NODE_ENV === "production"
+  const defaultMax = isProduction ? 2 : 10
+
   const p = new Pool({
     connectionString: process.env.DATABASE_URL,
-    max: Number.parseInt(process.env.DATABASE_POOL_MAX || "10", 10),
-    idleTimeoutMillis: 10000,
+    max: Number.parseInt(process.env.DATABASE_POOL_MAX || String(defaultMax), 10),
+    // Close idle connections quickly so they don't go stale while the lambda is warm.
+    // Supabase's PgBouncer session pooler may close backend connections after its own
+    // idle timeout — if our client-side timeout is longer, we hand out dead sockets.
+    idleTimeoutMillis: isProduction ? 4000 : 10000,
     connectionTimeoutMillis: 15000,
     allowExitOnIdle: true,
+    // TCP keepalive detects connections silently closed by PgBouncer / load balancers.
+    // Without this, the pool can hand out dead sockets that fail with
+    // "Connection terminated unexpectedly".
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10000,
     ssl: { rejectUnauthorized: false },
   })
 
