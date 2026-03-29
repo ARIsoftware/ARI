@@ -13,7 +13,7 @@ function createPool(): Pool | null {
   // In serverless (Vercel), each lambda gets its own pool.
   // Many concurrent lambdas × large pool = connection exhaustion on Supabase.
   const isProduction = process.env.NODE_ENV === "production"
-  const defaultMax = isProduction ? 2 : 10
+  const defaultMax = isProduction ? 3 : 10
 
   const p = new Pool({
     connectionString: process.env.DATABASE_URL,

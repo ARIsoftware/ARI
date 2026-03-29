@@ -75,10 +75,12 @@ export async function withUserContext<T>(
   }
 
   const attempt = async (isRetry: boolean): Promise<T> => {
-    const rawClient = await pool.connect()
-    const client = pgBouncerCompat(rawClient)
+    let client: PoolClient | null = null
 
     try {
+      const rawClient = await pool.connect()
+      client = pgBouncerCompat(rawClient)
+
       // Begin transaction - SET LOCAL only lasts within transaction
       await client.query('BEGIN')
 
@@ -100,24 +102,27 @@ export async function withUserContext<T>(
 
       return result
     } catch (error) {
-      // Rollback on any error
-      try {
-        await client.query('ROLLBACK')
-      } catch (rollbackError) {
-        // Rollback will also fail on a dead connection — that's expected
+      // Rollback on any error (skip if we never got a connection)
+      if (client) {
+        try {
+          await client.query('ROLLBACK')
+        } catch (rollbackError) {
+          // Rollback will also fail on a dead connection — that's expected
+        }
       }
 
       // If this was a stale connection (killed by PgBouncer while idle),
       // destroy it so the pool doesn't reuse it, then retry once.
       if (!isRetry && isStaleConnectionError(error)) {
-        client.release(true) // true = destroy, don't return to pool
+        if (client) client.release(true) // true = destroy, don't return to pool
+        client = null // prevent double-release in finally
         return attempt(true)
       }
 
       throw error
     } finally {
       // Always release the client back to the pool
-      client.release()
+      if (client) client.release()
     }
   }
 

@@ -157,9 +157,9 @@ export async function PUT(request: NextRequest) {
 
     const updates = parseResult.data
 
-    // Get existing settings
-    const existingResult = await withRLS((db) =>
-      db
+    // Read + write in a single connection to reduce pool pressure
+    const newSettings = await withRLS(async (db) => {
+      const existingResult = await db
         .select({ settings: moduleSettings.settings })
         .from(moduleSettings)
         .where(
@@ -169,36 +169,28 @@ export async function PUT(request: NextRequest) {
           )
         )
         .limit(1)
-    )
 
-    const existingSettings = (existingResult[0]?.settings || {}) as Record<string, unknown>
+      const existingSettings = (existingResult[0]?.settings || {}) as Record<string, unknown>
 
-    // Merge updates with existing settings
-    const newSettings: ThemeSettings = {
-      activeThemeId: updates.activeThemeId ?? (existingSettings.activeThemeId as string) ?? DEFAULT_THEME_SETTINGS.activeThemeId,
-      activeFont: updates.activeFont ?? (existingSettings.activeFont as string) ?? DEFAULT_THEME_SETTINGS.activeFont,
-      customThemes: updates.customThemes ?? (existingSettings.customThemes as CustomTheme[]) ?? DEFAULT_THEME_SETTINGS.customThemes,
-      sidebarView: updates.sidebarView ?? (existingSettings.sidebarView as 'default' | 'compressed') ?? DEFAULT_THEME_SETTINGS.sidebarView,
-    }
+      const merged: ThemeSettings = {
+        activeThemeId: updates.activeThemeId ?? (existingSettings.activeThemeId as string) ?? DEFAULT_THEME_SETTINGS.activeThemeId,
+        activeFont: updates.activeFont ?? (existingSettings.activeFont as string) ?? DEFAULT_THEME_SETTINGS.activeFont,
+        customThemes: updates.customThemes ?? (existingSettings.customThemes as CustomTheme[]) ?? DEFAULT_THEME_SETTINGS.customThemes,
+        sidebarView: updates.sidebarView ?? (existingSettings.sidebarView as 'default' | 'compressed') ?? DEFAULT_THEME_SETTINGS.sidebarView,
+      }
 
-    // Upsert the settings
-    if (existingResult.length === 0) {
-      // Insert new record
-      await withRLS((db) =>
-        db.insert(moduleSettings).values({
+      if (existingResult.length === 0) {
+        await db.insert(moduleSettings).values({
           userId: user.id,
           moduleId: THEME_MODULE_ID,
           enabled: true,
-          settings: newSettings,
+          settings: merged,
         })
-      )
-    } else {
-      // Update existing record
-      await withRLS((db) =>
-        db
+      } else {
+        await db
           .update(moduleSettings)
           .set({
-            settings: newSettings,
+            settings: merged,
             updatedAt: new Date().toISOString(),
           })
           .where(
@@ -207,8 +199,10 @@ export async function PUT(request: NextRequest) {
               eq(moduleSettings.moduleId, THEME_MODULE_ID)
             )
           )
-      )
-    }
+      }
+
+      return merged
+    })
 
     return NextResponse.json(newSettings)
   } catch (error) {
