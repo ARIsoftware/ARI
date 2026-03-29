@@ -46,7 +46,11 @@ export function useMusicPlayerContext() {
   return context
 }
 
-export function MusicPlayerContextProvider({ children }: { children: React.ReactNode }) {
+export function useMusicPlayerContextSafe() {
+  return useContext(MusicPlayerContext)
+}
+
+export function MusicPlayerContextProvider({ children, isAuthenticated = false }: { children: React.ReactNode; isAuthenticated?: boolean }) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isActive, setIsActive] = useState(false)
   const [isReady, setIsReady] = useState(false)
@@ -129,7 +133,7 @@ export function MusicPlayerContextProvider({ children }: { children: React.React
   }, [])
 
   useEffect(() => {
-    if (!mounted || typeof window === "undefined") return
+    if (!mounted || !isAuthenticated || typeof window === "undefined") return
 
     if (!window.YT && !document.querySelector('script[src*="youtube.com/iframe_api"]')) {
       const tag = document.createElement("script")
@@ -159,7 +163,7 @@ export function MusicPlayerContextProvider({ children }: { children: React.React
       setIsReady(false)
       setIsPlaying(false)
     }
-  }, [mounted, initializePlayer])
+  }, [mounted, isAuthenticated, initializePlayer])
 
   const setPlaylist = useCallback((songs: MusicPlaylistEntry[]) => {
     setPlaylistState(songs)
@@ -233,8 +237,8 @@ export function MusicPlayerContextProvider({ children }: { children: React.React
   return (
     <MusicPlayerContext.Provider value={value}>
       {children}
-      {mounted && <div ref={playerRef} className="absolute w-0 h-0 overflow-hidden" />}
-      {mounted && (
+      {mounted && isAuthenticated && <div ref={playerRef} className="absolute w-0 h-0 overflow-hidden" />}
+      {mounted && isAuthenticated && (
         <Suspense fallback={null}>
           <PlaylistSync />
         </Suspense>

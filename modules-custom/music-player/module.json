@@ -32,5 +32,9 @@
   },
   "topBarIcon": {
     "component": "./components/top-bar-icon.tsx"
+  },
+  "globalProvider": {
+    "component": "./components/music-player-context.tsx",
+    "exportName": "MusicPlayerContextProvider"
   }
 }
