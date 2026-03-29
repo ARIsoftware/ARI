@@ -18,22 +18,20 @@ export function RadarTaskDots({
   onTaskClick,
   limit = 5
 }: RadarTaskDotsProps) {
-  // Transform and sort tasks by priority (lowest score first = highest priority)
+  // Transform tasks (parent already provides sorted + sliced data)
   const transformedTasks = tasks
     .map(transformTaskForRadar)
-    .sort((a, b) => a.score - b.score)
     .slice(0, limit)
 
   // Convert polar coordinates to cartesian for positioning
-  const getPosition = (task: ReturnType<typeof transformTaskForRadar>) => {
+  const getPosition = (task: ReturnType<typeof transformTaskForRadar>, taskIndex: number) => {
     // Map score to distance from center (0-1 range, where 0 is center)
-    // Lower score = closer to center = higher priority
+    // Higher score = closer to center = higher priority
     const maxRadius = 140 // Maximum radius in pixels
-    const radius = Math.min(task.score, 1) * maxRadius
+    const radius = Math.max(0, 1 - task.score / 10) * maxRadius
 
     // Distribute tasks around different angles to avoid overlap
     const angleStep = 360 / Math.min(transformedTasks.length, 5)
-    const taskIndex = transformedTasks.findIndex(t => t.id === task.id)
     const angle = (taskIndex * angleStep - 90) * Math.PI / 180
 
     const x = radius * Math.cos(angle)
@@ -60,7 +58,7 @@ export function RadarTaskDots({
             const fullTask = tasks.find(t => t.id === task.id)
             if (!fullTask) return null
 
-            const { x, y } = getPosition(task)
+            const { x, y } = getPosition(task, index)
             const isHovered = hoveredTask === task.id
 
             return (
@@ -123,7 +121,7 @@ export function RadarTaskDots({
                   >
                     <div className="bg-white/95 backdrop-blur shadow-lg rounded px-2 py-1 text-xs">
                       <div className="font-medium truncate">{task.title}</div>
-                      <div className="text-gray-500">Score: {task.score.toFixed(2)}</div>
+                      <div className="text-gray-500">Score: {typeof task.score === 'number' ? task.score.toFixed(1) : 'N/A'}</div>
                     </div>
                   </foreignObject>
                 )}

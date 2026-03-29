@@ -35,6 +35,16 @@ const DEFAULT_WEIGHTS = {
   strategic_fit: 1.0
 }
 
+// Maximum possible weighted Euclidean distance (when all normalized axes are at 0, target is 1)
+// Each axis contributes weight * 1^2, so max = sqrt(sum of weights)
+const MAX_DISTANCE = Math.sqrt(
+  DEFAULT_WEIGHTS.impact +
+  DEFAULT_WEIGHTS.severity +
+  DEFAULT_WEIGHTS.timeliness +
+  DEFAULT_WEIGHTS.effort +
+  DEFAULT_WEIGHTS.strategic_fit
+) // ≈ 2.2583
+
 export function normalizeAxes(axes: TaskAxes): NormalizedAxes {
   return {
     impact: (axes.impact - 1) / 4,           // Convert 1-5 to 0-1
@@ -52,7 +62,7 @@ export function calculatePriorityScore(
   const normalized = normalizeAxes(axes)
 
   // Calculate weighted Euclidean distance from target values
-  const score = Math.sqrt(
+  const distance = Math.sqrt(
     weights.impact * Math.pow(normalized.impact - TARGET_VALUES.impact, 2) +
     weights.severity * Math.pow(normalized.severity - TARGET_VALUES.severity, 2) +
     weights.timeliness * Math.pow(normalized.timeliness - TARGET_VALUES.timeliness, 2) +
@@ -60,13 +70,14 @@ export function calculatePriorityScore(
     weights.strategic_fit * Math.pow(normalized.strategic_fit - TARGET_VALUES.strategic_fit, 2)
   )
 
-  return score
+  // Normalize distance to 0-1 range, then invert so higher score = higher priority (0-10 scale)
+  return Math.max(0, Math.min(10, (1 - distance / MAX_DISTANCE) * 10))
 }
 
 export function getTaskPriorityLevel(score: number): 'critical' | 'high' | 'medium' | 'low' {
-  if (score < 0.3) return 'critical'
-  if (score < 0.5) return 'high'
-  if (score < 0.7) return 'medium'
+  if (score > 7) return 'critical'
+  if (score > 5) return 'high'
+  if (score > 3) return 'medium'
   return 'low'
 }
 
@@ -101,12 +112,13 @@ export function transformTaskForRadar(task: Task) {
   }
 
   const normalized = normalizeAxes(axes)
-  const score = task.priority_score || calculatePriorityScore(axes)
+  // Always recalculate from axes to ensure consistent inverted scoring
+  const score = calculatePriorityScore(axes)
 
   // Calculate position on radar chart
   // Convert score to radius (0 = center, 1 = edge)
-  // Lower score = closer to center = higher priority
-  const radius = Math.min(score, 1)
+  // Higher score = closer to center = higher priority
+  const radius = Math.max(0, 1 - score / 10)
 
   // Angle based on primary axis (the one with highest normalized value)
   const primaryAxis = Object.entries(normalized).reduce((max, [key, value]) =>
