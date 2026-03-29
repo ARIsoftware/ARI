@@ -1,0 +1,36 @@
+{
+  "id": "music-player",
+  "group": "Entertainment",
+  "name": "Music Player",
+  "description": "Background YouTube music player with playlist management",
+  "version": "1.0.0",
+  "author": "ARI",
+  "icon": "Music",
+  "enabled": true,
+  "fullscreen": false,
+  "menuPriority": 50,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": false
+  },
+  "routes": [
+    {
+      "path": "/music-player",
+      "label": "Music",
+      "icon": "Music",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": ["music_playlist"],
+    "migrations": "./database/migrations"
+  },
+  "topBarIcon": {
+    "component": "./components/top-bar-icon.tsx"
+  }
+}
