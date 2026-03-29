@@ -51,7 +51,9 @@ export interface ModuleDatabaseConfig {
 export interface ModuleDashboardConfig {
   /** Whether this module provides dashboard widgets */
   widgets?: boolean
-  /** Paths to widget components (relative to module root) */
+  /** Paths to small stat card components for the Quick Overview grid (relative to module root) */
+  statCards?: string[]
+  /** Paths to larger widget components for the content area (relative to module root) */
   widgetComponents?: string[]
 }
 
