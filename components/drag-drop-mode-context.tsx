@@ -55,18 +55,9 @@ export function DragDropModeProvider({ children, isAuthenticated, isAuthLoading 
       })
   }, [isAuthLoading, isAuthenticated])
 
-  // Keyboard shortcut: Cmd+D to toggle drag mode
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "d" && (event.metaKey || event.ctrlKey)) {
-        event.preventDefault()
-        setIsDragMode(prev => !prev)
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [])
+  // Ref for keyboard shortcut to read current drag mode without stale closure
+  const isDragModeRef = useRef(false)
+  isDragModeRef.current = isDragMode
 
   const setDragMode = useCallback((mode: boolean) => {
     setIsDragMode(mode)
@@ -89,6 +80,10 @@ export function DragDropModeProvider({ children, isAuthenticated, isAuthLoading 
 
     console.log("[DragDrop] Saving orders:", { moduleOrder: moduleOrderToSave, iconOrder: iconOrderToSave })
 
+    // Update local state immediately (optimistic) so UI reflects new order on exit
+    if (moduleOrderToSave) setModuleOrder(moduleOrderToSave)
+    if (iconOrderToSave) setIconOrder(iconOrderToSave)
+
     // Build request body with only the orders that have changes
     const body: { moduleOrder?: Record<string, number>; iconOrder?: Record<string, number> } = {}
     if (moduleOrderToSave) body.moduleOrder = moduleOrderToSave
@@ -105,19 +100,29 @@ export function DragDropModeProvider({ children, isAuthenticated, isAuthLoading 
           throw new Error("Failed to save order")
         }
         console.log("[DragDrop] Orders saved successfully")
-        // Update local order states after successful save
-        if (moduleOrderToSave) {
-          setModuleOrder(moduleOrderToSave)
-        }
-        if (iconOrderToSave) {
-          setIconOrder(iconOrderToSave)
-        }
       })
       .catch(error => {
         console.error("[DragDrop] Failed to save order:", error)
-        // Could show a toast notification here on error
       })
   }, [])
+
+  // Keyboard shortcut: Cmd+D to toggle drag mode
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "d" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault()
+        if (isDragModeRef.current) {
+          saveOrder()
+          setDragMode(false)
+        } else {
+          setIsDragMode(true)
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [saveOrder, setDragMode])
 
   return (
     <DragDropModeContext.Provider
