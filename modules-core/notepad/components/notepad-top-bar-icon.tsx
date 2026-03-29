@@ -31,7 +31,7 @@ export function NotepadTopBarIcon({ isDragMode = false }: { isDragMode?: boolean
             <Button
               variant="ghost"
               size="icon"
-              className={`h-8 w-8 text-white hover:bg-white/10 ${dragItemClass}`}
+              className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 ${dragItemClass}`}
               onClick={isDragMode ? undefined : () => setIsNotepadOpen(true)}
             >
               <StickyNote className="h-5 w-5" />

@@ -8,11 +8,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { useMusicPlayerContext } from "@/modules/music-player/components/music-player-context"
+import { useMusicPlayerContextSafe } from "@/modules/music-player/components/music-player-context"
 
 export default function MusicPlayerTopBarIcon({ isDragMode = false }: { isDragMode?: boolean }) {
   const router = useRouter()
-  const { isActive, isReady, currentSong, playlist, playNext, pause, resume } = useMusicPlayerContext()
+  const context = useMusicPlayerContextSafe()
+  const { isActive = false, isReady = false, currentSong = null, playlist = [], playNext = () => {}, pause = () => {}, resume = () => {} } = context ?? {}
 
   const dragItemClass = isDragMode
     ? "ring-1 ring-white/40 shadow-[0_0_8px_rgba(255,255,255,0.15)] rounded-lg"
@@ -50,7 +51,7 @@ export default function MusicPlayerTopBarIcon({ isDragMode = false }: { isDragMo
           <Button
             variant="ghost"
             size="icon"
-            className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+            className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 hover:text-topbar-foreground ${dragItemClass}`}
             onClick={handleMainClick}
             disabled={!isReady && !isDragMode}
           >
@@ -73,7 +74,7 @@ export default function MusicPlayerTopBarIcon({ isDragMode = false }: { isDragMo
             <Button
               variant="ghost"
               size="icon"
-              className={`h-8 w-8 text-white hover:bg-white/10 hover:text-white ${dragItemClass}`}
+              className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 hover:text-topbar-foreground ${dragItemClass}`}
               onClick={handleNextClick}
             >
               <SkipForward className="h-5 w-5" />

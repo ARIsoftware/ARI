@@ -48,6 +48,10 @@ export interface ThemeColors {
   chart4: string
   chart5: string
 
+  // Topbar colors (optional – defaults to background/foreground)
+  topbarBackground?: string
+  topbarForeground?: string
+
   // Sidebar colors
   sidebarBackground: string
   sidebarForeground: string
@@ -123,6 +127,8 @@ export const CSS_VAR_MAP: Record<keyof ThemeColors, string> = {
   chart3: '--chart-3',
   chart4: '--chart-4',
   chart5: '--chart-5',
+  topbarBackground: '--topbar-background',
+  topbarForeground: '--topbar-foreground',
   sidebarBackground: '--sidebar-background',
   sidebarForeground: '--sidebar-foreground',
   sidebarPrimary: '--sidebar-primary',

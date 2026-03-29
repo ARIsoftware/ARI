@@ -54,6 +54,13 @@ function applyThemeColors(colors: ThemeColors) {
       root.style.setProperty(cssVar, value)
     }
   }
+  // Reset optional topbar vars to defaults when not set by theme
+  if (!colors.topbarBackground) {
+    root.style.removeProperty('--topbar-background')
+  }
+  if (!colors.topbarForeground) {
+    root.style.removeProperty('--topbar-foreground')
+  }
 }
 
 // Apply font to document
