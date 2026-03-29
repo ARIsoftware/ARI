@@ -161,7 +161,8 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
   const [dragIcons, setDragIcons] = useState(sortedIcons)
   useEffect(() => {
     if (isDragMode) setDragIcons(sortedIcons)
-  }, [isDragMode]) // Reset when entering drag mode
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally snapshot sortedIcons only when entering drag mode
+  }, [isDragMode])
 
   const renderedDragIcons = useMemo(() => dragIcons.filter(icon => {
     if (icon.type === "module" && icon.module.topBarIcon?.component) {
