@@ -1,34 +1,35 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+
 import { Keyboard, Terminal } from "lucide-react"
 
 interface KeyBinding {
   id: string
   keys: string[]
   description: string
-  category: "navigation" | "editing"
 }
 
 const KEYBINDINGS: KeyBinding[] = [
   {
     id: "command-palette",
-    keys: ["⌘", "K"],
+    keys: ["Ctrl", "⇧", "K"],
     description: "Open command palette",
-    category: "navigation",
   },
   {
     id: "toggle-sidebar",
-    keys: ["⌘", "B"],
+    keys: ["Ctrl", "⇧", "B"],
     description: "Toggle sidebar visibility",
-    category: "navigation",
   },
   {
     id: "drag-drop-mode",
-    keys: ["⌘", "D"],
+    keys: ["Ctrl", "⇧", "D"],
     description: "Enter drag-and-drop mode to reorder sidebar modules",
-    category: "editing",
+  },
+  {
+    id: "quick-add-task",
+    keys: ["Ctrl", "⇧", "L"],
+    description: "Open quick add task panel",
   },
 ]
 
@@ -50,9 +51,6 @@ function KeyCombo({ keys }: { keys: string[] }) {
 }
 
 export function KeybindingsTab(): React.ReactElement {
-  const navigationBindings = KEYBINDINGS.filter(kb => kb.category === "navigation")
-  const editingBindings = KEYBINDINGS.filter(kb => kb.category === "editing")
-
   return (
     <div className="space-y-6">
       <Card>
@@ -62,44 +60,20 @@ export function KeybindingsTab(): React.ReactElement {
             Keyboard Shortcuts
           </CardTitle>
           <CardDescription>
-            Navigate ARI faster with these keyboard shortcuts. All shortcuts use the Command key (⌘) on Mac or Control (Ctrl) on Windows.
+            Navigate ARI faster with these keyboard shortcuts. All shortcuts use Ctrl + Shift + key.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Navigation shortcuts */}
-          <div>
-            <h3 className="mb-3 text-sm font-medium text-slate-700 flex items-center gap-2">
-              <Badge variant="outline" className="text-xs">Navigation</Badge>
-            </h3>
-            <div className="space-y-3">
-              {navigationBindings.map((binding) => (
-                <div
-                  key={binding.id}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3"
-                >
-                  <span className="text-sm text-slate-700">{binding.description}</span>
-                  <KeyCombo keys={binding.keys} />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Editing shortcuts */}
-          <div>
-            <h3 className="mb-3 text-sm font-medium text-slate-700 flex items-center gap-2">
-              <Badge variant="outline" className="text-xs">Editing</Badge>
-            </h3>
-            <div className="space-y-3">
-              {editingBindings.map((binding) => (
-                <div
-                  key={binding.id}
-                  className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3"
-                >
-                  <span className="text-sm text-slate-700">{binding.description}</span>
-                  <KeyCombo keys={binding.keys} />
-                </div>
-              ))}
-            </div>
+        <CardContent>
+          <div className="space-y-3">
+            {KEYBINDINGS.map((binding) => (
+              <div
+                key={binding.id}
+                className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3"
+              >
+                <span className="text-sm text-slate-700">{binding.description}</span>
+                <KeyCombo keys={binding.keys} />
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
