@@ -449,7 +449,10 @@ export default function WelcomePage() {
               Configure ARI
             </h1>
             <p className="text-black" style={{ lineHeight: '26px', fontSize: '16px', fontWeight: 300 }}>
-              Configure your environment to get ARI running. This step is about preparing your local setup so the application can run smoothly. Nothing here is difficult, but it does require a bit of care and attention to detail. This entire setup process should take around 10 to 20 minutes, depending on your system and familiarity with the tools involved.
+              Welcome to ARI. Engineered for those who want complete command over the software that runs their life. The first AI-enabled No Code workspace that can be completely customized to your workflow and grows with you. Build entirely new modules in minutes. Where mastery, modularity, and AI work in your favour so you can do your best work and live your best life.
+            </p>
+            <p className="text-black mt-4" style={{ lineHeight: '26px', fontSize: '16px', fontWeight: 300 }}>
+              This welcome wizard will help you configure ARI. Nothing here is difficult, but it does require a bit of care and attention to detail. <span style={{ fontWeight: 500 }}>This entire setup process should take around 10 to 20 minutes, depending on your system and familiarity with the tools involved. <a href="https://ari.software/docs" target="_blank" rel="noopener noreferrer" className="underline">Need Help?</a></span>
             </p>
           </div>
 
