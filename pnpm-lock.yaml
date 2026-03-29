@@ -229,9 +229,6 @@ importers:
       svix:
         specifier: ^1.84.1
         version: 1.84.1
-      swapy:
-        specifier: ^1.0.5
-        version: 1.0.5
       tailwind-merge:
         specifier: ^2.6.0
         version: 2.6.0
@@ -4351,9 +4348,6 @@ packages:
 
   svix@1.84.1:
     resolution: {integrity: sha512-K8DPPSZaW/XqXiz1kEyzSHYgmGLnhB43nQCMeKjWGCUpLIpAMMM8kx3rVVOSm6Bo6EHyK1RQLPT4R06skM/MlQ==}
-
-  swapy@1.0.5:
-    resolution: {integrity: sha512-XEzy5HCw7yESb7QajKTBJ+NA/BL0kAKlE7XhSMPZawF740X4ws/5CFtXRsVDQ+EztISC759a9+DJM9mxjz4hXg==}
 
   swr@2.3.6:
     resolution: {integrity: sha512-wfHRmHWk/isGNMwlLGlZX5Gzz/uTgo0o2IRuTMcf4CPuPFJZlq0rDaKUx+ozB5nBOReNV1kiOyzMfj+MBMikLw==}
@@ -9068,8 +9062,6 @@ snapshots:
     dependencies:
       standardwebhooks: 1.0.0
       uuid: 10.0.0
-
-  swapy@1.0.5: {}
 
   swr@2.3.6(react@19.2.0):
     dependencies:
