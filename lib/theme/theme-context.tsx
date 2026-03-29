@@ -6,6 +6,7 @@ import {
   useEffect,
   useState,
   useCallback,
+  useRef,
   type ReactNode,
 } from 'react'
 import type { ThemeSettings, ThemeColors, CustomTheme, ThemePreset, SidebarView } from './types'
@@ -223,27 +224,34 @@ export function ThemeProvider({ children, isAuthenticated: isAuthProp, isAuthLoa
       })
   }, [isAuthLoading, isAuthProp])
 
-  // Save settings to API and cache
+  // Debounce API saves so rapid theme switching doesn't spam DB connections
+  const pendingSettingsRef = useRef<Partial<ThemeSettings> | null>(null)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const saveSettings = useCallback(
-    async (settings: Partial<ThemeSettings>) => {
-      // Update cache immediately
+    (settings: Partial<ThemeSettings>) => {
+      // Update cache immediately (instant UI)
       const cached = localStorage.getItem(THEME_CACHE_KEY)
       const current = cached ? JSON.parse(cached) : {}
       const updated = { ...current, ...settings }
       localStorage.setItem(THEME_CACHE_KEY, JSON.stringify(updated))
 
-      // Save to API if authenticated
-      if (isAuthenticatedState) {
-        try {
-          await fetch('/api/theme', {
+      // Merge with any pending unsaved settings
+      pendingSettingsRef.current = { ...pendingSettingsRef.current, ...settings }
+
+      // Debounce the API call — only the last change within 500ms hits the server
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = setTimeout(() => {
+        const toSave = pendingSettingsRef.current
+        pendingSettingsRef.current = null
+        if (isAuthenticatedState && toSave) {
+          fetch('/api/theme', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(settings),
-          })
-        } catch (e) {
-          console.error('[Theme] Failed to save to API:', e)
+            body: JSON.stringify(toSave),
+          }).catch((e) => console.error('[Theme] Failed to save to API:', e))
         }
-      }
+      }, 500)
     },
     [isAuthenticatedState]
   )
