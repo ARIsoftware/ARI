@@ -216,7 +216,6 @@ When approved, create the module following this order:
     - Document the required environment variable for the secret
     - See `/docs/MODULES.md` section 7.5 for detailed guidance
 12. Ask the user for permission to execute the .sql file, or ask if they want to run the .SQL statements themselves.
-13. If the user needs to take any action to complete the setup of the module (run a .sql file, restart the dev server etc), please clearly indicate the actions they need to take with clear instructions.
 
 ## Data Fetching Best Practices
 
@@ -678,3 +677,4 @@ Before marking complete, verify:
 10. **v0 code is a visual starting point only**: Always build proper API routes, hooks, and database schema. Never leave mock data in production components.
 11. **Use the pg-aiguide MCP tools** when creating database schemas. These are configured in `.mcp.json` and must be used to validate data types, indexes, and constraints — do not skip this step.
 12. **Don't use PostgreSQL array casts in Drizzle's `sql` template literal** (e.g. `${value}::uuid[]`). Drizzle parameterizes values for safety, so the array gets passed as a bound parameter (`$1`) that PostgreSQL can't cast to a typed array. Instead, use Drizzle's query builder methods (e.g. individual `update().where()` calls with `Promise.all` for batch operations).
+13. If the user must take any action to complete the module setup (for example, run a .sql file or restart the dev server), make that your last message so it is clearly visible. Use these statement: "🧑🏼‍💻 USER ACTION REQUIRED:" followed by clear, step-by-step instructions for what they need to do.
