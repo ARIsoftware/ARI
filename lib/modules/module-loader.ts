@@ -35,7 +35,7 @@ interface GeneratedManifest {
       path: string
       label: string
       icon?: string
-      sidebarPosition?: 'main' | 'bottom' | 'secondary'
+      sidebarPosition?: 'main' | 'bottom' | 'secondary' | 'hidden' | 'none'
     }>
     permissions?: {
       database?: boolean
@@ -58,9 +58,10 @@ interface GeneratedManifest {
       panel?: string
     }
     topBarIcon?: {
-      icon: string
-      route: string
+      icon?: string
+      route?: string
       tooltip?: string
+      component?: string
     }
     path: string
     sourceDir: string
