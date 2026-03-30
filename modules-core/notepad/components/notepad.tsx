@@ -191,7 +191,7 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
 
       {/* Sliding Panel - always rendered but off-screen when closed */}
       <div
-        className={`fixed bg-white z-[101] transform transition-all duration-300 ease-in-out overflow-hidden ${
+        className={`fixed bg-background text-foreground z-[101] transform transition-all duration-300 ease-in-out overflow-hidden ${
           isFullscreen
             ? "inset-4 w-auto h-auto"
             : "top-0 right-0 h-full w-[500px] shadow-2xl"
@@ -205,7 +205,7 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
       >
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b">
+          <div className="flex items-center justify-between p-6 border-b border-border">
             <div className="flex items-center gap-2">
               <StickyNote className="w-5 h-5" />
               <h2 className="text-xl font-semibold">Notepad</h2>
@@ -215,7 +215,6 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsFullscreen(!isFullscreen)}
-                className="hover:bg-gray-100"
               >
                 {isFullscreen ? (
                   <Minimize2 className="w-5 h-5" />
@@ -227,7 +226,6 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
                 variant="ghost"
                 size="icon"
                 onClick={handleClose}
-                className="hover:bg-gray-100"
               >
                 <X className="w-5 h-5" />
               </Button>
@@ -235,8 +233,8 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
           </div>
 
           {/* Instructions */}
-          <div className="px-6 py-4 bg-gray-50 border-b">
-            <p className="text-sm text-gray-600">
+          <div className="px-6 py-4 bg-muted border-b border-border">
+            <p className="text-sm text-muted-foreground">
               {isViewingHistory
                 ? `Viewing previous version. Click "Restore" to make this your current version.`
                 : "Welcome to your notepad. Use this area to jot down tasks, notes, ideas, reminders, or anything really. Don't forget to press save when you're done!"
@@ -258,7 +256,7 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between gap-4 p-6 border-t bg-gray-50">
+          <div className="flex items-center justify-between gap-4 p-6 border-t border-border bg-muted">
             <div className="flex items-center gap-3">
               {/* Navigation Arrows */}
               <div className="flex items-center gap-1">
@@ -267,9 +265,8 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
                   size="icon"
                   onClick={navigateToPreviousRevision}
                   disabled={!canGoBack || isLoading}
-                  className="h-8 w-8 hover:bg-gray-100"
+                  className="h-8 w-8"
                   title="Previous version"
-                  style={{ color: '#828285' }}
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
@@ -278,9 +275,8 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
                   size="icon"
                   onClick={navigateToNextRevision}
                   disabled={!canGoForward || isLoading}
-                  className="h-8 w-8 hover:bg-gray-100"
+                  className="h-8 w-8"
                   title="Next version"
-                  style={{ color: '#828285' }}
                 >
                   <ChevronRight className="w-4 h-4" />
                 </Button>
@@ -289,12 +285,12 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
               {/* Status Text */}
               <div className="text-sm">
                 {isViewingHistory && (
-                  <span className="font-medium" style={{ color: '#828285' }}>
+                  <span className="font-medium text-muted-foreground">
                     {getVersionLabel()}
                   </span>
                 )}
                 {!isViewingHistory && showWarning && (
-                  <span className="text-red-600 font-medium">
+                  <span className="text-destructive font-medium">
                     {charactersLeft} characters left
                   </span>
                 )}
@@ -315,7 +311,7 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
               {isViewingHistory ? (
                 <Button
                   onClick={handleRestore}
-                  className="min-w-[100px] bg-blue-600 hover:bg-blue-700"
+                  className="min-w-[100px] bg-primary text-primary-foreground hover:bg-primary/90"
                   disabled={isSaving}
                 >
                   {isSaving ? "Restoring..." : "Restore"}
@@ -323,7 +319,7 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
               ) : (
                 <Button
                   onClick={handleSave}
-                  className="min-w-[100px] bg-blue-600 hover:bg-blue-700"
+                  className="min-w-[100px] bg-primary text-primary-foreground hover:bg-primary/90"
                   disabled={!hasUnsavedChanges || isSaving}
                 >
                   {isSaving ? "Saving..." : "Save"}
