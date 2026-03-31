@@ -28,14 +28,35 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [backupCode, setBackupCode] = useState('')
   const router = useRouter()
 
-  // Trigger first-run admin bootstrap (no-op if users already exist)
+  // Trigger first-run admin bootstrap (no-op if users already exist).
+  // Cached in sessionStorage so repeat visits don't re-hit the endpoint.
   useEffect(() => {
-    fetch('/api/auth/bootstrap', { method: 'POST' })
+    const cached = sessionStorage.getItem('ari:bootstrap')
+    if (cached) {
+      if (cached === 'no_users') setNoUsers(true)
+      return
+    }
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 3000)
+
+    fetch('/api/auth/bootstrap', { method: 'POST', signal: controller.signal })
       .then(res => res.json())
       .then(data => {
-        if (data.status === 'no_users') setNoUsers(true)
+        if (controller.signal.aborted) return
+        const status = data.status || 'ok'
+        sessionStorage.setItem('ari:bootstrap', status)
+        if (status === 'no_users') setNoUsers(true)
       })
-      .catch(() => {})
+      .catch(() => {
+        // Timeout or network error — don't cache, allow retry on next mount
+      })
+      .finally(() => clearTimeout(timeout))
+
+    return () => {
+      controller.abort()
+      clearTimeout(timeout)
+    }
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {

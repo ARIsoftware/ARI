@@ -36,7 +36,38 @@ function createPool(): Pool | null {
     console.warn("[DB Pool] Unexpected connection error (will auto-recover):", err.message)
   })
 
+  addConnectionValidation(p)
+
   return p
+}
+
+/**
+ * Monkey-patch pool.connect() to validate connections with a `SELECT 1` ping
+ * before returning them. If the connection is stale (silently closed by
+ * PgBouncer), destroy it and acquire a fresh one.
+ *
+ * This fixes stale-connection errors for ALL callers — including Better Auth's
+ * internal Kysely queries, bootstrap, and withAdminDb — without requiring each
+ * caller to implement its own retry logic.
+ */
+function addConnectionValidation(p: Pool): void {
+  const originalConnect = p.connect.bind(p)
+
+  p.connect = async function validatedConnect(callback?: any): Promise<any> {
+    // If called with a callback, don't interfere (legacy pattern)
+    if (typeof callback === 'function') return originalConnect(callback)
+
+    const client = await originalConnect()
+    try {
+      await client.query('SELECT 1')
+      return client
+    } catch {
+      // Connection is dead — destroy it so the pool doesn't reuse it
+      try { client.release(true) } catch {}
+      // Acquire a fresh connection (this one will be newly established)
+      return await originalConnect()
+    }
+  } as any
 }
 
 const pool = globalThis.__ariPgPool ?? createPool()
