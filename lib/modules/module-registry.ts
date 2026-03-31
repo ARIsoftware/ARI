@@ -13,9 +13,6 @@ import { createDbClient } from '@/lib/db-supabase'
 import { loadModules } from './module-loader'
 import type { ModuleMetadata, ModuleSettings } from './module-types'
 
-// Track if we've logged the module list on server start
-let hasLoggedModuleListOnStartup = false
-
 /**
  * Get all discovered modules (regardless of enabled state)
  *
@@ -23,13 +20,6 @@ let hasLoggedModuleListOnStartup = false
  */
 export async function getModules(): Promise<ModuleMetadata[]> {
   const { modules } = await loadModules()
-
-  // Log module list once on server startup
-  if (!hasLoggedModuleListOnStartup) {
-    hasLoggedModuleListOnStartup = true
-    console.log(`[Modules] Server startup - discovered ${modules.length} modules:`, modules.map(m => m.id))
-  }
-
   return modules
 }
 

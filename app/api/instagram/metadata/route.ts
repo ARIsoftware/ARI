@@ -65,11 +65,10 @@ export async function POST(req: NextRequest) {
           if (oembedData.thumbnail_url) {
             metadata.thumbnail = oembedData.thumbnail_url;
             metadata.title = oembedData.title || (oembedData.author_name ? `Post by ${oembedData.author_name}` : null);
-            console.log("Successfully fetched via oEmbed API");
           }
         }
       } catch (e) {
-        console.log("oEmbed API failed:", e.message);
+        // oEmbed is optional, fall through to other methods
       }
 
       // Method 2: Try to fetch with different user agents
@@ -103,12 +102,10 @@ export async function POST(req: NextRequest) {
                 metadata.thumbnail = ogImageMatch[1];
                 metadata.title = titleMatch ? titleMatch[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&') : null;
                 metadata.description = descriptionMatch ? descriptionMatch[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&') : null;
-                console.log(`Successfully fetched with user agent: ${userAgent.substring(0, 30)}...`);
                 break;
               }
             }
           } catch (e) {
-            console.log(`Failed with user agent ${userAgent.substring(0, 30)}:`, e.message);
             continue;
           }
         }
@@ -129,11 +126,10 @@ export async function POST(req: NextRequest) {
             const embedImageMatch = embedHtml.match(/"display_url":"([^"]+)"/);
             if (embedImageMatch) {
               metadata.thumbnail = embedImageMatch[1].replace(/\\u0026/g, '&');
-              console.log("Successfully fetched via embed URL");
             }
           }
         } catch (e) {
-          console.log("Embed method failed:", e.message);
+          // Embed method is optional, fall through to placeholder
         }
       }
 
@@ -148,7 +144,6 @@ export async function POST(req: NextRequest) {
         // Create a consistent placeholder based on the post ID
         metadata.thumbnail = `https://via.placeholder.com/400x400/E4405F/FFFFFF?text=IG+Post`;
         metadata.title = metadata.title || "Instagram Post";
-        console.log("Using placeholder thumbnail");
       }
     }
 

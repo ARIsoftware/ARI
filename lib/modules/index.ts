@@ -11,7 +11,6 @@ let cachedDuplicateErrors: DuplicateModuleError[] | null = null;
 export function getInstalledModules(): string[] {
   if (cachedModules === null) {
     cachedModules = scanInstalledModules();
-    console.log('📦 Discovered modules:', cachedModules);
   }
   return cachedModules;
 }
