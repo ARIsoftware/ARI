@@ -10,8 +10,6 @@ export async function ensureMotivationSetup(supabase: SupabaseClient) {
 
     // If table doesn't exist, create it
     if (tablesError?.message?.includes('relation "public.motivation_content" does not exist')) {
-      console.log('Creating motivation_content table...');
-
       const { error: createError } = await supabase.rpc('create_motivation_table', {
         sql: `
           CREATE TABLE IF NOT EXISTS motivation_content (
@@ -62,8 +60,6 @@ export async function ensureMotivationSetup(supabase: SupabaseClient) {
     const bucketExists = buckets?.some(bucket => bucket.name === 'motivation-photos');
 
     if (!bucketExists) {
-      console.log('Creating motivation-photos bucket...');
-
       const { error: createBucketError } = await supabase
         .storage
         .createBucket('motivation-photos', {

@@ -48,9 +48,6 @@ export function BackupTrigger() {
 
     // Trigger backup in background (fire and forget)
     createBackup.mutate(undefined, {
-      onSuccess: () => {
-        console.log('[BackupTrigger] Automatic backup created successfully')
-      },
       onError: (error) => {
         console.error('[BackupTrigger] Automatic backup failed:', error)
       },

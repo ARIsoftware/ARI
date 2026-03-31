@@ -97,8 +97,6 @@ export default function HyroxPage() {
         getHyroxStationRecords(user.id),
         getHyroxWorkoutHistory(user.id, 1) // Get last workout
       ])
-      console.log('Loaded station records:', records)
-      
       // Ensure records have valid best_time values
       const validRecords = records.map(record => ({
         ...record,
@@ -268,7 +266,6 @@ export default function HyroxPage() {
       if (!recordResult) {
         console.error('Failed to update station record for:', currentStationData.name)
       } else {
-        console.log('Successfully updated station record:', currentStationData.name, 'with time:', stationTime)
         // Reload station records to reflect the update
         loadStationRecords()
       }
@@ -325,11 +322,9 @@ export default function HyroxPage() {
   const progress = ((currentStation) / workoutStations.length) * 100
 
   const runDatabaseTest = async () => {
-    console.log('Running database diagnostics...')
     try {
       const response = await fetch('/api/modules/hyrox/test-database')
       const result = await response.json()
-      console.log('Database test result:', result)
       
       if (!result.success) {
         toast({

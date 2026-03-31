@@ -96,22 +96,6 @@ export default function TasksPage() {
   const { isFeatureEnabled } = useFeatures()
   const searchParams = useSearchParams()
 
-  // JWT Debugging for RLS Setup
-  useEffect(() => {
-    const debugJWT = async () => {
-      if (user?.id && user?.email) {
-        console.log("🔑 RLS Debug Info:")
-        console.log("  User ID:", user.id)
-        console.log("  Email:", user.email)
-
-        // Note: Better Auth uses opaque session tokens, not JWTs
-        console.log("  Session active:", !!session)
-      }
-    }
-
-    debugJWT()
-  }, [user?.id, user?.email, session?.access_token])
-
   // TanStack Query for tasks - replaces local state + realtime subscription
   const queryClient = useQueryClient()
   const { data: tasks = [], isLoading: loading, refetch: refetchTasks } = useTasks()
@@ -132,7 +116,6 @@ export default function TasksPage() {
   // Redirect to sign-in if user is not authenticated
   useEffect(() => {
     if (user === null) {
-      console.log("❌ User not authenticated, redirecting to sign-in")
       router.push('/sign-in')
     }
   }, [user, router])

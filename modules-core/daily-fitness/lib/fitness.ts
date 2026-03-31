@@ -4,8 +4,6 @@ import { incrementFitnessTaskCompletion } from "./fitness-stats"
 export type { FitnessTask }
 
 export async function getFitnessTasks(): Promise<FitnessTask[]> {
-  console.log("Attempting to fetch fitness tasks from fitness_database table")
-
   const response = await fetch('/api/modules/daily-fitness', {
     credentials: 'include',
   })
@@ -17,13 +15,10 @@ export async function getFitnessTasks(): Promise<FitnessTask[]> {
   }
 
   const data = await response.json()
-  console.log("Successfully fetched fitness tasks:", data)
   return data
 }
 
 export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_at" | "updated_at" | "order_index"> & { youtube_url?: string | null }): Promise<FitnessTask> {
-  console.log("Attempting to create fitness task:", task)
-
   const response = await fetch('/api/modules/daily-fitness', {
     method: 'POST',
     headers: {
@@ -40,7 +35,6 @@ export async function createFitnessTask(task: Omit<FitnessTask, "id" | "created_
   }
 
   const data = await response.json()
-  console.log("Successfully created fitness task:", data)
   return data
 }
 

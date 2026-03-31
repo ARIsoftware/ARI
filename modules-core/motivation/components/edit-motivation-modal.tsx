@@ -106,7 +106,7 @@ export function EditMotivationModal({
               }
             }
           } catch (metadataError) {
-            console.log("Could not fetch new Instagram metadata");
+            // Metadata fetch is optional
           }
         }
 
@@ -128,7 +128,7 @@ export function EditMotivationModal({
               }
             }
           } catch (metadataError) {
-            console.log("Could not fetch new Twitter metadata");
+            // Metadata fetch is optional
           }
         }
       }

@@ -167,8 +167,6 @@ export async function regenerateModuleRegistry(): Promise<{
     // Write to file
     await writeFile(OUTPUT_FILE, content, 'utf-8')
 
-    console.log(`[Registry] Regenerated with ${moduleMap.size} modules`)
-
     return {
       success: true,
       moduleCount: moduleMap.size

@@ -23,14 +23,11 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log('Calling OpenAI with task context...');
-
     // Get user's task context
     let taskContext = ''
     try {
       const context = await getTaskContext()
       taskContext = formatTaskContextForAI(context)
-      console.log('Task context loaded successfully')
     } catch (error) {
       console.warn('Failed to load task context:', error)
       // Continue without task context if it fails
@@ -48,8 +45,6 @@ You can answer questions about their tasks, provide insights about their product
 
     // Combine system message with user messages
     const messagesWithContext = [systemMessage, ...messages]
-
-    console.log('Sending request to OpenAI with', messagesWithContext.length, 'messages');
 
     // Direct OpenAI API call
     const response = await fetch('https://api.openai.com/v1/chat/completions', {

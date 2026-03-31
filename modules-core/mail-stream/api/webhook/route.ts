@@ -119,8 +119,6 @@ export async function POST(request: NextRequest) {
       })
     })
 
-    console.log(`[Mail Stream Webhook] Stored event: ${eventType}`)
-
     // Return success
     return NextResponse.json({ received: true })
 

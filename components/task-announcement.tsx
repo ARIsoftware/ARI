@@ -480,14 +480,6 @@ export function TaskAnnouncement() {
   const customMessage = process.env.NEXT_PUBLIC_TOP_BAR_MESSAGE
   const customColor = process.env.NEXT_PUBLIC_TOP_BAR_COLOR || '#000000'
 
-  // Debug logging - remove after confirming it works
-  console.log('🔍 Top Bar Debug:', {
-    customMessage,
-    customColor,
-    rawMessage: process.env.NEXT_PUBLIC_TOP_BAR_MESSAGE,
-    rawColor: process.env.NEXT_PUBLIC_TOP_BAR_COLOR
-  })
-
   // Stop the focus timer
   const stopFocusTimer = () => {
     globalTimerState.isActive = false

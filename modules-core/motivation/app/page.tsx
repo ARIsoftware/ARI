@@ -264,8 +264,6 @@ function SortableItem({ item, onDelete, onPlay, onEdit, onRefresh }: {
 }
 
 export default function MotivationPage() {
-  console.log('[MotivationPage] Module version loading - with aspect ratio fixes');
-
   const [items, setItems] = useState<MotivationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -319,7 +317,6 @@ export default function MotivationPage() {
       .limit(1);
 
     if (checkError && checkError.message.includes("relation") && checkError.message.includes("does not exist")) {
-      console.log("Table doesn't exist yet. Needs migration.");
       throw new Error("Please run the database migration in Supabase dashboard to enable the Motivation feature.");
     }
   };

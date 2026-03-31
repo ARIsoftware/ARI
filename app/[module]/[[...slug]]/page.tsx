@@ -55,8 +55,6 @@ export default async function ModuleCatchAllPage({
   // Construct the full page path (module + slug)
   const pagePath = slug.length > 0 ? `${module}/${slug.join('/')}` : module
 
-  console.log(`[Module Route] Attempting to load page: ${pagePath}`)
-
   // If a stale/invalid cookie exists, middleware may let this through.
   // Do a real session check here so expired sessions redirect to sign-in instead of 404.
   const { user } = await getAuthenticatedUser()
@@ -66,8 +64,6 @@ export default async function ModuleCatchAllPage({
 
   // Server-side validation - check if module exists and is enabled
   const moduleInfo = await getEnabledModule(module, user.id)
-
-  console.log(`[Module Route] moduleInfo result:`, moduleInfo ? `Found (${moduleInfo.name})` : 'null')
 
   if (!moduleInfo) {
     // Module doesn't exist or is disabled
@@ -93,8 +89,6 @@ export default async function ModuleCatchAllPage({
       }
     }
   }
-
-  console.log(`[Module Route] Page loader exists for ${pagePath}:`, !!pageLoader)
 
   if (!pageLoader) {
     console.error(`[Module Route] 404 - No page loader registered for path: ${pagePath}`)

@@ -100,11 +100,8 @@ export function DragDropModeProvider({ children, isAuthenticated, isAuthLoading 
     const widgetOrderToSave = pendingWidgetOrderRef.current
 
     if (!moduleOrderToSave && !iconOrderToSave && !statCardOrderToSave && !widgetOrderToSave) {
-      console.log("[DragDrop] No pending orders to save")
       return
     }
-
-    console.log("[DragDrop] Saving orders:", { moduleOrder: moduleOrderToSave, iconOrder: iconOrderToSave, statCardOrder: statCardOrderToSave, widgetOrder: widgetOrderToSave })
 
     // Update local state immediately (optimistic) so UI reflects new order on exit
     if (moduleOrderToSave) setModuleOrder(moduleOrderToSave)
@@ -129,7 +126,6 @@ export function DragDropModeProvider({ children, isAuthenticated, isAuthLoading 
         if (!response.ok) {
           throw new Error("Failed to save order")
         }
-        console.log("[DragDrop] Orders saved successfully")
       })
       .catch(error => {
         console.error("[DragDrop] Failed to save order:", error)

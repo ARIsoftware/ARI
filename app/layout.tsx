@@ -68,7 +68,6 @@ export default async function RootLayout({
     }
   } catch (error) {
     // User not authenticated or error fetching - sidebar will load without modules
-    console.log('[Layout] No authenticated user for server-side loading')
   }
 
   return (

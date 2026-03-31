@@ -88,12 +88,10 @@ export async function POST(req: NextRequest) {
               metadata.thumbnail = thumbnail;
               metadata.title = (twitterTitleMatch?.[1] || titleMatch?.[1])?.replace(/&quot;/g, '"').replace(/&amp;/g, '&') || null;
               metadata.description = (twitterDescMatch?.[1] || descriptionMatch?.[1])?.replace(/&quot;/g, '"').replace(/&amp;/g, '&') || null;
-              console.log(`Successfully fetched Twitter metadata with user agent: ${userAgent.substring(0, 30)}...`);
               break;
             }
           }
         } catch (e) {
-          console.log(`Failed with user agent ${userAgent.substring(0, 30)}:`, e.message);
           continue;
         }
       }
@@ -104,7 +102,6 @@ export async function POST(req: NextRequest) {
 
     // Method 2: Generate a placeholder thumbnail based on tweet ID
     if (!metadata.thumbnail) {
-      console.log("Using placeholder thumbnail for Twitter");
       metadata.thumbnail = `https://via.placeholder.com/400x400/1DA1F2/FFFFFF?text=X+Post`;
       metadata.title = metadata.title || "X Post";
     }

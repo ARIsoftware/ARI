@@ -32,9 +32,6 @@ export async function GET(request: NextRequest) {
     // Registry is generated at build time via npm run generate-module-registry
     const allModules = await getModules()
 
-    // Log module list when /modules page is visited
-    console.log(`[Modules] Viewing modules page - ${allModules.length} modules:`, allModules.map(m => m.id))
-
     const settings = await withRLS((db) =>
       db.select().from(moduleSettings).where(eq(moduleSettings.userId, user.id))
     )

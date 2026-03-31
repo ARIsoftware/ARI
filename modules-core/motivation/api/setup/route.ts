@@ -30,7 +30,6 @@ export async function GET(req: NextRequest) {
     let tableCreated = false;
     if (!tableExists) {
       // For now, we'll just log this since table creation requires migration
-      console.log("Table needs to be created via migration");
       tableCreated = false;
     } else {
       tableCreated = true;

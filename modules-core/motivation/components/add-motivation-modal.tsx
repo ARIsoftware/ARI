@@ -201,7 +201,7 @@ export function AddMotivationModal({
           }
         }
       } catch (metadataError) {
-        console.log("Could not fetch Instagram metadata, using custom thumbnail");
+        // Metadata fetch is optional, continue with custom thumbnail
       }
 
       // If we don't have a real thumbnail, create our custom one
@@ -320,7 +320,7 @@ export function AddMotivationModal({
           }
         }
       } catch (metadataError) {
-        console.log("Could not fetch Twitter metadata, continuing without thumbnail");
+        // Metadata fetch is optional, continue without thumbnail
       }
 
       const position = await getNextPosition();
