@@ -155,15 +155,27 @@ export async function withAdminDb<T>(
     throw new Error('Database pool not initialized')
   }
 
-  const rawClient = await pool.connect()
-  const client = pgBouncerCompat(rawClient)
+  const p = pool // narrowed to non-null by the guard above
+  const attempt = async (isRetry: boolean): Promise<T> => {
+    const rawClient = await p.connect()
+    const client = pgBouncerCompat(rawClient)
 
-  try {
-    const db = drizzle(client as PoolClient)
-    return await operation(db)
-  } finally {
-    client.release()
+    try {
+      const db = drizzle(client as PoolClient)
+      return await operation(db)
+    } catch (error) {
+      if (!isRetry && isStaleConnectionError(error)) {
+        client.release(true) // destroy dead connection
+        return attempt(true)
+      }
+      throw error
+    } finally {
+      // release() after release(true) is a no-op in pg, safe to call
+      try { client.release() } catch {}
+    }
   }
+
+  return attempt(false)
 }
 
 /**
