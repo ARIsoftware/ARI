@@ -125,3 +125,6 @@ logs/
 # Auto-generated module registry files
 lib/generated/
 preflight.yml
+
+# pnpm workspace config (local security hardening)
+pnpm-workspace.yaml
