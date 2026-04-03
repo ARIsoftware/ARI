@@ -58,7 +58,7 @@
     "@types/leaflet": "^1.9.21",
     "ai": "^5.0.102",
     "autoprefixer": "^10.4.22",
-    "better-auth": "^1.4.7",
+    "better-auth": "^1.4.9",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
