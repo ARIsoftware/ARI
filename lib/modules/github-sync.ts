@@ -38,12 +38,11 @@ const BINARY_EXTENSIONS = /\.(png|jpg|jpeg|gif|ico|webp|bmp|avif|woff|woff2|ttf|
 
 export function collectFiles(dir: string, basePath: string = ''): { path: string; content: string; encoding: 'utf-8' | 'base64' }[] {
   const files: { path: string; content: string; encoding: 'utf-8' | 'base64' }[] = []
-  if (!fs.existsSync(dir)) return files
-
   const resolvedDir = path.resolve(dir)
+  if (!fs.existsSync(resolvedDir)) return files
 
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const fullPath = path.resolve(dir, entry.name)
+  for (const entry of fs.readdirSync(resolvedDir, { withFileTypes: true })) {
+    const fullPath = path.resolve(resolvedDir, entry.name)
     const relativePath = basePath ? `${basePath}/${entry.name}` : entry.name
 
     // Guard against path traversal — resolved path must stay within the base directory
