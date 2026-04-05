@@ -34,8 +34,8 @@ run_quiet() {
   local spin_chars='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
   local pid i=0
 
-  # Run the command, capture all output
-  "$@" >"$logfile" 2>&1 &
+  # Run the command, capture all output (close stdin so piped invocations work)
+  "$@" </dev/null >"$logfile" 2>&1 &
   pid=$!
 
   # Spinner loop
@@ -140,7 +140,7 @@ printf "    ${DIM}○${RESET}  ${BOLD}PostgreSQL Client${RESET}  ${DIM}— datab
 printf "    ${DIM}○${RESET}  ${BOLD}Claude Code${RESET}  ${DIM}— AI coding assistant${RESET}\n\n"
 printf "    ${DIM}○${RESET}  ${BOLD}ARI${RESET}  ${DIM}— clone repo & install dependencies${RESET}\n"
 echo ""
-read -rp "  Ready to start? Press ENTER " _
+read -rp "  Ready to start? Press ENTER " _ </dev/tty
 echo ""
 
 # ── Homebrew (macOS only) ────────────────────────────────────────────────────
@@ -158,8 +158,10 @@ if [[ "$ARI_PLATFORM" == "darwin" ]]; then
     eval "$("$BREW_BIN" shellenv)" 2>/dev/null || true
   else
     export NONINTERACTIVE=1
-    run_quiet "Installing Homebrew" \
-      bash -c 'curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh | bash'
+    BREW_SCRIPT="$(mktemp)"
+    curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh -o "$BREW_SCRIPT"
+    run_quiet "Installing Homebrew" /bin/bash "$BREW_SCRIPT"
+    rm -f "$BREW_SCRIPT"
     # Add to PATH for this session (Apple Silicon)
     if [[ -x /opt/homebrew/bin/brew ]]; then
       eval "$(/opt/homebrew/bin/brew shellenv)"
