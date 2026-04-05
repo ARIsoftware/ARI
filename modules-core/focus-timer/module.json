@@ -1,0 +1,13 @@
+{
+  "id": "focus-timer",
+  "name": "Focus Timer",
+  "group": "Tools",
+  "description": "Fullscreen focus timer with configurable durations",
+  "version": "1.0.0",
+  "icon": "Clock",
+  "enabled": true,
+  "routes": [],
+  "topBarIcon": {
+    "component": "./components/top-bar-icon.tsx"
+  }
+}
