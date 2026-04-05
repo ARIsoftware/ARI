@@ -42,7 +42,14 @@ import { CORE_MODULE_IDS } from "@/lib/modules/constants"
 
 // Strip HTML tags from module names for safe display
 function sanitizeDisplayName(name: string): string {
-  return name.replace(/<[^>]*>?/g, '').trim() || 'Unknown'
+  // Iteratively strip tags to handle partial/nested tags like "<scr<script>ipt>"
+  let sanitized = name
+  let prev = ''
+  while (sanitized !== prev) {
+    prev = sanitized
+    sanitized = sanitized.replace(/<[^>]*>/g, '')
+  }
+  return sanitized.trim() || 'Unknown'
 }
 
 // Icon mapping for library modules (external API doesn't provide icons)
