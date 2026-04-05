@@ -113,7 +113,7 @@ if [[ "$ARI_PLATFORM" == "darwin" ]]; then
   if [[ -n "$BREW_BIN" ]]; then
     eval "$("$BREW_BIN" shellenv)" 2>/dev/null || true
   else
-    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     # Add to PATH for this session (Apple Silicon)
     if [[ -x /opt/homebrew/bin/brew ]]; then
       eval "$(/opt/homebrew/bin/brew shellenv)"
