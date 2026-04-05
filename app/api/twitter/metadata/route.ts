@@ -44,6 +44,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid Twitter/X URL" }, { status: 400 });
     }
 
+    // Construct the sanitized URL string from the validated URL object.
+    // This ensures only the allowlisted origin + validated path are used.
+    const sanitizedUrl = `${validatedUrl.origin}${validatedUrl.pathname}`;
+
     // Try multiple approaches to get Twitter/X metadata
     let metadata = {
       thumbnail: null,
@@ -62,7 +66,7 @@ export async function POST(req: NextRequest) {
 
       for (const userAgent of userAgents) {
         try {
-          const response = await fetch(validatedUrl, {
+          const response = await fetch(sanitizedUrl, {
             headers: {
               "User-Agent": userAgent,
               "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
