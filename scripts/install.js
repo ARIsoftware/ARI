@@ -280,6 +280,15 @@ function detectClaudeCode() {
   return { installed: !!out, version: out ? parseVersion(out) : null };
 }
 
+function detectPsql() {
+  // Check standard PATH first, then common Homebrew keg-only location
+  const out = run('psql --version') || run('/opt/homebrew/opt/libpq/bin/psql --version');
+  if (!out) return { installed: false, version: null };
+  // psql outputs "psql (PostgreSQL) 18.3" — only two version parts, so parseVersion won't match
+  const match = out.match(/(\d+\.\d+(?:\.\d+)?)/);
+  return { installed: true, version: match ? match[1] : null };
+}
+
 function detectGhCli() {
   const out = run('gh --version');
   return { installed: !!out, version: out ? parseVersion(out) : null };
@@ -350,6 +359,23 @@ const TOOLS = [
     },
     detect: detectSupabaseCli,
     description: 'Database management tools for Supabase PostgreSQL.',
+  },
+  {
+    id: 'psql',
+    name: 'PostgreSQL Client',
+    required: false,
+    installCmds: {
+      darwin: 'brew install libpq',
+      linux: {
+        apt: 'sudo apt-get install -y postgresql-client',
+        dnf: 'sudo dnf install -y postgresql',
+        pacman: 'sudo pacman -S --noconfirm postgresql-libs',
+        zypper: 'sudo zypper install -y postgresql',
+      },
+      win32: 'winget install -e --id PostgreSQL.psql',
+    },
+    detect: detectPsql,
+    description: 'PostgreSQL client for database operations via Claude Code.',
   },
   {
     id: 'claude-code',
@@ -437,7 +463,7 @@ async function cloneAndSetup() {
   console.log(`  ${blue('Setup ARI')}`);
   hr();
 
-  const defaultDir = process.cwd();
+  const defaultDir = path.join(os.homedir(), 'ARI');
   const answer = await askQuestion(`  Where would you like to install ARI? ${dim(`[${defaultDir}]`)} `);
   let targetDir = answer || defaultDir;
 
@@ -605,6 +631,15 @@ function runVerification(ariResult) {
     name: 'Supabase CLI',
     ok: supabase.installed,
     detail: supabase.installed ? `v${supabase.version}` : 'not found',
+  });
+
+  // PostgreSQL Client
+  const psql = detectPsql();
+  checks.push({
+    name: 'PostgreSQL Client',
+    ok: true, // optional, always "ok"
+    detail: psql.installed ? `v${psql.version}` : 'skipped',
+    optional: true,
   });
 
   // ARI cloned
