@@ -45,6 +45,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid Instagram URL" }, { status: 400 });
     }
 
+    // Construct the sanitized URL string from the validated URL object.
+    // This ensures only the allowlisted origin + validated path are used.
+    const sanitizedUrl = `${validatedUrl.origin}${validatedUrl.pathname}`;
+
     // Try multiple approaches to get Instagram metadata
     let metadata = {
       thumbnail: null,
@@ -55,7 +59,7 @@ export async function POST(req: NextRequest) {
     try {
       // Method 1: Try Instagram's oEmbed API (most reliable)
       try {
-        const oembedUrl = `https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(validatedUrl.toString())}&access_token=&fields=thumbnail_url,title,author_name`;
+        const oembedUrl = `https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(sanitizedUrl)}&access_token=&fields=thumbnail_url,title,author_name`;
 
         // Try without access token first (sometimes works for public posts)
         const oembedResponse = await fetch(oembedUrl);
@@ -81,7 +85,7 @@ export async function POST(req: NextRequest) {
 
         for (const userAgent of userAgents) {
           try {
-            const response = await fetch(validatedUrl, {
+            const response = await fetch(sanitizedUrl, {
               headers: {
                 "User-Agent": userAgent,
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
