@@ -59,6 +59,27 @@ fi
 
 export ARI_PLATFORM ARI_PKG_MGR
 
+# ── Show ARI logo and welcome ────────────────────────────────────────────────
+CYAN='\033[1;36m'
+DIM='\033[2m'
+BOLD='\033[1m'
+
+echo ""
+printf "  ${CYAN}╔═══╗   ╔════╗   ═╗${RESET}\n"
+printf "  ${CYAN}║   ║   ║    ║    ║${RESET}\n"
+printf "  ${CYAN}╠═══╣   ╠════╝    ║${RESET}\n"
+printf "  ${CYAN}║   ║   ║  ╚═╗    ║${RESET}\n"
+printf "  ${CYAN}╩   ╩   ╩    ╩   ═╩═${RESET}\n"
+echo ""
+printf "  ${DIM}P R E M I E R   P E R S O N A L   P R O D U C T I V I T Y${RESET}\n"
+echo ""
+printf "  Platform: ${BOLD}${ARI_PLATFORM}${RESET}\n"
+echo ""
+printf "  Welcome to ARI. Engineered for those who want complete command over the\n"
+printf "  software that runs their life. The first AI-enabled No Code workspace that\n"
+printf "  can be completely customized to your workflow and grows with you. Build\n"
+printf "  entirely new modules in minutes. Where mastery, modularity, and AI work in\n"
+printf "  your favour so you can do your best work and live your best life.\n"
 echo ""
 
 # ── Homebrew (macOS only) ────────────────────────────────────────────────────
