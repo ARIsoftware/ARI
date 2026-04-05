@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     const { content } = body
 
     // Validate content length
-    if (!content || typeof content !== 'string') {
+    if (content === undefined || content === null || typeof content !== 'string') {
       return createErrorResponse('Content is required', 400)
     }
 

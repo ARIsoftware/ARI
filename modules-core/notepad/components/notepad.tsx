@@ -214,6 +214,26 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
               <Button
                 variant="ghost"
                 size="icon"
+                onClick={navigateToPreviousRevision}
+                disabled={!canGoBack || isLoading}
+                className="h-8 w-8"
+                title="Previous version"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={navigateToNextRevision}
+                disabled={!canGoForward || isLoading}
+                className="h-8 w-8"
+                title="Next version"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => setIsFullscreen(!isFullscreen)}
               >
                 {isFullscreen ? (
@@ -257,47 +277,20 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
 
           {/* Footer */}
           <div className="flex items-center justify-between gap-4 p-6 border-t border-border bg-muted">
-            <div className="flex items-center gap-3">
-              {/* Navigation Arrows */}
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={navigateToPreviousRevision}
-                  disabled={!canGoBack || isLoading}
-                  className="h-8 w-8"
-                  title="Previous version"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={navigateToNextRevision}
-                  disabled={!canGoForward || isLoading}
-                  className="h-8 w-8"
-                  title="Next version"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
-
-              {/* Status Text */}
-              <div className="text-sm">
-                {isViewingHistory && (
-                  <span className="font-medium text-muted-foreground">
-                    {getVersionLabel()}
-                  </span>
-                )}
-                {!isViewingHistory && showWarning && (
-                  <span className="text-destructive font-medium">
-                    {charactersLeft} characters left
-                  </span>
-                )}
-                {!isViewingHistory && !showWarning && hasUnsavedChanges && (
-                  <span className="text-amber-600">• Unsaved changes</span>
-                )}
-              </div>
+            <div className="text-sm">
+              {isViewingHistory && (
+                <span className="font-medium text-muted-foreground">
+                  {getVersionLabel()}
+                </span>
+              )}
+              {!isViewingHistory && showWarning && (
+                <span className="text-destructive font-medium">
+                  {charactersLeft} characters left
+                </span>
+              )}
+              {!isViewingHistory && !showWarning && hasUnsavedChanges && (
+                <span className="text-amber-600">• Unsaved changes</span>
+              )}
             </div>
 
             <div className="flex gap-2">

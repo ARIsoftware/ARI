@@ -19,6 +19,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useState, useEffect } from "react"
 import { createTask } from "@/modules/tasks/lib/utils"
 import { getGoals, type Goal } from "@/lib/goals"
+import { useModuleEnabled } from "@/lib/modules/module-hooks"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
@@ -47,6 +48,7 @@ export default function AddTaskPage() {
   const user = session?.user
   const { toast } = useToast()
   const router = useRouter()
+  const { enabled: northstarEnabled } = useModuleEnabled('northstar')
   const [loading, setLoading] = useState(false)
   const [date, setDate] = useState<Date>()
   const [northStars, setNorthStars] = useState<Goal[]>([])
@@ -78,8 +80,10 @@ export default function AddTaskPage() {
     strategic_fit: "How well this aligns with your strategic priorities"
   }
 
-  // Load northstars/goals
+  // Load northstars/goals if northstar module is enabled
   useEffect(() => {
+    if (!northstarEnabled) return
+
     const loadNorthStars = async () => {
       try {
         const goals = await getGoals()
@@ -90,7 +94,7 @@ export default function AddTaskPage() {
     }
 
     loadNorthStars()
-  }, [])
+  }, [northstarEnabled])
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({
@@ -379,7 +383,8 @@ export default function AddTaskPage() {
                 </CardContent>
               </Card>
 
-              {/* NorthStar Alignment Section */}
+              {/* NorthStar Alignment Section - only show if northstar module is enabled */}
+              {northstarEnabled && (
               <Card className="mt-6">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -431,6 +436,7 @@ export default function AddTaskPage() {
                   )}
                 </CardContent>
               </Card>
+              )}
 
               {/* Priority Score Section */}
               <Card className="mt-6">

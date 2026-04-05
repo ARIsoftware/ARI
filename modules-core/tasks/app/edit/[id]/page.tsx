@@ -65,6 +65,7 @@ export default function EditTaskPage() {
   const { toast } = useToast()
   const router = useRouter()
   const { enabled: majorProjectsEnabled } = useModuleEnabled('major-projects')
+  const { enabled: northstarEnabled } = useModuleEnabled('northstar')
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
   const [date, setDate] = useState<Date>()
@@ -132,9 +133,11 @@ export default function EditTaskPage() {
           setDate(new Date(foundTask.due_date))
         }
 
-        // Load northstars/goals
-        const goals = await getGoals()
-        setNorthStars(goals)
+        // Load northstars/goals if northstar module is enabled
+        if (northstarEnabled) {
+          const goals = await getGoals()
+          setNorthStars(goals)
+        }
 
         // Load projects if major-projects module is enabled
         if (majorProjectsEnabled) {
@@ -165,7 +168,7 @@ export default function EditTaskPage() {
     }
 
     loadData()
-  }, [id, router, toast, user?.id, majorProjectsEnabled])
+  }, [id, router, toast, user?.id, majorProjectsEnabled, northstarEnabled])
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({
@@ -458,7 +461,8 @@ export default function EditTaskPage() {
                 </CardContent>
               </Card>
 
-              {/* NorthStar Alignment Section */}
+              {/* NorthStar Alignment Section - only show if northstar module is enabled */}
+              {northstarEnabled && (
               <Card className="mt-6">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -510,6 +514,7 @@ export default function EditTaskPage() {
                   )}
                 </CardContent>
               </Card>
+              )}
 
               {/* Priority Score Section */}
               <Card className="mt-6">
