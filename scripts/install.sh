@@ -10,15 +10,11 @@
 set -euo pipefail
 
 # Colors
-BLUE='\033[1;34m'
-GREEN='\033[1;32m'
 RED='\033[1;31m'
 YELLOW='\033[1;33m'
 DIM='\033[2m'
 RESET='\033[0m'
 
-info()  { printf "${BLUE}%s${RESET}\n" "$1"; }
-ok()    { printf "${GREEN}✔${RESET} %s\n" "$1"; }
 warn()  { printf "${YELLOW}⚠${RESET} %s\n" "$1"; }
 err()   { printf "${RED}✘${RESET} %s\n" "$1"; }
 
@@ -98,7 +94,9 @@ printf "    ${DIM}○${RESET}  ${BOLD}PostgreSQL Client${RESET}  ${DIM}— datab
 printf "    ${DIM}○${RESET}  ${BOLD}Claude Code${RESET}  ${DIM}— AI coding assistant${RESET}\n\n"
 printf "    ${DIM}○${RESET}  ${BOLD}ARI${RESET}  ${DIM}— clone repo & install dependencies${RESET}\n"
 echo ""
-read -rp "  Ready to start? Press ENTER " _ </dev/tty
+if [[ -t 0 ]] || [[ -e /dev/tty ]]; then
+  read -rp "  Ready to start? Press ENTER " _ </dev/tty
+fi
 echo ""
 
 # ── Homebrew (macOS only) ────────────────────────────────────────────────────
@@ -115,8 +113,7 @@ if [[ "$ARI_PLATFORM" == "darwin" ]]; then
   if [[ -n "$BREW_BIN" ]]; then
     eval "$("$BREW_BIN" shellenv)" 2>/dev/null || true
   else
-    export NONINTERACTIVE=1
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     # Add to PATH for this session (Apple Silicon)
     if [[ -x /opt/homebrew/bin/brew ]]; then
       eval "$(/opt/homebrew/bin/brew shellenv)"
