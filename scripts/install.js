@@ -157,27 +157,37 @@ function stripAnsi(s) {
 }
 
 function showWelcome() {
-  console.log('');
-  console.log(`  ${CYAN}╔═══╗   ╔════╗   ═╗${RESET}`);
-  console.log(`  ${CYAN}║   ║   ║    ║    ║${RESET}`);
-  console.log(`  ${CYAN}╠═══╣   ╠════╝    ║${RESET}`);
-  console.log(`  ${CYAN}║   ║   ║  ╚═╗    ║${RESET}`);
-  console.log(`  ${CYAN}╩   ╩   ╩    ╩   ═╩═${RESET}`);
-  console.log('');
+  // Logo and welcome text are shown by install.sh (bash) before Node.js runs.
+  // When run directly via node (e.g. on Windows), show the logo here.
+  if (!process.env.ARI_PLATFORM) {
+    console.log('');
+    console.log(`  ${CYAN}╔═══╗   ╔════╗   ═╗${RESET}`);
+    console.log(`  ${CYAN}║   ║   ║    ║    ║${RESET}`);
+    console.log(`  ${CYAN}╠═══╣   ╠════╝    ║${RESET}`);
+    console.log(`  ${CYAN}║   ║   ║  ╚═╗    ║${RESET}`);
+    console.log(`  ${CYAN}╩   ╩   ╩    ╩   ═╩═${RESET}`);
+    console.log('');
+    console.log(`  ${DIM}P R E M I E R   P E R S O N A L   P R O D U C T I V I T Y${RESET}`);
+    console.log('');
+    console.log(`  Platform: ${bold(platformLabel())}`);
+    console.log('');
+    console.log(`  Welcome to ARI. Engineered for those who want complete command over the`);
+    console.log(`  software that runs their life. The first AI-enabled No Code workspace that`);
+    console.log(`  can be completely customized to your workflow and grows with you. Build`);
+    console.log(`  entirely new modules in minutes. Where mastery, modularity, and AI work in`);
+    console.log(`  your favour so you can do your best work and live your best life.`);
+    console.log('');
+  }
 
-  console.log(`  ${DIM}P R E M I E R   P E R S O N A L   P R O D U C T I V I T Y${RESET}`);
-  console.log('');
-  console.log(`  Platform: ${bold(platformLabel())}`);
-  console.log('');
-  console.log(`  Welcome to ARI. Engineered for those who want complete command over the`);
-  console.log(`  software that runs their life. The first AI-enabled No Code workspace that`);
-  console.log(`  can be completely customized to your workflow and grows with you. Build`);
-  console.log(`  entirely new modules in minutes. Where mastery, modularity, and AI work in`);
-  console.log(`  your favour so you can do your best work and live your best life.`);
-  console.log('');
   console.log(`  This installer will set up everything you need to run ARI. The installer is`);
   console.log(`  open source as can be viewed on our Github repo.`);
   console.log(`  Need help? https://ari.software/docs`);
+  console.log('');
+  if (PLATFORM === 'darwin') {
+    console.log(`    ${SYM_ARROW}  ${bold('Homebrew')}  ${dim('— macOS package manager')}`);
+    console.log('');
+  }
+  console.log(`    ${SYM_ARROW}  ${bold('Node.js')}  ${dim('— JavaScript runtime')}`);
   console.log('');
   console.log(`    ${SYM_ARROW}  ${bold('Git')}  ${dim('— version control')}`);
   console.log('');
@@ -188,6 +198,8 @@ function showWelcome() {
   console.log(`    ${SYM_ARROW}  ${bold('Vercel CLI')}  ${dim('— deployment (optional)')}`);
   console.log('');
   console.log(`    ${SYM_ARROW}  ${bold('Supabase CLI')}  ${dim('— database tools')}`);
+  console.log('');
+  console.log(`    ${SYM_ARROW}  ${bold('PostgreSQL Client')}  ${dim('— database operations (optional)')}`);
   console.log('');
   console.log(`    ${SYM_ARROW}  ${bold('Claude Code')}  ${dim('— AI coding assistant')}`);
   console.log('');
@@ -297,6 +309,33 @@ function detectGhCli() {
 // ── Tool Definitions ────────────────────────────────────────────────────────
 
 const TOOLS = [
+  ...(PLATFORM === 'darwin' ? [{
+    id: 'homebrew',
+    name: 'Homebrew',
+    required: true,
+    installCmds: {
+      darwin: '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"',
+    },
+    detect: detectBrew,
+    description: 'macOS package manager for installing developer tools.',
+  }] : []),
+  {
+    id: 'node',
+    name: 'Node.js',
+    required: true,
+    installCmds: {
+      darwin: 'brew install node',
+      linux: {
+        apt: 'curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - && sudo apt-get install -y nodejs',
+        dnf: 'sudo dnf install -y nodejs',
+        pacman: 'sudo pacman -S --noconfirm nodejs npm',
+        zypper: 'sudo zypper install -y nodejs',
+      },
+      win32: 'winget install -e --id OpenJS.NodeJS.LTS',
+    },
+    detect: detectNode,
+    description: 'JavaScript runtime that powers ARI.',
+  },
   {
     id: 'git',
     name: 'Git',
