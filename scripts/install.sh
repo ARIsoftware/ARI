@@ -22,6 +22,48 @@ ok()    { printf "${GREEN}✔${RESET} %s\n" "$1"; }
 warn()  { printf "${YELLOW}⚠${RESET} %s\n" "$1"; }
 err()   { printf "${RED}✘${RESET} %s\n" "$1"; }
 
+# Run a command quietly with a spinner. Shows only errors on failure.
+# Usage: run_quiet "Installing Homebrew" command arg1 arg2 ...
+_RUN_QUIET_LOG=""
+trap 'rm -f "$_RUN_QUIET_LOG"' EXIT
+
+run_quiet() {
+  local label="$1"; shift
+  local logfile; logfile="$(mktemp)"
+  _RUN_QUIET_LOG="$logfile"
+  local spin_chars='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+  local pid i=0
+
+  # Run the command, capture all output
+  "$@" >"$logfile" 2>&1 &
+  pid=$!
+
+  # Spinner loop
+  printf "  ${DIM}%s${RESET} " "$label"
+  while kill -0 "$pid" 2>/dev/null; do
+    printf "\r  ${BLUE}%s${RESET} ${DIM}%s${RESET} " "${spin_chars:i++%${#spin_chars}:1}" "$label"
+    sleep 0.1
+  done
+
+  # Check exit status
+  wait "$pid"
+  local exit_code=$?
+  printf "\r\033[K"
+
+  if [[ $exit_code -eq 0 ]]; then
+    ok "$label"
+  else
+    err "$label — failed (exit code $exit_code)"
+    printf "${DIM}%s${RESET}\n" "--- output ---"
+    cat "$logfile"
+    printf "${DIM}%s${RESET}\n" "--- end ---"
+  fi
+
+  rm -f "$logfile"
+  _RUN_QUIET_LOG=""
+  return $exit_code
+}
+
 # ── Platform detection ───────────────────────────────────────────────────────
 OS_NAME="$(uname -s)"
 
@@ -61,7 +103,6 @@ export ARI_PLATFORM ARI_PKG_MGR
 
 # ── Show ARI logo and welcome ────────────────────────────────────────────────
 CYAN='\033[1;36m'
-DIM='\033[2m'
 BOLD='\033[1m'
 
 echo ""
@@ -81,6 +122,26 @@ printf "  can be completely customized to your workflow and grows with you. Buil
 printf "  entirely new modules in minutes. Where mastery, modularity, and AI work in\n"
 printf "  your favour so you can do your best work and live your best life.\n"
 echo ""
+echo ""
+printf "  This installer will set up everything you need to run ARI. The installer is\n"
+printf "  open source as can be viewed on our Github repo.\n"
+printf "  Need help? https://ari.software/docs\n"
+echo ""
+if [[ "$ARI_PLATFORM" == "darwin" ]]; then
+  printf "    ${DIM}○${RESET}  ${BOLD}Homebrew${RESET}  ${DIM}— macOS package manager${RESET}\n\n"
+fi
+printf "    ${DIM}○${RESET}  ${BOLD}Node.js${RESET}  ${DIM}— JavaScript runtime${RESET}\n\n"
+printf "    ${DIM}○${RESET}  ${BOLD}Git${RESET}  ${DIM}— version control${RESET}\n\n"
+printf "    ${DIM}○${RESET}  ${BOLD}GitHub CLI${RESET}  ${DIM}— repository management${RESET}\n\n"
+printf "    ${DIM}○${RESET}  ${BOLD}pnpm${RESET}  ${DIM}— package manager${RESET}\n\n"
+printf "    ${DIM}○${RESET}  ${BOLD}Vercel CLI${RESET}  ${DIM}— deployment (optional)${RESET}\n\n"
+printf "    ${DIM}○${RESET}  ${BOLD}Supabase CLI${RESET}  ${DIM}— database tools${RESET}\n\n"
+printf "    ${DIM}○${RESET}  ${BOLD}PostgreSQL Client${RESET}  ${DIM}— database operations (optional)${RESET}\n\n"
+printf "    ${DIM}○${RESET}  ${BOLD}Claude Code${RESET}  ${DIM}— AI coding assistant${RESET}\n\n"
+printf "    ${DIM}○${RESET}  ${BOLD}ARI${RESET}  ${DIM}— clone repo & install dependencies${RESET}\n"
+echo ""
+read -rp "  Ready to start? Press ENTER " _
+echo ""
 
 # ── Homebrew (macOS only) ────────────────────────────────────────────────────
 if [[ "$ARI_PLATFORM" == "darwin" ]]; then
@@ -96,89 +157,37 @@ if [[ "$ARI_PLATFORM" == "darwin" ]]; then
   if [[ -n "$BREW_BIN" ]]; then
     eval "$("$BREW_BIN" shellenv)" 2>/dev/null || true
   else
-    info "Homebrew is required but not installed."
-    printf "  Homebrew is the standard macOS package manager used to install developer tools.\n\n"
-    read -rp "  Install Homebrew? [Y/n] " yn
-    yn="${yn:-Y}"
-    if [[ "$yn" =~ ^[Yy] ]]; then
-      /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-      # Add to PATH for this session (Apple Silicon)
-      if [[ -x /opt/homebrew/bin/brew ]]; then
-        eval "$(/opt/homebrew/bin/brew shellenv)"
-      elif [[ -x /usr/local/bin/brew ]]; then
-        eval "$(/usr/local/bin/brew shellenv)"
-      fi
-      ok "Homebrew installed"
-    else
-      err "Homebrew is required. Cannot continue without it."
-      exit 1
+    export NONINTERACTIVE=1
+    run_quiet "Installing Homebrew" \
+      bash -c 'curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh | bash'
+    # Add to PATH for this session (Apple Silicon)
+    if [[ -x /opt/homebrew/bin/brew ]]; then
+      eval "$(/opt/homebrew/bin/brew shellenv)"
+    elif [[ -x /usr/local/bin/brew ]]; then
+      eval "$(/usr/local/bin/brew shellenv)"
     fi
   fi
 fi
 
 # ── Node.js ──────────────────────────────────────────────────────────────────
 install_node() {
-  info "Node.js (v18+) is required but not installed or outdated."
-  printf "  Node.js is the JavaScript runtime that powers ARI.\n\n"
-
   if [[ "$ARI_PLATFORM" == "darwin" ]]; then
-    read -rp "  Install Node.js via Homebrew? [Y/n] " yn
-    yn="${yn:-Y}"
-    if [[ "$yn" =~ ^[Yy] ]]; then
-      brew install node
-      ok "Node.js installed"
-    else
-      err "Node.js v18+ is required. Cannot continue without it."
-      exit 1
-    fi
-
+    run_quiet "Installing Node.js" brew install node
   elif [[ "$ARI_PLATFORM" == "linux" ]]; then
     case "$ARI_PKG_MGR" in
       apt)
-        read -rp "  Install Node.js via NodeSource LTS? [Y/n] " yn
-        yn="${yn:-Y}"
-        if [[ "$yn" =~ ^[Yy] ]]; then
-          # NodeSource setup for LTS
-          curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
-          sudo apt-get install -y nodejs
-          ok "Node.js installed"
-        else
-          err "Node.js v18+ is required. Cannot continue without it."
-          exit 1
-        fi
+        run_quiet "Setting up NodeSource LTS" bash -c \
+          'curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -'
+        run_quiet "Installing Node.js" sudo apt-get install -y nodejs
         ;;
       dnf)
-        read -rp "  Install Node.js via dnf? [Y/n] " yn
-        yn="${yn:-Y}"
-        if [[ "$yn" =~ ^[Yy] ]]; then
-          sudo dnf install -y nodejs
-          ok "Node.js installed"
-        else
-          err "Node.js v18+ is required. Cannot continue without it."
-          exit 1
-        fi
+        run_quiet "Installing Node.js" sudo dnf install -y nodejs
         ;;
       pacman)
-        read -rp "  Install Node.js via pacman? [Y/n] " yn
-        yn="${yn:-Y}"
-        if [[ "$yn" =~ ^[Yy] ]]; then
-          sudo pacman -S --noconfirm nodejs npm
-          ok "Node.js installed"
-        else
-          err "Node.js v18+ is required. Cannot continue without it."
-          exit 1
-        fi
+        run_quiet "Installing Node.js" sudo pacman -S --noconfirm nodejs npm
         ;;
       zypper)
-        read -rp "  Install Node.js via zypper? [Y/n] " yn
-        yn="${yn:-Y}"
-        if [[ "$yn" =~ ^[Yy] ]]; then
-          sudo zypper install -y nodejs
-          ok "Node.js installed"
-        else
-          err "Node.js v18+ is required. Cannot continue without it."
-          exit 1
-        fi
+        run_quiet "Installing Node.js" sudo zypper install -y nodejs
         ;;
       *)
         err "No supported package manager found."

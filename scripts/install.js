@@ -792,9 +792,11 @@ async function main() {
     process.exit(0);
   });
 
-  // Welcome screen
-  showWelcome();
-  await pressEnter('Ready to start? Press ENTER');
+  // Welcome screen (skip if install.sh already showed it)
+  if (!process.env.ARI_PLATFORM) {
+    showWelcome();
+    await pressEnter('Ready to start? Press ENTER');
+  }
 
   // Install tools
   const toolResults = await installTools();
