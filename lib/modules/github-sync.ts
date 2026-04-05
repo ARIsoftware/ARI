@@ -40,9 +40,16 @@ export function collectFiles(dir: string, basePath: string = ''): { path: string
   const files: { path: string; content: string; encoding: 'utf-8' | 'base64' }[] = []
   if (!fs.existsSync(dir)) return files
 
+  const resolvedDir = path.resolve(dir)
+
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const fullPath = path.join(dir, entry.name)
+    const fullPath = path.resolve(dir, entry.name)
     const relativePath = basePath ? `${basePath}/${entry.name}` : entry.name
+
+    // Guard against path traversal — resolved path must stay within the base directory
+    if (!fullPath.startsWith(resolvedDir + path.sep) && fullPath !== resolvedDir) {
+      continue
+    }
 
     if (entry.isDirectory()) {
       if (entry.name === 'node_modules' || entry.name === '.git') continue
