@@ -6,7 +6,6 @@ import { authClient } from "@/lib/auth-client"
 import { createSupabaseClient } from "@/lib/supabase-auth"
 import { Toaster } from "@/components/ui/toaster"
 import { ModuleProviders } from "@/components/module-providers"
-import { FeaturesProvider } from "@/lib/features-context"
 import { ModulesProvider } from "@/lib/modules/context"
 import { CommandPaletteProvider } from "@/components/command-palette"
 import { DragDropModeProvider } from "@/components/drag-drop-mode-context"
@@ -59,12 +58,10 @@ export function Providers({
   children,
   modules = [],
   enabledModules = [],
-  initialFeatures
 }: {
   children: React.ReactNode
   modules?: string[]
   enabledModules?: ModuleMetadata[]
-  initialFeatures?: Record<string, boolean>
 }) {
   const pathname = usePathname()
   const { data: sessionData, isPending } = authClient.useSession()
@@ -131,18 +128,16 @@ export function Providers({
     <Context.Provider value={{ user, session, isLoading: isPending, supabase }}>
       <ThemeProvider isAuthenticated={!!session} isAuthLoading={isPending}>
         <ModulesProvider modules={modules} enabledModules={enabledModules}>
-          <FeaturesProvider initialFeatures={initialFeatures} isAuthenticated={!!session} isAuthLoading={isPending}>
-            <ModuleProviders isAuthenticated={!!session}>
-              <CommandPaletteProvider>
-                <DragDropModeProvider isAuthenticated={!!session} isAuthLoading={isPending}>
-                  <QuickAddTaskProvider>
-                    {children}
-                    <Toaster />
-                  </QuickAddTaskProvider>
-                </DragDropModeProvider>
-              </CommandPaletteProvider>
-            </ModuleProviders>
-          </FeaturesProvider>
+          <ModuleProviders isAuthenticated={!!session}>
+            <CommandPaletteProvider>
+              <DragDropModeProvider isAuthenticated={!!session} isAuthLoading={isPending}>
+                <QuickAddTaskProvider>
+                  {children}
+                  <Toaster />
+                </QuickAddTaskProvider>
+              </DragDropModeProvider>
+            </CommandPaletteProvider>
+          </ModuleProviders>
         </ModulesProvider>
       </ThemeProvider>
     </Context.Provider>

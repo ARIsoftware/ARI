@@ -19,8 +19,6 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { useFeatures } from "@/lib/features-context"
-import { menuConfig, getUrlToFeatureMap } from "@/lib/menu-config"
 import { useEnabledModulesFromContext } from "@/lib/modules/context"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
 import { useDragDropMode } from "@/components/drag-drop-mode-context"
@@ -39,8 +37,6 @@ import {
 } from "@/components/ui/sidebar"
 import { SubmenuRenderer } from "@/components/sidebar-submenu-renderer"
 
-// Get URL to feature name mapping dynamically
-const URL_TO_FEATURE_MAP = getUrlToFeatureMap()
 
 // Types for render items (extracted so SortableSidebarGroup can use them)
 type ModuleGroup = {
@@ -103,7 +99,6 @@ function SortableSidebarGroup({ id, item, dragModeClass, position }: { id: strin
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname()
-  const { isFeatureEnabled, loading } = useFeatures()
   const [showMainMenu, setShowMainMenu] = useState(false)
 
   // Get enabled modules from context (pre-fetched server-side)
@@ -272,40 +267,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     setPendingOrder(newOrder)
   }
 
-  // Filter items based on feature preferences
-  const filterItems = (items: typeof menuConfig[0]['items']) => {
-    return items.filter(item => {
-      const featureName = URL_TO_FEATURE_MAP[item.url]
-      // If URL is not mapped to a feature (e.g., '#' placeholders), show it
-      if (!featureName) return true
-      // Otherwise check if feature is enabled
-      return isFeatureEnabled(featureName)
-    })
-  }
-
-  // Filter groups that have at least one visible item
-  const filteredNavMain = menuConfig
-    .map(group => ({
-      ...group,
-      items: filterItems(group.items)
-    }))
-    .filter(group => group.items.length > 0)
-
-  // Only show loading for features context (which is also fast)
-  // Modules are pre-fetched server-side, so no loading state needed
-  if (loading) {
-    return (
-      <Sidebar {...props}>
-        <SidebarContent>
-          <div className="flex items-center justify-center p-8">
-            <div className="text-sm text-muted-foreground">Loading...</div>
-          </div>
-        </SidebarContent>
-        <SidebarRail />
-      </Sidebar>
-    )
-  }
-
   // If we're on a page with a submenu and not forcing main menu, show the submenu
   if (activeSubmenuModule && !showMainMenu) {
     return (
@@ -331,27 +292,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar {...props} className={isDragMode ? "drag-mode-active" : ""}>
       <SidebarContent className="-mt-3.5">
-        {/* Core navigation groups - not draggable */}
-        {filteredNavMain.map((item) => (
-          <SidebarGroup key={item.title}>
-            {!isCompressed && <SidebarGroupLabel>{item.title}</SidebarGroupLabel>}
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {item.items.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild isActive={item.isActive}>
-                      <a href={item.url} className="flex items-center">
-                        <item.icon className="mr-2 size-4" />
-                        {item.title}
-                      </a>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
-
         {/* Modules container - groups are draggable units */}
         {isDragMode ? (
           /* Drag mode: Groups as draggable units via dnd-kit */

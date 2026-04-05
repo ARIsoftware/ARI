@@ -21,7 +21,7 @@ import { useState, useEffect } from "react"
 import { getTasks, updateTask, type Task } from "@/modules/tasks/lib/utils"
 import { getGoals, type Goal } from "@/lib/goals"
 interface MajorProject { id: string; project_name: string; [key: string]: any }
-import { useFeatures } from "@/lib/features-context"
+import { useModuleEnabled } from "@/lib/modules/module-hooks"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
@@ -64,7 +64,7 @@ export default function EditTaskPage() {
   const user = session?.user
   const { toast } = useToast()
   const router = useRouter()
-  const { isFeatureEnabled } = useFeatures()
+  const { enabled: majorProjectsEnabled } = useModuleEnabled('major-projects')
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
   const [date, setDate] = useState<Date>()
@@ -137,7 +137,7 @@ export default function EditTaskPage() {
         setNorthStars(goals)
 
         // Load projects if major-projects module is enabled
-        if (isFeatureEnabled('major-projects')) {
+        if (majorProjectsEnabled) {
           try {
             const res = await fetch('/api/modules/major-projects/data')
             const projectsData = res.ok ? await res.json() : []
@@ -165,7 +165,7 @@ export default function EditTaskPage() {
     }
 
     loadData()
-  }, [id, router, toast, user?.id, isFeatureEnabled])
+  }, [id, router, toast, user?.id, majorProjectsEnabled])
 
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({
@@ -350,7 +350,7 @@ export default function EditTaskPage() {
                   </div>
 
                   {/* Project Selection - Only show if major-projects module is enabled */}
-                  {isFeatureEnabled('major-projects') && projects.length > 0 && (
+                  {majorProjectsEnabled && projects.length > 0 && (
                     <div className="space-y-2">
                       <Label className="text-sm font-medium flex items-center gap-2">
                         <Briefcase className="w-4 h-4" />

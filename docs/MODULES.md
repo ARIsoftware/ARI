@@ -812,8 +812,7 @@ import type { Item } from '@/modules-core/module-id/types'
 
 #### Step 5.6.2: Remove Static Menu Entry
 
-- [ ] Check `/lib/menu-config.ts` for hardcoded entry
-- [ ] Remove module entry from `menuConfig` array
+- [ ] Modules provide their own menu items via `module.json` — no static menu config needed
 - [ ] Remove unused icon imports
 - [ ] Remove from feature descriptions
 - [ ] Module system will handle menu entry dynamically

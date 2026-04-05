@@ -118,7 +118,7 @@ All table definitions are centralized in `/lib/db/schema/schema.ts` using Drizzl
 - **`ari_launch_entries`**: ARI Launch module
 - **`module_settings`**: Per-user module preferences (JSONB)
 - **`module_migrations`**: Module migration tracking
-- **`user_preferences`**, **`user_feature_preferences`**: User settings
+- **`user_preferences`**: User settings
 - **`backup_metadata`**: Backup system metadata
 - **`user`**, **`session`**, **`account`**, **`verification`**: Better Auth system tables
 

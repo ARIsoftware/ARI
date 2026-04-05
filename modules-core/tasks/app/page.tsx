@@ -14,7 +14,7 @@ import { toggleTaskCompletion, toggleTaskPin, reorderTasks, deleteTask, updateTa
 import { useTasks } from "../hooks/use-tasks"
 import { useQueryClient } from "@tanstack/react-query"
 interface MajorProject { id: string; project_name: string; [key: string]: any }
-import { useFeatures } from "@/lib/features-context"
+import { useModuleEnabled } from "@/lib/modules/module-hooks"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/lib/supabase"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -93,7 +93,7 @@ export default function TasksPage() {
   const { session, supabase } = useSupabase()
   const user = session?.user
   const { toast } = useToast()
-  const { isFeatureEnabled } = useFeatures()
+  const { enabled: majorProjectsEnabled } = useModuleEnabled('major-projects')
   const searchParams = useSearchParams()
 
   // TanStack Query for tasks - replaces local state + realtime subscription
@@ -123,7 +123,7 @@ export default function TasksPage() {
   // Load projects if major-projects module is enabled
   useEffect(() => {
     const loadProjects = async () => {
-      if (isFeatureEnabled('major-projects')) {
+      if (majorProjectsEnabled) {
         try {
           const res = await fetch('/api/modules/major-projects/data')
           const projectsData = res.ok ? await res.json() : []
@@ -135,7 +135,7 @@ export default function TasksPage() {
     }
 
     loadProjects()
-  }, [isFeatureEnabled])
+  }, [majorProjectsEnabled])
 
   // Helper to update tasks cache optimistically
   const setTasksCache = (updater: (tasks: Task[]) => Task[]) => {
@@ -616,7 +616,7 @@ export default function TasksPage() {
                             </Badge>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {isFeatureEnabled('major-projects') && task.project_id && getProjectName(task.project_id, projects) && (
+                            {majorProjectsEnabled && task.project_id && getProjectName(task.project_id, projects) && (
                               <Badge
                                 variant="secondary"
                                 className="font-medium text-xs cursor-pointer bg-blue-100 text-blue-700 hover:bg-blue-200"
@@ -738,7 +738,7 @@ export default function TasksPage() {
                             {formatTaskAge(task.created_at)}
                           </span>
                         </div>
-                        {isFeatureEnabled('major-projects') && task.project_id && getProjectName(task.project_id, projects) && (
+                        {majorProjectsEnabled && task.project_id && getProjectName(task.project_id, projects) && (
                           <Badge
                             variant="secondary"
                             className="font-medium text-xs cursor-pointer bg-blue-100 text-blue-700 hover:bg-blue-200 mt-1"
@@ -818,7 +818,7 @@ export default function TasksPage() {
                             {formatTaskAge(task.created_at)}
                           </span>
                         </div>
-                        {isFeatureEnabled('major-projects') && task.project_id && getProjectName(task.project_id, projects) && (
+                        {majorProjectsEnabled && task.project_id && getProjectName(task.project_id, projects) && (
                           <Badge
                             variant="secondary"
                             className="font-medium text-xs cursor-pointer bg-blue-100 text-blue-700 hover:bg-blue-200 mt-1"
@@ -898,7 +898,7 @@ export default function TasksPage() {
                             {formatTaskAge(task.created_at)}
                           </span>
                         </div>
-                        {isFeatureEnabled('major-projects') && task.project_id && getProjectName(task.project_id, projects) && (
+                        {majorProjectsEnabled && task.project_id && getProjectName(task.project_id, projects) && (
                           <Badge
                             variant="secondary"
                             className="font-medium text-xs cursor-pointer bg-blue-100 text-blue-700 hover:bg-blue-200 mt-1"
@@ -978,7 +978,7 @@ export default function TasksPage() {
                             {formatTaskAge(task.created_at)}
                           </span>
                         </div>
-                        {isFeatureEnabled('major-projects') && task.project_id && getProjectName(task.project_id, projects) && (
+                        {majorProjectsEnabled && task.project_id && getProjectName(task.project_id, projects) && (
                           <Badge
                             variant="secondary"
                             className="font-medium text-xs cursor-pointer bg-blue-100 text-blue-700 hover:bg-blue-200 mt-1"
@@ -1123,7 +1123,7 @@ export default function TasksPage() {
                         >
                           {task.priority}
                         </Badge>
-                        {isFeatureEnabled('major-projects') && task.project_id && getProjectName(task.project_id, projects) && (
+                        {majorProjectsEnabled && task.project_id && getProjectName(task.project_id, projects) && (
                           <Badge
                             variant="secondary"
                             className={`font-medium text-xs cursor-pointer ${task.pinned ? "bg-white/10 text-gray-200 hover:bg-white/20" : "bg-blue-100 text-blue-700 hover:bg-blue-200"}`}
@@ -1249,7 +1249,7 @@ export default function TasksPage() {
                           >
                             {task.priority}
                           </Badge>
-                          {isFeatureEnabled('major-projects') && task.project_id && getProjectName(task.project_id, projects) && (
+                          {majorProjectsEnabled && task.project_id && getProjectName(task.project_id, projects) && (
                             <Badge
                               variant="secondary"
                               className={`font-medium text-xs cursor-pointer ${task.pinned ? "bg-white/10 text-gray-200 hover:bg-white/20" : "bg-blue-100 text-blue-700 hover:bg-blue-200"}`}

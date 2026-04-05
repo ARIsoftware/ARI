@@ -35,36 +35,14 @@ export default async function RootLayout({
   // Check for duplicate module IDs (critical error that blocks the app)
   const duplicateErrors = getDuplicateModuleErrors()
 
-  // Fetch enabled modules and features server-side for authenticated users
+  // Fetch enabled modules server-side for authenticated users
   // This eliminates the "Loading..." flash in the sidebar
   let enabledModules: Awaited<ReturnType<typeof getEnabledModules>> = []
-  let initialFeatures: Record<string, boolean> | undefined = undefined
 
   try {
-    const { user, withRLS } = await getAuthenticatedUser()
-    if (user && withRLS) {
-      // Fetch modules and features in parallel
-      const { userFeaturePreferences } = await import('@/lib/db/schema')
-      const [modules, featurePrefs] = await Promise.all([
-        getEnabledModules(user.id),
-        withRLS((db) =>
-          db.select({
-            featureName: userFeaturePreferences.featureName,
-            enabled: userFeaturePreferences.enabled
-          })
-          .from(userFeaturePreferences)
-        )
-      ])
-
-      enabledModules = modules
-
-      // Convert features array to map
-      if (featurePrefs) {
-        initialFeatures = {}
-        featurePrefs.forEach((pref) => {
-          initialFeatures![pref.featureName] = pref.enabled
-        })
-      }
+    const { user } = await getAuthenticatedUser()
+    if (user) {
+      enabledModules = await getEnabledModules(user.id)
     }
   } catch (error) {
     // User not authenticated or error fetching - sidebar will load without modules
@@ -103,7 +81,7 @@ export default async function RootLayout({
           {duplicateErrors.length > 0 ? (
             <ModuleErrorOverlay errors={duplicateErrors} />
           ) : (
-            <Providers modules={installedModules} enabledModules={enabledModules} initialFeatures={initialFeatures}>{children}</Providers>
+            <Providers modules={installedModules} enabledModules={enabledModules}>{children}</Providers>
           )}
         </QueryProvider>
       </body>
