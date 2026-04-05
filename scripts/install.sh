@@ -22,48 +22,6 @@ ok()    { printf "${GREEN}✔${RESET} %s\n" "$1"; }
 warn()  { printf "${YELLOW}⚠${RESET} %s\n" "$1"; }
 err()   { printf "${RED}✘${RESET} %s\n" "$1"; }
 
-# Run a command quietly with a spinner. Shows only errors on failure.
-# Usage: run_quiet "Installing Homebrew" command arg1 arg2 ...
-_RUN_QUIET_LOG=""
-trap 'rm -f "$_RUN_QUIET_LOG"' EXIT
-
-run_quiet() {
-  local label="$1"; shift
-  local logfile; logfile="$(mktemp)"
-  _RUN_QUIET_LOG="$logfile"
-  local spin_chars='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
-  local pid i=0
-
-  # Run the command, capture all output (close stdin so piped invocations work)
-  "$@" </dev/null >"$logfile" 2>&1 &
-  pid=$!
-
-  # Spinner loop
-  printf "  ${DIM}%s${RESET} " "$label"
-  while kill -0 "$pid" 2>/dev/null; do
-    printf "\r  ${BLUE}%s${RESET} ${DIM}%s${RESET} " "${spin_chars:i++%${#spin_chars}:1}" "$label"
-    sleep 0.1
-  done
-
-  # Check exit status
-  wait "$pid"
-  local exit_code=$?
-  printf "\r\033[K"
-
-  if [[ $exit_code -eq 0 ]]; then
-    ok "$label"
-  else
-    err "$label — failed (exit code $exit_code)"
-    printf "${DIM}%s${RESET}\n" "--- output ---"
-    cat "$logfile"
-    printf "${DIM}%s${RESET}\n" "--- end ---"
-  fi
-
-  rm -f "$logfile"
-  _RUN_QUIET_LOG=""
-  return $exit_code
-}
-
 # ── Platform detection ───────────────────────────────────────────────────────
 OS_NAME="$(uname -s)"
 
@@ -158,10 +116,7 @@ if [[ "$ARI_PLATFORM" == "darwin" ]]; then
     eval "$("$BREW_BIN" shellenv)" 2>/dev/null || true
   else
     export NONINTERACTIVE=1
-    BREW_SCRIPT="$(mktemp)"
-    curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh -o "$BREW_SCRIPT"
-    run_quiet "Installing Homebrew" /bin/bash "$BREW_SCRIPT"
-    rm -f "$BREW_SCRIPT"
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     # Add to PATH for this session (Apple Silicon)
     if [[ -x /opt/homebrew/bin/brew ]]; then
       eval "$(/opt/homebrew/bin/brew shellenv)"
@@ -174,23 +129,16 @@ fi
 # ── Node.js ──────────────────────────────────────────────────────────────────
 install_node() {
   if [[ "$ARI_PLATFORM" == "darwin" ]]; then
-    run_quiet "Installing Node.js" brew install node
+    brew install node
   elif [[ "$ARI_PLATFORM" == "linux" ]]; then
     case "$ARI_PKG_MGR" in
       apt)
-        run_quiet "Setting up NodeSource LTS" bash -c \
-          'curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -'
-        run_quiet "Installing Node.js" sudo apt-get install -y nodejs
+        curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+        sudo apt-get install -y nodejs
         ;;
-      dnf)
-        run_quiet "Installing Node.js" sudo dnf install -y nodejs
-        ;;
-      pacman)
-        run_quiet "Installing Node.js" sudo pacman -S --noconfirm nodejs npm
-        ;;
-      zypper)
-        run_quiet "Installing Node.js" sudo zypper install -y nodejs
-        ;;
+      dnf)    sudo dnf install -y nodejs ;;
+      pacman) sudo pacman -S --noconfirm nodejs npm ;;
+      zypper) sudo zypper install -y nodejs ;;
       *)
         err "No supported package manager found."
         echo "  Please install Node.js v18+ manually: https://nodejs.org"
