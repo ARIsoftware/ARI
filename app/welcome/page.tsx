@@ -2043,8 +2043,8 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                         await navigator.clipboard.writeText(setupSql)
                         setSqlCopied(true)
                         setTimeout(() => setSqlCopied(false), 3000)
-                      } catch {
-                        // Fallback: select text in the details view
+                      } catch (err) {
+                        console.error('Clipboard copy failed:', err)
                       }
                     }}
                     className="w-full rounded-lg bg-green-600 hover:bg-green-700 text-white"

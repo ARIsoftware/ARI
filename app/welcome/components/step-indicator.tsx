@@ -1,5 +1,6 @@
 "use client"
 
+import { Database } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface StepIndicatorProps {
@@ -65,14 +66,6 @@ const ShieldIcon = ({ className }: { className?: string }) => (
   </svg>
 )
 
-const DatabaseIcon = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <ellipse cx="12" cy="5" rx="9" ry="3" />
-    <path d="M3 5V19A9 3 0 0 0 21 19V5" />
-    <path d="M3 12A9 3 0 0 0 21 12" />
-  </svg>
-)
-
 const STEP_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "personal": PersonIcon,
   account: ShieldIcon,
@@ -81,7 +74,7 @@ const STEP_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
   resend: ResendIcon,
   vercel: VercelIcon,
   download: DownloadIcon,
-  install: DatabaseIcon,
+  install: Database,
 }
 
 export function StepIndicator({ currentStep, onStepClick }: StepIndicatorProps) {
