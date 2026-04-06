@@ -31,14 +31,9 @@ Before doing anything:
 - Always use parameterized queries (Drizzle handles this) — never interpolate user input into SQL.
 - If a module accepts file uploads, validate file types and sizes server-side.
 
-## MCP Server Tools
+## Postgres & Supabase Skills
 
-This project has the `pg-aiguide` MCP server configured (via `.mcp.json`) which provides PostgreSQL documentation and best practices. When creating database schemas:
-
-- Use `mcp__plugin_pg_pg-aiguide__semantic_search_postgres_docs` to look up PostgreSQL best practices for data types, indexes, constraints, and table design
-- Use `mcp__plugin_pg_pg-aiguide__semantic_search_tiger_docs` for TimescaleDB/Tiger Cloud guidance if time-series data is involved
-
-These tools help ensure database tables follow PostgreSQL conventions and best practices.
+This project has Supabase agent-skills installed (at `.claude/skills/supabase/`). When creating database schemas, use the `supabase-postgres-best-practices` skill to look up PostgreSQL best practices for data types, indexes, constraints, and table design. These skills help ensure database tables follow PostgreSQL conventions and best practices.
 
 ## Questions to Ask
 
@@ -131,7 +126,7 @@ Reverse-engineer the database schema from v0's mock data:
 - Type inference: strings → TEXT, numbers → INTEGER or NUMERIC, dates → TIMESTAMPTZ, booleans → BOOLEAN
 - Status/category fields with fixed string values → suggest CHECK constraint or enum
 - Always include `user_id TEXT` and standard timestamps (`created_at`, `updated_at`)
-- Use the pg-aiguide MCP tools to validate the derived schema design
+- Use the `supabase-postgres-best-practices` skill to validate the derived schema design
 
 Present the derived data model to the user for confirmation before building API routes.
 
@@ -190,7 +185,7 @@ When approved, create the module following this order:
      ```
    - See existing modules in that file for patterns (hello-world, tasks, etc.)
 6. **Create database schema** in `[module-folder]/database/schema.sql` if tables needed (this path is git-tracked so the module is fully portable as a self-contained folder)
-   - Use `mcp__plugin_pg_pg-aiguide__semantic_search_postgres_docs` to verify best practices for data types, indexes, and constraints
+   - Use the `supabase-postgres-best-practices` skill to verify best practices for data types, indexes, and constraints
    - Use `TEXT` type for `user_id` (matches Better Auth)
    - **MUST include `ALTER TABLE [table_name] ENABLE ROW LEVEL SECURITY;`** for every table
    - **MUST include RLS policies** that restrict SELECT/INSERT/UPDATE/DELETE to rows matching the authenticated user's `user_id`
@@ -675,6 +670,6 @@ Before marking complete, verify:
 8. **API route registration is MANUAL**: The `generate-module-registry` script only auto-generates page routes. API routes MUST be manually registered in `MODULE_API_ROUTES` in `/app/api/modules/[module]/[[...path]]/route.ts` — this is a Next.js/Turbopack limitation.
 9. **Module Portability**: Always use `@/modules/` alias for imports (NOT `@/modules-custom/` or `@/modules-core/`). This allows modules to be moved between directories without code changes. The alias resolves `modules-custom` first, then `modules-core`.
 10. **v0 code is a visual starting point only**: Always build proper API routes, hooks, and database schema. Never leave mock data in production components.
-11. **Use the pg-aiguide MCP tools** when creating database schemas. These are configured in `.mcp.json` and must be used to validate data types, indexes, and constraints — do not skip this step.
+11. **Use the Supabase agent-skills** when creating database schemas. Use the `supabase-postgres-best-practices` skill to validate data types, indexes, and constraints — do not skip this step.
 12. **Don't use PostgreSQL array casts in Drizzle's `sql` template literal** (e.g. `${value}::uuid[]`). Drizzle parameterizes values for safety, so the array gets passed as a bound parameter (`$1`) that PostgreSQL can't cast to a typed array. Instead, use Drizzle's query builder methods (e.g. individual `update().where()` calls with `Promise.all` for batch operations).
 13. If the user must take any action to complete the module setup (for example, run a .sql file or restart the dev server), make that your last message so it is clearly visible. Use these statement: "🧑🏼‍💻 USER ACTION REQUIRED:" followed by clear, step-by-step instructions for what they need to do.
