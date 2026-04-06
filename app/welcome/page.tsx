@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import {
   AlertCircle,
   Zap,
-  Download,
+  Save,
   Info,
   ExternalLink,
   CheckCircle,
@@ -18,7 +18,8 @@ import {
   Check,
   X,
   ArrowRight,
-  Copy
+  Copy,
+  Loader2
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { StepIndicator } from "./components/step-indicator"
@@ -272,6 +273,13 @@ export default function WelcomePage() {
     }
   }, [])
 
+  useEffect(() => {
+    fetch("/api/project-dir")
+      .then((res) => res.json())
+      .then((data) => setProjectDir(data.dir))
+      .catch(() => setProjectDir(null))
+  }, [])
+
   const allLines = [...completedLines]
   if (currentLineText) {
     allLines.push(currentLineText)
@@ -355,23 +363,55 @@ export default function WelcomePage() {
     return lines.join("\n")
   }
 
+  const [projectDir, setProjectDir] = useState<string | null>(null)
   const [envSaveStatus, setEnvSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [envSaveError, setEnvSaveError] = useState<string | null>(null)
+  const [envSavedPath, setEnvSavedPath] = useState<string | null>(null)
   const [sqlCopied, setSqlCopied] = useState(false)
+  const [installStatus, setInstallStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle')
+  const [installError, setInstallError] = useState<string | null>(null)
 
-  const handleDownloadEnvFile = async () => {
+  const handleSaveEnvFile = async () => {
     const content = generateEnvFileContent()
 
-    // Trigger browser download to the user's default downloads folder
-    const blob = new Blob([content], { type: "text/plain" })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.href = url
-    link.download = ".env.local"
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-    setEnvSaveStatus('saved')
+    try {
+      setEnvSaveStatus('saving')
+      setEnvSaveError(null)
+      const res = await fetch("/api/download-env", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to save file")
+      }
+      setEnvSavedPath(data.path)
+      setEnvSaveStatus('saved')
+    } catch (err) {
+      setEnvSaveStatus('error')
+      setEnvSaveError(err instanceof Error ? err.message : "Failed to save .env.local")
+    }
+  }
+
+  const handleInstallDatabase = async () => {
+    setInstallStatus('running')
+    setInstallError(null)
+    try {
+      const res = await fetch("/api/run-setup-sql", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ databaseUrl: formData.databaseUrl }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to run setup SQL")
+      }
+      setInstallStatus('success')
+    } catch (err) {
+      setInstallStatus('error')
+      setInstallError(err instanceof Error ? err.message : "Unknown error")
+    }
   }
 
   const handleContinue = () => {
@@ -1852,7 +1892,7 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                   <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
                     <h2 className="text-2xl font-semibold text-zinc-900">Save</h2>
                     <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
-                      Your environment configuration is ready. Save the .env.local file to your project root.
+                      Your environment configuration is ready. Review the contents below, then save it to <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-sm font-mono">{projectDir ? `${projectDir}/.env.local` : "~/ARI/.env.local"}</code>
                     </p>
                   </div>
 
@@ -1922,22 +1962,15 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                     </div>
                   </div>
 
-                  {/* .env.local preview (collapsed) */}
-                  <details className="group">
-                    <summary className="cursor-pointer text-sm text-blue-600 hover:text-blue-800 hover:underline list-none">
-                      View generated .env.local file
-                    </summary>
-                    <div className="mt-3">
-                      <CodeBlock
-                        language="env"
-                        code={generateEnvFileContent()}
-                      />
-                    </div>
-                  </details>
+                  {/* .env.local preview */}
+                  <CodeBlock
+                    language="env"
+                    code={generateEnvFileContent()}
+                  />
 
                   {/* Save button */}
                   <Button
-                    onClick={handleDownloadEnvFile}
+                    onClick={handleSaveEnvFile}
                     disabled={!isSupabaseComplete || envSaveStatus === 'saving'}
                     className="w-full rounded-lg bg-green-600 hover:bg-green-700 text-white"
                   >
@@ -1946,15 +1979,25 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                     ) : envSaveStatus === 'saved' ? (
                       <>
                         <Check className="w-4 h-4 mr-2" />
-                        Downloaded .env.local
+                        Saved to {envSavedPath || ".env.local"}
                       </>
                     ) : (
                       <>
-                        <Download className="w-4 h-4 mr-2" />
+                        <Save className="w-4 h-4 mr-2" />
                         Save .env.local
                       </>
                     )}
                   </Button>
+
+                  {envSaveStatus === 'error' && envSaveError && (
+                    <Alert className="bg-red-50 border-red-200">
+                      <AlertCircle className="w-4 h-4 text-red-600" />
+                      <AlertTitle className="text-red-800">Could not save file</AlertTitle>
+                      <AlertDescription className="text-red-700">
+                        {envSaveError}. Copy the contents above and manually create <code className="bg-red-100 px-1 rounded text-xs">.env.local</code> in your project directory.
+                      </AlertDescription>
+                    </Alert>
+                  )}
 
                   {/* What is .env.local */}
                   <Alert className="bg-green-50 border-green-200">
@@ -1963,18 +2006,7 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                     <AlertDescription className="text-green-700">
                       The <strong>.env.local</strong> file stores your environment variables (API keys, database credentials, secrets) for local development.
                       This file is automatically ignored by Git, keeping your sensitive data private.
-                    </AlertDescription>
-                  </Alert>
-
-                  {/* Next steps */}
-                  <Alert>
-                    <Info className="w-4 h-4" />
-                    <AlertTitle className="text-gray-800">After Saving</AlertTitle>
-                    <AlertDescription className="text-gray-700">
-                      <ol className="list-decimal list-inside space-y-1 text-sm mt-2">
-                        <li>Move the downloaded file to your project root directory</li>
-                        <li>Continue to the next step to set up your database</li>
-                      </ol>
+                      {envSaveStatus === 'saved' && " If a previous .env.local existed, it was backed up automatically."}
                     </AlertDescription>
                   </Alert>
 
@@ -2005,62 +2037,12 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                   <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
                     <h2 className="text-2xl font-semibold text-zinc-900">Install Database</h2>
                     <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
-                      Run this SQL in your Supabase SQL Editor to create the required tables and security policies.
+                      Create the required tables and security policies in your Supabase database.
                     </p>
                   </div>
 
                   {/* Content section */}
                   <div className="space-y-6" style={{ padding: '25px' }}>
-
-                  {/* Instructions */}
-                  <div className="space-y-3">
-                    <h3 className="text-base font-semibold text-gray-900">Steps</h3>
-                    <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700">
-                      <li>Open your <strong>Supabase Dashboard</strong> &rarr; <strong>SQL Editor</strong></li>
-                      <li>Click the button below to copy the setup SQL</li>
-                      <li>Paste it into the SQL Editor and click <strong>Run</strong></li>
-                      <li>Verify all 13 tables appear in the Table Editor with RLS enabled</li>
-                    </ol>
-                  </div>
-
-                  {/* SQL preview */}
-                  <details className="group">
-                    <summary className="cursor-pointer text-sm text-blue-600 hover:text-blue-800 hover:underline list-none">
-                      View setup SQL
-                    </summary>
-                    <div className="mt-3">
-                      <CodeBlock
-                        language="sql"
-                        code={setupSql}
-                      />
-                    </div>
-                  </details>
-
-                  {/* Copy SQL button */}
-                  <Button
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(setupSql)
-                        setSqlCopied(true)
-                        setTimeout(() => setSqlCopied(false), 3000)
-                      } catch (err) {
-                        console.error('Clipboard copy failed:', err)
-                      }
-                    }}
-                    className="w-full rounded-lg bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    {sqlCopied ? (
-                      <>
-                        <Check className="w-4 h-4 mr-2" />
-                        Copied to clipboard
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-4 h-4 mr-2" />
-                        Copy Setup SQL
-                      </>
-                    )}
-                  </Button>
 
                   {/* What this creates */}
                   <Alert className="bg-blue-50 border-blue-200">
@@ -2076,6 +2058,97 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                     </AlertDescription>
                   </Alert>
 
+                  {/* Install button */}
+                  {installStatus === 'idle' && (
+                    <Button
+                      onClick={handleInstallDatabase}
+                      disabled={!formData.databaseUrl}
+                      className="w-full rounded-lg bg-green-600 hover:bg-green-700 text-white py-6 text-base"
+                    >
+                      <Zap className="w-4 h-4 mr-2" />
+                      Install Database
+                    </Button>
+                  )}
+
+                  {installStatus === 'running' && (
+                    <div className="flex items-center justify-center gap-3 py-6 text-zinc-600">
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <span className="text-base font-medium">Installing tables and security policies...</span>
+                    </div>
+                  )}
+
+                  {installStatus === 'success' && (
+                    <Alert className="bg-green-50 border-green-200">
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      <AlertTitle className="text-green-800">Database installed successfully</AlertTitle>
+                      <AlertDescription className="text-green-700 text-sm">
+                        All 13 tables and RLS policies have been created.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {installStatus === 'error' && (
+                    <>
+                      <Alert className="bg-red-50 border-red-200">
+                        <AlertCircle className="w-4 h-4 text-red-600" />
+                        <AlertTitle className="text-red-800">Installation failed</AlertTitle>
+                        <AlertDescription className="text-red-700 text-sm">
+                          {installError}
+                        </AlertDescription>
+                      </Alert>
+                      <div className="flex gap-3">
+                        <Button
+                          onClick={() => {
+                            setInstallStatus('idle')
+                            setInstallError(null)
+                          }}
+                          variant="outline"
+                          className="flex-1"
+                        >
+                          Try Again
+                        </Button>
+                        <Button
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(setupSql)
+                              setSqlCopied(true)
+                              setTimeout(() => setSqlCopied(false), 3000)
+                            } catch (err) {
+                              console.error('Clipboard copy failed:', err)
+                            }
+                          }}
+                          variant="outline"
+                          className="flex-1"
+                        >
+                          {sqlCopied ? (
+                            <>
+                              <Check className="w-4 h-4 mr-2" />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="w-4 h-4 mr-2" />
+                              Copy SQL to run manually
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </>
+                  )}
+
+                  {/* SQL preview */}
+                  <details className="group">
+                    <summary className="cursor-pointer text-sm text-blue-600 hover:text-blue-800 hover:underline list-none">
+                      View setup SQL
+                    </summary>
+                    <div className="mt-3">
+                      <CodeBlock
+                        language="sql"
+                        code={setupSql}
+                      />
+                    </div>
+                  </details>
+
                   {/* Footer */}
                   <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
                     <button
@@ -2087,7 +2160,12 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                     </button>
                     <button
                       onClick={() => window.location.href = '/sign-in'}
-                      className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                      disabled={installStatus !== 'success'}
+                      className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium transition-colors ${
+                        installStatus === 'success'
+                          ? 'bg-blue-600 text-white hover:bg-blue-500'
+                          : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'
+                      }`}
                       style={{ borderRadius: '6px' }}
                     >
                       I have completed all steps
