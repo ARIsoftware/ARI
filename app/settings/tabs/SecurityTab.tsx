@@ -91,14 +91,14 @@ export function SecurityTab({
                         <Monitor className="h-5 w-5 text-muted-foreground" />
                       )}
                       <div>
-                        <p className="text-sm font-medium">
+                        <div className="text-sm font-medium flex items-center">
                           {device} · {browser}
                           {isCurrentSession && (
                             <Badge variant="secondary" className="ml-2">
                               This device
                             </Badge>
                           )}
-                        </p>
+                        </div>
                         <p className="text-xs text-muted-foreground">
                           {session.ipAddress || "Unknown IP"} · Last active {formatRelativeTime(session.updatedAt)}
                         </p>
