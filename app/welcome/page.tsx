@@ -1564,20 +1564,6 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
 
               {/* Resend Tab */}
               {currentTab === "resend" && (
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
-                        style={{ borderRadius: '6px' }}
-                      >
-                        I&apos;ve completed this step
-                        <ArrowRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                </div>
-              )}
-
-              {/* Resend Tab */}
-              {currentTab === "resend" && (
                 <div>
                   {/* Header section with gradient background */}
                   <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
