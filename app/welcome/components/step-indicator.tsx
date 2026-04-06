@@ -15,7 +15,6 @@ const STEPS = [
   { id: "resend", label: "Resend" },
   { id: "github", label: "GitHub" },
   { id: "vercel", label: "Vercel" },
-  { id: "install", label: "Install" },
   { id: "download", label: "Save" },
 ]
 

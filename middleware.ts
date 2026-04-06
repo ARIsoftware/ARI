@@ -5,6 +5,7 @@ import type { NextRequest } from 'next/server'
 // This is regenerated on build/dev via generate-module-registry script
 import moduleManifest from '@/lib/generated/module-manifest.json'
 
+const isSetupComplete = !!process.env.DATABASE_URL
 const isDev = process.env.NODE_ENV !== 'production'
 
 // Content Security Policy — computed once at startup
@@ -65,14 +66,11 @@ const publicRoutes = [...staticPublicRoutes, ...modulePublicRoutes]
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
-  // Read per-request so the wizard's .env.local write is observed immediately,
-  // not frozen at module-load time.
-  const isSetupComplete = !!process.env.DATABASE_URL
 
   // SETUP MODE: If DATABASE_URL is not configured, redirect to welcome wizard
   // Only allow /welcome and /api/auth (for post-setup login)
   if (!isSetupComplete) {
-    const setupApiRoutes = ["/api/download-env", "/api/project-dir", "/api/run-setup-sql"]
+    const setupApiRoutes = ["/api/download-env", "/api/project-dir"]
     const isSetupAllowed = pathname === "/welcome" ||
                            pathname.startsWith("/welcome/") ||
                            pathname.startsWith("/api/auth") ||

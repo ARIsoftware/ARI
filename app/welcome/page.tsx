@@ -9,7 +9,6 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   AlertCircle,
-  Zap,
   Save,
   Info,
   ExternalLink,
@@ -18,13 +17,10 @@ import {
   Check,
   X,
   ArrowRight,
-  Copy,
-  Loader2
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { StepIndicator } from "./components/step-indicator"
 import { CodeBlock } from "./components/code-block"
-import { setupSql } from "@/lib/db/setup-sql"
 
 // Common timezones (shared with settings page)
 const COMMON_TIMEZONES = [
@@ -84,7 +80,7 @@ const generateAuthSecret = () => {
   return btoa(String.fromCharCode(...array))
 }
 
-const STEP_ORDER = ["personal", "account", "supabase", "resend", "github", "vercel", "install", "download"]
+const STEP_ORDER = ["personal", "account", "supabase", "resend", "github", "vercel", "download"]
 
 export default function WelcomePage() {
   const [completedLines, setCompletedLines] = useState<string[]>([])
@@ -128,6 +124,17 @@ export default function WelcomePage() {
   const [profileSaved, setProfileSaved] = useState(false)
   const [adminConfirmPassword, setAdminConfirmPassword] = useState("")
   const [adminPasswordError, setAdminPasswordError] = useState("")
+
+  // Rehydrate the post-save state across the Fast Refresh reload that fires
+  // when /api/download-env writes .env.local. Without this the React state
+  // resets and the user lands back on step 1 with no idea what happened.
+  useEffect(() => {
+    if (localStorage.getItem('ari:welcome:saved') === '1') {
+      setEnvSaveStatus('saved')
+      setCurrentTab('download')
+      setShowOnboarding(true)
+    }
+  }, [])
 
   // Prefill profile from DB if available, then overlay with any localStorage edits
   useEffect(() => {
@@ -367,9 +374,6 @@ export default function WelcomePage() {
   const [envSaveStatus, setEnvSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [envSaveError, setEnvSaveError] = useState<string | null>(null)
   const [envSavedPath, setEnvSavedPath] = useState<string | null>(null)
-  const [sqlCopied, setSqlCopied] = useState(false)
-  const [installStatus, setInstallStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle')
-  const [installError, setInstallError] = useState<string | null>(null)
 
   const handleSaveEnvFile = async () => {
     const content = generateEnvFileContent()
@@ -388,33 +392,12 @@ export default function WelcomePage() {
       }
       setEnvSavedPath(data.path)
       setEnvSaveStatus('saved')
-      // Setup is now complete. Redirect to / immediately, before the
-      // dev-server env reload races us and refreshes the page. Middleware
-      // will route / to /sign-in for unauth users.
-      window.location.href = '/'
+      // Persist so the wizard rehydrates to this state after Next.js's
+      // Fast Refresh reload (which is unavoidable when .env.local is written).
+      localStorage.setItem('ari:welcome:saved', '1')
     } catch (err) {
       setEnvSaveStatus('error')
       setEnvSaveError(err instanceof Error ? err.message : "Failed to save .env.local")
-    }
-  }
-
-  const handleInstallDatabase = async () => {
-    setInstallStatus('running')
-    setInstallError(null)
-    try {
-      const res = await fetch("/api/run-setup-sql", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ databaseUrl: formData.databaseUrl }),
-      })
-      const data = await res.json()
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Failed to run setup SQL")
-      }
-      setInstallStatus('success')
-    } catch (err) {
-      setInstallStatus('error')
-      setInstallError(err instanceof Error ? err.message : "Unknown error")
     }
   }
 
@@ -1988,6 +1971,20 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                     </AlertDescription>
                   </Alert>
 
+                  {envSaveStatus === 'saved' && (
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-5">
+                      <h3 className="text-base font-semibold text-blue-900 mb-2">Setup almost complete</h3>
+                      <p className="text-sm text-blue-800 mb-3">
+                        Restart your dev server to load the new environment variables, then visit{" "}
+                        <code className="bg-blue-100 px-1.5 py-0.5 rounded text-xs font-mono">/sign-in</code>.
+                        Your admin account and database tables will be created automatically on first sign-in.
+                      </p>
+                      <div className="mb-3">
+                        <CodeBlock language="bash" code={`# In your terminal:\n# 1. Stop the dev server with Ctrl+C\n# 2. Start it again:\npnpm dev`} />
+                      </div>
+                    </div>
+                  )}
+
                   {/* Footer */}
                   <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
                     <button
@@ -1998,7 +1995,13 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                       Back
                     </button>
                     <button
-                      onClick={() => window.location.href = '/'}
+                      onClick={() => {
+                        localStorage.removeItem('ari:welcome:saved')
+                        // Clear any stale bootstrap cache from earlier visits
+                        // (e.g. a 'no_database' result from before the restart).
+                        sessionStorage.removeItem('ari:bootstrap')
+                        window.location.href = '/sign-in'
+                      }}
                       disabled={envSaveStatus !== 'saved'}
                       className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium transition-colors ${
                         envSaveStatus === 'saved'
@@ -2007,158 +2010,14 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                       }`}
                       style={{ borderRadius: '6px' }}
                     >
-                      Finish
-                      <Check className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                </div>
-              )}
-
-              {currentTab === "install" && (
-                <div>
-                  {/* Header section */}
-                  <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <h2 className="text-2xl font-semibold text-zinc-900">Install Database</h2>
-                    <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
-                      Create the required tables and security policies in your Supabase database.
-                    </p>
-                  </div>
-
-                  {/* Content section */}
-                  <div className="space-y-6" style={{ padding: '25px' }}>
-
-                  {/* What this creates */}
-                  <Alert className="bg-blue-50 border-blue-200">
-                    <Info className="w-4 h-4 text-blue-600" />
-                    <AlertTitle className="text-blue-800">What this creates</AlertTitle>
-                    <AlertDescription className="text-blue-700">
-                      <ul className="list-disc list-inside space-y-1 text-sm mt-2">
-                        <li><strong>5 auth tables</strong> &mdash; user, session, account, twoFactor, verification</li>
-                        <li><strong>3 system tables</strong> &mdash; user_preferences, module_settings, module_migrations</li>
-                        <li><strong>5 module tables</strong> &mdash; tasks, quotes, music_playlist, notepad, notepad_revisions</li>
-                        <li><strong>Row Level Security</strong> on all tables with appropriate policies</li>
-                      </ul>
-                    </AlertDescription>
-                  </Alert>
-
-                  {/* Install button */}
-                  {installStatus === 'idle' && (
-                    <Button
-                      onClick={handleInstallDatabase}
-                      disabled={!formData.databaseUrl}
-                      className="w-full rounded-lg bg-green-600 hover:bg-green-700 text-white py-6 text-base"
-                    >
-                      <Zap className="w-4 h-4 mr-2" />
-                      Install Database
-                    </Button>
-                  )}
-
-                  {installStatus === 'running' && (
-                    <div className="flex items-center justify-center gap-3 py-6 text-zinc-600">
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      <span className="text-base font-medium">Installing tables and security policies...</span>
-                    </div>
-                  )}
-
-                  {installStatus === 'success' && (
-                    <Alert className="bg-green-50 border-green-200">
-                      <CheckCircle className="w-4 h-4 text-green-600" />
-                      <AlertTitle className="text-green-800">Database installed successfully</AlertTitle>
-                      <AlertDescription className="text-green-700 text-sm">
-                        All 13 tables and RLS policies have been created.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
-                  {installStatus === 'error' && (
-                    <>
-                      <Alert className="bg-red-50 border-red-200">
-                        <AlertCircle className="w-4 h-4 text-red-600" />
-                        <AlertTitle className="text-red-800">Installation failed</AlertTitle>
-                        <AlertDescription className="text-red-700 text-sm">
-                          {installError}
-                        </AlertDescription>
-                      </Alert>
-                      <div className="flex gap-3">
-                        <Button
-                          onClick={() => {
-                            setInstallStatus('idle')
-                            setInstallError(null)
-                          }}
-                          variant="outline"
-                          className="flex-1"
-                        >
-                          Try Again
-                        </Button>
-                        <Button
-                          onClick={async () => {
-                            try {
-                              await navigator.clipboard.writeText(setupSql)
-                              setSqlCopied(true)
-                              setTimeout(() => setSqlCopied(false), 3000)
-                            } catch (err) {
-                              console.error('Clipboard copy failed:', err)
-                            }
-                          }}
-                          variant="outline"
-                          className="flex-1"
-                        >
-                          {sqlCopied ? (
-                            <>
-                              <Check className="w-4 h-4 mr-2" />
-                              Copied
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-4 h-4 mr-2" />
-                              Copy SQL to run manually
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </>
-                  )}
-
-                  {/* SQL preview */}
-                  <details className="group">
-                    <summary className="cursor-pointer text-sm text-blue-600 hover:text-blue-800 hover:underline list-none">
-                      View setup SQL
-                    </summary>
-                    <div className="mt-3">
-                      <CodeBlock
-                        language="sql"
-                        code={setupSql}
-                      />
-                    </div>
-                  </details>
-
-                  {/* Footer */}
-                  <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
-                    <button
-                      onClick={goToPreviousStep}
-                      className="inline-flex items-center justify-center px-4 py-2 text-base font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
-                      style={{ borderRadius: '6px' }}
-                    >
-                      Back
-                    </button>
-                    <button
-                      onClick={goToNextStep}
-                      disabled={installStatus !== 'success'}
-                      className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium transition-colors ${
-                        installStatus === 'success'
-                          ? 'bg-blue-600 text-white hover:bg-blue-500'
-                          : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'
-                      }`}
-                      style={{ borderRadius: '6px' }}
-                    >
-                      Next
+                      I've restarted — sign in
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
                 </div>
               )}
+
           </div>
         </div>
       </div>
