@@ -751,8 +751,7 @@ function showCompletion(ariResult) {
     const shortPath = shortenPath(ariResult.dir);
     console.log(`  To start ARI:`);
     console.log('');
-    console.log(`    ${DIM_BLUE}cd ${shortPath}${RESET}`);
-    console.log(`    ${DIM_BLUE}pnpm run dev${RESET}`);
+    console.log(`    ${DIM_BLUE}cd ${shortPath} && pnpm run dev${RESET}`);
     console.log('');
     console.log(`  Then open ${blue('http://localhost:3000')}`);
   } else {
