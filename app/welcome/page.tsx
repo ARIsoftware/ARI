@@ -81,7 +81,7 @@ const generateAuthSecret = () => {
   return btoa(String.fromCharCode(...array))
 }
 
-const STEP_ORDER = ["personal", "account", "github", "supabase", "resend", "vercel", "download"]
+const STEP_ORDER = ["personal", "account", "supabase", "github", "resend", "vercel", "download"]
 // Hidden: "local-env" step removed from flow since install script handles it. Content preserved below.
 
 export default function WelcomePage() {
