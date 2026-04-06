@@ -65,8 +65,6 @@ interface OnboardingData {
   // Admin Account (optional first-run bootstrap)
   adminEmail: string
   adminPassword: string
-  // OpenAI (optional)
-  openaiApiKey: string
   // Resend (optional)
   resendApiKey: string
   resendWebhookSecret: string
@@ -83,7 +81,7 @@ const generateAuthSecret = () => {
   return btoa(String.fromCharCode(...array))
 }
 
-const STEP_ORDER = ["personal", "account", "github", "supabase", "claude-code", "openai", "resend", "vercel", "download"]
+const STEP_ORDER = ["personal", "account", "github", "supabase", "resend", "vercel", "download"]
 // Hidden: "local-env" step removed from flow since install script handles it. Content preserved below.
 
 export default function WelcomePage() {
@@ -109,7 +107,6 @@ export default function WelcomePage() {
     betterAuthSecret: "",
     adminEmail: "",
     adminPassword: "",
-    openaiApiKey: "",
     resendApiKey: "",
     resendWebhookSecret: "",
     vercelSetupComplete: false,
@@ -321,12 +318,6 @@ export default function WelcomePage() {
       lines.push("# After your account is created on first run, you can safely delete these two lines.")
       lines.push(`ARI_FIRST_RUN_ADMIN_EMAIL=${formData.adminEmail}`)
       lines.push(`ARI_FIRST_RUN_ADMIN_PASSWORD=${formData.adminPassword}`)
-      lines.push("")
-    }
-
-    if (formData.openaiApiKey.trim()) {
-      lines.push("# OpenAI API Integration")
-      lines.push(`OPENAI_API_KEY=${formData.openaiApiKey}`)
       lines.push("")
     }
 
@@ -1571,222 +1562,8 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                 </div>
               )}
 
-              {/* Claude Code Tab */}
-              {currentTab === "claude-code" && (
-                <div>
-                  {/* Header section with gradient background */}
-                  <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <div className="flex items-center gap-2.5">
-                      <h2 className="text-2xl font-semibold text-zinc-900">Claude Code</h2>
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-600 text-white">RECOMMENDED</span>
-                    </div>
-                    <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
-                      Claude Code is an agentic coding tool by Anthropic that lives in your terminal. It was already installed by the install script — now you just need to set up your account.
-                    </p>
-                  </div>
-
-                  {/* Content section */}
-                  <div className="space-y-6" style={{ padding: '25px' }}>
-                  <Alert className="bg-orange-50 border-orange-200">
-                    <Zap className="w-4 h-4 text-orange-600" />
-                    <AlertTitle className="text-orange-800">Recommended</AlertTitle>
-                    <AlertDescription className="text-orange-700">
-                      Claude Code makes it easy to build new modules, fix bugs, and extend ARI using natural language. You can skip this step, but it&apos;s highly recommended.
-                    </AlertDescription>
-                  </Alert>
-
-                  {/* Step 1 */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
-                      1
-                    </div>
-                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Create an Anthropic account</h3>
-                  </div>
-
-                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
-                    <ol className="space-y-2.5">
-                      <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
-                          1
-                        </span>
-                        <span className="text-black">
-                          Go to <a href="https://claude.ai" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
-                            claude.ai
-                            <ExternalLink className="h-3 w-3" />
-                          </a> and create a free account (or sign in if you already have one)
-                        </span>
-                      </li>
-                      <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
-                          2
-                        </span>
-                        <span className="text-black">
-                          Subscribe to the <strong className="text-zinc-700">Max plan</strong> ($100/mo) for the best Claude Code experience, or use the <strong className="text-zinc-700">Pro plan</strong> ($20/mo) for lighter usage
-                        </span>
-                      </li>
-                      <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
-                          3
-                        </span>
-                        <span className="text-black">
-                          Alternatively, you can use an <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
-                            Anthropic API key
-                            <ExternalLink className="h-3 w-3" />
-                          </a> with pay-as-you-go billing
-                        </span>
-                      </li>
-                    </ol>
-                  </div>
-
-                  {/* Step 2 */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
-                      2
-                    </div>
-                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Connect Claude Code to your account</h3>
-                  </div>
-
-                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
-                    <p className="text-sm text-black mb-3">
-                      Claude Code was already installed by the install script. Open your terminal in the ARI project folder and run:
-                    </p>
-                    <CodeBlock language="bash" code="claude" />
-                    <p className="text-sm text-black mt-3">
-                      This will open a browser window to authenticate. Sign in with the same account you created above, and Claude Code will be ready to use.
-                    </p>
-                  </div>
-
-                  {/* Footer */}
-                  <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
-                    <button
-                      onClick={goToPreviousStep}
-                      className="inline-flex items-center justify-center px-4 py-2 text-base font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
-                      style={{ borderRadius: '6px' }}
-                    >
-                      Back
-                    </button>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={goToNextStep}
-                        className="inline-flex items-center justify-center px-4 py-2 text-base font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
-                        style={{ borderRadius: '6px' }}
-                      >
-                        Skip this step
-                      </button>
-                      <button
-                        onClick={goToNextStep}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
-                        style={{ borderRadius: '6px' }}
-                      >
-                        I&apos;ve completed this step
-                        <ArrowRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                </div>
-              )}
-
-              {/* OpenAI Tab */}
-              {currentTab === "openai" && (
-                <div>
-                  {/* Header section with gradient background */}
-                  <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <div className="flex items-center gap-2.5">
-                      <h2 className="text-2xl font-semibold text-zinc-900">OpenAI Configuration</h2>
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-600 text-white">OPTIONAL</span>
-                    </div>
-                    <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
-                      Enable AI-powered features like the /assist chat interface. You can skip this step if you don&apos;t need AI features.
-                    </p>
-                  </div>
-
-                  {/* Content section */}
-                  <div className="space-y-6" style={{ padding: '25px' }}>
-                  <Alert className="bg-purple-50 border-purple-200">
-                    <Zap className="w-4 h-4 text-purple-600" />
-                    <AlertTitle className="text-purple-800">Optional</AlertTitle>
-                    <AlertDescription className="text-purple-700">
-                      OpenAI integration is optional. Skip this step if you don&apos;t need AI-powered chat features.
-                    </AlertDescription>
-                  </Alert>
-
-                  {/* Step 1 */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
-                      1
-                    </div>
-                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Create a FREE OpenAI account</h3>
-                  </div>
-
-                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
-                    <ol className="space-y-2.5">
-                      <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
-                          1
-                        </span>
-                        <span className="text-black">
-                          Visit <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
-                            OpenAI Platform
-                            <ExternalLink className="h-3 w-3" />
-                          </a> (includes free credits)
-                        </span>
-                      </li>
-                      <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
-                          2
-                        </span>
-                        <span className="text-black">Click <strong className="text-zinc-700">&quot;Create new secret key&quot;</strong></span>
-                      </li>
-                      <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
-                          3
-                        </span>
-                        <span className="text-black">Copy the key immediately (it won&apos;t be shown again)</span>
-                      </li>
-                      <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
-                          4
-                        </span>
-                        <span className="text-black">Paste it below</span>
-                      </li>
-                    </ol>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="openaiApiKey" className="text-sm font-medium text-zinc-900">OpenAI API Key</Label>
-                    <Textarea
-                      id="openaiApiKey"
-                      value={formData.openaiApiKey}
-                      onChange={(e) => setFormData(prev => ({ ...prev, openaiApiKey: e.target.value }))}
-                      placeholder="sk-proj-..."
-                      className="text-sm min-h-[80px]"
-                      style={{ fontFamily: 'Geist Mono, monospace' }}
-                    />
-                    <p className="text-xs text-gray-500">
-                      Your key should start with &quot;sk-proj-&quot; or &quot;sk-&quot;
-                    </p>
-                  </div>
-
-                  {/* Footer */}
-                  <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
-                    <button
-                      onClick={goToPreviousStep}
-                      className="inline-flex items-center justify-center px-4 py-2 text-base font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
-                      style={{ borderRadius: '6px' }}
-                    >
-                      Back
-                    </button>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={goToNextStep}
-                        className="inline-flex items-center justify-center px-4 py-2 text-base font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
-                        style={{ borderRadius: '6px' }}
-                      >
-                        Skip this step
-                      </button>
-                      <button
-                        onClick={goToNextStep}
+              {/* Resend Tab */}
+              {currentTab === "resend" && (
                         className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
                         style={{ borderRadius: '6px' }}
                       >
@@ -1810,16 +1587,40 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-600 text-white">OPTIONAL</span>
                     </div>
                     <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
-                      Enable email sending and the <strong>Mail Stream</strong> module. Resend lets you send transactional emails and track their delivery status in real-time. Resend offers a free tier. Please check their website for details.
+                      Enable email sending in ARI. Resend lets you send transactional emails and track their delivery status in real-time. Resend offers a free tier. Please check their website for details.
                     </p>
                   </div>
 
                   {/* Content section */}
                   <div className="space-y-6" style={{ padding: '25px' }}>
-                  {/* Step 1: API Key */}
+                  {/* Step 1: Create Account */}
                   <div className="flex items-center gap-3">
                     <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       1
+                    </div>
+                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Create a free Resend account</h3>
+                  </div>
+
+                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
+                    <ol className="space-y-2.5">
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                          1
+                        </span>
+                        <span className="text-black">
+                          Go to <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
+                            Resend.com
+                            <ExternalLink className="h-3 w-3" />
+                          </a> and create a free account
+                        </span>
+                      </li>
+                    </ol>
+                  </div>
+
+                  {/* Step 2: API Key */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
+                      2
                     </div>
                     <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Get your Resend API Key</h3>
                   </div>
@@ -1868,131 +1669,6 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                     />
                   </div>
 
-                  {/* Step 2: Webhook Setup */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
-                      2
-                    </div>
-                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Set up Webhook for Mail Stream Module</h3>
-                  </div>
-
-                  <Alert className="bg-blue-50 border-blue-200">
-                    <Info className="w-4 h-4 text-blue-600" />
-                    <AlertTitle className="text-blue-800">Why set up a webhook?</AlertTitle>
-                    <AlertDescription className="text-blue-700">
-                      The <strong>Mail Stream</strong> module shows you a real-time log of all emails sent from ARI, including their delivery status (sent, delivered, bounced, etc.).
-                      Resend sends this status information to your app via webhooks. Without a webhook, Mail Stream won&apos;t receive email events.
-                    </AlertDescription>
-                  </Alert>
-
-                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
-                    <ol className="space-y-2.5">
-                      <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
-                          1
-                        </span>
-                        <span className="text-black">
-                          Go to <a href="https://resend.com/webhooks" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
-                            Resend Dashboard &rarr; Webhooks
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        </span>
-                      </li>
-                      <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
-                          2
-                        </span>
-                        <span className="text-black">Click <strong className="text-zinc-700">Add Webhook</strong></span>
-                      </li>
-                      <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
-                          3
-                        </span>
-                        <div className="flex-1">
-                          <span className="text-black block mb-2">Enter your webhook endpoint URL:</span>
-                          <CodeBlock
-                            language="url"
-                            code="https://YOUR-DOMAIN/api/modules/mail-stream/webhook"
-                          />
-                          <p className="text-xs text-black mt-2">Replace YOUR-DOMAIN with your actual domain</p>
-                        </div>
-                      </li>
-                      <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
-                          4
-                        </span>
-                        <span className="text-black">Select the events you want to track (recommended: <strong className="text-zinc-700">all events</strong>)</span>
-                      </li>
-                      <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
-                          5
-                        </span>
-                        <span className="text-black">Click <strong className="text-zinc-700">Create</strong> to save the webhook</span>
-                      </li>
-                    </ol>
-                  </div>
-
-                  {/* Step 3: Signing Secret */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
-                      3
-                    </div>
-                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Copy the Webhook Signing Secret</h3>
-                  </div>
-
-                  <Alert className="bg-amber-50 border-amber-200">
-                    <Shield className="w-4 h-4 text-amber-600" />
-                    <AlertTitle className="text-amber-800">Security: Signing Secret</AlertTitle>
-                    <AlertDescription className="text-amber-700">
-                      The signing secret verifies that webhook requests genuinely come from Resend, not from malicious actors.
-                      ARI uses this secret to validate each incoming webhook before processing it.
-                    </AlertDescription>
-                  </Alert>
-
-                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
-                    <ol className="space-y-2.5">
-                      <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
-                          1
-                        </span>
-                        <span className="text-black">After creating the webhook, click on it to view details</span>
-                      </li>
-                      <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
-                          2
-                        </span>
-                        <span className="text-black">Copy the <strong className="text-zinc-700">Signing Secret</strong> (starts with <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">whsec_</code>)</span>
-                      </li>
-                      <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
-                          3
-                        </span>
-                        <span className="text-black">Paste it below</span>
-                      </li>
-                    </ol>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="resendWebhookSecret" className="text-sm font-medium text-gray-900">Webhook Signing Secret</Label>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="text-xs max-w-xs">Used to verify webhook signatures (starts with whsec_)</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                    <Input
-                      id="resendWebhookSecret"
-                      value={formData.resendWebhookSecret}
-                      onChange={(e) => setFormData(prev => ({ ...prev, resendWebhookSecret: e.target.value }))}
-                      placeholder="whsec_..."
-                      className="text-sm"
-                      style={{ fontFamily: 'Geist Mono, monospace' }}
-                    />
-                  </div>
 
                   {/* Footer */}
                   <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
@@ -2221,15 +1897,6 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                         }
                         <span className="text-gray-500">
                           Admin Account: {formData.adminEmail && formData.adminPassword ? "Configured" : "Skipped"}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {formData.openaiApiKey ?
-                          <Check className="w-4 h-4 text-green-500" /> :
-                          <X className="w-4 h-4 text-gray-400" />
-                        }
-                        <span className="text-gray-500">
-                          OpenAI: {formData.openaiApiKey ? "Configured" : "Skipped"}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
