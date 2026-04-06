@@ -134,7 +134,7 @@ CREATE TABLE "user_preferences" (
 DROP TABLE IF EXISTS "module_settings" CASCADE;
 CREATE TABLE "module_settings" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-  "user_id" UUID NOT NULL,
+  "user_id" TEXT NOT NULL,
   "module_id" VARCHAR(255) NOT NULL,
   "enabled" BOOLEAN DEFAULT TRUE,
   "settings" JSONB,
@@ -160,7 +160,7 @@ CREATE TABLE "module_migrations" (
   "module_id" VARCHAR(255) NOT NULL,
   "migration_name" VARCHAR(255) NOT NULL,
   "applied_at" TIMESTAMPTZ DEFAULT NOW(),
-  "applied_by" UUID,
+  "applied_by" TEXT,
   PRIMARY KEY ("id"),
   CONSTRAINT "module_migrations_module_id_migration_name_key" UNIQUE ("module_id", "migration_name")
 );
@@ -189,7 +189,7 @@ CREATE TABLE "tasks" (
   "order_index" INTEGER DEFAULT 0,
   "completion_count" INTEGER DEFAULT 0,
   "user_email" TEXT,
-  "user_id" UUID NOT NULL,
+  "user_id" TEXT NOT NULL,
   "impact" INTEGER DEFAULT 3,
   "severity" INTEGER DEFAULT 3,
   "timeliness" INTEGER DEFAULT 3,
@@ -215,7 +215,7 @@ CREATE POLICY "tasks_rls_delete" ON "tasks" FOR DELETE TO public
 DROP TABLE IF EXISTS "quotes" CASCADE;
 CREATE TABLE "quotes" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-  "user_id" UUID NOT NULL,
+  "user_id" TEXT NOT NULL,
   "quote" TEXT NOT NULL,
   "author" TEXT,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -258,7 +258,7 @@ CREATE POLICY "music_playlist_rls_delete" ON "music_playlist" FOR DELETE TO publ
 DROP TABLE IF EXISTS "notepad" CASCADE;
 CREATE TABLE "notepad" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-  "user_id" UUID NOT NULL,
+  "user_id" TEXT NOT NULL,
   "content" TEXT NOT NULL,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -279,7 +279,7 @@ CREATE POLICY "notepad_rls_delete" ON "notepad" FOR DELETE TO public
 DROP TABLE IF EXISTS "notepad_revisions" CASCADE;
 CREATE TABLE "notepad_revisions" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-  "user_id" UUID NOT NULL,
+  "user_id" TEXT NOT NULL,
   "content" TEXT NOT NULL,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   "revision_number" INTEGER NOT NULL,
