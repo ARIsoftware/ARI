@@ -84,7 +84,7 @@ const generateAuthSecret = () => {
   return btoa(String.fromCharCode(...array))
 }
 
-const STEP_ORDER = ["personal", "account", "supabase", "resend", "github", "vercel", "download", "install"]
+const STEP_ORDER = ["personal", "account", "supabase", "resend", "github", "vercel", "install", "download"]
 
 export default function WelcomePage() {
   const [completedLines, setCompletedLines] = useState<string[]>([])
@@ -388,6 +388,10 @@ export default function WelcomePage() {
       }
       setEnvSavedPath(data.path)
       setEnvSaveStatus('saved')
+      // Setup is now complete. Redirect to / immediately, before the
+      // dev-server env reload races us and refreshes the page. Middleware
+      // will route / to /sign-in for unauth users.
+      window.location.href = '/'
     } catch (err) {
       setEnvSaveStatus('error')
       setEnvSaveError(err instanceof Error ? err.message : "Failed to save .env.local")
@@ -1795,7 +1799,7 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                           2
                         </span>
                         <span className="text-black">
-                          Install Vercel CLI: <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">npm install -g vercel</code>
+                          Run <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">vercel login</code> in your terminal
                         </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
@@ -1803,26 +1807,18 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                           3
                         </span>
                         <span className="text-black">
-                          Run <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">vercel login</code> in your terminal
+                          Run <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">vercel link</code> to connect your project
                         </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           4
                         </span>
-                        <span className="text-black">
-                          Run <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">vercel link</code> to connect your project
-                        </span>
-                      </li>
-                      <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
-                          5
-                        </span>
                         <span className="text-black">Add environment variables: From your dashboard, select your project. Select the Settings tab. Go to the Environment Variables section and copy your variables from .env.local to Vercel.</span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
-                          6
+                          5
                         </span>
                         <span className="text-black">
                           To deploy every commit automatically, connect your Git Repository: <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">vercel git connect</code>
@@ -1835,24 +1831,6 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                       </li>
                     </ol>
                   </div>
-
-                  <Alert>
-                    <Info className="w-4 h-4" />
-                    <AlertDescription className="text-zinc-700">
-                      After downloading your .env.local file, you can run{" "}
-                      <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">vercel env pull</code>
-                      {" "}to sync your environment variables.{" "}
-                      <a
-                        href="https://vercel.com/docs/cli"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-medium text-zinc-900 hover:underline inline-flex items-center gap-1"
-                      >
-                        Learn more
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </AlertDescription>
-                  </Alert>
 
                   {/* Footer */}
                   <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
@@ -2020,11 +1998,17 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                       Back
                     </button>
                     <button
-                      onClick={goToNextStep}
-                      className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                      onClick={() => window.location.href = '/'}
+                      disabled={envSaveStatus !== 'saved'}
+                      className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium transition-colors ${
+                        envSaveStatus === 'saved'
+                          ? 'bg-blue-600 text-white hover:bg-blue-500'
+                          : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'
+                      }`}
                       style={{ borderRadius: '6px' }}
                     >
-                      Next
+                      Finish
+                      <Check className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -2159,7 +2143,7 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                       Back
                     </button>
                     <button
-                      onClick={() => window.location.href = '/sign-in'}
+                      onClick={goToNextStep}
                       disabled={installStatus !== 'success'}
                       className={`inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium transition-colors ${
                         installStatus === 'success'
@@ -2168,8 +2152,8 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                       }`}
                       style={{ borderRadius: '6px' }}
                     >
-                      I have completed all steps
-                      <Check className="w-4 h-4" />
+                      Next
+                      <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
                 </div>

@@ -15,8 +15,8 @@ const STEPS = [
   { id: "resend", label: "Resend" },
   { id: "github", label: "GitHub" },
   { id: "vercel", label: "Vercel" },
-  { id: "download", label: "Save" },
   { id: "install", label: "Install" },
+  { id: "download", label: "Save" },
 ]
 
 // Icon components that accept className for dynamic sizing
