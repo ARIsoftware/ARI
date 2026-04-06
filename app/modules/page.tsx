@@ -165,14 +165,6 @@ export default function ModulesPage() {
       error?: string
     }
   } | null>(null)
-  // Uninstall state
-  const [uninstallSuccess, setUninstallSuccess] = useState<{
-    moduleId: string; moduleName: string; vercel?: boolean
-    githubSync?: { success: boolean; commitSha?: string; filesDeleted?: number; error?: string; message?: string } | null
-  } | null>(null)
-  const [uninstalling, setUninstalling] = useState<string | null>(null)
-  const [confirmUninstall, setConfirmUninstall] = useState<UnifiedModule | null>(null)
-
   const [githubSyncEnabled, setGithubSyncEnabled] = useState(true)
   const [githubConfigured, setGithubConfigured] = useState<boolean | null>(null)
   const [githubConfig, setGithubConfig] = useState<{ owner?: string; repo?: string; branch?: string } | null>(null)
@@ -596,42 +588,6 @@ export default function ModulesPage() {
     setInstallSuccess(null)
   }
 
-  const uninstallModule = async (mod: UnifiedModule) => {
-    setUninstalling(mod.id)
-    setConfirmUninstall(null)
-
-    try {
-      const response = await fetch('/api/modules/uninstall', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ moduleId: mod.id }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        setMessage({ type: 'error', text: data.error || 'Failed to uninstall module' })
-        return
-      }
-
-      setUninstallSuccess({
-        moduleId: mod.id,
-        moduleName: sanitizeDisplayName(mod.name),
-        vercel: data.vercel,
-        githubSync: data.githubSync || null,
-      })
-
-      // Refresh module lists
-      sessionStorage.removeItem(LIBRARY_CACHE_KEY)
-      await Promise.all([loadInstalledModules(), loadLibrary(false)])
-    } catch (error) {
-      console.error('Error uninstalling module:', error)
-      setMessage({ type: 'error', text: 'Failed to uninstall module' })
-    } finally {
-      setUninstalling(null)
-    }
-  }
-
   const renderModuleAction = (mod: UnifiedModule) => {
     if (mod.status === "installed") {
       const isEnabled = toggleStates[mod.id] ?? mod.isEnabled
@@ -734,20 +690,6 @@ export default function ModulesPage() {
     }
 
     return <AccessBadge access={mod.access} />
-  }
-
-  const renderUninstallButton = (mod: UnifiedModule) => {
-    if (mod.status !== "installed" || CORE_MODULE_IDS.includes(mod.id) || mod.isCustomModule) return null
-    return uninstalling === mod.id ? (
-      <span className="text-[10px] text-red-400">Uninstalling...</span>
-    ) : (
-      <button
-        className="text-[10px] text-red-400 hover:underline hover:text-red-500"
-        onClick={() => setConfirmUninstall(mod)}
-      >
-        Uninstall
-      </button>
-    )
   }
 
   return (
@@ -962,7 +904,6 @@ export default function ModulesPage() {
                               <div className="flex items-center gap-1.5 mt-1">
                                 {renderAccessBadge(mod)}
                                 <span className="text-[10px] text-muted-foreground">v{mod.version}</span>
-                                {renderUninstallButton(mod)}
                               </div>
                             </div>
                           </div>
@@ -999,7 +940,6 @@ export default function ModulesPage() {
                             <p className="text-sm font-semibold">{mod.name}</p>
                             {renderAccessBadge(mod)}
                             <span className="text-[10px] text-muted-foreground">v{mod.version}</span>
-                            {renderUninstallButton(mod)}
                             {hasChanged && (
                               <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500 text-amber-600">
                                 UNSAVED
@@ -1236,105 +1176,6 @@ export default function ModulesPage() {
                     )}
                   </Button>
                 )}
-              </div>
-            </div>
-          )}
-
-          {/* Uninstall Confirmation Dialog */}
-          <AlertDialog open={!!confirmUninstall} onOpenChange={(open) => !open && setConfirmUninstall(null)}>
-            <AlertDialogContent className="max-w-md">
-              <AlertDialogHeader>
-                <AlertDialogTitle>Uninstall {confirmUninstall ? sanitizeDisplayName(confirmUninstall.name) : 'Module'}?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to uninstall this module? The module&apos;s data will remain in the database so you can easily reinstall the module in the future.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  className="bg-red-600 hover:bg-red-700 text-white"
-                  onClick={() => confirmUninstall && uninstallModule(confirmUninstall)}
-                >
-                  Uninstall
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-
-          {/* Uninstall Success Full-Screen Overlay */}
-          {!!uninstallSuccess && (
-            <div className="fixed inset-0 z-50 bg-background flex items-center justify-center">
-              <div className="flex flex-col items-center text-center w-full max-w-md px-6">
-                {/* Large green checkmark */}
-                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30 ring-4 ring-green-200/50 dark:ring-green-800/30 shadow-lg mb-6">
-                  <CheckCircle2 className="h-10 w-10 text-green-600" />
-                </div>
-
-                {/* Title and subtitle */}
-                <h1 className="text-3xl font-bold tracking-tight mb-2">Module Uninstalled</h1>
-                <p className="text-muted-foreground mb-8">Your module has been successfully removed</p>
-
-                {/* Status card */}
-                <div className="w-full rounded-lg border p-4 space-y-3 mb-8">
-                  {uninstallSuccess.githubSync?.success === true ? (
-                    <div className="flex items-center gap-3">
-                      <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
-                      <div className="text-left">
-                        <div className="flex items-center gap-2">
-                          <Github className="h-4 w-4" />
-                          <span className="text-sm font-medium">Removed from GitHub</span>
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-0.5">
-                          {uninstallSuccess.githubSync.message || 'Module files deleted from repository.'}
-                        </p>
-                      </div>
-                    </div>
-                  ) : uninstallSuccess.githubSync?.success === false ? (
-                    <div className="flex items-center gap-3">
-                      <AlertCircle className="h-5 w-5 text-red-600 shrink-0" />
-                      <div className="text-left">
-                        <div className="flex items-center gap-2">
-                          <Github className="h-4 w-4" />
-                          <span className="text-sm font-medium">GitHub Sync Failed</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {uninstallSuccess.githubSync.error || 'Failed to remove module from GitHub.'}
-                        </p>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {/* Vercel rebuilding notice */}
-                  {uninstallSuccess.vercel && uninstallSuccess.githubSync?.success === true && (
-                    <div className="flex items-center gap-3">
-                      <div className="h-5 w-5 shrink-0 flex items-center justify-center">
-                        <div className="h-2.5 w-2.5 rounded-full bg-blue-500 animate-pulse" />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-sm text-muted-foreground">
-                          Vercel is rebuilding. Changes will take effect once the rebuild completes.
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-0.5">
-                          Estimated time 1 to 2 minutes.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Separator and close */}
-                <div className="w-full border-t mb-4" />
-                <p className="text-sm text-muted-foreground mb-4">You can close this window.</p>
-
-                <Button
-                  className="w-full bg-foreground text-background hover:bg-foreground/90"
-                  onClick={async () => {
-                    try { await fetch('/api/modules/refresh', { method: 'POST' }) } catch {}
-                    setUninstallSuccess(null)
-                  }}
-                >
-                  Close Window
-                </Button>
               </div>
             </div>
           )}
