@@ -78,10 +78,11 @@ next-env.d.ts
 # clerk configuration (can include secrets)
 /.clerk/
 
-# database dumps (but allow migrations and module database schemas)
+# database dumps (but allow migrations, module schemas, and setup)
 *.sql
 !/migrations/*.sql
 !**/database/*.sql
+!/lib/db/setup.sql
 
 # Private directory (folder tracked, contents ignored)
 /private/*

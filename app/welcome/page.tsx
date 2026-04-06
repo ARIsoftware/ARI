@@ -17,11 +17,13 @@ import {
   Shield,
   Check,
   X,
-  ArrowRight
+  ArrowRight,
+  Copy
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { StepIndicator } from "./components/step-indicator"
 import { CodeBlock } from "./components/code-block"
+import { setupSql } from "@/lib/db/setup-sql"
 
 // Common timezones (shared with settings page)
 const COMMON_TIMEZONES = [
@@ -81,8 +83,7 @@ const generateAuthSecret = () => {
   return btoa(String.fromCharCode(...array))
 }
 
-const STEP_ORDER = ["personal", "account", "supabase", "resend", "github", "vercel", "download"]
-// Hidden: "local-env" step removed from flow since install script handles it. Content preserved below.
+const STEP_ORDER = ["personal", "account", "supabase", "resend", "github", "vercel", "download", "install"]
 
 export default function WelcomePage() {
   const [completedLines, setCompletedLines] = useState<string[]>([])
@@ -355,6 +356,7 @@ export default function WelcomePage() {
   }
 
   const [envSaveStatus, setEnvSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [sqlCopied, setSqlCopied] = useState(false)
 
   const handleDownloadEnvFile = async () => {
     const content = generateEnvFileContent()
@@ -1330,8 +1332,8 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                           4
                         </span>
                         <span className="text-black">
-                          Go to <a href="https://supabase.com/dashboard/project/_/settings/api" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
-                            Project Settings &rarr; API
+                          Go to <a href="https://supabase.com/dashboard/project/_/settings/api-keys" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
+                            Project Settings &rarr; API Keys
                             <ExternalLink className="h-3 w-3" />
                           </a>
                         </span>
@@ -1371,13 +1373,13 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
 
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Label htmlFor="supabaseAnonKey" className="text-sm font-medium text-gray-900">Anon/Public Key</Label>
+                        <Label htmlFor="supabaseAnonKey" className="text-sm font-medium text-gray-900">Publishable Key</Label>
                         <Tooltip>
                           <TooltipTrigger>
                             <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p className="text-xs max-w-xs">Also called &quot;anon&quot; or &quot;publishable&quot; key. Safe to use in browser.</p>
+                            <p className="text-xs max-w-xs">The &quot;Publishable key&quot; from your Supabase API Keys page. Safe to use in browser.</p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
@@ -1385,7 +1387,7 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                         id="supabaseAnonKey"
                         value={formData.supabaseAnonKey}
                         onChange={(e) => setFormData(prev => ({ ...prev, supabaseAnonKey: e.target.value }))}
-                        placeholder="eyJhbGci ..."
+                        placeholder="sb_publishable_ ..."
                         className="text-sm"
                         style={{ fontFamily: 'Geist Mono, monospace' }}
                       />
@@ -1393,13 +1395,13 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
 
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Label htmlFor="supabaseSecretKey" className="text-sm font-medium text-gray-900">Service Role Secret</Label>
+                        <Label htmlFor="supabaseSecretKey" className="text-sm font-medium text-gray-900">Secret Key</Label>
                         <Tooltip>
                           <TooltipTrigger>
                             <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p className="text-xs max-w-xs">Server-side only key that bypasses Row Level Security. Keep this secret!</p>
+                            <p className="text-xs max-w-xs">The &quot;Secret key&quot; from your Supabase API Keys page. Server-side only — keep this secret!</p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
@@ -1407,7 +1409,7 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                         id="supabaseSecretKey"
                         value={formData.supabaseSecretKey}
                         onChange={(e) => setFormData(prev => ({ ...prev, supabaseSecretKey: e.target.value }))}
-                        placeholder="eyJhbGci ..."
+                        placeholder="sb_secret_ ..."
                         className="text-sm"
                         style={{ fontFamily: 'Geist Mono, monospace' }}
                       />
@@ -1848,9 +1850,9 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                 <div>
                   {/* Header section with gradient background */}
                   <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <h2 className="text-2xl font-semibold text-zinc-900">Install</h2>
+                    <h2 className="text-2xl font-semibold text-zinc-900">Save</h2>
                     <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
-                      Your environment configuration is ready. Save it to your project to finish setup.
+                      Your environment configuration is ready. Save the .env.local file to your project root.
                     </p>
                   </div>
 
@@ -1967,17 +1969,12 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                   {/* Next steps */}
                   <Alert>
                     <Info className="w-4 h-4" />
-                    <AlertTitle className="text-gray-800">Next Steps</AlertTitle>
+                    <AlertTitle className="text-gray-800">After Saving</AlertTitle>
                     <AlertDescription className="text-gray-700">
                       <ol className="list-decimal list-inside space-y-1 text-sm mt-2">
-                        <li>Click the download button above to generate your .env.local file</li>
-                        <li>Move the file to your project root directory</li>
-                        <li>Restart your development server</li>
-                        <li>Your application is ready to use!</li>
+                        <li>Move the downloaded file to your project root directory</li>
+                        <li>Continue to the next step to set up your database</li>
                       </ol>
-                      <p className="mt-2 text-xs text-gray-500">
-                        <strong>For production:</strong> Update <code className="bg-gray-200 px-1 rounded">BETTER_AUTH_URL</code> to your production domain in Vercel environment variables.
-                      </p>
                     </AlertDescription>
                   </Alert>
 
@@ -1990,17 +1987,112 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                     >
                       Back
                     </button>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={handleDownloadEnvFile}
-                        disabled={!isSupabaseComplete}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
-                        style={{ borderRadius: '6px' }}
-                      >
-                        I have completed all steps
-                        <Check className="w-4 h-4" />
-                      </button>
+                    <button
+                      onClick={goToNextStep}
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                      style={{ borderRadius: '6px' }}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+                </div>
+              )}
+
+              {currentTab === "install" && (
+                <div>
+                  {/* Header section */}
+                  <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
+                    <h2 className="text-2xl font-semibold text-zinc-900">Install Database</h2>
+                    <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
+                      Run this SQL in your Supabase SQL Editor to create the required tables and security policies.
+                    </p>
+                  </div>
+
+                  {/* Content section */}
+                  <div className="space-y-6" style={{ padding: '25px' }}>
+
+                  {/* Instructions */}
+                  <div className="space-y-3">
+                    <h3 className="text-base font-semibold text-gray-900">Steps</h3>
+                    <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700">
+                      <li>Open your <strong>Supabase Dashboard</strong> &rarr; <strong>SQL Editor</strong></li>
+                      <li>Click the button below to copy the setup SQL</li>
+                      <li>Paste it into the SQL Editor and click <strong>Run</strong></li>
+                      <li>Verify all 13 tables appear in the Table Editor with RLS enabled</li>
+                    </ol>
+                  </div>
+
+                  {/* SQL preview */}
+                  <details className="group">
+                    <summary className="cursor-pointer text-sm text-blue-600 hover:text-blue-800 hover:underline list-none">
+                      View setup SQL
+                    </summary>
+                    <div className="mt-3">
+                      <CodeBlock
+                        language="sql"
+                        code={setupSql}
+                      />
                     </div>
+                  </details>
+
+                  {/* Copy SQL button */}
+                  <Button
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(setupSql)
+                        setSqlCopied(true)
+                        setTimeout(() => setSqlCopied(false), 3000)
+                      } catch {
+                        // Fallback: select text in the details view
+                      }
+                    }}
+                    className="w-full rounded-lg bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {sqlCopied ? (
+                      <>
+                        <Check className="w-4 h-4 mr-2" />
+                        Copied to clipboard
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copy Setup SQL
+                      </>
+                    )}
+                  </Button>
+
+                  {/* What this creates */}
+                  <Alert className="bg-blue-50 border-blue-200">
+                    <Info className="w-4 h-4 text-blue-600" />
+                    <AlertTitle className="text-blue-800">What this creates</AlertTitle>
+                    <AlertDescription className="text-blue-700">
+                      <ul className="list-disc list-inside space-y-1 text-sm mt-2">
+                        <li><strong>5 auth tables</strong> &mdash; user, session, account, twoFactor, verification</li>
+                        <li><strong>3 system tables</strong> &mdash; user_preferences, module_settings, module_migrations</li>
+                        <li><strong>5 module tables</strong> &mdash; tasks, quotes, music_playlist, notepad, notepad_revisions</li>
+                        <li><strong>Row Level Security</strong> on all tables with appropriate policies</li>
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+
+                  {/* Footer */}
+                  <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
+                    <button
+                      onClick={goToPreviousStep}
+                      className="inline-flex items-center justify-center px-4 py-2 text-base font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
+                      style={{ borderRadius: '6px' }}
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={() => window.location.href = '/sign-in'}
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                      style={{ borderRadius: '6px' }}
+                    >
+                      I have completed all steps
+                      <Check className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
                 </div>
