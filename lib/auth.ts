@@ -28,6 +28,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export const auth = betterAuth({
+  baseURL: process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
   database: pool as any, // Will be null during build, but auth-helpers catches this
   trustedOrigins,
   emailAndPassword: {
