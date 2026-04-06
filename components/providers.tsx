@@ -115,6 +115,17 @@ export function Providers({
     if (!user) return
     const stored = localStorage.getItem('ari_welcome_profile')
     if (!stored) return
+    try {
+      const parsed = JSON.parse(stored)
+      const age = Date.now() - (parsed._savedAt || 0)
+      if (age >= 24 * 60 * 60 * 1000) {
+        localStorage.removeItem('ari_welcome_profile')
+        return
+      }
+    } catch {
+      localStorage.removeItem('ari_welcome_profile')
+      return
+    }
     fetch('/api/user-preferences', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

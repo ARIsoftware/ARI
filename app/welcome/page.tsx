@@ -81,7 +81,7 @@ const generateAuthSecret = () => {
   return btoa(String.fromCharCode(...array))
 }
 
-const STEP_ORDER = ["personal", "account", "supabase", "github", "resend", "vercel", "download"]
+const STEP_ORDER = ["personal", "account", "supabase", "resend", "github", "vercel", "download"]
 // Hidden: "local-env" step removed from flow since install script handles it. Content preserved below.
 
 export default function WelcomePage() {
@@ -138,11 +138,19 @@ export default function WelcomePage() {
         }
       } catch {}
 
-      // Check localStorage for in-progress edits
+      // Check localStorage for in-progress edits (expires after 24 hours)
       let localData: Record<string, string> | null = null
       try {
         const stored = localStorage.getItem('ari_welcome_profile')
-        if (stored) localData = JSON.parse(stored)
+        if (stored) {
+          const parsed = JSON.parse(stored)
+          const age = Date.now() - (parsed._savedAt || 0)
+          if (age < 24 * 60 * 60 * 1000) {
+            localData = parsed
+          } else {
+            localStorage.removeItem('ari_welcome_profile')
+          }
+        }
       } catch {}
 
       // Merge: localStorage edits take priority over DB data
@@ -183,6 +191,7 @@ export default function WelcomePage() {
         city: profileData.city || null,
         linkedin_url: profileData.linkedin_url || null,
         timezone: profileData.timezone,
+        _savedAt: Date.now(),
       }))
       setProfileSaved(true)
     } catch (error) {
@@ -1275,7 +1284,6 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                   <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
                     <div className="flex items-center gap-2.5">
                       <h2 className="text-2xl font-semibold text-zinc-900">Database &amp; Authentication</h2>
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-600 text-white">FREE</span>
                     </div>
                     <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
                       Configure your PostgreSQL database connection and authentication. You&apos;ll need API keys, the database connection string, and we&apos;ll generate a secure auth secret for you. Supabase offers a free tier. Please check their website for details.
@@ -1315,6 +1323,12 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           3
                         </span>
+                        <span className="text-black">Ensure <strong className="text-zinc-700">Enable Data API</strong> and <strong className="text-zinc-700">Enable automatic RLS</strong> are turned on in your project settings</span>
+                      </li>
+                      <li className="flex items-start gap-3 text-sm">
+                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                          4
+                        </span>
                         <span className="text-black">
                           Go to <a href="https://supabase.com/dashboard/project/_/settings/api" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
                             Project Settings &rarr; API
@@ -1324,7 +1338,7 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                       </li>
                       <li className="flex items-start gap-3 text-sm">
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
-                          4
+                          5
                         </span>
                         <span className="text-black">Copy each key below</span>
                       </li>
@@ -1431,7 +1445,7 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           3
                         </span>
-                        <span className="text-black">Select <strong className="text-zinc-700">URI</strong> tab and copy the connection string</span>
+                        <span className="text-black">Set Connection to <strong className="text-zinc-700">Transaction Pooler</strong>, enable <strong className="text-zinc-700">Use IPv4 connection</strong>, and select type <strong className="text-zinc-700">URI</strong></span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
