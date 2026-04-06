@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { createPortal } from "react-dom"
 import { StickyNote } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Notepad } from "./notepad"
@@ -17,6 +18,8 @@ import {
  */
 export default function NotepadTopBarIcon({ isDragMode = false }: { isDragMode?: boolean }) {
   const [isNotepadOpen, setIsNotepadOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
 
   // Apple-esque drag mode styling: subtle ring with glow effect
   const dragItemClass = isDragMode
@@ -43,7 +46,10 @@ export default function NotepadTopBarIcon({ isDragMode = false }: { isDragMode?:
         </Tooltip>
       </TooltipProvider>
 
-      <Notepad isOpen={isNotepadOpen} onClose={() => setIsNotepadOpen(false)} />
+      {mounted && createPortal(
+        <Notepad isOpen={isNotepadOpen} onClose={() => setIsNotepadOpen(false)} />,
+        document.body
+      )}
     </>
   )
 }
