@@ -692,20 +692,6 @@ export default function WelcomePage() {
                         </Alert>
                       )}
 
-                      <Alert className="bg-blue-50 border-blue-200">
-                        <Info className="w-4 h-4 text-blue-600" />
-                        <AlertDescription className="text-blue-700 text-sm">
-                          Your credentials are saved to <code className="bg-blue-100 px-1 rounded">.env.local</code> and used only to create your account when the database has no users.
-                          After your account is created, you can safely remove these lines from the file.
-                        </AlertDescription>
-                      </Alert>
-
-                      <Alert className="bg-slate-50 border-slate-200">
-                        <Shield className="w-4 h-4 text-slate-600" />
-                        <AlertDescription className="text-slate-700 text-sm">
-                          Two-factor authentication (Google Authenticator) is available. You can enable it after first login in <strong>Settings &gt; Security</strong>.
-                        </AlertDescription>
-                      </Alert>
                     </div>
 
                     {/* Footer */}
