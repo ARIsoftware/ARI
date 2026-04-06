@@ -35,9 +35,9 @@ All findings are normalized into three buckets. There is no "Critical" — anyth
 
 ## Execution: parallel subagents
 
-The audit is split across **3 Explore subagents launched in parallel** (single message, multiple tool calls). Each subagent is scoped to one concern and returns a structured list of findings. The main agent then dedupes, normalizes severities, and assembles the final report.
+When the agent runtime supports delegation, split the audit across **3 subagents launched in parallel**. Each subagent is scoped to one concern and returns a structured list of findings. The main agent then dedupes, normalizes severities, and assembles the final report.
 
-> If the running Claude Code version does not support parallel subagent dispatch (or the Agent tool is unavailable), fall back to running the three audits sequentially in the main thread. The audit must still complete — the parallelism is a performance optimization, not a hard requirement.
+> If the current agent runtime does not support subagent dispatch (or the delegation tool is unavailable), fall back to running the three audits sequentially in the main thread. The audit must still complete — the parallelism is a performance optimization, not a hard requirement.
 
 ### Subagent 1 — Security
 Scope: `[module]/api/**`, `[module]/components/**`, `[module]/lib/**`, `[module]/app/**`, `[module]/hooks/**`.

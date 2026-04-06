@@ -459,7 +459,7 @@ This repo supports both Claude Code and OpenAI Codex CLI. Because each tool look
 |---|---|---|---|
 | Project instructions | `CLAUDE.md` | `AGENTS.md` | — (edit both) |
 | Slash commands / prompts | `.claude/commands/*.md` | `.codex/prompts/*.md` | `.agents/commands/*.md` |
-| Skills | `.claude/skills/*` | *(no equivalent)* | `.agents/skills/*` |
+| Skills | `.claude/skills/*` | *(no equivalent)* | — (Claude-only) |
 
 - **When adding or editing a slash command:** update the file in `.agents/commands/`, `.claude/commands/`, AND `.codex/prompts/`. They must stay in sync manually.
 - **When editing project instructions:** update both `CLAUDE.md` and `AGENTS.md`.

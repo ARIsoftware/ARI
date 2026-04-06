@@ -33,7 +33,7 @@ Before doing anything:
 
 ## Postgres & Supabase Skills
 
-This project has Supabase agent-skills installed (at `.claude/skills/supabase/`). When creating database schemas, use the `supabase-postgres-best-practices` skill to look up PostgreSQL best practices for data types, indexes, constraints, and table design. These skills help ensure database tables follow PostgreSQL conventions and best practices.
+This project includes Supabase guidance in the shared skills/docs layer (`.agents/skills/` for the shared source, mirrored into Claude where applicable). When creating database schemas, use the `supabase-postgres-best-practices` skill to look up PostgreSQL best practices for data types, indexes, constraints, and table design. These references help ensure database tables follow PostgreSQL conventions and best practices.
 
 ## Questions to Ask
 

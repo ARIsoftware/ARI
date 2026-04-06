@@ -1,18 +1,21 @@
-# Claude Code Commands
+# ARI Custom Commands
 
-This document describes the custom Claude Code slash commands available for the ARI project. These commands provide automated workflows for common development tasks.
+This document describes the repo's custom prompt/command files for Claude Code and OpenAI Codex. These commands provide automated workflows for common development tasks.
 
-**Location**: Commands are defined in `/.claude/commands/`
+**Locations**:
+- Claude: `/.claude/commands/`
+- Codex: `/.codex/prompts/`
+- Shared source/reference copy: `/.agents/commands/`
 
 ---
 
 ## Available Commands
 
-### `/createmodule` - Create a New Module
+### `/ari-create-module` - Create a New Module
 
 **Purpose**: Scaffolds a new module in the `modules-custom` directory using the `hello-world` template.
 
-**Usage**: Type `/createmodule` in Claude Code to start the interactive wizard.
+**Usage**: Invoke `/ari-create-module` in Claude Code or the corresponding prompt in Codex to start the interactive wizard.
 
 **What it does**:
 1. Reads project documentation (`/docs/MODULES.md`, `/CLAUDE.md`)
@@ -45,11 +48,11 @@ This document describes the custom Claude Code slash commands available for the 
 
 ---
 
-### `/scanmodules` - Security Audit
+### `/ari-audit-module` - Security Audit
 
-**Purpose**: Performs a comprehensive static code security audit of all modules in `/modules-core` and `/modules-custom`.
+**Purpose**: Performs a comprehensive static code security audit of a single module in `/modules-core` or `/modules-custom`.
 
-**Usage**: Type `/scanmodules` in Claude Code to run the security scan.
+**Usage**: Invoke `/ari-audit-module <module-id>`.
 
 **What it checks** (16 categories):
 
@@ -90,9 +93,9 @@ This document describes the custom Claude Code slash commands available for the 
 ```
 
 **Summary Includes**:
-- Module-by-module findings with line numbers
-- Summary table with issue counts by severity
-- Top 5 priorities to address first
+- Findings for the requested module with line numbers
+- Severity-grouped issue list
+- Follow-up priorities
 - Security disclaimer
 
 **Important**: This is a static code review and does not replace penetration testing, runtime monitoring, or infrastructure security reviews. Always conduct manual security reviews for production applications.
@@ -101,11 +104,12 @@ This document describes the custom Claude Code slash commands available for the 
 
 ## Creating New Commands
 
-To create a new Claude Code command:
+To create a new shared command/prompt:
 
-1. Create a markdown file in `/.claude/commands/[command-name].md`
-2. Write instructions for Claude to follow when the command is invoked
-3. The command becomes available as `/[command-name]`
+1. Create or update the canonical copy in `/.agents/commands/[command-name].md`
+2. Copy the same content into `/.claude/commands/[command-name].md`
+3. Copy the same content into `/.codex/prompts/[command-name].md`
+4. Keep all three files in sync when making later edits
 
 **Tips for writing commands**:
 - Be specific about what files to read and in what order
