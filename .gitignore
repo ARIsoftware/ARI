@@ -32,6 +32,9 @@ Desktop.ini
 *_MIGRATION.md
 *_MIGRATION_*.md
 FIX_PLAN.md
+!.agents/commands/*.md
+!.claude/commands/*.md
+!.codex/prompts/*.md
 
 # IDE/Editor
 .idea/
