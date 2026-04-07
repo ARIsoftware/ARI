@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { createErrorResponse } from '@/lib/api-helpers'
+import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
+import { z } from 'zod'
 import { notepad, notepadRevisions } from '@/lib/db/schema'
-import { eq, desc, max, sql, and } from 'drizzle-orm'
+import { eq, max, sql, and } from 'drizzle-orm'
 
 const MAX_CONTENT_LENGTH = 6000
+
+const updateNotepadSchema = z.object({
+  content: z.string().max(MAX_CONTENT_LENGTH, `Content exceeds maximum length of ${MAX_CONTENT_LENGTH} characters`),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,32 +36,24 @@ export async function GET(request: NextRequest) {
       updated_at: data[0].updatedAt
     })
   } catch (err) {
-    console.error('API error:', err)
+    console.error('API error:', err instanceof Error ? err.message : err)
     return createErrorResponse('Internal server error', 500)
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { user, withRLS } = await getAuthenticatedUser()
+    const validation = await validateRequestBody(request, updateNotepadSchema)
+    if (!validation.success) {
+      return validation.response
+    }
+    const { content } = validation.data
 
+    const { user, withRLS } = await getAuthenticatedUser()
     if (!user || !withRLS) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    const body = await request.json()
-    const { content } = body
-
-    // Validate content length
-    if (content === undefined || content === null || typeof content !== 'string') {
-      return createErrorResponse('Content is required', 400)
-    }
-
-    if (content.length > MAX_CONTENT_LENGTH) {
-      return createErrorResponse(`Content exceeds maximum length of ${MAX_CONTENT_LENGTH} characters`, 400)
-    }
-
-    // Run independent queries in parallel for better performance
     const [maxRevisionResult, existingNotepad] = await Promise.all([
       withRLS((db) =>
         db.select({ maxRevision: max(notepadRevisions.revisionNumber) })
@@ -73,7 +70,6 @@ export async function POST(request: NextRequest) {
 
     const revisionNumber = (maxRevisionResult[0]?.maxRevision || 0) + 1
 
-    // Insert revision and update/create notepad in parallel
     const [newRevision] = await Promise.all([
       withRLS((db) =>
         db.insert(notepadRevisions)
@@ -104,7 +100,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(newRevision[0])
   } catch (err) {
-    console.error('API error:', err)
+    console.error('API error:', err instanceof Error ? err.message : err)
     return createErrorResponse('Internal server error', 500)
   }
 }
