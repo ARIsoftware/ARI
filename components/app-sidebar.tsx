@@ -3,7 +3,7 @@
 import type * as React from "react"
 import { useState, useEffect, useMemo } from "react"
 import { usePathname } from "next/navigation"
-import { ChevronRight } from "lucide-react"
+import { ChevronRight, Settings, Package } from "lucide-react"
 import {
   DndContext,
   PointerSensor,
@@ -450,6 +450,26 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         )}
       </SidebarContent>
       <SidebarFooter>
+        <div className="border-t border-sidebar-border/60 pt-1">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={pathname.startsWith('/modules')}>
+                <a href="/modules" className="flex items-center">
+                  <Package className="mr-2 size-4" />
+                  <span>Modules</span>
+                </a>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={pathname.startsWith('/settings')}>
+                <a href="/settings" className="flex items-center">
+                  <Settings className="mr-2 size-4" />
+                  <span>Settings</span>
+                </a>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </div>
         <div
           className="px-2 py-1 text-[10px] text-muted-foreground/60 font-mono select-none"
           title={`commit ${process.env.NEXT_PUBLIC_ARI_COMMIT}`}

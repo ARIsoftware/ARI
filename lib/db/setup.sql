@@ -123,6 +123,12 @@ CREATE TABLE IF NOT EXISTS "user_preferences" (
   CONSTRAINT "user_preferences_user_id_key" UNIQUE ("user_id")
 );
 
+-- Enable RLS on user_preferences. ARI enforces access at the application
+-- layer via withRLS(); the service role key bypasses RLS, so no policies are
+-- needed. This just prevents anon/authenticated roles from touching the table
+-- directly and silences the Supabase "unrestricted" warning.
+ALTER TABLE "user_preferences" ENABLE ROW LEVEL SECURITY;
+
 -- Table: module_settings
 CREATE TABLE IF NOT EXISTS "module_settings" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),

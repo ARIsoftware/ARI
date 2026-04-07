@@ -50,9 +50,9 @@ export default function DashboardPage() {
             <Button
               variant="outline"
               className="border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-600 dark:text-blue-300 dark:hover:bg-blue-900/30"
-              onClick={() => (window.location.href = '/settings')}
+              onClick={() => (window.location.href = '/modules')}
             >
-              Go to Settings to Enable Tasks
+              Go to the Module Library to Enable Tasks
             </Button>
           </AlertDescription>
         </Alert>

@@ -473,7 +473,6 @@ function CanvasInner({ board }: CanvasInnerProps) {
             </Button>
             <AlertDialogAction
               onClick={() => {
-                const href = pendingHref
                 saveBoard.mutate(
                   {
                     name: board.name,
@@ -495,7 +494,6 @@ function CanvasInner({ board }: CanvasInnerProps) {
                       setDirty(false)
                       dirtyRef.current = false
                       setPendingHref(null)
-                      if (href) window.location.href = href
                     },
                     onError: (err) => {
                       toast({ variant: 'destructive', title: 'Failed to save', description: err.message })
@@ -505,7 +503,7 @@ function CanvasInner({ board }: CanvasInnerProps) {
                 )
               }}
             >
-              Save & leave
+              Save
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
