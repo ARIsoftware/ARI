@@ -4,6 +4,16 @@ import { useState, useEffect } from "react"
 import { X, StickyNote, ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { getNotepad, saveNotepad, getNotepadRevisions, restoreNotepadRevision, NotepadRevision } from "@/modules/notepad/lib/notepad"
 
@@ -26,6 +36,7 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
   const [currentRevisionIndex, setCurrentRevisionIndex] = useState(-1) // -1 means viewing latest
   const [isViewingHistory, setIsViewingHistory] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
 
   // Load saved content and revisions from database when component mounts
   useEffect(() => {
@@ -52,8 +63,8 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
       }
     }
 
-    loadNotepad()
-  }, [])
+    if (isOpen) loadNotepad()
+  }, [isOpen])
 
   // Track changes
   useEffect(() => {
@@ -73,6 +84,9 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
       await saveNotepad(content)
       setSavedContent(content)
       setHasUnsavedChanges(false)
+      // Reload revisions so the history arrows reflect the new revision
+      const revisionsList = await getNotepadRevisions()
+      setRevisions(revisionsList)
       setCurrentRevisionIndex(-1)
       setIsViewingHistory(false)
       toast({
@@ -160,10 +174,40 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
 
   const handleClose = () => {
     if (hasUnsavedChanges) {
-      const confirmClose = window.confirm("You have unsaved changes. Are you sure you want to close?")
-      if (!confirmClose) return
+      setShowUnsavedDialog(true)
+      return
     }
     onClose()
+  }
+
+  const handleDiscardAndClose = () => {
+    setContent(savedContent)
+    setHasUnsavedChanges(false)
+    setShowUnsavedDialog(false)
+    onClose()
+  }
+
+  const handleSaveFromDialog = async () => {
+    setIsSaving(true)
+    try {
+      await saveNotepad(content)
+      setSavedContent(content)
+      setHasUnsavedChanges(false)
+      const revisionsList = await getNotepadRevisions()
+      setRevisions(revisionsList)
+      setCurrentRevisionIndex(-1)
+      setIsViewingHistory(false)
+      setShowUnsavedDialog(false)
+    } catch (error) {
+      console.error("Failed to save notepad:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save notepad. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const charactersLeft = MAX_CHARACTERS - content.length
@@ -322,6 +366,30 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
           </div>
         </div>
       </div>
+
+      <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes to your notepad. Save before closing?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay</AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={handleDiscardAndClose}
+              disabled={isSaving}
+            >
+              Discard
+            </Button>
+            <AlertDialogAction onClick={handleSaveFromDialog} disabled={isSaving}>
+              {isSaving ? "Saving..." : "Save"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }
