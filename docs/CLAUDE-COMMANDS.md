@@ -4,8 +4,10 @@ This document describes the repo's custom prompt/command files for Claude Code a
 
 **Locations**:
 - Claude: `/.claude/commands/`
-- Codex: `/.codex/prompts/`
+- Codex repo copy: `/.codex/prompts/`
 - Shared source/reference copy: `/.agents/commands/`
+
+For Codex CLI, the repo copy is not the live discovery location. Codex custom prompts are discovered from `~/.codex/prompts/`, invoked as `/prompts:<name>`, and are deprecated upstream in favor of skills.
 
 ---
 
@@ -15,7 +17,7 @@ This document describes the repo's custom prompt/command files for Claude Code a
 
 **Purpose**: Scaffolds a new module in the `modules-custom` directory using the `hello-world` template.
 
-**Usage**: Invoke `/ari-create-module` in Claude Code or the corresponding prompt in Codex to start the interactive wizard.
+**Usage**: Invoke `/ari-create-module` in Claude Code. In Codex, if you install the prompt into `~/.codex/prompts/ari-create-module.md`, invoke `/prompts:ari-create-module`.
 
 **What it does**:
 1. Reads project documentation (`/docs/MODULES.md`, `/CLAUDE.md`)
@@ -108,8 +110,9 @@ To create a new shared command/prompt:
 
 1. Create or update the canonical copy in `/.agents/commands/[command-name].md`
 2. Copy the same content into `/.claude/commands/[command-name].md`
-3. Copy the same content into `/.codex/prompts/[command-name].md`
-4. Keep all three files in sync when making later edits
+3. Copy the same content into `/.codex/prompts/[command-name].md` as the repo reference copy
+4. If you want Codex CLI to expose it as a slash command, also install it to `~/.codex/prompts/[command-name].md`
+5. Keep the shared copies in sync when making later edits
 
 **Tips for writing commands**:
 - Be specific about what files to read and in what order

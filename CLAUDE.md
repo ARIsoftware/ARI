@@ -458,10 +458,11 @@ This repo supports both Claude Code and OpenAI Codex CLI. Because each tool look
 | Concept | Claude path | Codex path | Shared source (informational) |
 |---|---|---|---|
 | Project instructions | `CLAUDE.md` | `AGENTS.md` | — (edit both) |
-| Slash commands / prompts | `.claude/commands/*.md` | `.codex/prompts/*.md` | `.agents/commands/*.md` |
+| Slash commands / prompts | `.claude/commands/*.md` | Repo copy only: `.codex/prompts/*.md` | `.agents/commands/*.md` |
 | Skills | `.claude/skills/*` | *(no equivalent)* | — (Claude-only) |
 
-- **When adding or editing a slash command:** update the file in `.agents/commands/`, `.claude/commands/`, AND `.codex/prompts/`. They must stay in sync manually.
+- **When adding or editing a shared command prompt:** update the file in `.agents/commands/`, `.claude/commands/`, AND the repo copy in `.codex/prompts/`. They must stay in sync manually.
+- **Important for Codex:** repo-local `.codex/prompts/` files are only portable reference copies. Codex custom prompts are loaded from `~/.codex/prompts/` and invoked as `/prompts:<name>`. Custom prompts are deprecated upstream in favor of skills.
 - **When editing project instructions:** update both `CLAUDE.md` and `AGENTS.md`.
 - Claude-only (no Codex equivalent): `.claude/agents/` subagents, `.claude/settings.local.json` permissions, hooks. Don't try to port these.
 - MCP servers: Claude reads project-level `.mcp.json`; Codex only reads global `~/.codex/config.toml`. If MCP servers are added, configure both separately.
