@@ -10,9 +10,10 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
 import { z } from 'zod'
 import { moduleSettings } from '@/lib/db/schema'
-import { eq, and, sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 
 /**
  * Settings Schema
@@ -20,7 +21,7 @@ import { eq, and, sql } from 'drizzle-orm'
  */
 const SettingsSchema = z.object({
   showAuthor: z.boolean().optional(),
-  cardsPerRow: z.number().min(1).max(4).optional(),
+  cardsPerRow: z.number().int().min(1).max(4).optional(),
   defaultSortOrder: z.enum(['asc', 'desc']).optional()
 })
 
@@ -57,11 +58,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data[0]?.settings || {})
 
   } catch (error) {
-    console.error('GET /api/modules/quotes/settings error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    console.error('GET /api/modules/quotes/settings error:', error instanceof Error ? error.message : error)
+    return createErrorResponse('Internal server error', 500)
   }
 }
 
@@ -74,30 +72,16 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
+    const validation = await validateRequestBody(request, SettingsSchema)
+    if (!validation.success) {
+      return validation.response
+    }
+
     const { user, withRLS } = await getAuthenticatedUser()
-
     if (!user || !withRLS) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+      return createErrorResponse('Unauthorized', 401)
     }
 
-    // Parse and validate body
-    const body = await request.json()
-    const parseResult = SettingsSchema.safeParse(body)
-
-    if (!parseResult.success) {
-      return NextResponse.json(
-        {
-          error: 'Validation failed',
-          details: parseResult.error.issues
-        },
-        { status: 400 }
-      )
-    }
-
-    // Check if settings exist (RLS filters automatically)
     const existing = await withRLS((db) =>
       db.select({ id: moduleSettings.id })
         .from(moduleSettings)
@@ -106,23 +90,21 @@ export async function PUT(request: NextRequest) {
     )
 
     if (existing.length > 0) {
-      // Update existing settings
       await withRLS((db) =>
         db.update(moduleSettings)
           .set({
-            settings: parseResult.data,
+            settings: validation.data,
             updatedAt: sql`timezone('utc'::text, now())`
           })
           .where(eq(moduleSettings.id, existing[0].id))
       )
     } else {
-      // Insert new settings
       await withRLS((db) =>
         db.insert(moduleSettings)
           .values({
             userId: user.id,
             moduleId: 'quotes',
-            settings: parseResult.data
+            settings: validation.data
           })
       )
     }
@@ -133,10 +115,7 @@ export async function PUT(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('PUT /api/modules/quotes/settings error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    console.error('PUT /api/modules/quotes/settings error:', error instanceof Error ? error.message : error)
+    return createErrorResponse('Internal server error', 500)
   }
 }

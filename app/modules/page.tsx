@@ -38,7 +38,6 @@ import {
   X,
 } from "lucide-react"
 import { LICENSE_CACHE_KEY, LIBRARY_CACHE_KEY, CACHE_TTL } from "@/lib/license-helpers"
-import { CORE_MODULE_IDS } from "@/lib/modules/constants"
 
 // Strip HTML tags from module names for safe display
 function sanitizeDisplayName(name: string): string {
@@ -669,7 +668,7 @@ export default function ModulesPage() {
       } else if (mod.isCustomModule) {
         badgeColor = '#07be07'
         badgeText = 'USER MODULE'
-      } else if (CORE_MODULE_IDS.includes(mod.id)) {
+      } else {
         badgeColor = '#000000'
         badgeText = 'CORE MODULE'
       }

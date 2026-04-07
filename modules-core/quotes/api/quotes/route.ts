@@ -25,12 +25,24 @@ const deleteQuerySchema = z.object({
   id: z.string().uuid('Invalid quote ID format')
 })
 
+const listQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+})
+
 export async function GET(request: NextRequest) {
   try {
-    const { user, withRLS } = await getAuthenticatedUser()
+    const { searchParams } = new URL(request.url)
+    const queryValidation = validateQueryParams(searchParams, listQuerySchema)
+    if (!queryValidation.success) {
+      return queryValidation.response
+    }
+    const limit = queryValidation.data.limit ?? 100
+    const offset = queryValidation.data.offset ?? 0
 
+    const { user, withRLS } = await getAuthenticatedUser()
     if (!user || !withRLS) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      return createErrorResponse('Authentication required', 401)
     }
 
     const data = await withRLS((db) =>
@@ -38,12 +50,14 @@ export async function GET(request: NextRequest) {
         .from(quotes)
         .where(eq(quotes.userId, user.id))
         .orderBy(desc(quotes.createdAt))
+        .limit(limit)
+        .offset(offset)
     )
 
     return NextResponse.json(toSnakeCase(data))
   } catch (err) {
-    console.error('API error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('API error:', err instanceof Error ? err.message : err)
+    return createErrorResponse('Internal server error', 500)
   }
 }
 
@@ -74,7 +88,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(toSnakeCase(data[0]), { status: 201 })
   } catch (err) {
-    console.error('API error:', err)
+    console.error('API error:', err instanceof Error ? err.message : err)
     return createErrorResponse('Internal server error', 500)
   }
 }
@@ -110,7 +124,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json(toSnakeCase(data[0]))
   } catch (err) {
-    console.error('API error:', err)
+    console.error('API error:', err instanceof Error ? err.message : err)
     return createErrorResponse('Internal server error', 500)
   }
 }
@@ -138,7 +152,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error('API error:', err)
+    console.error('API error:', err instanceof Error ? err.message : err)
     return createErrorResponse('Internal server error', 500)
   }
 }

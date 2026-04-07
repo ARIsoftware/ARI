@@ -27,11 +27,10 @@
     "coreFeatures": []
   },
   "database": {
-    "tables": ["quotes"],
-    "migrations": "./database/migrations"
+    "tables": ["quotes"]
   },
   "dashboard": {
-    "widgets": false,
+    "widgets": true,
     "widgetComponents": ["./components/widget.tsx"]
   },
   "settings": {
