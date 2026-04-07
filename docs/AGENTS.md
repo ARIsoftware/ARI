@@ -51,7 +51,7 @@
 - Supabase: maintain RLS. When changing policies, include scripts under `supabase/migrations/` and consider `scripts/check-all-rls-policies.sql` for validation.
 
 ## Environment & Secrets
-- Required: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (use new publishable key format `sb_publishable_...`), and `OPENAI_API_KEY` (chat route); server-only `SUPABASE_SECRET_KEY` powers backup exports/imports.
+- Required: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (use new publishable key format `sb_publishable_...`; legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` is still honored as a fallback), and `OPENAI_API_KEY` (chat route); server-only `SUPABASE_SECRET_KEY` powers backup exports/imports.
 - Optional: `ADMIN_USER_IDS` (comma-separated UUIDs) extends admin access; `ALLOW_BACKUP_OPERATIONS=true` must be set to run backups in production.
 - Keep service-role keys server-side—client code should rely on authenticated Supabase clients created via `lib/auth-helpers.ts` or `lib/supabase-auth.ts`.
 - **Note**: Use Supabase's new publishable key format (`sb_publishable_...`) instead of legacy JWT anon keys.
@@ -74,7 +74,7 @@ SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_URL=
 POSTGRES_URL_NON_POOLING=
 SUPABASE_JWT_SECRET=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=  # Use new publishable key format: sb_publishable_...
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=  # Use new publishable key format: sb_publishable_... (legacy NEXT_PUBLIC_SUPABASE_ANON_KEY still honored as fallback)
 POSTGRES_PASSWORD=
 POSTGRES_DATABASE=
 SUPABASE_ANON_KEY=  # Use new publishable key format: sb_publishable_...

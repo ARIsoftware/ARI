@@ -312,7 +312,7 @@ export default function WelcomePage() {
     lines.push(`DATABASE_URL=${formData.databaseUrl}`)
     lines.push("DATABASE_POOL_MAX=3")
     lines.push(`NEXT_PUBLIC_SUPABASE_URL=${formData.supabaseUrl}`)
-    lines.push(`NEXT_PUBLIC_SUPABASE_ANON_KEY=${formData.supabaseAnonKey}`)
+    lines.push(`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${formData.supabaseAnonKey}`)
     lines.push(`SUPABASE_SECRET_KEY=${formData.supabaseSecretKey}`)
     lines.push("")
 

@@ -14,7 +14,7 @@ export default function SimpleTestPage() {
       try {
         // Log environment
         logs.push(`URL: ${process.env.NEXT_PUBLIC_SUPABASE_URL}`)
-        logs.push(`Has Key: ${!!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`)
+        logs.push(`Has Key: ${!!(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)}`)
 
         // Create client
         logs.push('Creating Supabase client...')
@@ -25,7 +25,7 @@ export default function SimpleTestPage() {
         logs.push('Testing direct REST API...')
         const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/`, {
           headers: {
-            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            'apikey': (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)!,
           }
         })
         logs.push(`REST API response: ${response.status} ${response.statusText}`)

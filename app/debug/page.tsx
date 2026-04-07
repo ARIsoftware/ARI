@@ -1262,7 +1262,7 @@ export default function DatabaseTestPage() {
         updateTestResult('Environment Variables', { status: 'testing' })
         try {
           const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-          const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+          const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
           if (!supabaseUrl || !supabaseAnonKey) {
             throw new Error('Missing environment variables')
@@ -1735,7 +1735,7 @@ export default function DatabaseTestPage() {
     console.log('🚀 Database Test Page loaded')
     console.log('Environment:', {
       url: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + '...',
-      hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      hasAnonKey: !!(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
     })
   }, [])
 
