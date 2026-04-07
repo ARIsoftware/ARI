@@ -11,6 +11,7 @@ import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
 import { createDbClient } from '@/lib/db-supabase'
 import { loadModules } from './module-loader'
+import { runModuleSchemaInstall } from './schema-installer'
 import type { ModuleMetadata, ModuleSettings } from './module-types'
 
 /**
@@ -176,6 +177,18 @@ export async function setModuleEnabled(
     return {
       success: false,
       error: `Module '${moduleId}' not found`
+    }
+  }
+
+  // When enabling, run the module's schema.sql to provision its tables.
+  // This is idempotent — re-runs are no-ops. uninstall.sql is never run.
+  if (enabled) {
+    const installResult = await runModuleSchemaInstall(moduleId)
+    if (!installResult.ok) {
+      return {
+        success: false,
+        error: `Schema install failed: ${installResult.error}`
+      }
     }
   }
 

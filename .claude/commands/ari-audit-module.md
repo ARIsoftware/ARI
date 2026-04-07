@@ -227,11 +227,26 @@ Every confirmed hardcoded secret must appear in the report with file + line and 
 - [ ] No imports reaching into a sibling module's internals — **High**
 
 ### B3. Install-time SQL (user-emphasized)
-- [ ] Module has either `database/schema.sql` or `database/schema.ts` — **Medium** if missing (only required if the module has DB tables)
-- [ ] If `schema.sql` exists, it is picked up by the module loader at install time (verify by reading `lib/modules/`) — **High** if not loaded
-- [ ] **No `DROP TABLE`, `DROP SCHEMA`, `DROP DATABASE`, or `TRUNCATE`** anywhere in the module's `.sql` files — **High**
-- [ ] **No `DELETE FROM ...` without a `WHERE` clause** — **High**
-- [ ] All `CREATE TABLE` statements use `IF NOT EXISTS` (idempotent install) — **Medium**
+
+**Required database files.** Every module that owns tables must ship all three of these files inside `[module]/database/`:
+- [ ] `database/schema.sql` — the canonical CREATE TABLE / CREATE INDEX / RLS policy script that the module loader runs at install time. **High** if missing.
+- [ ] `database/schema.ts` — the Drizzle ORM table definitions used by API routes via `withRLS()`. **High** if missing.
+- [ ] `database/uninstall.sql` — a manual-only teardown script (DROP TABLE statements). This file is **never executed automatically**; it exists only so a user can manually run it from the Supabase SQL editor if they want to fully remove the module's tables. **Medium** if missing.
+
+**Install SQL must run every time the module is enabled.** The module loader is expected to execute `schema.sql` on every enable (not just first install), so the script must be fully idempotent. Verify by reading `lib/modules/module-loader.ts`:
+- [ ] Confirm `schema.sql` is executed on enable, not gated behind a "first install only" check. **High** if not executed on enable.
+- [ ] Every `CREATE TABLE` uses `IF NOT EXISTS` so re-running the script on an already-installed module is a no-op. **High** if any CREATE TABLE is non-idempotent.
+- [ ] Every `CREATE INDEX` uses `IF NOT EXISTS`. **Medium** if missing.
+- [ ] Every `CREATE POLICY` is wrapped in `DROP POLICY IF EXISTS ...; CREATE POLICY ...` (or equivalent) so re-runs don't fail on duplicate policies. **Medium** if missing.
+
+**Install SQL must never be destructive.** The install script (`schema.sql`) and any other `.sql` file the module loader executes must NOT contain anything that can destroy user data:
+- [ ] **No `DROP TABLE`, `DROP SCHEMA`, `DROP DATABASE`, `DROP INDEX`, or `TRUNCATE`** anywhere in `schema.sql` or any auto-loaded SQL file. **High** — re-enabling the module would wipe user data.
+- [ ] **No `DELETE FROM ...` without a `WHERE` clause** in any auto-loaded SQL file. **High**.
+- [ ] **No `ALTER TABLE ... DROP COLUMN`** in `schema.sql`. **High** — would silently lose user data on every enable.
+
+**`uninstall.sql` is manual-only.** This file is allowed (and expected) to contain `DROP TABLE` statements, but it must never be wired into the module loader, an enable hook, a disable hook, or any API route:
+- [ ] Confirm `uninstall.sql` is NOT referenced from `lib/modules/module-loader.ts`, `module.json`, or any code path that runs on enable/disable. **High** if it is auto-executed anywhere.
+- [ ] The file should be clearly labeled at the top as a manual-only teardown script (comment block explaining the user must run it themselves in the Supabase SQL editor). **Low** if the warning comment is missing.
 - [ ] All `CREATE INDEX` statements use `IF NOT EXISTS` — **Low**
 - [ ] Every table has `user_id TEXT NOT NULL` — **High**
 - [ ] Every table has `created_at` and `updated_at` (TIMESTAMPTZ) — **Low**

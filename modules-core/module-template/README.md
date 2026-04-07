@@ -59,18 +59,15 @@ This module is already installed in the `/modules` directory. To use it:
 
 This module requires one database table: `module_template_entries`
 
-### Applying Migrations
+### Automatic install on enable
 
-1. Go to Settings → Features in ARI
-2. Find "Module Template" module
-3. Click "View SQL" or "Copy to Clipboard"
-4. Open your Supabase SQL Editor
-5. Paste and run the SQL
-6. Return to ARI and click "Mark as Applied"
+`database/schema.sql` is executed automatically by the module loader every time the module is enabled. The script is fully idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, `DROP POLICY IF EXISTS … CREATE POLICY …`), so re-enabling is a safe no-op. You do not need to paste the SQL into Supabase manually.
 
-### Manual Migration (Alternative)
+To ship a schema change in a module update, edit `schema.sql` additively (`ALTER TABLE … ADD COLUMN IF NOT EXISTS …`) and update `schema.ts` to match. The next enable will pick up the change.
 
-Copy the SQL from `database/schema.sql` and run it in Supabase SQL Editor.
+### Manual uninstall
+
+`database/uninstall.sql` is **never** run by the module loader. It exists only as a manual teardown script — open it in the Supabase SQL editor and run it yourself if you want to permanently drop this module's tables.
 
 ## File Structure
 
@@ -94,9 +91,9 @@ modules/module-template/
 │   └── utils.ts               # Helper functions
 │
 ├── database/                   # Database schemas
-│   ├── schema.sql             # Table definitions
-│   └── migrations/
-│       └── 001_example.sql    # Example migration
+│   ├── schema.sql             # Auto-run on every module enable (idempotent)
+│   ├── schema.ts              # Drizzle ORM definitions (runtime source of truth)
+│   └── uninstall.sql          # MANUAL ONLY — never auto-runs
 │
 └── types/                      # TypeScript types
     └── index.ts               # Module type definitions

@@ -184,12 +184,20 @@ When approved, create the module following this order:
      },
      ```
    - See existing modules in that file for patterns (`modules-core/module-template`, tasks, etc.)
-6. **Create database schema** in `[module-folder]/database/schema.sql` if tables needed (this path is git-tracked so the module is fully portable as a self-contained folder)
-   - Use the `supabase-postgres-best-practices` skill to verify best practices for data types, indexes, and constraints
-   - Use `TEXT` type for `user_id` (matches Better Auth)
-   - **MUST include `ALTER TABLE [table_name] ENABLE ROW LEVEL SECURITY;`** for every table
-   - **MUST include RLS policies** that restrict SELECT/INSERT/UPDATE/DELETE to rows matching the authenticated user's `user_id`
-   - Do NOT add `auth.uid()` RLS policies (Better Auth doesn't use this) — use application-level enforcement via `withRLS()`
+6. **Create database files** if the module owns tables. **All three files are required** and live in `[module-folder]/database/`:
+   - **`schema.sql`** — auto-executed by the module loader on **every** module enable. **Must be fully idempotent**:
+     - Every `CREATE TABLE` uses `IF NOT EXISTS`
+     - Every `CREATE INDEX` uses `IF NOT EXISTS`
+     - Every policy is wrapped: `DROP POLICY IF EXISTS … ON <table>; CREATE POLICY …`
+     - Schema additions in updates use `ALTER TABLE … ADD COLUMN IF NOT EXISTS …`
+     - **Must contain NO** `DROP TABLE`, `DROP SCHEMA`, `DROP DATABASE`, `TRUNCATE`, `ALTER TABLE … DROP COLUMN`, or unconditional `DELETE`. The runtime installer at `lib/modules/schema-installer.ts` refuses to execute files containing any of these tokens.
+     - Use `TEXT` type for `user_id` (matches Better Auth)
+     - Every table must include `ALTER TABLE [table] ENABLE ROW LEVEL SECURITY;` and SELECT/INSERT/UPDATE/DELETE policies referencing `current_setting('app.current_user_id')`
+     - Do NOT use `auth.uid()` (Better Auth doesn't use this) — use application-level enforcement via `withRLS()`
+     - Use the `supabase-postgres-best-practices` skill to verify best practices for data types, indexes, and constraints
+   - **`schema.ts`** — Drizzle ORM definitions used by API routes via `withRLS()`. The runtime source of truth. Must mirror `schema.sql` exactly.
+   - **`uninstall.sql`** — manual-only teardown script containing only `DROP TABLE IF EXISTS … CASCADE` statements (drop in reverse FK order) plus the standard header warning. **This file is NEVER auto-run** by the module loader, an enable hook, a disable hook, or any API route. It exists only so a user can manually drop the module's tables from the Supabase SQL editor.
+   - See `modules-core/module-template/database/` for the canonical example of all three files.
 7. **Add Drizzle schema definition** to `/lib/db/schema/schema.ts` (REQUIRED for API routes to work)
    - See existing table definitions in that file for examples
    - Use `text("user_id")` for the user_id column
@@ -210,7 +218,7 @@ When approved, create the module following this order:
     - Create route handler using `createPublicRouteHandler` wrapper
     - Document the required environment variable for the secret
     - See `/docs/MODULES.md` section 7.5 for detailed guidance
-12. Ask the user for permission to execute the .sql file, or ask if they want to run the .SQL statements themselves.
+12. **Database tables provision automatically.** Because `schema.sql` is auto-run by the module loader on every enable, you do NOT need to ask the user to run any SQL manually. The user only needs to enable the new module from Settings → Features and the tables will be created. (Exception: if the user wants to fully remove the module's tables later, they can manually run `uninstall.sql` from Supabase.)
 
 ## Data Fetching Best Practices
 
@@ -625,7 +633,9 @@ Before marking complete, verify:
 - [ ] All API routes use `withRLS()` helper (NOT Supabase client) - see `modules-core/module-template/api/data/route.ts`
 - [ ] **If module has API routes**: Routes registered in `MODULE_API_ROUTES` in `/app/api/modules/[module]/[[...path]]/route.ts`
 - [ ] Drizzle schema added to `/lib/db/schema/schema.ts` (required for API routes)
-- [ ] Database `database/schema.sql` created inside the module folder (git-tracked, keeps module self-contained)
+- [ ] **Database `database/schema.sql` created** inside the module folder, fully idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, `DROP POLICY IF EXISTS … CREATE POLICY …`, `ALTER TABLE … ADD COLUMN IF NOT EXISTS`)
+- [ ] **`schema.sql` contains NO `DROP TABLE`, `DROP SCHEMA`, `DROP DATABASE`, `TRUNCATE`, `ALTER TABLE … DROP COLUMN`, or unconditional `DELETE`** (the runtime installer will refuse to execute the file)
+- [ ] **Database `database/uninstall.sql` created** with the standard manual-only header and `DROP TABLE IF EXISTS … CASCADE` for every table the module owns (drop in reverse FK order)
 - [ ] TanStack Query hooks created inside the module directory (`hooks/use-[module-name].ts`) — NOT in `/lib/hooks/`
 - [ ] **All imports use `@/modules/` alias** (NOT `@/modules-custom/` or `@/modules-core/`)
 - [ ] Page uses TanStack Query hooks (not manual useState/useEffect/fetch)

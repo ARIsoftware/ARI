@@ -305,9 +305,10 @@ END $$;
     /components/        # Module components
     /hooks/             # Module-specific TanStack Query hooks
     /database/          # Database files
-      schema.sql        # SQL schema for reference/setup
+      schema.sql        # Idempotent SQL — auto-run on every module enable
       schema.ts         # Drizzle table definitions (auto-included in barrel)
       relations.ts      # Drizzle relations (optional, auto-included)
+      uninstall.sql     # Manual-only teardown script — never auto-runs
 
 /modules-custom         # User-created modules (same structure as modules-core)
 ```

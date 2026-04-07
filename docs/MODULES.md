@@ -511,9 +511,9 @@ Modules can add a quick access icon to the global top navigation bar:
     ]
     ```
 
-- [ ] **4.9 Apply database migrations** (if needed)
+- [ ] **4.9 Database tables provision automatically**
 
-  Copy SQL from `modules/my-module/database/schema.sql` to Supabase SQL Editor and run.
+  `database/schema.sql` is executed by the module loader on every enable, so you do NOT need to copy SQL into Supabase manually. Just enable the module in Settings → Features and the tables will be created. The script must be fully idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, `DROP POLICY IF EXISTS … CREATE POLICY …`) and must contain no `DROP TABLE`/`TRUNCATE`/`DROP COLUMN` statements — the runtime installer rejects files containing those tokens.
 
 - [ ] **4.10 Test the module** - See [QA Verification Steps](#11-qa-verification-steps)
 
@@ -639,14 +639,19 @@ mkdir -p modules-core/[module-id]/{app,api/data,api/settings,components,lib,type
 
 #### Step 5.3.2: Database Schema (`database/schema.sql`)
 
-- [ ] Copy existing table creation SQL
-- [ ] Add comprehensive header comment
-- [ ] Document each column with inline comments
-- [ ] Ensure RLS is enabled
-- [ ] Include all 4 RLS policies (SELECT, INSERT, UPDATE, DELETE)
+`schema.sql` is **auto-executed by the module loader on every enable**, so it must be fully idempotent. It is NOT a manual setup file.
+
+- [ ] Every `CREATE TABLE` uses `IF NOT EXISTS`
+- [ ] Every `CREATE INDEX` uses `IF NOT EXISTS`
+- [ ] Every policy is wrapped: `DROP POLICY IF EXISTS … ON <table>; CREATE POLICY …`
+- [ ] Schema additions in updates use `ALTER TABLE … ADD COLUMN IF NOT EXISTS …`
+- [ ] **Contains no** `DROP TABLE`, `DROP SCHEMA`, `DROP DATABASE`, `TRUNCATE`, `ALTER TABLE … DROP COLUMN`, or unconditional `DELETE` (the runtime installer at `lib/modules/schema-installer.ts` will refuse to execute the file)
+- [ ] Ensure RLS is enabled on every table
+- [ ] Include all 4 RLS policies (SELECT, INSERT, UPDATE, DELETE) referencing `current_setting('app.current_user_id')`
 - [ ] Add indexes for common queries
-- [ ] Add triggers (e.g., updated_at auto-update)
-- [ ] Include verification queries at bottom
+- [ ] Document each column with inline comments
+
+A sibling file `database/uninstall.sql` should also exist with `DROP TABLE IF EXISTS … CASCADE` statements for every table the module owns. **`uninstall.sql` is never auto-run** — it's a manual teardown the user can run themselves in the Supabase SQL editor.
 
 **RLS Policy Pattern:**
 ```sql
