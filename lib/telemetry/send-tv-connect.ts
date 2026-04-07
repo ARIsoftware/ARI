@@ -4,12 +4,6 @@ import { getAriInstance } from "./instance"
 const PLATFORM: "darwin" | "linux" | "windows" =
   process.platform === "darwin" ? "darwin" : process.platform === "win32" ? "windows" : "linux"
 
-/** Strip "+sha" suffix from NEXT_PUBLIC_ARI_VERSION (e.g. "0.1.0+d1163bd" -> "0.1.0"). */
-function getSemver(): string {
-  const raw = process.env.NEXT_PUBLIC_ARI_VERSION || "0.0.0"
-  return raw.split("+")[0]
-}
-
 /**
  * Fire-and-forget anonymous install ping. Sent once per server process startup
  * (from instrumentation.ts) when telemetry is enabled. Swallows all errors.
@@ -22,7 +16,7 @@ export async function sendTvConnect(): Promise<void> {
     const payload = {
       instance_id: instance.id,
       event: "ari_started" as const,
-      ari_version: getSemver(),
+      ari_version: process.env.NEXT_PUBLIC_ARI_VERSION || "0.0.0",
       platform: PLATFORM,
       timestamp: new Date().toISOString(),
     }
