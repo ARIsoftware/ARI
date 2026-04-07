@@ -450,7 +450,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         )}
       </SidebarContent>
       <SidebarFooter>
-        <div className="border-t border-sidebar-border/60 pt-1">
+        <div className="border-t border-sidebar-border/60 pt-[15px]">
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={pathname.startsWith('/modules')}>
