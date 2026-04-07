@@ -294,6 +294,73 @@ CREATE POLICY "notepad_revisions_rls_update" ON "notepad_revisions" FOR UPDATE T
 CREATE POLICY "notepad_revisions_rls_delete" ON "notepad_revisions" FOR DELETE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
+-- Table: brainstorm_boards
+DROP TABLE IF EXISTS "brainstorm_edges" CASCADE;
+DROP TABLE IF EXISTS "brainstorm_nodes" CASCADE;
+DROP TABLE IF EXISTS "brainstorm_boards" CASCADE;
+CREATE TABLE "brainstorm_boards" (
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "user_id" TEXT NOT NULL REFERENCES public."user"("id") ON DELETE CASCADE,
+  "name" VARCHAR(200) NOT NULL,
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY ("id")
+);
+ALTER TABLE "brainstorm_boards" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "brainstorm_boards_rls_select" ON "brainstorm_boards" FOR SELECT TO public
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY "brainstorm_boards_rls_insert" ON "brainstorm_boards" FOR INSERT TO public
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY "brainstorm_boards_rls_update" ON "brainstorm_boards" FOR UPDATE TO public
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY "brainstorm_boards_rls_delete" ON "brainstorm_boards" FOR DELETE TO public
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+
+-- Table: brainstorm_nodes
+CREATE TABLE "brainstorm_nodes" (
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "board_id" UUID NOT NULL REFERENCES "brainstorm_boards"("id") ON DELETE CASCADE,
+  "user_id" TEXT NOT NULL REFERENCES public."user"("id") ON DELETE CASCADE,
+  "text" TEXT NOT NULL DEFAULT '',
+  "x" DOUBLE PRECISION NOT NULL DEFAULT 0,
+  "y" DOUBLE PRECISION NOT NULL DEFAULT 0,
+  "color" VARCHAR(32) NOT NULL DEFAULT 'slate',
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY ("id")
+);
+ALTER TABLE "brainstorm_nodes" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "brainstorm_nodes_rls_select" ON "brainstorm_nodes" FOR SELECT TO public
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY "brainstorm_nodes_rls_insert" ON "brainstorm_nodes" FOR INSERT TO public
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY "brainstorm_nodes_rls_update" ON "brainstorm_nodes" FOR UPDATE TO public
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY "brainstorm_nodes_rls_delete" ON "brainstorm_nodes" FOR DELETE TO public
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+
+-- Table: brainstorm_edges
+CREATE TABLE "brainstorm_edges" (
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "board_id" UUID NOT NULL REFERENCES "brainstorm_boards"("id") ON DELETE CASCADE,
+  "user_id" TEXT NOT NULL REFERENCES public."user"("id") ON DELETE CASCADE,
+  "source_node_id" UUID NOT NULL REFERENCES "brainstorm_nodes"("id") ON DELETE CASCADE,
+  "target_node_id" UUID NOT NULL REFERENCES "brainstorm_nodes"("id") ON DELETE CASCADE,
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY ("id"),
+  CONSTRAINT "brainstorm_edges_no_self_loop" CHECK (source_node_id <> target_node_id),
+  CONSTRAINT "brainstorm_edges_unique_pair" UNIQUE (board_id, source_node_id, target_node_id)
+);
+ALTER TABLE "brainstorm_edges" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "brainstorm_edges_rls_select" ON "brainstorm_edges" FOR SELECT TO public
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY "brainstorm_edges_rls_insert" ON "brainstorm_edges" FOR INSERT TO public
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY "brainstorm_edges_rls_update" ON "brainstorm_edges" FOR UPDATE TO public
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY "brainstorm_edges_rls_delete" ON "brainstorm_edges" FOR DELETE TO public
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+
 -- ================================================================
 -- ARI INSTANCE (per-install identity for anonymous telemetry)
 -- ================================================================
@@ -340,6 +407,14 @@ CREATE INDEX IF NOT EXISTS idx_music_playlist_user_id ON "music_playlist"("user_
 CREATE INDEX IF NOT EXISTS idx_music_playlist_user_position ON "music_playlist"("user_id", "position" ASC);
 CREATE INDEX IF NOT EXISTS idx_notepad_user_id ON "notepad"("user_id");
 CREATE INDEX IF NOT EXISTS idx_notepad_revisions_user_id ON "notepad_revisions"("user_id");
+CREATE INDEX IF NOT EXISTS idx_brainstorm_boards_user_id ON "brainstorm_boards"("user_id");
+CREATE INDEX IF NOT EXISTS idx_brainstorm_boards_user_updated ON "brainstorm_boards"("user_id", "updated_at" DESC);
+CREATE INDEX IF NOT EXISTS idx_brainstorm_nodes_board_id ON "brainstorm_nodes"("board_id");
+CREATE INDEX IF NOT EXISTS idx_brainstorm_nodes_user_board ON "brainstorm_nodes"("user_id", "board_id");
+CREATE INDEX IF NOT EXISTS idx_brainstorm_edges_board_id ON "brainstorm_edges"("board_id");
+CREATE INDEX IF NOT EXISTS idx_brainstorm_edges_user_board ON "brainstorm_edges"("user_id", "board_id");
+CREATE INDEX IF NOT EXISTS idx_brainstorm_edges_source ON "brainstorm_edges"("source_node_id");
+CREATE INDEX IF NOT EXISTS idx_brainstorm_edges_target ON "brainstorm_edges"("target_node_id");
 
 SET session_replication_role = 'origin';
 
