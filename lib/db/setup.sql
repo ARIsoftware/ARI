@@ -24,8 +24,7 @@ $$ LANGUAGE sql STABLE;
 -- ================================================================
 
 -- Table: user
-DROP TABLE IF EXISTS "user" CASCADE;
-CREATE TABLE "user" (
+CREATE TABLE IF NOT EXISTS "user" (
   "id" TEXT NOT NULL,
   "name" TEXT,
   "email" TEXT NOT NULL,
@@ -43,8 +42,7 @@ ALTER TABLE "user" ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "user_rls_all" ON "user" FOR ALL TO public USING (true) WITH CHECK (true);
 
 -- Table: session
-DROP TABLE IF EXISTS "session" CASCADE;
-CREATE TABLE "session" (
+CREATE TABLE IF NOT EXISTS "session" (
   "id" TEXT NOT NULL,
   "userId" TEXT NOT NULL,
   "token" TEXT NOT NULL,
@@ -60,8 +58,7 @@ ALTER TABLE "session" ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "session_rls_all" ON "session" FOR ALL TO public USING (true) WITH CHECK (true);
 
 -- Table: account
-DROP TABLE IF EXISTS "account" CASCADE;
-CREATE TABLE "account" (
+CREATE TABLE IF NOT EXISTS "account" (
   "id" TEXT NOT NULL,
   "userId" TEXT NOT NULL,
   "accountId" TEXT NOT NULL,
@@ -81,8 +78,7 @@ ALTER TABLE "account" ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "account_rls_all" ON "account" FOR ALL TO public USING (true) WITH CHECK (true);
 
 -- Table: twoFactor
-DROP TABLE IF EXISTS "twoFactor" CASCADE;
-CREATE TABLE "twoFactor" (
+CREATE TABLE IF NOT EXISTS "twoFactor" (
   "id" TEXT NOT NULL DEFAULT gen_random_uuid(),
   "secret" TEXT NOT NULL,
   "backupCodes" TEXT NOT NULL,
@@ -93,8 +89,7 @@ ALTER TABLE "twoFactor" ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "twoFactor_rls_all" ON "twoFactor" FOR ALL TO public USING (true) WITH CHECK (true);
 
 -- Table: verification
-DROP TABLE IF EXISTS "verification" CASCADE;
-CREATE TABLE "verification" (
+CREATE TABLE IF NOT EXISTS "verification" (
   "id" TEXT NOT NULL,
   "identifier" TEXT NOT NULL,
   "value" TEXT NOT NULL,
@@ -111,8 +106,7 @@ CREATE POLICY "verification_rls_all" ON "verification" FOR ALL TO public USING (
 -- ================================================================
 
 -- Table: user_preferences
-DROP TABLE IF EXISTS "user_preferences" CASCADE;
-CREATE TABLE "user_preferences" (
+CREATE TABLE IF NOT EXISTS "user_preferences" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "user_id" TEXT NOT NULL,
   "name" VARCHAR(255),
@@ -130,8 +124,7 @@ CREATE TABLE "user_preferences" (
 );
 
 -- Table: module_settings
-DROP TABLE IF EXISTS "module_settings" CASCADE;
-CREATE TABLE "module_settings" (
+CREATE TABLE IF NOT EXISTS "module_settings" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "user_id" TEXT NOT NULL,
   "module_id" VARCHAR(255) NOT NULL,
@@ -153,8 +146,7 @@ CREATE POLICY "module_settings_rls_delete" ON "module_settings" FOR DELETE TO pu
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 -- Table: module_migrations
-DROP TABLE IF EXISTS "module_migrations" CASCADE;
-CREATE TABLE "module_migrations" (
+CREATE TABLE IF NOT EXISTS "module_migrations" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "module_id" VARCHAR(255) NOT NULL,
   "migration_name" VARCHAR(255) NOT NULL,
@@ -171,8 +163,7 @@ CREATE POLICY "module_migrations_rls_all" ON "module_migrations" FOR ALL TO publ
 -- ================================================================
 
 -- Table: tasks
-DROP TABLE IF EXISTS "tasks" CASCADE;
-CREATE TABLE "tasks" (
+CREATE TABLE IF NOT EXISTS "tasks" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "title" TEXT NOT NULL,
   "assignees" TEXT[],
@@ -211,8 +202,7 @@ CREATE POLICY "tasks_rls_delete" ON "tasks" FOR DELETE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 -- Table: quotes
-DROP TABLE IF EXISTS "quotes" CASCADE;
-CREATE TABLE "quotes" (
+CREATE TABLE IF NOT EXISTS "quotes" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "user_id" TEXT NOT NULL,
   "quote" TEXT NOT NULL,
@@ -232,8 +222,7 @@ CREATE POLICY "quotes_rls_delete" ON "quotes" FOR DELETE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 -- Table: music_playlist
-DROP TABLE IF EXISTS "music_playlist" CASCADE;
-CREATE TABLE "music_playlist" (
+CREATE TABLE IF NOT EXISTS "music_playlist" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "user_id" TEXT NOT NULL,
   "youtube_video_id" TEXT NOT NULL,
@@ -254,8 +243,7 @@ CREATE POLICY "music_playlist_rls_delete" ON "music_playlist" FOR DELETE TO publ
   USING (user_id = (SELECT current_setting('app.current_user_id')));
 
 -- Table: notepad
-DROP TABLE IF EXISTS "notepad" CASCADE;
-CREATE TABLE "notepad" (
+CREATE TABLE IF NOT EXISTS "notepad" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "user_id" TEXT NOT NULL,
   "content" TEXT NOT NULL,
@@ -275,8 +263,7 @@ CREATE POLICY "notepad_rls_delete" ON "notepad" FOR DELETE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 -- Table: notepad_revisions
-DROP TABLE IF EXISTS "notepad_revisions" CASCADE;
-CREATE TABLE "notepad_revisions" (
+CREATE TABLE IF NOT EXISTS "notepad_revisions" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "user_id" TEXT NOT NULL,
   "content" TEXT NOT NULL,
@@ -295,10 +282,7 @@ CREATE POLICY "notepad_revisions_rls_delete" ON "notepad_revisions" FOR DELETE T
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 -- Table: brainstorm_boards
-DROP TABLE IF EXISTS "brainstorm_edges" CASCADE;
-DROP TABLE IF EXISTS "brainstorm_nodes" CASCADE;
-DROP TABLE IF EXISTS "brainstorm_boards" CASCADE;
-CREATE TABLE "brainstorm_boards" (
+CREATE TABLE IF NOT EXISTS "brainstorm_boards" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "user_id" TEXT NOT NULL REFERENCES public."user"("id") ON DELETE CASCADE,
   "name" VARCHAR(200) NOT NULL,
@@ -317,7 +301,7 @@ CREATE POLICY "brainstorm_boards_rls_delete" ON "brainstorm_boards" FOR DELETE T
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 -- Table: brainstorm_nodes
-CREATE TABLE "brainstorm_nodes" (
+CREATE TABLE IF NOT EXISTS "brainstorm_nodes" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "board_id" UUID NOT NULL REFERENCES "brainstorm_boards"("id") ON DELETE CASCADE,
   "user_id" TEXT NOT NULL REFERENCES public."user"("id") ON DELETE CASCADE,
@@ -340,7 +324,7 @@ CREATE POLICY "brainstorm_nodes_rls_delete" ON "brainstorm_nodes" FOR DELETE TO 
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 -- Table: brainstorm_edges
-CREATE TABLE "brainstorm_edges" (
+CREATE TABLE IF NOT EXISTS "brainstorm_edges" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "board_id" UUID NOT NULL REFERENCES "brainstorm_boards"("id") ON DELETE CASCADE,
   "user_id" TEXT NOT NULL REFERENCES public."user"("id") ON DELETE CASCADE,
