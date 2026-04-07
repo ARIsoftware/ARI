@@ -26,6 +26,10 @@ import {
   MODULE_DASHBOARD_WIDGETS,
 } from '@/lib/generated/module-dashboard-registry'
 
+// Dynamic ESM imports have an unknown module shape; resolveComponent probes for `default` or any exported function.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DynamicModule = any
+
 function WidgetSkeleton() {
   return (
     <div className="flex items-center justify-center h-[120px]">
@@ -46,7 +50,7 @@ function useEnabledDashboardModuleIds(): Set<string> {
  * Resolves the component from a dynamic import module.
  * Handles both `export default` and named-only exports (takes the first exported function).
  */
-function resolveComponent(mod: any): ComponentType | null {
+function resolveComponent(mod: DynamicModule): ComponentType | null {
   if (mod.default) return mod.default
   for (const key of Object.keys(mod)) {
     if (typeof mod[key] === 'function') return mod[key]
@@ -54,7 +58,7 @@ function resolveComponent(mod: any): ComponentType | null {
   return null
 }
 
-function DynamicWidget({ loader }: { loader: () => Promise<any> }) {
+function DynamicWidget({ loader }: { loader: () => Promise<DynamicModule> }) {
   const [Component, setComponent] = useState<ComponentType | null>(null)
   const [failed, setFailed] = useState(false)
 
@@ -146,7 +150,7 @@ export function DashboardStatCards() {
   )
 
   const loaders = useMemo(() => {
-    const result: { key: string; loader: (() => Promise<any>) | null }[] = []
+    const result: { key: string; loader: (() => Promise<DynamicModule>) | null }[] = []
     for (const [moduleId, moduleLoaders] of Object.entries(MODULE_DASHBOARD_STAT_CARDS)) {
       if (!enabledIds.has(moduleId)) continue
       moduleLoaders.forEach((loader, i) => {
@@ -234,7 +238,7 @@ export function DashboardWidgetArea() {
   )
 
   const loaders = useMemo(() => {
-    const result: { key: string; loader: () => Promise<any> }[] = []
+    const result: { key: string; loader: () => Promise<DynamicModule> }[] = []
     for (const [moduleId, moduleLoaders] of Object.entries(MODULE_DASHBOARD_WIDGETS)) {
       if (!enabledIds.has(moduleId)) continue
       moduleLoaders.forEach((loader, i) => {

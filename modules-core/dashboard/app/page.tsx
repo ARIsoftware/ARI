@@ -10,7 +10,6 @@ import {
   Loader2,
 } from 'lucide-react'
 import { useDashboardData } from '@/modules/dashboard/hooks/use-dashboard'
-import { useQuickAddTask } from '@/modules/tasks/components/quick-add-task-sheet'
 import { useDragDropMode } from '@/components/drag-drop-mode-context'
 import { RecentActivityFeed } from '../components/recent-activity-feed'
 import { DashboardStatCards, DashboardWidgetArea } from '../components/dashboard-widgets'
@@ -23,7 +22,6 @@ export default function DashboardPage() {
     isLoading,
     isDataLoading,
   } = useDashboardData()
-  const { setOpen: openQuickAddTask } = useQuickAddTask()
   const { isDragMode } = useDragDropMode()
 
   // Show loading overlay while checking modules
@@ -77,7 +75,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-medium">Dashboard</h1>
-              <p className="text-sm text-[#aa2020] mt-1">
+              <p className="text-sm text-red-700 dark:text-red-400 mt-1">
                 {quote ? (
                   <>
                     {quote.quote}
@@ -89,7 +87,7 @@ export default function DashboardPage() {
               </p>
             </div>
             <div className="flex gap-2">
-              <Button size="sm" onClick={() => openQuickAddTask(true)}>
+              <Button size="sm" onClick={() => (window.location.href = '/tasks')}>
                 <Plus className="w-4 h-4 mr-2" />
                 New Task
               </Button>

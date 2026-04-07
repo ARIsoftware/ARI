@@ -37,6 +37,7 @@ export function useEnabledModules() {
     queryFn: async (): Promise<Set<string>> => {
       const res = await fetch('/api/modules/enabled')
       if (!res.ok) {
+        console.warn('useEnabledModules: failed to fetch enabled modules', res.status)
         return new Set()
       }
       const data = await res.json()
@@ -69,7 +70,7 @@ export function useDashboardQuote(enabled: boolean) {
         return null
       }
       const quotes: Quote[] = await res.json()
-      if (quotes.length === 0) {
+      if (!Array.isArray(quotes) || quotes.length === 0) {
         return null
       }
       // Pick a random quote
@@ -123,8 +124,8 @@ export function useDashboardRecentActivity(tasksEnabled: boolean, contactsEnable
               })
             })
           }
-        } catch {
-          // Silently fail for tasks
+        } catch (err) {
+          console.warn('Dashboard recent activity: failed to fetch tasks', err)
         }
       }
 
@@ -149,8 +150,8 @@ export function useDashboardRecentActivity(tasksEnabled: boolean, contactsEnable
               })
             })
           }
-        } catch {
-          // Silently fail for contacts
+        } catch (err) {
+          console.warn('Dashboard recent activity: failed to fetch contacts', err)
         }
       }
 
