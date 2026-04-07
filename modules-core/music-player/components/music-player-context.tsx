@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo, lazy, Suspense } from "react"
-import type { MusicPlaylistEntry } from "../types"
+import type { MusicPlaylistEntry } from "@/modules/music-player/types"
 
 const PlaylistSync = lazy(() => import("./playlist-sync").then(m => ({ default: m.PlaylistSync })))
 

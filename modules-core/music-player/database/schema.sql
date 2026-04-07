@@ -12,8 +12,8 @@ CREATE TABLE IF NOT EXISTS music_playlist (
 );
 
 -- Indexes
-CREATE INDEX idx_music_playlist_user_id ON music_playlist(user_id);
-CREATE INDEX idx_music_playlist_user_position ON music_playlist(user_id, position ASC);
+CREATE INDEX IF NOT EXISTS idx_music_playlist_user_id ON music_playlist(user_id);
+CREATE INDEX IF NOT EXISTS idx_music_playlist_user_position ON music_playlist(user_id, position ASC);
 
 -- Enable Row Level Security
 ALTER TABLE music_playlist ENABLE ROW LEVEL SECURITY;

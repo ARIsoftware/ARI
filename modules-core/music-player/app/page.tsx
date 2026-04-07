@@ -17,7 +17,7 @@ import {
   useUpdateMusicPlayerSettings,
 } from '@/modules/music-player/hooks/use-music-player'
 import { useMusicPlayerContextOptional } from '@/modules/music-player/components/music-player-context'
-import type { MusicPlaylistEntry } from '../types'
+import type { MusicPlaylistEntry } from '@/modules/music-player/types'
 
 function extractYouTubeId(url: string): string | null {
   const patterns = [

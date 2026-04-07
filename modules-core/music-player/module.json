@@ -27,8 +27,7 @@
     "coreFeatures": []
   },
   "database": {
-    "tables": ["music_playlist"],
-    "migrations": "./database/migrations"
+    "tables": ["music_playlist"]
   },
   "topBarIcon": {
     "component": "./components/top-bar-icon.tsx"

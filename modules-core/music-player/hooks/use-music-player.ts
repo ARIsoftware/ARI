@@ -31,7 +31,7 @@ export function useCreateSong() {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        const details = err.details?.map((d: any) => d.message).join(', ')
+        const details = err.details?.map((d: { message: string }) => d.message).join(', ')
         throw new Error(details || err.error || 'Failed to add song')
       }
       const json = await res.json()
@@ -79,7 +79,7 @@ export function useUpdateSong() {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        const details = err.details?.map((d: any) => d.message).join(', ')
+        const details = err.details?.map((d: { message: string }) => d.message).join(', ')
         throw new Error(details || err.error || 'Failed to update song')
       }
       const json = await res.json()
