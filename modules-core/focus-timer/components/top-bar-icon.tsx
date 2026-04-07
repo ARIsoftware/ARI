@@ -9,7 +9,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { getGlobalTimerState } from "@/lib/focus-timer-state"
+import {
+  getGlobalTimerState,
+  useFocusTimerListener,
+} from "@/modules/focus-timer/lib/focus-timer-state"
 
 const globalTimerState = getGlobalTimerState()
 
@@ -26,19 +29,9 @@ export default function FocusTimerTopBarIcon({ isDragMode = false }: { isDragMod
     : ""
 
   useEffect(() => {
-    // Initialize state from global
     setIsTimerActive(globalTimerState.isActive)
-
-    // Listen for global state changes
-    const listener = (isActive: boolean) => {
-      setIsTimerActive(isActive)
-    }
-    globalTimerState.listeners.push(listener)
-
-    return () => {
-      globalTimerState.listeners = globalTimerState.listeners.filter(l => l !== listener)
-    }
   }, [])
+  useFocusTimerListener((isActive) => setIsTimerActive(isActive))
 
   return (
     <>

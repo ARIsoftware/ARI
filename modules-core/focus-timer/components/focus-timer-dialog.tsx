@@ -4,7 +4,10 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Clock, StopCircle } from "lucide-react"
-import { getGlobalTimerState } from "@/lib/focus-timer-state"
+import {
+  getGlobalTimerState,
+  useFocusTimerListener,
+} from "@/modules/focus-timer/lib/focus-timer-state"
 
 const globalTimerState = getGlobalTimerState()
 
@@ -36,8 +39,8 @@ export function FocusTimerDialog({
   useEffect(() => {
     if (isTimerActive && globalTimerState.timeRemaining > 0) {
       intervalRef.current = setInterval(() => {
-        const newTime = globalTimerState.timeRemaining - 1
-        if (newTime <= 0) {
+        const newTime = Math.max(0, globalTimerState.timeRemaining - 1)
+        if (newTime === 0) {
           updateGlobalState(false, 0, setIsTimerActive)
         } else {
           updateGlobalState(true, newTime, setIsTimerActive)
@@ -57,6 +60,7 @@ export function FocusTimerDialog({
   }, [isTimerActive])
 
   const startTimer = (minutes: number) => {
+    if (!Number.isFinite(minutes) || minutes < 1 || minutes > 240) return
     updateGlobalState(true, minutes * 60, setIsTimerActive)
     onOpenChange(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -138,23 +142,13 @@ export function FocusTimer() {
   const [isTimerActive, setIsTimerActive] = useState(globalTimerState.isActive)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  useEffect(() => {
-    // Listen for global state changes
-    const listener = (isActive: boolean) => {
-      setIsTimerActive(isActive)
-    }
-    globalTimerState.listeners.push(listener)
-
-    return () => {
-      globalTimerState.listeners = globalTimerState.listeners.filter(l => l !== listener)
-    }
-  }, [])
+  useFocusTimerListener((isActive) => setIsTimerActive(isActive))
 
   useEffect(() => {
     if (isTimerActive && globalTimerState.timeRemaining > 0) {
       intervalRef.current = setInterval(() => {
-        const newTime = globalTimerState.timeRemaining - 1
-        if (newTime <= 0) {
+        const newTime = Math.max(0, globalTimerState.timeRemaining - 1)
+        if (newTime === 0) {
           updateGlobalState(false, 0, setIsTimerActive)
         } else {
           updateGlobalState(true, newTime, setIsTimerActive)

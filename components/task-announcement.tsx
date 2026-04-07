@@ -56,7 +56,11 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { getGlobalTimerState } from "@/lib/focus-timer-state"
+import {
+  getGlobalTimerState,
+  addFocusTimerListener,
+  removeFocusTimerListener,
+} from "@/modules/focus-timer/lib/focus-timer-state"
 
 const globalTimerState = getGlobalTimerState()
 
@@ -437,11 +441,11 @@ export function TaskAnnouncement() {
         setFocusTimer({ isActive, timeRemaining, isComplete: false })
       }
     }
-    globalTimerState.listeners.push(listener)
+    addFocusTimerListener(listener)
 
     return () => {
       abortController.abort()
-      globalTimerState.listeners = globalTimerState.listeners.filter(l => l !== listener)
+      removeFocusTimerListener(listener)
     }
   }, [user?.id, session?.access_token, isTasksEnabled])
 
