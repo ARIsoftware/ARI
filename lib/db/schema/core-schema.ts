@@ -100,7 +100,7 @@ export const verification = pgTable("verification", {
 
 export const moduleSettings = pgTable("module_settings", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
-	userId: uuid("user_id").notNull(),
+	userId: text("user_id").notNull(),
 	moduleId: varchar("module_id", { length: 255 }).notNull(),
 	enabled: boolean().default(true),
 	settings: jsonb().default({}),
@@ -108,13 +108,13 @@ export const moduleSettings = pgTable("module_settings", {
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [
 	index("idx_module_settings_module_id").using("btree", table.moduleId.asc().nullsLast().op("text_ops")),
-	index("idx_module_settings_user_enabled").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.enabled.asc().nullsLast().op("uuid_ops")),
-	index("idx_module_settings_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
+	index("idx_module_settings_user_enabled").using("btree", table.userId.asc().nullsLast().op("text_ops"), table.enabled.asc().nullsLast().op("bool_ops")),
+	index("idx_module_settings_user_id").using("btree", table.userId.asc().nullsLast().op("text_ops")),
 	unique("module_settings_user_id_module_id_key").on(table.userId, table.moduleId),
-	pgPolicy("module_settings_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
-	pgPolicy("module_settings_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
-	pgPolicy("module_settings_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
-	pgPolicy("module_settings_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("module_settings_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("module_settings_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("module_settings_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("module_settings_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
 ]);
 
 export const moduleMigrations = pgTable("module_migrations", {
