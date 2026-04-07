@@ -41,8 +41,7 @@
     }
   ],
   "database": {
-    "tables": ["tasks"],
-    "migrations": "./database/migrations"
+    "tables": ["tasks"]
   },
   "dashboard": {
     "widgets": true,

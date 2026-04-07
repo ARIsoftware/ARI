@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, validateQueryParams, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
 import { createTaskSchema, updateTaskSchema, uuidParamSchema } from '@/lib/validation'
-import { calculatePriorityScore } from '../lib/priority-utils'
+import { calculatePriorityScore } from '@/modules/tasks/lib/priority-utils'
 import { z } from 'zod'
 import { tasks } from '@/lib/db/schema'
 import { desc, eq, asc, sql, and } from 'drizzle-orm'
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     // Transform camelCase to snake_case for backward compatibility
     return NextResponse.json(toSnakeCase(data))
   } catch (err) {
-    console.error('API error:', err)
+    console.error('API error:', err instanceof Error ? err.message : err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     // Transform camelCase to snake_case for backward compatibility
     return NextResponse.json(toSnakeCase(data[0]), { status: 201 })
   } catch (err) {
-    console.error('API error:', err)
+    console.error('API error:', err instanceof Error ? err.message : err)
     return createErrorResponse('Internal server error', 500)
   }
 }
@@ -195,7 +195,7 @@ export async function PUT(request: NextRequest) {
     // Transform camelCase to snake_case for backward compatibility
     return NextResponse.json(toSnakeCase(data[0]))
   } catch (err) {
-    console.error('API error:', err)
+    console.error('API error:', err instanceof Error ? err.message : err)
     return createErrorResponse('Internal server error', 500)
   }
 }
@@ -227,7 +227,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error('API error:', err)
+    console.error('API error:', err instanceof Error ? err.message : err)
     return createErrorResponse('Internal server error', 500)
   }
 }

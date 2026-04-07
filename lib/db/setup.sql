@@ -308,6 +308,7 @@ CREATE INDEX IF NOT EXISTS idx_module_settings_user_id ON "module_settings"("use
 CREATE INDEX IF NOT EXISTS idx_module_settings_module_id ON "module_settings"("module_id");
 CREATE INDEX IF NOT EXISTS idx_module_migrations_module_id ON "module_migrations"("module_id");
 CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON "tasks"("user_id");
+CREATE INDEX IF NOT EXISTS idx_tasks_user_id_completed ON "tasks"("user_id", "completed");
 CREATE INDEX IF NOT EXISTS idx_tasks_completed ON "tasks"("completed");
 CREATE INDEX IF NOT EXISTS idx_tasks_order_index ON "tasks"("order_index");
 CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON "tasks"("created_at");

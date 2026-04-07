@@ -1,6 +1,10 @@
 -- Recalculate all task priority scores with normalized distance formula
 -- (higher score = higher priority, 0-10 range)
 -- Run this once after deploying the code changes.
+--
+-- CAUTION: This UPDATE has no WHERE clause and rewrites the priority_score
+-- and updated_at columns of EVERY row in the tasks table. Confirm you are
+-- on the correct database and have a backup before running.
 
 UPDATE tasks
 SET priority_score = GREATEST(0, LEAST(10,

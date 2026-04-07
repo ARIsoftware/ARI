@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { validateQueryParams, createErrorResponse } from '@/lib/api-helpers'
 import { tasks } from '@/lib/db/schema'
 import { eq, and, gte, lte } from 'drizzle-orm'
+import { z } from 'zod'
+
+const analyticsQuerySchema = z.object({
+  days: z.coerce.number().int().min(1).max(365).optional(),
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,9 +17,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // Get query parameters
     const { searchParams } = new URL(request.url)
-    const days = parseInt(searchParams.get('days') || '30')
+    const validation = validateQueryParams(searchParams, analyticsQuerySchema)
+    if (!validation.success) {
+      return validation.response
+    }
+    const days = validation.data.days ?? 30
 
     // Calculate date range
     const endDate = new Date()
@@ -101,7 +110,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Error in task analytics API:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('Error in task analytics API:', error instanceof Error ? error.message : error)
+    return createErrorResponse('Internal server error', 500)
   }
 }

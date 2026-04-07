@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { toSnakeCase } from '@/lib/api-helpers'
-import { calculatePriorityScore } from '../../lib/priority-utils'
+import { toSnakeCase, validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
+import { calculatePriorityScore } from '@/modules/tasks/lib/priority-utils'
 import { z } from 'zod'
 import { tasks } from '@/lib/db/schema'
-import { eq, desc, and } from 'drizzle-orm'
+import { eq, desc, and, inArray } from 'drizzle-orm'
 
 // Force dynamic rendering - no caching
 export const dynamic = 'force-dynamic'
@@ -18,6 +18,10 @@ const updatePrioritiesSchema = z.object({
     effort: z.number().min(1).max(5),
     strategic_fit: z.number().min(1).max(5)
   })
+})
+
+const batchPrioritiesSchema = z.object({
+  taskIds: z.array(z.string().uuid()).min(1).max(500),
 })
 
 export async function GET(request: NextRequest) {
@@ -34,7 +38,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(toSnakeCase(data))
   } catch (err) {
-    console.error('API error:', err)
+    console.error('API error:', err instanceof Error ? err.message : err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -47,16 +51,10 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const validation = updatePrioritiesSchema.safeParse(body)
-
+    const validation = await validateRequestBody(request, updatePrioritiesSchema)
     if (!validation.success) {
-      return NextResponse.json({
-        error: 'Invalid request data',
-        details: validation.error.errors
-      }, { status: 400 })
+      return validation.response
     }
-
     const { taskId, axes } = validation.data
 
     // Calculate priority score
@@ -84,7 +82,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json(toSnakeCase(data[0]))
   } catch (err) {
-    console.error('API error:', err)
+    console.error('API error:', err instanceof Error ? err.message : err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -92,64 +90,53 @@ export async function PUT(request: NextRequest) {
 // Batch update multiple tasks
 export async function POST(request: NextRequest) {
   try {
+    const validation = await validateRequestBody(request, batchPrioritiesSchema)
+    if (!validation.success) {
+      return validation.response
+    }
+    const { taskIds } = validation.data
+
     const { user, withRLS } = await getAuthenticatedUser()
-
     if (!user || !withRLS) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+      return createErrorResponse('Authentication required', 401)
     }
 
-    const body = await request.json()
-    const { taskIds } = body
-
-    if (!Array.isArray(taskIds) || taskIds.length === 0) {
-      return NextResponse.json({ error: 'Invalid task IDs' }, { status: 400 })
-    }
-
-    // Recalculate priority scores for all specified tasks
-    const updates = []
-    for (const taskId of taskIds) {
-      // Fetch current task data
-      const taskData = await withRLS((db) =>
-        db.select({
+    // Fetch all tasks in one query, then recompute scores in memory.
+    const updatedAt = new Date().toISOString()
+    const updates = await withRLS(async (db) => {
+      const rows = await db
+        .select({
+          id: tasks.id,
           impact: tasks.impact,
           severity: tasks.severity,
           timeliness: tasks.timeliness,
           effort: tasks.effort,
-          strategicFit: tasks.strategicFit
+          strategicFit: tasks.strategicFit,
         })
         .from(tasks)
-        .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)))
-        .limit(1)
-      )
+        .where(and(inArray(tasks.id, taskIds), eq(tasks.userId, user.id)))
 
-      if (taskData.length === 0) continue
-
-      const task = taskData[0]
-      const axes = {
-        impact: task.impact || 3,
-        severity: task.severity || 3,
-        timeliness: task.timeliness || 3,
-        effort: task.effort || 3,
-        strategic_fit: task.strategicFit || 3
-      }
-
-      const priorityScore = calculatePriorityScore(axes)
-
-      await withRLS((db) =>
-        db.update(tasks)
-          .set({
-            priorityScore: String(priorityScore),
-            updatedAt: new Date().toISOString()
+      return Promise.all(
+        rows.map(async (row) => {
+          const priorityScore = calculatePriorityScore({
+            impact: row.impact ?? 3,
+            severity: row.severity ?? 3,
+            timeliness: row.timeliness ?? 3,
+            effort: row.effort ?? 3,
+            strategic_fit: row.strategicFit ?? 3,
           })
-          .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)))
+          await db
+            .update(tasks)
+            .set({ priorityScore: String(priorityScore), updatedAt })
+            .where(and(eq(tasks.id, row.id), eq(tasks.userId, user.id)))
+          return { taskId: row.id, priorityScore }
+        })
       )
-
-      updates.push({ taskId, priorityScore })
-    }
+    })
 
     return NextResponse.json({ updated: updates.length, tasks: updates })
   } catch (err) {
-    console.error('API error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('API error:', err instanceof Error ? err.message : err)
+    return createErrorResponse('Internal server error', 500)
   }
 }

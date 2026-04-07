@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
       updated_at: data[0].updatedAt
     })
   } catch (err) {
-    console.error('API error:', err)
+    console.error('API error:', err instanceof Error ? err.message : err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

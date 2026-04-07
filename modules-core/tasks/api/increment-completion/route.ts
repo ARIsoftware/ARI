@@ -3,7 +3,7 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
 import { z } from 'zod'
 import { tasks } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 
 const incrementCompletionSchema = z.object({
   taskId: z.string().uuid('Invalid task ID format'),
@@ -25,11 +25,11 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // Get current completion count (RLS automatically filters by user_id)
+    // Defense-in-depth: explicit user_id filter in addition to RLS.
     const taskData = await withRLS((db) =>
       db.select({ completionCount: tasks.completionCount })
         .from(tasks)
-        .where(eq(tasks.id, taskId))
+        .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)))
         .limit(1)
     )
 
@@ -46,19 +46,18 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Completion count too high', 400)
     }
 
-    // Update the task (RLS automatically ensures user can only update their own)
     await withRLS((db) =>
       db.update(tasks)
         .set({
           completionCount: newCount,
           updatedAt: new Date().toISOString()
         })
-        .where(eq(tasks.id, taskId))
+        .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)))
     )
 
     return NextResponse.json({ success: true, completion_count: newCount })
   } catch (err) {
-    console.error('API error:', err)
+    console.error('API error:', err instanceof Error ? err.message : err)
     return createErrorResponse('Internal server error', 500)
   }
 }
