@@ -13,13 +13,13 @@ CREATE INDEX IF NOT EXISTS idx_brainstorm_boards_user_updated ON brainstorm_boar
 
 ALTER TABLE brainstorm_boards ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS brainstorm_boards_rls_select ON brainstorm_boards;
-CREATE POLICY brainstorm_boards_rls_select ON brainstorm_boards FOR SELECT USING (user_id = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY brainstorm_boards_rls_select ON brainstorm_boards FOR SELECT USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 DROP POLICY IF EXISTS brainstorm_boards_rls_insert ON brainstorm_boards;
-CREATE POLICY brainstorm_boards_rls_insert ON brainstorm_boards FOR INSERT WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY brainstorm_boards_rls_insert ON brainstorm_boards FOR INSERT WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
 DROP POLICY IF EXISTS brainstorm_boards_rls_update ON brainstorm_boards;
-CREATE POLICY brainstorm_boards_rls_update ON brainstorm_boards FOR UPDATE USING (user_id = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY brainstorm_boards_rls_update ON brainstorm_boards FOR UPDATE USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 DROP POLICY IF EXISTS brainstorm_boards_rls_delete ON brainstorm_boards;
-CREATE POLICY brainstorm_boards_rls_delete ON brainstorm_boards FOR DELETE USING (user_id = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY brainstorm_boards_rls_delete ON brainstorm_boards FOR DELETE USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 CREATE TABLE IF NOT EXISTS brainstorm_nodes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -37,13 +37,13 @@ CREATE INDEX IF NOT EXISTS idx_brainstorm_nodes_user_board ON brainstorm_nodes (
 
 ALTER TABLE brainstorm_nodes ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS brainstorm_nodes_rls_select ON brainstorm_nodes;
-CREATE POLICY brainstorm_nodes_rls_select ON brainstorm_nodes FOR SELECT USING (user_id = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY brainstorm_nodes_rls_select ON brainstorm_nodes FOR SELECT USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 DROP POLICY IF EXISTS brainstorm_nodes_rls_insert ON brainstorm_nodes;
-CREATE POLICY brainstorm_nodes_rls_insert ON brainstorm_nodes FOR INSERT WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY brainstorm_nodes_rls_insert ON brainstorm_nodes FOR INSERT WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
 DROP POLICY IF EXISTS brainstorm_nodes_rls_update ON brainstorm_nodes;
-CREATE POLICY brainstorm_nodes_rls_update ON brainstorm_nodes FOR UPDATE USING (user_id = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY brainstorm_nodes_rls_update ON brainstorm_nodes FOR UPDATE USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 DROP POLICY IF EXISTS brainstorm_nodes_rls_delete ON brainstorm_nodes;
-CREATE POLICY brainstorm_nodes_rls_delete ON brainstorm_nodes FOR DELETE USING (user_id = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY brainstorm_nodes_rls_delete ON brainstorm_nodes FOR DELETE USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 CREATE TABLE IF NOT EXISTS brainstorm_edges (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -62,10 +62,10 @@ CREATE INDEX IF NOT EXISTS idx_brainstorm_edges_target ON brainstorm_edges (targ
 
 ALTER TABLE brainstorm_edges ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS brainstorm_edges_rls_select ON brainstorm_edges;
-CREATE POLICY brainstorm_edges_rls_select ON brainstorm_edges FOR SELECT USING (user_id = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY brainstorm_edges_rls_select ON brainstorm_edges FOR SELECT USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 DROP POLICY IF EXISTS brainstorm_edges_rls_insert ON brainstorm_edges;
-CREATE POLICY brainstorm_edges_rls_insert ON brainstorm_edges FOR INSERT WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY brainstorm_edges_rls_insert ON brainstorm_edges FOR INSERT WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
 DROP POLICY IF EXISTS brainstorm_edges_rls_update ON brainstorm_edges;
-CREATE POLICY brainstorm_edges_rls_update ON brainstorm_edges FOR UPDATE USING (user_id = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY brainstorm_edges_rls_update ON brainstorm_edges FOR UPDATE USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 DROP POLICY IF EXISTS brainstorm_edges_rls_delete ON brainstorm_edges;
-CREATE POLICY brainstorm_edges_rls_delete ON brainstorm_edges FOR DELETE USING (user_id = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY brainstorm_edges_rls_delete ON brainstorm_edges FOR DELETE USING (user_id::text = (SELECT current_setting('app.current_user_id')));

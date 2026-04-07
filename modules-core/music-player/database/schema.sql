@@ -18,16 +18,16 @@ ALTER TABLE music_playlist ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS music_playlist_rls_select ON music_playlist;
 CREATE POLICY music_playlist_rls_select ON music_playlist FOR SELECT TO public
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 DROP POLICY IF EXISTS music_playlist_rls_insert ON music_playlist;
 CREATE POLICY music_playlist_rls_insert ON music_playlist FOR INSERT TO public
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 DROP POLICY IF EXISTS music_playlist_rls_update ON music_playlist;
 CREATE POLICY music_playlist_rls_update ON music_playlist FOR UPDATE TO public
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 DROP POLICY IF EXISTS music_playlist_rls_delete ON music_playlist;
 CREATE POLICY music_playlist_rls_delete ON music_playlist FOR DELETE TO public
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));

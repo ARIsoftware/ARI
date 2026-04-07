@@ -57,16 +57,16 @@ ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS tasks_rls_select ON tasks;
 CREATE POLICY tasks_rls_select ON tasks FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 DROP POLICY IF EXISTS tasks_rls_insert ON tasks;
 CREATE POLICY tasks_rls_insert ON tasks FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 DROP POLICY IF EXISTS tasks_rls_update ON tasks;
 CREATE POLICY tasks_rls_update ON tasks FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 DROP POLICY IF EXISTS tasks_rls_delete ON tasks;
 CREATE POLICY tasks_rls_delete ON tasks FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));

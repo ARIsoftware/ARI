@@ -17,19 +17,19 @@ ALTER TABLE notepad ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS notepad_rls_select ON notepad;
 CREATE POLICY notepad_rls_select ON notepad FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 DROP POLICY IF EXISTS notepad_rls_insert ON notepad;
 CREATE POLICY notepad_rls_insert ON notepad FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 DROP POLICY IF EXISTS notepad_rls_update ON notepad;
 CREATE POLICY notepad_rls_update ON notepad FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 DROP POLICY IF EXISTS notepad_rls_delete ON notepad;
 CREATE POLICY notepad_rls_delete ON notepad FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 CREATE TABLE IF NOT EXISTS notepad_revisions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -46,16 +46,16 @@ ALTER TABLE notepad_revisions ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS notepad_revisions_rls_select ON notepad_revisions;
 CREATE POLICY notepad_revisions_rls_select ON notepad_revisions FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 DROP POLICY IF EXISTS notepad_revisions_rls_insert ON notepad_revisions;
 CREATE POLICY notepad_revisions_rls_insert ON notepad_revisions FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 DROP POLICY IF EXISTS notepad_revisions_rls_update ON notepad_revisions;
 CREATE POLICY notepad_revisions_rls_update ON notepad_revisions FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 DROP POLICY IF EXISTS notepad_revisions_rls_delete ON notepad_revisions;
 CREATE POLICY notepad_revisions_rls_delete ON notepad_revisions FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
