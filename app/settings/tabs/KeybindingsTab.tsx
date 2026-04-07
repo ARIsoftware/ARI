@@ -97,6 +97,12 @@ export function KeybindingsTab(): React.ReactElement {
           </div>
           <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3">
             <div>
+              <span className="text-sm font-medium text-slate-700">/ari-audit-module</span>
+              <p className="text-xs text-slate-500 mt-0.5">Audit a module for issues, anti-patterns, and ARI conventions</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3">
+            <div>
               <span className="text-sm font-medium text-slate-700">/ari-update</span>
               <p className="text-xs text-slate-500 mt-0.5">Pull the latest ARI updates from the official upstream repository</p>
             </div>
