@@ -1,10 +1,12 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Loader2, LogOut, Monitor, ShieldCheck, Smartphone } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { BarChart3, Loader2, LogOut, Monitor, ShieldCheck, Smartphone } from "lucide-react"
 import { parseUserAgent, formatRelativeTime } from "@/lib/utils"
 import { TwoFactorSetup } from "./TwoFactorSetup"
 import type { Session } from "../types"
@@ -31,6 +33,35 @@ export function SecurityTab({
   twoFactorEnabled = false,
 }: SecurityTabProps): React.ReactElement {
   const router = useRouter()
+  const [telemetryEnabled, setTelemetryEnabled] = useState<boolean | null>(null)
+  const [telemetrySaving, setTelemetrySaving] = useState(false)
+
+  useEffect(() => {
+    fetch("/api/telemetry")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && typeof d.telemetryEnabled === "boolean") setTelemetryEnabled(d.telemetryEnabled)
+      })
+      .catch(() => {})
+  }, [])
+
+  const handleTelemetryToggle = async (next: boolean) => {
+    const prev = telemetryEnabled
+    setTelemetryEnabled(next)
+    setTelemetrySaving(true)
+    try {
+      const res = await fetch("/api/telemetry", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: next }),
+      })
+      if (!res.ok) setTelemetryEnabled(prev)
+    } catch {
+      setTelemetryEnabled(prev)
+    } finally {
+      setTelemetrySaving(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -157,6 +188,34 @@ export function SecurityTab({
         </Card>
         <TwoFactorSetup twoFactorEnabled={twoFactorEnabled} />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <BarChart3 className="h-5 w-5 text-purple-500" />
+            Anonymous Usage Statistics
+          </CardTitle>
+          <CardDescription>
+            Help improve ARI by sharing anonymous install and version data.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start justify-between rounded-lg border p-4">
+            <div className="pr-4">
+              <p className="text-sm font-medium">Share anonymous usage statistics</p>
+              <p className="text-sm text-muted-foreground">
+                Sends a single ping on server startup containing only an opaque install ID,
+                ARI version, and platform. No personal data, account info, or content is shared.
+              </p>
+            </div>
+            <Switch
+              checked={telemetryEnabled ?? false}
+              disabled={telemetryEnabled === null || telemetrySaving}
+              onCheckedChange={handleTelemetryToggle}
+            />
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

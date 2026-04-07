@@ -295,6 +295,29 @@ CREATE POLICY "notepad_revisions_rls_delete" ON "notepad_revisions" FOR DELETE T
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 -- ================================================================
+-- ARI INSTANCE (per-install identity for anonymous telemetry)
+-- ================================================================
+
+CREATE TABLE IF NOT EXISTS "ari_instance" (
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "telemetry_enabled" BOOLEAN NOT NULL DEFAULT TRUE,
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY ("id")
+);
+
+INSERT INTO "ari_instance" ("telemetry_enabled")
+SELECT TRUE
+WHERE NOT EXISTS (SELECT 1 FROM "ari_instance");
+
+ALTER TABLE "ari_instance" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "ari_instance_rls_select" ON "ari_instance" FOR SELECT TO public
+  USING (TRUE);
+CREATE POLICY "ari_instance_rls_update" ON "ari_instance" FOR UPDATE TO public
+  USING (TRUE) WITH CHECK (TRUE);
+CREATE POLICY "ari_instance_rls_insert" ON "ari_instance" FOR INSERT TO public
+  WITH CHECK (TRUE);
+
+-- ================================================================
 -- INDEXES
 -- ================================================================
 

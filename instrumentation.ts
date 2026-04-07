@@ -30,5 +30,10 @@ export async function register() {
       console.error('❌ Failed to generate module registry:', error)
       // Don't throw - allow server to start even if registry generation fails
     }
+
+    // Fire-and-forget anonymous install ping. Never blocks startup.
+    void import('./lib/telemetry/send-tv-connect').then(({ sendTvConnect }) => {
+      sendTvConnect().catch(() => {})
+    }).catch(() => {})
   }
 }
