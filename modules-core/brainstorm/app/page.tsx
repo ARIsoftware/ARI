@@ -6,8 +6,7 @@ import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Loader2, Plus, Trash2, Network } from 'lucide-react'
+import { Loader2, Plus, Trash2, Network, ArrowLeft } from 'lucide-react'
 import {
   useBrainstormBoard,
   useBrainstormBoards,
@@ -32,10 +31,6 @@ export default function BrainstormPage() {
 
   const { data: currentBoard, isLoading: boardLoading } = useBrainstormBoard(selectedId)
 
-  // Auto-select first board
-  useEffect(() => {
-    if (!selectedId && boards.length > 0) setSelectedId(boards[0].id)
-  }, [boards, selectedId])
 
   // Random quote
   useEffect(() => {
@@ -102,19 +97,10 @@ export default function BrainstormPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {boards.length > 0 && (
-            <Select value={selectedId} onValueChange={setSelectedId}>
-              <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder="Select a board" />
-              </SelectTrigger>
-              <SelectContent>
-                {boards.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.name} ({b.node_count})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {selectedId && (
+            <Button variant="outline" onClick={() => setSelectedId('')}>
+              <ArrowLeft className="w-4 h-4 mr-1" /> All boards
+            </Button>
           )}
           <Button onClick={() => { setCreating(true); setNewName(''); setNameError('') }}>
             <Plus className="w-4 h-4 mr-1" /> New board
@@ -163,6 +149,30 @@ export default function BrainstormPage() {
             </Button>
           </CardContent>
         </Card>
+      ) : !selectedId ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {boards.map((b) => (
+            <Card
+              key={b.id}
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => setSelectedId(b.id)}
+            >
+              <CardContent className="p-5">
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center shrink-0">
+                    <Network className="w-5 h-5 text-violet-600 dark:text-violet-300" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-semibold text-base truncate">{b.name}</h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {b.node_count} {b.node_count === 1 ? 'idea' : 'ideas'}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       ) : boardLoading || !currentBoard ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
