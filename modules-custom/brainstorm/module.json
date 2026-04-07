@@ -1,0 +1,42 @@
+{
+  "id": "brainstorm",
+  "group": "Creative",
+  "name": "Brainstorm",
+  "description": "Mind-map style brainstorming canvases powered by React Flow",
+  "version": "1.0.0",
+  "author": "ARI",
+  "icon": "Network",
+  "enabled": true,
+  "fullscreen": false,
+  "menuPriority": 13,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": true
+  },
+  "routes": [
+    {
+      "path": "/brainstorm",
+      "label": "Brainstorm",
+      "icon": "Network",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": [
+      "brainstorm_boards",
+      "brainstorm_nodes",
+      "brainstorm_edges"
+    ]
+  },
+  "dashboard": {
+    "widgets": true,
+    "statCards": [
+      "./components/dashboard-stat-card.tsx"
+    ]
+  }
+}
