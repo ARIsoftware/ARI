@@ -82,13 +82,13 @@
 
 ```typescript
 export const MODULE_PAGES: Record<string, any> = {
-  'hello-world': () => import('@/modules/hello-world/app/page'),
+  'module-template': () => import('@/modules/module-template/app/page'),
   'my-module': () => import('@/modules/my-module/app/page'),
   // Add your module here
 }
 
 export const REGISTERED_MODULE_IDS = [
-  'hello-world',
+  'module-template',
   'my-module',
   // Add your module ID here
 ]
@@ -100,8 +100,8 @@ Module API routes are proxied through `/app/api/modules/[module]/[[...path]]/rou
 
 ```typescript
 const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
-  'hello-world': {
-    'data': () => import('@/modules/hello-world/api/data/route')
+  'module-template': {
+    'data': () => import('@/modules/module-template/api/data/route')
   },
   'my-module': {
     'data': () => import('@/modules/my-module/api/data/route')
@@ -113,9 +113,9 @@ const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
 
 | Type | URL Pattern | Maps To |
 |------|------------|---------|
-| Page | `/hello-world` | `/modules/hello-world/app/page.tsx` |
-| Page | `/hello-world/settings` | `/modules/hello-world/app/settings/page.tsx` |
-| API | `/api/modules/hello-world/data` | `/modules/hello-world/api/data/route.ts` |
+| Page | `/module-template` | `/modules/module-template/app/page.tsx` |
+| Page | `/module-template/settings` | `/modules/module-template/app/settings/page.tsx` |
+| API | `/api/modules/module-template/data` | `/modules/module-template/api/data/route.ts` |
 
 ### Module Discovery Process
 
@@ -527,7 +527,7 @@ Use this comprehensive checklist when converting an existing ARI feature into a 
 
 Before starting migration, ensure:
 
-- ✅ Module system is working (`/modules-core/hello-world` loads successfully)
+- ✅ Module system is working (`/modules-core/module-template` loads successfully)
 - ✅ You have access to Supabase dashboard
 - ✅ Development server can be restarted
 - ✅ Git working directory is clean (recommended)
@@ -1119,9 +1119,9 @@ export const myModuleDataRelations = relations(myModuleData, ({many}) => ({
 }
 ```
 
-### Reference: Hello World Schema
+### Reference: Module Template Schema
 
-See `/modules-core/hello-world/database/schema.sql` and `/modules-core/hello-world/database/schema.ts` for a complete working example.
+See `/modules-core/module-template/database/schema.sql` and `/modules-core/module-template/database/schema.ts` for a complete working example.
 
 ---
 
@@ -1387,7 +1387,7 @@ export async function PATCH(
 
 ### Reference Implementation
 
-See `/modules-core/hello-world/api/data/route.ts` for a complete working example with GET, POST, and DELETE handlers.
+See `/modules-core/module-template/api/data/route.ts` for a complete working example with GET, POST, and DELETE handlers.
 
 ---
 
@@ -2283,7 +2283,7 @@ See [Section 8: Components](#8-components) for full details.
 
 ### Template Module
 
-Use `/modules/hello-world/` as a complete reference implementation. It demonstrates:
+Use `/modules/module-template/` as a complete reference implementation. It demonstrates:
 - Module manifest with all fields
 - Main page with authentication
 - API routes (GET, POST, DELETE)

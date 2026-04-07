@@ -1,4 +1,4 @@
-# Hello World Module
+# Module Template Module
 
 > **Template Module for ARI Module System**
 > Use this as a reference when building your own modules
@@ -17,7 +17,7 @@ This is a fully-featured example module demonstrating all capabilities of the AR
 ## Features Demonstrated
 
 ### 1. **Page Routing**
-- Main module page at `/hello-world`
+- Main module page at `/module-template`
 - Uses ARI's authentication context
 - Follows ARI's design patterns
 
@@ -29,7 +29,7 @@ This is a fully-featured example module demonstrating all capabilities of the AR
 - Proper error handling
 
 ### 3. **Database Integration**
-- Custom table: `hello_world_entries`
+- Custom table: `module_template_entries`
 - Drizzle ORM with `withRLS()` helper
 - User-specific data isolation at application level
 - Table defined in `/lib/db/schema/schema.ts`
@@ -51,18 +51,18 @@ This module is already installed in the `/modules` directory. To use it:
 
 1. **Enable the module** in Settings → Features
 2. **Apply database migrations** (see below)
-3. **Navigate to** `/hello-world` to see it in action
+3. **Navigate to** `/module-template` to see it in action
 
 ## Database Setup
 
 ### Required Tables
 
-This module requires one database table: `hello_world_entries`
+This module requires one database table: `module_template_entries`
 
 ### Applying Migrations
 
 1. Go to Settings → Features in ARI
-2. Find "Hello World" module
+2. Find "Module Template" module
 3. Click "View SQL" or "Copy to Clipboard"
 4. Open your Supabase SQL Editor
 5. Paste and run the SQL
@@ -75,12 +75,12 @@ Copy the SQL from `database/schema.sql` and run it in Supabase SQL Editor.
 ## File Structure
 
 ```
-modules/hello-world/
+modules/module-template/
 ├── module.json                 # Module manifest (required)
 ├── README.md                   # This file
 │
 ├── app/                        # Module pages (Next.js App Router)
-│   └── page.tsx               # Main module page at /hello-world
+│   └── page.tsx               # Main module page at /module-template
 │
 ├── components/                 # Module components
 │   ├── widget.tsx             # Dashboard widget
@@ -88,7 +88,7 @@ modules/hello-world/
 │
 ├── api/                        # Module API routes
 │   └── data/
-│       └── route.ts           # API handlers at /api/modules-core/hello-world/data
+│       └── route.ts           # API handlers at /api/modules-core/module-template/data
 │
 ├── lib/                        # Module utilities
 │   └── utils.ts               # Helper functions
@@ -106,7 +106,7 @@ modules/hello-world/
 
 ### Using the Module Page
 
-Navigate to `/hello-world` in your browser. The page shows:
+Navigate to `/module-template` in your browser. The page shows:
 - User information
 - List of entries (from database)
 - Form to create new entries
@@ -117,11 +117,11 @@ Authentication is handled via HTTP-only cookies (Better Auth), so no Authorizati
 
 ```typescript
 // From a React component - cookies are sent automatically
-const response = await fetch('/api/modules/hello-world/data')
+const response = await fetch('/api/modules/module-template/data')
 const { entries } = await response.json()
 
 // Create new entry
-const response = await fetch('/api/modules/hello-world/data', {
+const response = await fetch('/api/modules/module-template/data', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ message: 'Hello from API' })
@@ -132,14 +132,14 @@ const response = await fetch('/api/modules/hello-world/data', {
 
 ```typescript
 import {
-  useHelloWorldEntries,
-  useCreateHelloWorldEntry,
-  useDeleteHelloWorldEntry,
-} from '@/modules/hello-world/hooks/use-hello-world'
+  useModuleTemplateEntries,
+  useCreateModuleTemplateEntry,
+  useDeleteModuleTemplateEntry,
+} from '@/modules/module-template/hooks/use-module-template'
 
 // In your component
-const { data: entries = [], isLoading } = useHelloWorldEntries()
-const createEntry = useCreateHelloWorldEntry()
+const { data: entries = [], isLoading } = useModuleTemplateEntries()
+const createEntry = useCreateModuleTemplateEntry()
 
 // Create with optimistic updates
 createEntry.mutate('My message')
@@ -149,10 +149,10 @@ createEntry.mutate('My message')
 
 ```typescript
 // Import types
-import { HelloWorldEntry } from '@/modules/hello-world/types'
+import { ModuleTemplateEntry } from '@/modules/module-template/types'
 
 // Call the API (cookies handle auth automatically)
-const response = await fetch('/api/modules/hello-world/data')
+const response = await fetch('/api/modules/module-template/data')
 const data = await response.json()
 ```
 
@@ -171,9 +171,9 @@ const data = await response.json()
 Create new pages in `/app`:
 ```
 app/
-├── page.tsx                    # Main page at /hello-world
+├── page.tsx                    # Main page at /module-template
 └── settings/
-    └── page.tsx               # Sub-page at /hello-world/settings
+    └── page.tsx               # Sub-page at /module-template/settings
 ```
 
 Update `module.json` routes:
@@ -181,13 +181,13 @@ Update `module.json` routes:
 {
   "routes": [
     {
-      "path": "/hello-world",
-      "label": "Hello World",
+      "path": "/module-template",
+      "label": "Module Template",
       "icon": "Package",
       "sidebarPosition": "main",
       "children": [
         {
-          "path": "/hello-world/settings",
+          "path": "/module-template/settings",
           "label": "Settings",
           "icon": "Settings"
         }
@@ -203,9 +203,9 @@ Create new route handlers in `/api`:
 ```
 api/
 ├── data/
-│   └── route.ts               # /api/modules/hello-world/data
+│   └── route.ts               # /api/modules/module-template/data
 └── stats/
-    └── route.ts               # /api/modules/hello-world/stats
+    └── route.ts               # /api/modules/module-template/stats
 ```
 
 ### Adding Database Tables
@@ -223,7 +223,7 @@ api/
 # Start dev server
 npm run dev
 
-# Visit http://localhost:3000/hello-world
+# Visit http://localhost:3000/module-template
 # Changes to files will hot-reload automatically
 ```
 

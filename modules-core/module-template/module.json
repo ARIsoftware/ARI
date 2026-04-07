@@ -1,12 +1,12 @@
 {
-  "id": "hello-world",
+  "id": "module-template",
   "group": "Welcome!",
-  "name": "Hello World",
+  "name": "Module Template",
   "description": "A template module demonstrating all core features of the ARI module system",
   "version": "1.0.0",
   "author": "ARI",
   "icon": "Package",
-  "enabled": true,
+  "enabled": false,
   "fullscreen": false,
   "menuPriority": 2,
   "permissions": {
@@ -16,8 +16,8 @@
   },
   "routes": [
     {
-      "path": "/hello-world",
-      "label": "Hello World",
+      "path": "/module-template",
+      "label": "Module Template",
       "icon": "Package",
       "sidebarPosition": "main"
     }
@@ -27,7 +27,7 @@
     "coreFeatures": []
   },
   "database": {
-    "tables": ["hello_world_entries"]
+    "tables": ["module_template_entries"]
   },
   "dashboard": {
     "widgets": true,
@@ -38,8 +38,8 @@
   },
   "topBarIcon": {
     "icon": "Hand",
-    "route": "/hello-world",
-    "tooltip": "Hello World"
+    "route": "/module-template",
+    "tooltip": "Module Template"
   },
   "submenu": {
     "component": "./components/sidebar-submenu.tsx"

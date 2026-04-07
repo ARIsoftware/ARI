@@ -1,5 +1,5 @@
 /**
- * Hello World Module - Utility Functions
+ * Module Template Module - Utility Functions
  *
  * This file contains helper functions used across the module.
  * It demonstrates:
@@ -8,7 +8,7 @@
  * - Common patterns
  */
 
-import type { HelloWorldEntry } from '../types'
+import type { ModuleTemplateEntry } from '../types'
 
 /**
  * Format entry date for display
@@ -58,9 +58,9 @@ export function validateMessage(message: string): { valid: boolean; error?: stri
  * @returns Sorted array
  */
 export function sortEntriesByDate(
-  entries: HelloWorldEntry[],
+  entries: ModuleTemplateEntry[],
   order: 'asc' | 'desc' = 'desc'
-): HelloWorldEntry[] {
+): ModuleTemplateEntry[] {
   return [...entries].sort((a, b) => {
     const dateA = new Date(a.created_at).getTime()
     const dateB = new Date(b.created_at).getTime()
@@ -76,9 +76,9 @@ export function sortEntriesByDate(
  * @returns Filtered array
  */
 export function filterEntries(
-  entries: HelloWorldEntry[],
+  entries: ModuleTemplateEntry[],
   query: string
-): HelloWorldEntry[] {
+): ModuleTemplateEntry[] {
   if (!query || query.trim().length === 0) {
     return entries
   }
@@ -95,7 +95,7 @@ export function filterEntries(
  * @param entries - Array of entries
  * @returns Statistics object
  */
-export function getEntryStats(entries: HelloWorldEntry[]) {
+export function getEntryStats(entries: ModuleTemplateEntry[]) {
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const thisWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
@@ -132,7 +132,7 @@ export function truncateMessage(message: string, maxLength: number = 100): strin
  * @param entry - Entry to check
  * @returns True if created today
  */
-export function isCreatedToday(entry: HelloWorldEntry): boolean {
+export function isCreatedToday(entry: ModuleTemplateEntry): boolean {
   const now = new Date()
   const entryDate = new Date(entry.created_at)
   return (
@@ -150,7 +150,7 @@ export const DEBUG = process.env.NODE_ENV === 'development'
 
 export function log(...args: any[]) {
   if (DEBUG) {
-    console.log('[hello-world]', ...args)
+    console.log('[module-template]', ...args)
   }
 }
 

@@ -1,5 +1,5 @@
 /**
- * Hello World Module - Settings API Routes
+ * Module Template Module - Settings API Routes
  *
  * This file defines API endpoints for managing module settings.
  * It demonstrates:
@@ -8,8 +8,8 @@
  * - GET and PUT patterns for settings
  *
  * Endpoints:
- * - GET /api/modules/hello-world/settings  - Get user's settings
- * - PUT /api/modules/hello-world/settings  - Update user's settings
+ * - GET /api/modules/module-template/settings  - Get user's settings
+ * - PUT /api/modules/module-template/settings  - Update user's settings
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     const data = await withRLS((db) =>
       db.select({ settings: moduleSettings.settings })
         .from(moduleSettings)
-        .where(eq(moduleSettings.moduleId, 'hello-world'))
+        .where(eq(moduleSettings.moduleId, 'module-template'))
         .limit(1)
     )
 
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data[0]?.settings || {})
 
   } catch (error) {
-    console.error('GET /api/modules/hello-world/settings error:', error instanceof Error ? error.message : error)
+    console.error('GET /api/modules/module-template/settings error:', error instanceof Error ? error.message : error)
     return createErrorResponse('Internal server error', 500)
   }
 }
@@ -102,7 +102,7 @@ export async function PUT(request: NextRequest) {
     const existing = await withRLS((db) =>
       db.select({ id: moduleSettings.id })
         .from(moduleSettings)
-        .where(eq(moduleSettings.moduleId, 'hello-world'))
+        .where(eq(moduleSettings.moduleId, 'module-template'))
         .limit(1)
     )
 
@@ -120,7 +120,7 @@ export async function PUT(request: NextRequest) {
         db.insert(moduleSettings)
           .values({
             userId: user.id,
-            moduleId: 'hello-world',
+            moduleId: 'module-template',
             settings: validation.data
           })
       )
@@ -132,7 +132,7 @@ export async function PUT(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('PUT /api/modules/hello-world/settings error:', error instanceof Error ? error.message : error)
+    console.error('PUT /api/modules/module-template/settings error:', error instanceof Error ? error.message : error)
     return createErrorResponse('Internal server error', 500)
   }
 }

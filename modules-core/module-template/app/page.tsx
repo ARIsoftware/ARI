@@ -1,7 +1,7 @@
 /**
- * Hello World Module - Main Page
+ * Module Template Module - Main Page
  *
- * This is the main page component for the Hello World module.
+ * This is the main page component for the Module Template module.
  * It demonstrates:
  * - TanStack Query for data fetching
  * - Optimistic updates for instant UI feedback
@@ -22,7 +22,7 @@
  *
  * This will show onboarding only until the user completes it.
  *
- * Route: /hello-world
+ * Route: /module-template
  */
 
 'use client'
@@ -37,15 +37,15 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2, Package, Plus, Trash2, BarChart3, Sparkles } from 'lucide-react'
 import {
-  useHelloWorldEntries,
-  useCreateHelloWorldEntry,
-  useDeleteHelloWorldEntry,
-  useHelloWorldSettings,
-  useUpdateHelloWorldSettings,
-} from '../hooks/use-hello-world'
-import type { HelloWorldEntry } from '../types'
+  useModuleTemplateEntries,
+  useCreateModuleTemplateEntry,
+  useDeleteModuleTemplateEntry,
+  useModuleTemplateSettings,
+  useUpdateModuleTemplateSettings,
+} from '../hooks/use-module-template'
+import type { ModuleTemplateEntry } from '../types'
 
-export default function HelloWorldPage() {
+export default function ModuleTemplatePage() {
   const { user } = useAuth()
   const { toast } = useToast()
 
@@ -53,13 +53,13 @@ export default function HelloWorldPage() {
   const { enabled: quotesEnabled, loading: quotesLoading } = useModuleEnabled('quotes')
 
   // TanStack Query hooks for data fetching
-  const { data: entries = [], isLoading } = useHelloWorldEntries()
-  const createEntry = useCreateHelloWorldEntry()
-  const deleteEntry = useDeleteHelloWorldEntry()
+  const { data: entries = [], isLoading } = useModuleTemplateEntries()
+  const createEntry = useCreateModuleTemplateEntry()
+  const deleteEntry = useDeleteModuleTemplateEntry()
 
   // Settings hooks for onboarding
-  const { data: settings, isLoading: settingsLoading } = useHelloWorldSettings()
-  const updateSettings = useUpdateHelloWorldSettings()
+  const { data: settings, isLoading: settingsLoading } = useModuleTemplateSettings()
+  const updateSettings = useUpdateModuleTemplateSettings()
 
   // Local state for form
   const [newMessage, setNewMessage] = useState('')
@@ -183,7 +183,7 @@ export default function HelloWorldPage() {
             <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
               <Sparkles className="w-8 h-8 text-primary" />
             </div>
-            <CardTitle className="text-2xl">Welcome to Hello World</CardTitle>
+            <CardTitle className="text-2xl">Welcome to Module Template</CardTitle>
             <CardDescription>
               This is a sample onboarding screen. Use this pattern when your module needs
               to collect initial configuration from the user before they can use it.
@@ -256,7 +256,7 @@ export default function HelloWorldPage() {
       {/* Page Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-4xl font-medium">Hello World</h1>
+          <h1 className="text-4xl font-medium">Module Template</h1>
           {quotesEnabled && randomQuote && (
             <p className="text-sm text-[#aa2020] mt-1">
               {randomQuote.quote}
@@ -342,7 +342,7 @@ export default function HelloWorldPage() {
         <CardHeader>
           <CardTitle>Your Entries</CardTitle>
           <CardDescription>
-            Messages stored in the hello_world_entries table
+            Messages stored in the module_template_entries table
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -353,7 +353,7 @@ export default function HelloWorldPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {entries.map((entry: HelloWorldEntry) => (
+              {entries.map((entry: ModuleTemplateEntry) => (
                 <div
                   key={entry.id}
                   className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors"
@@ -389,14 +389,14 @@ export default function HelloWorldPage() {
             <strong>This is a template module.</strong> Use it as a reference when building your own modules.
           </p>
           <ul className="list-disc list-inside space-y-1 ml-2">
-            <li>Data Fetching: Uses TanStack Query hooks from <code>@/lib/hooks/use-hello-world</code></li>
+            <li>Data Fetching: Uses TanStack Query hooks from <code>@/lib/hooks/use-module-template</code></li>
             <li>API Calls: Authentication handled via cookies (Better Auth)</li>
             <li>Database: Uses Drizzle ORM with <code>withRLS()</code> helper</li>
             <li>UI Components: Uses Shadcn/ui components from <code>@/components/ui</code></li>
             <li>TypeScript: Fully typed with custom types from <code>../types</code></li>
           </ul>
           <p className="pt-2">
-            See <code>/modules/hello-world/README.md</code> for complete documentation.
+            See <code>/modules/module-template/README.md</code> for complete documentation.
           </p>
         </CardContent>
       </Card>

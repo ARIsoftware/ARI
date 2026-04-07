@@ -162,7 +162,7 @@ The ARI module system allows features to be:
 │  └── module-pages-registry.ts  ← Auto-generated before build     │
 ├─────────────────────────────────────────────────────────────────┤
 │  /modules                                                        │
-│  ├── /hello-world         ← Example module                       │
+│  ├── /module-template         ← Example module                       │
 │  ├── /contacts                                                   │
 │  ├── /shipments                                                  │
 │  └── ...                                                         │
@@ -446,8 +446,8 @@ Every module requires a `module.json` file:
 
 ```json
 {
-  "id": "hello-world",
-  "name": "Hello World",
+  "id": "module-template",
+  "name": "Module Template",
   "description": "A template module demonstrating all core features",
   "version": "1.0.0",
   "author": "Your Name",
@@ -464,8 +464,8 @@ Every module requires a `module.json` file:
 
   "routes": [
     {
-      "path": "/hello-world",
-      "label": "Hello World",
+      "path": "/module-template",
+      "label": "Module Template",
       "icon": "Package",
       "sidebarPosition": "main"
     }
@@ -477,7 +477,7 @@ Every module requires a `module.json` file:
   },
 
   "database": {
-    "tables": ["hello_world_entries"],
+    "tables": ["module_template_entries"],
     "migrations": "./database/migrations"
   },
 
@@ -566,7 +566,7 @@ Because Next.js/Turbopack cannot resolve fully dynamic imports at build time, we
 ```typescript
 // /lib/generated/module-pages-registry.ts (auto-generated)
 export const MODULE_PAGES: Record<string, any> = {
-  'hello-world': () => import('@/modules-core/hello-world/app/page'),
+  'module-template': () => import('@/modules-core/module-template/app/page'),
   'contacts': () => import('@/modules-core/contacts/app/page'),
   'shipments': () => import('@/modules-core/shipments/app/page'),
   // ... auto-generated for all modules
@@ -639,9 +639,9 @@ import { getEnabledModule } from '@/lib/modules-core/module-registry'
 // Static registry of module API routes
 // IMPORTANT: Must be manually updated when adding new module APIs
 const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
-  'hello-world': {
-    'data': () => import('@/modules-core/hello-world/api/data/route'),
-    'settings': () => import('@/modules-core/hello-world/api/settings/route')
+  'module-template': {
+    'data': () => import('@/modules-core/module-template/api/data/route'),
+    'settings': () => import('@/modules-core/module-template/api/settings/route')
   },
   'contacts': {
     '': () => import('@/modules-core/contacts/api/route'),
@@ -695,7 +695,7 @@ export async function PATCH(req, ctx) { return handleRequest(req, 'PATCH', ctx.p
 ### Example Module API Route
 
 ```typescript
-// /modules-core/hello-world/api/data/route.ts
+// /modules-core/module-template/api/data/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { z } from 'zod'
@@ -712,7 +712,7 @@ export async function GET(request: NextRequest) {
   }
 
   const { data, error } = await supabase
-    .from('hello_world_entries')
+    .from('module_template_entries')
     .select('*')
     .order('created_at', { ascending: false })
 
@@ -738,7 +738,7 @@ export async function POST(request: NextRequest) {
   }
 
   const { data, error } = await supabase
-    .from('hello_world_entries')
+    .from('module_template_entries')
     .insert({ user_id: user.id, message: result.data.message })
     .select()
     .single()
@@ -788,18 +788,18 @@ CREATE POLICY "Users can update own settings"
 Each module can define its own tables with RLS:
 
 ```sql
--- /modules-core/hello-world/database/schema.sql
-CREATE TABLE hello_world_entries (
+-- /modules-core/module-template/database/schema.sql
+CREATE TABLE module_template_entries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   message TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
-ALTER TABLE hello_world_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE module_template_entries ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can CRUD own entries"
-  ON hello_world_entries FOR ALL
+  ON module_template_entries FOR ALL
   USING (auth.uid() = user_id);
 ```
 
@@ -812,7 +812,7 @@ Modules can store per-user settings in the `module_settings.settings` JSONB colu
 ### Settings API Route
 
 ```typescript
-// /modules-core/hello-world/api/settings/route.ts
+// /modules-core/module-template/api/settings/route.ts
 export async function GET(request: NextRequest) {
   const { user, supabase } = await getAuthenticatedUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -821,7 +821,7 @@ export async function GET(request: NextRequest) {
     .from('module_settings')
     .select('settings')
     .eq('user_id', user.id)
-    .eq('module_id', 'hello-world')
+    .eq('module_id', 'module-template')
     .single()
 
   return NextResponse.json(data?.settings || {})
@@ -837,7 +837,7 @@ export async function PUT(request: NextRequest) {
     .from('module_settings')
     .upsert({
       user_id: user.id,
-      module_id: 'hello-world',
+      module_id: 'module-template',
       settings,
       updated_at: new Date().toISOString()
     }, { onConflict: 'user_id,module_id' })
@@ -855,14 +855,14 @@ Modules can provide dashboard widgets that appear on the main dashboard:
 ### Widget Component
 
 ```typescript
-// /modules-core/hello-world/components/widget.tsx
+// /modules-core/module-template/components/widget.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useSupabase } from '@/components/providers'
 
-export function HelloWorldWidget() {
+export function ModuleTemplateWidget() {
   const { session } = useSupabase()
   const [count, setCount] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -870,7 +870,7 @@ export function HelloWorldWidget() {
   useEffect(() => {
     if (!session?.access_token) return
 
-    fetch('/api/modules-core/hello-world/data', {
+    fetch('/api/modules-core/module-template/data', {
       headers: { 'Authorization': `Bearer ${session.access_token}` }
     })
       .then(res => res.json())
@@ -881,7 +881,7 @@ export function HelloWorldWidget() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Hello World</CardTitle>
+        <CardTitle>Module Template</CardTitle>
       </CardHeader>
       <CardContent>
         {loading ? 'Loading...' : `${count} entries`}
@@ -912,7 +912,7 @@ Modules can provide settings panels for the Settings page:
 ### Settings Panel Component
 
 ```typescript
-// /modules-core/hello-world/components/settings-panel.tsx
+// /modules-core/module-template/components/settings-panel.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -925,7 +925,7 @@ interface Settings {
   theme: 'light' | 'dark' | 'auto'
 }
 
-export function HelloWorldSettingsPanel() {
+export function ModuleTemplateSettingsPanel() {
   const { session } = useSupabase()
   const [settings, setSettings] = useState<Settings>({
     enableNotifications: true,
@@ -934,7 +934,7 @@ export function HelloWorldSettingsPanel() {
 
   useEffect(() => {
     // Load settings from API
-    fetch('/api/modules-core/hello-world/settings', {
+    fetch('/api/modules-core/module-template/settings', {
       headers: { 'Authorization': `Bearer ${session?.access_token}` }
     })
       .then(res => res.json())
@@ -942,7 +942,7 @@ export function HelloWorldSettingsPanel() {
   }, [session])
 
   const handleSave = async () => {
-    await fetch('/api/modules-core/hello-world/settings', {
+    await fetch('/api/modules-core/module-template/settings', {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${session?.access_token}`,
@@ -988,13 +988,13 @@ Modules define their navigation items in `module.json`:
 {
   "routes": [
     {
-      "path": "/hello-world",
-      "label": "Hello World",
+      "path": "/module-template",
+      "label": "Module Template",
       "icon": "Package",
       "sidebarPosition": "main",
       "children": [
         {
-          "path": "/hello-world/settings",
+          "path": "/module-template/settings",
           "label": "Settings",
           "icon": "Settings"
         }
@@ -1209,4 +1209,4 @@ To implement this in your own Next.js app:
 4. Add the database tables
 5. Build your first module following the template
 
-Use the `hello-world` module as a complete reference implementation.
+Use the `module-template` module as a complete reference implementation.

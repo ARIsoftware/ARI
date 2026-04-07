@@ -45,20 +45,20 @@ The module system requires two database tables: `module_settings` and `module_mi
 
 ---
 
-## 📋 Step 2: Apply Hello-World Module Schema
+## 📋 Step 2: Apply Module-Template Module Schema
 
-The hello-world module requires its own database table: `hello_world_entries`.
+The module-template module requires its own database table: `module_template_entries`.
 
 ### Instructions:
 
-1. Open the file: `/modules-core/hello-world/database/schema.sql`
+1. Open the file: `/modules-core/module-template/database/schema.sql`
 2. Copy **the entire contents**
 3. Go to Supabase Dashboard → **SQL Editor**
 4. Create a new query
 5. Paste the SQL
 6. Click **"Run"** to execute
 7. Verify table was created:
-   - `hello_world_entries` (module data)
+   - `module_template_entries` (module data)
 
 ---
 
@@ -82,9 +82,9 @@ npm run dev
 1. Navigate to `/settings` in your browser
 2. Click on the **"Features"** tab
 3. Scroll down to the **"Modules"** section
-4. You should see **"Hello World"** module listed with:
+4. You should see **"Module Template"** module listed with:
    - Package icon
-   - Name: "Hello World"
+   - Name: "Module Template"
    - Version: v1.0.0
    - Toggle switch (should be ON by default)
 
@@ -92,14 +92,14 @@ npm run dev
 
 1. Look at the left sidebar navigation
 2. You should see a new section called **"Modules"**
-3. Under it, you should see **"Hello World"** with a Package icon
+3. Under it, you should see **"Module Template"** with a Package icon
 
 ### Test 3: Visit Module Page
 
-1. Click on **"Hello World"** in the sidebar, or navigate to `/hello-world`
+1. Click on **"Module Template"** in the sidebar, or navigate to `/module-template`
 2. You should see:
    - Page loads successfully (no errors)
-   - Module header: "Hello World Module"
+   - Module header: "Module Template Module"
    - Welcome message with your email
    - Statistics card
    - Form to create entries
@@ -107,7 +107,7 @@ npm run dev
 
 ### Test 4: Create an Entry
 
-1. On the `/hello-world` page, enter a message in the input field
+1. On the `/module-template` page, enter a message in the input field
 2. Click **"Add"**
 3. Entry should appear in the list below
 4. Try clicking the delete button (trash icon) to remove it
@@ -115,10 +115,10 @@ npm run dev
 ### Test 5: Check API Routes
 
 1. Open browser DevTools (F12) → Network tab
-2. Create a new entry on the `/hello-world` page
+2. Create a new entry on the `/module-template` page
 3. You should see:
-   - POST request to `/api/modules-core/hello-world/data` (status 200)
-   - GET request to `/api/modules-core/hello-world/data` (status 200)
+   - POST request to `/api/modules-core/module-template/data` (status 200)
+   - GET request to `/api/modules-core/module-template/data` (status 200)
    - No errors in the console
 
 ---
@@ -131,7 +131,7 @@ You should now have:
 
 - ✅ Module appears in Settings → Features tab
 - ✅ Module appears in sidebar navigation
-- ✅ Module page loads at `/hello-world`
+- ✅ Module page loads at `/module-template`
 - ✅ Can create/view/delete entries
 - ✅ API routes working correctly
 - ✅ Database RLS policies enforcing user isolation
@@ -152,11 +152,11 @@ You should now have:
 
 ### 404 Error on Module Page
 
-**Symptom**: Visiting `/hello-world` shows 404
+**Symptom**: Visiting `/module-template` shows 404
 
 **Solutions**:
 1. Verify `/app/[module]/[[...slug]]/page.tsx` exists
-2. Check that `/modules-core/hello-world/module.json` has `"enabled": true`
+2. Check that `/modules-core/module-template/module.json` has `"enabled": true`
 3. Clear `.next` folder: `rm -rf .next && npm run dev`
 4. Check server logs for module loading errors
 
@@ -177,7 +177,7 @@ You should now have:
 
 **Solutions**:
 1. Go to Settings → Features → Modules
-2. Toggle the switch ON for "Hello World"
+2. Toggle the switch ON for "Module Template"
 3. Page will refresh
 4. Module should now appear in sidebar
 
@@ -224,8 +224,8 @@ Here's a complete list of files created for the module system:
 
 Now that the module system is working, you can:
 
-1. **Explore the hello-world module code** - See how it's structured
-2. **Create your own module** - Copy the hello-world template
+1. **Explore the module-template module code** - See how it's structured
+2. **Create your own module** - Copy the module-template template
 3. **Add dashboard widgets** - Modules can provide dashboard widgets
 4. **Add settings panels** - Modules can have their own settings UI
 5. **Create module dependencies** - Modules can depend on other modules
@@ -244,8 +244,8 @@ Now that the module system is working, you can:
 
 ### URL Structure
 
-- **Module Page**: `/hello-world` → `/modules-core/hello-world/app/page.tsx`
-- **Module API**: `/api/modules-core/hello-world/data` → `/modules-core/hello-world/api/data/route.ts`
+- **Module Page**: `/module-template` → `/modules-core/module-template/app/page.tsx`
+- **Module API**: `/api/modules-core/module-template/data` → `/modules-core/module-template/api/data/route.ts`
 
 ### Database Architecture
 
@@ -294,6 +294,6 @@ Now that the module system is working, you can:
 
 ---
 
-**Need Help?** Check `/modules-core/hello-world/README.md` for detailed documentation.
+**Need Help?** Check `/modules-core/module-template/README.md` for detailed documentation.
 
-**Want to Build a Module?** Use hello-world as a template and reference!
+**Want to Build a Module?** Use module-template as a template and reference!

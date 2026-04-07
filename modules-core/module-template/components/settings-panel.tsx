@@ -1,5 +1,5 @@
 /**
- * Hello World Module - Settings Panel
+ * Module Template Module - Settings Panel
  *
  * This component appears in Settings → Features when the module is enabled.
  * It demonstrates:
@@ -31,16 +31,16 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { Loader2, Save, CheckCircle2 } from 'lucide-react'
 import {
-  useHelloWorldSettings,
-  useUpdateHelloWorldSettings,
-} from '../hooks/use-hello-world'
-import type { HelloWorldSettings } from '../types'
+  useModuleTemplateSettings,
+  useUpdateModuleTemplateSettings,
+} from '../hooks/use-module-template'
+import type { ModuleTemplateSettings } from '../types'
 
 /**
  * Default settings values
  * Used when user hasn't saved any settings yet
  */
-const DEFAULT_SETTINGS: HelloWorldSettings = {
+const DEFAULT_SETTINGS: ModuleTemplateSettings = {
   // Onboarding fields (managed by main page, not settings panel)
   onboardingCompleted: true,
   sampleQuestion1: '',
@@ -56,20 +56,20 @@ const DEFAULT_SETTINGS: HelloWorldSettings = {
 }
 
 /**
- * HelloWorldSettings Component
+ * ModuleTemplateSettings Component
  *
  * Exported as a named export (not default) because it's imported
  * by the Settings page via dynamic import.
  */
-export function HelloWorldSettingsPanel() {
+export function ModuleTemplateSettingsPanel() {
   const { toast } = useToast()
 
   // TanStack Query hooks
-  const { data: savedSettings, isLoading } = useHelloWorldSettings()
-  const updateSettings = useUpdateHelloWorldSettings()
+  const { data: savedSettings, isLoading } = useModuleTemplateSettings()
+  const updateSettings = useUpdateModuleTemplateSettings()
 
   // Local state for form (merged with defaults)
-  const [settings, setSettings] = useState<HelloWorldSettings>(DEFAULT_SETTINGS)
+  const [settings, setSettings] = useState<ModuleTemplateSettings>(DEFAULT_SETTINGS)
   const [saved, setSaved] = useState(false)
 
   // Update local state when saved settings load
@@ -104,9 +104,9 @@ export function HelloWorldSettingsPanel() {
   /**
    * Helper to update settings
    */
-  const updateSetting = <K extends keyof HelloWorldSettings>(
+  const updateSetting = <K extends keyof ModuleTemplateSettings>(
     key: K,
-    value: HelloWorldSettings[K]
+    value: ModuleTemplateSettings[K]
   ) => {
     setSettings(prev => ({ ...prev, [key]: value }))
   }
@@ -127,9 +127,9 @@ export function HelloWorldSettingsPanel() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h3 className="text-lg font-medium">Hello World Settings</h3>
+        <h3 className="text-lg font-medium">Module Template Settings</h3>
         <p className="text-sm text-muted-foreground">
-          Configure your Hello World module preferences
+          Configure your Module Template module preferences
         </p>
       </div>
 
@@ -287,7 +287,7 @@ export function HelloWorldSettingsPanel() {
           </summary>
           <div className="mt-2 space-y-1 text-xs text-muted-foreground">
             <p>• Settings stored in: <code>module_settings.settings</code> (JSONB)</p>
-            <p>• API endpoint: <code>/api/modules/hello-world/settings</code></p>
+            <p>• API endpoint: <code>/api/modules/module-template/settings</code></p>
             <p>• User-specific: Each user has their own settings</p>
             <p>• Default values: Defined in DEFAULT_SETTINGS constant</p>
             <p>• Auth: Better Auth cookies (no Authorization header needed)</p>
@@ -313,8 +313,8 @@ export function HelloWorldSettingsPanel() {
  *    - Merge defaults with loaded settings
  *
  * 3. TanStack Query:
- *    - useHelloWorldSettings() - fetches current settings
- *    - useUpdateHelloWorldSettings() - saves with optimistic updates
+ *    - useModuleTemplateSettings() - fetches current settings
+ *    - useUpdateModuleTemplateSettings() - saves with optimistic updates
  *    - Automatic cache invalidation on mutation
  *
  * 4. Form Controls:

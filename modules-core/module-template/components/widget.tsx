@@ -1,5 +1,5 @@
 /**
- * Hello World Module - Dashboard Widget
+ * Module Template Module - Dashboard Widget
  *
  * This widget appears on the main dashboard when the module is enabled.
  * It demonstrates:
@@ -29,12 +29,12 @@ interface WidgetStats {
 }
 
 /**
- * HelloWorldWidget Component
+ * ModuleTemplateWidget Component
  *
  * Exported as a named export (not default) because it's imported
  * by the dashboard via dynamic import.
  */
-export function HelloWorldWidget() {
+export function ModuleTemplateWidget() {
   const [stats, setStats] = useState<WidgetStats>({ entryCount: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -49,7 +49,7 @@ export function HelloWorldWidget() {
       setError(false)
 
       // Auth is handled via cookies - no need to pass Authorization header
-      const response = await fetch('/api/modules/hello-world/data')
+      const response = await fetch('/api/modules/module-template/data')
 
       if (!response.ok) {
         throw new Error('Failed to load stats')
@@ -79,7 +79,7 @@ export function HelloWorldWidget() {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Hello World</CardTitle>
+          <CardTitle className="text-sm font-medium">Module Template</CardTitle>
           <Package className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
@@ -96,7 +96,7 @@ export function HelloWorldWidget() {
     return (
       <Card className="border-red-200">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Hello World</CardTitle>
+          <CardTitle className="text-sm font-medium">Module Template</CardTitle>
           <AlertCircle className="h-4 w-4 text-red-600" />
         </CardHeader>
         <CardContent>
@@ -120,7 +120,7 @@ export function HelloWorldWidget() {
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Hello World</CardTitle>
+        <CardTitle className="text-sm font-medium">Module Template</CardTitle>
         <Package className="h-4 w-4 text-blue-600" />
       </CardHeader>
       <CardContent>
@@ -150,7 +150,7 @@ export function HelloWorldWidget() {
           variant="ghost"
           size="sm"
           className="w-full mt-3 text-xs"
-          onClick={() => window.location.href = '/hello-world'}
+          onClick={() => window.location.href = '/module-template'}
         >
           <Package className="w-3 h-3 mr-1" />
           View Module

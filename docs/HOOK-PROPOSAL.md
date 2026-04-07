@@ -115,7 +115,7 @@ The module system **already has infrastructure** for widgets, but HD Dashboard d
 - `useModulesWithWidgets()` - React hook for widget modules
 
 **Existing Widget Examples:**
-- `/modules-core/hello-world/components/widget.tsx`
+- `/modules-core/module-template/components/widget.tsx`
 - `/modules-core/major-projects/components/widget.tsx`
 - `/modules-core/quotes/components/widget.tsx`
 

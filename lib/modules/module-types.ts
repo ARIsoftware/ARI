@@ -144,7 +144,7 @@ export interface PublicRouteConfig {
  * The complete module.json structure
  */
 export interface ModuleManifest {
-  /** Unique module identifier (kebab-case, e.g., "hello-world") */
+  /** Unique module identifier (kebab-case, e.g., "module-template") */
   id: string
   /** Group name for organizing modules in sidebar (modules with same group appear together) */
   group?: string

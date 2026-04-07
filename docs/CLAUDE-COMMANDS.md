@@ -15,7 +15,7 @@ For Codex CLI, the repo copy is not the live discovery location. Codex custom pr
 
 ### `/ari-create-module` - Create a New Module
 
-**Purpose**: Scaffolds a new module in the `modules-custom` directory using the `hello-world` template.
+**Purpose**: Scaffolds a new module in the `modules-custom` directory using the `module-template` template.
 
 **Usage**: Invoke `/ari-create-module` in Claude Code. In Codex, if you install the prompt into `~/.codex/prompts/ari-create-module.md`, invoke `/prompts:ari-create-module`.
 
@@ -31,7 +31,7 @@ For Codex CLI, the repo copy is not the live discovery location. Codex custom pr
    - Ensures folder doesn't already exist
    - Confirms target directory (`modules-custom` recommended)
 4. Creates the module structure:
-   - Copies template from `modules-core/hello-world`
+   - Copies template from `modules-core/module-template`
    - Updates `module.json` with your settings
    - Creates page component, API routes, and database schema
    - Runs `npm run generate-module-registry`
@@ -44,7 +44,7 @@ For Codex CLI, the repo copy is not the live discovery location. Codex custom pr
 
 **Best Practices**:
 - Always create new modules in `modules-custom/` (not `modules-core/`)
-- Follow the auth patterns from the hello-world template
+- Follow the auth patterns from the module-template template
 - Include RLS policies in your database schema
 - Use proper theming (Tailwind classes, not hardcoded colors)
 

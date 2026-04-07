@@ -1,11 +1,11 @@
-The user would like to create a custom module in the modules-custom directory. Each new module should start with the modules-core/hello-world module as a starting template.
+The user would like to create a custom module in the modules-custom directory. Each new module should start with the modules-core/module-template module as a starting template.
 
 ## Pre-flight Checks
 
 Before doing anything:
 1. Read `/docs/MODULES.md` thoroughly - this is the primary module documentation
 2. Read `/CLAUDE.md` for project conventions (authentication, RLS, theming)
-3. Confirm `modules-core/hello-world` exists. If not, inform the user that this template module is missing.
+3. Confirm `modules-core/module-template` exists. **If it does not exist, STOP immediately. Tell the user: "The Module Template at `modules-core/module-template` is missing — this is required as the starting template for new modules. How would you like to proceed?" Wait for the user's instructions before doing anything else.**
 4. Confirm we are at the repo root and that `modules-custom` exists. If not, create it.
 
 ## Security Requirements
@@ -134,8 +134,8 @@ Present the derived data model to the user for confirmation before building API 
 
 When approved, create the module following this order:
 
-1. **Copy template structure** from `modules-core/hello-world/`
-   - **If v0 code was provided:** Copy the template for module.json, API, hooks, types, and database structure only. Do NOT use hello-world's `app/page.tsx` — the v0 code will replace it.
+1. **Copy template structure** from `modules-core/module-template/`
+   - **If v0 code was provided:** Copy the template for module.json, API, hooks, types, and database structure only. Do NOT use `modules-core/module-template`'s `app/page.tsx` — the v0 code will replace it.
 1.5. **If v0 code was provided — Install dependencies:**
    - Follow the Dependency Resolution steps from the "v0 Code Integration" section
    - Install any missing shadcn components and npm packages before proceeding
@@ -148,7 +148,7 @@ When approved, create the module following this order:
    - Required dependencies
 3. **Create/update page component** in `app/page.tsx`
    - **If v0 code was provided:** Use the v0 component as the base for `app/page.tsx`. Apply the Code Restructuring Rules from the "v0 Code Integration" section. Extract sub-components to `components/` directory.
-   - **Random Quote under title**: Every module page MUST include a random quote displayed under the page title when the Quotes module is enabled. Follow the Hello World pattern:
+   - **Random Quote under title**: Every module page MUST include a random quote displayed under the page title when the Quotes module is enabled. Follow the Module Template pattern:
      1. Import `useModuleEnabled` from `@/lib/modules/module-hooks` and `useEffect`
      2. Check if quotes is enabled: `const { enabled: quotesEnabled, loading: quotesLoading } = useModuleEnabled('quotes')`
      3. Add state: `const [randomQuote, setRandomQuote] = useState<{ quote: string; author?: string } | null>(null)`
@@ -161,7 +161,7 @@ When approved, create the module following this order:
           </p>
         )}
         ```
-     See `modules-core/hello-world/app/page.tsx` for the complete implementation.
+     See `modules-core/module-template/app/page.tsx` for the complete implementation.
 4. **Create API routes** if needed:
    - Use `const { user, withRLS } = await getAuthenticatedUser()` (NOT supabase client)
    - Use `withRLS((db) => db.select()...)` for all database operations
@@ -169,7 +169,7 @@ When approved, create the module following this order:
    - Use `toSnakeCase()` from `@/lib/api-helpers` for responses
    - **Drizzle `numeric()` columns return STRINGS** - convert to `Number()` in GET responses before sending to client (see "Drizzle Numeric Column Handling" section below)
    - **Zod schemas MUST have human-readable error messages** on every constraint (see "Zod Validation Rules" section below)
-   - See `modules-core/hello-world/api/data/route.ts` as the reference
+   - See `modules-core/module-template/api/data/route.ts` as the reference
    - **If v0 code was provided:** Use the derived data model from the "v0 Code Integration" analysis to inform API route data shapes. Build routes that serve data in the same shape the v0 components already expect (matching the mock data structure).
 5. **Register API routes in MODULE_API_ROUTES** (REQUIRED if module has API routes):
    - Edit `/app/api/modules/[module]/[[...path]]/route.ts`
@@ -183,7 +183,7 @@ When approved, create the module following this order:
        'data/[id]': () => import('@/modules/my-module/api/data/[id]/route'), // For dynamic routes
      },
      ```
-   - See existing modules in that file for patterns (hello-world, tasks, etc.)
+   - See existing modules in that file for patterns (`modules-core/module-template`, tasks, etc.)
 6. **Create database schema** in `[module-folder]/database/schema.sql` if tables needed (this path is git-tracked so the module is fully portable as a self-contained folder)
    - Use the `supabase-postgres-best-practices` skill to verify best practices for data types, indexes, and constraints
    - Use `TEXT` type for `user_id` (matches Better Auth)
@@ -232,7 +232,7 @@ import type { MyModuleEntry } from '@/modules/my-module/types'  // Correct!
 // NOT: '@/modules-custom/my-module/types' or '@/modules-core/my-module/types'
 ```
 
-See `modules-core/hello-world/hooks/` for the reference pattern.
+See `modules-core/module-template/hooks/` for the reference pattern.
 
 ### Optimistic Updates Pattern
 
@@ -284,25 +284,25 @@ After creating dashboard components, run `npm run generate-module-registry` to r
 
 ## Submenu Implementation
 
-If the module requires a sidebar submenu, follow the Hello World module as the template:
+If the module requires a sidebar submenu, follow the Module Template module as the template:
 
 **Note:** Submenus should only contain the actual navigation links (Overview, Settings, etc.). Do NOT include the module name as a header item - the Back button provides sufficient context for users to know which module they're in.
 
-1. **Read the Hello World submenu component** at `modules-core/hello-world/components/sidebar-submenu.tsx` - copy and adapt this for your module
-2. **Read the Hello World module.json** to see how the `submenu` field is configured
+1. **Read the Module Template submenu component** at `modules-core/module-template/components/sidebar-submenu.tsx` - copy and adapt this for your module
+2. **Read the Module Template module.json** to see how the `submenu` field is configured
 3. **Register your submenu** in `/components/sidebar-submenu-renderer.tsx`:
    - Add a static import at the top: `import YourModuleSubmenu from '@/modules/your-module/components/sidebar-submenu'`
    - **IMPORTANT**: Always use `@/modules/` alias (NOT `@/modules-custom/` or `@/modules-core/`) - this allows modules to be moved between directories without code changes
    - Add an entry to the `SUBMENU_COMPONENTS` registry: `'your-module': YourModuleSubmenu`
 4. **Create sub-pages** for each submenu item (e.g., `app/settings/page.tsx`)
 
-Always reference the Hello World module's actual code as the source of truth for submenu implementation.
+Always reference the Module Template module's actual code as the source of truth for submenu implementation.
 
 ## Onboarding Section Implementation
 
-If the module requires an onboarding/setup screen, follow the **Hello World module** pattern at `modules-core/hello-world/app/page.tsx`. This provides a clean, centered card-based setup experience.
+If the module requires an onboarding/setup screen, follow the **Module Template module** pattern at `modules-core/module-template/app/page.tsx`. This provides a clean, centered card-based setup experience.
 
-**IMPORTANT**: Hello World is a template module that ALWAYS shows the onboarding screen (with a skip button) so developers can see the pattern. When creating a real module, you must modify the condition to only show onboarding until the user completes it.
+**IMPORTANT**: Module Template is a template module that ALWAYS shows the onboarding screen (with a skip button) so developers can see the pattern. When creating a real module, you must modify the condition to only show onboarding until the user completes it.
 
 ### Onboarding Pattern Overview
 
@@ -325,11 +325,11 @@ If the module requires an onboarding/setup screen, follow the **Hello World modu
    }
    ```
 
-3. **Create settings API route** (`api/settings/route.ts`) - copy from Hello World:
+3. **Create settings API route** (`api/settings/route.ts`) - copy from Module Template:
    - GET: Fetch user settings (returns empty object `{}` if none exist)
    - PUT: Create/update settings (upsert pattern using `module_id`)
 
-4. **Create TanStack Query hooks** for settings (see `modules-core/hello-world/hooks/use-hello-world.ts`):
+4. **Create TanStack Query hooks** for settings (see `modules-core/module-template/hooks/use-module-template.ts`):
    ```typescript
    export function useModuleSettings() {
      return useQuery({
@@ -376,7 +376,7 @@ If the module requires an onboarding/setup screen, follow the **Hello World modu
 
 5. **Implement onboarding UI in page component**:
 
-   **NOTE**: Hello World uses `showOnboardingDemo` state to always show the onboarding as a demo.
+   **NOTE**: Module Template uses `showOnboardingDemo` state to always show the onboarding as a demo.
    For real modules, remove that state and use `!settings?.onboardingCompleted` directly:
 
    ```tsx
@@ -393,7 +393,7 @@ If the module requires an onboarding/setup screen, follow the **Hello World modu
    }
 
    // Onboarding screen - shows until user completes it
-   // NOTE: Hello World uses `showOnboardingDemo` state instead - remove that for real modules!
+   // NOTE: Module Template uses `showOnboardingDemo` state instead - remove that for real modules!
    if (!settings?.onboardingCompleted) {
      return (
        <div className="p-6 max-w-md mx-auto">
@@ -425,7 +425,7 @@ If the module requires an onboarding/setup screen, follow the **Hello World modu
                {updateSettings.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                Get Started
              </Button>
-             {/* NOTE: Remove the "Skip to Module Demo" button from Hello World - that's only for the template */}
+             {/* NOTE: Remove the "Skip to Module Demo" button from Module Template - that's only for the template */}
            </CardContent>
          </Card>
        </div>
@@ -436,7 +436,7 @@ If the module requires an onboarding/setup screen, follow the **Hello World modu
    return (
      <div className="p-6">
        {/* Main module content */}
-       {/* NOTE: Remove the "View Onboarding Demo" button from Hello World - that's only for the template */}
+       {/* NOTE: Remove the "View Onboarding Demo" button from Module Template - that's only for the template */}
      </div>
    )
    ```
@@ -450,10 +450,10 @@ If the module requires an onboarding/setup screen, follow the **Hello World modu
 - `Loader2` from `lucide-react` for loading spinner
 
 ### Reference Files
-- **Main example**: `modules-core/hello-world/app/page.tsx` (onboarding UI pattern)
-- **Settings API**: `modules-core/hello-world/api/settings/route.ts`
-- **Hooks**: `modules-core/hello-world/hooks/use-hello-world.ts` (useHelloWorldSettings, useUpdateHelloWorldSettings)
-- **Types**: `modules-core/hello-world/types/index.ts`
+- **Main example**: `modules-core/module-template/app/page.tsx` (onboarding UI pattern)
+- **Settings API**: `modules-core/module-template/api/settings/route.ts`
+- **Hooks**: `modules-core/module-template/hooks/use-module-template.ts` (useModuleTemplateSettings, useUpdateModuleTemplateSettings)
+- **Types**: `modules-core/module-template/types/index.ts`
 
 ## Drizzle Numeric Column Handling
 
@@ -622,7 +622,7 @@ Before marking complete, verify:
 - [ ] **SECURITY: Database tables have RLS enabled** (verify in schema.sql: `ALTER TABLE ... ENABLE ROW LEVEL SECURITY`)
 - [ ] **SECURITY: No secrets, credentials, or sensitive data hardcoded or logged**
 - [ ] module.json is valid and complete
-- [ ] All API routes use `withRLS()` helper (NOT Supabase client) - see hello-world/api/data/route.ts
+- [ ] All API routes use `withRLS()` helper (NOT Supabase client) - see `modules-core/module-template/api/data/route.ts`
 - [ ] **If module has API routes**: Routes registered in `MODULE_API_ROUTES` in `/app/api/modules/[module]/[[...path]]/route.ts`
 - [ ] Drizzle schema added to `/lib/db/schema/schema.ts` (required for API routes)
 - [ ] Database `database/schema.sql` created inside the module folder (git-tracked, keeps module self-contained)
@@ -635,7 +635,7 @@ Before marking complete, verify:
 - [ ] **Mutation hooks surface API error details** (parse `err.details` from Zod validation responses)
 - [ ] **All create/edit dialogs have inline validation** (red outlines + error text below fields)
 - [ ] **Dialogs only close on `onSuccess`** (never before API confirms - user must not lose form data on error)
-- [ ] **Random quote displayed under page title** when Quotes module is enabled (follows Hello World pattern)
+- [ ] **Random quote displayed under page title** when Quotes module is enabled (follows Module Template pattern)
 - [ ] Page does NOT block on session check (no "Authenticating..." spinner)
 - [ ] **Page does NOT include layout wrappers** (no SidebarProvider, AppSidebar, DarkModeProvider, SidebarInset, or header with breadcrumbs - these are already provided by the module routing system)
 - [ ] Component uses proper theming (Tailwind classes, not hardcoded colors)
@@ -648,8 +648,8 @@ Before marking complete, verify:
 - [ ] **If onboarding exists**: Settings types include `onboardingCompleted` flag
 - [ ] **If onboarding exists**: Settings API with GET (fetch) and PUT (upsert) endpoints
 - [ ] **If onboarding exists**: Conditional render shows onboarding when `!settings?.onboardingCompleted`
-- [ ] **If onboarding exists**: Centered card UI follows Hello World pattern
-- [ ] **If onboarding exists**: Removed Hello World demo-specific code (`showOnboardingDemo` state, "Skip to Module Demo" button, "View Onboarding Demo" button)
+- [ ] **If onboarding exists**: Centered card UI follows Module Template pattern
+- [ ] **If onboarding exists**: Removed Module Template demo-specific code (`showOnboardingDemo` state, "Skip to Module Demo" button, "View Onboarding Demo" button)
 - [ ] **If v0 import used**: All mock/static data replaced with TanStack Query hooks
 - [ ] **If v0 import used**: No hardcoded data arrays remain in components
 - [ ] **If v0 import used**: All event handlers wired to real mutations
@@ -664,7 +664,7 @@ Before marking complete, verify:
 2. **ALL module code MUST be self-contained within the module directory.** Hooks, components, types, utilities — everything lives inside `modules-core/<id>/` or `modules-custom/<id>/`. NEVER place module-specific code in shared directories like `lib/hooks/`, `lib/`, or `components/`. A module must be installable by adding its single folder. A module must be deletable by removing its single folder. The ONLY exceptions are the required registration touchpoints: Drizzle schema in `/lib/db/schema/schema.ts`, API routes in `MODULE_API_ROUTES`, and submenu registration in `sidebar-submenu-renderer.tsx`.
 3. **NEVER start the dev server** — the user will do this.
 4. **Never run a .sql statement without explicit approval.**
-5. **Follow existing code patterns exactly** — use hello-world as the template.
+5. **Follow existing code patterns exactly** — use `modules-core/module-template` as the template.
 6. **API routes must use Drizzle + withRLS()** — NOT Supabase client.
 7. **Do NOT use `auth.uid()` in database RLS policies** — Better Auth doesn't support this. User isolation is enforced at the application level via `withRLS()` helper.
 8. **API route registration is MANUAL**: The `generate-module-registry` script only auto-generates page routes. API routes MUST be manually registered in `MODULE_API_ROUTES` in `/app/api/modules/[module]/[[...path]]/route.ts` — this is a Next.js/Turbopack limitation.

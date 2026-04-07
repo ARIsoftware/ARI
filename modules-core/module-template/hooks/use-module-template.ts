@@ -1,7 +1,7 @@
 /**
- * Hello World Module - TanStack Query Hooks
+ * Module Template Module - TanStack Query Hooks
  *
- * This file provides data fetching hooks for the hello-world module.
+ * This file provides data fetching hooks for the module-template module.
  * Uses TanStack Query for:
  * - Automatic caching and deduplication
  * - Optimistic updates for instant UI feedback
@@ -9,24 +9,24 @@
  * - Error handling
  *
  * Usage:
- *   import { useHelloWorldEntries, useCreateHelloWorldEntry } from '@/modules/hello-world/hooks/use-hello-world'
+ *   import { useModuleTemplateEntries, useCreateModuleTemplateEntry } from '@/modules/module-template/hooks/use-module-template'
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { HelloWorldEntry, HelloWorldSettings } from '../types'
+import type { ModuleTemplateEntry, ModuleTemplateSettings } from '../types'
 
 // Query keys
-const ENTRIES_KEY = ['hello-world-entries']
-const SETTINGS_KEY = ['hello-world-settings']
+const ENTRIES_KEY = ['module-template-entries']
+const SETTINGS_KEY = ['module-template-settings']
 
 /**
  * Fetch all entries for the current user
  */
-export function useHelloWorldEntries() {
+export function useModuleTemplateEntries() {
   return useQuery({
     queryKey: ENTRIES_KEY,
-    queryFn: async (): Promise<HelloWorldEntry[]> => {
-      const res = await fetch('/api/modules/hello-world/data')
+    queryFn: async (): Promise<ModuleTemplateEntry[]> => {
+      const res = await fetch('/api/modules/module-template/data')
       if (!res.ok) {
         const error = await res.json()
         throw new Error(error.error || 'Failed to fetch entries')
@@ -40,12 +40,12 @@ export function useHelloWorldEntries() {
 /**
  * Create a new entry with optimistic updates
  */
-export function useCreateHelloWorldEntry() {
+export function useCreateModuleTemplateEntry() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (message: string): Promise<HelloWorldEntry> => {
-      const res = await fetch('/api/modules/hello-world/data', {
+    mutationFn: async (message: string): Promise<ModuleTemplateEntry> => {
+      const res = await fetch('/api/modules/module-template/data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message }),
@@ -59,16 +59,16 @@ export function useCreateHelloWorldEntry() {
     },
     onMutate: async (newMessage) => {
       await queryClient.cancelQueries({ queryKey: ENTRIES_KEY })
-      const previous = queryClient.getQueryData<HelloWorldEntry[]>(ENTRIES_KEY)
+      const previous = queryClient.getQueryData<ModuleTemplateEntry[]>(ENTRIES_KEY)
 
-      queryClient.setQueryData<HelloWorldEntry[]>(ENTRIES_KEY, (old = []) => [
+      queryClient.setQueryData<ModuleTemplateEntry[]>(ENTRIES_KEY, (old = []) => [
         {
           id: 'temp-' + Date.now(),
           user_id: '',
           message: newMessage,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        } as HelloWorldEntry,
+        } as ModuleTemplateEntry,
         ...old,
       ])
 
@@ -88,12 +88,12 @@ export function useCreateHelloWorldEntry() {
 /**
  * Delete an entry with optimistic updates
  */
-export function useDeleteHelloWorldEntry() {
+export function useDeleteModuleTemplateEntry() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (id: string): Promise<void> => {
-      const res = await fetch(`/api/modules/hello-world/data?id=${encodeURIComponent(id)}`, {
+      const res = await fetch(`/api/modules/module-template/data?id=${encodeURIComponent(id)}`, {
         method: 'DELETE',
       })
       if (!res.ok) {
@@ -103,9 +103,9 @@ export function useDeleteHelloWorldEntry() {
     },
     onMutate: async (deletedId) => {
       await queryClient.cancelQueries({ queryKey: ENTRIES_KEY })
-      const previous = queryClient.getQueryData<HelloWorldEntry[]>(ENTRIES_KEY)
+      const previous = queryClient.getQueryData<ModuleTemplateEntry[]>(ENTRIES_KEY)
 
-      queryClient.setQueryData<HelloWorldEntry[]>(ENTRIES_KEY, (old = []) =>
+      queryClient.setQueryData<ModuleTemplateEntry[]>(ENTRIES_KEY, (old = []) =>
         old.filter(e => e.id !== deletedId)
       )
 
@@ -125,11 +125,11 @@ export function useDeleteHelloWorldEntry() {
 /**
  * Fetch module settings
  */
-export function useHelloWorldSettings() {
+export function useModuleTemplateSettings() {
   return useQuery({
     queryKey: SETTINGS_KEY,
-    queryFn: async (): Promise<Partial<HelloWorldSettings>> => {
-      const res = await fetch('/api/modules/hello-world/settings')
+    queryFn: async (): Promise<Partial<ModuleTemplateSettings>> => {
+      const res = await fetch('/api/modules/module-template/settings')
       if (!res.ok) {
         // Return empty object if no settings exist yet
         return {}
@@ -142,12 +142,12 @@ export function useHelloWorldSettings() {
 /**
  * Update module settings
  */
-export function useUpdateHelloWorldSettings() {
+export function useUpdateModuleTemplateSettings() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (settings: Partial<HelloWorldSettings>): Promise<void> => {
-      const res = await fetch('/api/modules/hello-world/settings', {
+    mutationFn: async (settings: Partial<ModuleTemplateSettings>): Promise<void> => {
+      const res = await fetch('/api/modules/module-template/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings),
@@ -159,9 +159,9 @@ export function useUpdateHelloWorldSettings() {
     },
     onMutate: async (newSettings) => {
       await queryClient.cancelQueries({ queryKey: SETTINGS_KEY })
-      const previous = queryClient.getQueryData<Partial<HelloWorldSettings>>(SETTINGS_KEY)
+      const previous = queryClient.getQueryData<Partial<ModuleTemplateSettings>>(SETTINGS_KEY)
 
-      queryClient.setQueryData<Partial<HelloWorldSettings>>(SETTINGS_KEY, (old = {}) => ({
+      queryClient.setQueryData<Partial<ModuleTemplateSettings>>(SETTINGS_KEY, (old = {}) => ({
         ...old,
         ...newSettings,
       }))

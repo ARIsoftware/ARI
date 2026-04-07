@@ -1,5 +1,5 @@
 /**
- * Hello World Module - Data API Routes
+ * Module Template Module - Data API Routes
  *
  * Reference template demonstrating ARI's API conventions:
  * - `validateRequestBody` / `validateQueryParams` for input validation
@@ -9,10 +9,10 @@
  * - All four CRUD verbs (GET / POST / PUT / DELETE)
  *
  * Endpoints:
- * - GET    /api/modules/hello-world/data       - List entries (paginated)
- * - POST   /api/modules/hello-world/data       - Create new entry
- * - PUT    /api/modules/hello-world/data       - Update an entry by id
- * - DELETE /api/modules/hello-world/data?id=x  - Delete entry by id
+ * - GET    /api/modules/module-template/data       - List entries (paginated)
+ * - POST   /api/modules/module-template/data       - Create new entry
+ * - PUT    /api/modules/module-template/data       - Update an entry by id
+ * - DELETE /api/modules/module-template/data?id=x  - Delete entry by id
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -24,7 +24,7 @@ import {
   toSnakeCase,
 } from '@/lib/api-helpers'
 import { z } from 'zod'
-import { helloWorldEntries } from '@/lib/db/schema'
+import { moduleTemplateEntries } from '@/lib/db/schema'
 import { and, eq, desc } from 'drizzle-orm'
 
 const CreateEntrySchema = z.object({
@@ -69,9 +69,9 @@ export async function GET(request: NextRequest) {
 const entries = await withRLS((db) =>
       db
         .select()
-        .from(helloWorldEntries)
-        .where(eq(helloWorldEntries.userId, user.id))
-        .orderBy(desc(helloWorldEntries.createdAt))
+        .from(moduleTemplateEntries)
+        .where(eq(moduleTemplateEntries.userId, user.id))
+        .orderBy(desc(moduleTemplateEntries.createdAt))
         .limit(limit)
         .offset(offset)
     )
@@ -81,7 +81,7 @@ const entries = await withRLS((db) =>
       count: entries?.length || 0,
     })
   } catch (error) {
-    console.error('GET /api/modules/hello-world/data error:', error instanceof Error ? error.message : error)
+    console.error('GET /api/modules/module-template/data error:', error instanceof Error ? error.message : error)
     return createErrorResponse('Internal server error', 500)
   }
 }
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     // INSERT requires explicit user_id (RLS validates but does not auto-populate).
     const data = await withRLS((db) =>
       db
-        .insert(helloWorldEntries)
+        .insert(moduleTemplateEntries)
         .values({
           userId: user.id,
           message: validation.data.message,
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ entry: toSnakeCase(data[0]) }, { status: 201 })
   } catch (error) {
-    console.error('POST /api/modules/hello-world/data error:', error instanceof Error ? error.message : error)
+    console.error('POST /api/modules/module-template/data error:', error instanceof Error ? error.message : error)
     return createErrorResponse('Internal server error', 500)
   }
 }
@@ -132,9 +132,9 @@ export async function PUT(request: NextRequest) {
 
 const data = await withRLS((db) =>
       db
-        .update(helloWorldEntries)
+        .update(moduleTemplateEntries)
         .set({ message, updatedAt: new Date().toISOString() })
-        .where(and(eq(helloWorldEntries.id, id), eq(helloWorldEntries.userId, user.id)))
+        .where(and(eq(moduleTemplateEntries.id, id), eq(moduleTemplateEntries.userId, user.id)))
         .returning()
     )
 
@@ -144,7 +144,7 @@ const data = await withRLS((db) =>
 
     return NextResponse.json({ entry: toSnakeCase(data[0]) })
   } catch (error) {
-    console.error('PUT /api/modules/hello-world/data error:', error instanceof Error ? error.message : error)
+    console.error('PUT /api/modules/module-template/data error:', error instanceof Error ? error.message : error)
     return createErrorResponse('Internal server error', 500)
   }
 }
@@ -164,13 +164,13 @@ export async function DELETE(request: NextRequest) {
 
 await withRLS((db) =>
       db
-        .delete(helloWorldEntries)
-        .where(and(eq(helloWorldEntries.id, queryValidation.data.id), eq(helloWorldEntries.userId, user.id)))
+        .delete(moduleTemplateEntries)
+        .where(and(eq(moduleTemplateEntries.id, queryValidation.data.id), eq(moduleTemplateEntries.userId, user.id)))
     )
 
     return NextResponse.json({ success: true, message: 'Entry deleted successfully' })
   } catch (error) {
-    console.error('DELETE /api/modules/hello-world/data error:', error instanceof Error ? error.message : error)
+    console.error('DELETE /api/modules/module-template/data error:', error instanceof Error ? error.message : error)
     return createErrorResponse('Internal server error', 500)
   }
 }

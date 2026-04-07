@@ -1,5 +1,5 @@
 /**
- * Hello World Module - Type Definitions
+ * Module Template Module - Type Definitions
  *
  * This file contains TypeScript type definitions for the module.
  * It demonstrates:
@@ -15,12 +15,12 @@
  */
 
 /**
- * HelloWorldEntry
+ * ModuleTemplateEntry
  *
- * Represents a row in the hello_world_entries table
+ * Represents a row in the module_template_entries table
  * Maps directly to database schema
  */
-export interface HelloWorldEntry {
+export interface ModuleTemplateEntry {
   id: string              // UUID primary key
   user_id: string         // Foreign key to auth.users
   message: string         // Entry message content
@@ -31,7 +31,7 @@ export interface HelloWorldEntry {
 /**
  * CreateEntryRequest
  *
- * Request body for POST /api/modules/hello-world/data
+ * Request body for POST /api/modules/module-template/data
  */
 export interface CreateEntryRequest {
   message: string
@@ -40,26 +40,26 @@ export interface CreateEntryRequest {
 /**
  * GetEntriesResponse
  *
- * Response from GET /api/modules/hello-world/data
+ * Response from GET /api/modules/module-template/data
  */
 export interface GetEntriesResponse {
-  entries: HelloWorldEntry[]
+  entries: ModuleTemplateEntry[]
   count: number
 }
 
 /**
  * CreateEntryResponse
  *
- * Response from POST /api/modules/hello-world/data
+ * Response from POST /api/modules/module-template/data
  */
 export interface CreateEntryResponse {
-  entry: HelloWorldEntry
+  entry: ModuleTemplateEntry
 }
 
 /**
  * DeleteEntryResponse
  *
- * Response from DELETE /api/modules/hello-world/data
+ * Response from DELETE /api/modules/module-template/data
  */
 export interface DeleteEntryResponse {
   success: boolean
@@ -67,12 +67,12 @@ export interface DeleteEntryResponse {
 }
 
 /**
- * HelloWorldSettings
+ * ModuleTemplateSettings
  *
  * Module settings stored in module_settings.settings (JSONB)
  * These are user-specific preferences for the module
  */
-export interface HelloWorldSettings {
+export interface ModuleTemplateSettings {
   // Onboarding fields (required before using module)
   // This demonstrates the onboarding pattern for modules that need initial setup
   onboardingCompleted: boolean
@@ -96,22 +96,22 @@ export interface HelloWorldSettings {
 /**
  * GetSettingsResponse
  *
- * Response from GET /api/modules/hello-world/settings
+ * Response from GET /api/modules/module-template/settings
  */
-export type GetSettingsResponse = Partial<HelloWorldSettings>
+export type GetSettingsResponse = Partial<ModuleTemplateSettings>
 
 /**
  * UpdateSettingsRequest
  *
- * Request body for PUT /api/modules/hello-world/settings
+ * Request body for PUT /api/modules/module-template/settings
  * Partial updates supported
  */
-export type UpdateSettingsRequest = Partial<HelloWorldSettings>
+export type UpdateSettingsRequest = Partial<ModuleTemplateSettings>
 
 /**
  * UpdateSettingsResponse
  *
- * Response from PUT /api/modules/hello-world/settings
+ * Response from PUT /api/modules/module-template/settings
  */
 export interface UpdateSettingsResponse {
   success: boolean
@@ -163,9 +163,9 @@ export interface ApiErrorResponse {
  *
  * 6. Usage:
  *    - Import types in components:
- *      import { HelloWorldEntry } from '../types'
+ *      import { ModuleTemplateEntry } from '../types'
  *    - Import types in API routes:
  *      import type { CreateEntryRequest } from '../../types'
  *    - Import types in other modules:
- *      import type { HelloWorldEntry } from '@/modules/hello-world/types'
+ *      import type { ModuleTemplateEntry } from '@/modules/module-template/types'
  */

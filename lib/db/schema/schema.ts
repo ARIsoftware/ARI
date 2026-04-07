@@ -10,7 +10,7 @@
 
 export * from './core-schema'
 export * from '@/modules/brainstorm/database/schema'
-export * from '@/modules/hello-world/database/schema'
+export * from '@/modules/module-template/database/schema'
 export * from '@/modules/music-player/database/schema'
 export * from '@/modules/notepad/database/schema'
 export * from '@/modules/quotes/database/schema'

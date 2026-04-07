@@ -124,6 +124,6 @@ export const POST = createPublicRouteHandler(securityConfig, async (request, con
  * since they're just health checks with no payload.
  */
 export const GET = createPublicHealthCheck(
-  '/api/modules/hello-world/webhook',
-  'Example webhook receiver for Hello World module'
+  '/api/modules/module-template/webhook',
+  'Example webhook receiver for Module Template module'
 )

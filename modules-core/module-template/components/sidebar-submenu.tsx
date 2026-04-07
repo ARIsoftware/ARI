@@ -14,17 +14,17 @@ import { Home, Settings } from 'lucide-react'
 const menuItems = [
   {
     label: 'Overview',
-    path: '/hello-world',
+    path: '/module-template',
     icon: Home,
   },
   {
     label: 'Settings',
-    path: '/hello-world/settings',
+    path: '/module-template/settings',
     icon: Settings,
   },
 ]
 
-export default function HelloWorldSubmenu({ moduleId, module }: ModuleSubmenuProps) {
+export default function ModuleTemplateSubmenu({ moduleId, module }: ModuleSubmenuProps) {
   const pathname = usePathname()
 
   return (

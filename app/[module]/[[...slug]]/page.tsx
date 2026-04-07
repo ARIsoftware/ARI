@@ -6,8 +6,8 @@
  *
  * URL Pattern: /[module]/[[...slug]]
  * Examples:
- *   /hello-world → /modules/hello-world/app/page.tsx
- *   /hello-world/settings → /modules/hello-world/app/settings/page.tsx
+ *   /module-template → /modules/module-template/app/page.tsx
+ *   /module-template/settings → /modules/module-template/app/settings/page.tsx
  *
  * IMPORTANT: This uses a registry-based approach since Next.js doesn't support
  * fully dynamic imports at build time.

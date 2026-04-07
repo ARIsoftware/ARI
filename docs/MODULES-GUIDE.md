@@ -116,11 +116,11 @@ This is the heart of your module - it tells ARI everything about it:
 
 ## Creating Your First Module
 
-The easiest way to create a module is to copy the **hello-world** template:
+The easiest way to create a module is to copy the **module-template** template:
 
 ```bash
 # Copy the template
-cp -r modules/hello-world modules/my-module
+cp -r modules/module-template modules/my-module
 
 # Edit the module.json
 # Change: id, name, description, routes path/label
@@ -311,7 +311,7 @@ For detailed troubleshooting, see:
 | Resource | Description |
 |----------|-------------|
 | `/docs/MODULES.md` | Complete technical reference |
-| `/modules/hello-world/` | Template module with all features |
+| `/modules/module-template/` | Template module with all features |
 | [Lucide Icons](https://lucide.dev) | Available icon names for manifest |
 | [Shadcn/ui](https://ui.shadcn.com) | UI component documentation |
 
