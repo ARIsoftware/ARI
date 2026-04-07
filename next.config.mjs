@@ -11,13 +11,14 @@ function git(cmd, fallback) {
   }
 }
 
-const buildNum = git("rev-list --count HEAD", "0")
-const commitSha = git("rev-parse --short HEAD", "unknown")
+const commitSha =
+  process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ||
+  git("rev-parse --short HEAD", "unknown")
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   env: {
-    NEXT_PUBLIC_ARI_VERSION: `${pkg.version}+${buildNum}`,
+    NEXT_PUBLIC_ARI_VERSION: `${pkg.version}+${commitSha}`,
     NEXT_PUBLIC_ARI_COMMIT: commitSha,
   },
   eslint: {
