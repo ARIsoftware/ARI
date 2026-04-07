@@ -197,7 +197,7 @@ export async function GET(req: NextRequest) {
       logger.info(`[Backup Verify] Method 3 (information_schema) found ${discoveredTables.length} tables`)
     } else {
       primaryMethod = 'none'
-      warnings.push('CRITICAL: All discovery methods failed. Run /migrations/backup_system_functions.sql')
+      warnings.push('CRITICAL: All discovery methods failed. Re-run lib/db/setup.sql in the Supabase SQL editor to install the backup RPC functions.')
       logger.error('[Backup Verify] All discovery methods failed!')
     }
 

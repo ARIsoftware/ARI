@@ -421,7 +421,7 @@ Comprehensive database backup and restore system with dynamic table discovery. M
 - **Export**: `/app/api/backup/export/route.ts` — auto-discovers all tables via `information_schema`, exports as executable SQL with checksums
 - **Import**: `/app/api/backup/import/route.ts` — restores from SQL backup with transaction rollback on error
 - **Verify**: `/app/api/backup/verify/route.ts` — preview what will be backed up before exporting
-- **Setup**: Run `/migrations/backup_system_functions.sql` once in Supabase SQL Editor for optimal RPC-based table discovery
+- **Setup**: Backup RPC functions (`get_all_user_tables`, `get_all_table_columns`, `get_table_row_counts`, `exec_sql`) are installed automatically by `lib/db/setup.sql` during initial setup. Re-run that file if discovery ever fails on an existing install.
 - **Debug**: `/debug` page includes backup system diagnostic tests
 
 ## Troubleshooting

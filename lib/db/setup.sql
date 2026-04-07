@@ -409,3 +409,113 @@ CREATE INDEX IF NOT EXISTS idx_brainstorm_edges_target ON "brainstorm_edges"("ta
 SET session_replication_role = 'origin';
 
 COMMIT;
+
+-- ================================================================
+-- Backup System RPC Functions
+-- ================================================================
+-- These functions power the dynamic table discovery used by the
+-- backup system at /settings > Backups. Defined OUTSIDE the
+-- transaction above so they install on a fresh database without
+-- depending on any application table.
+-- ================================================================
+
+-- Returns all user (public-schema) tables, excluding system/internal ones.
+CREATE OR REPLACE FUNCTION public.get_all_user_tables()
+RETURNS TABLE(table_name text)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, pg_catalog
+AS $$
+  SELECT t.table_name::text
+  FROM information_schema.tables t
+  WHERE t.table_schema = 'public'
+    AND t.table_type = 'BASE TABLE'
+    AND t.table_name NOT IN (
+      'spatial_ref_sys',
+      'schema_migrations',
+      'pg_stat_statements',
+      'geography_columns',
+      'geometry_columns'
+    )
+  ORDER BY t.table_name;
+$$;
+
+-- Returns column metadata for every public-schema table in one call.
+CREATE OR REPLACE FUNCTION public.get_all_table_columns()
+RETURNS TABLE(
+  table_name text,
+  column_name text,
+  data_type text,
+  is_nullable text,
+  column_default text,
+  character_maximum_length integer,
+  ordinal_position integer
+)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, pg_catalog
+AS $$
+  SELECT
+    c.table_name::text,
+    c.column_name::text,
+    c.data_type::text,
+    c.is_nullable::text,
+    c.column_default::text,
+    c.character_maximum_length::integer,
+    c.ordinal_position::integer
+  FROM information_schema.columns c
+  JOIN information_schema.tables t
+    ON t.table_schema = c.table_schema
+   AND t.table_name = c.table_name
+  WHERE c.table_schema = 'public'
+    AND t.table_type = 'BASE TABLE'
+  ORDER BY c.table_name, c.ordinal_position;
+$$;
+
+-- Returns approximate row counts for every public-schema table.
+CREATE OR REPLACE FUNCTION public.get_table_row_counts()
+RETURNS TABLE(table_name text, row_count bigint)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_catalog
+AS $$
+DECLARE
+  rec record;
+  cnt bigint;
+BEGIN
+  FOR rec IN
+    SELECT t.table_name
+    FROM information_schema.tables t
+    WHERE t.table_schema = 'public'
+      AND t.table_type = 'BASE TABLE'
+  LOOP
+    EXECUTE format('SELECT COUNT(*) FROM public.%I', rec.table_name) INTO cnt;
+    table_name := rec.table_name;
+    row_count := cnt;
+    RETURN NEXT;
+  END LOOP;
+END;
+$$;
+
+-- Executes an arbitrary read-only SQL query and returns the result as JSON.
+-- Used as a fallback by the backup discovery code. SECURITY DEFINER is safe
+-- here because the function is only callable by the service role (Supabase
+-- does not expose it to anon/authenticated by default).
+CREATE OR REPLACE FUNCTION public.exec_sql(query text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_catalog
+AS $$
+DECLARE
+  result jsonb;
+BEGIN
+  EXECUTE 'SELECT COALESCE(jsonb_agg(row_to_json(r)), ''[]''::jsonb) FROM (' || query || ') r'
+    INTO result;
+  RETURN result;
+END;
+$$;
+
+-- Restrict exec_sql to service role only (defense in depth).
+REVOKE ALL ON FUNCTION public.exec_sql(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.exec_sql(text) FROM anon, authenticated;

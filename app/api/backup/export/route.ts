@@ -247,7 +247,7 @@ async function discoverAllSchemas(client: any, tables: string[]): Promise<Record
 
     // METHOD 3: Fallback warning - schema discovery failed
     logger.warn('⚠️ Schema discovery failed - empty tables will not have CREATE TABLE statements')
-    logger.warn('Run /migrations/backup_system_functions.sql in Supabase to enable full schema discovery')
+    logger.warn('Re-run lib/db/setup.sql in Supabase to install the backup RPC functions and enable full schema discovery')
 
     return allSchemas
   } catch (error: any) {

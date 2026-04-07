@@ -698,7 +698,7 @@ export default function DatabaseTestPage() {
           methodsAvailable: result.discoveryResults,
           recommendation: result.discoveryMethod === 'rpc_function'
             ? 'Optimal - database functions working correctly'
-            : 'Run /migrations/backup_system_functions.sql for optimal performance'
+            : 'Re-run lib/db/setup.sql in Supabase to install the backup RPC functions for optimal performance'
         }
       })
       console.log('✅ Table discovery test complete:', methodLabel)
@@ -736,7 +736,7 @@ export default function DatabaseTestPage() {
           message: 'No tables discovered - all discovery methods failed',
           data: {
             found: 0,
-            hint: 'Check database connection and run /migrations/backup_system_functions.sql'
+            hint: 'Check database connection and re-run lib/db/setup.sql in the Supabase SQL editor to install the backup RPC functions'
           }
         })
         console.error('❌ No tables discovered')
