@@ -40,7 +40,7 @@ When the agent runtime supports delegation, split the audit across **3 subagents
 > If the current agent runtime does not support subagent dispatch (or the delegation tool is unavailable), fall back to running the three audits sequentially in the main thread. The audit must still complete — the parallelism is a performance optimization, not a hard requirement.
 
 ### Subagent 1 — Security
-Scope: `[module]/api/**`, `[module]/components/**`, `[module]/lib/**`, `[module]/app/**`, `[module]/hooks/**`.
+Scope: the entire module directory (`modules-core/[id]/**` or `modules-custom/[id]/**`) including `api/`, `components/`, `lib/`, `app/`, `hooks/`, `database/`, `module.json`, fixtures, and any docs. The hardcoded-credential scan in category 11 must cover **all file types**, not just TypeScript.
 Runs Part A (Security Audit — 16 categories below). Returns findings as `{severity, file, line, category, issue, risk, recommendation}`.
 
 ### Subagent 2 — Production-Readiness
@@ -152,12 +152,30 @@ await supabase.from("table").insert({ user_id, ...data })
 - [ ] Unmaintained / abandoned libraries — **Medium**
 - [ ] Packages running arbitrary code at install time — **Medium**
 
-### 11. Configuration & Secrets
-- [ ] Hardcoded secrets/API keys/tokens — **High**
+### 11. Configuration & Secrets (hardcoded credential scan — run explicitly)
+Scan **every file** in the module — including `*.ts`, `*.tsx`, `*.js`, `*.json`, `*.sql`, `*.md`, `module.json`, fixtures, and any seed/sample data — for hardcoded secrets that should live in environment variables. This check must run on every audit; do not skip it.
+
+- [ ] Hardcoded API keys, tokens, passwords, or client secrets anywhere in module files — **High**
 - [ ] `NEXT_PUBLIC_*` used for values that should be server-only — **High**
+- [ ] Secret-looking values committed to `module.json`, fixtures, or seed SQL — **High**
 - [ ] Undocumented / unvalidated env vars — **Low**
 - [ ] Internal configuration exposed via public endpoints — **Medium**
 - [ ] Debug flags or unsafe test config left enabled — **Medium**
+
+**Concrete patterns to grep for** (case-insensitive). Any match that is not clearly a placeholder, type definition, or `process.env.X` reference is **High**:
+
+- Provider key prefixes: `sk-`, `sk-ant-`, `sk-proj-`, `pk_live_`, `pk_test_`, `rk_live_`, `xoxb-`, `xoxp-`, `ghp_`, `gho_`, `ghu_`, `ghs_`, `github_pat_`, `glpat-`, `AIza`, `ya29.`, `AKIA`, `ASIA`, `eyJhbGciOi` (JWT), `-----BEGIN .* PRIVATE KEY-----`
+- Supabase / Postgres: `service_role`, `supabase.co` URLs combined with a literal key, `postgres://...:...@`, `postgresql://...:...@`
+- Generic assignment patterns: `(api[_-]?key|secret|token|password|passwd|pwd|client[_-]?secret|access[_-]?token|auth[_-]?token|bearer)\s*[:=]\s*["'][^"']{12,}["']`
+- Any string literal ≥ 32 chars of high-entropy base64/hex assigned to a variable named like a credential
+- Bearer tokens hardcoded in `fetch`/`axios` headers instead of read from `process.env`
+
+**Acceptable (not a finding)**:
+- `process.env.FOO` references
+- Placeholder strings like `"your-api-key-here"`, `"<REPLACE_ME>"`, `"xxx"` in docs/examples
+- Test fixtures clearly marked as fake (but flag as **Low** if ambiguous)
+
+Every confirmed hardcoded secret must appear in the report with file + line and the recommendation to move it to an env var (and rotate the leaked credential).
 
 ### 12. Cryptography & Password Handling
 - [ ] Custom cryptography instead of standard libraries — **High**
