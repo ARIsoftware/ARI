@@ -805,6 +805,11 @@ function main() {
   fs.writeFileSync(RELATIONS_OUTPUT_FILE, relationsBarrel, 'utf-8');
   console.log('✅ Relations barrel generated at:', RELATIONS_OUTPUT_FILE);
 
+  // Mirror lib/db/setup.sql into lib/db/setup-sql.ts so /welcome's bootstrap
+  // route always runs the canonical schema (no manual sync, no drift).
+  console.log('📝 Generating setup-sql.ts...');
+  require('./generate-setup-sql.js')();
+
   console.log('');
   console.log('Registered modules:');
   for (const [id, { dirName, folder }] of moduleMap) {
