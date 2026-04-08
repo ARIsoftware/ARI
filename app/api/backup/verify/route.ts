@@ -3,6 +3,8 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { createClient } from "@supabase/supabase-js"
 import { logger } from '@/lib/logger'
 
+export const debugRole = "backup-verify"
+
 // Create service role client for full database access
 const getServiceSupabase = () => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL

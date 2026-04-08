@@ -8,6 +8,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { getModules } from '@/lib/modules/module-registry'
+
+export const debugRole = "modules-list-all"
 import { moduleSettings } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 

@@ -8,9 +8,11 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { moduleSettings } from '@/lib/db/schema'
-import { getModules, getEnabledModule } from '@/lib/modules/module-registry'
+import { getModules } from '@/lib/modules/module-registry'
 import { safeErrorResponse } from '@/lib/api-error'
 import { eq } from 'drizzle-orm'
+
+export const debugRole = "debug-module-status"
 
 export async function GET() {
   try {
@@ -23,7 +25,6 @@ export async function GET() {
       })
     }
 
-    // Get all modules
     const allModules = await getModules()
 
     // Get user's module settings
@@ -31,33 +32,29 @@ export async function GET() {
       db.select().from(moduleSettings).where(eq(moduleSettings.userId, user.id))
     )
 
-    // Check specific modules
-    const contactsModule = await getEnabledModule('contacts')
-    const winterArcModule = await getEnabledModule('winter-arc')
-    const majorProjectsModule = await getEnabledModule('major-projects')
+    // Build a per-user enabled map: a module is enabled iff its manifest is
+    // enabled AND the user hasn't explicitly disabled it.
+    const userDisabled = new Set(
+      settings
+        .filter((s: any) => s.enabled === false)
+        .map((s: any) => s.moduleId ?? s.module_id)
+        .filter(Boolean)
+    )
+
+    const moduleChecks: Record<string, { exists: true; enabled: boolean }> = {}
+    for (const m of allModules) {
+      moduleChecks[m.id] = {
+        exists: true,
+        enabled: m.enabled !== false && !userDisabled.has(m.id),
+      }
+    }
 
     return NextResponse.json({
       authenticated: true,
       userId: user.id,
       allModules: allModules.map(m => ({ id: m.id, enabled: m.enabled })),
       userSettings: settings,
-      moduleChecks: {
-        contacts: {
-          exists: allModules.some(m => m.id === 'contacts'),
-          enabled: !!contactsModule,
-          module: contactsModule
-        },
-        'winter-arc': {
-          exists: allModules.some(m => m.id === 'winter-arc'),
-          enabled: !!winterArcModule,
-          module: winterArcModule
-        },
-        'major-projects': {
-          exists: allModules.some(m => m.id === 'major-projects'),
-          enabled: !!majorProjectsModule,
-          module: majorProjectsModule
-        }
-      }
+      moduleChecks,
     })
   } catch (error: any) {
     console.error('[Debug] Module status error:', error)

@@ -166,6 +166,32 @@ function detectExportedMethods(filePath) {
 }
 
 /**
+ * Read a route file and detect debug metadata exports:
+ *   export const debugRole = 'some-key'
+ *   export const isPublic = true
+ *
+ * These let core route files declare their identity to /debug and the
+ * security system without /debug needing to hardcode any paths.
+ */
+function detectRouteMetadata(filePath) {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const meta = {};
+    const roleMatch = content.match(/export\s+const\s+debugRole\s*=\s*['"]([^'"]+)['"]/);
+    if (roleMatch) meta.debugRole = roleMatch[1];
+    if (/export\s+const\s+isPublic\s*=\s*true\b/.test(content)) meta.isPublic = true;
+    // Reliability check: warn if a route is marked public but also pulls in
+    // the auth helper — likely an accidental contradiction.
+    if (meta.isPublic && /getAuthenticatedUser/.test(content)) {
+      console.warn(`⚠️  ${filePath}: marked isPublic=true but imports getAuthenticatedUser — likely contradiction`);
+    }
+    return meta;
+  } catch {
+    return {};
+  }
+}
+
+/**
  * Discover all core API routes under app/api/.
  * Returns array of { path, fullPath, methods }.
  */
@@ -185,11 +211,14 @@ function discoverCoreApiRoutes() {
       const routeFileJs = path.join(apiDir, routePath, 'route.js');
       const actualFile = fs.existsSync(routeFile) ? routeFile : routeFileJs;
       const methods = detectExportedMethods(actualFile);
+      const metadata = detectRouteMetadata(actualFile);
 
       return {
         path: routePath || '(root)',
         fullPath: `/api/${routePath}`,
         methods: methods.length > 0 ? methods : ['unknown'],
+        ...(metadata.debugRole ? { debugRole: metadata.debugRole } : {}),
+        ...(metadata.isPublic ? { isPublic: true } : {}),
       };
     })
     .sort((a, b) => a.fullPath.localeCompare(b.fullPath));
@@ -305,6 +334,23 @@ function generateManifest(moduleMap, moduleApiMap) {
 
   // Discover all module API routes with methods
   const moduleApiRoutes = discoverModuleApiRoutes(moduleMap, moduleApiMap);
+
+  // Append intentionally-public core routes into the top-level publicRoutes
+  // list. Core route files declare themselves with `export const isPublic = true`,
+  // so middleware, the security tab, and the public-endpoint security tester
+  // all get a single source of truth with no hardcoding in /debug.
+  for (const route of coreApiRoutes) {
+    if (route.isPublic) {
+      publicRoutes.push({
+        moduleId: 'core',
+        path: route.path,
+        fullPath: route.fullPath,
+        methods: route.methods,
+        security: { type: 'core' },
+        description: 'Core route declared public via export const isPublic = true',
+      });
+    }
+  }
 
   return {
     generatedAt: new Date().toISOString(),

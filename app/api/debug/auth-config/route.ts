@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 
+export const debugRole = "auth-config"
+
 /**
  * GET /api/debug/auth-config
  * Returns non-sensitive auth configuration details for debugging.

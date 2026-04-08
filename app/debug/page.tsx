@@ -7,6 +7,107 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AlertCircle, CheckCircle2, XCircle, Loader2, Shield, ShieldAlert, ShieldCheck, Database as DatabaseIcon, Package, Save, Key, Globe, Lock, ChevronRight } from 'lucide-react'
+import moduleManifest from '@/lib/generated/module-manifest.json'
+
+type ManifestModule = { id: string; name: string; enabled?: boolean }
+type ManifestApiRoute = { path: string; fullPath: string; moduleId: string; methods: string[] }
+type ManifestCoreRoute = { path: string; fullPath: string; methods: string[]; debugRole?: string; isPublic?: boolean }
+type ManifestPublicRoute = {
+  moduleId: string
+  path: string
+  fullPath: string
+  methods: string[]
+  security?: { type: string; rateLimit?: number } | string
+  description?: string
+}
+type Manifest = {
+  modules: ManifestModule[]
+  moduleApiRoutes: ManifestApiRoute[]
+  coreApiRoutes: ManifestCoreRoute[]
+  publicRoutes: ManifestPublicRoute[]
+}
+const MANIFEST = moduleManifest as Manifest
+
+/** HTTP methods considered mutations for security probing. */
+const MUTATION_METHODS = ['PUT', 'PATCH'] as const
+const isMutationMethod = (m: string): boolean =>
+  (MUTATION_METHODS as readonly string[]).includes(m)
+
+/**
+ * Better Auth owns its catch-all (`/api/auth/[...all]/route.ts`), so its
+ * sub-paths can't carry `debugRole` exports. This is the one place to update
+ * if Better Auth ever changes its API surface.
+ */
+const BETTER_AUTH_ROUTES = {
+  'auth-get-session': '/api/auth/get-session',
+  'auth-list-sessions': '/api/auth/list-sessions',
+} as const
+type BetterAuthRole = keyof typeof BETTER_AUTH_ROUTES
+
+/**
+ * debug-role → fully-qualified core API path. Each core route declares its
+ * own role via `export const debugRole = '...'` in its route.ts.
+ */
+const CORE_ROUTE_BY_ROLE = new Map<string, string>(
+  MANIFEST.coreApiRoutes
+    .filter((r) => !!r.debugRole)
+    .map((r) => [r.debugRole as string, r.fullPath])
+)
+
+/**
+ * Look up a core API route by its debug role. Throws loudly if the role is
+ * unknown — renaming or deleting a tagged route file without updating its
+ * `debugRole` export breaks /debug at the call site instead of silently 404ing.
+ */
+const route = (role: string): string => {
+  if (role in BETTER_AUTH_ROUTES) {
+    return BETTER_AUTH_ROUTES[role as BetterAuthRole]
+  }
+  const path = CORE_ROUTE_BY_ROLE.get(role)
+  if (!path) {
+    throw new Error(
+      `/debug: no core route tagged with debugRole='${role}' — add 'export const debugRole = "${role}"' to the relevant route.ts file and regenerate the manifest`
+    )
+  }
+  return path
+}
+
+const ENABLED_MODULES: ManifestModule[] = MANIFEST.modules.filter((m) => m.enabled !== false)
+const ENABLED_MODULE_IDS = new Set(ENABLED_MODULES.map((m) => m.id))
+const MODULE_NAME_BY_ID = new Map(MANIFEST.modules.map((m) => [m.id, m.name]))
+
+/**
+ * Group every manifest API route by its enabled moduleId. Single source of
+ * truth for /debug — used both to seed the per-module fetch tests below and
+ * to drive the Modules tab's API-route probing loop.
+ */
+const ENABLED_MODULE_API_ROUTES: ReadonlyMap<string, readonly ManifestApiRoute[]> = (() => {
+  const byModule = new Map<string, ManifestApiRoute[]>()
+  for (const r of MANIFEST.moduleApiRoutes) {
+    if (!ENABLED_MODULE_IDS.has(r.moduleId)) continue
+    const arr = byModule.get(r.moduleId) ?? []
+    arr.push(r)
+    byModule.set(r.moduleId, arr)
+  }
+  return byModule
+})()
+
+/**
+ * One "Fetch <Module Name>" test per enabled module that exposes a GET route.
+ * Prefers a static (non-parameterized) GET so the request is meaningful.
+ */
+type DynamicModuleTest = { name: string; moduleId: string; fullPath: string }
+const DYNAMIC_MODULE_TESTS: DynamicModuleTest[] = (() => {
+  const tests: DynamicModuleTest[] = []
+  for (const [moduleId, routes] of ENABLED_MODULE_API_ROUTES) {
+    const getRoutes = routes.filter((r) => r.methods.includes('GET'))
+    const preferred = getRoutes.find((r) => !r.path.includes('[')) ?? getRoutes[0]
+    if (!preferred) continue
+    const displayName = MODULE_NAME_BY_ID.get(moduleId) ?? moduleId
+    tests.push({ name: `Fetch ${displayName}`, moduleId, fullPath: preferred.fullPath })
+  }
+  return tests.sort((a, b) => a.name.localeCompare(b.name))
+})()
 
 const DATA_TOGGLE_COLORS = {
   success: { bg: 'bg-green-50 dark:bg-green-950', text: 'text-green-600 dark:text-green-400', btn: 'text-green-600 dark:text-green-400' },
@@ -37,17 +138,6 @@ function DataToggle({ data, variant = 'success' }: { data: any; variant?: 'succe
     </div>
   )
 }
-
-/** Core routes that are intentionally public (no auth required by design) */
-const KNOWN_PUBLIC_ROUTES = [
-  '/api/auth/bootstrap',      // First-run admin setup — only works when zero users exist
-  '/api/health',              // Health check for monitoring
-  '/api/health/resend',       // Resend health check
-  '/api/debug/auth-config',   // Debug auth info (non-sensitive)
-  '/api/debug/endpoints',     // Debug endpoint listing
-  '/api/onboarding/save-env', // First-run onboarding
-  '/api/test-connection',     // DB connectivity check
-]
 
 interface TestResult {
   name: string
@@ -80,17 +170,14 @@ export default function DatabaseTestPage() {
     return () => clearTimeout(timer)
   }, [])
 
-  const [testResults, setTestResults] = useState<TestResult[]>([
+  const [testResults, setTestResults] = useState<TestResult[]>(() => [
     { name: 'Supabase Client Initialization', status: 'pending' },
     { name: 'Environment Variables', status: 'pending' },
     { name: 'Network Connectivity', status: 'pending' },
     { name: 'Connection Test', status: 'pending' },
     { name: 'Authentication Status', status: 'pending' },
     { name: 'Session Status', status: 'pending' },
-    { name: 'Fetch Tasks', status: 'pending' },
-    { name: 'Fetch Contacts', status: 'pending' },
-    { name: 'Fetch Northstar Entries', status: 'pending' },
-    { name: 'Fetch Fitness Data', status: 'pending' },
+    ...DYNAMIC_MODULE_TESTS.map((t) => ({ name: t.name, status: 'pending' as const })),
     { name: 'Test RLS Policies', status: 'pending' },
   ])
   const [securityResults, setSecurityResults] = useState<SecurityTestResult[]>([])
@@ -142,8 +229,8 @@ export default function DatabaseTestPage() {
 
     async function runHealthChecks() {
       const [dbResult, resendResult] = await Promise.allSettled([
-        fetch('/api/health').then(r => r.json()),
-        fetch('/api/health/resend').then(r => r.json()),
+        fetch(route('health-database')).then(r => r.json()),
+        fetch(route('health-resend')).then(r => r.json()),
       ])
 
       setHealthChecks(prev => ({
@@ -157,7 +244,7 @@ export default function DatabaseTestPage() {
     // Auto-fetch endpoint summary on mount
     async function fetchEndpointSummary() {
       try {
-        const response = await fetch('/api/debug/endpoints')
+        const response = await fetch(route('debug-endpoints'))
         if (response.ok) {
           const data = await response.json()
           setEndpointsData(data)
@@ -208,8 +295,10 @@ export default function DatabaseTestPage() {
   const testApiEndpointSecurity = async (endpoint: string, method: string) => {
     updateSecurityResult(endpoint, method, { status: 'testing' })
 
-    // Skip known-public routes — mark as secure with explanation
-    if (KNOWN_PUBLIC_ROUTES.includes(endpoint)) {
+    // Skip routes that are intentionally public — sourced from the manifest
+    // via /api/debug/endpoints (auto-fetched on mount). No hardcoded list.
+    const knownPublic = endpointsData?.publicEndpoints?.some((e) => e.fullPath === endpoint)
+    if (knownPublic) {
       updateSecurityResult(endpoint, method, {
         status: 'secure',
         message: 'Intentionally public (no auth by design)',
@@ -301,7 +390,7 @@ export default function DatabaseTestPage() {
       // Reuse already-fetched data or fetch fresh
       let data = endpointsData
       if (!data) {
-        const response = await fetch('/api/debug/endpoints')
+        const response = await fetch(route('debug-endpoints'))
         if (!response.ok) throw new Error(`Failed to fetch endpoints: ${response.status}`)
         data = await response.json()
         setEndpointsData(data)
@@ -362,7 +451,7 @@ export default function DatabaseTestPage() {
     // Test 1: Discover modules via API
     updateModuleResult('Module Discovery', { status: 'testing' })
     try {
-      const response = await fetch('/api/modules/all')
+      const response = await fetch(route('modules-list-all'))
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
@@ -388,7 +477,7 @@ export default function DatabaseTestPage() {
       // Dynamically fetch the generated registry to compare against discovered modules
       updateModuleResult('Registry Completeness', { status: 'testing' })
       try {
-        const statusResponse = await fetch('/api/debug/module-status')
+        const statusResponse = await fetch(route('debug-module-status'))
         const statusData = statusResponse.ok ? await statusResponse.json() : null
 
         // Modules with routes defined should have pages registered
@@ -493,66 +582,71 @@ export default function DatabaseTestPage() {
         console.warn('⚠️ Some routes inaccessible:', inaccessibleRoutes)
       }
 
-      // Test 5: Module API Routes Registry (NEW - Post-Migration)
-      // Only test modules that have API routes AND are enabled
+      // Test 5: Module API Routes Registry — pulls every registered module API
+      // route from the manifest (via the shared ENABLED_MODULE_API_ROUTES map),
+      // intersects with the currently enabled modules, and probes them in
+      // parallel. No module IDs are hardcoded.
       updateModuleResult('Module API Routes', { status: 'testing' })
-      const modulesWithApiRoutes: Record<string, string[]> = {
-        'contacts': [''], // Base route
-        'motivation': ['setup', 'reorder', 'refresh-thumbnail'],
-        'winter-arc': [''] // Base route
-      }
-      const apiRouteTests: Array<{ module: string; route: string; status: string; message?: string }> = []
+      const enabledModuleIds = new Set<string>(enabledModules.map((m: any) => m.id))
+      const authHeaders = session?.access_token
+        ? { 'Authorization': `Bearer ${session.access_token}` }
+        : undefined
+
+      type ApiRouteTest = { module: string; route: string; status: string; message?: string }
+      const probeJobs: Array<Promise<ApiRouteTest>> = []
       const skippedModules: string[] = []
 
-      // Only test enabled modules
-      const enabledModuleIds = enabledModules.map((m: any) => m.id)
-
-      for (const [moduleId, testRoutes] of Object.entries(modulesWithApiRoutes)) {
-        // Skip if module is not enabled
-        if (!enabledModuleIds.includes(moduleId)) {
+      for (const moduleId of enabledModuleIds) {
+        const routes = ENABLED_MODULE_API_ROUTES.get(moduleId)
+        if (!routes || routes.length === 0) {
           skippedModules.push(moduleId)
           continue
         }
-
-        for (const route of testRoutes) {
-          const endpoint = route
-            ? `/api/modules/${moduleId}/${route}`
-            : `/api/modules/${moduleId}`
-
-          try {
-            const response = await fetch(endpoint, {
-              method: 'HEAD',
-              headers: session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}
-            })
-
-            const success = response.status === 200 || response.status === 401 || response.status === 405 // 401 = auth working, 405 = POST-only endpoint
-            apiRouteTests.push({
+        for (const r of routes) {
+          // Routes with [param] segments can't be HEAD-probed without a real ID.
+          if (r.path.includes('[')) {
+            probeJobs.push(Promise.resolve({
               module: moduleId,
-              route: endpoint,
-              status: success ? 'accessible' : 'error',
-              message: `HTTP ${response.status}`
-            })
-          } catch (error) {
-            apiRouteTests.push({
-              module: moduleId,
-              route: endpoint,
-              status: 'error',
-              message: 'Request failed'
-            })
+              route: r.fullPath,
+              status: 'accessible',
+              message: 'dynamic segment — skipped probe',
+            }))
+            continue
           }
+          probeJobs.push(
+            fetch(r.fullPath, { method: 'HEAD', headers: authHeaders })
+              .then((response): ApiRouteTest => {
+                // 200 = ok, 401 = auth wall reached, 405 = method-only endpoint
+                const success = response.status === 200 || response.status === 401 || response.status === 405
+                return {
+                  module: moduleId,
+                  route: r.fullPath,
+                  status: success ? 'accessible' : 'error',
+                  message: `HTTP ${response.status}`,
+                }
+              })
+              .catch((): ApiRouteTest => ({
+                module: moduleId,
+                route: r.fullPath,
+                status: 'error',
+                message: 'Request failed',
+              }))
+          )
         }
       }
+
+      const apiRouteTests = await Promise.all(probeJobs)
 
       const failedApiRoutes = apiRouteTests.filter(t => t.status === 'error')
       if (failedApiRoutes.length === 0) {
         updateModuleResult('Module API Routes', {
           status: 'success',
-          message: `All ${apiRouteTests.length} enabled module API routes accessible${skippedModules.length > 0 ? ` (${skippedModules.length} disabled module(s) skipped)` : ''}`,
+          message: `All ${apiRouteTests.length} enabled module API routes accessible${skippedModules.length > 0 ? ` (${skippedModules.length} module(s) without API routes)` : ''}`,
           data: {
             tested: apiRouteTests.length,
             routes: apiRouteTests,
-            skippedModules: skippedModules.length > 0 ? skippedModules : undefined,
-            info: 'Only tests API routes for enabled modules'
+            modulesWithoutApiRoutes: skippedModules.length > 0 ? skippedModules : undefined,
+            info: 'Tests every module API route declared in the manifest for enabled modules'
           }
         })
         console.log('✅ Module API routes check passed')
@@ -563,7 +657,7 @@ export default function DatabaseTestPage() {
           data: {
             failedApiRoutes,
             allTests: apiRouteTests,
-            skippedModules: skippedModules.length > 0 ? skippedModules : undefined,
+            modulesWithoutApiRoutes: skippedModules.length > 0 ? skippedModules : undefined,
             hint: 'Check MODULE_API_ROUTES registry in /app/api/modules/[module]/[[...path]]/route.ts'
           }
         })
@@ -573,7 +667,7 @@ export default function DatabaseTestPage() {
       // Test 6: Module Enabled/Disabled Status
       updateModuleResult('Module Status Check', { status: 'testing' })
       try {
-        const response = await fetch('/api/debug/module-status')
+        const response = await fetch(route('debug-module-status'))
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`)
         }
@@ -647,13 +741,16 @@ export default function DatabaseTestPage() {
     setBackupResults([])
     console.log('💾 Starting backup system diagnostics...')
 
-    // Test 1: Verify backup endpoint accessibility
+    // Single verify fetch reused by all subtests below — the route is
+    // expensive (full table discovery + row counts) so one call serves all.
+    let verifyResult: any = null
     updateBackupResult('Backup Endpoint Accessibility', { status: 'testing' })
     try {
-      const response = await fetch('/api/backup/verify')
+      const response = await fetch(route('backup-verify'))
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
+      verifyResult = await response.json()
 
       updateBackupResult('Backup Endpoint Accessibility', {
         status: 'success',
@@ -664,18 +761,17 @@ export default function DatabaseTestPage() {
       updateBackupResult('Backup Endpoint Accessibility', {
         status: 'error',
         error: error.message,
-        data: { hint: 'Check if /api/backup/verify route exists' }
+        data: { hint: 'Check if backup-verify route is registered' }
       })
       console.error('❌ Backup endpoint failed:', error)
       setIsRunningBackupTests(false)
       return
     }
 
-    // Test 2: Table Discovery Methods
+    // Test 2: Table Discovery Methods (reuses verifyResult)
     updateBackupResult('Table Discovery Test', { status: 'testing' })
     try {
-      const response = await fetch('/api/backup/verify')
-      const result = await response.json()
+      const result = verifyResult
 
       if (result.status === 'error') {
         throw new Error(result.error)
@@ -711,11 +807,10 @@ export default function DatabaseTestPage() {
       console.error('❌ Table discovery test failed:', error)
     }
 
-    // Test 3: Table Discovery Results
+    // Test 3: Table Discovery Results (reuses verifyResult)
     updateBackupResult('Table Discovery Results', { status: 'testing' })
     try {
-      const response = await fetch('/api/backup/verify')
-      const result = await response.json()
+      const result = verifyResult
 
       const foundTables = result.tablesFound
 
@@ -749,11 +844,10 @@ export default function DatabaseTestPage() {
       console.error('❌ Table discovery failed:', error)
     }
 
-    // Test 4: Row Count Summary
+    // Test 4: Row Count Summary (reuses verifyResult)
     updateBackupResult('Row Count Summary', { status: 'testing' })
     try {
-      const response = await fetch('/api/backup/verify')
-      const result = await response.json()
+      const result = verifyResult
 
       updateBackupResult('Row Count Summary', {
         status: 'success',
@@ -776,11 +870,10 @@ export default function DatabaseTestPage() {
       console.error('❌ Row count summary failed:', error)
     }
 
-    // Test 5: System Warnings Check
+    // Test 5: System Warnings Check (reuses verifyResult)
     updateBackupResult('System Warnings', { status: 'testing' })
     try {
-      const response = await fetch('/api/backup/verify')
-      const result = await response.json()
+      const result = verifyResult
 
       if (!result.warnings || result.warnings.length === 0) {
         updateBackupResult('System Warnings', {
@@ -816,7 +909,7 @@ export default function DatabaseTestPage() {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 5000)
 
-      const response = await fetch('/api/backup/export', {
+      const response = await fetch(route('backup-export'), {
         method: 'HEAD',
         signal: controller.signal
       })
@@ -861,7 +954,7 @@ export default function DatabaseTestPage() {
     console.log('🌐 Fetching endpoints data...')
 
     try {
-      const response = await fetch('/api/debug/endpoints')
+      const response = await fetch(route('debug-endpoints'))
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
@@ -886,7 +979,7 @@ export default function DatabaseTestPage() {
       // Reuse already-fetched data or fetch fresh
       let data = endpointsData
       if (!data) {
-        const response = await fetch('/api/debug/endpoints')
+        const response = await fetch(route('debug-endpoints'))
         if (!response.ok) throw new Error(`Failed to fetch endpoints: ${response.status}`)
         data = await response.json()
         setEndpointsData(data)
@@ -1018,7 +1111,7 @@ export default function DatabaseTestPage() {
     // Better Auth uses /api/auth/get-session for session checks
     updateAuthConfigResult('Auth API Endpoint', { status: 'testing' })
     try {
-      const response = await fetch('/api/auth/get-session', {
+      const response = await fetch(route('auth-get-session'), {
         method: 'GET',
         credentials: 'include'
       })
@@ -1106,7 +1199,7 @@ export default function DatabaseTestPage() {
     // Test 4: Check auth configuration via API
     updateAuthConfigResult('Auth Configuration', { status: 'testing' })
     try {
-      const response = await fetch('/api/debug/auth-config')
+      const response = await fetch(route('auth-config'))
       if (response.ok) {
         const config = await response.json()
 
@@ -1150,15 +1243,43 @@ export default function DatabaseTestPage() {
       })
     }
 
-    // Test 5: Test authorization patterns
+    // Test 5: Authorization patterns — pick probes dynamically from the manifest:
+    //   - first dynamic-segment GET route (tests ID-param protection)
+    //   - first PUT/PATCH route (tests mutation protection)
     updateAuthConfigResult('Authorization Patterns', { status: 'testing' })
     try {
-      // Test that protected routes reject unauthenticated access
-      const testRoutes = [
-        { path: '/api/contacts/test-uuid-12345', method: 'GET', name: 'Contacts by ID' },
-        { path: '/api/tasks/priorities', method: 'PUT', name: 'Task Priorities' },
-      ]
+      const enabledRoutes: ManifestApiRoute[] = []
+      for (const routes of ENABLED_MODULE_API_ROUTES.values()) enabledRoutes.push(...routes)
 
+      const idParamRoute = enabledRoutes.find((r) => r.path.includes('[') && r.methods.includes('GET'))
+      const mutationRoute = enabledRoutes.find((r) => r.methods.some(isMutationMethod))
+
+      const probeIdSubstitution = (fullPath: string) => fullPath.replace(/\[[^\]]+\]/g, 'test-uuid-12345')
+
+      const testRoutes: Array<{ path: string; method: string; name: string }> = []
+      if (idParamRoute) {
+        testRoutes.push({
+          path: probeIdSubstitution(idParamRoute.fullPath),
+          method: 'GET',
+          name: `${MODULE_NAME_BY_ID.get(idParamRoute.moduleId) ?? idParamRoute.moduleId} by ID`,
+        })
+      }
+      if (mutationRoute) {
+        const mutationMethod = mutationRoute.methods.find(isMutationMethod) ?? 'PUT'
+        testRoutes.push({
+          path: probeIdSubstitution(mutationRoute.fullPath),
+          method: mutationMethod,
+          name: `${MODULE_NAME_BY_ID.get(mutationRoute.moduleId) ?? mutationRoute.moduleId} mutation`,
+        })
+      }
+
+      if (testRoutes.length === 0) {
+        updateAuthConfigResult('Authorization Patterns', {
+          status: 'warning',
+          message: 'No installed module exposes a route suitable for probing — skipped',
+          data: { hint: 'Install a module with a dynamic-segment or PUT/PATCH route to enable this check' }
+        })
+      } else {
       const results = []
       for (const route of testRoutes) {
         try {
@@ -1198,6 +1319,7 @@ export default function DatabaseTestPage() {
           : 'Some routes may not be properly protected',
         data: { results }
       })
+      }
     } catch (error: any) {
       updateAuthConfigResult('Authorization Patterns', {
         status: 'error',
@@ -1210,7 +1332,7 @@ export default function DatabaseTestPage() {
     try {
       if (session) {
         // Try to list sessions
-        const response = await fetch('/api/auth/list-sessions', {
+        const response = await fetch(route('auth-list-sessions'), {
           method: 'GET',
           credentials: 'include'
         })
@@ -1324,7 +1446,7 @@ export default function DatabaseTestPage() {
           const controller = new AbortController()
           const timeoutId = setTimeout(() => controller.abort(), 5000)
 
-          const response = await fetch('/api/test-connection', {
+          const response = await fetch(route('test-connection'), {
             signal: controller.signal
           })
 
@@ -1363,7 +1485,7 @@ export default function DatabaseTestPage() {
           const controller = new AbortController()
           const timeoutId = setTimeout(() => controller.abort(), 5000)
 
-          const response = await fetch('/api/health', { signal: controller.signal })
+          const response = await fetch(route('health-database'), { signal: controller.signal })
           clearTimeout(timeoutId)
 
           const data = await response.json()
@@ -1507,113 +1629,64 @@ export default function DatabaseTestPage() {
       console.error('❌ Session check failed:', error)
     }
 
-    // PHASE 3: Data fetching tests via API routes (run in parallel)
-    // These test the real app data path: API route → Better Auth → Drizzle withRLS()
-    const phase3Tests = [
-      // Test 6: Fetch Tasks via API
-      (async () => {
-        updateTestResult('Fetch Tasks', { status: 'testing' })
-        try {
-          const response = await fetch('/api/modules/tasks')
-          if (!response.ok) {
-            const err = await response.json().catch(() => ({}))
-            throw new Error(err.error || `HTTP ${response.status}`)
-          }
-          const data = await response.json()
-          const count = Array.isArray(data) ? data.length : data.tasks?.length || 0
-          updateTestResult('Fetch Tasks', {
-            status: 'success',
-            message: `Found ${count} tasks via API`,
-            data: { count, source: '/api/modules/tasks' }
-          })
-        } catch (error: any) {
-          updateTestResult('Fetch Tasks', {
-            status: error.message.includes('401') || error.message.includes('Unauthorized') ? 'warning' : 'error',
-            error: error.message,
-            data: { hint: 'Tests the real API route with Better Auth + withRLS()' }
-          })
+    // PHASE 3: Data fetching tests via API routes (run in parallel).
+    // One test per installed module with a GET API route. For each successful
+    // fetch we compute RLS ownership in-place (instead of stashing the rows)
+    // so phase3Summaries holds bounded metadata even for huge result sets.
+    type Phase3Summary = {
+      rowCount: number
+      source: string
+      hasUserScoping: boolean
+      allOwnedByCurrentUser: boolean | null
+    }
+    const phase3Summaries = new Map<string, Phase3Summary>()
+
+    const phase3Tests = DYNAMIC_MODULE_TESTS.map((test) => async () => {
+      updateTestResult(test.name, { status: 'testing' })
+      try {
+        const response = await fetch(test.fullPath)
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}))
+          throw new Error(err.error || `HTTP ${response.status}`)
         }
-      })(),
+        const data = await response.json()
+        // Modules return either a bare array or { items: [...] } / { tasks: [...] } etc.
+        const rows: any[] = Array.isArray(data)
+          ? data
+          : Array.isArray((data as any)?.items) ? (data as any).items
+          : Object.values(data as Record<string, unknown>).find((v) => Array.isArray(v)) as any[] | undefined ?? []
 
-      // Test: Fetch Contacts via API
-      (async () => {
-        updateTestResult('Fetch Contacts', { status: 'testing' })
-        try {
-          const response = await fetch('/api/modules/contacts')
-          if (!response.ok) {
-            const err = await response.json().catch(() => ({}))
-            throw new Error(err.error || `HTTP ${response.status}`)
-          }
-          const data = await response.json()
-          const count = Array.isArray(data) ? data.length : 0
-          updateTestResult('Fetch Contacts', {
-            status: 'success',
-            message: `Found ${count} contacts via API`,
-            data: { count, source: '/api/modules/contacts' }
-          })
-        } catch (error: any) {
-          updateTestResult('Fetch Contacts', {
-            status: error.message.includes('401') || error.message.includes('Unauthorized') ? 'warning' : 'error',
-            error: error.message,
-            data: { hint: 'Tests the real API route with Better Auth + withRLS()' }
-          })
-        }
-      })(),
+        const sample = rows[0]
+        const hasUserScoping = !!sample && typeof sample === 'object' && ('user_id' in sample || 'userId' in sample)
+        const allOwnedByCurrentUser = hasUserScoping && user
+          ? rows.every((r: any) => r.user_id === user.id || r.userId === user.id)
+          : null
 
-      // Test: Fetch Northstar Entries via API
-      (async () => {
-        updateTestResult('Fetch Northstar Entries', { status: 'testing' })
-        try {
-          const response = await fetch('/api/modules/northstar/goals')
-          if (!response.ok) {
-            const err = await response.json().catch(() => ({}))
-            throw new Error(err.error || `HTTP ${response.status}`)
-          }
-          const data = await response.json()
-          const count = Array.isArray(data) ? data.length : 0
-          updateTestResult('Fetch Northstar Entries', {
-            status: 'success',
-            message: `Found ${count} goals via API`,
-            data: { count, source: '/api/modules/northstar/goals' }
-          })
-        } catch (error: any) {
-          updateTestResult('Fetch Northstar Entries', {
-            status: error.message.includes('401') || error.message.includes('Unauthorized') ? 'warning' : 'error',
-            error: error.message,
-            data: { hint: 'Tests the real API route with Better Auth + withRLS()' }
-          })
-        }
-      })(),
+        phase3Summaries.set(test.moduleId, {
+          rowCount: rows.length,
+          source: test.fullPath,
+          hasUserScoping,
+          allOwnedByCurrentUser,
+        })
 
-      // Test: Fetch Fitness Data via API
-      (async () => {
-        updateTestResult('Fetch Fitness Data', { status: 'testing' })
-        try {
-          const response = await fetch('/api/modules/daily-fitness')
-          if (!response.ok) {
-            const err = await response.json().catch(() => ({}))
-            throw new Error(err.error || `HTTP ${response.status}`)
-          }
-          const data = await response.json()
-          const count = Array.isArray(data) ? data.length : 0
-          updateTestResult('Fetch Fitness Data', {
-            status: 'success',
-            message: `Found ${count} fitness records via API`,
-            data: { count, source: '/api/modules/daily-fitness' }
-          })
-        } catch (error: any) {
-          updateTestResult('Fetch Fitness Data', {
-            status: error.message.includes('401') || error.message.includes('Unauthorized') ? 'warning' : 'error',
-            error: error.message,
-            data: { hint: 'Tests the real API route with Better Auth + withRLS()' }
-          })
-        }
-      })()
-    ]
+        updateTestResult(test.name, {
+          status: 'success',
+          message: `Found ${rows.length} record(s) via API`,
+          data: { count: rows.length, source: test.fullPath }
+        })
+      } catch (error: any) {
+        updateTestResult(test.name, {
+          status: error.message.includes('401') || error.message.includes('Unauthorized') ? 'warning' : 'error',
+          error: error.message,
+          data: { hint: 'Tests the real API route with Better Auth + withRLS()', source: test.fullPath }
+        })
+      }
+    })
 
-    await Promise.all(phase3Tests)
+    await Promise.all(phase3Tests.map((fn) => fn()))
 
-    // Test 10: RLS Policies Test via API
+    // RLS Policies — pick the first module summary that returned user-scoped
+    // rows. Ownership was already verified during phase 3.
     updateTestResult('Test RLS Policies', { status: 'testing' })
     try {
       if (!user) {
@@ -1623,30 +1696,40 @@ export default function DatabaseTestPage() {
           data: { note: 'Sign in to test RLS policies' }
         })
       } else {
-        // If tasks API worked above, RLS is functioning (withRLS enforces user isolation)
-        const response = await fetch('/api/modules/tasks')
-        if (!response.ok) {
-          const err = await response.json().catch(() => ({}))
-          throw new Error(err.error || `HTTP ${response.status}`)
-        }
-        const data = await response.json()
-        const tasks = Array.isArray(data) ? data : data.tasks || []
-
-        // Verify all returned tasks belong to the current user
-        const allOwned = tasks.every((t: any) => t.user_id === user.id || t.userId === user.id)
-
-        updateTestResult('Test RLS Policies', {
-          status: allOwned ? 'success' : 'error',
-          message: allOwned
-            ? `RLS working - all ${tasks.length} tasks belong to current user`
-            : 'RLS ISSUE - found tasks belonging to other users!',
-          data: {
-            userId: user.id,
-            taskCount: tasks.length,
-            allOwnedByUser: allOwned,
-            note: 'API routes use Drizzle ORM with withRLS() for user isolation'
+        let probe: (Phase3Summary & { moduleId: string }) | null = null
+        for (const [moduleId, summary] of phase3Summaries) {
+          if (summary.hasUserScoping && summary.rowCount > 0) {
+            probe = { moduleId, ...summary }
+            break
           }
-        })
+        }
+
+        if (!probe) {
+          updateTestResult('Test RLS Policies', {
+            status: 'warning',
+            message: 'No installed module returned user-scoped rows — skipped',
+            data: {
+              note: 'RLS test requires at least one module API to return rows containing user_id/userId',
+              checkedModules: Array.from(phase3Summaries.keys())
+            }
+          })
+        } else {
+          const allOwned = probe.allOwnedByCurrentUser === true
+          updateTestResult('Test RLS Policies', {
+            status: allOwned ? 'success' : 'error',
+            message: allOwned
+              ? `RLS working — all ${probe.rowCount} record(s) from ${probe.moduleId} belong to current user`
+              : `RLS ISSUE — found ${probe.moduleId} records belonging to other users!`,
+            data: {
+              userId: user.id,
+              probedModule: probe.moduleId,
+              source: probe.source,
+              rowCount: probe.rowCount,
+              allOwnedByUser: allOwned,
+              note: 'API routes use Drizzle ORM with withRLS() for user isolation'
+            }
+          })
+        }
       }
     } catch (error: any) {
       updateTestResult('Test RLS Policies', {
@@ -2027,6 +2110,16 @@ export default function DatabaseTestPage() {
                       <p className="text-red-600 dark:text-red-400 font-medium">
                         WARNING: {securitySummary.vulnerable} endpoint(s) may be publicly accessible!
                       </p>
+                      <ul className="mt-2 space-y-1">
+                        {securityResults
+                          .filter(r => r.status === 'vulnerable')
+                          .map((r, i) => (
+                            <li key={i} className="text-xs font-mono text-red-600 dark:text-red-400">
+                              <span className="inline-block min-w-[3rem]">{r.method}</span> {r.endpoint}
+                              {r.responseStatus ? ` → HTTP ${r.responseStatus}` : ''}
+                            </li>
+                          ))}
+                      </ul>
                     </div>
                   )}
                 </div>

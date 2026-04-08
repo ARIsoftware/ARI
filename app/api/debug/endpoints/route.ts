@@ -12,6 +12,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import moduleManifest from '@/lib/generated/module-manifest.json'
 
+export const debugRole = "debug-endpoints"
+
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {
     const { user } = await getAuthenticatedUser()

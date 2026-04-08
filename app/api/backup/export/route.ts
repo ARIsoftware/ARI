@@ -6,6 +6,8 @@ import { logger } from '@/lib/logger'
 import crypto from "crypto"
 import { safeErrorResponse } from '@/lib/api-error'
 
+export const debugRole = "backup-export"
+
 // Create service role client for full database access
 const getServiceSupabase = () => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL

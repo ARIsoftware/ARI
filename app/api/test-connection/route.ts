@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { safeErrorResponse } from '@/lib/api-error'
 
+export const debugRole = "test-connection"
+
 export async function GET() {
   // Require authentication for this diagnostic endpoint
   const { user } = await getAuthenticatedUser()

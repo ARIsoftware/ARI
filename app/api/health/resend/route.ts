@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getAuthenticatedUser } from "@/lib/auth-helpers"
 
 export const dynamic = "force-dynamic"
+export const debugRole = "health-resend"
 
 export async function GET() {
   const { user } = await getAuthenticatedUser()

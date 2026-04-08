@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
 
+export const debugRole = "onboarding-save-env"
+// Intentionally public — only effective during first-run setup before DATABASE_URL is configured
+export const isPublic = true
+
 /**
  * POST: Save .env.local file to project root
  * Used by the onboarding wizard to write the generated env file directly

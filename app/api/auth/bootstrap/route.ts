@@ -3,6 +3,10 @@ import { pool } from "@/lib/db/pool"
 import { auth } from "@/lib/auth"
 import { setupSql } from "@/lib/db/setup-sql"
 
+export const debugRole = "auth-bootstrap"
+// Intentionally public — only succeeds when zero users exist (first-run admin setup)
+export const isPublic = true
+
 export type BootstrapStatus =
   | "already_initialized"
   | "created"

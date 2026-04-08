@@ -52,16 +52,19 @@ const protectedRoutes = [
   "/api" // All API routes require authentication (defense-in-depth)
 ]
 
-// Static public routes (non-module)
+// Static public routes that the manifest cannot describe:
+//   /sign-in, /auth, /database-error — UI pages (not API routes)
+//   /api/auth — Better Auth's catch-all (owned by Better Auth, can't be tagged)
 const staticPublicRoutes = ["/sign-in", "/auth", "/api/auth", "/database-error"]
 
-// Get dynamic public routes from module manifest
-// These are module API routes that have publicRoutes configured in module.json
+// All other public API routes are sourced from the manifest. Both module
+// routes (declared in module.json) and core routes (declared via
+// `export const isPublic = true`) flow through manifest.publicRoutes — see
+// scripts/generate-module-registry.js.
 const modulePublicRoutes: string[] = (moduleManifest.publicRoutes || []).map(
   (route: { fullPath: string }) => route.fullPath
 )
 
-// Combine static and dynamic public routes
 const publicRoutes = [...staticPublicRoutes, ...modulePublicRoutes]
 
 export async function middleware(req: NextRequest) {
