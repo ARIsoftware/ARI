@@ -176,6 +176,7 @@ import {
   Heart as HeartIcon,
   Loader,
   Loader2,
+  Network,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -357,6 +358,7 @@ const ICON_REGISTRY: Record<string, LucideIcon> = {
   ThumbsDown,
   Loader,
   Loader2,
+  Network,
 }
 
 /**
