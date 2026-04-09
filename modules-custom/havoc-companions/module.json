@@ -1,0 +1,33 @@
+{
+  "id": "havoc-companions",
+  "group": "Entertainment",
+  "name": "Havoc Companions",
+  "description": "Three cute animal companions roam your screen and slowly cause delightful havoc to the interface.",
+  "version": "1.0.0",
+  "author": "ARI",
+  "icon": "PawPrint",
+  "enabled": false,
+  "fullscreen": false,
+  "menuPriority": 60,
+  "permissions": {
+    "database": false,
+    "api": true,
+    "dashboard": false
+  },
+  "routes": [
+    {
+      "path": "/havoc-companions",
+      "label": "Companions",
+      "icon": "PawPrint",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "globalProvider": {
+    "component": "./components/havoc-companions-provider.tsx",
+    "exportName": "HavocCompanionsProvider"
+  }
+}
