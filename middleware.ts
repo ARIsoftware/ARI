@@ -1,4 +1,4 @@
-import { hasSessionCookie } from "@/lib/auth-middleware"
+import { hasSessionCookie, hasApiKeyHeader } from "@/lib/auth-middleware"
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 // Import the generated module manifest to get public routes
@@ -184,9 +184,14 @@ export async function middleware(req: NextRequest) {
     const hasSession = hasSessionCookie(req.cookies)
 
     if (!hasSession) {
-      // For API routes, return JSON 401 instead of redirecting to HTML page
-      // This prevents "Unexpected token '<'" errors when client fetches expect JSON
+      // For API routes, check for API key header as alternative auth
       if (pathname.startsWith('/api')) {
+        if (hasApiKeyHeader(req.headers)) {
+          // Format looks valid — let request through for full validation
+          // in getAuthenticatedUser()
+          return response
+        }
+        // No session cookie and no valid API key header
         return NextResponse.json(
           { error: 'Unauthorized' },
           { status: 401 }

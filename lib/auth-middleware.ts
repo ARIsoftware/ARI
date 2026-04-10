@@ -9,6 +9,10 @@ const BETTER_AUTH_COOKIE_NAME = "better-auth.session_token"
 // Minimum length for a valid session token (prevents obviously invalid tokens)
 const MIN_TOKEN_LENGTH = 32
 
+// API key format: ari_k_ + 64 hex chars = 70 chars minimum
+const API_KEY_PREFIX = "ari_k_"
+const MIN_API_KEY_LENGTH = 38
+
 /**
  * Check if a session cookie exists and has valid format.
  * This is a quick check for middleware - full validation happens server-side.
@@ -39,4 +43,15 @@ export function hasSessionCookie(cookies: { get: (name: string) => { value: stri
   }
 
   return true
+}
+
+/**
+ * Check if the request has a valid-format API key header.
+ * Lightweight format check only — full validation (hash lookup, expiry, IP)
+ * happens in getAuthenticatedUser().
+ */
+export function hasApiKeyHeader(headers: { get: (name: string) => string | null }): boolean {
+  const apiKey = headers.get('x-api-key')
+  if (!apiKey) return false
+  return apiKey.startsWith(API_KEY_PREFIX) && apiKey.length >= MIN_API_KEY_LENGTH
 }

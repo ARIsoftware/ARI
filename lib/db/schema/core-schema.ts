@@ -153,6 +153,61 @@ export const userPreferences = pgTable("user_preferences", {
 ]);
 
 // =============================================================================
+// API KEY TABLES
+// =============================================================================
+
+export const apiKeys = pgTable("api_keys", {
+	id: text().primaryKey().notNull(),
+	userId: text("user_id").notNull(),
+	label: varchar({ length: 255 }).notNull(),
+	keyHash: text("key_hash").notNull(),
+	keyPrefix: varchar("key_prefix", { length: 12 }).notNull(),
+	expiresAt: timestamp("expires_at", { withTimezone: true, mode: 'string' }),
+	allowedIps: text("allowed_ips").array(),
+	lastUsedAt: timestamp("last_used_at", { withTimezone: true, mode: 'string' }),
+	requestCount: integer("request_count").default(0).notNull(),
+	revoked: boolean().default(false).notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_api_keys_key_hash").using("btree", table.keyHash.asc().nullsLast().op("text_ops")),
+	index("idx_api_keys_user_id").using("btree", table.userId.asc().nullsLast().op("text_ops")),
+	foreignKey({
+		columns: [table.userId],
+		foreignColumns: [user.id],
+		name: "api_keys_user_id_fkey"
+	}).onDelete("cascade"),
+	pgPolicy("api_keys_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("api_keys_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("api_keys_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("api_keys_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+]);
+
+export const apiKeyUsageLogs = pgTable("api_key_usage_logs", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	apiKeyId: text("api_key_id").notNull(),
+	userId: text("user_id").notNull(),
+	endpoint: text().notNull(),
+	method: varchar({ length: 10 }).notNull(),
+	statusCode: integer("status_code").notNull(),
+	ipAddress: text("ip_address"),
+	userAgent: text("user_agent"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_api_key_usage_logs_key_created").using("btree", table.apiKeyId.asc().nullsLast().op("text_ops"), table.createdAt.desc().nullsFirst()),
+	index("idx_api_key_usage_logs_user_id").using("btree", table.userId.asc().nullsLast().op("text_ops")),
+	foreignKey({
+		columns: [table.apiKeyId],
+		foreignColumns: [apiKeys.id],
+		name: "api_key_usage_logs_api_key_id_fkey"
+	}).onDelete("cascade"),
+	pgPolicy("api_key_usage_logs_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("api_key_usage_logs_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("api_key_usage_logs_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("api_key_usage_logs_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+]);
+
+// =============================================================================
 // SHARED TABLES (not owned by any specific module)
 // =============================================================================
 

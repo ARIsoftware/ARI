@@ -240,7 +240,7 @@ END $$;
 #### Keyboard Shortcuts
 | Shortcut | Action |
 |----------|--------|
-| `Cmd+K` | Open command palette |
+| `Cmd+K` (`⌘K`) | Open command palette |
 | `Cmd+B` | Toggle sidebar visibility |
 | `Cmd+D` | Enter drag-and-drop mode for sidebar reordering |
 

@@ -38,7 +38,7 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.key === "K" && e.ctrlKey && e.shiftKey) {
+      if (e.key === "k" && e.metaKey && !e.shiftKey) {
         e.preventDefault()
         setOpen(!open)
       }

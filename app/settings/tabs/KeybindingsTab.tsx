@@ -13,7 +13,7 @@ interface KeyBinding {
 const KEYBINDINGS: KeyBinding[] = [
   {
     id: "command-palette",
-    keys: ["Ctrl", "⇧", "K"],
+    keys: ["⌘", "K"],
     description: "Open command palette",
   },
   {
@@ -60,7 +60,7 @@ export function KeybindingsTab(): React.ReactElement {
             Keyboard Shortcuts
           </CardTitle>
           <CardDescription>
-            Navigate ARI faster with these keyboard shortcuts. All shortcuts use Ctrl + Shift + key.
+            Navigate ARI faster with these keyboard shortcuts.
           </CardDescription>
         </CardHeader>
         <CardContent>

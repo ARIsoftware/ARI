@@ -1867,7 +1867,7 @@ export default function DatabaseTestPage() {
     <div className="container mx-auto p-6 max-w-7xl">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-4xl font-bold tracking-tight">Test Dashboard</h1>
+        <h1 className="text-4xl font-bold tracking-tight">System Testing</h1>
         <p className="text-muted-foreground mt-2">Comprehensive system testing and diagnostics</p>
       </div>
 
@@ -2702,7 +2702,7 @@ export default function DatabaseTestPage() {
                         <CardContent>
                           <ul className="space-y-1">
                             {endpointsData.warnings.map((warning, i) => (
-                              <li key={i} className="text-sm text-yellow-200">{warning}</li>
+                              <li key={i} className="text-sm text-yellow-900 dark:text-yellow-200">{warning}</li>
                             ))}
                           </ul>
                         </CardContent>

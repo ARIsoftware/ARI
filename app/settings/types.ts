@@ -68,6 +68,34 @@ export interface VerificationResult {
   extraTables: string[]
 }
 
+// API Key types
+export interface ApiKey {
+  id: string
+  label: string
+  key_prefix: string
+  expires_at: string | null
+  allowed_ips: string[] | null
+  last_used_at: string | null
+  request_count: number
+  revoked: boolean
+  created_at: string
+}
+
+export interface ApiKeyUsageLog {
+  id: string
+  endpoint: string
+  method: string
+  status_code: number
+  ip_address: string | null
+  user_agent: string | null
+  created_at: string
+}
+
+export interface ApiKeyCreateResponse {
+  key: ApiKey
+  raw_key: string
+}
+
 export interface FontOption {
   value: string
   label: string

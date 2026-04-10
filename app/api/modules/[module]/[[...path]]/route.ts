@@ -22,6 +22,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import moduleManifest from '@/lib/generated/module-manifest.json'
 import { MODULE_API_ROUTES } from '@/lib/generated/module-api-registry'
+import { recordApiKeyUsage } from '@/lib/api-keys'
 
 /**
  * Public routes from module manifest
@@ -61,19 +62,21 @@ async function handleRequest(
   const pathArray = path || []
   const apiPath = pathArray.join('/')
 
+  const apiKeyValue = request.headers.get('x-api-key')
+
   try {
     // Check if this is a public route (configured in module.json publicRoutes)
     // Public routes skip authentication but must implement their own security
     const isPublic = isPublicRoute(module, apiPath, method)
 
     if (!isPublic) {
-      // Lightweight cookie check — avoids a DB round-trip here.
+      // Lightweight auth check — avoids a DB round-trip here.
       // The actual auth verification + module-enabled check happens
       // inside each module handler via getAuthenticatedUser().
       const cookieStore = await cookies()
       const sessionCookie = cookieStore.get('better-auth.session_token')
         || cookieStore.get('__Secure-better-auth.session_token')
-      if (!sessionCookie) {
+      if (!sessionCookie && !apiKeyValue) {
         return NextResponse.json(
           { error: 'Unauthorized' },
           { status: 401 }
@@ -144,11 +147,35 @@ async function handleRequest(
       )
     }
 
-    // Execute the appropriate HTTP method handler
-    // Pass both request and context (context contains params for module handler to use)
-    // Module handlers receive: (request: NextRequest, context: { params: Promise<RouteParams> })
-    // If we detected a dynamic route, pass transformed params, otherwise pass original
-    return await handler[method](request, { params: dynamicParams || params })
+    // Execute the handler
+    const result = await handler[method](request, { params: dynamicParams || params })
+
+    // Log API key usage (fire-and-forget) — no extra DB lookup needed,
+    // getAuthenticatedUser() inside the handler already resolved the key
+    if (apiKeyValue) {
+      const endpoint = `/api/modules/${module}${apiPath ? '/' + apiPath : ''}`
+      // Read API key metadata set by getAuthenticatedUser() via response header
+      // We pass request info so the logging in auth-helpers has it available
+      const { hashApiKey, lookupApiKey } = await import('@/lib/api-keys')
+      const keyHash = hashApiKey(apiKeyValue)
+      lookupApiKey(keyHash).then((keyRow) => {
+        if (keyRow) {
+          recordApiKeyUsage({
+            apiKeyId: keyRow.id,
+            userId: keyRow.userId,
+            endpoint,
+            method,
+            statusCode: result.status,
+            ipAddress: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+              || request.headers.get('x-real-ip')
+              || null,
+            userAgent: request.headers.get('user-agent'),
+          })
+        }
+      }).catch(() => {})
+    }
+
+    return result
   } catch (error: any) {
     // Log error for debugging
     console.error(`[Module API ${module}/${apiPath}] Error:`, error)

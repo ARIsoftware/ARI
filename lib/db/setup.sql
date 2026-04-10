@@ -165,6 +165,59 @@ ALTER TABLE "module_migrations" ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "module_migrations_rls_all" ON "module_migrations" FOR ALL TO public USING (true) WITH CHECK (true);
 
 -- ================================================================
+-- API KEY TABLES
+-- ================================================================
+
+-- Table: api_keys
+CREATE TABLE IF NOT EXISTS "api_keys" (
+  "id" TEXT NOT NULL,
+  "user_id" TEXT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "label" VARCHAR(255) NOT NULL,
+  "key_hash" TEXT NOT NULL,
+  "key_prefix" VARCHAR(12) NOT NULL,
+  "expires_at" TIMESTAMPTZ,
+  "allowed_ips" TEXT[],
+  "last_used_at" TIMESTAMPTZ,
+  "request_count" INTEGER NOT NULL DEFAULT 0,
+  "revoked" BOOLEAN NOT NULL DEFAULT FALSE,
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY ("id")
+);
+ALTER TABLE "api_keys" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "api_keys_rls_select" ON "api_keys" FOR SELECT TO public
+  USING (user_id = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY "api_keys_rls_insert" ON "api_keys" FOR INSERT TO public
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY "api_keys_rls_update" ON "api_keys" FOR UPDATE TO public
+  USING (user_id = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY "api_keys_rls_delete" ON "api_keys" FOR DELETE TO public
+  USING (user_id = (SELECT current_setting('app.current_user_id')));
+
+-- Table: api_key_usage_logs
+CREATE TABLE IF NOT EXISTS "api_key_usage_logs" (
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "api_key_id" TEXT NOT NULL REFERENCES "api_keys"("id") ON DELETE CASCADE,
+  "user_id" TEXT NOT NULL,
+  "endpoint" TEXT NOT NULL,
+  "method" VARCHAR(10) NOT NULL,
+  "status_code" INTEGER NOT NULL,
+  "ip_address" TEXT,
+  "user_agent" TEXT,
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY ("id")
+);
+ALTER TABLE "api_key_usage_logs" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "api_key_usage_logs_rls_select" ON "api_key_usage_logs" FOR SELECT TO public
+  USING (user_id = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY "api_key_usage_logs_rls_insert" ON "api_key_usage_logs" FOR INSERT TO public
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY "api_key_usage_logs_rls_update" ON "api_key_usage_logs" FOR UPDATE TO public
+  USING (user_id = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY "api_key_usage_logs_rls_delete" ON "api_key_usage_logs" FOR DELETE TO public
+  USING (user_id = (SELECT current_setting('app.current_user_id')));
+
+-- ================================================================
 -- MODULE TABLES
 -- ================================================================
 
@@ -387,6 +440,10 @@ CREATE INDEX IF NOT EXISTS idx_user_preferences_user_id ON "user_preferences"("u
 CREATE INDEX IF NOT EXISTS idx_module_settings_user_id ON "module_settings"("user_id");
 CREATE INDEX IF NOT EXISTS idx_module_settings_module_id ON "module_settings"("module_id");
 CREATE INDEX IF NOT EXISTS idx_module_migrations_module_id ON "module_migrations"("module_id");
+CREATE INDEX IF NOT EXISTS idx_api_keys_key_hash ON "api_keys"("key_hash");
+CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON "api_keys"("user_id");
+CREATE INDEX IF NOT EXISTS idx_api_key_usage_logs_key_created ON "api_key_usage_logs"("api_key_id", "created_at" DESC);
+CREATE INDEX IF NOT EXISTS idx_api_key_usage_logs_user_id ON "api_key_usage_logs"("user_id");
 CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON "tasks"("user_id");
 CREATE INDEX IF NOT EXISTS idx_tasks_user_id_completed ON "tasks"("user_id", "completed");
 CREATE INDEX IF NOT EXISTS idx_tasks_completed ON "tasks"("completed");

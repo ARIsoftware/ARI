@@ -24,6 +24,7 @@ import {
   NotificationsTab,
   SecurityTab,
   IntegrationsTab,
+  ApiTab,
   BackupsTab,
 } from "./tabs"
 import {
@@ -406,7 +407,7 @@ export default function SettingsPage(): React.ReactElement {
           </TopBar>
 
           <main className="flex-1 bg-background">
-            <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8 lg:px-8">
+            <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-8 lg:px-8">
               <div className="flex flex-col gap-3">
                 <Badge className="w-fit text-sm font-medium">Crafted for focus-first teams</Badge>
                 <h1 className="text-3xl font-semibold tracking-tight text-foreground">Settings</h1>
@@ -422,8 +423,9 @@ export default function SettingsPage(): React.ReactElement {
                     <TabsTrigger value="themes">Themes</TabsTrigger>
                     <TabsTrigger value="keybindings">Commands</TabsTrigger>
                     <TabsTrigger value="notifications">Notifications</TabsTrigger>
-                    <TabsTrigger value="security">Security</TabsTrigger>
                     <TabsTrigger value="integrations">Integrations</TabsTrigger>
+                    <TabsTrigger value="security">Security</TabsTrigger>
+                    <TabsTrigger value="api">API</TabsTrigger>
                     <TabsTrigger value="backups">Backups</TabsTrigger>
                   </TabsList>
                   <div className="flex items-center gap-2">
@@ -494,6 +496,10 @@ export default function SettingsPage(): React.ReactElement {
 
                 <TabsContent value="integrations">
                   <IntegrationsTab />
+                </TabsContent>
+
+                <TabsContent value="api">
+                  <ApiTab />
                 </TabsContent>
 
                 <TabsContent value="backups">
