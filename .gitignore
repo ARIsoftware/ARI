@@ -132,3 +132,8 @@ preflight.yml
 
 # pnpm workspace config (local security hardening)
 pnpm-workspace.yaml
+
+# Supabase local runtime files
+supabase/.temp/
+supabase/.branches/
+supabase/.env
