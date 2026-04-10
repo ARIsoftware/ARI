@@ -10,11 +10,12 @@
  * Called by install.sh after Homebrew + Node.js are bootstrapped.
  */
 
-const { execSync, exec: execCb } = require('child_process');
+const { execSync, exec: execCb, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const os = require('os');
+const crypto = require('crypto');
 
 // ── ANSI Colors & Symbols ───────────────────────────────────────────────────
 
@@ -306,6 +307,36 @@ function detectGhCli() {
   return { installed: !!out, version: out ? parseVersion(out) : null };
 }
 
+function detectDocker() {
+  const version = run('docker --version');
+  if (!version) return { installed: false, running: false, version: null };
+  const running = !!run('docker info');
+  return { installed: true, running, version: parseVersion(version) };
+}
+
+async function waitForDocker(initialStatus) {
+  if (!initialStatus.installed) {
+    console.log(`  ${SYM_WARN} ${yellow('Docker is not installed.')}`);
+    console.log(`  ${dim('Install Docker Desktop: https://www.docker.com/products/docker-desktop')}`);
+    return false;
+  }
+
+  const maxRetries = 2;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    console.log(`  ${SYM_WARN} ${yellow('Docker is not running.')}`);
+    console.log('');
+    console.log(`  Please start Docker and wait until it is ready.`);
+
+    await pressEnter('Then press ENTER to continue');
+    console.log('');
+
+    if (detectDocker().running) return true;
+  }
+
+  console.log(`  ${dim('Skipping local Supabase setup — Docker is required.')}`);
+  return false;
+}
+
 // ── Tool Definitions ────────────────────────────────────────────────────────
 
 const TOOLS = [
@@ -586,9 +617,393 @@ async function installDependencies(targetDir) {
   }
 }
 
+// ── Local Supabase Setup ───────────────────────────────────────────────────
+
+function parseSupabaseEnv(targetDir) {
+  const raw = run(`cd "${targetDir}" && supabase status -o env`);
+  if (!raw) return null;
+
+  const vars = {};
+  for (const line of raw.split('\n')) {
+    const match = line.match(/^([A-Z_]+)="?(.*?)"?$/);
+    if (match) vars[match[1]] = match[2];
+  }
+  return vars;
+}
+
+function readExistingEnv(filePath) {
+  const vars = {};
+  try {
+    const content = fs.readFileSync(filePath, 'utf8');
+    for (const line of content.split('\n')) {
+      const match = line.match(/^([A-Z_]+)=(.*)$/);
+      if (match) vars[match[1]] = match[2];
+    }
+  } catch { /* file doesn't exist or unreadable */ }
+  return vars;
+}
+
+// SYNC: env key mapping is duplicated in the embedded cli.js writeEnvFile(). Keep both in sync.
+function generateEnvFile(targetDir, supabaseVars) {
+  const envPath = path.join(targetDir, '.env.supabase.local');
+  const existing = readExistingEnv(envPath);
+
+  const secret = existing.BETTER_AUTH_SECRET
+    || crypto.randomBytes(32).toString('base64');
+
+  const adminPassword = existing.ARI_FIRST_RUN_ADMIN_PASSWORD
+    || crypto.randomBytes(16).toString('base64url');
+
+  const envContent = [
+    `NEXT_PUBLIC_SUPABASE_URL=${supabaseVars.API_URL || ''}`,
+    `NEXT_PUBLIC_SUPABASE_ANON_KEY=${supabaseVars.ANON_KEY || ''}`,
+    `SUPABASE_SERVICE_ROLE_KEY=${supabaseVars.SERVICE_ROLE_KEY || ''}`,
+    `DATABASE_URL=${supabaseVars.DB_URL || ''}`,
+    `BETTER_AUTH_SECRET=${secret}`,
+    `BETTER_AUTH_URL=http://localhost:3000`,
+    `ARI_FIRST_RUN_ADMIN_EMAIL=local@ari.software`,
+    `ARI_FIRST_RUN_ADMIN_PASSWORD=${adminPassword}`,
+    '', // trailing newline
+  ].join('\n');
+
+  fs.writeFileSync(envPath, envContent);
+  return { secret, adminPassword, databaseUrl: supabaseVars.DB_URL };
+}
+
+async function runSetupSql(targetDir, databaseUrl) {
+  const setupSqlPath = path.join(targetDir, 'lib', 'db', 'setup.sql');
+  if (!fs.existsSync(setupSqlPath)) return false;
+
+  try {
+    const pg = require(path.join(targetDir, 'node_modules', 'pg'));
+    const sql = fs.readFileSync(setupSqlPath, 'utf8');
+    const client = new pg.Client({ connectionString: databaseUrl, ssl: false });
+    await client.connect();
+    await client.query(sql);
+    await client.end();
+    return true;
+  } catch (err) {
+    // Fallback: try psql
+    const psqlResult = run(`psql "${databaseUrl}" -f "${setupSqlPath}"`)
+      || run(`/opt/homebrew/opt/libpq/bin/psql "${databaseUrl}" -f "${setupSqlPath}"`);
+    if (psqlResult !== null) return true;
+    throw err;
+  }
+}
+
+function createCliLauncher(targetDir) {
+  const ariDir = path.join(targetDir, '.ari');
+  if (!fs.existsSync(ariDir)) fs.mkdirSync(ariDir, { recursive: true });
+
+  // .ari/cli.js
+  const cliContent = `#!/usr/bin/env node
+
+/**
+ * ARI CLI — Local development helper
+ * Usage: ./ari start | stop | status
+ */
+
+const { execSync, spawn } = require('child_process');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+
+const ROOT = path.resolve(__dirname, '..');
+const ENV_FILE = path.join(ROOT, '.env.supabase.local');
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+const YELLOW = '\\x1b[1;33m';
+const GREEN = '\\x1b[1;32m';
+const RED = '\\x1b[1;31m';
+const DIM = '\\x1b[2m';
+const RESET = '\\x1b[0m';
+
+function run(cmd) {
+  try {
+    return execSync(cmd, { encoding: 'utf8', stdio: 'pipe', cwd: ROOT }).trim();
+  } catch {
+    return null;
+  }
+}
+
+function isDockerRunning() {
+  return !!run('docker info');
+}
+
+function isSupabaseRunning() {
+  const out = run('supabase status');
+  return out && out.includes('API URL');
+}
+
+function parseSupabaseEnv() {
+  const raw = run('supabase status -o env');
+  if (!raw) return null;
+  const vars = {};
+  for (const line of raw.split('\\n')) {
+    const match = line.match(/^([A-Z_]+)="?(.*?)"?$/);
+    if (match) vars[match[1]] = match[2];
+  }
+  return vars;
+}
+
+function readExistingEnv() {
+  if (!fs.existsSync(ENV_FILE)) return {};
+  const vars = {};
+  try {
+    for (const line of fs.readFileSync(ENV_FILE, 'utf8').split('\\n')) {
+      const match = line.match(/^([A-Z_]+)=(.*)$/);
+      if (match) vars[match[1]] = match[2];
+    }
+  } catch {}
+  return vars;
+}
+
+// SYNC: env key mapping is duplicated in the installer generateEnvFile(). Keep both in sync.
+function writeEnvFile(supabaseVars) {
+  const existing = readExistingEnv();
+  const secret = existing.BETTER_AUTH_SECRET || crypto.randomBytes(32).toString('base64');
+  const adminPassword = existing.ARI_FIRST_RUN_ADMIN_PASSWORD || crypto.randomBytes(16).toString('base64url');
+
+  const content = [
+    'NEXT_PUBLIC_SUPABASE_URL=' + (supabaseVars.API_URL || ''),
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY=' + (supabaseVars.ANON_KEY || ''),
+    'SUPABASE_SERVICE_ROLE_KEY=' + (supabaseVars.SERVICE_ROLE_KEY || ''),
+    'DATABASE_URL=' + (supabaseVars.DB_URL || ''),
+    'BETTER_AUTH_SECRET=' + secret,
+    'BETTER_AUTH_URL=http://localhost:3000',
+    'ARI_FIRST_RUN_ADMIN_EMAIL=local@ari.software',
+    'ARI_FIRST_RUN_ADMIN_PASSWORD=' + adminPassword,
+    '',
+  ].join('\\n');
+
+  fs.writeFileSync(ENV_FILE, content);
+  return { secret, adminPassword };
+}
+
+// ── Commands ───────────────────────────────────────────────────────────────
+
+function start() {
+  // Check Docker
+  if (!isDockerRunning()) {
+    console.log('\\n  ' + YELLOW + '⚠' + RESET + ' Docker is not running.');
+    console.log('  Please start Docker and wait until it is ready.\\n');
+    process.exit(1);
+  }
+
+  // Start Supabase (idempotent)
+  if (!isSupabaseRunning()) {
+    console.log('  Starting Supabase...');
+    try {
+      execSync('supabase start', { stdio: 'inherit', cwd: ROOT });
+    } catch {
+      console.log('\\n  ' + RED + '✘' + RESET + ' Failed to start Supabase.');
+      process.exit(1);
+    }
+  } else {
+    console.log('  ' + GREEN + '✔' + RESET + ' Supabase is already running');
+  }
+
+  // Regenerate env file
+  const vars = parseSupabaseEnv();
+  if (vars) {
+    writeEnvFile(vars);
+    console.log('  ' + GREEN + '✔' + RESET + ' .env.supabase.local updated');
+  }
+
+  console.log('');
+
+  // Start Next.js dev server (foreground)
+  const child = spawn('pnpm', ['dev'], { stdio: 'inherit', cwd: ROOT, shell: true });
+
+  const cleanup = () => {
+    child.kill();
+    console.log('\\n  ' + DIM + 'Next.js stopped. Supabase containers are still running.' + RESET);
+    console.log('  ' + DIM + 'Run ./ari stop to shut them down.' + RESET + '\\n');
+    process.exit(0);
+  };
+
+  process.on('SIGINT', cleanup);
+  process.on('SIGTERM', cleanup);
+
+  child.on('exit', (code) => {
+    process.exit(code || 0);
+  });
+}
+
+function stop() {
+  console.log('  Stopping Supabase...');
+  try {
+    execSync('supabase stop', { stdio: 'inherit', cwd: ROOT });
+    console.log('  ' + GREEN + '✔' + RESET + ' Supabase stopped');
+  } catch {
+    console.log('  ' + RED + '✘' + RESET + ' Failed to stop Supabase');
+    process.exit(1);
+  }
+}
+
+function status() {
+  try {
+    execSync('supabase status', { stdio: 'inherit', cwd: ROOT });
+  } catch {
+    console.log('  Supabase is not running.');
+  }
+  console.log('');
+  if (fs.existsSync(ENV_FILE)) {
+    console.log('  ' + GREEN + '✔' + RESET + ' .env.supabase.local exists');
+  } else {
+    console.log('  ' + YELLOW + '⚠' + RESET + ' .env.supabase.local not found');
+  }
+}
+
+// ── Main ───────────────────────────────────────────────────────────────────
+
+const cmd = process.argv[2];
+const commands = { start, stop, status };
+
+if (!cmd || !commands[cmd]) {
+  console.log('');
+  console.log('  Usage: ./ari <command>');
+  console.log('');
+  console.log('  Commands:');
+  console.log('    start    Start Supabase + dev server');
+  console.log('    stop     Stop Supabase containers');
+  console.log('    status   Show Supabase status');
+  console.log('');
+  process.exit(cmd ? 1 : 0);
+}
+
+commands[cmd]();
+`;
+
+  fs.writeFileSync(path.join(ariDir, 'cli.js'), cliContent);
+
+  // Unix launcher
+  const unixLauncher = `#!/usr/bin/env bash\nexec node "$(dirname "$0")/.ari/cli.js" "$@"\n`;
+  const unixPath = path.join(targetDir, 'ari');
+  fs.writeFileSync(unixPath, unixLauncher);
+  try { fs.chmodSync(unixPath, 0o755); } catch { /* Windows */ }
+
+  // Windows launcher
+  const winLauncher = `@echo off\r\nnode "%~dp0.ari\\cli.js" %*\r\n`;
+  fs.writeFileSync(path.join(targetDir, 'ari.cmd'), winLauncher);
+}
+
+// Like runAsync but streams output to terminal (stdio: 'inherit') instead of capturing it
+function spawnAsync(cmd, args, opts) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, opts);
+    child.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`${cmd} exited with code ${code}`));
+    });
+    child.on('error', reject);
+  });
+}
+
+async function setupLocalSupabase(targetDir) {
+  console.log('');
+  hr();
+  console.log(`  ${blue('Local Supabase Setup')}`);
+  hr();
+
+  const result = {
+    supabaseStarted: false,
+    envGenerated: false,
+    schemaInitialized: false,
+    cliCreated: false,
+    adminPassword: null,
+  };
+
+  try {
+    // Check Docker
+    const docker = detectDocker();
+    if (!docker.running) {
+      const dockerReady = await waitForDocker(docker);
+      if (!dockerReady) {
+        console.log(`  ${SYM_DASH} Skipping local Supabase setup`);
+        console.log(`  ${dim('You can set up Supabase Cloud manually or run ./ari start later.')}`);
+        return result;
+      }
+    } else {
+      console.log(`  ${SYM_CHECK} Docker is running`);
+    }
+
+    // Ask user
+    const shouldSetup = await askYesNo('Set up local Supabase database?', true);
+    if (!shouldSetup) {
+      console.log(`  ${SYM_DASH} Skipped local Supabase setup`);
+      return result;
+    }
+
+    // Start Supabase
+    const spinner = new Spinner();
+    const alreadyRunning = !!run(`cd "${targetDir}" && supabase status 2>/dev/null | grep "API URL"`);
+
+    if (alreadyRunning) {
+      console.log(`  ${SYM_CHECK} Supabase is already running`);
+      result.supabaseStarted = true;
+    } else {
+      console.log('');
+      console.log(`  ${dim('Starting Supabase (first run downloads images — this may take a few minutes)…')}`);
+      console.log('');
+      try {
+        await spawnAsync('supabase', ['start'], { stdio: 'inherit', cwd: targetDir, shell: true });
+        console.log('');
+        console.log(`  ${SYM_CHECK} Supabase started`);
+        result.supabaseStarted = true;
+      } catch (err) {
+        console.log('');
+        console.log(`  ${SYM_CROSS} ${red('Failed to start Supabase')}`);
+        console.log(`  ${dim(err.message)}`);
+        console.log(`  ${dim('You can try running: cd ' + shortenPath(targetDir) + ' && supabase start')}`);
+        return result;
+      }
+    }
+
+    // Parse env and generate .env.supabase.local
+    spinner.start('Generating .env.supabase.local…');
+    const supabaseVars = parseSupabaseEnv(targetDir);
+    if (!supabaseVars || !supabaseVars.DB_URL) {
+      spinner.error('Failed to read Supabase status');
+      return result;
+    }
+
+    const envResult = generateEnvFile(targetDir, supabaseVars);
+    result.adminPassword = envResult.adminPassword;
+    spinner.success('.env.supabase.local generated');
+    result.envGenerated = true;
+
+    // Run setup.sql
+    spinner.start('Initializing database schema…');
+    try {
+      const ok = await runSetupSql(targetDir, envResult.databaseUrl);
+      if (ok) {
+        spinner.success('Database schema initialized');
+        result.schemaInitialized = true;
+      } else {
+        spinner.error('setup.sql not found');
+      }
+    } catch (err) {
+      spinner.error('Failed to initialize database schema');
+      console.log(`  ${dim(err.message.split('\n').slice(0, 3).join('\n  '))}`);
+      console.log('');
+      console.log(`  ${dim('You can run it manually via Supabase Studio:')}`);
+      console.log(`  ${DIM_BLUE}http://127.0.0.1:54323${RESET}`);
+    }
+  } finally {
+    // Always create CLI launcher regardless of how far setup got
+    createCliLauncher(targetDir);
+    result.cliCreated = true;
+    console.log(`  ${SYM_CHECK} CLI launcher created ${dim('(./ari start | stop | status)')}`);
+  }
+
+  return result;
+}
+
 // ── Verification Tests ──────────────────────────────────────────────────────
 
-function runVerification(ariResult) {
+function runVerification(ariResult, supabaseResult) {
   console.log('');
   hr();
   console.log(`  ${blue('Verification Tests')}`);
@@ -697,6 +1112,46 @@ function runVerification(ariResult) {
     detail: depsExist ? 'node_modules exists' : 'not installed',
   });
 
+  // Docker
+  const docker = detectDocker();
+  checks.push({
+    name: 'Docker',
+    ok: true, // optional
+    detail: docker.running ? `running (v${docker.version || '?'})` : docker.installed ? 'installed but not running' : 'not installed',
+    optional: true,
+  });
+
+  // Supabase Local
+  if (supabaseResult) {
+    checks.push({
+      name: 'Supabase Local',
+      ok: true,
+      detail: supabaseResult.supabaseStarted ? 'running' : 'not started',
+      optional: true,
+    });
+
+    checks.push({
+      name: '.env.supabase.local',
+      ok: true,
+      detail: supabaseResult.envGenerated ? 'generated' : 'not generated',
+      optional: true,
+    });
+
+    checks.push({
+      name: 'Database Schema',
+      ok: true,
+      detail: supabaseResult.schemaInitialized ? 'initialized' : 'not initialized',
+      optional: true,
+    });
+
+    checks.push({
+      name: 'ARI CLI',
+      ok: true,
+      detail: supabaseResult.cliCreated ? './ari ready' : 'not created',
+      optional: true,
+    });
+  }
+
   // Print results
   const nameWidth = Math.max(...checks.map((c) => c.name.length));
   let passed = 0;
@@ -738,7 +1193,7 @@ function shortenPath(p) {
 
 // ── Completion Screen ───────────────────────────────────────────────────────
 
-function showCompletion(ariResult) {
+function showCompletion(ariResult, supabaseResult) {
   console.log('');
   drawBox([
     '',
@@ -749,9 +1204,27 @@ function showCompletion(ariResult) {
 
   if (ariResult && ariResult.dir) {
     const shortPath = shortenPath(ariResult.dir);
-    console.log(`  To start ARI:`);
-    console.log('');
-    console.log(`    ${DIM_BLUE}cd ${shortPath} && pnpm run dev${RESET}`);
+
+    if (supabaseResult && supabaseResult.supabaseStarted) {
+      console.log(`  ${bold('Supabase Studio:')} ${blue('http://127.0.0.1:54323')}`);
+      console.log(`  ${bold('Admin email:')}     local@ari.software`);
+      if (supabaseResult.adminPassword) {
+        console.log(`  ${bold('Admin password:')}  ${supabaseResult.adminPassword}`);
+      }
+      console.log('');
+      console.log(`  To start ARI:`);
+      console.log('');
+      console.log(`    ${DIM_BLUE}cd ${shortPath} && ./ari start${RESET}`);
+      console.log('');
+      console.log(`  To stop Supabase containers:`);
+      console.log('');
+      console.log(`    ${DIM_BLUE}./ari stop${RESET}`);
+    } else {
+      console.log(`  To start ARI:`);
+      console.log('');
+      console.log(`    ${DIM_BLUE}cd ${shortPath} && pnpm run dev${RESET}`);
+    }
+
     console.log('');
     console.log(`  Then open ${blue('http://localhost:3000')}`);
   } else {
@@ -803,11 +1276,17 @@ async function main() {
   // Clone & setup
   const ariResult = await cloneAndSetup();
 
+  // Local Supabase setup (only if clone succeeded and deps installed)
+  let supabaseResult = null;
+  if (ariResult && ariResult.cloned && ariResult.depsInstalled) {
+    supabaseResult = await setupLocalSupabase(ariResult.dir);
+  }
+
   // Verification
-  runVerification(ariResult);
+  runVerification(ariResult, supabaseResult);
 
   // Completion
-  showCompletion(ariResult);
+  showCompletion(ariResult, supabaseResult);
 
   process.stdout.write(SHOW_CURSOR);
 }

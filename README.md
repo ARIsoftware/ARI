@@ -9,7 +9,7 @@ Engineered for those who want complete command over the software that runs their
 https://ari.software
 
 
-## Automated Setup
+## Quick Start (Recommended)
 
 Install ARI and all its dependencies with a single command:
 
@@ -23,271 +23,168 @@ Install ARI and all its dependencies with a single command:
 irm https://ari.software/install-win | iex
 ```
 
-This interactive wizard will detect your platform and set up your environment with the tools needed to run ARI (Git, Node.js, pnpm, Supabase CLI, etc.), then clone and install ARI for you.
+The installer will:
+1. Install required tools (Git, Node.js, pnpm, Supabase CLI, etc.)
+2. Clone the ARI repository
+3. Install dependencies
+4. Set up a local Supabase database (requires [Docker](https://www.docker.com/products/docker-desktop))
+5. Initialize the database schema
+6. Create the `./ari` CLI for daily use
 
-## Manual Setup (macOS, Windows, Linux)
+After installation:
 
-Here are the full step by step instructions to set up your local environment to run ARI. Below you will find installations instructions for macOS, Windows and Linux. If you have run the automated setup script, you do not need to complete these steps.
+```bash
+cd ~/ARI
+./ari start     # Start Supabase + dev server
+```
 
-## Prerequisites
+Then open http://localhost:3000
 
-1. Node.js JavaScript runtime
-2. pnpm Package manager
-3. Git Version control
-4. Vercel CLI Deployment (optional)
-5. Supabase CLI Database management
+When you're done:
+
+```
+Ctrl+C          # Stop the dev server
+./ari stop      # Stop Supabase containers
+```
 
 ---
 
-## Get Started (macOS)
+## Requirements
 
-### 1. Install Homebrew (Package Manager)
+- **Node.js** v18+
+- **pnpm** (package manager)
+- **Git**
+- **Docker** (for local Supabase database)
+- **Supabase CLI**
 
-Open Terminal and run:
+The automated installer handles all of these. See the Manual Setup section below if you prefer to install them yourself.
+
+---
+
+## Daily Usage
 
 ```bash
+./ari start     # Check Docker, start Supabase, start dev server
+./ari stop      # Stop Supabase containers
+./ari status    # Show Supabase status
+```
+
+`./ari start` regenerates `.env.supabase.local` on every run to keep Supabase connection details fresh while preserving your auth secret and admin credentials.
+
+On Windows, use `.\ari.cmd` instead of `./ari`.
+
+---
+
+## Manual Setup
+
+If you prefer not to use the automated installer, follow the steps below for your platform.
+
+### Prerequisites
+
+1. [Node.js](https://nodejs.org) v18+
+2. [pnpm](https://pnpm.io)
+3. [Git](https://git-scm.com)
+4. [Docker](https://www.docker.com/products/docker-desktop) (for local Supabase)
+5. [Supabase CLI](https://supabase.com/docs/guides/cli)
+6. [Vercel CLI](https://vercel.com/docs/cli) (optional, for deployment)
+
+### macOS
+
+```bash
+# Install Homebrew (if needed)
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-```
 
-After installation, follow the on-screen instructions to add Homebrew to your PATH.
+# Install tools
+brew install git node pnpm supabase/tap/supabase
 
-### 2. Install Git
-
-```bash
-brew install git
-```
-
-### 3. Install Node.js (v18+)
-
-```bash
-brew install node
-```
-
-Verify installation:
-
-```bash
-node --version
-```
-
-### 4. Install pnpm (Package Manager)
-
-```bash
-brew install pnpm
-```
-
-### 5. Install Vercel CLI (Optional)
-
-For managing Vercel Hosting:
-
-```bash
-npm install -g vercel
-```
-
-### 6. Install Supabase CLI
-
-For database management:
-
-```bash
-brew install supabase/tap/supabase
-```
-
-### 7. Clone the Repository & Install Dependencies (If you don't have the files already):
-
-```bash
+# Clone and install
 git clone https://github.com/ARIsoftware/ARI.git
 cd ARI
 pnpm install
-```
 
-### 8. Run the Development Server
+# Start local Supabase (requires Docker)
+supabase start
 
-```bash
+# Start ARI
 pnpm run dev
 ```
 
-### 9. Open in Browser
-
-Navigate to: http://localhost:3000/
-
----
-
-## Get Started (Windows)
-
-### 1. Install winget (Package Manager)
-
-winget comes pre-installed on Windows 11 and Windows 10 (version 1809+). Open PowerShell or Command Prompt and verify:
+### Windows
 
 ```powershell
-winget --version
-```
-
-If not installed, download [App Installer](https://apps.microsoft.com/store/detail/app-installer/9NBLGGH4NNS1) from the Microsoft Store.
-
-### 2. Install Git
-
-```powershell
+# Install tools via winget
 winget install Git.Git
-```
-
-Restart your terminal after installation.
-
-### 3. Install Node.js (v18+)
-
-```powershell
 winget install OpenJS.NodeJS.LTS
-```
-
-Verify installation:
-
-```powershell
-node --version
-```
-
-### 4. Install pnpm (Package Manager)
-
-```powershell
 npm install -g pnpm
-```
 
-Or using winget:
-
-```powershell
-winget install pnpm.pnpm
-```
-
-### 5. Install Vercel CLI (Optional)
-
-For managing Vercel Hosting:
-
-```powershell
-npm install -g vercel
-```
-
-### 6. Install Supabase CLI
-
-Using Scoop (recommended for Windows):
-
-```powershell
-# Install Scoop if you don't have it
+# Install Supabase CLI via Scoop
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
-
-# Add Supabase bucket and install
 scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
 scoop install supabase
-```
 
-Or using npm (requires Node.js 20+):
-
-```powershell
-npm install -g supabase
-```
-
-### 7. Clone the Repository & Install Dependencies (If you don't have the files already):
-
-```powershell
+# Clone and install
 git clone https://github.com/ARIsoftware/ARI.git
 cd ARI
 pnpm install
-```
 
-### 8. Run the Development Server
+# Start local Supabase (requires Docker)
+supabase start
 
-```powershell
+# Start ARI
 pnpm run dev
 ```
 
-### 9. Open in Browser
+### Linux (Debian/Ubuntu)
 
-Navigate to: http://localhost:3000/
-
----
-
-## Get Started (Linux)
-
-> These instructions use `apt` for Debian/Ubuntu-based distributions. Adjust commands for your distribution (e.g., `dnf` for Fedora, `pacman` for Arch).
-
-### 1. Update System Packages
+> Adjust commands for your distribution (e.g., `dnf` for Fedora, `pacman` for Arch).
 
 ```bash
-sudo apt update && sudo apt upgrade -y
-```
-
-### 2. Install Git
-
-```bash
+# Install tools
+sudo apt update
 sudo apt install git -y
-```
-
-### 3. Install Node.js (v18+)
-
-Using NodeSource repository:
-
-```bash
 curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
 sudo apt install nodejs -y
-```
+npm install -g pnpm supabase
 
-Verify installation:
-
-```bash
-node --version
-```
-
-### 4. Install pnpm (Package Manager)
-
-```bash
-npm install -g pnpm
-```
-
-Or using Corepack (included with Node.js 16.13+):
-
-```bash
-corepack enable
-corepack prepare pnpm@latest --activate
-```
-
-### 5. Install Vercel CLI (Optional)
-
-For managing Vercel Hosting:
-
-```bash
-npm install -g vercel
-```
-
-### 6. Install Supabase CLI
-
-Using npm (requires Node.js 20+):
-
-```bash
-npm install -g supabase
-```
-
-Or using Homebrew for Linux:
-
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-brew install supabase/tap/supabase
-```
-
-### 7. Clone the Repository & Install Dependencies (If you don't have the files already):
-
-```bash
+# Clone and install
 git clone https://github.com/ARIsoftware/ARI.git
 cd ARI
 pnpm install
-```
 
-### 8. Run the Development Server
+# Start local Supabase (requires Docker)
+supabase start
 
-```bash
+# Start ARI
 pnpm run dev
 ```
 
-### 9. Open in Browser
+### After Manual Setup
 
-Navigate to: http://localhost:3000/
+Open http://localhost:3000 in your browser.
 
+The first time you run ARI, you'll need a `.env.supabase.local` file with your local Supabase credentials. Run `supabase status -o env` to see the values, then create the file:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=<API_URL from supabase status>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<ANON_KEY from supabase status>
+SUPABASE_SERVICE_ROLE_KEY=<SERVICE_ROLE_KEY from supabase status>
+DATABASE_URL=<DB_URL from supabase status>
+BETTER_AUTH_SECRET=<generate with: openssl rand -base64 32>
+BETTER_AUTH_URL=http://localhost:3000
+ARI_FIRST_RUN_ADMIN_EMAIL=local@ari.software
+ARI_FIRST_RUN_ADMIN_PASSWORD=<choose a password, minimum 18 characters>
+```
+
+You'll also need to run the database setup SQL against your local database:
+
+```bash
+psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f lib/db/setup.sql
+```
+
+The automated installer (`./ari start`) handles all of this automatically.
+
+---
 
 ## Module Library & Backend API
 

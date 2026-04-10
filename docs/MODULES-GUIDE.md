@@ -50,7 +50,7 @@ cp -r ~/Downloads/my-module modules/
 git submodule add https://github.com/user/ari-module.git modules/my-module
 
 # Restart dev server
-npm run dev
+pnpm dev
 ```
 
 That's it! The module will appear in Settings → Features and the sidebar automatically.

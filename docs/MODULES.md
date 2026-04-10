@@ -2145,7 +2145,7 @@ Run through this checklist after creating or updating a module:
 cat modules/my-module/module.json | jq .
 
 # Clear Next.js cache and restart
-rm -rf .next && npm run dev
+rm -rf .next && pnpm dev
 ```
 
 ### API Routes Returning 404
@@ -2160,7 +2160,7 @@ rm -rf .next && npm run dev
 ```bash
 # Clear Next.js cache
 rm -rf .next
-npm run dev
+pnpm dev
 ```
 
 ### Page Stuck on Loading

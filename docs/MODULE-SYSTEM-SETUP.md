@@ -70,7 +70,7 @@ After applying the database schemas, restart your dev server to ensure the modul
 # Stop current server (Ctrl+C if running)
 
 # Restart dev server
-npm run dev
+pnpm dev
 ```
 
 ---
@@ -157,7 +157,7 @@ You should now have:
 **Solutions**:
 1. Verify `/app/[module]/[[...slug]]/page.tsx` exists
 2. Check that `/modules-core/module-template/module.json` has `"enabled": true`
-3. Clear `.next` folder: `rm -rf .next && npm run dev`
+3. Clear `.next` folder: `rm -rf .next && pnpm dev`
 4. Check server logs for module loading errors
 
 ### API Errors
