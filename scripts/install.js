@@ -1206,27 +1206,23 @@ function showCompletion(ariResult, supabaseResult) {
     const shortPath = shortenPath(ariResult.dir);
 
     if (supabaseResult && supabaseResult.supabaseStarted) {
-      console.log(`  ${bold('Supabase Studio:')} ${blue('http://127.0.0.1:54323')}`);
-      console.log(`  ${bold('Admin email:')}     local@ari.software`);
-      if (supabaseResult.adminPassword) {
-        console.log(`  ${bold('Admin password:')}  ${supabaseResult.adminPassword}`);
-      }
-      console.log('');
       console.log(`  To start ARI:`);
       console.log('');
       console.log(`    ${DIM_BLUE}cd ${shortPath} && ./ari start${RESET}`);
       console.log('');
-      console.log(`  To stop Supabase containers:`);
+      console.log(`  Then open ${blue('http://localhost:3000')}`);
       console.log('');
-      console.log(`    ${DIM_BLUE}./ari stop${RESET}`);
+      console.log(`  To stop ARI:`);
+      console.log('');
+      console.log(`    ${DIM_BLUE}cd ${shortPath} && ./ari stop${RESET}`);
     } else {
       console.log(`  To start ARI:`);
       console.log('');
       console.log(`    ${DIM_BLUE}cd ${shortPath} && pnpm run dev${RESET}`);
+      console.log('');
+      console.log(`  Then open ${blue('http://localhost:3000')}`);
     }
 
-    console.log('');
-    console.log(`  Then open ${blue('http://localhost:3000')}`);
   } else {
     console.log(`  Clone ARI manually and run:`);
     console.log('');
@@ -1236,6 +1232,9 @@ function showCompletion(ariResult, supabaseResult) {
   }
 
   console.log('');
+  if (supabaseResult && supabaseResult.supabaseStarted) {
+    console.log(`  ${dim('Supabase Studio:')} ${blue('http://127.0.0.1:54323')}`);
+  }
   console.log(`  ${dim('Need help? hello@ari.software')}`);
   console.log('');
 }
