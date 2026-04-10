@@ -29,7 +29,9 @@ function createPool(): Pool | null {
     // "Connection terminated unexpectedly".
     keepAlive: true,
     keepAliveInitialDelayMillis: 10000,
-    ssl: { rejectUnauthorized: false },
+    ssl: process.env.DATABASE_URL?.includes("127.0.0.1") || process.env.DATABASE_URL?.includes("localhost")
+      ? false
+      : { rejectUnauthorized: false },
   })
 
   p.on("error", (err) => {
