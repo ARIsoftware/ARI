@@ -1,16 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
+import { checkRateLimit, getClientIp } from '@/lib/modules/public-route-security'
 
 export const debugRole = "onboarding-save-env"
 // Intentionally public — only effective during first-run setup before DATABASE_URL is configured
 export const isPublic = true
 
-/**
- * POST: Save .env.local file to project root
- * Used by the onboarding wizard to write the generated env file directly
- */
 export async function POST(request: NextRequest) {
+  if (!checkRateLimit(`save-env:${getClientIp(request)}`, 3)) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded. Please try again later.' },
+      { status: 429 }
+    )
+  }
+
+  const origin = request.headers.get("origin")
+  const referer = request.headers.get("referer")
+  if (!origin && !referer) {
+    return NextResponse.json(
+      { error: 'Missing origin header' },
+      { status: 400 }
+    )
+  }
+
   try {
     const { content } = await request.json()
     if (!content || typeof content !== 'string') {

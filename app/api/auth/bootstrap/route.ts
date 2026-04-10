@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { pool } from "@/lib/db/pool"
 import { auth } from "@/lib/auth"
 import { setupSql } from "@/lib/db/setup-sql"
+import { checkRateLimit, getClientIp } from "@/lib/modules/public-route-security"
 
 export const debugRole = "auth-bootstrap"
 // Intentionally public — only succeeds when zero users exist (first-run admin setup)
@@ -23,7 +24,23 @@ let initialized = false
 // schema install instead of racing.
 const BOOTSTRAP_LOCK_KEY = 9173451
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  if (!checkRateLimit(`bootstrap:${getClientIp(request)}`, 3)) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded. Please try again later." },
+      { status: 429 }
+    )
+  }
+
+  const origin = request.headers.get("origin")
+  const referer = request.headers.get("referer")
+  if (!origin && !referer) {
+    return NextResponse.json(
+      { error: "Missing origin header" },
+      { status: 400 }
+    )
+  }
+
   if (initialized) {
     return NextResponse.json({ status: "already_initialized" })
   }

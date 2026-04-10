@@ -44,7 +44,7 @@ setInterval(() => {
 /**
  * Check rate limit for a given identifier
  */
-function checkRateLimit(identifier: string, maxRequests: number): boolean {
+export function checkRateLimit(identifier: string, maxRequests: number): boolean {
   const now = Date.now()
   const windowMs = 60 * 1000 // 1 minute window
 
@@ -67,7 +67,7 @@ function checkRateLimit(identifier: string, maxRequests: number): boolean {
 /**
  * Get client IP from request
  */
-function getClientIp(request: NextRequest): string {
+export function getClientIp(request: NextRequest): string {
   // Check common headers for real IP (reverse proxy scenarios)
   const forwardedFor = request.headers.get('x-forwarded-for')
   if (forwardedFor) {
