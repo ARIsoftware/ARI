@@ -5,7 +5,7 @@ import type { NextRequest } from 'next/server'
 // This is regenerated on build/dev via generate-module-registry script
 import moduleManifest from '@/lib/generated/module-manifest.json'
 
-const isSetupComplete = !!process.env.DATABASE_URL
+const isSetupComplete = !!process.env.DATABASE_URL && !!process.env.BETTER_AUTH_SECRET
 const isDev = process.env.NODE_ENV !== 'production'
 
 // Content Security Policy — computed once at startup
@@ -27,7 +27,6 @@ const cspHeader = [
 
 const protectedRoutes = [
   "/",
-  "/welcome",  // Protected when setup is complete (requires auth to rerun wizard)
   "/tasks",
   "/dashboard",
   "/daily-fitness",
@@ -55,7 +54,7 @@ const protectedRoutes = [
 // Static public routes that the manifest cannot describe:
 //   /sign-in, /auth, /database-error — UI pages (not API routes)
 //   /api/auth — Better Auth's catch-all (owned by Better Auth, can't be tagged)
-const staticPublicRoutes = ["/sign-in", "/auth", "/api/auth", "/database-error"]
+const staticPublicRoutes = ["/sign-in", "/auth", "/api/auth", "/database-error", "/welcome"]
 
 // All other public API routes are sourced from the manifest. Both module
 // routes (declared in module.json) and core routes (declared via

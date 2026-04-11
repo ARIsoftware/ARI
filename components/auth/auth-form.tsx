@@ -46,10 +46,11 @@ export function AuthForm({ mode }: AuthFormProps) {
   // Cached in sessionStorage so repeat visits don't re-hit the endpoint.
   useEffect(() => {
     const cached = sessionStorage.getItem('ari:bootstrap')
-    if (cached) {
-      if (cached === 'no_users') setNoUsers(true)
+    if (cached === 'no_users') {
+      window.location.href = '/welcome'
       return
     }
+    if (cached) return
 
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 3000)
@@ -65,7 +66,11 @@ export function AuthForm({ mode }: AuthFormProps) {
         if (!RECOVERABLE_BOOTSTRAP_STATUSES.includes(status)) {
           sessionStorage.setItem('ari:bootstrap', status)
         }
-        if (status === 'no_users') setNoUsers(true)
+        if (status === 'no_users') {
+          // No users exist — redirect to welcome wizard for first-time setup
+          window.location.href = '/welcome'
+          return
+        }
         if (status === 'install_failed') setInstallError(data.error || 'Database setup failed')
       })
       .catch(() => {
