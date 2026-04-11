@@ -161,8 +161,8 @@ fi
 # ── Hand off to install.js ───────────────────────────────────────────────────
 INSTALL_JS="/tmp/ari-install-$$.js"
 INSTALL_URL="https://raw.githubusercontent.com/ARIsoftware/ARI/main/scripts/install.js"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOCAL_JS="$SCRIPT_DIR/install.js"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd 2>/dev/null)" || SCRIPT_DIR=""
+LOCAL_JS="${SCRIPT_DIR:+$SCRIPT_DIR/install.js}"
 
 if curl -fsSL "$INSTALL_URL" -o "$INSTALL_JS" 2>/dev/null; then
   : # Downloaded successfully
