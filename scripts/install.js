@@ -15,7 +15,6 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const os = require('os');
-const crypto = require('crypto');
 
 // ── ANSI Colors & Symbols ───────────────────────────────────────────────────
 
@@ -631,43 +630,20 @@ function parseSupabaseEnv(targetDir) {
   return vars;
 }
 
-function readExistingEnv(filePath) {
-  const vars = {};
-  try {
-    const content = fs.readFileSync(filePath, 'utf8');
-    for (const line of content.split('\n')) {
-      const match = line.match(/^([A-Z_]+)=(.*)$/);
-      if (match) vars[match[1]] = match[2];
-    }
-  } catch { /* file doesn't exist or unreadable */ }
-  return vars;
-}
-
 // SYNC: env key mapping is duplicated in the embedded cli.js writeEnvFile(). Keep both in sync.
 function generateEnvFile(targetDir, supabaseVars) {
   const envPath = path.join(targetDir, '.env.supabase.local');
-  const existing = readExistingEnv(envPath);
-
-  const secret = existing.BETTER_AUTH_SECRET
-    || crypto.randomBytes(32).toString('base64');
-
-  const adminPassword = existing.ARI_FIRST_RUN_ADMIN_PASSWORD
-    || crypto.randomBytes(16).toString('base64url');
 
   const envContent = [
     `NEXT_PUBLIC_SUPABASE_URL=${supabaseVars.API_URL || ''}`,
     `NEXT_PUBLIC_SUPABASE_ANON_KEY=${supabaseVars.ANON_KEY || ''}`,
     `SUPABASE_SERVICE_ROLE_KEY=${supabaseVars.SERVICE_ROLE_KEY || ''}`,
     `DATABASE_URL=${supabaseVars.DB_URL || ''}`,
-    `BETTER_AUTH_SECRET=${secret}`,
-    `BETTER_AUTH_URL=http://localhost:3000`,
-    `ARI_FIRST_RUN_ADMIN_EMAIL=local@ari.software`,
-    `ARI_FIRST_RUN_ADMIN_PASSWORD=${adminPassword}`,
     '', // trailing newline
   ].join('\n');
 
   fs.writeFileSync(envPath, envContent);
-  return { secret, adminPassword, databaseUrl: supabaseVars.DB_URL };
+  return { databaseUrl: supabaseVars.DB_URL };
 }
 
 async function runSetupSql(targetDir, databaseUrl) {
@@ -706,7 +682,6 @@ function createCliLauncher(targetDir) {
 const { execSync, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
 
 const ROOT = path.resolve(__dirname, '..');
 const ENV_FILE = path.join(ROOT, '.env.supabase.local');
@@ -747,38 +722,17 @@ function parseSupabaseEnv() {
   return vars;
 }
 
-function readExistingEnv() {
-  if (!fs.existsSync(ENV_FILE)) return {};
-  const vars = {};
-  try {
-    for (const line of fs.readFileSync(ENV_FILE, 'utf8').split('\\n')) {
-      const match = line.match(/^([A-Z_]+)=(.*)$/);
-      if (match) vars[match[1]] = match[2];
-    }
-  } catch {}
-  return vars;
-}
-
 // SYNC: env key mapping is duplicated in the installer generateEnvFile(). Keep both in sync.
 function writeEnvFile(supabaseVars) {
-  const existing = readExistingEnv();
-  const secret = existing.BETTER_AUTH_SECRET || crypto.randomBytes(32).toString('base64');
-  const adminPassword = existing.ARI_FIRST_RUN_ADMIN_PASSWORD || crypto.randomBytes(16).toString('base64url');
-
   const content = [
     'NEXT_PUBLIC_SUPABASE_URL=' + (supabaseVars.API_URL || ''),
     'NEXT_PUBLIC_SUPABASE_ANON_KEY=' + (supabaseVars.ANON_KEY || ''),
     'SUPABASE_SERVICE_ROLE_KEY=' + (supabaseVars.SERVICE_ROLE_KEY || ''),
     'DATABASE_URL=' + (supabaseVars.DB_URL || ''),
-    'BETTER_AUTH_SECRET=' + secret,
-    'BETTER_AUTH_URL=http://localhost:3000',
-    'ARI_FIRST_RUN_ADMIN_EMAIL=local@ari.software',
-    'ARI_FIRST_RUN_ADMIN_PASSWORD=' + adminPassword,
     '',
   ].join('\\n');
 
   fs.writeFileSync(ENV_FILE, content);
-  return { secret, adminPassword };
 }
 
 // ── Commands ───────────────────────────────────────────────────────────────
@@ -912,7 +866,6 @@ async function setupLocalSupabase(targetDir) {
     envGenerated: false,
     schemaInitialized: false,
     cliCreated: false,
-    adminPassword: null,
   };
 
   try {
@@ -970,7 +923,6 @@ async function setupLocalSupabase(targetDir) {
     }
 
     const envResult = generateEnvFile(targetDir, supabaseVars);
-    result.adminPassword = envResult.adminPassword;
     spinner.success('.env.supabase.local generated');
     result.envGenerated = true;
 
