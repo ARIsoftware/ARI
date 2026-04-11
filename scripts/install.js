@@ -599,16 +599,19 @@ async function cloneAndSetup() {
 }
 
 async function installDependencies(targetDir) {
-  const spinner = new Spinner();
-  spinner.start('Installing dependencies (this may take a minute)…');
+  console.log('');
+  console.log(`  ${dim('Installing dependencies (this may take a minute)…')}`);
+  console.log('');
 
   try {
-    await runAsync(`cd "${targetDir}" && pnpm install`);
-    spinner.success('Dependencies installed');
+    await spawnAsync('pnpm', ['install'], { stdio: 'inherit', cwd: targetDir, shell: true });
+    console.log('');
+    console.log(`  ${SYM_CHECK} Dependencies installed`);
     return { cloned: true, dir: targetDir, depsInstalled: true };
   } catch (err) {
-    spinner.error('Failed to install dependencies');
-    console.log(`  ${dim(err.message.split('\n').slice(0, 3).join('\n  '))}`);
+    console.log('');
+    console.log(`  ${SYM_CROSS} ${red('Failed to install dependencies')}`);
+    console.log(`  ${dim(err.message)}`);
     console.log('');
     console.log(`  ${dim('You can try running this manually:')}`);
     console.log(`  ${DIM_BLUE}cd "${targetDir}" && pnpm install${RESET}`);
