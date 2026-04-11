@@ -8,10 +8,22 @@ Engineered for those who want complete command over the software that runs their
 
 https://ari.software
 
+## Requirements
+
+ARI uses Docker for a self-contained Supabase database - local, secure, fast, and hassle-free. Download the free Docker Desktop app:
+https://www.docker.com/products/docker-desktop/
+
+When you run the ARI installer, it will automatically install all the required packages. See the Manual Setup section below if you prefer to install them yourself.
+
+- **Node.js** v18+
+- **pnpm** (package manager)
+- **Git**
+- **Docker** (for local Supabase database)
+- **Supabase CLI**
 
 ## Quick Start (Recommended)
 
-Install ARI and all its dependencies with a single command:
+Install ARI with a single command:
 
 **macOS / Linux:**
 ```bash
@@ -30,159 +42,35 @@ The installer will:
 4. Set up a local Supabase database (requires [Docker](https://www.docker.com/products/docker-desktop))
 5. Initialize the database schema
 6. Create the `./ari` CLI for daily use
+7. Start ARI and the supabase database.
 
-After installation:
+## Accessing ARI:
+**To view ARI visit:** http://localhost:3000
+
+**Access the Database Studio:** http://localhost:54323/
+
+## Useful Commands:
+
+When you want to start ARI, change into your ARI directory (`cd ~/ARI`) and then run:
 
 ```bash
-cd ~/ARI
-./ari start     # Start Supabase + dev server
+./ari start
 ```
 
-Then open http://localhost:3000
+To view the status of ARI, run:
 
-When you're done:
+```bash
+./ari status
+```
+
+When you want to stop ARI:
 
 ```
 Ctrl+C          # Stop the dev server
 ./ari stop      # Stop Supabase containers
 ```
 
----
-
-## Requirements
-
-- **Node.js** v18+
-- **pnpm** (package manager)
-- **Git**
-- **Docker** (for local Supabase database)
-- **Supabase CLI**
-
-The automated installer handles all of these. See the Manual Setup section below if you prefer to install them yourself.
-
----
-
-## Daily Usage
-
-```bash
-./ari start     # Check Docker, start Supabase, start dev server
-./ari stop      # Stop Supabase containers
-./ari status    # Show Supabase status
-```
-
-`./ari start` regenerates `.env.supabase.local` on every run to keep Supabase connection details fresh while preserving your auth secret and admin credentials.
-
-On Windows, use `.\ari.cmd` instead of `./ari`.
-
----
-
-## Manual Setup
-
-If you prefer not to use the automated installer, follow the steps below for your platform.
-
-### Prerequisites
-
-1. [Node.js](https://nodejs.org) v18+
-2. [pnpm](https://pnpm.io)
-3. [Git](https://git-scm.com)
-4. [Docker](https://www.docker.com/products/docker-desktop) (for local Supabase)
-5. [Supabase CLI](https://supabase.com/docs/guides/cli)
-6. [Vercel CLI](https://vercel.com/docs/cli) (optional, for deployment)
-
-### macOS
-
-```bash
-# Install Homebrew (if needed)
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Install tools
-brew install git node pnpm supabase/tap/supabase
-
-# Clone and install
-git clone https://github.com/ARIsoftware/ARI.git
-cd ARI
-pnpm install
-
-# Start local Supabase (requires Docker)
-supabase start
-
-# Start ARI
-pnpm run dev
-```
-
-### Windows
-
-```powershell
-# Install tools via winget
-winget install Git.Git
-winget install OpenJS.NodeJS.LTS
-npm install -g pnpm
-
-# Install Supabase CLI via Scoop
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
-scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
-scoop install supabase
-
-# Clone and install
-git clone https://github.com/ARIsoftware/ARI.git
-cd ARI
-pnpm install
-
-# Start local Supabase (requires Docker)
-supabase start
-
-# Start ARI
-pnpm run dev
-```
-
-### Linux (Debian/Ubuntu)
-
-> Adjust commands for your distribution (e.g., `dnf` for Fedora, `pacman` for Arch).
-
-```bash
-# Install tools
-sudo apt update
-sudo apt install git -y
-curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
-sudo apt install nodejs -y
-npm install -g pnpm supabase
-
-# Clone and install
-git clone https://github.com/ARIsoftware/ARI.git
-cd ARI
-pnpm install
-
-# Start local Supabase (requires Docker)
-supabase start
-
-# Start ARI
-pnpm run dev
-```
-
-### After Manual Setup
-
-Open http://localhost:3000 in your browser.
-
-The first time you run ARI, you'll need a `.env.supabase.local` file with your local Supabase credentials. Run `supabase status -o env` to see the values, then create the file:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=<API_URL from supabase status>
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<ANON_KEY from supabase status>
-SUPABASE_SERVICE_ROLE_KEY=<SERVICE_ROLE_KEY from supabase status>
-DATABASE_URL=<DB_URL from supabase status>
-BETTER_AUTH_SECRET=<generate with: openssl rand -base64 32>
-BETTER_AUTH_URL=http://localhost:3000
-ARI_FIRST_RUN_ADMIN_EMAIL=local@ari.software
-ARI_FIRST_RUN_ADMIN_PASSWORD=<choose a password, minimum 18 characters>
-```
-
-You'll also need to run the database setup SQL against your local database:
-
-```bash
-psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -f lib/db/setup.sql
-```
-
-The automated installer (`./ari start`) handles all of this automatically.
+On Windows, use `.\ari.cmd start` `.\ari.cmd status` and `.\ari.cmd stop`
 
 ---
 
