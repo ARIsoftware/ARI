@@ -1243,7 +1243,7 @@ async function main() {
   showCompletion(ariResult, supabaseResult);
 
   process.stdout.write(SHOW_CURSOR);
-  process.stdin.unref();
+  process.exit(0);
 }
 
 main().catch((err) => {
