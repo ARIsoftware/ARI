@@ -1173,7 +1173,7 @@ function showCompletion(ariResult, supabaseResult) {
     } else {
       console.log(`  To start ARI:`);
       console.log('');
-      console.log(`    ${DIM_BLUE}cd ${shortPath} && pnpm run dev${RESET}`);
+      console.log(`    ${DIM_BLUE}cd ${shortPath} && ./ari start${RESET}`);
       console.log('');
       console.log(`  Then open ${blue('http://localhost:3000')}`);
     }
@@ -1183,7 +1183,7 @@ function showCompletion(ariResult, supabaseResult) {
     console.log('');
     console.log(`    ${DIM_BLUE}git clone https://github.com/ARIsoftware/ARI.git${RESET}`);
     console.log(`    ${DIM_BLUE}cd ARI && pnpm install${RESET}`);
-    console.log(`    ${DIM_BLUE}pnpm run dev${RESET}`);
+    console.log(`    ${DIM_BLUE}./ari start${RESET}`);
   }
 
   console.log('');
@@ -1243,7 +1243,7 @@ async function main() {
   showCompletion(ariResult, supabaseResult);
 
   process.stdout.write(SHOW_CURSOR);
-  process.exit(0);
+  process.stdin.unref();
 }
 
 main().catch((err) => {
