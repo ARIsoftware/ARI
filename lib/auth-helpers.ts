@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
+import { pool } from "@/lib/db/pool"
 import { createDbClient } from "@/lib/db-supabase"
 import { withUserContext, withAdminDb, type DrizzleDb } from "@/lib/db"
 import { hashApiKey, lookupApiKey, checkIpAllowed } from "@/lib/api-keys"
@@ -136,17 +137,18 @@ export async function createAuthenticatedClient() {
  * Used by env-writing endpoints (/api/download-env, /api/onboarding/save-env).
  */
 export async function requireAuthIfUsersExist(requestHeaders: Headers): Promise<NextResponse | null> {
-  const { pool } = await import("@/lib/db/pool")
-  let hasUsers = false
-  if (pool) {
-    try {
-      const result = await pool.query('SELECT EXISTS(SELECT 1 FROM public."user") AS has_users')
-      hasUsers = result.rows[0]?.has_users === true
-    } catch {
-      // Table may not exist yet — no users
-    }
+  if (!pool) return null // No database yet — setup in progress
+  try {
+    const result = await pool.query('SELECT EXISTS(SELECT 1 FROM public."user") AS has_users')
+    const hasUsers = result.rows[0]?.has_users === true
+    if (!hasUsers) return null
+  } catch (err: unknown) {
+    // "relation does not exist" means schema not installed yet — no users
+    const code = (err as { code?: string })?.code
+    if (code === '42P01') return null
+    // Any other DB error: fail closed
+    return NextResponse.json({ error: "Service unavailable" }, { status: 503 })
   }
-  if (!hasUsers) return null
   const session = await auth.api.getSession({ headers: requestHeaders })
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

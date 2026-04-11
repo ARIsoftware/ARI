@@ -8,13 +8,14 @@ interface StepIndicatorProps {
   onStepClick: (step: string) => void
 }
 
+// Disabled steps: supabase, resend, vercel — may be restored in the future
 const STEPS = [
-  { id: "personal", label: "Personal" },
   { id: "account", label: "Account" },
-  { id: "supabase", label: "Supabase" },
-  { id: "resend", label: "Resend" },
+  { id: "personal", label: "Personal" },
+  // { id: "supabase", label: "Supabase" },
+  // { id: "resend", label: "Resend" },
   { id: "github", label: "GitHub" },
-  { id: "vercel", label: "Vercel" },
+  // { id: "vercel", label: "Vercel" },
   { id: "download", label: "Save" },
 ]
 

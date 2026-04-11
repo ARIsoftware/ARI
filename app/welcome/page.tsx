@@ -80,7 +80,8 @@ const generateAuthSecret = () => {
   return btoa(String.fromCharCode(...array))
 }
 
-const STEP_ORDER = ["personal", "account", "supabase", "resend", "github", "vercel", "download"]
+// Disabled steps: "supabase", "resend", "vercel" — may be restored in the future
+const STEP_ORDER = ["account", "personal", "github", "download"]
 
 export default function WelcomePage() {
   const [completedLines, setCompletedLines] = useState<string[]>([])
@@ -90,7 +91,7 @@ export default function WelcomePage() {
   const [showContinue, setShowContinue] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
 
-  const [currentTab, setCurrentTab] = useState("personal")
+  const [currentTab, setCurrentTab] = useState("account")
   const [selectedOS, setSelectedOS] = useState<"mac" | "windows" | "linux" | null>(null)
 
   const [formData, setFormData] = useState<OnboardingData>({
@@ -122,6 +123,7 @@ export default function WelcomePage() {
     timezone: 'UTC',
   })
   const [profileSaved, setProfileSaved] = useState(false)
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [adminConfirmPassword, setAdminConfirmPassword] = useState("")
   const [adminPasswordError, setAdminPasswordError] = useState("")
 
@@ -136,75 +138,71 @@ export default function WelcomePage() {
     }
   }, [])
 
-  // Prefill profile from DB if available, then overlay with any localStorage edits
+  // Prefill profile from DB when user navigates to the personal tab
   useEffect(() => {
+    if (currentTab !== 'personal') return
+    // Prefill email from account tab if not already set
+    if (formData.adminEmail && !profileData.email) {
+      setProfileData(prev => ({ ...prev, email: formData.adminEmail }))
+    }
     async function loadProfile() {
-      let dbData: Record<string, string> | null = null
       try {
         const res = await fetch('/api/user-preferences')
-        if (res.ok) {
-          dbData = await res.json()
+        if (!res.ok) return
+        const data = await res.json()
+        if (data.error) return
+        const merged = {
+          name: data.name || '',
+          email: data.email || '',
+          title: data.title || '',
+          company_name: data.company_name || '',
+          country: data.country || '',
+          city: data.city || '',
+          linkedin_url: data.linkedin_url || '',
+          timezone: data.timezone || 'UTC',
         }
-      } catch {}
-
-      // Check localStorage for in-progress edits (expires after 24 hours)
-      let localData: Record<string, string> | null = null
-      try {
-        const stored = localStorage.getItem('ari_welcome_profile')
-        if (stored) {
-          const parsed = JSON.parse(stored)
-          const age = Date.now() - (parsed._savedAt || 0)
-          if (age < 24 * 60 * 60 * 1000) {
-            localData = parsed
-          } else {
-            localStorage.removeItem('ari_welcome_profile')
-          }
-        }
-      } catch {}
-
-      // Merge: localStorage edits take priority over DB data
-      const merged = {
-        name: localData?.name || dbData?.name || '',
-        email: localData?.email || dbData?.email || '',
-        title: localData?.title || dbData?.title || '',
-        company_name: localData?.company_name || dbData?.company_name || '',
-        country: localData?.country || dbData?.country || '',
-        city: localData?.city || dbData?.city || '',
-        linkedin_url: localData?.linkedin_url || dbData?.linkedin_url || '',
-        timezone: localData?.timezone || dbData?.timezone || 'UTC',
-      }
-
-      const hasData = Object.values(merged).some(v => v && v !== 'UTC')
-      if (hasData) {
-        setProfileData(merged)
-        if (localData) setProfileSaved(true)
+        const hasData = Object.values(merged).some(v => v && v !== 'UTC')
+        if (hasData) setProfileData(merged)
+      } catch (error) {
+        console.error('Failed to load profile:', error)
       }
     }
     loadProfile()
-  }, [])
+  }, [currentTab])
 
   const handleProfileChange = (field: string, value: string) => {
     setProfileData(prev => ({ ...prev, [field]: value }))
     setProfileSaved(false)
   }
 
-  const handleProfileSave = () => {
-    // Save to localStorage — persisted to DB on first authenticated page load
+  const handleProfileSave = async (): Promise<boolean> => {
+    setIsSavingProfile(true)
     try {
-      localStorage.setItem('ari_welcome_profile', JSON.stringify({
-        name: profileData.name || null,
-        email: profileData.email || null,
-        title: profileData.title || null,
-        company_name: profileData.company_name || null,
-        country: profileData.country || null,
-        city: profileData.city || null,
-        linkedin_url: profileData.linkedin_url || null,
-        timezone: profileData.timezone,
-        _savedAt: Date.now(),
-      }))
-      setProfileSaved(true)
+      const res = await fetch('/api/user-preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: profileData.name || null,
+          email: profileData.email || null,
+          title: profileData.title || null,
+          company_name: profileData.company_name || null,
+          country: profileData.country || null,
+          city: profileData.city || null,
+          linkedin_url: profileData.linkedin_url || null,
+          timezone: profileData.timezone,
+        }),
+      })
+      if (res.ok) {
+        setProfileSaved(true)
+        return true
+      }
+      console.error('Failed to save profile:', await res.text())
+      return false
     } catch (error) {
-      console.error('Failed to save profile to localStorage:', error)
+      console.error('Failed to save profile:', error)
+      return false
+    } finally {
+      setIsSavingProfile(false)
     }
   }
 
@@ -637,15 +635,16 @@ export default function WelcomePage() {
                           Skip this step
                         </button>
                         <button
-                          onClick={() => {
-                            handleProfileSave()
-                            goToNextStep()
+                          disabled={isSavingProfile}
+                          onClick={async () => {
+                            const saved = await handleProfileSave()
+                            if (saved) goToNextStep()
                           }}
-                          className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                          className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
                           style={{ borderRadius: '6px' }}
                         >
-                          Save & Continue
-                          <ArrowRight className="w-4 h-4" />
+                          {isSavingProfile ? 'Saving...' : 'Save & Continue'}
+                          {!isSavingProfile && <ArrowRight className="w-4 h-4" />}
                         </button>
                       </div>
                     </div>
