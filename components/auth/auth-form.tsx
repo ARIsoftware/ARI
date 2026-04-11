@@ -33,7 +33,6 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
-  const [noUsers, setNoUsers] = useState(false)
   const [installError, setInstallError] = useState<string | null>(null)
   const [bootstrapNonce, setBootstrapNonce] = useState(0)
   const [twoFactorRequired, setTwoFactorRequired] = useState(false)
@@ -87,7 +86,6 @@ export function AuthForm({ mode }: AuthFormProps) {
   const retryBootstrap = () => {
     sessionStorage.removeItem('ari:bootstrap')
     setInstallError(null)
-    setNoUsers(false)
     setBootstrapNonce(n => n + 1)
   }
 
@@ -297,16 +295,6 @@ export function AuthForm({ mode }: AuthFormProps) {
               <Button type="button" size="sm" variant="outline" onClick={retryBootstrap}>
                 Retry
               </Button>
-            </AlertDescription>
-          </Alert>
-        )}
-        {noUsers && (
-          <Alert className="mb-4">
-            <AlertDescription>
-              There are no user accounts set up yet. Visit the docs to view the installation steps:{' '}
-              <a href="https://ari.software/docs" target="_blank" rel="noopener noreferrer" className="underline font-medium">
-                ari.software/docs
-              </a>
             </AlertDescription>
           </Alert>
         )}

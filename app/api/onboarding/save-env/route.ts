@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
 import { checkRateLimit, getClientIp } from '@/lib/modules/public-route-security'
-import { pool } from '@/lib/db/pool'
-import { auth } from '@/lib/auth'
-import { headers } from 'next/headers'
+import { requireAuthIfUsersExist } from '@/lib/auth-helpers'
 
 export const debugRole = "onboarding-save-env"
 // Public during setup — guarded below by user-count check
@@ -27,23 +25,8 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // Guard: only allow if no users exist OR the caller is authenticated
-  let hasUsers = false
-  if (pool) {
-    try {
-      const result = await pool.query('SELECT EXISTS(SELECT 1 FROM public."user") AS has_users')
-      hasUsers = result.rows[0]?.has_users === true
-    } catch {
-      // Table may not exist yet — that's fine, no users
-    }
-  }
-
-  if (hasUsers) {
-    const session = await auth.api.getSession({ headers: await headers() })
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-  }
+  const denied = await requireAuthIfUsersExist(request.headers)
+  if (denied) return denied
 
   try {
     const { content } = await request.json()

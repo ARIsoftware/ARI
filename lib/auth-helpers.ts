@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
+import { NextResponse } from "next/server"
 import { createDbClient } from "@/lib/db-supabase"
 import { withUserContext, withAdminDb, type DrizzleDb } from "@/lib/db"
 import { hashApiKey, lookupApiKey, checkIpAllowed } from "@/lib/api-keys"
@@ -127,4 +128,28 @@ export async function getAuthenticatedUser() {
  */
 export async function createAuthenticatedClient() {
   return createDbClient()
+}
+
+/**
+ * Guard for routes that should be public during setup but require auth after.
+ * Returns null if access is allowed, or a 401 NextResponse if denied.
+ * Used by env-writing endpoints (/api/download-env, /api/onboarding/save-env).
+ */
+export async function requireAuthIfUsersExist(requestHeaders: Headers): Promise<NextResponse | null> {
+  const { pool } = await import("@/lib/db/pool")
+  let hasUsers = false
+  if (pool) {
+    try {
+      const result = await pool.query('SELECT EXISTS(SELECT 1 FROM public."user") AS has_users')
+      hasUsers = result.rows[0]?.has_users === true
+    } catch {
+      // Table may not exist yet — no users
+    }
+  }
+  if (!hasUsers) return null
+  const session = await auth.api.getSession({ headers: requestHeaders })
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+  return null
 }
