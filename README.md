@@ -42,7 +42,6 @@ The installer will:
 4. Set up a local Supabase database (requires [Docker](https://www.docker.com/products/docker-desktop))
 5. Initialize the database schema
 6. Create the `./ari` CLI for daily use
-7. Start ARI and the supabase database.
 
 ## Accessing ARI:
 **To view ARI visit:** http://localhost:3000
