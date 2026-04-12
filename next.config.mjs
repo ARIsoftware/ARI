@@ -6,7 +6,7 @@ import { resolve } from "node:path"
 // Load .env.supabase.local (overrides .env.local values already loaded by Next.js)
 const supabaseEnvPath = resolve(process.cwd(), ".env.supabase.local")
 if (existsSync(supabaseEnvPath)) {
-  dotenvConfig({ path: supabaseEnvPath, override: true })
+  dotenvConfig({ path: supabaseEnvPath, override: true, quiet: true })
 }
 
 const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"))
