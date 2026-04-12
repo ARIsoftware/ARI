@@ -604,7 +604,7 @@ async function installDependencies(targetDir) {
   console.log('');
 
   try {
-    await spawnAsync('pnpm', ['install'], { stdio: 'inherit', cwd: targetDir, shell: true });
+    await spawnAsync('pnpm', ['install'], { stdio: 'inherit', cwd: targetDir });
     console.log('');
     console.log(`  ${SYM_CHECK} Dependencies installed`);
     return { cloned: true, dir: targetDir, depsInstalled: true };
@@ -904,7 +904,7 @@ async function setupLocalSupabase(targetDir) {
       console.log(`  ${dim('Starting Supabase (first run downloads images — this may take a few minutes)…')}`);
       console.log('');
       try {
-        await spawnAsync('supabase', ['start'], { stdio: 'inherit', cwd: targetDir, shell: true });
+        await spawnAsync('supabase', ['start'], { stdio: 'inherit', cwd: targetDir });
         console.log('');
         console.log(`  ${SYM_CHECK} Supabase started`);
         result.supabaseStarted = true;
@@ -1160,29 +1160,22 @@ function showCompletion(ariResult, supabaseResult) {
   if (ariResult && ariResult.dir) {
     const shortPath = shortenPath(ariResult.dir);
 
-    if (supabaseResult && supabaseResult.supabaseStarted) {
-      console.log(`  To start ARI:`);
-      console.log('');
-      console.log(`    ${DIM_BLUE}cd ${shortPath} && ./ari start${RESET}`);
-      console.log('');
-      console.log(`  Then open ${blue('http://localhost:3000')}`);
-      console.log('');
-      console.log(`  To stop ARI:`);
-      console.log('');
-      console.log(`    ${DIM_BLUE}cd ${shortPath} && ./ari stop${RESET}`);
-    } else {
-      console.log(`  To start ARI:`);
-      console.log('');
-      console.log(`    ${DIM_BLUE}cd ${shortPath} && ./ari start${RESET}`);
-      console.log('');
-      console.log(`  Then open ${blue('http://localhost:3000')}`);
-    }
+    console.log(`  To start ARI, navigate to the directory where you installed ARI and run:`);
+    console.log('');
+    console.log(`    ${DIM_BLUE}./ari start${RESET}`);
+    console.log('');
+    console.log(`  Then open ${blue('http://localhost:3000')}`);
+    console.log('');
+    console.log(`  To stop ARI, press Ctrl+C and run:`);
+    console.log('');
+    console.log(`    ${DIM_BLUE}./ari stop${RESET}`);
 
   } else {
     console.log(`  Clone ARI manually and run:`);
     console.log('');
     console.log(`    ${DIM_BLUE}git clone https://github.com/ARIsoftware/ARI.git${RESET}`);
-    console.log(`    ${DIM_BLUE}cd ARI && pnpm install${RESET}`);
+    console.log(`    ${DIM_BLUE}cd ARI${RESET}`);
+    console.log(`    ${DIM_BLUE}pnpm install${RESET}`);
     console.log(`    ${DIM_BLUE}./ari start${RESET}`);
   }
 
@@ -1241,6 +1234,12 @@ async function main() {
 
   // Completion
   showCompletion(ariResult, supabaseResult);
+
+  // Write install directory for the shell wrapper to cd into
+  const dirFile = process.env.ARI_INSTALL_DIR_FILE;
+  if (dirFile && ariResult && ariResult.dir) {
+    try { fs.writeFileSync(dirFile, ariResult.dir); } catch (e) { /* best-effort */ }
+  }
 
   process.stdout.write(SHOW_CURSOR);
   process.exit(0);

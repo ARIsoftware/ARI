@@ -160,6 +160,8 @@ fi
 
 # ── Hand off to install.js ───────────────────────────────────────────────────
 INSTALL_JS="/tmp/ari-install-$$.js"
+INSTALL_DIR_FILE="/tmp/ari-install-dir-$$"
+export ARI_INSTALL_DIR_FILE="$INSTALL_DIR_FILE"
 INSTALL_URL="https://raw.githubusercontent.com/ARIsoftware/ARI/main/scripts/install.js"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd 2>/dev/null)" || SCRIPT_DIR=""
 LOCAL_JS="${SCRIPT_DIR:+$SCRIPT_DIR/install.js}"
@@ -177,5 +179,21 @@ fi
 echo ""
 node "$INSTALL_JS"
 EXIT_CODE=$?
+
+# Read install directory written by install.js
+INSTALL_DIR=""
+if [[ -f "$INSTALL_DIR_FILE" ]]; then
+  INSTALL_DIR="$(cat "$INSTALL_DIR_FILE")"
+  rm -f "$INSTALL_DIR_FILE"
+fi
+
 rm -f "$INSTALL_JS"
+
+# On success, switch into the install directory and start a fresh shell
+if [[ $EXIT_CODE -eq 0 ]] && [[ -n "$INSTALL_DIR" ]] && [[ -d "$INSTALL_DIR" ]]; then
+  unset ARI_PLATFORM ARI_PKG_MGR ARI_INSTALL_DIR_FILE
+  cd "$INSTALL_DIR" || true
+  exec "${SHELL:-bash}"
+fi
+
 exit $EXIT_CODE
