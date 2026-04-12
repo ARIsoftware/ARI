@@ -125,6 +125,7 @@ logs/
 
 # Claude Code
 .claude/worktrees/
+.mcp.json
 
 # Auto-generated module registry files
 lib/generated/
