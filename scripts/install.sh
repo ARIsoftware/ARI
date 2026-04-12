@@ -193,7 +193,7 @@ rm -f "$INSTALL_JS"
 if [[ $EXIT_CODE -eq 0 ]] && [[ -n "$INSTALL_DIR" ]] && [[ -d "$INSTALL_DIR" ]]; then
   unset ARI_PLATFORM ARI_PKG_MGR ARI_INSTALL_DIR_FILE
   cd "$INSTALL_DIR" || true
-  exec "${SHELL:-bash}"
+  exec "${SHELL:-bash}" -l
 fi
 
 exit $EXIT_CODE

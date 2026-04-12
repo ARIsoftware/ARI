@@ -771,7 +771,7 @@ function start() {
   console.log('');
 
   // Start Next.js dev server (foreground)
-  const child = spawn('pnpm', ['dev'], { stdio: 'inherit', cwd: ROOT, shell: true });
+  const child = spawn('pnpm', ['dev'], { stdio: 'inherit', cwd: ROOT });
 
   const cleanup = () => {
     child.kill();
@@ -1158,8 +1158,6 @@ function showCompletion(ariResult, supabaseResult) {
   console.log('');
 
   if (ariResult && ariResult.dir) {
-    const shortPath = shortenPath(ariResult.dir);
-
     console.log(`  To start ARI, navigate to the directory where you installed ARI and run:`);
     console.log('');
     console.log(`    ${DIM_BLUE}./ari start${RESET}`);
