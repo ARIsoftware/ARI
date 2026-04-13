@@ -333,7 +333,7 @@ export function WorkspaceIdentitySection(): React.ReactElement {
             </Select>
           </div>
         </CardContent>
-        <CardFooter className="border-t bg-muted/60 flex justify-between">
+        <CardFooter className="pt-6 border-t bg-muted/60 flex justify-between">
           <div className="flex items-center text-sm text-muted-foreground">
             {hasChanges ? (
               <span className="text-amber-600">Unsaved changes</span>

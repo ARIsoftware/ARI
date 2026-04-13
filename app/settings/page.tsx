@@ -421,8 +421,8 @@ export default function SettingsPage(): React.ReactElement {
                   <TabsList>
                     <TabsTrigger value="general">General</TabsTrigger>
                     <TabsTrigger value="themes">Themes</TabsTrigger>
-                    <TabsTrigger value="keybindings">Commands</TabsTrigger>
-                    <TabsTrigger value="notifications">Notifications</TabsTrigger>
+                    <TabsTrigger value="keybindings">Shortcuts</TabsTrigger>
+                    {/* <TabsTrigger value="notifications">Notifications</TabsTrigger> */}
                     <TabsTrigger value="integrations">Integrations</TabsTrigger>
                     <TabsTrigger value="security">Security</TabsTrigger>
                     <TabsTrigger value="api">API</TabsTrigger>

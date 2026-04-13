@@ -181,26 +181,20 @@ export default function WelcomePage() {
   const handleProfileSave = async (): Promise<boolean> => {
     setIsSavingProfile(true)
     try {
-      const res = await fetch('/api/user-preferences', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: profileData.name || null,
-          email: profileData.email || null,
-          title: profileData.title || null,
-          company_name: profileData.company_name || null,
-          country: profileData.country || null,
-          city: profileData.city || null,
-          linkedin_url: profileData.linkedin_url || null,
-          timezone: profileData.timezone,
-        }),
-      })
-      if (res.ok) {
-        setProfileSaved(true)
-        return true
-      }
-      console.error('Failed to save profile:', await res.text())
-      return false
+      // Save to localStorage — the settings page will sync to DB on first authenticated load
+      localStorage.setItem('ari_welcome_profile', JSON.stringify({
+        name: profileData.name || null,
+        email: profileData.email || null,
+        title: profileData.title || null,
+        company_name: profileData.company_name || null,
+        country: profileData.country || null,
+        city: profileData.city || null,
+        linkedin_url: profileData.linkedin_url || null,
+        timezone: profileData.timezone,
+        _savedAt: Date.now(),
+      }))
+      setProfileSaved(true)
+      return true
     } catch (error) {
       console.error('Failed to save profile:', error)
       return false

@@ -22,7 +22,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import moduleManifest from '@/lib/generated/module-manifest.json'
 import { MODULE_API_ROUTES } from '@/lib/generated/module-api-registry'
-import { recordApiKeyUsage } from '@/lib/api-keys'
+import { recordApiKeyUsage, hashApiKey, lookupApiKey } from '@/lib/api-keys'
 
 /**
  * Public routes from module manifest
@@ -150,16 +150,13 @@ async function handleRequest(
     // Execute the handler
     const result = await handler[method](request, { params: dynamicParams || params })
 
-    // Log API key usage (fire-and-forget) — no extra DB lookup needed,
-    // getAuthenticatedUser() inside the handler already resolved the key
+    // Log API key usage before returning the response
     if (apiKeyValue) {
-      const endpoint = `/api/modules/${module}${apiPath ? '/' + apiPath : ''}`
-      // Read API key metadata set by getAuthenticatedUser() via response header
-      // We pass request info so the logging in auth-helpers has it available
-      const { hashApiKey, lookupApiKey } = await import('@/lib/api-keys')
-      const keyHash = hashApiKey(apiKeyValue)
-      lookupApiKey(keyHash).then((keyRow) => {
+      try {
+        const keyHash = hashApiKey(apiKeyValue)
+        const keyRow = await lookupApiKey(keyHash)
         if (keyRow) {
+          const endpoint = `/api/modules/${module}${apiPath ? '/' + apiPath : ''}`
           recordApiKeyUsage({
             apiKeyId: keyRow.id,
             userId: keyRow.userId,
@@ -172,7 +169,9 @@ async function handleRequest(
             userAgent: request.headers.get('user-agent'),
           })
         }
-      }).catch(() => {})
+      } catch (err) {
+        console.error('[Module API] Failed to log API key usage:', err)
+      }
     }
 
     return result

@@ -211,7 +211,7 @@ export function ApiTab(): React.ReactElement {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Key className="h-5 w-5" />
-                API Keys
+                ARI API Keys
               </CardTitle>
               <CardDescription className="mt-1">
                 Generate API keys to let external applications securely access your data.
@@ -223,7 +223,7 @@ export function ApiTab(): React.ReactElement {
               <Label htmlFor="key-label" className="text-xs text-muted-foreground">Label</Label>
               <Input
                 id="key-label"
-                placeholder="e.g. Todoist Integration"
+                placeholder="e.g. My Integration"
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 className="mt-1"

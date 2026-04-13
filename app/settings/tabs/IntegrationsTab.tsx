@@ -1,13 +1,85 @@
 "use client"
 
+import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
-import { Switch } from "@/components/ui/switch"
-import { Plug } from "lucide-react"
+import { Plug, Eye, EyeOff, Check } from "lucide-react"
+
+interface ProviderConfig {
+  id: string
+  name: string
+  description: string
+  envKey: string
+  placeholder: string
+}
+
+const providers: ProviderConfig[] = [
+  {
+    id: "openrouter",
+    name: "OpenRouter",
+    description: "Unified API gateway for multiple LLM providers.",
+    envKey: "OPENROUTER_API_KEY",
+    placeholder: "sk-or-...",
+  },
+  {
+    id: "claude",
+    name: "Claude",
+    description: "Anthropic's Claude models for advanced reasoning.",
+    envKey: "ANTHROPIC_API_KEY",
+    placeholder: "sk-ant-...",
+  },
+  {
+    id: "openai",
+    name: "OpenAI",
+    description: "GPT models for chat, code, and embeddings.",
+    envKey: "OPENAI_API_KEY",
+    placeholder: "sk-...",
+  },
+  {
+    id: "gemini",
+    name: "Google Gemini",
+    description: "Google's Gemini models for multimodal tasks.",
+    envKey: "GOOGLE_GEMINI_API_KEY",
+    placeholder: "AIza...",
+  },
+]
 
 export function IntegrationsTab(): React.ReactElement {
+  const [keys, setKeys] = useState<Record<string, string>>({})
+  const [visibility, setVisibility] = useState<Record<string, boolean>>({})
+  const [saved, setSaved] = useState<Record<string, boolean>>({})
+
+  function handleKeyChange(id: string, value: string) {
+    setKeys(prev => ({ ...prev, [id]: value }))
+    setSaved(prev => ({ ...prev, [id]: false }))
+  }
+
+  function toggleVisibility(id: string) {
+    setVisibility(prev => ({ ...prev, [id]: !prev[id] }))
+  }
+
+  async function handleSave(provider: ProviderConfig) {
+    const key = keys[provider.id]?.trim()
+    if (!key) return
+
+    try {
+      const response = await fetch("/api/settings/api-keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: provider.envKey, value: key }),
+      })
+
+      if (response.ok) {
+        setSaved(prev => ({ ...prev, [provider.id]: true }))
+      }
+    } catch (error) {
+      console.error(`Failed to save ${provider.name} key:`, error)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -17,105 +89,69 @@ export function IntegrationsTab(): React.ReactElement {
             Connected apps
           </CardTitle>
           <CardDescription>
-            Manage the tools that sync data into Ari.
+            Store your AI API keys here.{" "}
+            <a
+              href="https://ari.software/docs/api-integrations"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-4 hover:text-foreground"
+            >
+              Learn more
+            </a>
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-xl border p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Supabase</p>
-                <p className="text-xs text-muted-foreground">Realtime tasks & auth</p>
-              </div>
-              <Badge variant="secondary">Connected</Badge>
-            </div>
-            <Separator className="my-4" />
-            <p className="text-sm text-muted-foreground">
-              Syncs tasks, fitness logs, and motivation content via secured service role.
-            </p>
-            <Button variant="outline" size="sm" className="mt-4 w-full">
-              Manage keys
-            </Button>
-          </div>
-          <div className="rounded-xl border p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Notion</p>
-                <p className="text-xs text-muted-foreground">Docs & rituals</p>
-              </div>
-              <Badge variant="outline">Available</Badge>
-            </div>
-            <Separator className="my-4" />
-            <p className="text-sm text-muted-foreground">
-              Mirror rituals, handbooks, and SOPs directly into Ari dashboards.
-            </p>
-            <Button size="sm" className="mt-4 w-full">
-              Connect
-            </Button>
-          </div>
-          <div className="rounded-xl border p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Linear</p>
-                <p className="text-xs text-muted-foreground">Engineering backlog</p>
-              </div>
-              <Badge variant="outline">Available</Badge>
-            </div>
-            <Separator className="my-4" />
-            <p className="text-sm text-muted-foreground">
-              Auto-link shipped tickets to Ari milestones with status mirroring.
-            </p>
-            <Button size="sm" className="mt-4 w-full">
-              Connect
-            </Button>
-          </div>
-          <div className="rounded-xl border p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Slack</p>
-                <p className="text-xs text-muted-foreground">Channel digests</p>
-              </div>
-              <Badge variant="outline">Available</Badge>
-            </div>
-            <Separator className="my-4" />
-            <p className="text-sm text-muted-foreground">
-              Send curated notifications into team channels with context-aware summaries.
-            </p>
-            <Button size="sm" className="mt-4 w-full">
-              Connect
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          {providers.map((provider) => {
+            const value = keys[provider.id] || ""
+            const isVisible = visibility[provider.id] || false
+            const isSaved = saved[provider.id] || false
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">Automation recipes</CardTitle>
-          <CardDescription>
-            Kick-start automation with prebuilt flows. Toggle to activate instantly.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div className="flex flex-col justify-between rounded-xl border p-5">
-            <div>
-              <p className="text-sm font-medium">Quiet hours</p>
-              <p className="mt-2 text-sm text-muted-foreground">Mute notifications nightly and resurface blockers each morning.</p>
-            </div>
-            <div className="mt-4 flex items-center justify-between">
-              <Badge variant="outline">Recommended</Badge>
-              <Switch defaultChecked />
-            </div>
-          </div>
-          <div className="flex flex-col justify-between rounded-xl border p-5">
-            <div>
-              <p className="text-sm font-medium">Post-meeting recap</p>
-              <p className="mt-2 text-sm text-muted-foreground">Collect action items after calendar events tagged "Ari".</p>
-            </div>
-            <div className="mt-4 flex items-center justify-between">
-              <Badge variant="secondary">Active</Badge>
-              <Switch defaultChecked />
-            </div>
-          </div>
+            return (
+              <div key={provider.id} className="rounded-xl border p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{provider.name}</p>
+                    <p className="text-xs text-muted-foreground">{provider.envKey}</p>
+                  </div>
+                  {isSaved ? (
+                    <Badge variant="secondary">Saved</Badge>
+                  ) : (
+                    <Badge variant="outline">Not configured</Badge>
+                  )}
+                </div>
+                <Separator className="my-4" />
+                <p className="text-sm text-muted-foreground">
+                  {provider.description}
+                </p>
+                <div className="mt-4 flex gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      type={isVisible ? "text" : "password"}
+                      placeholder={provider.placeholder}
+                      value={value}
+                      onChange={(e) => handleKeyChange(provider.id, e.target.value)}
+                      className="pr-10 font-mono text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => toggleVisibility(provider.id)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {isVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={isSaved ? "outline" : "default"}
+                    onClick={() => handleSave(provider)}
+                    disabled={!value.trim()}
+                  >
+                    {isSaved ? <Check className="h-4 w-4" /> : "Save"}
+                  </Button>
+                </div>
+              </div>
+            )
+          })}
         </CardContent>
       </Card>
     </div>
