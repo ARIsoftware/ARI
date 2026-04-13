@@ -805,7 +805,7 @@ export default function ModulesPage() {
                       <p className="mt-[20px]" style={{ color: '#222', fontSize: '.85rem' }}>
                         Your license key was sent to your email after purchase.{' '}
                         <a
-                          href="https://ari.software"
+                          href="https://ari.software/#download"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="underline hover:text-foreground"

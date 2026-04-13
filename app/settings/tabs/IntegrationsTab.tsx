@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
-import { Plug, Eye, EyeOff, Check } from "lucide-react"
+import { Plug, Eye, EyeOff, Check, FileCode } from "lucide-react"
 
 interface ProviderConfig {
   id: string
@@ -152,6 +152,26 @@ export function IntegrationsTab(): React.ReactElement {
               </div>
             )
           })}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <FileCode className="h-5 w-5 text-slate-500" />
+            Using environment variables
+          </CardTitle>
+          <CardDescription>
+            Prefer managing keys outside the UI? Add them directly to your <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">.env.local</code> file in the project root. Environment variables take precedence over values saved through the UI.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <pre className="rounded-lg border bg-muted/50 p-4 font-mono text-sm text-muted-foreground overflow-x-auto">
+{`OPENROUTER_API_KEY=sk-ajg...
+ANTHROPIC_API_KEY=sk-ant...
+OPENAI_API_KEY=sk-dfdf...
+GOOGLE_GEMINI_API_KEY=AIza...`}
+          </pre>
         </CardContent>
       </Card>
     </div>

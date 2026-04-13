@@ -37,6 +37,15 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
   const [isViewingHistory, setIsViewingHistory] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
+  const [userTimezone, setUserTimezone] = useState("UTC")
+
+  // Load user timezone preference
+  useEffect(() => {
+    fetch("/api/user-preferences")
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data?.timezone) setUserTimezone(data.timezone) })
+      .catch(() => {})
+  }, [])
 
   // Load saved content and revisions from database when component mounts
   useEffect(() => {
@@ -220,7 +229,10 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
       return "Latest Version"
     }
     const revision = revisions[currentRevisionIndex]
-    return new Date(revision.created_at).toLocaleDateString()
+    const d = new Date(revision.created_at)
+    const date = d.toLocaleDateString(undefined, { timeZone: userTimezone, month: 'numeric', day: 'numeric', year: 'numeric' })
+    const time = d.toLocaleTimeString(undefined, { timeZone: userTimezone, hour: 'numeric', minute: '2-digit' })
+    return `${date} ${time}`
   }
 
   return (
