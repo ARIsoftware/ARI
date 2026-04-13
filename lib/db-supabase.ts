@@ -13,13 +13,13 @@ import { createClient } from "@supabase/supabase-js"
 export function createDbClient() {
   // Validate at runtime (not build time) to avoid Vercel build failures
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY
+  const supabaseServiceKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!supabaseUrl) {
     throw new Error('NEXT_PUBLIC_SUPABASE_URL environment variable is required')
   }
   if (!supabaseServiceKey) {
-    throw new Error('SUPABASE_SECRET_KEY environment variable is required')
+    throw new Error('SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY environment variable is required')
   }
 
   return createClient(supabaseUrl, supabaseServiceKey, {

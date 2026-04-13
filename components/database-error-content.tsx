@@ -29,7 +29,7 @@ export function DatabaseErrorContent({ onRetry }: { onRetry?: () => void }) {
               <span>
                 <strong>Local development:</strong> Check the{" "}
                 <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">
-                  .env.local
+                  .env.supabase.local
                 </code>{" "}
                 file to ensure the database connection string and credentials
                 are configured properly.

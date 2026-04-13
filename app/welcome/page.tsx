@@ -92,6 +92,7 @@ export default function WelcomePage() {
   const [showOnboarding, setShowOnboarding] = useState(false)
 
   const [currentTab, setCurrentTab] = useState("account")
+  const [localSupabaseDetected, setLocalSupabaseDetected] = useState(false)
   const [selectedOS, setSelectedOS] = useState<"mac" | "windows" | "linux" | null>(null)
 
   const [formData, setFormData] = useState<OnboardingData>({
@@ -281,7 +282,12 @@ export default function WelcomePage() {
   useEffect(() => {
     fetch("/api/project-dir")
       .then((res) => res.json())
-      .then((data) => setProjectDir(data.dir))
+      .then((data) => {
+        setProjectDir(data.dir)
+        if (data.localSupabase?.detected) {
+          setLocalSupabaseDetected(true)
+        }
+      })
       .catch(() => setProjectDir(null))
   }, [])
 
@@ -306,13 +312,20 @@ export default function WelcomePage() {
     lines.push("BETTER_AUTH_URL=http://localhost:3000")
     lines.push("")
 
-    lines.push("## PRODUCTION SUPABASE")
-    lines.push(`DATABASE_URL=${formData.databaseUrl}`)
-    lines.push("DATABASE_POOL_MAX=3")
-    lines.push(`NEXT_PUBLIC_SUPABASE_URL=${formData.supabaseUrl}`)
-    lines.push(`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${formData.supabaseAnonKey}`)
-    lines.push(`SUPABASE_SECRET_KEY=${formData.supabaseSecretKey}`)
-    lines.push("")
+    if (localSupabaseDetected && !formData.databaseUrl) {
+      lines.push("# Supabase: Using local Supabase (configured via .env.supabase.local)")
+      lines.push("# To use a remote Supabase instance, add DATABASE_URL, NEXT_PUBLIC_SUPABASE_URL,")
+      lines.push("# NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, and SUPABASE_SECRET_KEY here.")
+      lines.push("")
+    } else {
+      lines.push("## PRODUCTION SUPABASE")
+      lines.push(`DATABASE_URL=${formData.databaseUrl}`)
+      lines.push("DATABASE_POOL_MAX=3")
+      lines.push(`NEXT_PUBLIC_SUPABASE_URL=${formData.supabaseUrl}`)
+      lines.push(`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${formData.supabaseAnonKey}`)
+      lines.push(`SUPABASE_SECRET_KEY=${formData.supabaseSecretKey}`)
+      lines.push("")
+    }
 
     lines.push("# Allow the user to take manual backups on the /settings page.")
     lines.push("# Default: true")
@@ -414,7 +427,7 @@ export default function WelcomePage() {
   }
 
 
-  const isSupabaseComplete = formData.supabaseUrl && formData.supabaseAnonKey && formData.supabaseSecretKey && formData.databaseUrl && formData.betterAuthSecret
+  const isSupabaseComplete = (localSupabaseDetected || (formData.supabaseUrl && formData.supabaseAnonKey && formData.supabaseSecretKey && formData.databaseUrl)) && formData.betterAuthSecret
 
   // Intro/typing animation screen
   if (!showOnboarding) {
@@ -1865,12 +1878,12 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                     <div className="space-y-1 text-sm">
                       {/* Required configurations */}
                       <div className="flex items-center gap-2">
-                        {formData.databaseUrl ?
+                        {(localSupabaseDetected || formData.databaseUrl) ?
                           <Check className="w-4 h-4 text-green-500" /> :
                           <X className="w-4 h-4 text-red-500" />
                         }
-                        <span className={!formData.databaseUrl ? "text-red-600" : "text-gray-900"}>
-                          Database: {formData.databaseUrl ? "Configured" : "Required - please complete"}
+                        <span className={!(localSupabaseDetected || formData.databaseUrl) ? "text-red-600" : "text-gray-900"}>
+                          Database: {localSupabaseDetected ? "Local Supabase" : formData.databaseUrl ? "Configured" : "Required - please complete"}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1883,12 +1896,12 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        {formData.supabaseUrl && formData.supabaseSecretKey ?
+                        {(localSupabaseDetected || (formData.supabaseUrl && formData.supabaseSecretKey)) ?
                           <Check className="w-4 h-4 text-green-500" /> :
                           <X className="w-4 h-4 text-red-500" />
                         }
-                        <span className={!(formData.supabaseUrl && formData.supabaseSecretKey) ? "text-red-600" : "text-gray-900"}>
-                          Supabase API: {formData.supabaseUrl && formData.supabaseSecretKey ? "Configured" : "Required - please complete"}
+                        <span className={!(localSupabaseDetected || (formData.supabaseUrl && formData.supabaseSecretKey)) ? "text-red-600" : "text-gray-900"}>
+                          Supabase API: {localSupabaseDetected ? "Local Supabase" : (formData.supabaseUrl && formData.supabaseSecretKey) ? "Configured" : "Required - please complete"}
                         </span>
                       </div>
                       {/* Optional configurations */}
