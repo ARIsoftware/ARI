@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TopBar } from "@/components/top-bar"
-import { Check, TimerReset } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 import {
   GeneralTab,
   ThemesTab,
@@ -40,10 +40,7 @@ import {
 export default function SettingsPage(): React.ReactElement {
   // Get session from context (avoids redundant API call)
   const { session } = useAuth()
-
-  // UI state
-  const [isSaving, setIsSaving] = useState(false)
-  const [savedMessage, setSavedMessage] = useState<string | null>(null)
+  const { toast } = useToast()
 
   // General tab state
   const [themePreference, setThemePreference] = useState("system")
@@ -108,16 +105,6 @@ export default function SettingsPage(): React.ReactElement {
     }
   }
 
-  function handleSaveChanges(): void {
-    setIsSaving(true)
-    setSavedMessage(null)
-    window.setTimeout(() => {
-      setIsSaving(false)
-      setSavedMessage("Your preferences are synced across devices.")
-    }, 800)
-  }
-
-
   function toggleNotification(key: keyof NotificationSettings): void {
     setNotificationSettings(prev => ({ ...prev, [key]: !prev[key] }))
   }
@@ -127,9 +114,10 @@ export default function SettingsPage(): React.ReactElement {
     try {
       await authClient.revokeSession({ token })
       await loadSessions()
-      setSavedMessage("Session revoked successfully.")
+      toast({ title: "Session revoked", description: "The session has been signed out." })
     } catch (error) {
       console.error("Failed to revoke session:", error)
+      toast({ variant: "destructive", title: "Failed to revoke session", description: "Please try again." })
     } finally {
       setRevokingSession(null)
     }
@@ -140,9 +128,10 @@ export default function SettingsPage(): React.ReactElement {
     try {
       await authClient.revokeSessions()
       await loadSessions()
-      setSavedMessage("All other sessions have been signed out.")
+      toast({ title: "Sessions revoked", description: "All other sessions have been signed out." })
     } catch (error) {
       console.error("Failed to revoke sessions:", error)
+      toast({ variant: "destructive", title: "Failed to revoke sessions", description: "Please try again." })
     } finally {
       setRevokingAllSessions(false)
     }
@@ -435,19 +424,6 @@ export default function SettingsPage(): React.ReactElement {
                     <Button variant="outline" size="sm" onClick={() => window.location.href = "/debug"}>
                       Debug
                     </Button>
-                    <Button size="sm" onClick={handleSaveChanges} disabled={isSaving}>
-                      {isSaving ? (
-                        <span className="flex items-center gap-2">
-                          <TimerReset className="h-4 w-4 animate-spin" />
-                          Saving
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-2">
-                          <Check className="h-4 w-4" />
-                          Save changes
-                        </span>
-                      )}
-                    </Button>
                   </div>
                 </div>
 
@@ -524,14 +500,6 @@ export default function SettingsPage(): React.ReactElement {
                 </TabsContent>
               </Tabs>
 
-              {savedMessage && (
-                <div className="sticky bottom-6 flex items-center justify-between rounded-xl border border-accent/50 bg-accent/10 px-6 py-4 text-sm text-accent-foreground shadow-lg">
-                  <span>{savedMessage}</span>
-                  <Button variant="outline" size="sm" onClick={() => setSavedMessage(null)}>
-                    Dismiss
-                  </Button>
-                </div>
-              )}
             </div>
           </main>
         </SidebarInset>
