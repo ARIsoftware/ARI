@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { z } from 'zod'
+import { userPreferences } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
+import { toSnakeCase } from '@/lib/api-helpers'
 
 // Validation schema for user preferences
 const userPreferencesSchema = z.object({
@@ -23,13 +26,6 @@ function getErrorMessage(error: unknown): string {
   return String(error)
 }
 
-/** Supabase REST API returns 404 for missing tables (not PostgreSQL 42P01) */
-function isTableNotFound(status: number, errorCode?: string): boolean {
-  return status === 404 || errorCode === '42P01'
-}
-
-const TABLE_MISSING_MSG = 'The user_preferences table does not exist. Please run the migration at /migrations/user_preferences.sql'
-
 const DEFAULT_PREFS = (userId: string, email: string) => ({
   id: null,
   user_id: userId,
@@ -45,26 +41,21 @@ const DEFAULT_PREFS = (userId: string, email: string) => ({
 
 export async function GET() {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user || !supabase) {
+    if (!user || !withRLS) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const result = await supabase
-      .from('user_preferences')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle()
+    const rows = await withRLS((db) =>
+      db.select().from(userPreferences).where(eq(userPreferences.userId, user.id)).limit(1)
+    )
 
-    if (result.error) {
-      if (isTableNotFound(result.status, result.error.code)) {
-        return NextResponse.json(DEFAULT_PREFS(user.id, user.email))
-      }
-      throw result.error
+    if (rows.length === 0) {
+      return NextResponse.json(DEFAULT_PREFS(user.id, user.email))
     }
 
-    return NextResponse.json(result.data || DEFAULT_PREFS(user.id, user.email))
+    return NextResponse.json(toSnakeCase(rows[0]))
   } catch (error) {
     console.error('Failed to fetch user preferences:', error)
     return NextResponse.json(
@@ -76,9 +67,9 @@ export async function GET() {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { user, supabase } = await getAuthenticatedUser()
+    const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user || !supabase) {
+    if (!user || !withRLS) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -94,32 +85,37 @@ export async function PUT(request: NextRequest) {
 
     const validatedData = validationResult.data
 
-    const result = await supabase
-      .from('user_preferences')
-      .upsert(
-        {
-          user_id: user.id,
-          ...validatedData,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id' }
-      )
-      .select()
+    const result = await withRLS((db) =>
+      db.insert(userPreferences)
+        .values({
+          userId: user.id,
+          name: validatedData.name ?? null,
+          email: validatedData.email ?? null,
+          title: validatedData.title ?? null,
+          companyName: validatedData.company_name ?? null,
+          country: validatedData.country ?? null,
+          city: validatedData.city ?? null,
+          linkedinUrl: validatedData.linkedin_url ?? null,
+          timezone: validatedData.timezone ?? 'UTC',
+        })
+        .onConflictDoUpdate({
+          target: userPreferences.userId,
+          set: {
+            name: validatedData.name ?? null,
+            email: validatedData.email ?? null,
+            title: validatedData.title ?? null,
+            companyName: validatedData.company_name ?? null,
+            country: validatedData.country ?? null,
+            city: validatedData.city ?? null,
+            linkedinUrl: validatedData.linkedin_url ?? null,
+            timezone: validatedData.timezone ?? 'UTC',
+            updatedAt: new Date().toISOString(),
+          },
+        })
+        .returning()
+    )
 
-    if (result.error || isTableNotFound(result.status, result.error?.code)) {
-      if (isTableNotFound(result.status, result.error?.code)) {
-        return NextResponse.json(
-          { error: 'Table not found', message: TABLE_MISSING_MSG },
-          { status: 500 }
-        )
-      }
-      return NextResponse.json(
-        { error: 'Failed to save user preferences', message: result.error?.message || result.statusText || 'Unknown error' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json(result.data?.[0] ?? result.data)
+    return NextResponse.json(toSnakeCase(result[0]))
   } catch (error) {
     console.error('Failed to save user preferences:', error)
     return NextResponse.json(
