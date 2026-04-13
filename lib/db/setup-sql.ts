@@ -20,7 +20,7 @@ CREATE SCHEMA IF NOT EXISTS app;
 CREATE OR REPLACE FUNCTION app.current_user_id()
 RETURNS TEXT AS $$
   SELECT current_setting('app.current_user_id', true);
-$$ LANGUAGE sql STABLE;
+$$ LANGUAGE sql STABLE SET search_path = '';
 
 -- ================================================================
 -- AUTH TABLES (user must come first - referenced by others)
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS "user" (
   CONSTRAINT "user_email_key" UNIQUE ("email")
 );
 ALTER TABLE "user" ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "user_rls_all" ON "user" FOR ALL TO public USING (true) WITH CHECK (true);
+CREATE POLICY "user_rls_deny" ON "user" FOR ALL TO public USING (false);
 
 -- Table: session
 CREATE TABLE IF NOT EXISTS "session" (
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS "session" (
   CONSTRAINT "session_token_key" UNIQUE ("token")
 );
 ALTER TABLE "session" ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "session_rls_all" ON "session" FOR ALL TO public USING (true) WITH CHECK (true);
+CREATE POLICY "session_rls_deny" ON "session" FOR ALL TO public USING (false);
 
 -- Table: account
 CREATE TABLE IF NOT EXISTS "account" (
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS "account" (
   PRIMARY KEY ("id")
 );
 ALTER TABLE "account" ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "account_rls_all" ON "account" FOR ALL TO public USING (true) WITH CHECK (true);
+CREATE POLICY "account_rls_deny" ON "account" FOR ALL TO public USING (false);
 
 -- Table: twoFactor
 CREATE TABLE IF NOT EXISTS "twoFactor" (
@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS "twoFactor" (
   PRIMARY KEY ("id")
 );
 ALTER TABLE "twoFactor" ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "twoFactor_rls_all" ON "twoFactor" FOR ALL TO public USING (true) WITH CHECK (true);
+CREATE POLICY "twoFactor_rls_deny" ON "twoFactor" FOR ALL TO public USING (false);
 
 -- Table: verification
 CREATE TABLE IF NOT EXISTS "verification" (
@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS "verification" (
   PRIMARY KEY ("id")
 );
 ALTER TABLE "verification" ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "verification_rls_all" ON "verification" FOR ALL TO public USING (true) WITH CHECK (true);
+CREATE POLICY "verification_rls_deny" ON "verification" FOR ALL TO public USING (false);
 
 -- ================================================================
 -- SYSTEM TABLES
@@ -126,11 +126,15 @@ CREATE TABLE IF NOT EXISTS "user_preferences" (
   CONSTRAINT "user_preferences_user_id_key" UNIQUE ("user_id")
 );
 
--- Enable RLS on user_preferences. ARI enforces access at the application
--- layer via withRLS(); the service role key bypasses RLS, so no policies are
--- needed. This just prevents anon/authenticated roles from touching the table
--- directly and silences the Supabase "unrestricted" warning.
 ALTER TABLE "user_preferences" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "user_preferences_rls_select" ON "user_preferences" FOR SELECT TO public
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY "user_preferences_rls_insert" ON "user_preferences" FOR INSERT TO public
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY "user_preferences_rls_update" ON "user_preferences" FOR UPDATE TO public
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY "user_preferences_rls_delete" ON "user_preferences" FOR DELETE TO public
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 -- Table: module_settings
 CREATE TABLE IF NOT EXISTS "module_settings" (
@@ -165,7 +169,7 @@ CREATE TABLE IF NOT EXISTS "module_migrations" (
   CONSTRAINT "module_migrations_module_id_migration_name_key" UNIQUE ("module_id", "migration_name")
 );
 ALTER TABLE "module_migrations" ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "module_migrations_rls_all" ON "module_migrations" FOR ALL TO public USING (true) WITH CHECK (true);
+CREATE POLICY "module_migrations_rls_deny" ON "module_migrations" FOR ALL TO public USING (false);
 
 -- ================================================================
 -- API KEY TABLES
@@ -423,12 +427,7 @@ SELECT TRUE
 WHERE NOT EXISTS (SELECT 1 FROM "ari_instance");
 
 ALTER TABLE "ari_instance" ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "ari_instance_rls_select" ON "ari_instance" FOR SELECT TO public
-  USING (TRUE);
-CREATE POLICY "ari_instance_rls_update" ON "ari_instance" FOR UPDATE TO public
-  USING (TRUE) WITH CHECK (TRUE);
-CREATE POLICY "ari_instance_rls_insert" ON "ari_instance" FOR INSERT TO public
-  WITH CHECK (TRUE);
+CREATE POLICY "ari_instance_rls_deny" ON "ari_instance" FOR ALL TO public USING (false);
 
 -- ================================================================
 -- INDEXES

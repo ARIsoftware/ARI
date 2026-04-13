@@ -397,9 +397,9 @@ export default function TasksPage() {
               <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-medium">Todo List</h1>
-                {user && (
-                  <p className="text-sm text-muted-foreground mt-1" suppressHydrationWarning>Welcome back, {user.firstName || user.email || "there"}!</p>
-                )}
+                <p className="text-sm text-muted-foreground mt-1" suppressHydrationWarning>
+                  {user ? `Welcome back, ${user.firstName || user.email || "there"}!` : '\u00A0'}
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" onClick={() => router.push("/tasks/radar")}>

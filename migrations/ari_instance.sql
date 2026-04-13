@@ -23,19 +23,12 @@ INSERT INTO "ari_instance" ("telemetry_enabled")
 SELECT TRUE
 WHERE NOT EXISTS (SELECT 1 FROM "ari_instance");
 
--- Enable RLS. ari_instance is install-scoped (not user-scoped), so any
--- authenticated user may read/update the single row. Server-side code
--- using the service role bypasses these policies anyway.
+-- Enable RLS. ari_instance is install-scoped (not user-scoped). Server-side
+-- code using the service role bypasses RLS. Deny non-service-role access.
 ALTER TABLE "ari_instance" ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "ari_instance_rls_select" ON "ari_instance";
-CREATE POLICY "ari_instance_rls_select" ON "ari_instance" FOR SELECT TO public
-  USING (TRUE);
-
 DROP POLICY IF EXISTS "ari_instance_rls_update" ON "ari_instance";
-CREATE POLICY "ari_instance_rls_update" ON "ari_instance" FOR UPDATE TO public
-  USING (TRUE) WITH CHECK (TRUE);
-
 DROP POLICY IF EXISTS "ari_instance_rls_insert" ON "ari_instance";
-CREATE POLICY "ari_instance_rls_insert" ON "ari_instance" FOR INSERT TO public
-  WITH CHECK (TRUE);
+DROP POLICY IF EXISTS "ari_instance_rls_deny" ON "ari_instance";
+CREATE POLICY "ari_instance_rls_deny" ON "ari_instance" FOR ALL TO public USING (false);

@@ -150,6 +150,8 @@ export default function WelcomePage() {
       try {
         const res = await fetch('/api/user-preferences')
         if (!res.ok) return
+        const contentType = res.headers.get('content-type') || ''
+        if (!contentType.includes('application/json')) return
         const data = await res.json()
         if (data.error) return
         const merged = {
@@ -427,7 +429,9 @@ export default function WelcomePage() {
   }
 
 
-  const isSupabaseComplete = (localSupabaseDetected || (formData.supabaseUrl && formData.supabaseAnonKey && formData.supabaseSecretKey && formData.databaseUrl)) && formData.betterAuthSecret
+  const isDatabaseConfigured = localSupabaseDetected || !!formData.databaseUrl
+  const isSupabaseApiConfigured = localSupabaseDetected || (!!formData.supabaseUrl && !!formData.supabaseSecretKey)
+  const isSupabaseComplete = isDatabaseConfigured && isSupabaseApiConfigured && (!!formData.supabaseAnonKey || localSupabaseDetected) && formData.betterAuthSecret
 
   // Intro/typing animation screen
   if (!showOnboarding) {
@@ -1878,11 +1882,11 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                     <div className="space-y-1 text-sm">
                       {/* Required configurations */}
                       <div className="flex items-center gap-2">
-                        {(localSupabaseDetected || formData.databaseUrl) ?
+                        {isDatabaseConfigured ?
                           <Check className="w-4 h-4 text-green-500" /> :
                           <X className="w-4 h-4 text-red-500" />
                         }
-                        <span className={!(localSupabaseDetected || formData.databaseUrl) ? "text-red-600" : "text-gray-900"}>
+                        <span className={!isDatabaseConfigured ? "text-red-600" : "text-gray-900"}>
                           Database: {localSupabaseDetected ? "Local Supabase" : formData.databaseUrl ? "Configured" : "Required - please complete"}
                         </span>
                       </div>
@@ -1896,11 +1900,11 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        {(localSupabaseDetected || (formData.supabaseUrl && formData.supabaseSecretKey)) ?
+                        {isSupabaseApiConfigured ?
                           <Check className="w-4 h-4 text-green-500" /> :
                           <X className="w-4 h-4 text-red-500" />
                         }
-                        <span className={!(localSupabaseDetected || (formData.supabaseUrl && formData.supabaseSecretKey)) ? "text-red-600" : "text-gray-900"}>
+                        <span className={!isSupabaseApiConfigured ? "text-red-600" : "text-gray-900"}>
                           Supabase API: {localSupabaseDetected ? "Local Supabase" : (formData.supabaseUrl && formData.supabaseSecretKey) ? "Configured" : "Required - please complete"}
                         </span>
                       </div>
@@ -1992,7 +1996,7 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                         Your admin account and database tables will be created automatically on first sign-in.
                       </p>
                       <div className="mb-3">
-                        <CodeBlock language="bash" code={`# In your terminal:\n# 1. Stop the dev server with Ctrl+C\n# 2. Start it again:\npnpm dev`} />
+                        <CodeBlock language="bash" code={`# In your terminal:\n# 1. Stop the dev server with Ctrl+C\n# 2. Start it again:\n./ari start`} />
                       </div>
                     </div>
                   )}

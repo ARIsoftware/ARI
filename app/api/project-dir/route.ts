@@ -1,19 +1,16 @@
 import { NextResponse } from "next/server"
-import { existsSync } from "node:fs"
-import { resolve } from "node:path"
 
 export async function GET() {
-  const hasSupabaseUrl = !!process.env.NEXT_PUBLIC_SUPABASE_URL
-  const hasAnonKey = !!(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)
-  const hasServiceKey = !!(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const hasAnonKey = !!(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+  const hasServiceKey = !!(process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
   const hasDatabaseUrl = !!process.env.DATABASE_URL
-  const envFileExists = existsSync(resolve(process.cwd(), ".env.supabase.local"))
+  const isLocal = !!supabaseUrl && (supabaseUrl.includes("127.0.0.1") || supabaseUrl.includes("localhost"))
 
   return NextResponse.json({
     dir: process.cwd(),
     localSupabase: {
-      detected: hasSupabaseUrl && hasAnonKey && hasServiceKey && hasDatabaseUrl,
-      envFileExists,
+      detected: isLocal && hasAnonKey && hasServiceKey && hasDatabaseUrl,
     },
   })
 }
