@@ -131,7 +131,7 @@ export function SecurityTab({
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          {session.ipAddress || "Unknown IP"} · Last active {formatRelativeTime(session.updatedAt)}
+                          {(!session.ipAddress || /^(::1?|127\.0\.0\.1|[0:]+)$/.test(session.ipAddress.trim())) ? 'localhost' : session.ipAddress} · Signed in {new Date(session.createdAt).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric', year: 'numeric' })} {new Date(session.createdAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
                         </p>
                       </div>
                     </div>
