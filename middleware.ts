@@ -54,7 +54,7 @@ const protectedRoutes = [
 // Static public routes that the manifest cannot describe:
 //   /sign-in, /auth, /database-error — UI pages (not API routes)
 //   /api/auth — Better Auth's catch-all (owned by Better Auth, can't be tagged)
-const staticPublicRoutes = ["/sign-in", "/auth", "/api/auth", "/database-error", "/welcome"]
+const staticPublicRoutes = ["/sign-in", "/auth", "/api/auth", "/database-error", "/welcome", "/robots.txt"]
 
 // All other public API routes are sourced from the manifest. Both module
 // routes (declared in module.json) and core routes (declared via
