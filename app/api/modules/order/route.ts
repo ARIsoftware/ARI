@@ -16,7 +16,9 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { createDbClient } from '@/lib/db-supabase'
+import { withAdminDb } from '@/lib/db'
+import { moduleSettings } from '@/lib/db/schema'
+import { eq, and } from 'drizzle-orm'
 import { z } from 'zod'
 
 const TOPBAR_ICONS_MODULE_ID = "__topbar_icons__"
@@ -38,33 +40,31 @@ export async function GET() {
   }
 
   try {
-    const supabase = createDbClient()
-
     // Fetch all module settings for this user
-    const { data: allSettings } = await supabase
-      .from('module_settings')
-      .select('module_id, settings')
-      .eq('user_id', user.id)
+    const allSettings = await withAdminDb(async (db) =>
+      db.select({ moduleId: moduleSettings.moduleId, settings: moduleSettings.settings })
+        .from(moduleSettings)
+        .where(eq(moduleSettings.userId, user.id))
+    )
 
     const specialIds = new Set([TOPBAR_ICONS_MODULE_ID, DASHBOARD_STAT_CARDS_MODULE_ID, DASHBOARD_WIDGETS_MODULE_ID])
 
     // Extract special orders
-    const iconSettings = allSettings?.find(s => s.module_id === TOPBAR_ICONS_MODULE_ID)
-    const iconOrder = iconSettings?.settings?.iconOrder || null
+    const iconSettings = allSettings.find(s => s.moduleId === TOPBAR_ICONS_MODULE_ID)
+    const iconOrder = (iconSettings?.settings as Record<string, any>)?.iconOrder || null
 
-    const statCardSettings = allSettings?.find(s => s.module_id === DASHBOARD_STAT_CARDS_MODULE_ID)
-    const statCardOrder = statCardSettings?.settings?.statCardOrder || null
+    const statCardSettings = allSettings.find(s => s.moduleId === DASHBOARD_STAT_CARDS_MODULE_ID)
+    const statCardOrder = (statCardSettings?.settings as Record<string, any>)?.statCardOrder || null
 
-    const widgetSettings = allSettings?.find(s => s.module_id === DASHBOARD_WIDGETS_MODULE_ID)
-    const widgetOrder = widgetSettings?.settings?.widgetOrder || null
+    const widgetSettings = allSettings.find(s => s.moduleId === DASHBOARD_WIDGETS_MODULE_ID)
+    const widgetOrder = (widgetSettings?.settings as Record<string, any>)?.widgetOrder || null
 
     // Build module order from all module settings that have menuPriority
     const moduleOrder: Record<string, number> = {}
-    if (allSettings) {
-      for (const setting of allSettings) {
-        if (!specialIds.has(setting.module_id) && setting.settings?.menuPriority !== undefined) {
-          moduleOrder[setting.module_id] = setting.settings.menuPriority
-        }
+    for (const setting of allSettings) {
+      const settingsObj = setting.settings as Record<string, any> | null
+      if (!specialIds.has(setting.moduleId) && settingsObj?.menuPriority !== undefined) {
+        moduleOrder[setting.moduleId] = settingsObj.menuPriority
       }
     }
 
@@ -102,32 +102,37 @@ export async function POST(request: NextRequest) {
     }
 
     const { moduleOrder, iconOrder, statCardOrder, widgetOrder } = parseResult.data
-    const supabase = createDbClient()
     const userId = user.id
 
-    // Helper: fetch existing settings, merge a key, upsert
-    async function upsertSettingsKey(moduleId: string, settingsKey: string, value: unknown) {
-      const { data: existing } = await supabase
-        .from('module_settings')
-        .select('settings')
-        .eq('user_id', userId)
-        .eq('module_id', moduleId)
-        .single()
+    // Helper: read existing settings, merge a key, upsert — single connection to avoid races
+    async function upsertSettingsKey(modId: string, settingsKey: string, value: unknown) {
+      await withAdminDb(async (db) => {
+        const existing = await db.select({ settings: moduleSettings.settings })
+          .from(moduleSettings)
+          .where(
+            and(
+              eq(moduleSettings.userId, userId),
+              eq(moduleSettings.moduleId, modId)
+            )
+          )
 
-      const { error } = await supabase
-        .from('module_settings')
-        .upsert(
-          {
-            user_id: userId,
-            module_id: moduleId,
+        const merged = { ...((existing[0]?.settings as Record<string, any>) || {}), [settingsKey]: value }
+
+        await db.insert(moduleSettings)
+          .values({
+            userId,
+            moduleId: modId,
             enabled: true,
-            settings: { ...(existing?.settings || {}), [settingsKey]: value },
-            updated_at: new Date().toISOString()
-          },
-          { onConflict: 'user_id,module_id' }
-        )
-
-      if (error) throw new Error(`Failed to update ${settingsKey} for ${moduleId}: ${error.message}`)
+            settings: merged,
+          })
+          .onConflictDoUpdate({
+            target: [moduleSettings.userId, moduleSettings.moduleId],
+            set: {
+              settings: merged,
+              updatedAt: new Date().toISOString(),
+            },
+          })
+      })
     }
 
     // Update module orders (each module gets its own menuPriority)

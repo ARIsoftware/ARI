@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { createDbClient } from '@/lib/db-supabase'
+import { withAdminDb } from '@/lib/db'
+import { moduleSettings } from '@/lib/db/schema'
+import { eq, and } from 'drizzle-orm'
 import { LICENSE_MODULE_ID } from '@/lib/license-helpers'
 
 function maskKey(key: string): string {
@@ -19,22 +21,25 @@ export async function GET() {
   }
 
   try {
-    const supabase = createDbClient()
+    const rows = await withAdminDb(async (db) =>
+      db.select({ settings: moduleSettings.settings })
+        .from(moduleSettings)
+        .where(
+          and(
+            eq(moduleSettings.userId, user.id),
+            eq(moduleSettings.moduleId, LICENSE_MODULE_ID)
+          )
+        )
+    )
 
-    const { data, error } = await supabase
-      .from('module_settings')
-      .select('settings')
-      .eq('user_id', user.id)
-      .eq('module_id', LICENSE_MODULE_ID)
-      .single()
-
-    if (error || !data?.settings?.key) {
+    const data = rows[0]
+    if (!data || !(data.settings as Record<string, any>)?.key) {
       // If no DB license, check for env var license key
       const envKey = process.env.ARI_LICENSE_KEY
       return NextResponse.json({ active: false, ...(envKey ? { env_key: envKey } : {}) })
     }
 
-    const settings = data.settings
+    const settings = data.settings as Record<string, any>
     return NextResponse.json({
       active: true,
       status: settings.status,
@@ -60,21 +65,15 @@ export async function DELETE() {
   }
 
   try {
-    const supabase = createDbClient()
-
-    const { error } = await supabase
-      .from('module_settings')
-      .delete()
-      .eq('user_id', user.id)
-      .eq('module_id', LICENSE_MODULE_ID)
-
-    if (error) {
-      console.error('[API /license/status] Failed to deactivate:', error)
-      return NextResponse.json(
-        { error: 'Failed to deactivate license' },
-        { status: 500 }
-      )
-    }
+    await withAdminDb(async (db) => {
+      await db.delete(moduleSettings)
+        .where(
+          and(
+            eq(moduleSettings.userId, user.id),
+            eq(moduleSettings.moduleId, LICENSE_MODULE_ID)
+          )
+        )
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {

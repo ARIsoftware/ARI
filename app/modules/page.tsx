@@ -427,15 +427,29 @@ export default function ModulesPage() {
         })
       })
 
+      const data = await response.json()
+
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to save changes')
+        // Extract specific per-module errors from batch response
+        const moduleErrors = data.results
+          ?.filter((r: any) => !r.success && r.error)
+          .map((r: any) => r.error)
+        const errorDetail = moduleErrors?.length > 0
+          ? moduleErrors.join('; ')
+          : (data.error || 'Failed to save changes')
+        throw new Error(errorDetail)
+      }
+
+      // Log schema warnings (e.g. "relation already exists") but still reload
+      if (data.warnings?.length > 0) {
+        console.warn('Module schema warnings:', data.warnings)
       }
 
       window.location.reload()
     } catch (error) {
       console.error('Error saving module changes:', error)
-      setMessage({ type: 'error', text: 'Failed to save changes. Please try again.' })
+      const errorText = error instanceof Error ? error.message : 'Failed to save changes'
+      setMessage({ type: 'error', text: `${errorText}. Please try again.` })
       setIsSaving(false)
     }
   }

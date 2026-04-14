@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { getLicenseKey, MODULES_API_BASE, buildClientInfo } from '@/lib/license-helpers'
+import { MODULES_API_BASE, buildClientInfo } from '@/lib/license-helpers'
+import { getLicenseKey } from '@/lib/license-helpers-server'
 import { z } from 'zod'
 import { writeFile, mkdir, rm, readdir, cp, readFile } from 'fs/promises'
 import { join, dirname } from 'path'

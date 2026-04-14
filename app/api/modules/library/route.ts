@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { getLicenseKey, MODULES_API_BASE, buildClientInfo } from '@/lib/license-helpers'
+import { MODULES_API_BASE, buildClientInfo } from '@/lib/license-helpers'
+import { getLicenseKey } from '@/lib/license-helpers-server'
 
 export async function GET() {
   const { user } = await getAuthenticatedUser()

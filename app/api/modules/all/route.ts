@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { getModules } from '@/lib/modules/module-registry'
+import { getModules, bootstrapModuleSettings } from '@/lib/modules/module-registry'
 
 export const debugRole = "modules-list-all"
 import { moduleSettings } from '@/lib/db/schema'
@@ -42,16 +42,27 @@ export async function GET(request: NextRequest) {
     const settingsMap = new Map<string, boolean>()
     if (settings) {
       settings.forEach((setting) => {
-        settingsMap.set(setting.moduleId, setting.enabled ?? true)
+        settingsMap.set(setting.moduleId, setting.enabled ?? false)
       })
     }
 
-    // Add isEnabled property to each module
+    // Bootstrap: seed DB records for newly discovered modules
+    const existingIds = new Set(settingsMap.keys())
+    const unseeded = allModules.filter(m => !existingIds.has(m.id) && !m.isOverridden)
+    if (unseeded.length > 0) {
+      await bootstrapModuleSettings(user.id, allModules, existingIds)
+      // Re-read from DB after bootstrap (don't assume defaults)
+      const refreshed = await withRLS((db) =>
+        db.select().from(moduleSettings).where(eq(moduleSettings.userId, user.id))
+      )
+      settingsMap.clear()
+      refreshed?.forEach((s) => settingsMap.set(s.moduleId, s.enabled ?? false))
+    }
+
+    // Add isEnabled property — DB is sole source of truth, default disabled
     const modulesWithEnabledState = allModules.map(module => ({
       ...module,
-      isEnabled: settingsMap.has(module.id)
-        ? settingsMap.get(module.id)
-        : (module.enabled ?? true)
+      isEnabled: settingsMap.get(module.id) ?? false
     }))
 
     return NextResponse.json({

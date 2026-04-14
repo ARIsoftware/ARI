@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { createDbClient } from '@/lib/db-supabase'
+import { withAdminDb } from '@/lib/db'
+import { moduleSettings } from '@/lib/db/schema'
 import { LICENSE_MODULE_ID } from '@/lib/license-helpers'
 import { z } from 'zod'
 const POLAR_ORGANIZATION_ID = "b1e4ddc2-774b-4bfb-aedd-5ffb0f67e8e3"
@@ -58,7 +59,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Store validated license in module_settings
-    const supabase = createDbClient()
     const licenseData = {
       key,
       status: polarData.status,
@@ -70,20 +70,24 @@ export async function POST(request: NextRequest) {
       license_key_id: polarData.id || null,
     }
 
-    const { error: upsertError } = await supabase
-      .from('module_settings')
-      .upsert(
-        {
-          user_id: user.id,
-          module_id: LICENSE_MODULE_ID,
-          enabled: true,
-          settings: licenseData,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id,module_id' }
-      )
-
-    if (upsertError) {
+    try {
+      await withAdminDb(async (db) => {
+        await db.insert(moduleSettings)
+          .values({
+            userId: user.id,
+            moduleId: LICENSE_MODULE_ID,
+            enabled: true,
+            settings: licenseData,
+          })
+          .onConflictDoUpdate({
+            target: [moduleSettings.userId, moduleSettings.moduleId],
+            set: {
+              settings: licenseData,
+              updatedAt: new Date().toISOString(),
+            },
+          })
+      })
+    } catch (upsertError) {
       console.error('[API /license/validate] Failed to store license:', upsertError)
       return NextResponse.json(
         { error: 'Failed to store license data' },

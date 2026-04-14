@@ -9,10 +9,12 @@
 
 import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
-import { createDbClient } from '@/lib/db-supabase'
+import { withAdminDb } from '@/lib/db'
+import { moduleSettings as moduleSettingsTable } from '@/lib/db/schema'
+import { eq, and } from 'drizzle-orm'
 import { loadModules } from './module-loader'
 import { runModuleSchemaInstall } from './schema-installer'
-import type { ModuleMetadata, ModuleSettings } from './module-types'
+import type { ModuleMetadata } from './module-types'
 
 /**
  * Get all discovered modules (regardless of enabled state)
@@ -25,14 +27,71 @@ export async function getModules(): Promise<ModuleMetadata[]> {
 }
 
 /**
+ * Bootstrap module_settings records for modules that don't have one yet.
+ * Core modules default to their manifest `enabled` state.
+ * Custom modules always default to disabled so the user must explicitly enable
+ * them (which triggers the schema installer).
+ *
+ * Safe to call repeatedly — uses INSERT … ON CONFLICT DO NOTHING.
+ */
+export async function bootstrapModuleSettings(
+  userId: string,
+  allModules: ModuleMetadata[],
+  existingModuleIds: Set<string>
+): Promise<void> {
+  const unseeded = allModules.filter(
+    m => !existingModuleIds.has(m.id) && !m.isOverridden
+  )
+  if (unseeded.length === 0) return
+
+  const records = unseeded.map(m => {
+    const isCustom = m.path?.includes('modules-custom')
+    return {
+      userId,
+      moduleId: m.id,
+      enabled: isCustom ? false : (m.enabled ?? true),
+      settings: {},
+    }
+  })
+
+  try {
+    await withAdminDb(async (db) => {
+      await db.insert(moduleSettingsTable)
+        .values(records)
+        .onConflictDoNothing({
+          target: [moduleSettingsTable.userId, moduleSettingsTable.moduleId],
+        })
+    })
+
+    // Run schema installer for modules being bootstrapped as enabled (parallel)
+    const enabledRecords = records.filter(r => r.enabled)
+    await Promise.all(enabledRecords.map(r => runModuleSchemaInstall(r.moduleId)))
+  } catch (error) {
+    console.error('[Modules] Bootstrap failed:', error)
+    // Non-fatal — modules will appear disabled until next load
+  }
+}
+
+/** Build maps from a module_settings query result */
+function buildSettingsMaps(settings: { moduleId: string; enabled: boolean | null; settings: unknown }[]) {
+  const enabledMap = new Map<string, boolean>()
+  const configMap = new Map<string, Record<string, any>>()
+  for (const s of settings) {
+    enabledMap.set(s.moduleId, s.enabled ?? false)
+    if (s.settings) {
+      configMap.set(s.moduleId, s.settings as Record<string, any>)
+    }
+  }
+  return { enabledMap, configMap }
+}
+
+/**
  * Get all enabled modules for the current authenticated user
  *
  * @param userId - Optional user ID (if not provided, uses current session)
  * @returns Array of enabled modules
  */
 export async function getEnabledModules(userId?: string): Promise<ModuleMetadata[]> {
-  const supabase = createDbClient()
-
   // Get current user if not provided
   let currentUserId = userId
   if (!currentUserId) {
@@ -48,33 +107,36 @@ export async function getEnabledModules(userId?: string): Promise<ModuleMetadata
   // Get all modules
   const allModules = await getModules()
 
-  // Get user's module settings from database
-  const { data: settings } = await supabase
-    .from('module_settings')
-    .select('*')
-    .eq('user_id', currentUserId)
+  // Get user's module settings from database (Drizzle via PG pool)
+  const settings = await withAdminDb(async (db) =>
+    db.select()
+      .from(moduleSettingsTable)
+      .where(eq(moduleSettingsTable.userId, currentUserId!))
+  )
 
-  // Create maps for module_id -> enabled state and settings
-  const settingsMap = new Map<string, boolean>()
-  const moduleSettingsMap = new Map<string, Record<string, any>>()
-  if (settings) {
-    settings.forEach((setting: ModuleSettings) => {
-      settingsMap.set(setting.module_id, setting.enabled)
-      if (setting.settings) {
-        moduleSettingsMap.set(setting.module_id, setting.settings as Record<string, any>)
-      }
-    })
+  let { enabledMap: settingsMap, configMap: moduleSettingsMap } = buildSettingsMaps(settings)
+
+  // Bootstrap: seed DB records for newly discovered modules
+  const existingIds = new Set(settingsMap.keys())
+  const unseeded = allModules.filter(m => !existingIds.has(m.id) && !m.isOverridden)
+  if (unseeded.length > 0) {
+    await bootstrapModuleSettings(currentUserId, allModules, existingIds)
+    // Re-read from DB after bootstrap (don't assume defaults)
+    const refreshed = await withAdminDb(async (db) =>
+      db.select()
+        .from(moduleSettingsTable)
+        .where(eq(moduleSettingsTable.userId, currentUserId!))
+    )
+    ;({ enabledMap: settingsMap, configMap: moduleSettingsMap } = buildSettingsMaps(refreshed))
   }
 
   // Filter modules based on enabled state and merge user's custom menuPriority
-  // Default to enabled if no setting exists
+  // Require explicit DB record — default to disabled
   // Exclude overridden modules - they should never appear in enabled list
   return allModules
     .filter(module => {
       if (module.isOverridden) return false
-
-      const isEnabledInDb = settingsMap.get(module.id)
-      return isEnabledInDb !== undefined ? isEnabledInDb : (module.enabled ?? true)
+      return settingsMap.get(module.id) === true
     })
     .map(module => {
       // Merge user's custom menuPriority from settings if available
@@ -104,8 +166,6 @@ export async function getEnabledModule(
   moduleId: string,
   userId?: string
 ): Promise<ModuleMetadata | null> {
-  const supabase = createDbClient()
-
   // Get current user if not provided
   let currentUserId = userId
   if (!currentUserId) {
@@ -127,18 +187,41 @@ export async function getEnabledModule(
     return null // Module doesn't exist
   }
 
-  // Check if module is enabled for this user
-  const { data: setting } = await supabase
-    .from('module_settings')
-    .select('enabled')
-    .eq('user_id', currentUserId)
-    .eq('module_id', moduleId)
-    .single()
+  // Check if module is enabled for this user (Drizzle via PG pool)
+  const settingRows = await withAdminDb(async (db) =>
+    db.select({ enabled: moduleSettingsTable.enabled })
+      .from(moduleSettingsTable)
+      .where(
+        and(
+          eq(moduleSettingsTable.userId, currentUserId!),
+          eq(moduleSettingsTable.moduleId, moduleId)
+        )
+      )
+  )
+  const setting = settingRows[0] ?? null
 
-  // If no setting exists, use manifest default
-  const isEnabled = setting ? setting.enabled : (module.enabled ?? true)
+  // If no setting exists, seed just this module's record
+  if (!setting) {
+    const isCustom = module.path?.includes('modules-custom')
+    const defaultEnabled = isCustom ? false : (module.enabled ?? true)
 
-  return isEnabled ? module : null
+    try {
+      await withAdminDb(async (db) => {
+        await db.insert(moduleSettingsTable)
+          .values({ userId: currentUserId!, moduleId, enabled: defaultEnabled, settings: {} })
+          .onConflictDoNothing({
+            target: [moduleSettingsTable.userId, moduleSettingsTable.moduleId],
+          })
+      })
+      if (defaultEnabled) await runModuleSchemaInstall(moduleId)
+    } catch (error) {
+      console.error(`[Modules] Bootstrap for ${moduleId} failed:`, error)
+    }
+
+    return defaultEnabled ? module : null
+  }
+
+  return setting.enabled ? module : null
 }
 
 /**
@@ -165,9 +248,7 @@ export async function setModuleEnabled(
   moduleId: string,
   userId: string,
   enabled: boolean
-): Promise<{ success: boolean; error?: string }> {
-  const supabase = createDbClient()
-
+): Promise<{ success: boolean; error?: string; warning?: string }> {
   // Verify module exists
   const module = await getModules().then(modules =>
     modules.find(m => m.id === moduleId)
@@ -182,38 +263,51 @@ export async function setModuleEnabled(
 
   // When enabling, run the module's schema.sql to provision its tables.
   // This is idempotent — re-runs are no-ops. uninstall.sql is never run.
+  // "already exists" errors are harmless warnings; other failures block the enable.
+  let schemaWarning: string | undefined
   if (enabled) {
     const installResult = await runModuleSchemaInstall(moduleId)
     if (!installResult.ok) {
-      return {
-        success: false,
-        error: `Schema install failed: ${installResult.error}`
+      const isHarmless = installResult.error?.includes('already exists')
+      if (isHarmless) {
+        console.warn(`[Modules] Schema install warning for ${moduleId}: ${installResult.error}`)
+        schemaWarning = `Schema install failed: ${installResult.error}`
+      } else {
+        return {
+          success: false,
+          error: `Schema install failed: ${installResult.error}`
+        }
       }
     }
   }
 
-  // Upsert module setting
-  const { error } = await supabase
-    .from('module_settings')
-    .upsert({
-      user_id: userId,
-      module_id: moduleId,
-      enabled,
-      settings: {}, // Default empty settings object
-      updated_at: new Date().toISOString()
-    }, {
-      onConflict: 'user_id,module_id'
+  // Upsert module setting via Drizzle (replaces legacy Supabase REST upsert)
+  try {
+    await withAdminDb(async (db) => {
+      await db.insert(moduleSettingsTable)
+        .values({
+          userId,
+          moduleId,
+          enabled,
+          settings: {},
+        })
+        .onConflictDoUpdate({
+          target: [moduleSettingsTable.userId, moduleSettingsTable.moduleId],
+          set: {
+            enabled,
+            updatedAt: new Date().toISOString(),
+          },
+        })
     })
-
-  if (error) {
+  } catch (error) {
     console.error('[Modules] Failed to update module settings:', error)
     return {
       success: false,
-      error: error.message
+      error: (error as Error).message
     }
   }
 
-  return { success: true }
+  return { success: true, warning: schemaWarning }
 }
 
 /**
@@ -227,8 +321,6 @@ export async function getModuleSettings(
   moduleId: string,
   userId?: string
 ): Promise<Record<string, any> | null> {
-  const supabase = createDbClient()
-
   // Get current user if not provided
   let currentUserId = userId
   if (!currentUserId) {
@@ -241,14 +333,18 @@ export async function getModuleSettings(
     currentUserId = session.user.id
   }
 
-  const { data } = await supabase
-    .from('module_settings')
-    .select('settings')
-    .eq('user_id', currentUserId)
-    .eq('module_id', moduleId)
-    .single()
+  const rows = await withAdminDb(async (db) =>
+    db.select({ settings: moduleSettingsTable.settings })
+      .from(moduleSettingsTable)
+      .where(
+        and(
+          eq(moduleSettingsTable.userId, currentUserId!),
+          eq(moduleSettingsTable.moduleId, moduleId)
+        )
+      )
+  )
 
-  return data?.settings || null
+  return (rows[0]?.settings as Record<string, any>) || null
 }
 
 /**
@@ -264,8 +360,6 @@ export async function updateModuleSettings(
   userId: string,
   settings: Record<string, any>
 ): Promise<{ success: boolean; error?: string }> {
-  const supabase = createDbClient()
-
   // Verify module exists
   const module = await getModules().then(modules =>
     modules.find(m => m.id === moduleId)
@@ -279,23 +373,28 @@ export async function updateModuleSettings(
   }
 
   // Update settings (create row if doesn't exist)
-  const { error } = await supabase
-    .from('module_settings')
-    .upsert({
-      user_id: userId,
-      module_id: moduleId,
-      enabled: true, // Default enabled when updating settings
-      settings,
-      updated_at: new Date().toISOString()
-    }, {
-      onConflict: 'user_id,module_id'
+  try {
+    await withAdminDb(async (db) => {
+      await db.insert(moduleSettingsTable)
+        .values({
+          userId,
+          moduleId,
+          enabled: true, // Default enabled when updating settings
+          settings,
+        })
+        .onConflictDoUpdate({
+          target: [moduleSettingsTable.userId, moduleSettingsTable.moduleId],
+          set: {
+            settings,
+            updatedAt: new Date().toISOString(),
+          },
+        })
     })
-
-  if (error) {
+  } catch (error) {
     console.error('[Modules] Failed to update module settings:', error)
     return {
       success: false,
-      error: error.message
+      error: (error as Error).message
     }
   }
 

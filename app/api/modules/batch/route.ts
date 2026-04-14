@@ -57,14 +57,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Apply all changes
-    const results: { moduleId: string; success: boolean; error?: string }[] = []
+    const results: { moduleId: string; success: boolean; error?: string; warning?: string }[] = []
 
     for (const { moduleId, enabled } of changes) {
       const result = await setModuleEnabled(moduleId, user.id, enabled)
       results.push({
         moduleId,
         success: result.success,
-        error: result.error
+        error: result.error,
+        warning: result.warning
       })
     }
 
@@ -78,10 +79,16 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
+    // Collect warnings (e.g. schema already exists — non-fatal)
+    const warnings = results
+      .filter(r => r.warning)
+      .map(r => r.warning)
+
     return NextResponse.json({
       success: true,
       results,
-      updated: changes.length
+      updated: changes.length,
+      ...(warnings.length > 0 && { warnings })
     })
   } catch (error: unknown) {
     console.error('[API /modules/batch POST] Error:', error)

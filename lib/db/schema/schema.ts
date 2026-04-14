@@ -9,6 +9,7 @@
  */
 
 export * from './core-schema'
+export * from '@/modules/bible-study/database/schema'
 export * from '@/modules/brainstorm/database/schema'
 export * from '@/modules/module-template/database/schema'
 export * from '@/modules/music-player/database/schema'
