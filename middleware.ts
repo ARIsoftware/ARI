@@ -25,6 +25,19 @@ const cspHeader = [
   "media-src 'self'"
 ].join("; ")
 
+/** Apply all security headers to any response (redirects, errors, etc.) */
+function withSecurityHeaders(res: NextResponse): NextResponse {
+  res.headers.set("X-Robots-Tag", "noindex, nofollow")
+  res.headers.set("Content-Security-Policy", cspHeader)
+  res.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
+  res.headers.set("X-Frame-Options", "DENY")
+  res.headers.set("X-Content-Type-Options", "nosniff")
+  res.headers.set("X-XSS-Protection", "1; mode=block")
+  res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
+  res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+  return res
+}
+
 const protectedRoutes = [
   "/",
   "/tasks",
@@ -79,17 +92,10 @@ export async function middleware(req: NextRequest) {
                            setupApiRoutes.includes(pathname)
 
     if (!isSetupAllowed) {
-      return NextResponse.redirect(new URL("/welcome", req.url))
+      return withSecurityHeaders(NextResponse.redirect(new URL("/welcome", req.url)))
     }
 
-    // Allow setup routes without auth - just add security headers
-    const setupResponse = NextResponse.next({ request: req })
-    setupResponse.headers.set("X-Robots-Tag", "noindex, nofollow")
-    setupResponse.headers.set("X-Frame-Options", "DENY")
-    setupResponse.headers.set("X-Content-Type-Options", "nosniff")
-    setupResponse.headers.set("X-XSS-Protection", "1; mode=block")
-    setupResponse.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
-    return setupResponse
+    return withSecurityHeaders(NextResponse.next({ request: req }))
   }
 
   // IP/HOSTNAME ALLOWLIST: Restrict access if ALLOWED_IPS is configured
@@ -118,9 +124,9 @@ export async function middleware(req: NextRequest) {
       const hostAllowed = allowedHostnames.has(host)
 
       if (!ipAllowed && !hostAllowed) {
-        return new NextResponse('Access Denied - IP Address Not Authorized in ALLOWED_IPS.', {
+        return withSecurityHeaders(new NextResponse('Access Denied - IP Address Not Authorized in ALLOWED_IPS.', {
           status: 403,
-        })
+        }))
       }
     }
     // If no client IP header found, allow (likely direct/localhost access)
@@ -128,46 +134,14 @@ export async function middleware(req: NextRequest) {
 
   // Block sign-up endpoint — only server-side bootstrap can create accounts
   if (pathname.startsWith('/api/auth/sign-up')) {
-    return new NextResponse(JSON.stringify({ error: 'Sign-up is disabled' }), {
+    return withSecurityHeaders(new NextResponse(JSON.stringify({ error: 'Sign-up is disabled' }), {
       status: 403,
       headers: { 'Content-Type': 'application/json' },
-    })
+    }))
   }
 
   // NORMAL MODE: Setup complete, existing auth logic below
-  let response = NextResponse.next({
-    request: req,
-  })
-
-  // Add comprehensive security headers
-  response.headers.set("X-Robots-Tag", "noindex, nofollow")
-
-  // Content Security Policy
-  response.headers.set("Content-Security-Policy", cspHeader)
-
-  // HTTP Strict Transport Security
-  response.headers.set(
-    "Strict-Transport-Security",
-    "max-age=31536000; includeSubDomains; preload"
-  )
-
-  // X-Frame-Options
-  response.headers.set("X-Frame-Options", "DENY")
-
-  // X-Content-Type-Options
-  response.headers.set("X-Content-Type-Options", "nosniff")
-
-  // X-XSS-Protection
-  response.headers.set("X-XSS-Protection", "1; mode=block")
-
-  // Referrer-Policy
-  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
-
-  // Permissions-Policy
-  response.headers.set(
-    "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=()"
-  )
+  const response = withSecurityHeaders(NextResponse.next({ request: req }))
 
   // Allow public routes without any auth checks
   if (publicRoutes.some(route => pathname.startsWith(route))) {
@@ -191,13 +165,13 @@ export async function middleware(req: NextRequest) {
           return response
         }
         // No session cookie and no valid API key header
-        return NextResponse.json(
+        return withSecurityHeaders(NextResponse.json(
           { error: 'Unauthorized' },
           { status: 401 }
-        )
+        ))
       }
       // For page routes, redirect to sign-in
-      return NextResponse.redirect(new URL('/sign-in', req.url))
+      return withSecurityHeaders(NextResponse.redirect(new URL('/sign-in', req.url)))
     }
 
     // Session cookie exists - allow request to proceed
