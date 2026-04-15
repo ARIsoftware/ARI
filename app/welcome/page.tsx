@@ -132,7 +132,7 @@ export default function WelcomePage() {
   // when /api/download-env writes .env.local. Without this the React state
   // resets and the user lands back on step 1 with no idea what happened.
   useEffect(() => {
-    if (localStorage.getItem('ari:welcome:saved') === '1') {
+    if (sessionStorage.getItem('ari:welcome:saved') === '1') {
       setEnvSaveStatus('saved')
       setCurrentTab('download')
       setShowOnboarding(true)
@@ -409,7 +409,7 @@ export default function WelcomePage() {
       setEnvSaveStatus('saved')
       // Persist so the wizard rehydrates to this state after Next.js's
       // Fast Refresh reload (which is unavoidable when .env.local is written).
-      localStorage.setItem('ari:welcome:saved', '1')
+      sessionStorage.setItem('ari:welcome:saved', '1')
     } catch (err) {
       setEnvSaveStatus('error')
       setEnvSaveError(err instanceof Error ? err.message : "Failed to save .env.local")
@@ -2044,7 +2044,7 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                     </button>
                     <button
                       onClick={() => {
-                        localStorage.removeItem('ari:welcome:saved')
+                        sessionStorage.removeItem('ari:welcome:saved')
                         // Clear any stale bootstrap cache from earlier visits
                         // (e.g. a 'no_database' result from before the restart).
                         sessionStorage.removeItem('ari:bootstrap')
