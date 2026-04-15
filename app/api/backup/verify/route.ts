@@ -1,35 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { createClient } from "@supabase/supabase-js"
 import { logger } from '@/lib/logger'
+import { getServiceSupabase, EXCLUDED_TABLES } from '../utils'
 
 export const debugRole = "backup-verify"
-
-// Create service role client for full database access
-const getServiceSupabase = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseSecretKey) {
-    throw new Error("Missing Supabase environment variables")
-  }
-
-  return createClient(supabaseUrl, supabaseSecretKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  })
-}
-
-// Tables to exclude from backups (system/internal tables)
-const EXCLUDED_TABLES = new Set([
-  'spatial_ref_sys',
-  'schema_migrations',
-  'pg_stat_statements',
-  'geography_columns',
-  'geometry_columns',
-])
 
 interface TableInfo {
   name: string

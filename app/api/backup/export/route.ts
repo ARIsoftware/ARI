@@ -1,39 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { isProductionSafeOperation } from '@/lib/admin-helpers'
-import { createClient } from "@supabase/supabase-js"
 import { logger } from '@/lib/logger'
-import crypto from "crypto"
 import { safeErrorResponse } from '@/lib/api-error'
+import { getServiceSupabase, EXCLUDED_TABLES, calculateChecksum, stripNul } from '../utils'
 
 export const debugRole = "backup-export"
-
-// Create service role client for full database access
-const getServiceSupabase = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
-  
-  if (!supabaseUrl || !supabaseSecretKey) {
-    throw new Error("Missing Supabase environment variables")
-  }
-  
-  return createClient(supabaseUrl, supabaseSecretKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  })
-}
-
-// Dynamic table discovery with 3-tier approach
-// Tables to exclude from backups (system/internal tables)
-const EXCLUDED_TABLES = new Set([
-  'spatial_ref_sys',
-  'schema_migrations',
-  'pg_stat_statements',
-  'geography_columns',
-  'geometry_columns',
-])
 
 async function discoverTables(client: any): Promise<{ tables: string[], method: string, warnings: string[] }> {
   const warnings: string[] = []
@@ -479,13 +451,6 @@ function mapDataType(dataType: string, isNullable: string, columnDefault: string
   return sqlType
 }
 
-// Calculate checksum for data integrity
-function calculateChecksum(data: any): string {
-  const hash = crypto.createHash('sha256')
-  hash.update(JSON.stringify(data))
-  return hash.digest('hex')
-}
-
 export async function POST(req: NextRequest) {
   try {
     // Authenticate user
@@ -744,21 +709,22 @@ export async function POST(req: NextRequest) {
             if (val === null) return 'NULL'
             if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE'
             if (typeof val === 'number') return val
-            if (typeof val === 'string') return `'${val.replace(/'/g, "''")}'`
+            if (typeof val === 'string') return `'${stripNul(val).replace(/'/g, "''")}'`
             if (val instanceof Date) return `'${val.toISOString()}'`
             if (Array.isArray(val)) {
               const escaped = val.map(v =>
                 typeof v === 'string'
-                  ? `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+                  ? `"${stripNul(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
                   : String(v)
               )
               return `'{${escaped.join(',')}}'`
             }
             // JSONB/JSON objects
             if (typeof val === 'object') {
-              return `'${JSON.stringify(val).replace(/'/g, "''")}'::jsonb`
+              return `'${stripNul(JSON.stringify(val)).replace(/'/g, "''")}'::jsonb`
             }
-            return val
+            // Fallback: coerce to string for safety
+            return `'${stripNul(String(val)).replace(/'/g, "''")}'`
           }).join(', ')
           
           sqlContent += `INSERT INTO "${table}" (${columns}) VALUES (${values});\n`
