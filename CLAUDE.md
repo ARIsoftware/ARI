@@ -70,7 +70,7 @@ export const authClient = createAuthClient({})
 API route helper that provides backward-compatible interface:
 ```typescript
 export async function getAuthenticatedUser() {
-  // Returns: { user, session, supabase (legacy), withRLS (Drizzle) }
+  // Returns: { user, session, withRLS }
 }
 ```
 
@@ -140,9 +140,6 @@ const newTask = await withRLS((db) =>
   db.insert(tasks).values({ title: 'New', user_id: user.id })
 )
 ```
-
-#### Legacy Supabase Client (Deprecated)
-The `supabase` client from `getAuthenticatedUser()` uses the service role key and bypasses RLS. It's kept for backward compatibility but new code should use `withRLS()`.
 
 ### SQL Development Tips
 
@@ -289,7 +286,6 @@ END $$;
     schema.ts          # AUTO-GENERATED barrel re-exporting core + module schemas
     relations.ts       # AUTO-GENERATED barrel re-exporting core + module relations
     index.ts           # Re-exports schema.ts + relations.ts
-  /db-supabase.ts      # Supabase client (legacy)
   /api-helpers.ts      # API validation helpers
   /hooks/              # TanStack Query hooks (use-tasks.ts, use-contacts.ts, etc.)
   /modules/            # Module system infrastructure

@@ -2,13 +2,12 @@ import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
 import { pool } from "@/lib/db/pool"
-import { createDbClient } from "@/lib/db-supabase"
 import { withUserContext, withAdminDb, type DrizzleDb } from "@/lib/db"
 import { hashApiKey, lookupApiKey, checkIpAllowed } from "@/lib/api-keys"
 import { user as userTable } from "@/lib/db/schema/core-schema"
 import { eq } from "drizzle-orm"
 
-const NULL_AUTH = { user: null, session: null, supabase: null, withRLS: null }
+const NULL_AUTH = { user: null, session: null, withRLS: null }
 
 /**
  * Get authenticated user and database client for API routes.
@@ -16,7 +15,7 @@ const NULL_AUTH = { user: null, session: null, supabase: null, withRLS: null }
  * 1. Better Auth session cookie (browser sessions)
  * 2. API key via x-api-key header (external applications)
  *
- * @returns Object with user, session, supabase (legacy), and withRLS (new Drizzle helper)
+ * @returns Object with user, session, and withRLS (Drizzle helper)
  */
 export async function getAuthenticatedUser() {
   // Skip auth during build/static generation to prevent build errors
@@ -42,10 +41,6 @@ export async function getAuthenticatedUser() {
   }
 
   if (session) {
-    // Lazy Supabase client — only created if accessed (most callers only use withRLS)
-    // @deprecated - use withRLS() instead for new code
-    let _supabase: ReturnType<typeof createDbClient> | null = null
-
     return {
       user: {
         id: session.user.id,
@@ -60,10 +55,6 @@ export async function getAuthenticatedUser() {
       session: {
         access_token: session.session.token,
         user: session.user,
-      },
-      get supabase() {
-        if (!_supabase) _supabase = createDbClient()
-        return _supabase
       },
       withRLS: <T>(operation: (db: DrizzleDb) => Promise<T>): Promise<T> =>
         withUserContext(session.user.id, operation),
@@ -106,7 +97,6 @@ export async function getAuthenticatedUser() {
         },
       },
       session: null,
-      supabase: null,
       withRLS: <T>(operation: (db: DrizzleDb) => Promise<T>): Promise<T> =>
         withUserContext(keyRow.userId, operation),
       /** API key metadata — only set when authenticated via API key */
@@ -124,19 +114,14 @@ export async function getAuthenticatedUser() {
 }
 
 /**
- * @deprecated Use getAuthenticatedUser() instead.
- * Kept for backwards compatibility during migration.
- */
-export async function createAuthenticatedClient() {
-  return createDbClient()
-}
-
-/**
  * Guard for routes that should be public during setup but require auth after.
  * Returns null if access is allowed, or a 401 NextResponse if denied.
  * Used by env-writing endpoints (/api/download-env, /api/onboarding/save-env).
  */
 export async function requireAuthIfUsersExist(requestHeaders: Headers): Promise<NextResponse | null> {
+  // During setup (BETTER_AUTH_SECRET not yet written to .env.local),
+  // always allow — middleware already controls access in setup mode.
+  if (!process.env.BETTER_AUTH_SECRET) return null
   if (!pool) return null // No database yet — setup in progress
   try {
     const result = await pool.query('SELECT EXISTS(SELECT 1 FROM public."user") AS has_users')

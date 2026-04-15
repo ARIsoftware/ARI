@@ -489,7 +489,7 @@ function calculateChecksum(data: any): string {
 export async function POST(req: NextRequest) {
   try {
     // Authenticate user
-    const { user, supabase: userSupabase } = await getAuthenticatedUser()
+    const { user } = await getAuthenticatedUser()
     
     if (!user) {
       return NextResponse.json(
@@ -545,6 +545,7 @@ export async function POST(req: NextRequest) {
             .select('*', { count: 'exact' })
             .range(offset, offset + chunkSize - 1)
             .order('created_at', { ascending: true, nullsFirst: true })
+            .order('id', { ascending: true, nullsFirst: true })
 
           if (error) {
             // Some tables might not have created_at, try without ordering
@@ -684,7 +685,8 @@ export async function POST(req: NextRequest) {
 
           logger.info(`Inferred schema for ${tableName} from data: ${schema.length} columns`)
         } else {
-          logger.warn(`Cannot create table ${tableName} - no schema and no data`)
+          logger.warn(`Empty table ${tableName} has no cached schema — included as comment only`)
+          sqlContent += `-- Table: ${tableName} (empty, no schema available)\n\n`
           continue
         }
       }
@@ -740,10 +742,22 @@ export async function POST(req: NextRequest) {
           const columns = Object.keys(row).map(col => `"${col}"`).join(', ')
           const values = Object.values(row).map((val: any) => {
             if (val === null) return 'NULL'
-            if (typeof val === 'string') return `'${val.replace(/'/g, "''")}'`
             if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE'
-            if (Array.isArray(val)) return `'{${val.join(',')}}'::TEXT[]`
+            if (typeof val === 'number') return val
+            if (typeof val === 'string') return `'${val.replace(/'/g, "''")}'`
             if (val instanceof Date) return `'${val.toISOString()}'`
+            if (Array.isArray(val)) {
+              const escaped = val.map(v =>
+                typeof v === 'string'
+                  ? `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+                  : String(v)
+              )
+              return `'{${escaped.join(',')}}'`
+            }
+            // JSONB/JSON objects
+            if (typeof val === 'object') {
+              return `'${JSON.stringify(val).replace(/'/g, "''")}'::jsonb`
+            }
             return val
           }).join(', ')
           
@@ -768,7 +782,8 @@ export async function POST(req: NextRequest) {
             colName === 'created_at' || colName === 'updated_at' || colName === 'completed' ||
             colName.includes('order') || colName.includes('index')) {
           if (!indexedColumns.has(colName)) {
-            sqlContent += `CREATE INDEX IF NOT EXISTS idx_${tableName.replace(/-/g, '_')}_${colName} ON "${tableName}"("${colName}");\n`
+            const safeIndexName = `idx_${tableName}_${colName}`.replace(/[^a-z0-9_]/gi, '_')
+            sqlContent += `CREATE INDEX IF NOT EXISTS ${safeIndexName} ON "${tableName}"("${colName}");\n`
             indexedColumns.add(colName)
           }
         }
@@ -776,11 +791,17 @@ export async function POST(req: NextRequest) {
     }
     sqlContent += `\n`
     
-    // Reset sequences
-    sqlContent += `-- Reset sequences if needed\n`
-    for (const table of tables) {
-      if (table === 'tasks' || table === 'fitness_database') {
-        sqlContent += `SELECT setval(pg_get_serial_sequence('"${table}"', 'order_index'), COALESCE((SELECT MAX(order_index) FROM "${table}"), 0) + 1, false);\n`
+    // Reset sequences for any table/column that uses a sequence
+    sqlContent += `-- Reset sequences\n`
+    for (const [tableName, schema] of Object.entries(tableSchemas)) {
+      if (!Array.isArray(schema)) continue
+      for (const col of schema as any[]) {
+        const def = col.column_default as string | null
+        // Detect serial/identity columns by their default (nextval or identity)
+        if (def && (def.includes('nextval') || def.includes('identity'))) {
+          const colName = col.column_name
+          sqlContent += `DO $$ BEGIN IF pg_get_serial_sequence('"${tableName}"', '${colName}') IS NOT NULL THEN PERFORM setval(pg_get_serial_sequence('"${tableName}"', '${colName}'), COALESCE((SELECT MAX("${colName}") FROM "${tableName}"), 0) + 1, false); END IF; END $$;\n`
+        }
       }
     }
     sqlContent += `\n`

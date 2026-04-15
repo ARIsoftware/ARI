@@ -1,87 +1,120 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createSupabaseClient } from '@/lib/supabase-auth'
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { CheckCircle2, XCircle, Loader2 } from 'lucide-react'
+
+interface TestResult {
+  name: string
+  status: 'pending' | 'testing' | 'success' | 'error'
+  message?: string
+  latencyMs?: number
+}
 
 export default function SimpleTestPage() {
-  const [status, setStatus] = useState('Testing...')
-  const [details, setDetails] = useState<any>({})
+  const [results, setResults] = useState<TestResult[]>([])
+  const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    const runTest = async () => {
-      const logs: string[] = []
+  const update = (name: string, patch: Partial<TestResult>) => {
+    setResults(prev => prev.map(r => r.name === name ? { ...r, ...patch } : r))
+  }
 
-      try {
-        // Log environment
-        logs.push(`URL: ${process.env.NEXT_PUBLIC_SUPABASE_URL}`)
-        logs.push(`Has Key: ${!!(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)}`)
+  const runTests = async () => {
+    setLoading(true)
+    const tests: TestResult[] = [
+      { name: 'Database Connection (PG Pool)', status: 'pending' },
+      { name: 'Authentication', status: 'pending' },
+      { name: 'Module Settings (Drizzle)', status: 'pending' },
+    ]
+    setResults(tests)
 
-        // Create client
-        logs.push('Creating Supabase client...')
-        const supabase = createSupabaseClient()
-        logs.push('Client created')
-
-        // Try a direct REST call first
-        logs.push('Testing direct REST API...')
-        const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/`, {
-          headers: {
-            'apikey': (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)!,
-          }
-        })
-        logs.push(`REST API response: ${response.status} ${response.statusText}`)
-
-        // Now try the SDK
-        logs.push('Testing SDK query...')
-
-        // Set a timeout for the SDK call
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('SDK timeout after 5s')), 5000)
-        )
-
-        const queryPromise = supabase
-          .from('tasks')
-          .select('count')
-          .limit(1)
-
-        const result = await Promise.race([queryPromise, timeoutPromise]) as any
-
-        logs.push(`SDK result: ${JSON.stringify(result)}`)
-
-        setStatus('Test Complete')
-        setDetails({ logs, result })
-
-      } catch (error: any) {
-        logs.push(`Error: ${error.message}`)
-        setStatus('Test Failed')
-        setDetails({ logs, error: error.message })
+    // Test 1: Database health via PG pool
+    update('Database Connection (PG Pool)', { status: 'testing' })
+    try {
+      const start = performance.now()
+      const res = await fetch('/api/health')
+      const latencyMs = Math.round(performance.now() - start)
+      const data = await res.json()
+      if (res.ok && data.checks?.database?.status === 'ok') {
+        update('Database Connection (PG Pool)', { status: 'success', message: `Connected (${latencyMs}ms)`, latencyMs })
+      } else {
+        update('Database Connection (PG Pool)', { status: 'error', message: data.checks?.database?.message || `HTTP ${res.status}` })
       }
+    } catch (err: any) {
+      update('Database Connection (PG Pool)', { status: 'error', message: err.message })
     }
 
-    runTest()
-  }, [])
+    // Test 2: Auth + Drizzle withRLS (user-preferences requires both)
+    update('Authentication', { status: 'testing' })
+    try {
+      const start = performance.now()
+      const res = await fetch('/api/user-preferences')
+      const latencyMs = Math.round(performance.now() - start)
+      if (res.status === 401) {
+        update('Authentication', { status: 'error', message: 'Not authenticated' })
+      } else if (res.ok) {
+        update('Authentication', { status: 'success', message: `Session valid (${latencyMs}ms)`, latencyMs })
+      } else {
+        update('Authentication', { status: 'error', message: `HTTP ${res.status}` })
+      }
+    } catch (err: any) {
+      update('Authentication', { status: 'error', message: err.message })
+    }
+
+    // Test 3: Module settings read (Drizzle withRLS)
+    update('Module Settings (Drizzle)', { status: 'testing' })
+    try {
+      const start = performance.now()
+      const res = await fetch('/api/modules/all')
+      const latencyMs = Math.round(performance.now() - start)
+      if (res.ok) {
+        const data = await res.json()
+        update('Module Settings (Drizzle)', { status: 'success', message: `${data.count} modules loaded (${latencyMs}ms)`, latencyMs })
+      } else {
+        update('Module Settings (Drizzle)', { status: 'error', message: `HTTP ${res.status}` })
+      }
+    } catch (err: any) {
+      update('Module Settings (Drizzle)', { status: 'error', message: err.message })
+    }
+
+    setLoading(false)
+  }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Simple Supabase Test</h1>
-      <div className="bg-gray-100 dark:bg-gray-900 p-4 rounded">
-        <p className="font-semibold mb-2">Status: {status}</p>
-        {details.logs && (
-          <div className="space-y-1">
-            <p className="font-semibold">Logs:</p>
-            {details.logs.map((log: string, i: number) => (
-              <p key={i} className="text-sm font-mono">{log}</p>
-            ))}
-          </div>
-        )}
-        {details.error && (
-          <p className="text-red-500 mt-2">Error: {details.error}</p>
-        )}
-        {details.result && (
-          <pre className="mt-2 text-xs">
-            {JSON.stringify(details.result, null, 2)}
-          </pre>
-        )}
-      </div>
+    <div className="container mx-auto p-6 max-w-2xl">
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick DB Health Check</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Tests the actual database path (Drizzle ORM via PG pool) used by the application.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={runTests} disabled={loading} className="mb-4">
+            {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Running...</> : 'Run Tests'}
+          </Button>
+
+          {results.length > 0 && (
+            <div className="space-y-2">
+              {results.map((r) => (
+                <div key={r.name} className="flex items-center gap-2 p-2 rounded bg-muted/50">
+                  {r.status === 'testing' && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                  {r.status === 'success' && <CheckCircle2 className="h-4 w-4 text-green-500" />}
+                  {r.status === 'error' && <XCircle className="h-4 w-4 text-red-500" />}
+                  {r.status === 'pending' && <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />}
+                  <span className="font-medium text-sm">{r.name}</span>
+                  {r.message && (
+                    <span className={`text-xs ml-auto ${r.status === 'error' ? 'text-red-500' : 'text-muted-foreground'}`}>
+                      {r.message}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
