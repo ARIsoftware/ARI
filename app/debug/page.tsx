@@ -2717,7 +2717,7 @@ export default function DatabaseTestPage() {
                           Public Endpoints (Unauthenticated)
                         </CardTitle>
                         <p className="text-sm text-muted-foreground">
-                          These endpoints can be accessed without authentication but have security configured
+                          Setup-only endpoints — public during first-run, protected after a user account exists
                         </p>
                       </CardHeader>
                       <CardContent>
@@ -2749,6 +2749,11 @@ export default function DatabaseTestPage() {
                                     {endpoint.hasRateLimit && (
                                       <Badge variant="outline" className="bg-purple-500/20 text-purple-500 border-purple-500/50">
                                         Rate Limited
+                                      </Badge>
+                                    )}
+                                    {endpoint.requiresAuthIfUsers && (
+                                      <Badge variant="outline" className="bg-green-500/20 text-green-500 border-green-500/50">
+                                        Auth Required Post-Setup
                                       </Badge>
                                     )}
                                   </div>

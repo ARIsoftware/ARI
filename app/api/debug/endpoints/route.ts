@@ -33,7 +33,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       path: string
       fullPath: string
       methods: string[]
-      security: { type: string; rateLimit?: number }
+      security: { type: string; rateLimit?: number | boolean; requiresAuthIfUsers?: boolean }
       description?: string
     }>
 
@@ -45,6 +45,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       securityType: route.security.type,
       description: route.description,
       hasRateLimit: !!route.security.rateLimit,
+      requiresAuthIfUsers: !!route.security.requiresAuthIfUsers,
     }))
 
     // Private module endpoints (exclude public ones)

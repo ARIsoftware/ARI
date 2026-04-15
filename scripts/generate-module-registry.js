@@ -180,6 +180,8 @@ function detectRouteMetadata(filePath) {
     const roleMatch = content.match(/export\s+const\s+debugRole\s*=\s*['"]([^'"]+)['"]/);
     if (roleMatch) meta.debugRole = roleMatch[1];
     if (/export\s+const\s+isPublic\s*=\s*true\b/.test(content)) meta.isPublic = true;
+    if (/\bcheckRateLimit\b/.test(content)) meta.hasRateLimit = true;
+    if (/\brequireAuthIfUsersExist\b/.test(content)) meta.requiresAuthIfUsers = true;
     // Reliability check: warn if a route is marked public but also pulls in
     // the auth helper — likely an accidental contradiction.
     if (meta.isPublic && /getAuthenticatedUser/.test(content)) {
@@ -219,6 +221,8 @@ function discoverCoreApiRoutes() {
         methods: methods.length > 0 ? methods : ['unknown'],
         ...(metadata.debugRole ? { debugRole: metadata.debugRole } : {}),
         ...(metadata.isPublic ? { isPublic: true } : {}),
+        ...(metadata.hasRateLimit ? { hasRateLimit: true } : {}),
+        ...(metadata.requiresAuthIfUsers ? { requiresAuthIfUsers: true } : {}),
       };
     })
     .sort((a, b) => a.fullPath.localeCompare(b.fullPath));
@@ -346,7 +350,11 @@ function generateManifest(moduleMap, moduleApiMap) {
         path: route.path,
         fullPath: route.fullPath,
         methods: route.methods,
-        security: { type: 'core' },
+        security: {
+          type: 'core',
+          ...(route.hasRateLimit ? { rateLimit: true } : {}),
+          ...(route.requiresAuthIfUsers ? { requiresAuthIfUsers: true } : {}),
+        },
         description: 'Core route declared public via export const isPublic = true',
       });
     }
