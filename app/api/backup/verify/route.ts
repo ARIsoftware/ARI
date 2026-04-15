@@ -144,7 +144,7 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    logger.info(`[Backup Verify] Verification requested by user: ${user.id}`)
+    logger.info(`[Backup Verify] Verification requested by user: ${user.id.slice(0, 8)}…`)
 
     // Get service client
     const client = getServiceSupabase()
