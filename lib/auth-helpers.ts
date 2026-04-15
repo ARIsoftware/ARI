@@ -114,26 +114,40 @@ export async function getAuthenticatedUser() {
 }
 
 /**
- * Guard for routes that should be public during setup but require auth after.
- * Returns null if access is allowed, or a 401 NextResponse if denied.
- * Used by env-writing endpoints (/api/download-env, /api/onboarding/save-env).
+ * Check whether users exist in the database. Used by the welcome layout guard
+ * and API route guards to decide whether authentication is required.
  */
-export async function requireAuthIfUsersExist(requestHeaders: Headers): Promise<NextResponse | null> {
-  // During setup (BETTER_AUTH_SECRET not yet written to .env.local),
-  // always allow — middleware already controls access in setup mode.
-  if (!process.env.BETTER_AUTH_SECRET) return null
-  if (!pool) return null // No database yet — setup in progress
+export type UsersCheckResult =
+  | { status: "no-env" }
+  | { status: "no-pool" }
+  | { status: "no-table" }
+  | { status: "db-error" }
+  | { status: "no-users" }
+  | { status: "has-users" }
+
+export async function checkUsersExist(): Promise<UsersCheckResult> {
+  if (!process.env.DATABASE_URL || !process.env.BETTER_AUTH_SECRET) return { status: "no-env" }
+  if (!pool) return { status: "no-pool" }
   try {
     const result = await pool.query('SELECT EXISTS(SELECT 1 FROM public."user") AS has_users')
-    const hasUsers = result.rows[0]?.has_users === true
-    if (!hasUsers) return null
+    return result.rows[0]?.has_users === true ? { status: "has-users" } : { status: "no-users" }
   } catch (err: unknown) {
-    // "relation does not exist" means schema not installed yet — no users
     const code = (err as { code?: string })?.code
-    if (code === '42P01') return null
-    // Any other DB error: fail closed
+    if (code === "42P01") return { status: "no-table" }
+    return { status: "db-error" }
+  }
+}
+
+/**
+ * Guard for routes that should be public during setup but require auth after.
+ * Returns null if access is allowed, or a 401/503 NextResponse if denied.
+ */
+export async function requireAuthIfUsersExist(requestHeaders: Headers): Promise<NextResponse | null> {
+  const check = await checkUsersExist()
+  if (check.status === "db-error") {
     return NextResponse.json({ error: "Service unavailable" }, { status: 503 })
   }
+  if (check.status !== "has-users") return null
   const session = await auth.api.getSession({ headers: requestHeaders })
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

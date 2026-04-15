@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { existsSync } from "fs"
+import path from "path"
 
 export async function GET() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -9,6 +11,7 @@ export async function GET() {
 
   return NextResponse.json({
     dir: process.cwd(),
+    envFileExists: existsSync(path.join(process.cwd(), ".env.local")),
     localSupabase: {
       detected: isLocal && hasAnonKey && hasServiceKey && hasDatabaseUrl,
     },

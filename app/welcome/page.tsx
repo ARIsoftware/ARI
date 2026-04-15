@@ -280,6 +280,7 @@ export default function WelcomePage() {
       .then((res) => res.json())
       .then((data) => {
         setProjectDir(data.dir)
+        if (data.envFileExists) setEnvFileExists(true)
         if (data.localSupabase?.detected) {
           setLocalSupabaseDetected(true)
         }
@@ -378,11 +379,18 @@ export default function WelcomePage() {
   }
 
   const [projectDir, setProjectDir] = useState<string | null>(null)
-  const [envSaveStatus, setEnvSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [envFileExists, setEnvFileExists] = useState(false)
+  const [envSaveStatus, setEnvSaveStatus] = useState<'idle' | 'confirm-overwrite' | 'saving' | 'saved' | 'error'>('idle')
   const [envSaveError, setEnvSaveError] = useState<string | null>(null)
   const [envSavedPath, setEnvSavedPath] = useState<string | null>(null)
 
   const handleSaveEnvFile = async () => {
+    // If .env.local exists and user hasn't confirmed, ask first
+    if (envFileExists && envSaveStatus !== 'confirm-overwrite') {
+      setEnvSaveStatus('confirm-overwrite')
+      return
+    }
+
     const content = generateEnvFileContent()
 
     try {
@@ -1939,26 +1947,56 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                     code={generateEnvFileContent()}
                   />
 
+                  {/* Overwrite confirmation */}
+                  {envSaveStatus === 'confirm-overwrite' && (
+                    <Alert className="bg-amber-50 border-amber-200">
+                      <AlertCircle className="w-4 h-4 text-amber-600" />
+                      <AlertTitle className="text-amber-800">A .env.local file already exists</AlertTitle>
+                      <AlertDescription className="text-amber-700">
+                        Your existing file will be backed up automatically before overwriting.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   {/* Save button */}
-                  <Button
-                    onClick={handleSaveEnvFile}
-                    disabled={!isSupabaseComplete || envSaveStatus === 'saving'}
-                    className="w-full rounded-lg bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    {envSaveStatus === 'saving' ? (
-                      <>Saving...</>
-                    ) : envSaveStatus === 'saved' ? (
-                      <>
-                        <Check className="w-4 h-4 mr-2" />
-                        Saved to {envSavedPath || ".env.local"}
-                      </>
-                    ) : (
-                      <>
+                  {envSaveStatus === 'confirm-overwrite' ? (
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={() => setEnvSaveStatus('idle')}
+                        variant="outline"
+                        className="flex-1 rounded-lg"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleSaveEnvFile}
+                        className="flex-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white"
+                      >
                         <Save className="w-4 h-4 mr-2" />
-                        Save .env.local
-                      </>
-                    )}
-                  </Button>
+                        Overwrite .env.local
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      onClick={handleSaveEnvFile}
+                      disabled={!isSupabaseComplete || envSaveStatus === 'saving'}
+                      className="w-full rounded-lg bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      {envSaveStatus === 'saving' ? (
+                        <>Saving...</>
+                      ) : envSaveStatus === 'saved' ? (
+                        <>
+                          <Check className="w-4 h-4 mr-2" />
+                          Saved to {envSavedPath || ".env.local"}
+                        </>
+                      ) : (
+                        <>
+                          <Save className="w-4 h-4 mr-2" />
+                          Save .env.local
+                        </>
+                      )}
+                    </Button>
+                  )}
 
                   {envSaveStatus === 'error' && envSaveError && (
                     <Alert className="bg-red-50 border-red-200">
