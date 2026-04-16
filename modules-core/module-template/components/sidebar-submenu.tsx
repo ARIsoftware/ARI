@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import type { ModuleSubmenuProps } from '@/components/sidebar-submenu-renderer'
+import type { ModuleSubmenuProps } from '@/lib/modules/submenu-types'
 import {
   SidebarGroup,
   SidebarGroupContent,

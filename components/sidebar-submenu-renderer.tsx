@@ -1,7 +1,6 @@
 'use client'
 
 import React, { Suspense } from 'react'
-import type { ModuleMetadata } from '@/lib/modules/module-types'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import {
   SidebarMenuButton,
@@ -9,16 +8,10 @@ import {
   SidebarGroupContent,
 } from '@/components/ui/sidebar'
 import { MODULE_SUBMENUS } from '@/lib/generated/module-submenu-registry'
+import type { ModuleSubmenuProps } from '@/lib/modules/submenu-types'
 
-/**
- * Props passed to module submenu components
- */
-export interface ModuleSubmenuProps {
-  /** Module ID this submenu belongs to */
-  moduleId: string
-  /** Module metadata for reference */
-  module: ModuleMetadata
-}
+// Re-export so existing consumer imports from this file keep working
+export type { ModuleSubmenuProps }
 
 // Module-level cache so lazy components survive unmount/remount cycles
 const lazyCache = new Map<string, React.LazyExoticComponent<React.ComponentType<ModuleSubmenuProps>>>()

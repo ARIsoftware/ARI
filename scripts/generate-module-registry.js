@@ -474,7 +474,7 @@ function generateSubmenuRegistry(moduleMap) {
  * To regenerate: npm run generate-module-registry
  */
 
-import type { ModuleSubmenuProps } from '@/components/sidebar-submenu-renderer'
+import type { ModuleSubmenuProps } from '@/lib/modules/submenu-types'
 import type { ComponentType } from 'react'
 
 type SubmenuLoader = () => Promise<{ default: ComponentType<ModuleSubmenuProps> }>

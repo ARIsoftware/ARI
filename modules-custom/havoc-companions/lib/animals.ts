@@ -6,8 +6,6 @@
  * `ALL_SPECIES`, so adding a species is a one-line change.
  */
 
-import type { HavocCompanion } from '@/modules/havoc-companions/types'
-
 export const ALL_SPECIES = [
   'cat',
   'dog',
@@ -24,6 +22,14 @@ export const ALL_SPECIES = [
 ] as const
 
 export type CompanionSpecies = (typeof ALL_SPECIES)[number]
+
+/** A single havoc companion as stored in module_settings.settings.animals */
+export interface HavocCompanion {
+  /** Stable id used as React key + slot identifier */
+  id: string
+  species: CompanionSpecies
+  name: string
+}
 
 export const SPECIES_LABEL: Record<CompanionSpecies, string> = {
   cat: 'Cat',
