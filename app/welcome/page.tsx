@@ -48,12 +48,6 @@ const COMMON_TIMEZONES = [
 ]
 
 interface OnboardingData {
-  // GitHub (tracking)
-  githubSetupComplete: boolean
-  // GitHub Sync (optional)
-  githubToken: string
-  githubRepoOwner: string
-  githubRepoName: string
   // Supabase (required)
   supabaseUrl: string
   supabaseAnonKey: string
@@ -80,8 +74,8 @@ const generateAuthSecret = () => {
   return btoa(String.fromCharCode(...array))
 }
 
-// Disabled steps: "supabase", "resend", "vercel" — may be restored in the future
-const STEP_ORDER = ["account", "personal", "github", "download"]
+// Disabled steps: "supabase", "resend", "vercel", "github" — may be restored in the future
+const STEP_ORDER = ["account", "personal", "download"]
 
 export default function WelcomePage() {
   const [completedLines, setCompletedLines] = useState<string[]>([])
@@ -96,10 +90,6 @@ export default function WelcomePage() {
   const [selectedOS, setSelectedOS] = useState<"mac" | "windows" | "linux" | null>(null)
 
   const [formData, setFormData] = useState<OnboardingData>({
-    githubSetupComplete: false,
-    githubToken: "",
-    githubRepoOwner: "",
-    githubRepoName: "",
     supabaseUrl: "",
     supabaseAnonKey: "",
     supabaseSecretKey: "",
@@ -363,18 +353,6 @@ export default function WelcomePage() {
       lines.push("")
     }
 
-    if (formData.githubToken.trim()) {
-      lines.push("# GitHub Sync (for auto-committing installed modules)")
-      lines.push(`GITHUB_TOKEN=${formData.githubToken}`)
-      if (formData.githubRepoOwner.trim()) {
-        lines.push(`GITHUB_REPO_OWNER=${formData.githubRepoOwner}`)
-      }
-      if (formData.githubRepoName.trim()) {
-        lines.push(`GITHUB_REPO_NAME=${formData.githubRepoName}`)
-      }
-      lines.push("")
-    }
-
     return lines.join("\n")
   }
 
@@ -495,10 +473,7 @@ export default function WelcomePage() {
               Configure ARI
             </h1>
             <p className="text-black" style={{ lineHeight: '26px', fontSize: '16px', fontWeight: 300 }}>
-              Welcome to ARI. Engineered for those who want complete command over the software that runs their life. The first AI-enabled No Code workspace that can be completely customized to your workflow and grows with you. Build entirely new modules in minutes. Where mastery, modularity, and AI work in your favour so you can do your best work and live your best life.
-            </p>
-            <p className="text-black mt-4" style={{ lineHeight: '26px', fontSize: '16px', fontWeight: 300 }}>
-              This welcome wizard will help you configure ARI. Nothing here is difficult, but it does require a bit of care and attention to detail. <span style={{ fontWeight: 500 }}>This entire setup process should take around 10 to 20 minutes, depending on your system and familiarity with the tools involved. <a href="https://ari.software/docs" target="_blank" rel="noopener noreferrer" className="underline">Need Help?</a></span>
+              Welcome to ARI. Engineered for those who want complete command over the software that runs their life. The first AI-enabled No Code workspace that can be completely customized to your workflow and grows with you. Build entirely new modules in minutes. Where mastery, modularity, and AI work in your favour so you can do your best work and live your best life. <a href="https://ari.software/docs" target="_blank" rel="noopener noreferrer" className="underline" style={{ fontWeight: 500 }}>Need Help?</a>
             </p>
           </div>
 
@@ -1132,198 +1107,6 @@ export default function WelcomePage() {
                 </div>
               )}
 
-              {/* GitHub Tab */}
-              {currentTab === "github" && (
-                <div>
-                  {/* Header section with gradient background */}
-                  <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <div className="flex items-center gap-2.5">
-                      <h2 className="text-2xl font-semibold text-zinc-900">Create Your Private Repository</h2>
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-600 text-white">FREE</span>
-                    </div>
-                    <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
-                      Set up your own private GitHub repository. Your code pushes here, while you can still pull updates from the official ARI repo.
-                    </p>
-                  </div>
-
-                  {/* Content section */}
-                  <div style={{ padding: '25px' }}>
-                    <div className="space-y-2">
-                      {/* Step 1: Authenticate */}
-                      <div className="relative flex gap-4">
-                        <div className="flex flex-col items-center">
-                          <div className="flex w-10 h-10 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-sm font-semibold">1</div>
-                          <div className="mt-2 h-full w-px bg-zinc-200" />
-                        </div>
-                        <div className="flex-1 pb-8">
-                          <h3 className="mb-3 font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Authenticate with GitHub</h3>
-                          <p className="mb-3 text-base text-black" style={{ lineHeight: '1.6' }}>If you haven&apos;t already, log in to GitHub via the CLI:</p>
-                          <CodeBlock
-                            language="bash"
-                            code={`gh auth login`}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Step 2: Create private repo */}
-                      <div className="relative flex gap-4">
-                        <div className="flex flex-col items-center">
-                          <div className="flex w-10 h-10 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-sm font-semibold">2</div>
-                          <div className="mt-2 h-full w-px bg-zinc-200" />
-                        </div>
-                        <div className="flex-1 pb-8">
-                          <h3 className="mb-3 font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Create your private repository</h3>
-                          <p className="mb-3 text-base text-black" style={{ lineHeight: '1.6' }}>From your ARI project folder, run:</p>
-                          <CodeBlock
-                            language="bash"
-                            code={`gh repo create my-ari --private --source=. --remote=origin --push`}
-                          />
-                          <p className="mt-3 text-sm text-black" style={{ lineHeight: '1.6' }}>
-                            Replace <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-zinc-600">my-ari</code> with whatever you&apos;d like to name your repo.
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Step 3: Verify */}
-                      <div className="relative flex gap-4">
-                        <div className="flex flex-col items-center">
-                          <div className="flex w-10 h-10 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-sm font-semibold">3</div>
-                          <div className="mt-2 h-full w-px bg-zinc-200" />
-                        </div>
-                        <div className="flex-1 pb-8">
-                          <h3 className="mb-3 font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Verify your setup</h3>
-                          <p className="mb-3 text-base text-black" style={{ lineHeight: '1.6' }}>Check that both remotes are configured:</p>
-                          <CodeBlock
-                            language="bash"
-                            code={`git remote -v`}
-                          />
-                          <p className="mt-3 mb-2 text-sm text-black" style={{ lineHeight: '1.6' }}>You should see both remotes:</p>
-                          <CodeBlock
-                            language="text"
-                            code={`origin    https://github.com/you/my-ari.git (fetch)
-origin    https://github.com/you/my-ari.git (push)
-upstream  https://github.com/ARIsoftware/ARI.git (fetch)
-upstream  https://github.com/ARIsoftware/ARI.git (push)`}
-                          />
-
-                          {/* Explanation box */}
-                          <div className="mt-4 rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
-                            <ul className="space-y-2 text-base" style={{ lineHeight: '1.6' }}>
-                              <li className="text-black">
-                                <strong className="text-zinc-700">origin</strong> = your private repo (your changes go here)
-                              </li>
-                              <li className="text-black">
-                                <strong className="text-zinc-700">upstream</strong> = official ARI repo (pull updates from here with <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-sm font-mono text-zinc-700">/ari-update</code>)
-                              </li>
-                            </ul>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Step 4: GitHub Token */}
-                      <div className="relative flex gap-4">
-                        <div className="flex flex-col items-center">
-                          <div className="flex w-10 h-10 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-sm font-semibold">4</div>
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="mb-3 font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Enable GitHub Sync <span className="text-sm font-normal text-zinc-500">(optional)</span></h3>
-                          <p className="mb-4 text-base text-black" style={{ lineHeight: '1.6' }}>
-                            When you install new modules from the Module Library, ARI can automatically commit them to your repo so they persist across rebuilds. To enable this, create a Personal Access Token and paste it below.
-                          </p>
-
-                          <div className="mb-4 rounded-xl border border-zinc-200 p-4 space-y-3">
-                            <p className="text-sm font-semibold text-zinc-900">How to create the token:</p>
-                            <ol className="list-decimal list-inside space-y-2 text-sm text-black" style={{ lineHeight: '1.6' }}>
-                              <li>
-                                Go to{' '}
-                                <a
-                                  href="https://github.com/settings/tokens?type=beta"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:underline"
-                                >
-                                  github.com/settings/tokens
-                                </a>
-                                {' '}and click <strong>Generate new token</strong>
-                              </li>
-                              <li>Set <strong>Token name</strong> to something like <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-zinc-600 text-xs">ARI Module Sync</code></li>
-                              <li>Set <strong>Expiration</strong> to your preference (or no expiration)</li>
-                              <li>Under <strong>Repository access</strong>, select <strong>Only select repositories</strong> and choose your ARI repo</li>
-                              <li>Click <strong>Repository permissions</strong>, find <strong>Contents</strong>, and set it to <strong>Read and write</strong></li>
-                              <li>Click <strong>Generate token</strong> and copy it</li>
-                            </ol>
-                          </div>
-
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="githubToken" className="text-sm font-medium text-gray-900">Personal Access Token</Label>
-                              <Input
-                                id="githubToken"
-                                value={formData.githubToken}
-                                onChange={(e) => setFormData(prev => ({ ...prev, githubToken: e.target.value }))}
-                                placeholder="github_pat_xxxxxxxxxxxx"
-                                className="text-sm"
-                                style={{ fontFamily: 'Geist Mono, monospace' }}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="githubRepoOwner" className="text-sm font-medium text-gray-900">Repository Owner</Label>
-                              <Input
-                                id="githubRepoOwner"
-                                value={formData.githubRepoOwner}
-                                onChange={(e) => setFormData(prev => ({ ...prev, githubRepoOwner: e.target.value }))}
-                                placeholder="your-github-username"
-                                className="text-sm"
-                                style={{ fontFamily: 'Geist Mono, monospace' }}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="githubRepoName" className="text-sm font-medium text-gray-900">Repository Name</Label>
-                              <Input
-                                id="githubRepoName"
-                                value={formData.githubRepoName}
-                                onChange={(e) => setFormData(prev => ({ ...prev, githubRepoName: e.target.value }))}
-                                placeholder="my-ari"
-                                className="text-sm"
-                                style={{ fontFamily: 'Geist Mono, monospace' }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Footer */}
-                    <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
-                      <button
-                        onClick={goToPreviousStep}
-                        className="inline-flex items-center justify-center px-4 py-2 text-base font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
-                        style={{ borderRadius: '6px' }}
-                      >
-                        Back
-                      </button>
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={goToNextStep}
-                          className="inline-flex items-center justify-center px-4 py-2 text-base font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
-                          style={{ borderRadius: '6px' }}
-                        >
-                          Skip this step
-                        </button>
-                        <button
-                          onClick={goToNextStep}
-                          className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
-                          style={{ borderRadius: '6px' }}
-                        >
-                          I&apos;ve completed this step
-                          <ArrowRight className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Supabase Tab */}
               {currentTab === "supabase" && (
                 <div>
@@ -1927,15 +1710,6 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                         }
                         <span className="text-gray-500">
                           Resend: {formData.resendApiKey ? "Configured" : "Skipped"}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {formData.githubToken ?
-                          <Check className="w-4 h-4 text-green-500" /> :
-                          <X className="w-4 h-4 text-gray-400" />
-                        }
-                        <span className="text-gray-500">
-                          GitHub Sync: {formData.githubToken ? "Configured" : "Skipped"}
                         </span>
                       </div>
                     </div>

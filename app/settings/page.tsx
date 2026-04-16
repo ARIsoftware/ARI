@@ -25,6 +25,7 @@ import {
   SecurityTab,
   IntegrationsTab,
   ApiTab,
+  GitTab,
   BackupsTab,
 } from "./tabs"
 import {
@@ -415,6 +416,7 @@ export default function SettingsPage(): React.ReactElement {
                     <TabsTrigger value="integrations">Integrations</TabsTrigger>
                     <TabsTrigger value="security">Security</TabsTrigger>
                     <TabsTrigger value="api">API</TabsTrigger>
+                    <TabsTrigger value="git">GIT</TabsTrigger>
                     <TabsTrigger value="backups">Backups</TabsTrigger>
                   </TabsList>
                   <div className="flex items-center gap-2">
@@ -476,6 +478,10 @@ export default function SettingsPage(): React.ReactElement {
 
                 <TabsContent value="api">
                   <ApiTab />
+                </TabsContent>
+
+                <TabsContent value="git">
+                  <GitTab />
                 </TabsContent>
 
                 <TabsContent value="backups">
