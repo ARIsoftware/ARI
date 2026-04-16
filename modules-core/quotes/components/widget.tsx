@@ -166,34 +166,3 @@ export function QuotesWidget() {
     </Card>
   )
 }
-
-/**
- * DEVELOPER NOTES:
- *
- * 1. Widget Performance:
- *    - Lightweight widget showing quote count
- *    - Random quote selection for variety
- *    - No heavy computations
- *
- * 2. Error Handling:
- *    - Shows error states with retry
- *    - Gracefully handles empty states
- *    - Logs errors for debugging
- *
- * 3. Design Patterns:
- *    - Follows ARI's card design
- *    - Uses Shadcn/ui components
- *    - Consistent spacing and styling
- *    - Loading and error states
- *
- * 4. Integration:
- *    - Client component ('use client')
- *    - Named export (export function QuotesWidget)
- *    - Registered in module.json
- *    - Dynamically imported by dashboard
- *
- * 5. Data Fetching:
- *    - Authenticated API calls
- *    - Handles loading and error states
- *    - Random quote selection for inspiration
- */

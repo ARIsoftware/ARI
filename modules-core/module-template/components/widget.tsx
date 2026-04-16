@@ -159,36 +159,3 @@ export function ModuleTemplateWidget() {
     </Card>
   )
 }
-
-/**
- * DEVELOPER NOTES:
- *
- * 1. Authentication:
- *    - Better Auth uses HTTP-only cookies
- *    - No need to pass Authorization headers
- *    - Just make fetch calls - cookies are sent automatically
- *
- * 2. Widget Performance:
- *    - Keep widgets lightweight
- *    - Avoid heavy computations
- *    - Cache data where appropriate
- *    - Consider polling interval for real-time updates
- *
- * 3. Error Handling:
- *    - Always show error states
- *    - Provide retry mechanism
- *    - Don't crash the dashboard
- *    - Log errors for debugging
- *
- * 4. Design Patterns:
- *    - Follow ARI's card design
- *    - Use Shadcn/ui components
- *    - Maintain consistent spacing
- *    - Show loading states
- *
- * 5. Integration:
- *    - Widget must be client component ('use client')
- *    - Use named export (export function WidgetName)
- *    - Register in module.json dashboard.widgetComponents
- *    - Dashboard will dynamically import this component
- */
