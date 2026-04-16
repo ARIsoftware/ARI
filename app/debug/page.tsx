@@ -688,35 +688,24 @@ export default function DatabaseTestPage() {
             error: 'User must be logged in to check module status'
           })
         } else {
-          const disabledModuleIds = (statusData.userSettings || [])
-            .filter((s: any) => s.enabled === false)
-            .map((s: any) => s.moduleId || s.module_id)
-            .filter(Boolean)
           const moduleChecks = statusData.moduleChecks || {}
+          const moduleEntries = Object.entries(moduleChecks) as [string, { exists: boolean; enabled: boolean }][]
+          const activeModules = moduleEntries.filter(([, c]) => c.enabled).map(([id]) => id)
+          const inactiveModules = moduleEntries.filter(([, c]) => !c.enabled).map(([id]) => id)
 
-          if (disabledModuleIds.length === 0) {
-            updateModuleResult('Module Status Check', {
-              status: 'success',
-              message: 'All modules are enabled',
-              data: {
-                userId: statusData.userId,
-                moduleChecks
-              }
-            })
-            console.log('✅ All modules enabled')
-          } else {
-            updateModuleResult('Module Status Check', {
-              status: 'warning',
-              message: `${disabledModuleIds.length} module(s) are disabled in user settings`,
-              data: {
-                userId: statusData.userId,
-                disabledModules: disabledModuleIds,
-                moduleChecks,
-                hint: 'Go to /modules or /settings to enable these modules'
-              }
-            })
-            console.warn('⚠️ Disabled modules:', disabledModuleIds)
-          }
+          updateModuleResult('Module Status Check', {
+            status: 'success',
+            message: `${activeModules.length} active, ${inactiveModules.length} inactive`,
+            data: {
+              userId: statusData.userId,
+              activeCount: activeModules.length,
+              inactiveCount: inactiveModules.length,
+              activeModules,
+              inactiveModules,
+              moduleChecks
+            }
+          })
+          console.log(`✅ Modules: ${activeModules.length} active, ${inactiveModules.length} inactive`)
         }
       } catch (error: unknown) {
         updateModuleResult('Module Status Check', {
@@ -1713,14 +1702,59 @@ export default function DatabaseTestPage() {
         }
 
         if (!probe) {
-          updateTestResult('Test RLS Policies', {
-            status: 'warning',
-            message: 'No installed module returned user-scoped rows — skipped',
-            data: {
-              note: 'RLS test requires at least one module API to return rows containing user_id/userId',
-              checkedModules: Array.from(phase3Summaries.keys())
+          // No module returned user-scoped rows to probe (fresh install or
+          // empty DB). Fall back to a direct RLS check against module_settings
+          // via a dedicated debug endpoint, so the test still runs.
+          try {
+            // POST because the endpoint inserts/deletes a sentinel row —
+            // it's not a safe/idempotent GET.
+            const response = await fetch(route('debug-rls-test'), { method: 'POST' })
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`)
             }
-          })
+            const rls = await response.json()
+
+            if (rls.error || !rls.authenticated) {
+              updateTestResult('Test RLS Policies', {
+                status: 'error',
+                message: rls.error || 'Not authenticated',
+                data: rls
+              })
+            } else if (rls.success) {
+              updateTestResult('Test RLS Policies', {
+                status: 'success',
+                message: `RLS working — verified via module_settings (positive + negative tests passed)`,
+                data: {
+                  note: 'Tested using a sentinel row on module_settings since no module had user-scoped data',
+                  positiveTest: rls.positiveTest,
+                  negativeTest: rls.negativeTest,
+                  tableTested: rls.tableTested
+                }
+              })
+            } else {
+              updateTestResult('Test RLS Policies', {
+                status: 'error',
+                message: 'RLS ISSUE — sentinel-row RLS check failed',
+                data: {
+                  hint: rls.negativeTest?.passed === false
+                    ? 'Negative test failed — a different user context saw rows it should not have'
+                    : 'Positive test failed — current user context did not see their own inserted row',
+                  positiveTest: rls.positiveTest,
+                  negativeTest: rls.negativeTest
+                }
+              })
+            }
+          } catch (fallbackError: unknown) {
+            updateTestResult('Test RLS Policies', {
+              status: 'warning',
+              message: 'No installed module returned user-scoped rows — fallback RLS check failed',
+              data: {
+                note: 'RLS test requires at least one module API to return rows containing user_id/userId, or a working /api/debug/rls-test endpoint',
+                checkedModules: Array.from(phase3Summaries.keys()),
+                fallbackError: errMsg(fallbackError)
+              }
+            })
+          }
         } else {
           const allOwned = probe.allOwnedByCurrentUser === true
           updateTestResult('Test RLS Policies', {
@@ -2722,7 +2756,7 @@ export default function DatabaseTestPage() {
                       <CardHeader>
                         <CardTitle className="text-lg flex items-center gap-2">
                           <Globe className="h-5 w-5 text-orange-500" />
-                          Public Endpoints (Unauthenticated)
+                          Public Endpoints
                         </CardTitle>
                         <p className="text-sm text-muted-foreground">
                           Setup-only endpoints — public during first-run, protected after a user account exists
