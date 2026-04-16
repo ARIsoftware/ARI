@@ -77,22 +77,6 @@ const config: Config = {
   			sm: 'calc(var(--radius) - 4px)'
   		},
   		keyframes: {
-  			'accordion-down': {
-  				from: {
-  					height: '0'
-  				},
-  				to: {
-  					height: 'var(--radix-accordion-content-height)'
-  				}
-  			},
-  			'accordion-up': {
-  				from: {
-  					height: 'var(--radix-accordion-content-height)'
-  				},
-  				to: {
-  					height: '0'
-  				}
-  			},
   			'blink': {
   				'0%, 100%': {
   					opacity: '1'
@@ -101,29 +85,9 @@ const config: Config = {
   					opacity: '0'
   				}
   			},
-  			'shine': {
-  				'0%': {
-  					transform: 'translateX(-100%)'
-  				},
-  				'50%, 100%': {
-  					transform: 'translateX(100%)'
-  				}
-  			},
-  			'pulse-custom': {
-  				'0%, 66%, 100%': {
-  					transform: 'scale3d(1, 1, 1)'
-  				},
-  				'33%': {
-  					transform: 'scale3d(1.05, 1.05, 1.05)'
-  				}
-  			}
   		},
   		animation: {
-  			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out',
-  			'blink': 'blink 1s ease-in-out infinite',
-  			'shine': 'shine 3s ease-in-out infinite',
-  			'pulse-custom': 'pulse-custom 1.5s ease-in-out infinite'
+  			'blink': 'blink 1s ease-in-out infinite'
   		}
   	}
   },
