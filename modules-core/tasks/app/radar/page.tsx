@@ -20,7 +20,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useSupabase } from "@/components/providers"
-import { Task } from "@/lib/supabase"
+import type { Task } from "@/modules/tasks/types"
 import { transformTaskForRadar, getTaskPriorityLevel } from "@/modules/tasks/lib/priority-utils"
 import { TaskPriorityModal } from "@/modules/tasks/components/task-priority-modal"
 import { RadarTaskDots } from "@/modules/tasks/components/radar-task-dots"

@@ -13,26 +13,9 @@
  *   table and seed it from this file. The `id` fields match for easy seeding.
  */
 
-export interface BibleVersion {
-  /** Short unique identifier, also used as the stored value in settings */
-  id: string
-  /** Display code shown in selectors (e.g. "ESV") */
-  code: string
-  /** Full name (e.g. "English Standard Version") */
-  name: string
-  /** ISO 639-1 language code */
-  language: string
-  /** Publisher or rights holder */
-  publisher: string | null
-  /** Whether to show in the UI */
-  is_active: boolean
-  /** Determines how text may be used — see notes above */
-  source_type: 'public_domain' | 'licensed' | 'api_reference'
-  /** URL or API endpoint to retrieve text, if applicable */
-  source_reference: string | null
-  /** Any additional notes about licensing or usage */
-  notes: string | null
-}
+import type { BibleVersion } from '../types'
+
+export type { BibleVersion }
 
 export const BIBLE_VERSIONS: BibleVersion[] = [
   {

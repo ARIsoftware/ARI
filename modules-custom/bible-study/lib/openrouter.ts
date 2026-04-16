@@ -17,7 +17,7 @@ export interface OpenRouterConfig {
   baseUrl: string
 }
 
-export interface ChatMessage {
+export interface LLMMessage {
   role: 'system' | 'user' | 'assistant'
   content: string
 }
@@ -45,7 +45,7 @@ export function resolveOpenRouterConfig(
 
 export async function callOpenRouter(
   config: OpenRouterConfig,
-  messages: ChatMessage[]
+  messages: LLMMessage[]
 ): Promise<string> {
   const response = await fetch(`${config.baseUrl}/chat/completions`, {
     method: 'POST',

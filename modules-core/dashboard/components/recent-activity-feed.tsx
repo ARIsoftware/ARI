@@ -14,14 +14,7 @@ import {
 } from '@/components/ui/tooltip'
 import { Loader2, Activity, CheckCircle, Clock, Plus, User } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
-
-interface ActivityItem {
-  id: string
-  type: 'task_created' | 'task_completed' | 'contact_added'
-  title: string
-  description: string
-  timestamp: string
-}
+import type { ActivityItem } from '../types'
 
 interface RecentActivityFeedProps {
   activities: ActivityItem[]
