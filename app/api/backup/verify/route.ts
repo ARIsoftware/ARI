@@ -13,7 +13,7 @@ interface TableInfo {
 }
 
 // Test table discovery methods
-async function testDiscoveryMethods(client: any) {
+async function testDiscoveryMethods(client: ReturnType<typeof getServiceSupabase>) {
   const results = {
     method1_rpc_function: { success: false, tables: [] as string[], error: null as string | null },
     method2_raw_sql: { success: false, tables: [] as string[], error: null as string | null },
@@ -31,8 +31,8 @@ async function testDiscoveryMethods(client: any) {
     } else {
       results.method1_rpc_function.error = error?.message || 'No data returned'
     }
-  } catch (error: any) {
-    results.method1_rpc_function.error = error.message
+  } catch (error: unknown) {
+    results.method1_rpc_function.error = error instanceof Error ? error.message : String(error)
   }
 
   // Test Method 2: Raw SQL via exec_sql
@@ -51,7 +51,7 @@ async function testDiscoveryMethods(client: any) {
       const result = await client.rpc('exec_sql', { query })
       data = result.data
       error = result.error
-    } catch (rpcError: any) {
+    } catch (rpcError: unknown) {
       error = rpcError
     }
 
@@ -63,8 +63,8 @@ async function testDiscoveryMethods(client: any) {
     } else {
       results.method2_raw_sql.error = error?.message || 'No data returned'
     }
-  } catch (error: any) {
-    results.method2_raw_sql.error = error.message
+  } catch (error: unknown) {
+    results.method2_raw_sql.error = error instanceof Error ? error.message : String(error)
   }
 
   // Test Method 3: Direct information_schema query
@@ -83,15 +83,15 @@ async function testDiscoveryMethods(client: any) {
     } else {
       results.method3_information_schema.error = error?.message || 'No data returned'
     }
-  } catch (error: any) {
-    results.method3_information_schema.error = error.message
+  } catch (error: unknown) {
+    results.method3_information_schema.error = error instanceof Error ? error.message : String(error)
   }
 
   return results
 }
 
 // Get row counts for tables
-async function getRowCounts(client: any, tables: string[]): Promise<Record<string, number>> {
+async function getRowCounts(client: ReturnType<typeof getServiceSupabase>, tables: string[]): Promise<Record<string, number>> {
   const rowCounts: Record<string, number> = {}
 
   // Try using RPC function first (faster)
@@ -108,7 +108,7 @@ async function getRowCounts(client: any, tables: string[]): Promise<Record<strin
         return rowCounts
       }
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.info('[Backup Verify] RPC row count function not available, using fallback')
   }
 
@@ -212,12 +212,12 @@ export async function GET(req: NextRequest) {
       timestamp: new Date().toISOString()
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('[Backup Verify] Error:', error)
     return NextResponse.json(
       {
         status: 'error',
-        error: error.message || 'Failed to verify backup system',
+        error: error instanceof Error ? error.message : 'Failed to verify backup system',
         timestamp: new Date().toISOString()
       },
       { status: 500 }

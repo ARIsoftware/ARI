@@ -3,6 +3,7 @@ import { and, asc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { toSnakeCase } from '@/lib/api-helpers'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import type { DrizzleDb } from '@/lib/db'
 import { brainstormBoards, brainstormEdges, brainstormNodes } from '@/lib/db/schema'
 import { BRAINSTORM_COLORS } from '@/modules/brainstorm/types'
 
@@ -41,23 +42,23 @@ function validateGraph(nodes: z.infer<typeof SaveBoardSchema>['nodes'], edges: z
   return null
 }
 
-async function loadBoard(withRLS: any, boardId: string) {
-  const boards = await withRLS((db: any) =>
+async function loadBoard(withRLS: <T>(operation: (db: DrizzleDb) => Promise<T>) => Promise<T>, boardId: string) {
+  const boards = await withRLS((db) =>
     db.select().from(brainstormBoards).where(eq(brainstormBoards.id, boardId)).limit(1)
   )
   if (boards.length === 0) return null
 
   const [nodes, edges] = await Promise.all([
-    withRLS((db: any) =>
+    withRLS((db) =>
       db.select().from(brainstormNodes).where(eq(brainstormNodes.boardId, boardId)).orderBy(asc(brainstormNodes.createdAt))
     ),
-    withRLS((db: any) =>
+    withRLS((db) =>
       db.select().from(brainstormEdges).where(eq(brainstormEdges.boardId, boardId)).orderBy(asc(brainstormEdges.createdAt))
     ),
   ])
 
   // numeric/double precision comes back as number for doublePrecision in Drizzle, but normalize to be safe
-  const normalizedNodes = nodes.map((n: any) => ({ ...n, x: Number(n.x), y: Number(n.y) }))
+  const normalizedNodes = nodes.map((n: Record<string, unknown>) => ({ ...n, x: Number(n.x), y: Number(n.y) }))
 
   return { ...boards[0], nodes: normalizedNodes, edges }
 }
@@ -108,7 +109,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const existing = await loadBoard(withRLS, parsed.data.id)
     if (!existing) return NextResponse.json({ error: 'Board not found' }, { status: 404 })
 
-    await withRLS((db: any) => db.transaction(async (tx: any) => {
+    await withRLS((db) => db.transaction(async (tx) => {
       await tx.update(brainstormBoards)
         .set({
           name: parseResult.data.name.trim(),

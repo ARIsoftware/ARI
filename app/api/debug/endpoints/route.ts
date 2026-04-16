@@ -88,10 +88,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       },
       warnings,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Debug Endpoints] Error:', error)
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     )
   }

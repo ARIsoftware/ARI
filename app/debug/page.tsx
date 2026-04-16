@@ -28,6 +28,14 @@ type Manifest = {
 }
 const MANIFEST = moduleManifest as Manifest
 
+/** Extract a human-readable message from an unknown catch value. */
+const errMsg = (e: unknown): string =>
+  e instanceof Error ? e.message : String(e)
+
+/** Check whether an unknown catch value is an Error with a given `name`. */
+const errName = (e: unknown, name: string): boolean =>
+  e instanceof Error && e.name === name
+
 /** HTTP methods considered mutations for security probing. */
 const MUTATION_METHODS = ['PUT', 'PATCH'] as const
 const isMutationMethod = (m: string): boolean =>
@@ -370,11 +378,11 @@ export default function DatabaseTestPage() {
           responseStatus: response.status
         })
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       updateSecurityResult(endpoint, method, {
         status: 'error',
         message: 'Network error during test',
-        error: error.message
+        error: errMsg(error)
       })
     }
   }
@@ -413,7 +421,7 @@ export default function DatabaseTestPage() {
           batch.map(({ endpoint, method }) => testApiEndpointSecurity(endpoint, method))
         )
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Failed to fetch endpoints for security testing:', error)
     }
 
@@ -499,11 +507,11 @@ export default function DatabaseTestPage() {
           }
         })
         console.log('✅ Registry completeness check passed')
-      } catch (error: any) {
+      } catch (error: unknown) {
         updateModuleResult('Registry Completeness', {
           status: 'warning',
           message: 'Could not verify registry completeness',
-          data: { error: error.message }
+          data: { error: errMsg(error) }
         })
       }
 
@@ -710,10 +718,10 @@ export default function DatabaseTestPage() {
             console.warn('⚠️ Disabled modules:', disabledModuleIds)
           }
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         updateModuleResult('Module Status Check', {
           status: 'error',
-          error: error.message,
+          error: errMsg(error),
           data: {
             hint: 'Check if /api/debug/module-status endpoint exists'
           }
@@ -721,10 +729,10 @@ export default function DatabaseTestPage() {
         console.error('❌ Module status check failed:', error)
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       updateModuleResult('Module Discovery', {
         status: 'error',
-        error: error.message,
+        error: errMsg(error),
         data: {
           hint: 'Check if /api/modules/all endpoint is working'
         }
@@ -757,10 +765,10 @@ export default function DatabaseTestPage() {
         message: 'Backup verify endpoint is accessible',
       })
       console.log('✅ Backup endpoint accessible')
-    } catch (error: any) {
+    } catch (error: unknown) {
       updateBackupResult('Backup Endpoint Accessibility', {
         status: 'error',
-        error: error.message,
+        error: errMsg(error),
         data: { hint: 'Check if backup-verify route is registered' }
       })
       console.error('❌ Backup endpoint failed:', error)
@@ -798,10 +806,10 @@ export default function DatabaseTestPage() {
         }
       })
       console.log('✅ Table discovery test complete:', methodLabel)
-    } catch (error: any) {
+    } catch (error: unknown) {
       updateBackupResult('Table Discovery Test', {
         status: 'error',
-        error: error.message,
+        error: errMsg(error),
         data: { hint: 'Failed to test discovery methods' }
       })
       console.error('❌ Table discovery test failed:', error)
@@ -836,10 +844,10 @@ export default function DatabaseTestPage() {
         })
         console.error('❌ No tables discovered')
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       updateBackupResult('Table Discovery Results', {
         status: 'error',
-        error: error.message
+        error: errMsg(error)
       })
       console.error('❌ Table discovery failed:', error)
     }
@@ -862,10 +870,10 @@ export default function DatabaseTestPage() {
         }
       })
       console.log('✅ Row count summary complete:', result.totalRows)
-    } catch (error: any) {
+    } catch (error: unknown) {
       updateBackupResult('Row Count Summary', {
         status: 'error',
-        error: error.message
+        error: errMsg(error)
       })
       console.error('❌ Row count summary failed:', error)
     }
@@ -894,10 +902,10 @@ export default function DatabaseTestPage() {
         })
         console.warn('⚠️ Warnings:', result.warnings)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       updateBackupResult('System Warnings', {
         status: 'error',
-        error: error.message
+        error: errMsg(error)
       })
       console.error('❌ Warnings check failed:', error)
     }
@@ -927,8 +935,8 @@ export default function DatabaseTestPage() {
         }
       })
       console.log('✅ Export endpoint accessible')
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
+    } catch (error: unknown) {
+      if (errName(error, 'AbortError')) {
         updateBackupResult('Export Endpoint Test', {
           status: 'error',
           error: 'Export endpoint timed out',
@@ -938,7 +946,7 @@ export default function DatabaseTestPage() {
         updateBackupResult('Export Endpoint Test', {
           status: 'warning',
           message: 'Could not verify export endpoint',
-          error: error.message
+          error: errMsg(error)
         })
       }
       console.error('⚠️ Export endpoint test:', error)
@@ -961,7 +969,7 @@ export default function DatabaseTestPage() {
       const data = await response.json()
       setEndpointsData(data)
       console.log('✅ Endpoints data loaded:', data.summary)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Failed to fetch endpoints:', error)
       setEndpointsData(null)
     }
@@ -1074,16 +1082,16 @@ export default function DatabaseTestPage() {
                 : r
             ))
 
-          } catch (error: any) {
+          } catch (error: unknown) {
             setPublicSecurityResults(prev => prev.map(r =>
               r.endpoint === endpoint.fullPath && r.method === method
-                ? { ...r, status: 'error', message: `Network error: ${error.message}`, hasSecurityValidation: false }
+                ? { ...r, status: 'error', message: `Network error: ${errMsg(error)}`, hasSecurityValidation: false }
                 : r
             ))
           }
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to run public security tests:', error)
     }
 
@@ -1130,10 +1138,10 @@ export default function DatabaseTestPage() {
       } else {
         throw new Error(`Unexpected status: ${response.status}`)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       updateAuthConfigResult('Auth API Endpoint', {
         status: 'error',
-        error: error.message,
+        error: errMsg(error),
         data: { hint: 'Check if /api/auth/[...all]/route.ts exists' }
       })
     }
@@ -1162,10 +1170,10 @@ export default function DatabaseTestPage() {
           data: { hint: 'Sign in at /sign-in to test authenticated features' }
         })
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       updateAuthConfigResult('Session Status', {
         status: 'error',
-        error: error.message
+        error: errMsg(error)
       })
     }
 
@@ -1189,10 +1197,10 @@ export default function DatabaseTestPage() {
           : (!appUrl ? 'NEXT_PUBLIC_APP_URL not set (needed for production)' : 'All client-side env vars configured'),
         data: checks
       })
-    } catch (error: any) {
+    } catch (error: unknown) {
       updateAuthConfigResult('Environment Variables', {
         status: 'error',
-        error: error.message
+        error: errMsg(error)
       })
     }
 
@@ -1234,11 +1242,11 @@ export default function DatabaseTestPage() {
       } else {
         throw new Error(`HTTP ${response.status}`)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       updateAuthConfigResult('Auth Configuration', {
         status: 'warning',
         message: 'Could not verify auth configuration',
-        error: error.message,
+        error: errMsg(error),
         data: { hint: 'Server-side auth config not exposed to client' }
       })
     }
@@ -1320,10 +1328,10 @@ export default function DatabaseTestPage() {
         data: { results }
       })
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       updateAuthConfigResult('Authorization Patterns', {
         status: 'error',
-        error: error.message
+        error: errMsg(error)
       })
     }
 
@@ -1361,11 +1369,11 @@ export default function DatabaseTestPage() {
           data: { hint: 'Sign in to test session management features' }
         })
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       updateAuthConfigResult('Session Management', {
         status: 'warning',
         message: 'Could not verify session management',
-        error: error.message
+        error: errMsg(error)
       })
     }
 
@@ -1399,10 +1407,10 @@ export default function DatabaseTestPage() {
             }
           })
           console.log('✅ Environment variables check passed')
-        } catch (error: any) {
+        } catch (error: unknown) {
           updateTestResult('Environment Variables', {
             status: 'error',
-            error: error.message
+            error: errMsg(error)
           })
           console.error('❌ Environment variables check failed:', error)
         }
@@ -1420,10 +1428,10 @@ export default function DatabaseTestPage() {
             message: 'Client retrieved from global context'
           })
           console.log('✅ Supabase client from context')
-        } catch (error: any) {
+        } catch (error: unknown) {
           updateTestResult('Supabase Client Initialization', {
             status: 'error',
-            error: error.message
+            error: errMsg(error)
           })
           console.error('❌ Supabase client initialization failed:', error)
         }
@@ -1464,10 +1472,10 @@ export default function DatabaseTestPage() {
           } else {
             throw new Error(result.error || 'Network test failed')
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           updateTestResult('Network Connectivity', {
             status: 'error',
-            error: error.message,
+            error: errMsg(error),
             data: {
               hint: 'Check if Supabase URL is correct and accessible'
             }
@@ -1504,12 +1512,12 @@ export default function DatabaseTestPage() {
           } else {
             throw new Error(data.checks?.database?.error || `Health check returned ${response.status}`)
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           updateTestResult('Connection Test', {
             status: 'error',
-            error: error.message,
+            error: errMsg(error),
             data: {
-              hint: error.name === 'AbortError'
+              hint: errName(error, 'AbortError')
                 ? 'Connection timed out - check your network and database'
                 : 'Check database connectivity via /api/health'
             }
@@ -1582,10 +1590,10 @@ export default function DatabaseTestPage() {
           expired: isExpired
         })
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       updateTestResult('Authentication Status', {
         status: 'error',
-        error: error.message,
+        error: errMsg(error),
         data: {
           hint: 'Error accessing session from global context'
         }
@@ -1621,10 +1629,10 @@ export default function DatabaseTestPage() {
         })
         console.log('✅ Session found for user:', session.user?.email)
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       updateTestResult('Session Status', {
         status: 'error',
-        error: error.message
+        error: errMsg(error)
       })
       console.error('❌ Session check failed:', error)
     }
@@ -1674,10 +1682,10 @@ export default function DatabaseTestPage() {
           message: `Found ${rows.length} record(s) via API`,
           data: { count: rows.length, source: test.fullPath }
         })
-      } catch (error: any) {
+      } catch (error: unknown) {
         updateTestResult(test.name, {
-          status: error.message.includes('401') || error.message.includes('Unauthorized') ? 'warning' : 'error',
-          error: error.message,
+          status: errMsg(error).includes('401') || errMsg(error).includes('Unauthorized') ? 'warning' : 'error',
+          error: errMsg(error),
           data: { hint: 'Tests the real API route with Better Auth + withRLS()', source: test.fullPath }
         })
       }
@@ -1731,10 +1739,10 @@ export default function DatabaseTestPage() {
           })
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       updateTestResult('Test RLS Policies', {
         status: 'error',
-        error: error.message,
+        error: errMsg(error),
         data: { hint: 'Tests user isolation via withRLS()' }
       })
     }

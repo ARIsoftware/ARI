@@ -46,10 +46,10 @@ export async function POST(request: NextRequest) {
     fs.writeFileSync(envPath, content, 'utf-8')
 
     return NextResponse.json({ success: true, path: envPath })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Save Env] Error:', error)
     return NextResponse.json(
-      { error: 'Failed to save .env.local', details: error.message },
+      { error: 'Failed to save .env.local', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     )
   }

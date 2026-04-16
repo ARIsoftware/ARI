@@ -26,10 +26,10 @@ export async function POST() {
       output: stdout,
       ...(stderr ? { warnings: stderr } : {}),
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Module Refresh] Error:', error)
     return NextResponse.json(
-      { error: 'Failed to regenerate module registries', details: error.message },
+      { error: 'Failed to regenerate module registries', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     )
   }

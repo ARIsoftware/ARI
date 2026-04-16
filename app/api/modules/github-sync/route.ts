@@ -45,10 +45,10 @@ export async function POST(request: NextRequest) {
       commitSha: result.commitSha,
       filesCommitted: result.filesCommitted,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[GitHub Sync] Error:', error)
     return NextResponse.json(
-      { error: 'Failed to sync to GitHub', details: error.message },
+      { error: 'Failed to sync to GitHub', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     )
   }

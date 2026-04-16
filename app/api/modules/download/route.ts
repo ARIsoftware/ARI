@@ -211,9 +211,9 @@ export async function POST(request: NextRequest) {
             filesCommitted: result.filesCommitted,
             message: result.message,
           }
-        } catch (err: any) {
+        } catch (err: unknown) {
           console.error('[API /modules/download] GitHub sync failed:', err)
-          githubSync = { success: false, error: err.message }
+          githubSync = { success: false, error: err instanceof Error ? err.message : String(err) }
         }
       }
     }

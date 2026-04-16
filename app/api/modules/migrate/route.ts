@@ -58,10 +58,10 @@ export async function POST(request: NextRequest) {
           )
           await client.query('COMMIT')
           results.push({ name: migration.name, status: 'applied' })
-        } catch (err: any) {
+        } catch (err: unknown) {
           await client.query('ROLLBACK').catch(() => {})
           console.error(`[API /modules/migrate] Migration "${migration.name}" failed for ${moduleId}:`, err)
-          results.push({ name: migration.name, status: 'failed', error: err.message })
+          results.push({ name: migration.name, status: 'failed', error: err instanceof Error ? err.message : String(err) })
           // Stop processing remaining migrations on failure
           break
         }
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       success: allSucceeded,
       results,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API /modules/migrate] Error:', error)
     return NextResponse.json(
       { error: 'Failed to run migrations' },

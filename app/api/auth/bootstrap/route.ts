@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     if (!schemaPresent) {
       try {
         await client.query(setupSql)
-      } catch (installError: any) {
+      } catch (installError: unknown) {
         const message = installError instanceof Error ? installError.message : String(installError)
         console.error("Bootstrap install failed:", installError)
         return NextResponse.json(

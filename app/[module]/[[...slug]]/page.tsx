@@ -155,7 +155,7 @@ export default async function ModuleCatchAllPage({
         </div>
       )
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Log the error for debugging
     console.error(`Failed to load module ${module} page:`, error)
     notFound()

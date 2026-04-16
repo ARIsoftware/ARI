@@ -179,9 +179,9 @@ async function executeInTransaction(
         if (onProgress) {
           onProgress(processed, total)
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         const preview = statement.substring(0, 120).replace(/\n/g, ' ')
-        errors.push(`Failed: ${preview}... — ${error.message}`)
+        errors.push(`Failed: ${preview}... — ${error instanceof Error ? error.message : String(error)}`)
         // Rollback the entire transaction
         try { await client.query('ROLLBACK') } catch { /* ignore rollback errors */ }
         return { success: false, errors }
@@ -193,9 +193,9 @@ async function executeInTransaction(
     await client.query('COMMIT')
     return { success: true, errors: [] }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     try { await client.query('ROLLBACK') } catch { /* ignore */ }
-    errors.push(`Transaction failed: ${error.message}`)
+    errors.push(`Transaction failed: ${error instanceof Error ? error.message : String(error)}`)
     return { success: false, errors }
   } finally {
     try { client.release() } catch { /* ignore */ }
@@ -347,7 +347,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(response, { status: 200 })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Import error:', error)
     return NextResponse.json(
       { error: safeErrorResponse(error) },
@@ -382,9 +382,9 @@ export async function PUT(req: NextRequest) {
       metadata: validation.metadata
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error.message || 'Validation failed' },
+      { error: error instanceof Error ? error.message : 'Validation failed' },
       { status: 500 }
     )
   }

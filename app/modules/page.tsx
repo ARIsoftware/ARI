@@ -530,7 +530,7 @@ export default function ModulesPage() {
               },
             } : null)
           }
-        } catch (err: any) {
+        } catch (err: unknown) {
           setInstallSuccess(prev => prev ? {
             ...prev,
             migrationResult: { status: 'failed', error: 'Failed to connect to migration endpoint' },
@@ -557,7 +557,7 @@ export default function ModulesPage() {
   const handleInstallDone = async () => {
     // If already synced server-side (Vercel auto-sync), skip client-side github-sync call
     if (installSuccess?.githubSync?.success) {
-      try { await fetch('/api/modules/refresh', { method: 'POST' }) } catch {}
+      try { await fetch('/api/modules/refresh', { method: 'POST' }) } catch (err) { console.warn('Failed to refresh module registry:', err) }
       setInstallSuccess(null)
       return
     }
@@ -596,7 +596,7 @@ export default function ModulesPage() {
     // Trigger registry refresh
     try {
       await fetch('/api/modules/refresh', { method: 'POST' })
-    } catch { /* ignore refresh errors */ }
+    } catch (err) { console.warn('Failed to refresh module registry:', err) }
 
     setInstallSuccess(null)
   }
