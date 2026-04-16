@@ -302,30 +302,46 @@ export function ModuleTemplateSettingsPanel() {
  * DEVELOPER NOTES:
  *
  * 1. Authentication:
- *    - Better Auth uses HTTP-only cookies
- *    - No need to pass Authorization headers
- *    - API routes read auth from cookies automatically
+ *    - Better Auth uses HTTP-only cookies — fetches inside the hook send
+ *      them automatically. Do not pass `Authorization` headers.
+ *    - Server-side, the API route calls `getAuthenticatedUser()` + `withRLS()`
+ *      so tenant isolation holds even if a caller forgets a filter.
  *
  * 2. Settings Architecture:
- *    - Stored in module_settings table, settings column (JSONB)
- *    - Per-user settings (enforced via withRLS)
- *    - Always provide default values
- *    - Merge defaults with loaded settings
+ *    - Row lives in `public.module_settings`, column `settings` (JSONB),
+ *      one row per `(user_id, module_id)`.
+ *    - Row access is enforced by `withRLS()` — callers cannot read or write
+ *      another user's settings even with a crafted payload.
+ *    - Always ship a `DEFAULT_SETTINGS` constant and merge:
+ *      `setSettings({ ...DEFAULT_SETTINGS, ...savedSettings })`. This keeps
+ *      controlled form inputs from flipping between undefined and a value.
  *
- * 3. TanStack Query:
- *    - useModuleTemplateSettings() - fetches current settings
- *    - useUpdateModuleTemplateSettings() - saves with optimistic updates
- *    - Automatic cache invalidation on mutation
+ * 3. TanStack Query (the optimistic-update pattern):
+ *    - `useModuleTemplateSettings()` reads the `['module-template-settings']`
+ *      cache; every consumer that uses the same key shares the same data.
+ *    - `useUpdateModuleTemplateSettings()` follows the standard four-step
+ *      optimistic update in `hooks/use-module-template.ts`:
+ *        a. `onMutate`: `cancelQueries` → snapshot previous → `setQueryData`
+ *           with the new value → return `{ previous }` for rollback.
+ *        b. `onError`: restore the snapshot from context.
+ *        c. `onSettled`: `invalidateQueries` to refetch the source of truth.
+ *    - This means the UI reflects changes before the server responds, and
+ *      automatically corrects itself if the save fails.
  *
  * 4. Form Controls:
- *    - Use Shadcn/ui components for consistency
- *    - Provide clear labels and descriptions
- *    - Show validation errors
- *    - Disable inputs while saving
+ *    - Use Shadcn/ui components for consistency.
+ *    - Provide a clear `<Label>` and a description line for every control.
+ *    - Validation lives server-side (Zod in the API route); surface failures
+ *      via `onError` + `toast({ variant: 'destructive' })` rather than
+ *      building a parallel client-side schema.
+ *    - Disable inputs while `updateSettings.isPending` — do not let users
+ *      queue conflicting edits.
  *
  * 5. User Feedback:
- *    - Show loading state while fetching
- *    - Show saving state while saving
- *    - Show success confirmation
- *    - Handle errors gracefully with toast
+ *    - Loading: render a spinner while `isLoading`.
+ *    - Saving: swap the save button label while `isPending`.
+ *    - Success: flip `saved=true` for a short window (3s) for inline
+ *      confirmation. Avoid toasting success on every keystroke.
+ *    - Failure: toast with `variant: 'destructive'` and keep the form
+ *      editable so the user can retry.
  */
