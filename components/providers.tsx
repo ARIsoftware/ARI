@@ -9,7 +9,6 @@ import { ModuleProviders } from "@/components/module-providers"
 import { ModulesProvider } from "@/lib/modules/context"
 import { CommandPaletteProvider } from "@/components/command-palette"
 import { DragDropModeProvider } from "@/components/drag-drop-mode-context"
-import { QuickAddTaskProvider } from "@/modules/tasks/components/quick-add-task-sheet"
 import { ThemeProvider } from "@/lib/theme/theme-context"
 import type { ModuleMetadata } from '@/lib/modules/module-types'
 
@@ -142,10 +141,8 @@ export function Providers({
           <ModuleProviders isAuthenticated={!!session}>
             <CommandPaletteProvider>
               <DragDropModeProvider isAuthenticated={!!session} isAuthLoading={isPending}>
-                <QuickAddTaskProvider>
-                  {children}
-                  <Toaster />
-                </QuickAddTaskProvider>
+                {children}
+                <Toaster />
               </DragDropModeProvider>
             </CommandPaletteProvider>
           </ModuleProviders>

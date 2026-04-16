@@ -40,6 +40,10 @@
       "sidebarPosition": "none"
     }
   ],
+  "globalProvider": {
+    "component": "./components/quick-add-task-sheet.tsx",
+    "exportName": "QuickAddTaskProvider"
+  },
   "database": {
     "tables": ["tasks"]
   },

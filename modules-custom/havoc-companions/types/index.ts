@@ -1,22 +1,14 @@
 /**
  * Havoc Companions Module — Type Definitions
  *
- * `CompanionSpecies` lives in `lib/animals.ts` so the runtime species
- * list and the TS union stay in lockstep. It is re-exported from here
- * for import-site convenience.
+ * `CompanionSpecies` and `HavocCompanion` live in `lib/animals.ts` so the
+ * runtime species list and the TS types stay in lockstep. They are
+ * re-exported from here for import-site convenience.
  */
 
-import type { CompanionSpecies } from '@/modules/havoc-companions/lib/animals'
+export type { CompanionSpecies, HavocCompanion } from '../lib/animals'
 
-export type { CompanionSpecies }
-
-/** A single havoc companion as stored in module_settings.settings.animals */
-export interface HavocCompanion {
-  /** Stable id used as React key + slot identifier */
-  id: string
-  species: CompanionSpecies
-  name: string
-}
+import type { HavocCompanion } from '../lib/animals'
 
 /**
  * Settings persisted in module_settings.settings (JSONB).
