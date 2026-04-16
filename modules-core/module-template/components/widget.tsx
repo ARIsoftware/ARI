@@ -4,9 +4,9 @@
  * This widget appears on the main dashboard when the module is enabled.
  * It demonstrates:
  * - Client component usage ('use client')
- * - API calls with cookie-based auth (Better Auth)
- * - Loading states
- * - Error handling
+ * - TanStack Query for cached, shared data fetching
+ * - Cookie-based auth (Better Auth) via the underlying hook
+ * - Loading and error states
  * - ARI card design patterns
  *
  * IMPORTANT: Dashboard widgets MUST be client components.
@@ -17,65 +17,30 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Package, Loader2, AlertCircle } from 'lucide-react'
-
-interface WidgetStats {
-  entryCount: number
-  lastEntryMessage?: string
-  lastEntryDate?: string
-}
+import { useModuleTemplateEntries } from '../hooks/use-module-template'
 
 /**
  * ModuleTemplateWidget Component
  *
  * Exported as a named export (not default) because it's imported
  * by the dashboard via dynamic import.
+ *
+ * Uses the shared `useModuleTemplateEntries` hook so this widget reads
+ * from the same TanStack Query cache as the main page and any other
+ * consumer — no duplicate network request, and mutations elsewhere
+ * update the widget automatically.
  */
 export function ModuleTemplateWidget() {
-  const [stats, setStats] = useState<WidgetStats>({ entryCount: 0 })
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(false)
+  const { data: entries = [], isLoading, isError, refetch } = useModuleTemplateEntries()
 
-  useEffect(() => {
-    loadStats()
-  }, [])
-
-  const loadStats = async () => {
-    try {
-      setLoading(true)
-      setError(false)
-
-      // Auth is handled via cookies - no need to pass Authorization header
-      const response = await fetch('/api/modules/module-template/data')
-
-      if (!response.ok) {
-        throw new Error('Failed to load stats')
-      }
-
-      const data = await response.json()
-      const entries = data.entries || []
-
-      // Calculate stats
-      const widgetStats: WidgetStats = {
-        entryCount: entries.length,
-        lastEntryMessage: entries[0]?.message,
-        lastEntryDate: entries[0]?.created_at
-      }
-
-      setStats(widgetStats)
-    } catch (err) {
-      console.error('Widget error:', err)
-      setError(true)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const entryCount = entries.length
+  const lastEntry = entries[0]
 
   // Loading state
-  if (loading) {
+  if (isLoading) {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -92,7 +57,7 @@ export function ModuleTemplateWidget() {
   }
 
   // Error state
-  if (error) {
+  if (isError) {
     return (
       <Card className="border-red-200">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -106,7 +71,7 @@ export function ModuleTemplateWidget() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={loadStats}
+            onClick={() => refetch()}
             className="w-full mt-2 text-xs"
           >
             Retry
@@ -125,21 +90,21 @@ export function ModuleTemplateWidget() {
       </CardHeader>
       <CardContent>
         {/* Main metric */}
-        <div className="text-2xl font-medium">{stats.entryCount}</div>
+        <div className="text-2xl font-medium">{entryCount}</div>
         <p className="text-xs text-muted-foreground">
-          {stats.entryCount === 1 ? 'entry' : 'entries'} created
+          {entryCount === 1 ? 'entry' : 'entries'} created
         </p>
 
         {/* Last entry preview */}
-        {stats.lastEntryMessage && (
+        {lastEntry?.message && (
           <div className="mt-3 pt-3 border-t">
             <p className="text-xs text-muted-foreground mb-1">Latest entry:</p>
             <p className="text-sm font-medium line-clamp-2">
-              {stats.lastEntryMessage}
+              {lastEntry.message}
             </p>
-            {stats.lastEntryDate && (
+            {lastEntry.created_at && (
               <p className="text-xs text-muted-foreground mt-1">
-                {new Date(stats.lastEntryDate).toLocaleDateString()}
+                {new Date(lastEntry.created_at).toLocaleDateString()}
               </p>
             )}
           </div>
@@ -163,32 +128,36 @@ export function ModuleTemplateWidget() {
 /**
  * DEVELOPER NOTES:
  *
- * 1. Authentication:
- *    - Better Auth uses HTTP-only cookies
- *    - No need to pass Authorization headers
- *    - Just make fetch calls - cookies are sent automatically
+ * 1. Data Fetching (TanStack Query):
+ *    - Import the module's shared query hook (e.g. `useModuleTemplateEntries`)
+ *      from `../hooks/use-module-template` rather than calling `fetch` directly.
+ *    - Widgets, main pages, and settings panels that share a query key share a
+ *      single request and a single cache entry — no duplicate network calls.
+ *    - Mutations elsewhere (create / update / delete) update the widget
+ *      automatically via the hook's optimistic updates + cache invalidation.
+ *    - Refetch on retry via `refetch()` from the hook rather than re-running
+ *      local state logic.
  *
- * 2. Widget Performance:
- *    - Keep widgets lightweight
- *    - Avoid heavy computations
- *    - Cache data where appropriate
- *    - Consider polling interval for real-time updates
+ * 2. Authentication:
+ *    - Better Auth uses HTTP-only cookies — fetches inside the hook send them
+ *      automatically. Never pass Authorization headers.
  *
- * 3. Error Handling:
- *    - Always show error states
- *    - Provide retry mechanism
- *    - Don't crash the dashboard
- *    - Log errors for debugging
+ * 3. Widget Performance:
+ *    - Keep widgets lightweight and derive stats from already-cached data.
+ *    - TanStack Query handles stale-while-revalidate and window-focus refetch
+ *      for you — do not add polling unless a feature genuinely requires it.
  *
- * 4. Design Patterns:
- *    - Follow ARI's card design
- *    - Use Shadcn/ui components
- *    - Maintain consistent spacing
- *    - Show loading states
+ * 4. Error Handling:
+ *    - Use `isError` / `refetch()` from the hook for the error UI.
+ *    - Don't crash the dashboard — always render a fallback card.
  *
- * 5. Integration:
- *    - Widget must be client component ('use client')
- *    - Use named export (export function WidgetName)
- *    - Register in module.json dashboard.widgetComponents
- *    - Dashboard will dynamically import this component
+ * 5. Design Patterns:
+ *    - Follow ARI's card design and use Shadcn/ui components.
+ *    - Maintain consistent spacing and show loading states.
+ *
+ * 6. Integration:
+ *    - Widget must be a client component ('use client').
+ *    - Use a named export (export function WidgetName).
+ *    - Register in module.json `dashboard.widgetComponents`.
+ *    - Dashboard dynamically imports this component.
  */
