@@ -32,6 +32,7 @@ Desktop.ini
 *_MIGRATION.md
 *_MIGRATION_*.md
 FIX_PLAN.md
+.code-review/
 !.agents/commands/*.md
 !.claude/commands/*.md
 !.codex/prompts/*.md
