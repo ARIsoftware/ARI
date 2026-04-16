@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       db.select().from(contributionGraph).where(eq(contributionGraph.userId, user.id)).orderBy(asc(contributionGraph.boxIndex))
     )
 
-    return NextResponse.json(toSnakeCase(data) || [])
+    return NextResponse.json(toSnakeCase(data))
   } catch (err) {
     console.error('API error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

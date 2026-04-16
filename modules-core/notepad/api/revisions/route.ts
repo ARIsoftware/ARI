@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
         .where(eq(notepadRevisions.userId, user.id))
     )
 
-    const newRevisionNumber = (maxRevisionResult[0]?.maxRevision || 0) + 1
+    const newRevisionNumber = (maxRevisionResult[0]?.maxRevision ?? 0) + 1
 
     const newRevision = await withRLS((db) =>
       db.insert(notepadRevisions)

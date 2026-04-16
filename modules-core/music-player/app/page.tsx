@@ -82,7 +82,7 @@ export default function MusicPlayerPage() {
           setRandomQuote(quotes[Math.floor(Math.random() * quotes.length)])
         }
       })
-      .catch(() => {})
+      .catch((err) => console.warn('Failed to fetch quotes:', err))
     return () => { cancelled = true }
   }, [quotesEnabled, quotesLoading])
 

@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
         .orderBy(asc(musicPlaylist.position))
     )
 
-    return NextResponse.json({ songs: toSnakeCase(songs) || [] })
+    return NextResponse.json({ songs: toSnakeCase(songs) })
   } catch (error) {
     console.error('GET /api/modules/music-player/songs error:', error instanceof Error ? error.message : error)
     return createErrorResponse('Internal server error', 500)

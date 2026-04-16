@@ -77,8 +77,8 @@ const entries = await withRLS((db) =>
     )
 
     return NextResponse.json({
-      entries: toSnakeCase(entries) || [],
-      count: entries?.length || 0,
+      entries: toSnakeCase(entries),
+      count: entries.length,
     })
   } catch (error) {
     console.error('GET /api/modules/module-template/data error:', error instanceof Error ? error.message : error)

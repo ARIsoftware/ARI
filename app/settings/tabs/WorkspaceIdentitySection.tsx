@@ -109,7 +109,7 @@ export function WorkspaceIdentitySection(): React.ReactElement {
                   body: stored,
                 }).then(res => {
                   if (res.ok) localStorage.removeItem('ari_welcome_profile')
-                }).catch(() => {})
+                }).catch((err) => console.warn('Failed to sync welcome profile to DB:', err))
 
                 return
               }

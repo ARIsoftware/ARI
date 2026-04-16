@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       )
     ])
 
-    const revisionNumber = (maxRevisionResult[0]?.maxRevision || 0) + 1
+    const revisionNumber = (maxRevisionResult[0]?.maxRevision ?? 0) + 1
 
     const [newRevision] = await Promise.all([
       withRLS((db) =>
