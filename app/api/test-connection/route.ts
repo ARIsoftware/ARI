@@ -44,7 +44,7 @@ export async function GET() {
       statusText: response.statusText,
       url: supabaseUrl.substring(0, 30) + '...'
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json({
       success: false,
       error: safeErrorResponse(error),

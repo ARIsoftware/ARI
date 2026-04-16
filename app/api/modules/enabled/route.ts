@@ -27,10 +27,10 @@ export async function GET() {
         enabled: module.enabled
       }))
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] Error fetching enabled modules:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch enabled modules', details: error.message },
+      { error: 'Failed to fetch enabled modules', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     )
   }

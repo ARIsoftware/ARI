@@ -125,8 +125,8 @@ export function AuthForm({ mode }: AuthFormProps) {
         // to ensure session cookies are properly read
         window.location.href = '/dashboard'
       }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err))
       setLoading(false)
     }
   }
@@ -145,8 +145,8 @@ export function AuthForm({ mode }: AuthFormProps) {
       } else {
         window.location.href = '/dashboard'
       }
-    } catch (err: any) {
-      setError(err.message || 'Verification failed')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err))
       setTotpCode('')
       setLoading(false)
     }
@@ -167,8 +167,8 @@ export function AuthForm({ mode }: AuthFormProps) {
       } else {
         window.location.href = '/dashboard'
       }
-    } catch (err: any) {
-      setError(err.message || 'Verification failed')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err))
       setLoading(false)
     }
   }

@@ -47,9 +47,9 @@ export default function QuotesPage() {
 
       const data = await response.json();
       setQuotes(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error loading quotes:", error);
-      setError(error.message || "Failed to load quotes");
+      setError(error instanceof Error ? error.message : String(error));
     } finally {
       setLoading(false);
     }

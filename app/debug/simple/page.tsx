@@ -41,8 +41,8 @@ export default function SimpleTestPage() {
       } else {
         update('Database Connection (PG Pool)', { status: 'error', message: data.checks?.database?.message || `HTTP ${res.status}` })
       }
-    } catch (err: any) {
-      update('Database Connection (PG Pool)', { status: 'error', message: err.message })
+    } catch (err: unknown) {
+      update('Database Connection (PG Pool)', { status: 'error', message: err instanceof Error ? err.message : String(err) })
     }
 
     // Test 2: Auth + Drizzle withRLS (user-preferences requires both)
@@ -58,8 +58,8 @@ export default function SimpleTestPage() {
       } else {
         update('Authentication', { status: 'error', message: `HTTP ${res.status}` })
       }
-    } catch (err: any) {
-      update('Authentication', { status: 'error', message: err.message })
+    } catch (err: unknown) {
+      update('Authentication', { status: 'error', message: err instanceof Error ? err.message : String(err) })
     }
 
     // Test 3: Module settings read (Drizzle withRLS)
@@ -74,8 +74,8 @@ export default function SimpleTestPage() {
       } else {
         update('Module Settings (Drizzle)', { status: 'error', message: `HTTP ${res.status}` })
       }
-    } catch (err: any) {
-      update('Module Settings (Drizzle)', { status: 'error', message: err.message })
+    } catch (err: unknown) {
+      update('Module Settings (Drizzle)', { status: 'error', message: err instanceof Error ? err.message : String(err) })
     }
 
     setLoading(false)

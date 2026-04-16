@@ -61,8 +61,8 @@ export default function ProfilePage() {
       if (error) throw error
 
       setMessage('Profile updated successfully!')
-    } catch (error: any) {
-      setError(error.message || 'Failed to update profile')
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : String(error))
     } finally {
       setLoading(false)
     }
@@ -98,8 +98,8 @@ export default function ProfilePage() {
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
-    } catch (error: any) {
-      setError(error.message || 'Failed to change password')
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : String(error))
     } finally {
       setLoading(false)
     }

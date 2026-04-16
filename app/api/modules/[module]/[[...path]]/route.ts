@@ -175,13 +175,13 @@ async function handleRequest(
     }
 
     return result
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Log error for debugging
     console.error(`[Module API ${module}/${apiPath}] Error:`, error)
 
     // Generic error response
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     )
   }

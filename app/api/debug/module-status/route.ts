@@ -56,7 +56,7 @@ export async function GET() {
       userSettings: settings,
       moduleChecks,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Debug] Module status error:', error)
     return NextResponse.json({
       error: safeErrorResponse(error)

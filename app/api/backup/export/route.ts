@@ -3,11 +3,12 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { isProductionSafeOperation } from '@/lib/admin-helpers'
 import { logger } from '@/lib/logger'
 import { safeErrorResponse } from '@/lib/api-error'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServiceSupabase, EXCLUDED_TABLES, calculateChecksum, stripNul } from '../utils'
 
 export const debugRole = "backup-export"
 
-async function discoverTables(client: any): Promise<{ tables: string[], method: string, warnings: string[] }> {
+async function discoverTables(client: SupabaseClient): Promise<{ tables: string[], method: string, warnings: string[] }> {
   const warnings: string[] = []
 
   try {
@@ -32,8 +33,8 @@ async function discoverTables(client: any): Promise<{ tables: string[], method: 
       } else {
         logger.warn('Method 1 returned no results')
       }
-    } catch (rpcError: any) {
-      logger.warn('Method 1 (RPC) failed:', rpcError.message)
+    } catch (rpcError: unknown) {
+      logger.warn('Method 1 (RPC) failed:', rpcError instanceof Error ? rpcError.message : String(rpcError))
     }
 
     // METHOD 2: Try raw SQL via exec_sql RPC function
@@ -54,7 +55,7 @@ async function discoverTables(client: any): Promise<{ tables: string[], method: 
         const result = await client.rpc('exec_sql', { query })
         data = result.data
         error = result.error
-      } catch (rpcError: any) {
+      } catch (rpcError: unknown) {
         error = rpcError
       }
 
@@ -74,8 +75,8 @@ async function discoverTables(client: any): Promise<{ tables: string[], method: 
       } else {
         logger.warn('Method 2 returned no results')
       }
-    } catch (sqlError: any) {
-      logger.warn('Method 2 (raw SQL) failed:', sqlError.message)
+    } catch (sqlError: unknown) {
+      logger.warn('Method 2 (raw SQL) failed:', sqlError instanceof Error ? sqlError.message : String(sqlError))
     }
 
     // METHOD 3: Query information_schema directly via Supabase
@@ -103,8 +104,8 @@ async function discoverTables(client: any): Promise<{ tables: string[], method: 
       if (schemaError) {
         logger.warn('Method 3 failed:', schemaError.message || schemaError)
       }
-    } catch (schemaQueryError: any) {
-      logger.warn('Method 3 (information_schema) failed:', schemaQueryError.message)
+    } catch (schemaQueryError: unknown) {
+      logger.warn('Method 3 (information_schema) failed:', schemaQueryError instanceof Error ? schemaQueryError.message : String(schemaQueryError))
     }
 
     // All methods failed - do not use hardcoded fallback lists
@@ -113,9 +114,9 @@ async function discoverTables(client: any): Promise<{ tables: string[], method: 
 
     return { tables: [], method: 'none', warnings }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Critical error in table discovery:', error)
-    warnings.push(`Critical error during discovery: ${error.message}`)
+    warnings.push(`Critical error during discovery: ${error instanceof Error ? error.message : String(error)}`)
     return { tables: [], method: 'error', warnings }
   }
 }
@@ -127,7 +128,7 @@ function isValidTableName(tableName: string, validTables: string[]): boolean {
 
 // Discover all table schemas upfront in a single query
 // This is more efficient and reliable than per-table queries
-async function discoverAllSchemas(client: any, tables: string[]): Promise<Record<string, any[]>> {
+async function discoverAllSchemas(client: SupabaseClient, tables: string[]): Promise<Record<string, any[]>> {
   const allSchemas: Record<string, any[]> = {}
 
   // Initialize empty arrays for all tables
@@ -167,8 +168,8 @@ async function discoverAllSchemas(client: any, tables: string[]): Promise<Record
       } else if (error) {
         logger.warn('get_all_table_columns RPC failed:', error.message || error)
       }
-    } catch (rpcError: any) {
-      logger.warn('get_all_table_columns RPC not available:', rpcError.message)
+    } catch (rpcError: unknown) {
+      logger.warn('get_all_table_columns RPC not available:', rpcError instanceof Error ? rpcError.message : String(rpcError))
     }
 
     // METHOD 2: Try exec_sql RPC with information_schema query
@@ -215,8 +216,8 @@ async function discoverAllSchemas(client: any, tables: string[]): Promise<Record
       } else if (result.error) {
         logger.warn('exec_sql for schemas failed:', result.error.message || result.error)
       }
-    } catch (rpcError: any) {
-      logger.warn('exec_sql RPC call failed for schemas:', rpcError.message)
+    } catch (rpcError: unknown) {
+      logger.warn('exec_sql RPC call failed for schemas:', rpcError instanceof Error ? rpcError.message : String(rpcError))
     }
 
     // METHOD 3: Fallback warning - schema discovery failed
@@ -224,7 +225,7 @@ async function discoverAllSchemas(client: any, tables: string[]): Promise<Record
     logger.warn('Re-run lib/db/setup.sql in Supabase to install the backup RPC functions and enable full schema discovery')
 
     return allSchemas
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Critical error in schema discovery:', error)
     return allSchemas
   }
@@ -289,7 +290,7 @@ function getTableSchemaFromCache(
 }
 
 // Get primary key constraints
-async function getTableConstraints(client: any, tableName: string, validTables: string[]) {
+async function getTableConstraints(client: SupabaseClient, tableName: string, validTables: string[]) {
   // Security: Validate tableName against whitelist before using in SQL
   if (!isValidTableName(tableName, validTables)) {
     logger.warn(`Invalid table name rejected for constraints: ${tableName}`)
@@ -321,7 +322,7 @@ async function getTableConstraints(client: any, tableName: string, validTables: 
       if (!constraintsResult.error && constraintsResult.data) {
         constraints = constraintsResult.data
       }
-    } catch (rpcError: any) {
+    } catch (_rpcError: unknown) {
       logger.info(`exec_sql not available for constraints on ${tableName}, skipping constraint discovery`)
     }
 
@@ -555,9 +556,9 @@ export async function POST(req: NextRequest) {
         tableConstraints[table] = constraints
 
         logger.info(`Exported ${table}: ${allData.length} rows`)
-      } catch (tableError: any) {
+      } catch (tableError: unknown) {
         logger.error(`Error exporting table ${table}:`, tableError)
-        errors.push(`Error exporting ${table}: ${tableError.message}`)
+        errors.push(`Error exporting ${table}: ${tableError instanceof Error ? tableError.message : String(tableError)}`)
       }
     }
     
@@ -814,7 +815,7 @@ export async function POST(req: NextRequest) {
       }
     })
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error('Export error:', error)
     return NextResponse.json(
       { error: safeErrorResponse(error) },
