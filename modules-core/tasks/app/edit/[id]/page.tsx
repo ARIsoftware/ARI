@@ -20,7 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { useState, useEffect } from "react"
 import { getTasks, updateTask, type Task } from "@/modules/tasks/lib/utils"
 import { getGoals, type Goal } from "@/lib/goals"
-interface MajorProject { id: string; project_name: string; [key: string]: any }
+import type { MajorProject } from "@/modules/tasks/types"
 import { useModuleEnabled } from "@/lib/modules/module-hooks"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"

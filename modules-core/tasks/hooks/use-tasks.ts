@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { Task } from '@/lib/supabase'
+import type { Task } from '@/modules/tasks/types'
 
 // Input types for mutations
 export type CreateTaskInput = Omit<Task, 'id' | 'created_at' | 'updated_at' | 'order_index'>

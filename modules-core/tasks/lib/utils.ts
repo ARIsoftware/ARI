@@ -1,4 +1,4 @@
-import { type Task } from "@/lib/supabase"
+import { type Task } from "@/modules/tasks/types"
 import { incrementTaskCompletion } from "@/lib/fitness-stats"
 
 // Helper function to create authenticated fetch requests

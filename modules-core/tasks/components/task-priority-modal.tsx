@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Task } from "@/lib/supabase"
+import type { Task } from "@/modules/tasks/types"
 import {
   Dialog,
   DialogContent,

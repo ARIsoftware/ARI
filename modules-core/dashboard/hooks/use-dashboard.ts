@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import type { ActivityItem } from '../types'
 
 interface Quote {
   id: string
@@ -18,14 +19,6 @@ interface Contact {
   id: string
   name: string
   created_at: string
-}
-
-interface ActivityItem {
-  id: string
-  type: 'task_created' | 'task_completed' | 'contact_added'
-  title: string
-  description: string
-  timestamp: string
 }
 
 /**

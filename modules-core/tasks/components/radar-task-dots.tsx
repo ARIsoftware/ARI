@@ -1,6 +1,6 @@
 "use client"
 
-import { Task } from "@/lib/supabase"
+import type { Task } from "@/modules/tasks/types"
 import { transformTaskForRadar } from "../lib/priority-utils"
 
 interface RadarTaskDotsProps {

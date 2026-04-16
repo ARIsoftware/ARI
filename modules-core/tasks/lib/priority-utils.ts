@@ -1,4 +1,4 @@
-import { Task } from "@/lib/supabase"
+import type { Task } from "@/modules/tasks/types"
 
 export type TaskAxes = {
   impact: number      // 1-5: Higher is better
