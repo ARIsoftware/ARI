@@ -439,7 +439,7 @@ export default function WelcomePage() {
   if (!showOnboarding) {
     return (
       <div
-        className="min-h-screen bg-[#f9fafe]"
+        className="min-h-screen bg-white"
         style={{ padding: '70px 0 0 70px' }}
       >
         {/* Typed lines */}
@@ -485,7 +485,7 @@ export default function WelcomePage() {
       {/* Black bar at top */}
       <div className="w-full h-[45px] bg-black fixed top-0 left-0 z-50" />
       <div
-        className="min-h-screen bg-[#f9fafe] overflow-y-auto flex items-start justify-center px-8 pt-20 pb-12"
+        className="min-h-screen bg-white overflow-y-auto flex items-start justify-center px-8 pt-20 pb-12"
         style={{ paddingTop: 'calc(80px + 45px)' }}
       >
         <div style={{ width: '864px', maxWidth: '100%' }}>
