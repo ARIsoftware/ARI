@@ -125,7 +125,7 @@ export interface UpdateSettingsResponse {
  */
 export interface ApiErrorResponse {
   error: string
-  details?: any
+  details?: unknown
 }
 
 /**
@@ -138,9 +138,9 @@ export interface ApiErrorResponse {
  *    - Avoid 'any' types
  *
  * 2. Database Types:
- *    - Match Supabase column types
+ *    - Keep in sync with the Drizzle schema in `database/schema.ts`
  *    - Use string for UUIDs (not number)
- *    - Use string for timestamps (ISO format)
+ *    - Use string for ISO timestamps (mode: 'string' on timestamp columns)
  *    - Optional fields marked with ?
  *
  * 3. API Types:
