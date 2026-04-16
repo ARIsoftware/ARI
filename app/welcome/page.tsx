@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
@@ -21,6 +21,14 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { StepIndicator } from "./components/step-indicator"
 import { CodeBlock } from "./components/code-block"
+import { renderEnvFile } from "@/lib/env-file"
+import {
+  welcomeEmailSchema,
+  adminPasswordSchema,
+  profileFieldSchemas,
+  firstZodError,
+  type ProfileFieldName,
+} from "@/lib/validation"
 
 // Common timezones (shared with settings page)
 const COMMON_TIMEZONES = [
@@ -116,7 +124,8 @@ export default function WelcomePage() {
   const [profileSaved, setProfileSaved] = useState(false)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [adminConfirmPassword, setAdminConfirmPassword] = useState("")
-  const [adminPasswordError, setAdminPasswordError] = useState("")
+  const [adminStepError, setAdminStepError] = useState("")
+  const [profileErrors, setProfileErrors] = useState<Partial<Record<ProfileFieldName, string>>>({})
 
   // Rehydrate the post-save state across the Fast Refresh reload that fires
   // when /api/download-env writes .env.local. Without this the React state
@@ -163,23 +172,92 @@ export default function WelcomePage() {
     loadProfile()
   }, [currentTab])
 
+  // Blank input counts as "not filled in" (the whole Personal step is optional).
+  const validateProfileField = (field: ProfileFieldName, value: string): string | null => {
+    if (value.trim() === '') return null
+    return firstZodError(profileFieldSchemas[field], value)
+  }
+
+  const clearProfileError = (field: ProfileFieldName) => {
+    setProfileErrors(prev => {
+      if (!prev[field]) return prev
+      const { [field]: _removed, ...rest } = prev
+      return rest
+    })
+  }
+
   const handleProfileChange = (field: string, value: string) => {
     setProfileData(prev => ({ ...prev, [field]: value }))
     setProfileSaved(false)
+    if (field in profileFieldSchemas) {
+      clearProfileError(field as ProfileFieldName)
+    }
+  }
+
+  const handleProfileBlur = (field: ProfileFieldName) => {
+    const err = validateProfileField(field, profileData[field] ?? '')
+    if (err) {
+      setProfileErrors(prev => ({ ...prev, [field]: err }))
+    } else {
+      clearProfileError(field)
+    }
+  }
+
+  const validateAllProfileFields = (): boolean => {
+    const errors: Partial<Record<ProfileFieldName, string>> = {}
+    for (const field of Object.keys(profileFieldSchemas) as ProfileFieldName[]) {
+      const err = validateProfileField(field, profileData[field] ?? '')
+      if (err) errors[field] = err
+    }
+    setProfileErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const handleAdminContinue = () => {
+    const effectiveEmail = formData.adminEmail || profileData.email
+    // Skipping the step (all three fields blank) is allowed.
+    if (effectiveEmail || formData.adminPassword || adminConfirmPassword) {
+      const emailError = firstZodError(welcomeEmailSchema, effectiveEmail)
+      if (emailError) {
+        setAdminStepError(`Email: ${emailError}`)
+        return
+      }
+      const pwError = firstZodError(adminPasswordSchema, formData.adminPassword)
+      if (pwError) {
+        setAdminStepError(pwError)
+        return
+      }
+      if (formData.adminPassword !== adminConfirmPassword) {
+        setAdminStepError("Passwords do not match.")
+        return
+      }
+    }
+    // Normalize to match what the server-side schema does (trim + lowercase).
+    const normalized = effectiveEmail ? effectiveEmail.trim().toLowerCase() : ''
+    if (normalized && normalized !== formData.adminEmail) {
+      setFormData(prev => ({ ...prev, adminEmail: normalized }))
+    }
+    setAdminStepError("")
+    goToNextStep()
   }
 
   const handleProfileSave = async (): Promise<boolean> => {
+    if (!validateAllProfileFields()) return false
     setIsSavingProfile(true)
     try {
-      // Save to localStorage — the settings page will sync to DB on first authenticated load
+      // /settings syncs this to the DB on first authenticated load.
+      const clean = (v: string) => {
+        const s = v.trim()
+        return s === '' ? null : s
+      }
       localStorage.setItem('ari_welcome_profile', JSON.stringify({
-        name: profileData.name || null,
-        email: profileData.email || null,
-        title: profileData.title || null,
-        company_name: profileData.company_name || null,
-        country: profileData.country || null,
-        city: profileData.city || null,
-        linkedin_url: profileData.linkedin_url || null,
+        name: clean(profileData.name),
+        email: clean(profileData.email),
+        title: clean(profileData.title),
+        company_name: clean(profileData.company_name),
+        country: clean(profileData.country),
+        city: clean(profileData.city),
+        linkedin_url: clean(profileData.linkedin_url),
         timezone: profileData.timezone,
         _savedAt: Date.now(),
       }))
@@ -283,78 +361,28 @@ export default function WelcomePage() {
     allLines.push(currentLineText)
   }
 
-  const generateEnvFileContent = () => {
-    const lines: string[] = []
+  // Env values written to .env.local — driven by whatever the user typed.
+  // Memoized so the preview `<CodeBlock>` below doesn't re-render on every
+  // unrelated state change (typewriter ticks, tab switches, focus events).
+  const envFields = useMemo(
+    () => ({
+      betterAuthSecret: formData.betterAuthSecret,
+      databaseUrl: formData.databaseUrl,
+      supabaseUrl: formData.supabaseUrl,
+      supabaseAnonKey: formData.supabaseAnonKey,
+      supabaseSecretKey: formData.supabaseSecretKey,
+      adminEmail: formData.adminEmail,
+      adminPassword: formData.adminPassword,
+      resendApiKey: formData.resendApiKey,
+      resendWebhookSecret: formData.resendWebhookSecret,
+    }),
+    [formData],
+  )
 
-    lines.push("# ARI Application Environment Configuration")
-    lines.push("# Generated by onboarding wizard")
-    lines.push("")
-
-    lines.push("## Set this to localhost. On your host (e.g., Vercel) set it to your domain name.")
-    lines.push("NEXT_PUBLIC_APP_URL=http://localhost:3000")
-    lines.push("")
-
-    lines.push("# Better Auth Configuration (Required)")
-    lines.push(`BETTER_AUTH_SECRET=${formData.betterAuthSecret}`)
-    lines.push("BETTER_AUTH_URL=http://localhost:3000")
-    lines.push("")
-
-    if (localSupabaseDetected && !formData.databaseUrl) {
-      lines.push("# Supabase: Using local Supabase (configured via .env.supabase.local)")
-      lines.push("# To use a remote Supabase instance, add DATABASE_URL, NEXT_PUBLIC_SUPABASE_URL,")
-      lines.push("# NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, and SUPABASE_SECRET_KEY here.")
-      lines.push("")
-    } else {
-      lines.push("## PRODUCTION SUPABASE")
-      lines.push(`DATABASE_URL=${formData.databaseUrl}`)
-      lines.push("DATABASE_POOL_MAX=3")
-      lines.push(`NEXT_PUBLIC_SUPABASE_URL=${formData.supabaseUrl}`)
-      lines.push(`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${formData.supabaseAnonKey}`)
-      lines.push(`SUPABASE_SECRET_KEY=${formData.supabaseSecretKey}`)
-      lines.push("")
-    }
-
-    lines.push("# Allow the user to take manual backups on the /settings page.")
-    lines.push("# Default: true")
-    lines.push("ALLOW_BACKUP_OPERATIONS=true")
-    lines.push("")
-
-    lines.push("## Optional: Pre-fill the license key for module activation.")
-    lines.push("## If set, users won't need to manually enter it in the UI.")
-    lines.push("ARI_LICENSE_KEY=")
-    lines.push("")
-
-    lines.push("## Optionally restrict Access to specific IP addresses.")
-    lines.push("## Example: ALLOWED_IPS=1.1.1.1,8.8.8.8")
-    lines.push("## 127.0.0.1 and localhost and ::1 are always allowed.")
-    lines.push("ALLOWED_IPS=")
-    lines.push("")
-
-    lines.push("# Top Bar Customization (optional)")
-    lines.push("# NEXT_PUBLIC_TOP_BAR_MESSAGE=\"Custom Message\"")
-    lines.push("# NEXT_PUBLIC_TOP_BAR_COLOR=\"#c00\"")
-    lines.push("")
-
-    if (formData.adminEmail.trim() && formData.adminPassword.trim()) {
-      lines.push("# Initial Admin Account (First-Run Bootstrap)")
-      lines.push("# These credentials are used ONLY to create your admin account when the user table is empty.")
-      lines.push("# After your account is created on first run, you can safely delete these two lines.")
-      lines.push(`ARI_FIRST_RUN_ADMIN_EMAIL=${formData.adminEmail}`)
-      lines.push(`ARI_FIRST_RUN_ADMIN_PASSWORD=${formData.adminPassword}`)
-      lines.push("")
-    }
-
-    if (formData.resendApiKey.trim()) {
-      lines.push("# Resend Email Service")
-      lines.push(`RESEND_API_KEY=${formData.resendApiKey}`)
-      if (formData.resendWebhookSecret.trim()) {
-        lines.push(`RESEND_WEBHOOK_SECRET=${formData.resendWebhookSecret}`)
-      }
-      lines.push("")
-    }
-
-    return lines.join("\n")
-  }
+  const envFileContent = useMemo(
+    () => renderEnvFile(envFields, { localSupabaseDetected }),
+    [envFields, localSupabaseDetected],
+  )
 
   const [projectDir, setProjectDir] = useState<string | null>(null)
   const [envFileExists, setEnvFileExists] = useState(false)
@@ -369,24 +397,38 @@ export default function WelcomePage() {
       return
     }
 
-    const content = generateEnvFileContent()
-
     try {
       setEnvSaveStatus('saving')
       setEnvSaveError(null)
       const res = await fetch("/api/download-env", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ ...envFields, localSupabaseDetected }),
       })
-      const data = await res.json()
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Failed to save file")
+      // Server can return non-JSON on hard errors (dev-mode error pages, proxy
+      // failures, etc.) — fall back to raw text so the user gets something useful.
+      const rawBody = await res.text()
+      let data: Record<string, unknown> = {}
+      try {
+        data = rawBody ? JSON.parse(rawBody) : {}
+      } catch {
+        // non-JSON body
       }
-      setEnvSavedPath(data.path)
+      if (!res.ok || !data.success) {
+        const details = Array.isArray(data.details) ? data.details : []
+        const first = details[0] as { path?: string; message?: string } | undefined
+        const detail = first?.message ? `${first.path || 'value'}: ${first.message}` : null
+        throw new Error(
+          detail ||
+            (typeof data.error === 'string' ? data.error : null) ||
+            rawBody.slice(0, 200) ||
+            `HTTP ${res.status}`,
+        )
+      }
+      setEnvSavedPath(typeof data.path === 'string' ? data.path : null)
       setEnvSaveStatus('saved')
       // Persist so the wizard rehydrates to this state after Next.js's
-      // Fast Refresh reload (which is unavoidable when .env.local is written).
+      // Fast Refresh reload (unavoidable when .env.local is written).
       sessionStorage.setItem('ari:welcome:saved', '1')
     } catch (err) {
       setEnvSaveStatus('error')
@@ -505,9 +547,15 @@ export default function WelcomePage() {
                             id="welcome-name"
                             value={profileData.name}
                             onChange={(e) => handleProfileChange('name', e.target.value)}
+                            onBlur={() => handleProfileBlur('name')}
                             placeholder="Your full name"
                             className="border-zinc-200"
+                            maxLength={255}
+                            aria-invalid={!!profileErrors.name}
                           />
+                          {profileErrors.name && (
+                            <p className="text-xs text-red-600">{profileErrors.name}</p>
+                          )}
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="welcome-email" className="text-zinc-900 font-medium">Email</Label>
@@ -516,9 +564,15 @@ export default function WelcomePage() {
                             type="email"
                             value={profileData.email}
                             onChange={(e) => handleProfileChange('email', e.target.value)}
+                            onBlur={() => handleProfileBlur('email')}
                             placeholder="your@email.com"
                             className="border-zinc-200"
+                            maxLength={254}
+                            aria-invalid={!!profileErrors.email}
                           />
+                          {profileErrors.email && (
+                            <p className="text-xs text-red-600">{profileErrors.email}</p>
+                          )}
                         </div>
                       </div>
 
@@ -528,9 +582,15 @@ export default function WelcomePage() {
                           id="welcome-title"
                           value={profileData.title}
                           onChange={(e) => handleProfileChange('title', e.target.value)}
+                          onBlur={() => handleProfileBlur('title')}
                           placeholder="Your job title"
                           className="border-zinc-200"
+                          maxLength={255}
+                          aria-invalid={!!profileErrors.title}
                         />
+                        {profileErrors.title && (
+                          <p className="text-xs text-red-600">{profileErrors.title}</p>
+                        )}
                       </div>
 
                       <div className="space-y-2">
@@ -539,9 +599,15 @@ export default function WelcomePage() {
                           id="welcome-company"
                           value={profileData.company_name}
                           onChange={(e) => handleProfileChange('company_name', e.target.value)}
+                          onBlur={() => handleProfileBlur('company_name')}
                           placeholder="Your company name"
                           className="border-zinc-200"
+                          maxLength={255}
+                          aria-invalid={!!profileErrors.company_name}
                         />
+                        {profileErrors.company_name && (
+                          <p className="text-xs text-red-600">{profileErrors.company_name}</p>
+                        )}
                       </div>
 
                       <div className="grid gap-4 sm:grid-cols-2">
@@ -551,9 +617,15 @@ export default function WelcomePage() {
                             id="welcome-country"
                             value={profileData.country}
                             onChange={(e) => handleProfileChange('country', e.target.value)}
+                            onBlur={() => handleProfileBlur('country')}
                             placeholder="Your country"
                             className="border-zinc-200"
+                            maxLength={100}
+                            aria-invalid={!!profileErrors.country}
                           />
+                          {profileErrors.country && (
+                            <p className="text-xs text-red-600">{profileErrors.country}</p>
+                          )}
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="welcome-city" className="text-zinc-900 font-medium">City</Label>
@@ -561,9 +633,15 @@ export default function WelcomePage() {
                             id="welcome-city"
                             value={profileData.city}
                             onChange={(e) => handleProfileChange('city', e.target.value)}
+                            onBlur={() => handleProfileBlur('city')}
                             placeholder="Your city"
                             className="border-zinc-200"
+                            maxLength={100}
+                            aria-invalid={!!profileErrors.city}
                           />
+                          {profileErrors.city && (
+                            <p className="text-xs text-red-600">{profileErrors.city}</p>
+                          )}
                         </div>
                       </div>
 
@@ -571,11 +649,18 @@ export default function WelcomePage() {
                         <Label htmlFor="welcome-linkedin" className="text-zinc-900 font-medium">LinkedIn URL</Label>
                         <Input
                           id="welcome-linkedin"
+                          type="url"
                           value={profileData.linkedin_url}
                           onChange={(e) => handleProfileChange('linkedin_url', e.target.value)}
+                          onBlur={() => handleProfileBlur('linkedin_url')}
                           placeholder="https://linkedin.com/in/yourprofile"
                           className="border-zinc-200"
+                          maxLength={500}
+                          aria-invalid={!!profileErrors.linkedin_url}
                         />
+                        {profileErrors.linkedin_url && (
+                          <p className="text-xs text-red-600">{profileErrors.linkedin_url}</p>
+                        )}
                       </div>
 
                       <div className="space-y-2">
@@ -671,6 +756,8 @@ export default function WelcomePage() {
                           onChange={(e) => setFormData(prev => ({ ...prev, adminEmail: e.target.value }))}
                           placeholder="admin@example.com"
                           className="border-zinc-200"
+                          maxLength={254}
+                          autoComplete="email"
                         />
                         <p className="text-xs text-zinc-500">This will be your sign-in email address.</p>
                       </div>
@@ -683,13 +770,15 @@ export default function WelcomePage() {
                           value={formData.adminPassword}
                           onChange={(e) => {
                             setFormData(prev => ({ ...prev, adminPassword: e.target.value }))
-                            setAdminPasswordError("")
+                            setAdminStepError("")
                           }}
                           placeholder="Enter a strong password"
                           className="border-zinc-200"
                           minLength={18}
+                          maxLength={256}
+                          autoComplete="new-password"
                         />
-                        <p className="text-xs text-zinc-500">Minimum 18 characters required.</p>
+                        <p className="text-xs text-zinc-500">18–256 characters. Any printable characters allowed (letters, digits, symbols, emoji).</p>
                       </div>
 
                       <div className="space-y-2">
@@ -700,17 +789,19 @@ export default function WelcomePage() {
                           value={adminConfirmPassword}
                           onChange={(e) => {
                             setAdminConfirmPassword(e.target.value)
-                            setAdminPasswordError("")
+                            setAdminStepError("")
                           }}
                           placeholder="Confirm your password"
                           className="border-zinc-200"
+                          maxLength={256}
+                          autoComplete="new-password"
                         />
                       </div>
 
-                      {adminPasswordError && (
+                      {adminStepError && (
                         <Alert variant="destructive">
                           <AlertCircle className="h-4 w-4" />
-                          <AlertDescription>{adminPasswordError}</AlertDescription>
+                          <AlertDescription>{adminStepError}</AlertDescription>
                         </Alert>
                       )}
 
@@ -734,26 +825,7 @@ export default function WelcomePage() {
                           Skip this step
                         </button>
                         <button
-                          onClick={() => {
-                            const effectiveEmail = formData.adminEmail || profileData.email
-                            // Validate only if user has entered credentials
-                            if (effectiveEmail && formData.adminPassword) {
-                              if (formData.adminPassword.length < 18) {
-                                setAdminPasswordError("Password must be at least 18 characters.")
-                                return
-                              }
-                              if (formData.adminPassword !== adminConfirmPassword) {
-                                setAdminPasswordError("Passwords do not match.")
-                                return
-                              }
-                            }
-                            // Persist the effective email to formData
-                            if (!formData.adminEmail && profileData.email) {
-                              setFormData(prev => ({ ...prev, adminEmail: profileData.email }))
-                            }
-                            setAdminPasswordError("")
-                            goToNextStep()
-                          }}
+                          onClick={handleAdminContinue}
                           className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
                           style={{ borderRadius: '6px' }}
                         >
@@ -1718,7 +1790,7 @@ export default function WelcomePage() {
                   {/* .env.local preview */}
                   <CodeBlock
                     language="env"
-                    code={generateEnvFileContent()}
+                    code={envFileContent}
                   />
 
                   {/* Overwrite confirmation */}

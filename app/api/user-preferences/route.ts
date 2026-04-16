@@ -4,17 +4,17 @@ import { z } from 'zod'
 import { userPreferences } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { toSnakeCase } from '@/lib/api-helpers'
+import { profileFieldSchemas, emptyToNull } from '@/lib/validation'
 
-// Validation schema for user preferences
 const userPreferencesSchema = z.object({
-  name: z.string().max(255).optional().nullable(),
-  email: z.string().max(255).optional().nullable(),
-  title: z.string().max(255).optional().nullable(),
-  company_name: z.string().max(255).optional().nullable(),
-  country: z.string().max(100).optional().nullable(),
-  city: z.string().max(100).optional().nullable(),
-  linkedin_url: z.string().max(500).optional().nullable(),
-  timezone: z.string().max(50).optional(),
+  name: emptyToNull(profileFieldSchemas.name),
+  email: emptyToNull(profileFieldSchemas.email),
+  title: emptyToNull(profileFieldSchemas.title),
+  company_name: emptyToNull(profileFieldSchemas.company_name),
+  country: emptyToNull(profileFieldSchemas.country),
+  city: emptyToNull(profileFieldSchemas.city),
+  linkedin_url: emptyToNull(profileFieldSchemas.linkedin_url),
+  timezone: z.string().trim().max(50).optional(),
 })
 
 function getErrorMessage(error: unknown): string {

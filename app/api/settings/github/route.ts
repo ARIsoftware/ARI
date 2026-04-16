@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { readFile, writeFile, copyFile, access } from "fs/promises"
 import path from "path"
 import { getAuthenticatedUser } from "@/lib/auth-helpers"
+import { upsertEnvVars } from "@/lib/env-file"
 
 /**
  * GET: Return current GitHub Sync configuration (owner + repo name + whether a token is set).
@@ -92,60 +93,3 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ success: true })
 }
 
-/**
- * Upsert KEY=VALUE pairs in a dotenv-format string. When a key is set to null,
- * remove the existing line (if any). Values are quoted with double quotes and
- * embedded quotes/backslashes are escaped to keep the file parseable.
- */
-function upsertEnvVars(source: string, updates: Record<string, string | null>): string {
-  const lines = source.split(/\r?\n/)
-  const seen = new Set<string>()
-
-  const result: string[] = []
-  for (const line of lines) {
-    const match = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=/)
-    if (match && Object.prototype.hasOwnProperty.call(updates, match[1])) {
-      const key = match[1]
-      seen.add(key)
-      const nextValue = updates[key]
-      if (nextValue === null) {
-        // Drop the line
-        continue
-      }
-      result.push(`${key}=${formatEnvValue(nextValue)}`)
-      continue
-    }
-    result.push(line)
-  }
-
-  // Append any keys that didn't exist in the file yet
-  const appended: string[] = []
-  for (const [key, value] of Object.entries(updates)) {
-    if (seen.has(key) || value === null) continue
-    appended.push(`${key}=${formatEnvValue(value)}`)
-  }
-
-  if (appended.length > 0) {
-    // Ensure exactly one blank line separating new block from previous content
-    while (result.length > 0 && result[result.length - 1].trim() === "") {
-      result.pop()
-    }
-    if (result.length > 0) {
-      result.push("")
-    }
-    result.push(...appended)
-  }
-
-  // Preserve a single trailing newline
-  let output = result.join("\n")
-  if (!output.endsWith("\n")) output += "\n"
-  return output
-}
-
-function formatEnvValue(value: string): string {
-  if (value === "") return ""
-  // If value has no spaces, #, or quotes, write raw
-  if (/^[A-Za-z0-9_\-./:@]+$/.test(value)) return value
-  const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
-  return `"${escaped}"`
-}

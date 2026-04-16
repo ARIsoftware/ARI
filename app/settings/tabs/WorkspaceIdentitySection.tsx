@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { User, Info, Loader2, Save, Check } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { profileFieldSchemas, firstZodError, type ProfileFieldName } from "@/lib/validation"
 
 // Common timezones for the dropdown
 const COMMON_TIMEZONES = [
@@ -145,11 +146,11 @@ export function WorkspaceIdentitySection(): React.ReactElement {
 
   const validateForm = (): boolean => {
     const errors: Partial<Record<keyof UserPreferencesData, string>> = {}
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      errors.email = 'Please enter a valid email address'
-    }
-    if (formData.linkedin_url && !formData.linkedin_url.startsWith('http')) {
-      errors.linkedin_url = 'Please enter a valid URL starting with https://'
+    for (const [field, schema] of Object.entries(profileFieldSchemas) as Array<[ProfileFieldName, (typeof profileFieldSchemas)[ProfileFieldName]]>) {
+      const value = formData[field]
+      if (!value || value.trim() === '') continue
+      const err = firstZodError(schema, value)
+      if (err) errors[field] = err
     }
     setFieldErrors(errors)
     return Object.keys(errors).length === 0
@@ -235,7 +236,10 @@ export function WorkspaceIdentitySection(): React.ReactElement {
                 value={formData.name}
                 onChange={(e) => handleChange('name', e.target.value)}
                 placeholder="Your full name"
+                maxLength={255}
+                className={fieldErrors.name ? 'border-red-500 focus-visible:ring-red-500' : ''}
               />
+              {fieldErrors.name && <p className="text-sm text-red-500">{fieldErrors.name}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="profile-email">Email</Label>
@@ -245,6 +249,7 @@ export function WorkspaceIdentitySection(): React.ReactElement {
                 value={formData.email}
                 onChange={(e) => handleChange('email', e.target.value)}
                 placeholder="your@email.com"
+                maxLength={254}
                 className={fieldErrors.email ? 'border-red-500 focus-visible:ring-red-500' : ''}
               />
               {fieldErrors.email && <p className="text-sm text-red-500">{fieldErrors.email}</p>}
@@ -258,7 +263,10 @@ export function WorkspaceIdentitySection(): React.ReactElement {
               value={formData.title}
               onChange={(e) => handleChange('title', e.target.value)}
               placeholder="Your job title"
+              maxLength={255}
+              className={fieldErrors.title ? 'border-red-500 focus-visible:ring-red-500' : ''}
             />
+            {fieldErrors.title && <p className="text-sm text-red-500">{fieldErrors.title}</p>}
           </div>
 
           <div className="space-y-2">
@@ -268,7 +276,10 @@ export function WorkspaceIdentitySection(): React.ReactElement {
               value={formData.company_name}
               onChange={(e) => handleChange('company_name', e.target.value)}
               placeholder="Your company name"
+              maxLength={255}
+              className={fieldErrors.company_name ? 'border-red-500 focus-visible:ring-red-500' : ''}
             />
+            {fieldErrors.company_name && <p className="text-sm text-red-500">{fieldErrors.company_name}</p>}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -279,7 +290,10 @@ export function WorkspaceIdentitySection(): React.ReactElement {
                 value={formData.country}
                 onChange={(e) => handleChange('country', e.target.value)}
                 placeholder="Your country"
+                maxLength={100}
+                className={fieldErrors.country ? 'border-red-500 focus-visible:ring-red-500' : ''}
               />
+              {fieldErrors.country && <p className="text-sm text-red-500">{fieldErrors.country}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="profile-city">City</Label>
@@ -288,7 +302,10 @@ export function WorkspaceIdentitySection(): React.ReactElement {
                 value={formData.city}
                 onChange={(e) => handleChange('city', e.target.value)}
                 placeholder="Your city"
+                maxLength={100}
+                className={fieldErrors.city ? 'border-red-500 focus-visible:ring-red-500' : ''}
               />
+              {fieldErrors.city && <p className="text-sm text-red-500">{fieldErrors.city}</p>}
             </div>
           </div>
 
@@ -296,9 +313,11 @@ export function WorkspaceIdentitySection(): React.ReactElement {
             <Label htmlFor="profile-linkedin">LinkedIn URL</Label>
             <Input
               id="profile-linkedin"
+              type="url"
               value={formData.linkedin_url}
               onChange={(e) => handleChange('linkedin_url', e.target.value)}
               placeholder="https://linkedin.com/in/yourprofile"
+              maxLength={500}
               className={fieldErrors.linkedin_url ? 'border-red-500 focus-visible:ring-red-500' : ''}
             />
             {fieldErrors.linkedin_url && <p className="text-sm text-red-500">{fieldErrors.linkedin_url}</p>}

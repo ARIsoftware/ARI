@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import fs from 'fs'
+import { access, rename, writeFile } from 'fs/promises'
 import path from 'path'
 import { checkRateLimit, getClientIp } from '@/lib/modules/public-route-security'
 import { requireAuthIfUsersExist } from '@/lib/auth-helpers'
+import { welcomeEnvSaveRequestSchema, flattenZodErrors } from '@/lib/validation'
+import { renderEnvFile } from '@/lib/env-file'
 
 export const debugRole = "onboarding-save-env"
 // Public during setup — guarded below by user-count check
@@ -29,21 +31,36 @@ export async function POST(request: NextRequest) {
   if (denied) return denied
 
   try {
-    const { content } = await request.json()
-    if (!content || typeof content !== 'string') {
-      return NextResponse.json({ error: 'content is required' }, { status: 400 })
+    let body: unknown
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     }
+
+    const parsed = welcomeEnvSaveRequestSchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid input', details: flattenZodErrors(parsed.error) },
+        { status: 400 }
+      )
+    }
+
+    const { localSupabaseDetected, ...fields } = parsed.data
+    const content = renderEnvFile(fields, { localSupabaseDetected })
 
     const envPath = path.join(process.cwd(), '.env.local')
 
-    // Back up existing file before overwriting
-    if (fs.existsSync(envPath)) {
+    try {
+      await access(envPath)
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
       const backupPath = path.join(process.cwd(), `.env.local.${timestamp}`)
-      fs.renameSync(envPath, backupPath)
+      await rename(envPath, backupPath)
+    } catch {
+      // No existing file to back up
     }
 
-    fs.writeFileSync(envPath, content, 'utf-8')
+    await writeFile(envPath, content, 'utf-8')
 
     return NextResponse.json({ success: true, path: envPath })
   } catch (error: unknown) {
