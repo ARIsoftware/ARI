@@ -127,3 +127,45 @@ export interface ApiErrorResponse {
   error: string
   details?: any
 }
+
+/**
+ * DEVELOPER NOTES:
+ *
+ * 1. Type Safety:
+ *    - Export all types used in API and components
+ *    - Keep types in sync with database schema
+ *    - Use strict TypeScript settings
+ *    - Avoid 'any' types
+ *
+ * 2. Database Types:
+ *    - Match Supabase column types
+ *    - Use string for UUIDs (not number)
+ *    - Use string for timestamps (ISO format)
+ *    - Optional fields marked with ?
+ *
+ * 3. API Types:
+ *    - Separate request and response types
+ *    - Use Partial<T> for partial updates
+ *    - Include error response types
+ *    - Document which endpoint uses which type
+ *
+ * 4. Settings Types:
+ *    - Define complete settings interface
+ *    - Use union types for enums
+ *    - Make all fields optional in partial updates
+ *    - Keep in sync with Zod schemas in API routes
+ *
+ * 5. Exporting:
+ *    - Use named exports (not default)
+ *    - Export all public types
+ *    - Keep internal types private
+ *    - Organize by category
+ *
+ * 6. Usage:
+ *    - Import types in components:
+ *      import { ModuleTemplateEntry } from '../types'
+ *    - Import types in API routes:
+ *      import type { CreateEntryRequest } from '../../types'
+ *    - Import types in other modules:
+ *      import type { ModuleTemplateEntry } from '@/modules/module-template/types'
+ */
