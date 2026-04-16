@@ -132,40 +132,54 @@ export interface ApiErrorResponse {
  * DEVELOPER NOTES:
  *
  * 1. Type Safety:
- *    - Export all types used in API and components
- *    - Keep types in sync with database schema
- *    - Use strict TypeScript settings
- *    - Avoid 'any' types
+ *    - Export every type a consumer (component, hook, other module) reads.
+ *    - Prefer `unknown` over `any` for loose payloads (e.g. `details?: unknown`);
+ *      narrow with `typeof` / `instanceof` / Zod at the boundary.
+ *    - In `catch (error)` blocks, type as `unknown` and use
+ *      `error instanceof Error ? error.message : String(error)`.
+ *    - Keep types in sync with the Drizzle schema in `database/schema.ts`.
  *
  * 2. Database Types:
- *    - Keep in sync with the Drizzle schema in `database/schema.ts`
- *    - Use string for UUIDs (not number)
- *    - Use string for ISO timestamps (mode: 'string' on timestamp columns)
- *    - Optional fields marked with ?
+ *    - Drizzle columns are camelCase in TS (`userId`) but snake_case in
+ *      Postgres (`user_id`). `toSnakeCase()` in the API route converts
+ *      the response, so the shapes declared here (e.g. `ModuleTemplateEntry`)
+ *      should match what the frontend actually receives — snake_case.
+ *    - Use `string` for UUIDs and ISO timestamps (Drizzle timestamp columns
+ *      declare `mode: 'string'` to stay as strings end-to-end).
+ *    - Mark nullable columns with `?` — do not use `| null` unless the
+ *      API intentionally emits `null` instead of omitting the field.
  *
  * 3. API Types:
- *    - Separate request and response types
- *    - Use Partial<T> for partial updates
- *    - Include error response types
- *    - Document which endpoint uses which type
+ *    - Separate request (`CreateEntryRequest`) and response
+ *      (`CreateEntryResponse`) types; they're almost never the same shape.
+ *    - Use `Partial<T>` for PATCH-style updates (see `UpdateSettingsRequest`).
+ *    - Define a shared `ApiErrorResponse` — every route should return the
+ *      same error envelope shape.
+ *    - Comment which endpoint(s) each type maps to so grep can find consumers.
  *
  * 4. Settings Types:
- *    - Define complete settings interface
- *    - Use union types for enums
- *    - Make all fields optional in partial updates
- *    - Keep in sync with Zod schemas in API routes
+ *    - One complete settings interface, all fields required at the type level.
+ *    - Derive request/response shapes via `Partial<T>` — do not hand-write them.
+ *    - Prefer string-literal unions (e.g. `'light' | 'dark' | 'auto'`) over
+ *      `string` — this keeps the Zod schema in the API route and the TS
+ *      type aligned.
+ *    - Provide defaults in the settings panel (`DEFAULT_SETTINGS`) so the
+ *      UI never renders undefined fields.
  *
  * 5. Exporting:
- *    - Use named exports (not default)
- *    - Export all public types
- *    - Keep internal types private
- *    - Organize by category
+ *    - Named exports only — no default exports.
+ *    - Export everything a hook, component, or other module might consume;
+ *      keep helper/internal types un-exported to mark them as private.
  *
- * 6. Usage:
- *    - Import types in components:
- *      import { ModuleTemplateEntry } from '../types'
- *    - Import types in API routes:
- *      import type { CreateEntryRequest } from '../../types'
- *    - Import types in other modules:
+ * 6. Usage (where these imports live):
+ *    - Component (1 level deep, e.g. `components/widget.tsx`):
+ *      import type { ModuleTemplateEntry } from '../types'
+ *    - Hook (1 level deep, e.g. `hooks/use-module-template.ts`):
+ *      import type { ModuleTemplateEntry } from '../types'
+ *    - API route (2 levels deep, e.g. `api/data/route.ts`) — only needed
+ *      when returning typed shapes. The reference route in this template
+ *      uses Zod + Drizzle directly and does not import from here.
+ *      import type { GetEntriesResponse } from '../../types'
+ *    - Another module:
  *      import type { ModuleTemplateEntry } from '@/modules/module-template/types'
  */
