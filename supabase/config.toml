@@ -117,8 +117,12 @@ file_size_limit = "50MiB"
 # objects_path = "./images"
 
 [auth]
-# Disabled: ARI uses Better Auth instead of Supabase Auth (gotrue).
-enabled = false
+# Kept enabled so `supabase status -o env` emits ANON_KEY and SERVICE_ROLE_KEY
+# (CLI 2.45+ gates all auth key emission behind this flag, including the
+# new PUBLISHABLE_KEY/SECRET_KEY — disabling auth is not a workaround).
+# ARI uses Better Auth for user auth; gotrue runs idle. The keys are consumed by
+# app/api/backup/utils.ts, app/api/test-connection/route.ts, and lib/supabase-auth.ts.
+enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
 site_url = "http://127.0.0.1:3000"
