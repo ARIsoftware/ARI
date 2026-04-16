@@ -14,9 +14,9 @@ export function getGitHubConfig() {
   return { token, owner, repo, branch }
 }
 
-export type GitHubConfig = NonNullable<ReturnType<typeof getGitHubConfig>>
+type GitHubConfig = NonNullable<ReturnType<typeof getGitHubConfig>>
 
-export async function githubApi(endpoint: string, config: GitHubConfig, options: RequestInit = {}) {
+async function githubApi(endpoint: string, config: GitHubConfig, options: RequestInit = {}) {
   const url = `https://api.github.com/repos/${config.owner}/${config.repo}${endpoint}`
   const response = await fetch(url, {
     ...options,
@@ -36,7 +36,7 @@ export async function githubApi(endpoint: string, config: GitHubConfig, options:
 
 const BINARY_EXTENSIONS = /\.(png|jpg|jpeg|gif|ico|webp|bmp|avif|woff|woff2|ttf|otf|eot|pdf|zip|tar|gz|mp3|mp4|wav)$/i
 
-export function collectFiles(dir: string, basePath: string = ''): { path: string; content: string; encoding: 'utf-8' | 'base64' }[] {
+function collectFiles(dir: string, basePath: string = ''): { path: string; content: string; encoding: 'utf-8' | 'base64' }[] {
   const files: { path: string; content: string; encoding: 'utf-8' | 'base64' }[] = []
   const resolvedDir = path.resolve(dir)
   if (!fs.existsSync(resolvedDir)) return files
@@ -139,44 +139,5 @@ export async function commitModuleToGitHub(
     commitSha,
     filesCommitted: files.length,
     message: `Module "${moduleId}" committed to ${config.owner}/${config.repo}@${config.branch}`,
-  }
-}
-
-/**
- * Delete a module's files from GitHub by creating a commit that removes them.
- * Uses the Git Trees API with `sha: null` entries to mark files for deletion.
- */
-export async function deleteModuleFromGitHub(
-  moduleId: string,
-  config: GitHubConfig
-): Promise<{ commitSha: string; filesDeleted: number; message: string }> {
-  const commitPath = `modules-core/${moduleId}/`
-  const { currentSha, baseTreeSha } = await getHeadAndTree(config)
-
-  // Fetch full repo tree to find module files
-  const fullTree = await githubApi(`/git/trees/${baseTreeSha}?recursive=1`, config)
-  const moduleFiles = fullTree.tree.filter(
-    (entry: { path: string; type: string }) =>
-      entry.path.startsWith(commitPath) && entry.type === 'blob'
-  )
-
-  if (moduleFiles.length === 0) {
-    throw new Error(`No files found for module "${moduleId}" in GitHub`)
-  }
-
-  // Create tree entries with sha: null to delete each file
-  const treeEntries = moduleFiles.map((file: { path: string }) => ({
-    path: file.path,
-    mode: '100644' as const,
-    type: 'blob' as const,
-    sha: null,
-  }))
-
-  const commitSha = await commitTree(config, baseTreeSha, treeEntries, currentSha, `Remove module: ${moduleId}`)
-
-  return {
-    commitSha,
-    filesDeleted: moduleFiles.length,
-    message: `Module "${moduleId}" removed from ${config.owner}/${config.repo}@${config.branch}`,
   }
 }

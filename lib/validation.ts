@@ -315,22 +315,6 @@ export const updateShipmentSchema = z.object({
   notes: z.string().max(2000, 'Notes too long').nullable().optional()
 })
 
-// Generic validation utility
-export function validateRequestBody<T>(schema: z.ZodSchema<T>, data: unknown): T {
-  try {
-    return schema.parse(data)
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      const errorMessages = error.errors.map(err => ({
-        field: err.path.join('.'),
-        message: err.message
-      }))
-      throw new ValidationError('Invalid request data', errorMessages)
-    }
-    throw error
-  }
-}
-
 export class ValidationError extends Error {
   public readonly errors: Array<{ field: string; message: string }>
   

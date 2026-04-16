@@ -97,7 +97,3 @@ export const auth = betterAuth({
     nextCookies(),
   ],
 })
-
-// Export types for use in components
-export type Session = typeof auth.$Infer.Session
-export type User = typeof auth.$Infer.Session.user

@@ -39,30 +39,3 @@ export function setSecureCookie(name: string, value: string, options: CookieOpti
   document.cookie = cookieString
 }
 
-/**
- * Gets a cookie value by name
- */
-export function getCookie(name: string): string | null {
-  const encodedName = encodeURIComponent(name)
-  const cookies = document.cookie.split('; ')
-  
-  for (const cookie of cookies) {
-    const [cookieName, ...cookieValueParts] = cookie.split('=')
-    if (cookieName === encodedName) {
-      return decodeURIComponent(cookieValueParts.join('='))
-    }
-  }
-  
-  return null
-}
-
-/**
- * Deletes a cookie by setting it to expire in the past
- */
-export function deleteCookie(name: string, options: Pick<CookieOptions, 'path' | 'domain'> = {}) {
-  setSecureCookie(name, '', {
-    ...options,
-    maxAge: 0,
-    expires: new Date(0)
-  })
-}

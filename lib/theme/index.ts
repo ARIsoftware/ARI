@@ -2,4 +2,4 @@
 export * from './types'
 export * from './presets'
 export * from './fonts'
-export { ThemeProvider, useTheme, useDarkMode } from './theme-context'
+export { ThemeProvider, useTheme } from './theme-context'

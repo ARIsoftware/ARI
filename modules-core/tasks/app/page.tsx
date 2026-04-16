@@ -13,10 +13,9 @@ import { useState, useEffect, useMemo } from "react"
 import { toggleTaskCompletion, toggleTaskPin, reorderTasks, deleteTask, updateTask, type Task } from "../lib/utils"
 import { useTasks } from "../hooks/use-tasks"
 import { useQueryClient } from "@tanstack/react-query"
-interface MajorProject { id: string; project_name: string; [key: string]: any }
+import type { MajorProject } from "../types"
 import { useModuleEnabled } from "@/lib/modules/module-hooks"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/lib/supabase"
 import { useRouter, useSearchParams } from "next/navigation"
 import { schoolPride } from "@/lib/confetti"
 
