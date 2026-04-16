@@ -24,7 +24,7 @@ export function TwoFactorSetup({ twoFactorEnabled: initialEnabled }: { twoFactor
       if ((res.data?.user as any)?.twoFactorEnabled) {
         setStep("enabled")
       }
-    }).catch(() => {})
+    }).catch((err) => console.warn('Failed to check 2FA status:', err))
   }, [initialEnabled])
   const [password, setPassword] = useState("")
   const [totpURI, setTotpURI] = useState("")

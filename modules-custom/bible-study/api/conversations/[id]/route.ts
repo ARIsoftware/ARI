@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       conversation: toSnakeCase(conversation),
-      messages: toSnakeCase(messages) || [],
+      messages: toSnakeCase(messages),
     })
   } catch (error) {
     console.error('GET /api/modules/bible-study/conversations/[id] error:', error instanceof Error ? error.message : error)

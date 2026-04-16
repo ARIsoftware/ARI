@@ -1,7 +1,7 @@
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { tasks } from '@/lib/db/schema'
 import { desc } from 'drizzle-orm'
-import { Task } from '@/lib/supabase'
+import type { Task } from '@/modules/tasks/types'
 
 export interface TaskContext {
   totalTasks: number
@@ -22,133 +22,104 @@ export interface TaskContext {
 }
 
 export async function getTaskContext(): Promise<TaskContext> {
-  try {
-    const { user, withRLS } = await getAuthenticatedUser()
+  const { user, withRLS } = await getAuthenticatedUser()
 
-    if (!user || !withRLS) {
-      throw new Error('Authentication required')
-    }
-
-    // Fetch all tasks for the authenticated user (RLS filters automatically)
-    const tasksData = await withRLS((db) =>
-      db.select()
-        .from(tasks)
-        .orderBy(desc(tasks.updatedAt))
-    )
-
-    if (!tasksData) {
-      return createEmptyContext()
-    }
-
-    // Map Drizzle results to Task type (snake_case to camelCase mapping)
-    const mappedTasks: Task[] = tasksData.map(t => ({
-      id: t.id,
-      title: t.title,
-      assignees: t.assignees,
-      due_date: t.dueDate,
-      subtasks_completed: t.subtasksCompleted,
-      subtasks_total: t.subtasksTotal,
-      status: t.status,
-      priority: t.priority,
-      pinned: t.pinned,
-      completed: t.completed,
-      created_at: t.createdAt || '',
-      updated_at: t.updatedAt || '',
-      order_index: t.orderIndex,
-      completion_count: t.completionCount,
-      user_email: t.userEmail,
-      user_id: t.userId,
-      impact: t.impact,
-      severity: t.severity,
-      timeliness: t.timeliness,
-      effort: t.effort,
-      strategic_fit: t.strategicFit,
-      priority_score: t.priorityScore,
-      project_id: t.projectId,
-      monster_type: t.monsterType,
-      monster_colors: t.monsterColors,
-    }))
-
-    const now = new Date()
-
-    // Calculate metrics
-    const totalTasks = mappedTasks.length
-    const completedTasks = mappedTasks.filter(t => t.completed).length
-    const pendingTasks = mappedTasks.filter(t => t.status === 'Pending').length
-    const inProgressTasks = mappedTasks.filter(t => t.status === 'In Progress').length
-
-    const highPriorityTasks = mappedTasks.filter(t => t.priority === 'High').length
-    const mediumPriorityTasks = mappedTasks.filter(t => t.priority === 'Medium').length
-    const lowPriorityTasks = mappedTasks.filter(t => t.priority === 'Low').length
-
-    const pinnedTasks = mappedTasks.filter(t => t.pinned).length
-    const tasksWithDueDates = mappedTasks.filter(t => t.due_date).length
-
-    // Calculate overdue tasks
-    const overdueTasks = mappedTasks.filter(t => {
-      if (!t.due_date || t.completed) return false
-      return new Date(t.due_date) < now
-    }).length
-
-    // Get recent completions (last 10)
-    const recentCompletions = mappedTasks
-      .filter(t => t.completed)
-      .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-      .slice(0, 10)
-
-    // Get high priority pending tasks
-    const highPriorityPendingTasks = mappedTasks
-      .filter(t => t.priority === 'High' && !t.completed)
-      .slice(0, 5)
-
-    // Calculate completion rate
-    const completionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0
-
-    // Find last completion date
-    const lastCompletionDate = recentCompletions.length > 0
-      ? recentCompletions[0].updated_at
-      : null
-
-    return {
-      totalTasks,
-      completedTasks,
-      pendingTasks,
-      inProgressTasks,
-      highPriorityTasks,
-      mediumPriorityTasks,
-      lowPriorityTasks,
-      pinnedTasks,
-      tasksWithDueDates,
-      overdueTasks,
-      recentCompletions,
-      highPriorityPendingTasks,
-      allTasks: mappedTasks,
-      completionRate: Math.round(completionRate * 100) / 100,
-      lastCompletionDate,
-    }
-  } catch (error) {
-    console.error('Error getting task context:', error)
-    throw error
+  if (!user || !withRLS) {
+    throw new Error('Authentication required')
   }
-}
 
-function createEmptyContext(): TaskContext {
+  // Fetch all tasks for the authenticated user (RLS filters automatically)
+  const tasksData = await withRLS((db) =>
+    db.select()
+      .from(tasks)
+      .orderBy(desc(tasks.updatedAt))
+  )
+
+  // Map Drizzle results to Task type (snake_case to camelCase mapping)
+  const mappedTasks: Task[] = tasksData.map(t => ({
+    id: t.id,
+    title: t.title,
+    assignees: t.assignees,
+    due_date: t.dueDate,
+    subtasks_completed: t.subtasksCompleted,
+    subtasks_total: t.subtasksTotal,
+    status: t.status,
+    priority: t.priority,
+    pinned: t.pinned,
+    completed: t.completed,
+    created_at: t.createdAt || '',
+    updated_at: t.updatedAt || '',
+    order_index: t.orderIndex,
+    completion_count: t.completionCount,
+    user_email: t.userEmail,
+    user_id: t.userId,
+    impact: t.impact,
+    severity: t.severity,
+    timeliness: t.timeliness,
+    effort: t.effort,
+    strategic_fit: t.strategicFit,
+    priority_score: t.priorityScore,
+    project_id: t.projectId,
+    monster_type: t.monsterType,
+    monster_colors: t.monsterColors,
+  }))
+
+  const now = new Date()
+
+  // Calculate metrics
+  const totalTasks = mappedTasks.length
+  const completedTasks = mappedTasks.filter(t => t.completed).length
+  const pendingTasks = mappedTasks.filter(t => t.status === 'Pending').length
+  const inProgressTasks = mappedTasks.filter(t => t.status === 'In Progress').length
+
+  const highPriorityTasks = mappedTasks.filter(t => t.priority === 'High').length
+  const mediumPriorityTasks = mappedTasks.filter(t => t.priority === 'Medium').length
+  const lowPriorityTasks = mappedTasks.filter(t => t.priority === 'Low').length
+
+  const pinnedTasks = mappedTasks.filter(t => t.pinned).length
+  const tasksWithDueDates = mappedTasks.filter(t => t.due_date).length
+
+  // Calculate overdue tasks
+  const overdueTasks = mappedTasks.filter(t => {
+    if (!t.due_date || t.completed) return false
+    return new Date(t.due_date) < now
+  }).length
+
+  // Get recent completions (last 10)
+  const recentCompletions = mappedTasks
+    .filter(t => t.completed)
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+    .slice(0, 10)
+
+  // Get high priority pending tasks
+  const highPriorityPendingTasks = mappedTasks
+    .filter(t => t.priority === 'High' && !t.completed)
+    .slice(0, 5)
+
+  // Calculate completion rate
+  const completionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0
+
+  // Find last completion date
+  const lastCompletionDate = recentCompletions.length > 0
+    ? recentCompletions[0].updated_at
+    : null
+
   return {
-    totalTasks: 0,
-    completedTasks: 0,
-    pendingTasks: 0,
-    inProgressTasks: 0,
-    highPriorityTasks: 0,
-    mediumPriorityTasks: 0,
-    lowPriorityTasks: 0,
-    pinnedTasks: 0,
-    tasksWithDueDates: 0,
-    overdueTasks: 0,
-    recentCompletions: [],
-    highPriorityPendingTasks: [],
-    allTasks: [],
-    completionRate: 0,
-    lastCompletionDate: null,
+    totalTasks,
+    completedTasks,
+    pendingTasks,
+    inProgressTasks,
+    highPriorityTasks,
+    mediumPriorityTasks,
+    lowPriorityTasks,
+    pinnedTasks,
+    tasksWithDueDates,
+    overdueTasks,
+    recentCompletions,
+    highPriorityPendingTasks,
+    allTasks: mappedTasks,
+    completionRate: Math.round(completionRate * 100) / 100,
+    lastCompletionDate,
   }
 }
 

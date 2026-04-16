@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
         .orderBy(desc(bibleStudyWordStudies.createdAt))
     )
 
-    return NextResponse.json({ word_studies: toSnakeCase(entries) || [] })
+    return NextResponse.json({ word_studies: toSnakeCase(entries) })
   } catch (error) {
     console.error('GET /api/modules/bible-study/word-studies error:', error instanceof Error ? error.message : error)
     return createErrorResponse('Internal server error', 500)

@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
         .limit(50)
     )
 
-    return NextResponse.json({ messages: toSnakeCase(messages.reverse()) || [] })
+    return NextResponse.json({ messages: toSnakeCase(messages.reverse()) })
   } catch (error) {
     console.error('GET /api/modules/bible-study/chat error:', error instanceof Error ? error.message : error)
     return createErrorResponse('Internal server error', 500)

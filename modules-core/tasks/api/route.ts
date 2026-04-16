@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
         .limit(1)
     )
 
-    const nextOrderIndex = maxOrderData.length > 0 ? (maxOrderData[0].orderIndex || 0) + 1 : 0
+    const nextOrderIndex = maxOrderData.length > 0 ? (maxOrderData[0].orderIndex ?? 0) + 1 : 0
 
     // Calculate priority score if axes are provided
     let priorityScore: string | undefined = undefined

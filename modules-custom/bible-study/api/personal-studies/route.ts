@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
         .offset(offset)
     )
 
-    return NextResponse.json({ studies: toSnakeCase(entries) || [], count: entries?.length || 0 })
+    return NextResponse.json({ studies: toSnakeCase(entries), count: entries.length })
   } catch (error) {
     console.error('GET /api/modules/bible-study/personal-studies error:', error instanceof Error ? error.message : error)
     return createErrorResponse('Internal server error', 500)

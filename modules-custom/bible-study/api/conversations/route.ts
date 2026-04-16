@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
         .limit(100)
     )
 
-    return NextResponse.json({ conversations: toSnakeCase(conversations) || [] })
+    return NextResponse.json({ conversations: toSnakeCase(conversations) })
   } catch (error) {
     console.error('GET /api/modules/bible-study/conversations error:', error instanceof Error ? error.message : error)
     return createErrorResponse('Internal server error', 500)
