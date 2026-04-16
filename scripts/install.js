@@ -637,13 +637,19 @@ function parseSupabaseEnv(targetDir) {
 function generateEnvFile(targetDir, supabaseVars) {
   const envPath = path.join(targetDir, '.env.supabase.local');
 
-  const envContent = [
-    `NEXT_PUBLIC_SUPABASE_URL=${supabaseVars.API_URL || ''}`,
-    `NEXT_PUBLIC_SUPABASE_ANON_KEY=${supabaseVars.ANON_KEY || ''}`,
-    `SUPABASE_SERVICE_ROLE_KEY=${supabaseVars.SERVICE_ROLE_KEY || ''}`,
-    `DATABASE_URL=${supabaseVars.DB_URL || ''}`,
-    '', // trailing newline
-  ].join('\n');
+  // Only write keys that have values. Writing empty `KEY=` lines causes
+  // dotenv (with override: true in next.config.mjs) to overwrite values from
+  // .env.local with empty strings, which would break the client bundle.
+  const mappings = [
+    ['NEXT_PUBLIC_SUPABASE_URL', supabaseVars.API_URL],
+    ['NEXT_PUBLIC_SUPABASE_ANON_KEY', supabaseVars.ANON_KEY],
+    ['SUPABASE_SERVICE_ROLE_KEY', supabaseVars.SERVICE_ROLE_KEY],
+    ['DATABASE_URL', supabaseVars.DB_URL],
+  ];
+  const envContent = mappings
+    .filter(([, value]) => value)
+    .map(([key, value]) => key + '=' + value)
+    .join('\n') + '\n';
 
   fs.writeFileSync(envPath, envContent);
   return { databaseUrl: supabaseVars.DB_URL };
@@ -727,13 +733,19 @@ function parseSupabaseEnv() {
 
 // SYNC: env key mapping is duplicated in the installer generateEnvFile(). Keep both in sync.
 function writeEnvFile(supabaseVars) {
-  const content = [
-    'NEXT_PUBLIC_SUPABASE_URL=' + (supabaseVars.API_URL || ''),
-    'NEXT_PUBLIC_SUPABASE_ANON_KEY=' + (supabaseVars.ANON_KEY || ''),
-    'SUPABASE_SERVICE_ROLE_KEY=' + (supabaseVars.SERVICE_ROLE_KEY || ''),
-    'DATABASE_URL=' + (supabaseVars.DB_URL || ''),
-    '',
-  ].join('\\n');
+  // Only write keys that have values. Writing empty \`KEY=\` lines causes
+  // dotenv (with override: true in next.config.mjs) to overwrite values from
+  // .env.local with empty strings, which would break the client bundle.
+  const mappings = [
+    ['NEXT_PUBLIC_SUPABASE_URL', supabaseVars.API_URL],
+    ['NEXT_PUBLIC_SUPABASE_ANON_KEY', supabaseVars.ANON_KEY],
+    ['SUPABASE_SERVICE_ROLE_KEY', supabaseVars.SERVICE_ROLE_KEY],
+    ['DATABASE_URL', supabaseVars.DB_URL],
+  ];
+  const content = mappings
+    .filter(([, value]) => value)
+    .map(([key, value]) => key + '=' + value)
+    .join('\\n') + '\\n';
 
   fs.writeFileSync(ENV_FILE, content);
 }
