@@ -387,22 +387,3 @@ export function getLucideIcon(iconName?: string): LucideIcon {
 
   return Icon
 }
-
-/**
- * Validate if an icon name exists in the registry
- *
- * @param iconName - Name to check
- * @returns true if icon exists in registry, false otherwise
- */
-export function isValidLucideIcon(iconName: string): boolean {
-  return iconName in ICON_REGISTRY
-}
-
-/**
- * Get list of all available icon names in the registry
- *
- * @returns Array of icon names
- */
-export function getAllLucideIconNames(): string[] {
-  return Object.keys(ICON_REGISTRY)
-}

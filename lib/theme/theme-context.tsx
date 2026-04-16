@@ -418,30 +418,5 @@ export function useTheme() {
   return context
 }
 
-/**
- * Backward-compatible hook (alias for useTheme with legacy interface)
- */
-export function useDarkMode() {
-  const { activeThemeId, isDarkMode, toggleTheme, toggleDarkMode } = useTheme()
-
-  // Map activeThemeId to the old Theme type
-  type LegacyTheme = 'pastel' | 'dark' | 'blueprint' | 'light'
-  const legacyThemeMap: Record<string, LegacyTheme> = {
-    default: 'pastel',
-    pastel: 'pastel',
-    dark: 'dark',
-    blueprint: 'blueprint',
-    light: 'light',
-  }
-  const theme: LegacyTheme = legacyThemeMap[activeThemeId] || 'pastel'
-
-  return {
-    theme,
-    isDarkMode,
-    toggleTheme,
-    toggleDarkMode,
-  }
-}
-
 // Export presets and fonts for convenience
 export { THEME_PRESETS, FONTS }

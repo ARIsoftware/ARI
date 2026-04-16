@@ -1,7 +1,6 @@
 // API route helpers for validation and error handling
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { ValidationError } from './validation'
 
 /**
  * Validates request JSON body against a Zod schema
@@ -132,9 +131,9 @@ export function validateQueryParams<T>(
 export function createErrorResponse(
   message: string,
   status: number = 500,
-  details?: Record<string, any>
+  details?: Record<string, unknown>
 ): NextResponse {
-  const body: any = { error: message }
+  const body: Record<string, unknown> = { error: message }
   if (details) {
     body.details = details
   }

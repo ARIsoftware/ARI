@@ -139,15 +139,3 @@ export const CSS_VAR_MAP: Record<keyof ThemeColors, string> = {
   sidebarRing: '--sidebar-ring',
   radius: '--radius',
 }
-
-// Helper to convert theme colors to CSS variables
-export function themeToCssVars(colors: ThemeColors): Record<string, string> {
-  const vars: Record<string, string> = {}
-  for (const [key, value] of Object.entries(colors)) {
-    const cssVar = CSS_VAR_MAP[key as keyof ThemeColors]
-    if (cssVar) {
-      vars[cssVar] = value
-    }
-  }
-  return vars
-}
