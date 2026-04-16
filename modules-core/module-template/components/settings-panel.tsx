@@ -297,3 +297,35 @@ export function ModuleTemplateSettingsPanel() {
     </div>
   )
 }
+
+/**
+ * DEVELOPER NOTES:
+ *
+ * 1. Authentication:
+ *    - Better Auth uses HTTP-only cookies
+ *    - No need to pass Authorization headers
+ *    - API routes read auth from cookies automatically
+ *
+ * 2. Settings Architecture:
+ *    - Stored in module_settings table, settings column (JSONB)
+ *    - Per-user settings (enforced via withRLS)
+ *    - Always provide default values
+ *    - Merge defaults with loaded settings
+ *
+ * 3. TanStack Query:
+ *    - useModuleTemplateSettings() - fetches current settings
+ *    - useUpdateModuleTemplateSettings() - saves with optimistic updates
+ *    - Automatic cache invalidation on mutation
+ *
+ * 4. Form Controls:
+ *    - Use Shadcn/ui components for consistency
+ *    - Provide clear labels and descriptions
+ *    - Show validation errors
+ *    - Disable inputs while saving
+ *
+ * 5. User Feedback:
+ *    - Show loading state while fetching
+ *    - Show saving state while saving
+ *    - Show success confirmation
+ *    - Handle errors gracefully with toast
+ */
