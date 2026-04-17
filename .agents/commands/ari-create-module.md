@@ -46,6 +46,7 @@ Ask the user the following questions ONE AT A TIME, waiting for each answer befo
 5. **Top Bar**: Should it have a quick-access icon in the top bar?
 6. **Onboarding**: Does this module need an onboarding/setup screen to collect initial configuration from the user? (e.g., asking for birthdate, preferences, API keys, etc.)
 7. **Dashboard Widget**: Should this module add a card or widget to the main Dashboard? If yes, describe what it should display (e.g., summary stat, chart, recent items list). There are two types: **stat cards** (small cards in the Quick Overview grid) and **widgets** (larger components in the content area below).
+8. **File Storage**: Does this module need to store files (images, documents, audio, etc.)? If yes, what types of files and are there any size limits? (A private Supabase Storage bucket will be created automatically when the module is enabled.)
 
 If the user provides v0 code:
 - Read and analyze all provided v0 code files
@@ -65,6 +66,7 @@ Then ask follow-up clarifying questions based on their answers. You can ask any 
 - Are there any relationships to other modules or data (e.g., linking to tasks, contacts)? What should happen if the other data/module is not available or installed?
 - Are there any existing apps or tools that do something similar to what you want?
 - **Does this module need to receive data from external services?** (e.g., webhooks from Stripe, Resend, GitHub, etc.) If yes, a public route with security validation will be needed.
+- **Does this module need to store any files?** (e.g., images, PDFs, audio clips) If yes, a private Supabase Storage bucket will be provisioned automatically.
 
 Continue asking questions until you have a very clear picture of what to build. The goal is to avoid building the wrong thing or missing important requirements.
 
@@ -219,6 +221,181 @@ When approved, create the module following this order:
     - Document the required environment variable for the secret
     - See `/docs/MODULES.md` section 7.5 for detailed guidance
 12. **Database tables provision automatically.** Because `schema.sql` is auto-run by the module loader on every enable, you do NOT need to ask the user to run any SQL manually. The user only needs to enable the new module from Settings → Features and the tables will be created. (Exception: if the user wants to fully remove the module's tables later, they can manually run `uninstall.sql` from Supabase.)
+13. **If file storage needed** — set up Supabase Storage. See the "Supabase Storage for File Uploads" section below.
+
+## Supabase Storage for File Uploads
+
+If the module needs to store files (images, documents, audio, etc.), use Supabase Storage with a **private** bucket. Bucket creation and storage policies are provisioned automatically via `schema.sql` — no manual setup required.
+
+### Storage Schema (in `schema.sql`)
+
+Add the following to the module's `schema.sql`, **after** the module's own table definitions. Replace `my_module` with the actual module slug (using underscores):
+
+```sql
+-- =============================================================================
+-- SUPABASE STORAGE BUCKET
+-- =============================================================================
+-- Private bucket for module file uploads. Files are accessed via signed URLs only.
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'my_module',                    -- bucket id (use module slug with underscores)
+  'my_module',                    -- bucket name
+  false,                          -- ALWAYS private — files require signed URLs
+  10485760,                       -- 10 MB limit (adjust per module needs)
+  ARRAY['image/jpeg','image/png','image/webp']  -- allowed MIME types (adjust per module)
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- Storage RLS policies: restrict file access to the file owner.
+-- Files are stored under a path like: {user_id}/{filename}
+-- This ensures users can only access their own files.
+
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS my_module_storage_select ON storage.objects;
+CREATE POLICY my_module_storage_select ON storage.objects FOR SELECT
+  USING (
+    bucket_id = 'my_module'
+    AND (storage.foldername(name))[1] = current_setting('app.current_user_id')
+  );
+
+DROP POLICY IF EXISTS my_module_storage_insert ON storage.objects;
+CREATE POLICY my_module_storage_insert ON storage.objects FOR INSERT
+  WITH CHECK (
+    bucket_id = 'my_module'
+    AND (storage.foldername(name))[1] = current_setting('app.current_user_id')
+  );
+
+DROP POLICY IF EXISTS my_module_storage_update ON storage.objects;
+CREATE POLICY my_module_storage_update ON storage.objects FOR UPDATE
+  USING (
+    bucket_id = 'my_module'
+    AND (storage.foldername(name))[1] = current_setting('app.current_user_id')
+  );
+
+DROP POLICY IF EXISTS my_module_storage_delete ON storage.objects;
+CREATE POLICY my_module_storage_delete ON storage.objects FOR DELETE
+  USING (
+    bucket_id = 'my_module'
+    AND (storage.foldername(name))[1] = current_setting('app.current_user_id')
+  );
+```
+
+**Key rules:**
+- Buckets are **always private** (`public: false`). Files are served via signed URLs with expiry.
+- Files must be stored under a `{user_id}/` prefix so RLS policies enforce ownership.
+- Adjust `file_size_limit` (in bytes) and `allowed_mime_types` based on the module's needs.
+- The `ON CONFLICT (id) DO NOTHING` makes bucket creation idempotent.
+
+### Storage Uninstall (in `uninstall.sql`)
+
+Add bucket cleanup to the module's `uninstall.sql`:
+
+```sql
+-- Remove storage policies
+DROP POLICY IF EXISTS my_module_storage_select ON storage.objects;
+DROP POLICY IF EXISTS my_module_storage_insert ON storage.objects;
+DROP POLICY IF EXISTS my_module_storage_update ON storage.objects;
+DROP POLICY IF EXISTS my_module_storage_delete ON storage.objects;
+
+-- Remove storage bucket and all files
+DELETE FROM storage.objects WHERE bucket_id = 'my_module';
+DELETE FROM storage.buckets WHERE id = 'my_module';
+```
+
+### Upload API Route Pattern
+
+Create an upload endpoint at `api/upload/route.ts`:
+
+```typescript
+import { NextRequest, NextResponse } from 'next/server'
+import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { createClient } from '@supabase/supabase-js'
+
+const BUCKET_NAME = 'my_module'
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+
+// Service-role client for storage operations (bypasses RLS)
+function getStorageClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
+
+export async function POST(request: NextRequest) {
+  const { user } = await getAuthenticatedUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const formData = await request.formData()
+  const file = formData.get('file') as File | null
+
+  if (!file) {
+    return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+  }
+
+  if (file.size > MAX_FILE_SIZE) {
+    return NextResponse.json({ error: 'File too large' }, { status: 400 })
+  }
+
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    return NextResponse.json({ error: 'File type not allowed' }, { status: 400 })
+  }
+
+  // Store under user_id prefix for RLS enforcement
+  const fileName = `${user.id}/${Date.now()}-${file.name}`
+
+  const supabase = getStorageClient()
+  const { data, error } = await supabase.storage
+    .from(BUCKET_NAME)
+    .upload(fileName, file, {
+      contentType: file.type,
+      upsert: false,
+    })
+
+  if (error) {
+    console.error('Storage upload error:', error)
+    return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
+  }
+
+  return NextResponse.json({ path: data.path }, { status: 201 })
+}
+```
+
+### Signed URL Generation
+
+To serve private files, generate short-lived signed URLs in your GET API route:
+
+```typescript
+const supabase = getStorageClient()
+const { data } = await supabase.storage
+  .from(BUCKET_NAME)
+  .createSignedUrl(filePath, 3600) // 1 hour expiry
+
+// Return the signed URL to the client
+```
+
+### Storage in module.json
+
+Add storage configuration to the module manifest for documentation:
+
+```json
+{
+  "database": {
+    "tables": ["my_module_data"],
+    "storage": {
+      "bucket": "my_module",
+      "private": true,
+      "maxFileSize": 10485760,
+      "allowedMimeTypes": ["image/jpeg", "image/png", "image/webp"]
+    }
+  }
+}
+```
 
 ## Data Fetching Best Practices
 
@@ -667,6 +844,12 @@ Before marking complete, verify:
 - [ ] **If v0 import used**: Any non-standard npm dependencies installed
 - [ ] **If v0 import used**: v0 layout wrappers removed (no extra html/body wrappers)
 - [ ] **If v0 import used**: Component has default export and 'use client' directive
+- [ ] **If file storage needed**: Private bucket created in `schema.sql` (`INSERT INTO storage.buckets ... ON CONFLICT DO NOTHING`)
+- [ ] **If file storage needed**: Storage RLS policies on `storage.objects` restrict access to file owner via `user_id` path prefix
+- [ ] **If file storage needed**: Upload API route validates file type and size server-side before uploading
+- [ ] **If file storage needed**: Files stored under `{user_id}/` prefix to enforce ownership
+- [ ] **If file storage needed**: Files served via signed URLs (never public URLs)
+- [ ] **If file storage needed**: `uninstall.sql` includes storage policy removal and bucket cleanup
 
 ## Critical Rules
 
