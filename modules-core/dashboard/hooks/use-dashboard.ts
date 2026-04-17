@@ -127,7 +127,8 @@ export function useDashboardRecentActivity(tasksEnabled: boolean, contactsEnable
         try {
           const contactsRes = await fetch('/api/modules/contacts')
           if (contactsRes.ok) {
-            const contacts: Contact[] = await contactsRes.json()
+            const contactsData = await contactsRes.json()
+            const contacts: Contact[] = contactsData.data || contactsData
             const recentContacts = contacts
               .filter((c) => c.created_at)
               .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
