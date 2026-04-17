@@ -9,13 +9,13 @@ export default function ContactsDashboardStatCard() {
   const { data: contacts, isLoading } = useQuery({
     queryKey: ['dashboard-contacts'],
     queryFn: async () => {
-      const res = await fetch('/api/modules/contacts')
-      if (!res.ok) return []
+      const res = await fetch('/api/modules/contacts?limit=1')
+      if (!res.ok) return { total: 0 }
       return res.json()
     },
   })
 
-  const contactCount = contacts?.length ?? 0
+  const contactCount = contacts?.total ?? contacts?.data?.length ?? 0
 
   return (
     <Card className="hover:shadow-md transition-shadow">

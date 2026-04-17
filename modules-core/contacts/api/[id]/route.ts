@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { toSnakeCase } from '@/lib/api-helpers'
+import { validateRequestBody, toSnakeCase } from '@/lib/api-helpers'
+import { updateContactSchema } from '@/modules/contacts/lib/validation'
 import { contacts } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 
@@ -43,7 +44,10 @@ export async function PATCH(
 ) {
   try {
     const { id } = await context.params
-    const updates = await request.json()
+    const validation = await validateRequestBody(request, updateContactSchema)
+    if (!validation.success) return validation.response
+    const { contact: updates } = validation.data
+
     const { user, withRLS } = await getAuthenticatedUser()
 
     if (!user || !withRLS) {
@@ -53,7 +57,7 @@ export async function PATCH(
     // RLS automatically ensures user can only update their own contacts
     const data = await withRLS((db) =>
       db.update(contacts)
-        .set(updates)
+        .set({ ...updates, updatedAt: new Date().toISOString() })
         .where(eq(contacts.id, id))
         .returning()
     )

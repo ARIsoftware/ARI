@@ -9,13 +9,13 @@ export function useContacts() {
   return useQuery({
     queryKey: ['contacts'],
     queryFn: async (): Promise<Contact[]> => {
-      const res = await fetch('/api/modules/contacts')
+      const res = await fetch('/api/modules/contacts?limit=200')
       if (!res.ok) {
         const error = await res.json()
         throw new Error(error.error || 'Failed to fetch contacts')
       }
-      const data = await res.json()
-      // Sort alphabetically by name
+      const result = await res.json()
+      const data: Contact[] = result.data ?? result
       return data.sort((a: Contact, b: Contact) => a.name.localeCompare(b.name))
     },
   })

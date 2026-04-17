@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, validateQueryParams, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
-import { createTaskSchema, updateTaskSchema, uuidParamSchema } from '@/lib/validation'
+import { createTaskSchema, updateTaskSchema, uuidParamSchema } from '@/modules/tasks/lib/validation'
 import { calculatePriorityScore } from '@/modules/tasks/lib/priority-utils'
 import { z } from 'zod'
 import { tasks } from '@/lib/db/schema'

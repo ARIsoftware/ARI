@@ -121,7 +121,6 @@ export default function EditContactPage() {
     const errors: Record<string, boolean> = {}
     if (!formData.name) errors.name = true
     if (!formData.email) errors.email = true
-    if (!formData.phone) errors.phone = true
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors)
@@ -139,7 +138,7 @@ export default function EditContactPage() {
       const contactData = {
         name: formData.name,
         email: formData.email,
-        phone: formData.phone,
+        phone: formData.phone || null,
         category: formData.category,
         description: formData.description || null,
         company: formData.company || null,
@@ -271,14 +270,13 @@ export default function EditContactPage() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="phone">Phone Number *</Label>
+                        <Label htmlFor="phone">Phone Number</Label>
                         <Input
                           id="phone"
                           type="tel"
                           value={formData.phone}
                           onChange={(e) => handleInputChange("phone", e.target.value)}
                           placeholder="+1 (555) 123-4567"
-                          className={fieldErrors.phone ? "ring-2 ring-red-500 border-red-500" : ""}
                         />
                       </div>
                     </div>

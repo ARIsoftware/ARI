@@ -33,7 +33,8 @@ export async function getContacts(getToken: () => Promise<string | null>): Promi
     throw new Error(error.error || 'Failed to fetch contacts')
   }
 
-  return await response.json()
+  const result = await response.json()
+  return result.data ?? result
 }
 
 export async function getContact(id: string, getToken: () => Promise<string | null>): Promise<Contact | null> {
@@ -103,7 +104,7 @@ export async function updateContact(
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
     },
-    body: JSON.stringify(updates),
+    body: JSON.stringify({ contact: updates }),
   })
 
   if (!response.ok) {

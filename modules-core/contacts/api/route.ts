@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
-import { createContactSchema } from '@/lib/validation'
+import { createContactSchema } from '@/modules/contacts/lib/validation'
 import { contacts } from '@/lib/db/schema'
-import { asc } from 'drizzle-orm'
+import { asc, sql } from 'drizzle-orm'
 
-// GET /api/contacts - Fetch all contacts
+const MAX_LIMIT = 200
+const DEFAULT_LIMIT = 50
+
+// GET /api/contacts - Fetch contacts with pagination
 export async function GET(request: NextRequest) {
   try {
     const { user, withRLS } = await getAuthenticatedUser()
@@ -14,12 +17,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // RLS automatically filters by user_id
-    const data = await withRLS((db) =>
-      db.select().from(contacts).orderBy(asc(contacts.name))
-    )
+    const { searchParams } = new URL(request.url)
+    const limit = Math.min(Math.max(1, Number(searchParams.get('limit')) || DEFAULT_LIMIT), MAX_LIMIT)
+    const offset = Math.max(0, Number(searchParams.get('offset')) || 0)
 
-    return NextResponse.json(toSnakeCase(data) || [])
+    // RLS automatically filters by user_id
+    const [data, countResult] = await withRLS(async (db) => {
+      const rows = await db.select().from(contacts).orderBy(asc(contacts.name)).limit(limit).offset(offset)
+      const total = await db.select({ count: sql<number>`count(*)::int` }).from(contacts)
+      return [rows, total] as const
+    })
+
+    return NextResponse.json({
+      data: toSnakeCase(data) || [],
+      total: countResult[0].count,
+      limit,
+      offset,
+    })
   } catch (error) {
     console.error('Unexpected error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

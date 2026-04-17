@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS contacts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   email TEXT NOT NULL,
-  phone TEXT NOT NULL,
+  phone TEXT,
   category TEXT NOT NULL,
   description TEXT,
   company TEXT,
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS contacts (
   next_contact_date DATE,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-  user_id UUID NOT NULL
+  user_id TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_contacts_category ON contacts(category);
