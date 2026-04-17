@@ -248,7 +248,8 @@ Every confirmed hardcoded secret must appear in the report with file + line and 
 - [ ] Confirm `uninstall.sql` is NOT referenced from `lib/modules/module-loader.ts`, `module.json`, or any code path that runs on enable/disable. **High** if it is auto-executed anywhere.
 - [ ] The file should be clearly labeled at the top as a manual-only teardown script (comment block explaining the user must run it themselves in the Supabase SQL editor). **Low** if the warning comment is missing.
 - [ ] All `CREATE INDEX` statements use `IF NOT EXISTS` — **Low**
-- [ ] Every table has `user_id TEXT NOT NULL` — **High**
+- [ ] Every table has `user_id TEXT NOT NULL` in `schema.sql` — **High**. Must be `TEXT`, **not** `UUID`. Better Auth stores user IDs as text (see `core-schema.ts`: `session.userId`, `account.userId`, `moduleSettings.userId`, `userPreferences.userId` are all `text()`). Using `UUID` causes a type mismatch with `current_setting('app.current_user_id')` and with `user.id` returned by `getAuthenticatedUser()`.
+- [ ] Every table has `userId: text("user_id").notNull()` in `schema.ts` (Drizzle) — **High**. Must be `text()`, **not** `uuid()`, for the same reason above. A `uuid("user_id")` column will silently accept inserts but may cause cast errors or comparison failures with the text-typed user ID from Better Auth.
 - [ ] Every table has `created_at` and `updated_at` (TIMESTAMPTZ) — **Low**
 - [ ] Every table has `ALTER TABLE ... ENABLE ROW LEVEL SECURITY;` — **High**
 - [ ] Every table has SELECT/INSERT/UPDATE/DELETE policies referencing `current_setting('app.current_user_id')` — **High**
@@ -361,6 +362,7 @@ When auditing, the subagents should be aware of these reference files:
 - `lib/generated/module-pages-registry.ts` — page registration
 - `app/api/modules/[module]/[[...path]]/route.ts` — API registration
 - `lib/db/schema/schema.ts` — Drizzle schema barrel
+- `lib/db/schema/core-schema.ts` — Better Auth tables and system tables; source of truth that `user.id` is `text`, so all module `user_id` columns must also be `text`, not `uuid`
 - A reference module like `modules-core/tasks/` for the gold-standard structure
 
 ---
