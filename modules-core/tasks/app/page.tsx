@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Search, Filter, List, Grid3X3, Calendar, Pin, Bell, Plus, Trash2, Pencil, Columns, Table } from "lucide-react"
+import { Search, Filter, List, Grid3X3, Calendar, Pin, Bell, Plus, Trash2, Pencil, Columns, Table, BarChart3 } from "lucide-react"
 import { useState, useEffect, useMemo } from "react"
 import { toggleTaskCompletion, toggleTaskPin, reorderTasks, deleteTask, updateTask, type Task } from "../lib/utils"
 import { useTasks } from "../hooks/use-tasks"
@@ -402,7 +402,8 @@ export default function TasksPage() {
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" onClick={() => router.push("/tasks/radar")}>
-                  Radar
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  Priority Radar
                 </Button>
                 <Button onClick={() => router.push("/tasks/add")}>
                   <Plus className="w-4 h-4 mr-2" />

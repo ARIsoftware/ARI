@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { CalendarIcon, Save, X, Pin, ArrowLeft, Loader2, Pencil, Info, Compass, Briefcase } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useState, useEffect } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { getTasks, updateTask, type Task } from "@/modules/tasks/lib/utils"
 import { getGoals, type Goal } from "@/lib/goals"
 import type { MajorProject } from "@/modules/tasks/types"
@@ -64,6 +65,7 @@ export default function EditTaskPage() {
   const user = session?.user
   const { toast } = useToast()
   const router = useRouter()
+  const queryClient = useQueryClient()
   const { enabled: majorProjectsEnabled } = useModuleEnabled('major-projects')
   const { enabled: northstarEnabled } = useModuleEnabled('northstar')
   const [loading, setLoading] = useState(false)
@@ -230,12 +232,13 @@ export default function EditTaskPage() {
       const tokenFn = async () => session?.access_token || null
       await updateTask(id, updates, tokenFn)
 
+      await queryClient.invalidateQueries({ queryKey: ['tasks'] })
+
       toast({
         title: "Success",
         description: "Task updated successfully!",
       })
 
-      // Redirect to tasks page
       router.push("/tasks")
     } catch (error) {
       console.error("Failed to update task:", error)

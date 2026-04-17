@@ -97,8 +97,8 @@ export function getTaskColor(task: Task): string {
 
 export function getTaskSize(impact: number): number {
   // Size based on impact (1-5 scale)
-  // Returns radius in pixels
-  return 4 + (impact - 1) * 2 // 4px to 12px radius
+  // Returns radius in pixels — minimum 10px so dots are always readable
+  return 10 + (impact - 1) * 1.5 // 10px to 16px radius
 }
 
 // Transform task data for radar chart

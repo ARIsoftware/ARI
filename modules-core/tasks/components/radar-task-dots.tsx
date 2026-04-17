@@ -27,7 +27,7 @@ export function RadarTaskDots({
   const getPosition = (task: ReturnType<typeof transformTaskForRadar>, taskIndex: number) => {
     // Map score to distance from center (0-1 range, where 0 is center)
     // Higher score = closer to center = higher priority
-    const maxRadius = 140 // Maximum radius in pixels
+    const maxRadius = 120 // Maximum radius in pixels
     const radius = Math.max(0, 1 - task.score / 10) * maxRadius
 
     // Distribute tasks around different angles to avoid overlap
@@ -45,6 +45,7 @@ export function RadarTaskDots({
       <svg
         className="w-full h-full pointer-events-auto"
         viewBox="0 0 400 400"
+        overflow="visible"
         style={{ position: 'absolute', top: 0, left: 0 }}
       >
         <g transform="translate(200, 200)">
@@ -113,7 +114,7 @@ export function RadarTaskDots({
                 {/* Task title on hover */}
                 {isHovered && (
                   <foreignObject
-                    x={x + task.size + 5}
+                    x={x < 0 ? x - task.size - 155 : x + task.size + 5}
                     y={y - 10}
                     width="150"
                     height="40"

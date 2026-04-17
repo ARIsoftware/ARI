@@ -212,8 +212,8 @@ export default function RadarPage() {
                     Average task scores across all priority axes
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="pb-0">
-                  <div className="relative">
+                <CardContent className="pb-0 overflow-visible">
+                  <div className="relative overflow-visible">
                     <ChartContainer
                       config={chartConfig}
                       className="mx-auto aspect-square max-h-[450px] w-full p-4"
