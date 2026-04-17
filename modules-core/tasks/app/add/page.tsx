@@ -17,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Slider } from "@/components/ui/slider"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useState, useEffect } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { createTask } from "@/modules/tasks/lib/utils"
 import { getGoals, type Goal } from "@/lib/goals"
 import { useModuleEnabled } from "@/lib/modules/module-hooks"
@@ -48,6 +49,7 @@ export default function AddTaskPage() {
   const user = session?.user
   const { toast } = useToast()
   const router = useRouter()
+  const queryClient = useQueryClient()
   const { enabled: northstarEnabled } = useModuleEnabled('northstar')
   const [loading, setLoading] = useState(false)
   const [date, setDate] = useState<Date>()
@@ -168,12 +170,13 @@ export default function AddTaskPage() {
       const tokenFn = async () => session?.access_token || null
       await createTask(taskData, tokenFn)
 
+      await queryClient.invalidateQueries({ queryKey: ['tasks'] })
+
       toast({
         title: "Success",
         description: "Task created successfully!",
       })
 
-      // Redirect to tasks page
       router.push("/tasks")
     } catch (error) {
       console.error("Failed to create task:", error)
