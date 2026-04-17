@@ -29,10 +29,6 @@
   "database": {
     "tables": ["quotes"]
   },
-  "dashboard": {
-    "widgets": true,
-    "widgetComponents": ["./components/widget.tsx"]
-  },
   "settings": {
     "panel": "./components/settings-panel.tsx"
   }
