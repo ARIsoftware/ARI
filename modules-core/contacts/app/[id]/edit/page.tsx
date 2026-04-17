@@ -48,7 +48,7 @@ export default function EditContactPage() {
 
   const [loading, setLoading] = useState(id !== 'new')
   const [saving, setSaving] = useState(false)
-  const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({})
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const isNewContact = id === 'new'
 
   const [formData, setFormData] = useState<ContactFormData>({
@@ -112,21 +112,58 @@ export default function EditContactPage() {
   const handleInputChange = (field: keyof ContactFormData, value: string | Date | undefined) => {
     setFormData(prev => ({ ...prev, [field]: value }))
     if (fieldErrors[field]) {
-      setFieldErrors(prev => ({ ...prev, [field]: false }))
+      setFieldErrors(prev => {
+        const next = { ...prev }
+        delete next[field]
+        return next
+      })
     }
   }
 
   const handleSave = async () => {
-    // Validate required fields
-    const errors: Record<string, boolean> = {}
-    if (!formData.name) errors.name = true
-    if (!formData.email) errors.email = true
+    // Validate fields
+    const errors: Record<string, string> = {}
+    const UNSAFE_RE = /[<>\x00-\x1F\x7F]/
+
+    if (!formData.name) {
+      errors.name = "Name is required"
+    } else if (formData.name.length > 255) {
+      errors.name = "Name is too long (max 255 characters)"
+    } else if (UNSAFE_RE.test(formData.name)) {
+      errors.name = "Name contains invalid characters"
+    }
+
+    if (!formData.email) {
+      errors.email = "Email is required"
+    } else if (formData.email.length > 255) {
+      errors.email = "Email is too long"
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = "Please enter a valid email address"
+    }
+
+    if (formData.phone && !/^[+\d\s\-().]+$/.test(formData.phone)) {
+      errors.phone = "Please enter a valid phone number"
+    } else if (formData.phone && formData.phone.length > 50) {
+      errors.phone = "Phone number is too long"
+    }
+
+    if (formData.description && formData.description.length > 2000) {
+      errors.description = "Notes are too long (max 2000 characters)"
+    }
+
+    if (formData.company && (formData.company.length > 255 || UNSAFE_RE.test(formData.company))) {
+      errors.company = formData.company.length > 255 ? "Company name is too long" : "Company contains invalid characters"
+    }
+
+    if (formData.website && formData.website.length > 0 && !/^https?:\/\//i.test(formData.website)) {
+      errors.website = "URL must start with http:// or https://"
+    }
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors)
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields",
+        description: Object.values(errors)[0],
         variant: "destructive",
       })
       return
@@ -234,8 +271,10 @@ export default function EditContactPage() {
                           value={formData.name}
                           onChange={(e) => handleInputChange("name", e.target.value)}
                           placeholder="Enter full name"
-                          className={fieldErrors.name ? "ring-2 ring-red-500 border-red-500" : ""}
+                          maxLength={255}
+                          className={fieldErrors.name ? "ring-2 ring-destructive border-destructive" : ""}
                         />
+                        {fieldErrors.name && <p className="text-sm text-destructive">{fieldErrors.name}</p>}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="category">Category *</Label>
@@ -266,8 +305,10 @@ export default function EditContactPage() {
                           value={formData.email}
                           onChange={(e) => handleInputChange("email", e.target.value)}
                           placeholder="email@example.com"
-                          className={fieldErrors.email ? "ring-2 ring-red-500 border-red-500" : ""}
+                          maxLength={255}
+                          className={fieldErrors.email ? "ring-2 ring-destructive border-destructive" : ""}
                         />
+                        {fieldErrors.email && <p className="text-sm text-destructive">{fieldErrors.email}</p>}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="phone">Phone Number</Label>
@@ -277,7 +318,10 @@ export default function EditContactPage() {
                           value={formData.phone}
                           onChange={(e) => handleInputChange("phone", e.target.value)}
                           placeholder="+1 (555) 123-4567"
+                          maxLength={50}
+                          className={fieldErrors.phone ? "ring-2 ring-destructive border-destructive" : ""}
                         />
+                        {fieldErrors.phone && <p className="text-sm text-destructive">{fieldErrors.phone}</p>}
                       </div>
                     </div>
 
@@ -289,7 +333,9 @@ export default function EditContactPage() {
                         onChange={(e) => handleInputChange("description", e.target.value)}
                         placeholder="Add any notes about this contact..."
                         rows={3}
+                        maxLength={2000}
                       />
+                      {fieldErrors.description && <p className="text-sm text-destructive">{fieldErrors.description}</p>}
                     </div>
 
                     <div className="space-y-2">
@@ -342,7 +388,10 @@ export default function EditContactPage() {
                           value={formData.company || ""}
                           onChange={(e) => handleInputChange("company", e.target.value)}
                           placeholder="Company name"
+                          maxLength={255}
+                          className={fieldErrors.company ? "ring-2 ring-destructive border-destructive" : ""}
                         />
+                        {fieldErrors.company && <p className="text-sm text-destructive">{fieldErrors.company}</p>}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="birthday">Birthday</Label>
@@ -362,6 +411,7 @@ export default function EditContactPage() {
                         value={formData.address || ""}
                         onChange={(e) => handleInputChange("address", e.target.value)}
                         placeholder="Street address"
+                        maxLength={500}
                       />
                     </div>
 
@@ -373,7 +423,10 @@ export default function EditContactPage() {
                         value={formData.website || ""}
                         onChange={(e) => handleInputChange("website", e.target.value)}
                         placeholder="https://example.com"
+                        maxLength={255}
+                        className={fieldErrors.website ? "ring-2 ring-destructive border-destructive" : ""}
                       />
+                      {fieldErrors.website && <p className="text-sm text-destructive">{fieldErrors.website}</p>}
                     </div>
                   </CardContent>
                 </Card>
