@@ -629,15 +629,99 @@ ${moduleBlocks.join('\n')}
 }
 
 /**
+ * Extract exported symbol names from a TypeScript file.
+ * Matches: export const X, export function X, export type X, etc.
+ */
+function extractExportedSymbols(filePath) {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const symbols = [];
+    const regex = /export\s+(?:const|let|var|function|class|type|interface|enum)\s+(\w+)/g;
+    let match;
+    while ((match = regex.exec(content)) !== null) {
+      symbols.push(match[1]);
+    }
+    return symbols;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Collect all symbol names exported by the schema barrel (core-schema + module schemas).
+ * Used to validate that relations files only reference tables that actually exist.
+ */
+function collectAvailableSchemaExports(moduleMap) {
+  const exports = new Set();
+
+  // Core schema exports
+  const coreSchemaPath = path.join(process.cwd(), 'lib/db/schema/core-schema.ts');
+  for (const sym of extractExportedSymbols(coreSchemaPath)) {
+    exports.add(sym);
+  }
+
+  // Module schema exports
+  for (const [id, { dirName, folder }] of moduleMap) {
+    const schemaPath = path.join(process.cwd(), dirName, folder, 'database', 'schema.ts');
+    for (const sym of extractExportedSymbols(schemaPath)) {
+      exports.add(sym);
+    }
+  }
+
+  return exports;
+}
+
+/**
+ * Parse a relations file and return any imports from @/lib/db/schema that
+ * are not in the available exports set.
+ */
+function findUnsatisfiedSchemaImports(filePath, availableExports) {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const unsatisfied = [];
+
+    // Match: import { foo, bar } from "@/lib/db/schema"
+    // Also handles @/lib/db/schema/index or @/lib/db/schema/schema
+    const importRegex = /import\s*\{([^}]+)\}\s*from\s*["']@\/lib\/db\/schema(?:\/(?:index|schema))?["']/g;
+    let match;
+    while ((match = importRegex.exec(content)) !== null) {
+      const symbols = match[1].split(',').map(s => s.trim()).filter(Boolean);
+      for (const sym of symbols) {
+        // Handle aliased imports: "foo as bar" → check "foo"
+        const actualName = sym.split(/\s+as\s+/)[0].trim();
+        if (actualName && !availableExports.has(actualName)) {
+          unsatisfied.push(actualName);
+        }
+      }
+    }
+
+    return unsatisfied;
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Generate a barrel file that re-exports a core file + matching module database files.
  * Used for both schema.ts and relations.ts barrels.
+ *
+ * When availableSchemaExports is provided (for relations barrels), each file's
+ * imports from @/lib/db/schema are checked. Files with unsatisfied imports are
+ * skipped with a warning instead of breaking the build.
  */
-function generateDatabaseBarrel(moduleMap, fileName, coreExport, label) {
+function generateDatabaseBarrel(moduleMap, fileName, coreExport, label, availableSchemaExports) {
   const imports = [];
 
   for (const [id, { dirName, folder }] of moduleMap) {
     const filePath = path.join(process.cwd(), dirName, folder, 'database', fileName);
     if (fs.existsSync(filePath)) {
+      if (availableSchemaExports) {
+        const unsatisfied = findUnsatisfiedSchemaImports(filePath, availableSchemaExports);
+        if (unsatisfied.length > 0) {
+          console.warn(`⚠️  ${id}: Skipping ${fileName} (requires missing exports: ${unsatisfied.join(', ')})`);
+          continue;
+        }
+      }
       imports.push({ id, importPath: `@/modules/${folder}/database/${fileName.replace('.ts', '')}` });
     }
   }
@@ -807,9 +891,13 @@ function main() {
   fs.writeFileSync(SCHEMA_OUTPUT_FILE, schemaBarrel, 'utf-8');
   console.log('✅ Schema barrel generated at:', SCHEMA_OUTPUT_FILE);
 
+  // Collect available schema exports so relations can be validated
+  const availableSchemaExports = collectAvailableSchemaExports(moduleMap);
+
   // Generate relations barrel (lib/db/schema/relations.ts)
+  // Relations files with unsatisfied imports are skipped with a warning
   console.log('📝 Generating relations barrel...');
-  const relationsBarrel = generateDatabaseBarrel(moduleMap, 'relations.ts', './core-relations', 'Relations');
+  const relationsBarrel = generateDatabaseBarrel(moduleMap, 'relations.ts', './core-relations', 'Relations', availableSchemaExports);
   fs.writeFileSync(RELATIONS_OUTPUT_FILE, relationsBarrel, 'utf-8');
   console.log('✅ Relations barrel generated at:', RELATIONS_OUTPUT_FILE);
 

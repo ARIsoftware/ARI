@@ -1093,7 +1093,7 @@ After creating the file, run `npm run generate-module-registry` to regenerate th
 import { user } from "@/lib/db/schema/core-schema"
 ```
 
-**If your module has relations**, create `database/relations.ts`:
+**If your module has relations between its own tables**, create `database/relations.ts`:
 
 ```typescript
 import { relations } from "drizzle-orm/relations";
@@ -1103,6 +1103,8 @@ export const myModuleDataRelations = relations(myModuleData, ({many}) => ({
   items: many(myModuleItems),
 }));
 ```
+
+> **Important:** Relations should only reference tables owned by your module. Do not import tables from other modules — if that module isn't installed, the build will fail. If your module needs data from another module, handle that conditionally in your query code at runtime instead. The registry generator will skip any `relations.ts` that imports missing tables, but the relations in that file will be silently unavailable.
 
 ### Migration Application Process
 
