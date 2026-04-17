@@ -177,6 +177,7 @@ import {
   Loader,
   Loader2,
   Network,
+  StickyNote,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -208,6 +209,7 @@ const ICON_REGISTRY: Record<string, LucideIcon> = {
   Quote,
   Snowflake,
   Sparkles,
+  StickyNote,
   Trophy,
   Users,
 
