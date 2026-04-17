@@ -407,13 +407,8 @@ export default function KnowledgeManagerPage() {
     setCollectionColor(collection.color)
   }
 
-  // Loading state — show spinner inside the same root element to avoid hydration mismatch
   if (!session) {
-    return (
-      <div className="flex h-[calc(100vh-4rem)] overflow-hidden items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin" />
-      </div>
-    )
+    return null
   }
 
   return (
