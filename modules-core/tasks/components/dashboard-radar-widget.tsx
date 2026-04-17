@@ -106,7 +106,11 @@ export default function TasksDashboardRadarWidget() {
     <Card>
       <CardHeader className="items-center pb-2">
         <CardTitle>Priority Radar</CardTitle>
-        <CardDescription>Top 5 priority tasks across all axes</CardDescription>
+        <CardDescription className="text-center">
+          Task positions based on calculated priority scores
+          <br />
+          Showing 5 highest priority tasks — closer to center = higher priority
+        </CardDescription>
       </CardHeader>
       <CardContent className="pb-0">
         <div className="relative">
@@ -131,10 +135,10 @@ export default function TasksDashboardRadarWidget() {
               />
               <Radar
                 dataKey="value"
-                stroke="hsl(var(--chart-1))"
-                fill="hsl(var(--chart-1))"
-                fillOpacity={0.3}
-                strokeWidth={2}
+                stroke="transparent"
+                fill="transparent"
+                fillOpacity={0}
+                strokeWidth={0}
               />
             </RadarChart>
           </ChartContainer>
@@ -149,10 +153,7 @@ export default function TasksDashboardRadarWidget() {
         </div>
       </CardContent>
       <CardFooter className="flex-col gap-2 text-sm pt-2">
-        <div className="text-muted-foreground flex items-center gap-2 leading-none text-xs">
-          Closer to center = higher priority
-        </div>
-        <div className="flex gap-4 mt-1">
+        <div className="flex gap-4">
           <div className="flex items-center gap-1">
             <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
             <span className="text-xs">Overdue</span>
@@ -160,10 +161,6 @@ export default function TasksDashboardRadarWidget() {
           <div className="flex items-center gap-1">
             <div className="w-2.5 h-2.5 rounded-full bg-orange-500" />
             <span className="text-xs">Due Soon</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-            <span className="text-xs">Not Urgent</span>
           </div>
         </div>
       </CardFooter>

@@ -208,8 +208,10 @@ export default function RadarPage() {
               <Card>
                 <CardHeader className="items-center">
                   <CardTitle>Priority Distribution</CardTitle>
-                  <CardDescription>
-                    Average task scores across all priority axes
+                  <CardDescription className="text-center">
+                    Task positions based on calculated priority scores
+                    <br />
+                    Showing 5 highest priority tasks — closer to center = higher priority
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pb-0 overflow-visible">
@@ -238,10 +240,10 @@ export default function RadarPage() {
                         />
                         <Radar
                           dataKey="value"
-                          stroke="hsl(var(--chart-1))"
-                          fill="hsl(var(--chart-1))"
-                          fillOpacity={0.3}
-                          strokeWidth={2}
+                          stroke="transparent"
+                          fill="transparent"
+                          fillOpacity={0}
+                          strokeWidth={0}
                         />
                       </RadarChart>
                     </ChartContainer>
@@ -257,10 +259,7 @@ export default function RadarPage() {
                   </div>
                 </CardContent>
                 <CardFooter className="flex-col gap-2 text-sm">
-                  <div className="text-muted-foreground flex items-center gap-2 leading-none">
-                    Showing 5 highest priority tasks — closer to center = higher priority
-                  </div>
-                  <div className="flex gap-4 mt-2">
+                  <div className="flex gap-4">
                     <div className="flex items-center gap-1">
                       <div className="w-3 h-3 rounded-full bg-red-500" />
                       <span className="text-xs">Overdue</span>
@@ -268,10 +267,6 @@ export default function RadarPage() {
                     <div className="flex items-center gap-1">
                       <div className="w-3 h-3 rounded-full bg-orange-500" />
                       <span className="text-xs">Due Soon</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 rounded-full bg-green-500" />
-                      <span className="text-xs">Not Urgent</span>
                     </div>
                   </div>
                 </CardFooter>

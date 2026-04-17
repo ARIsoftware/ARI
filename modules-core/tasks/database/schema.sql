@@ -70,3 +70,31 @@ CREATE POLICY tasks_rls_update ON tasks FOR UPDATE
 DROP POLICY IF EXISTS tasks_rls_delete ON tasks;
 CREATE POLICY tasks_rls_delete ON tasks FOR DELETE
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+
+-- =============================================================================
+-- SAMPLE DATA (only inserted on first install when table is empty)
+-- =============================================================================
+
+DO $$
+DECLARE
+  my_user_id TEXT;
+  task_count INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO task_count FROM tasks;
+  IF task_count > 0 THEN
+    RETURN;
+  END IF;
+
+  SELECT id INTO my_user_id FROM public."user" LIMIT 1;
+
+  IF my_user_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  INSERT INTO tasks (user_id, title, status, priority, impact, severity, timeliness, effort, strategic_fit, priority_score, order_index)
+  VALUES
+    (my_user_id, 'Finalize Pitch Deck Draft', 'Pending', 'High', 5, 3, 2, 4, 5, 4.9, 0),
+    (my_user_id, 'Build MVP Landing Page', 'Pending', 'High', 5, 4, 3, 4, 5, 6.1, 1),
+    (my_user_id, 'Customer Discovery Interviews', 'Pending', 'Low', 3, 2, 1, 5, 2, 1.9, 2);
+
+END $$;

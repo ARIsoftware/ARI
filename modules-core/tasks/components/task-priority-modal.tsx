@@ -92,9 +92,9 @@ export function TaskPriorityModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Edit Task Priority</DialogTitle>
+          <DialogTitle>{task.title}</DialogTitle>
           <DialogDescription>
-            Adjust the priority factors for: <span className="font-medium">{task.title}</span>
+            Adjust the priority score
           </DialogDescription>
         </DialogHeader>
 
