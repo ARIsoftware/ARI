@@ -71,7 +71,7 @@ async function discoverTables(client: SupabaseClient): Promise<{ tables: string[
       }
 
       if (error) {
-        logger.warn('Method 2 failed:', error.message || error)
+        logger.warn('Method 2 failed:', error instanceof Error ? error.message : String(error))
       } else {
         logger.warn('Method 2 returned no results')
       }

@@ -17,7 +17,7 @@ type ManifestPublicRoute = {
   path: string
   fullPath: string
   methods: string[]
-  security?: { type: string; rateLimit?: number } | string
+  security?: { type: string; rateLimit?: boolean | number } | string
   description?: string
 }
 type Manifest = {
@@ -158,7 +158,7 @@ interface TestResult {
 interface SecurityTestResult {
   endpoint: string
   method: string
-  status: 'pending' | 'testing' | 'secure' | 'vulnerable' | 'error'
+  status: 'pending' | 'testing' | 'secure' | 'vulnerable' | 'error' | 'warning'
   message?: string
   responseStatus?: number
   error?: string
@@ -406,7 +406,7 @@ export default function DatabaseTestPage() {
 
       // Build test list from discovered endpoints (core + module)
       const allTests: Array<{ endpoint: string; method: string }> = []
-      for (const ep of [...(data.coreEndpoints || []), ...(data.moduleEndpoints || [])]) {
+      for (const ep of [...(data!.coreEndpoints || []), ...(data!.moduleEndpoints || [])]) {
         for (const method of ep.methods) {
           if (method === 'unknown') continue
           allTests.push({ endpoint: ep.fullPath, method })
@@ -981,7 +981,7 @@ export default function DatabaseTestPage() {
         data = await response.json()
         setEndpointsData(data)
       }
-      const publicEndpoints = data.publicEndpoints || []
+      const publicEndpoints = data!.publicEndpoints || []
 
       if (publicEndpoints.length === 0) {
         console.log('No public endpoints to test')
@@ -1553,7 +1553,7 @@ export default function DatabaseTestPage() {
         console.log('⚠️ Not authenticated - no session in context')
       } else {
         // Session exists - display session info from context
-        const expiresAt = session.expires_at ? new Date(session.expires_at * 1000) : null
+        const expiresAt = session.expiresAt ? new Date(session.expiresAt) : null
         const now = new Date()
         const isExpired = expiresAt ? expiresAt < now : false
 
@@ -1568,7 +1568,7 @@ export default function DatabaseTestPage() {
             expires_at: expiresAt?.toISOString() || 'Unknown',
             is_expired: isExpired,
             access_token: session.access_token ? 'Present (truncated)' : 'Missing',
-            refresh_token: session.refresh_token ? 'Present (truncated)' : 'Missing',
+            refresh_token: 'N/A (cookie-based auth)',
             note: 'Session retrieved from global context (instant, no network call)',
             user_from_context: user ? `Present (${user.email})` : 'Missing'
           }
@@ -1837,7 +1837,8 @@ export default function DatabaseTestPage() {
       testing: 'secondary',
       secure: 'default',
       vulnerable: 'destructive',
-      error: 'secondary'
+      error: 'secondary',
+      warning: 'outline'
     }
 
     const labels: Record<SecurityTestResult['status'], string> = {
@@ -1845,7 +1846,8 @@ export default function DatabaseTestPage() {
       testing: 'Testing',
       secure: 'Secure',
       vulnerable: 'Vulnerable',
-      error: 'Error'
+      error: 'Error',
+      warning: 'Warning'
     }
 
     return (

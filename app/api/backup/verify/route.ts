@@ -61,7 +61,7 @@ async function testDiscoveryMethods(client: ReturnType<typeof getServiceSupabase
         .map((row: any) => row.table_name)
         .filter((name: string) => name && !EXCLUDED_TABLES.has(name))
     } else {
-      results.method2_raw_sql.error = error?.message || 'No data returned'
+      results.method2_raw_sql.error = error instanceof Error ? error.message : (error ? String(error) : 'No data returned')
     }
   } catch (error: unknown) {
     results.method2_raw_sql.error = error instanceof Error ? error.message : String(error)

@@ -74,7 +74,7 @@ export function TetrisGame() {
               <div className="flex flex-col items-center">
                 <div className="grid grid-cols-3 gap-1 w-32 h-32">
                   <div></div>
-                  <button className="tetris-button" onClick={() => controller.moveUp?.()}>↑</button>
+                  <button className="tetris-button" onClick={() => controller.flipClockwise()}>↑</button>
                   <div></div>
                   <button className="tetris-button" onClick={() => controller.moveLeft()}>←</button>
                   <button className="tetris-button" onClick={() => controller.hardDrop()}>⏬</button>
@@ -88,7 +88,7 @@ export function TetrisGame() {
                 <button className="tetris-action-button" onClick={() => controller.flipClockwise()}>↻</button>
                 <button className="tetris-action-button" onClick={() => controller.flipCounterclockwise()}>↺</button>
                 <button className="tetris-action-button" onClick={() => controller.hold()}>H</button>
-                <button className="tetris-action-button" onClick={() => controller.togglePause()}>P</button>
+                <button className="tetris-action-button" onClick={() => controller.pause()}>P</button>
               </div>
             </div>
           </div>

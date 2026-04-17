@@ -91,7 +91,7 @@ export default function NotFoundPage() {
                 <div className="flex flex-col items-center">
                   <div className="grid grid-cols-3 gap-1 w-32 h-32">
                     <div></div>
-                    <button className="tetris-button" onClick={() => controller.moveUp?.()}>
+                    <button className="tetris-button" onClick={() => controller.flipClockwise()}>
                       ↑
                     </button>
                     <div></div>
@@ -123,7 +123,7 @@ export default function NotFoundPage() {
                   <button className="tetris-action-button" onClick={() => controller.hold()}>
                     H
                   </button>
-                  <button className="tetris-action-button" onClick={() => controller.togglePause()}>
+                  <button className="tetris-action-button" onClick={() => controller.pause()}>
                     P
                   </button>
                 </div>
