@@ -1043,7 +1043,7 @@ export default function DatabaseTestPage() {
               message = 'Properly rejected: missing security headers'
             } else if (responseStatus === 401) {
               status = 'secure'
-              message = 'Correctly denied for invalid/missing signature'
+              message = 'Correctly denied for invalid/missing credentials'
             } else if (responseStatus === 403) {
               status = 'secure'
               message = 'Properly rejected: access denied'
