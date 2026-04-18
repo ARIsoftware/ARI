@@ -14,21 +14,25 @@
 export async function register() {
   // Only run in Node.js runtime (not Edge)
   if (process.env.NEXT_RUNTIME === 'nodejs' || !process.env.NEXT_RUNTIME) {
-    console.log('🔄 Auto-generating module registry...')
+    // Only auto-generate in development — in production (Vercel), the filesystem
+    // is read-only and prebuild already generated the registry at build time.
+    if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+      console.log('🔄 Auto-generating module registry...')
 
-    try {
-      // Dynamic imports - only loaded in Node.js runtime
-      const { execSync } = await import('child_process')
-      const path = await import('path')
+      try {
+        // Dynamic imports - only loaded in Node.js runtime
+        const { execSync } = await import('child_process')
+        const path = await import('path')
 
-      // Run the registry generation script
-      const scriptPath = path.join(process.cwd(), 'scripts', 'generate-module-registry.js')
-      execSync(`node "${scriptPath}"`, { stdio: 'inherit' })
+        // Run the registry generation script
+        const scriptPath = path.join(process.cwd(), 'scripts', 'generate-module-registry.js')
+        execSync(`node "${scriptPath}"`, { stdio: 'inherit' })
 
-      console.log('✅ Module registry generated successfully')
-    } catch (error) {
-      console.error('❌ Failed to generate module registry:', error)
-      // Don't throw - allow server to start even if registry generation fails
+        console.log('✅ Module registry generated successfully')
+      } catch (error) {
+        console.error('❌ Failed to generate module registry:', error)
+        // Don't throw - allow server to start even if registry generation fails
+      }
     }
 
     // Fire-and-forget anonymous install ping. Never blocks startup.
