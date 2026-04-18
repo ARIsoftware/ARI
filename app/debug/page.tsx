@@ -1043,7 +1043,7 @@ export default function DatabaseTestPage() {
               message = 'Properly rejected: missing security headers'
             } else if (responseStatus === 401) {
               status = 'secure'
-              message = 'Properly rejected: invalid/missing signature'
+              message = 'Correctly denied for invalid/missing signature'
             } else if (responseStatus === 403) {
               status = 'secure'
               message = 'Properly rejected: access denied'
@@ -2295,7 +2295,7 @@ export default function DatabaseTestPage() {
                             {result.status === 'testing' && <Loader2 className="h-5 w-5 text-blue-500 mt-0.5 animate-spin" />}
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                <Badge variant="outline" className="bg-orange-500/20 text-orange-500 border-orange-500/50 text-xs">
+                                <Badge variant="outline" className="bg-blue-500/20 text-blue-500 border-blue-500/50 text-xs">
                                   <Globe className="h-3 w-3 mr-1" />
                                   Public
                                 </Badge>
@@ -2770,10 +2770,10 @@ export default function DatabaseTestPage() {
                         ) : (
                           <div className="space-y-3">
                             {endpointsData.publicEndpoints.map((endpoint, i) => (
-                              <div key={i} className="flex items-start justify-between p-3 rounded-lg bg-muted/50 border border-orange-500/30">
+                              <div key={i} className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-orange-500/30">
                                 <div className="space-y-1">
                                   <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="bg-orange-500/20 text-orange-500 border-orange-500/50">
+                                    <Badge variant="outline" className="bg-blue-500/20 text-blue-500 border-blue-500/50">
                                       <Globe className="h-3 w-3 mr-1" />
                                       Public
                                     </Badge>
