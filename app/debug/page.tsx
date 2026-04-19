@@ -1051,9 +1051,16 @@ export default function DatabaseTestPage() {
               status = 'secure'
               message = 'Rate limit enforced'
             } else if (responseStatus === 200 || responseStatus === 201) {
-              // This is concerning - request succeeded without security headers
-              status = 'vulnerable'
-              message = 'WARNING: Request succeeded without security headers!'
+              // Check if this is a self-limiting endpoint (e.g. bootstrap)
+              let responseBody: Record<string, unknown> | null = null
+              try { responseBody = await testResponse.json() } catch {}
+              if (responseBody?.status === 'already_initialized') {
+                status = 'secure'
+                message = 'Locked after initialization'
+              } else {
+                status = 'vulnerable'
+                message = 'WARNING: Request succeeded without security headers!'
+              }
             } else if (responseStatus === 404) {
               status = 'warning'
               message = 'Endpoint not found (may not be registered in proxy)'
