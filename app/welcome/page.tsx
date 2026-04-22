@@ -473,7 +473,7 @@ export default function WelcomePage() {
     setShowOnboarding(true)
   }
 
-  const showSupabaseStep = localSupabaseStatus === "cloud"
+  const showSupabaseStep = true // TODO: revert to localSupabaseStatus === "cloud"
   const stepOrder = showSupabaseStep ? STEP_ORDER_CLOUD : STEP_ORDER_LOCAL
 
   const goToPreviousStep = () => {
@@ -1224,7 +1224,7 @@ export default function WelcomePage() {
                       <h2 className="text-2xl font-semibold text-zinc-900">Database &amp; Authentication</h2>
                     </div>
                     <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
-                      Configure your PostgreSQL database connection and authentication. You&apos;ll need API keys, the database connection string, and we&apos;ll generate a secure auth secret for you. Supabase offers a free tier. Please check their website for details.
+                      Configure your Supabase.com database connection and authentication. You&apos;ll need API keys, the database connection string, and we&apos;ll generate a secure auth secret for you. Supabase offers a free tier. Please check their website for details.
                     </p>
                   </div>
 
