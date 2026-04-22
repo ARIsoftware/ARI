@@ -76,5 +76,3 @@ On Windows, use `.\ari.cmd start` `.\ari.cmd status` and `.\ari.cmd stop`
 ## 🤝 Need Help?
 
 Reach out to us at hello@ari.software
-
-
