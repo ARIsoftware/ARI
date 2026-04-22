@@ -468,9 +468,10 @@ Comprehensive database backup and restore system with dynamic table discovery. M
 
 ## Project Specific Claude Code Rules
 
-- Never start a server. I will start them, usually on port 3000.
-- Never edit a database directly, instead provide .sql files which I can manually run.
 - Please always ensure any new page or API or feature always follows all the patterns from the existing codebase including authentication, RLS, and theming support!
+- Never run SQL directly against the database (via psql, Drizzle, or any other tool) without first asking the user for confirmation. Creating or editing .sql files is fine, and modules which automatically run .sql file when activated is fine. Use this language: "Should I proceed with updating the database, or would you prefer to run it yourself?"
+- Before taking any action which is not reversible (E.g., rmdir, drop table etc), please request confirmation from the user.
+- Never start a server without asking the user for confirmation first.
 
 ## Multi-Agent Support (Claude Code + OpenAI Codex)
 

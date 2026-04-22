@@ -580,7 +580,7 @@ export default function TasksPage() {
                           <td className="px-6 py-4">
                             <div className="flex flex-wrap gap-1">
                               {task.assignees.length > 0 ? (
-                                task.assignees.map((name: string) => (
+                                (task.assignees ?? []).map((name: string) => (
                                   <span
                                     key={name}
                                     className="px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground"
@@ -1080,7 +1080,7 @@ export default function TasksPage() {
                           className={`flex items-center flex-wrap gap-x-4 gap-y-2 text-sm ${task.pinned ? "text-gray-300" : "text-muted-foreground"}`}
                         >
                           <div className="flex items-center gap-2">
-                            {task.assignees.map((name: string) => (
+                            {(task.assignees ?? []).map((name: string) => (
                               <span
                                 key={name}
                                 className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.pinned ? "bg-white/10 text-gray-200" : "bg-muted text-muted-foreground"}`}
@@ -1204,7 +1204,7 @@ export default function TasksPage() {
                         <div className={`space-y-2 text-sm ${task.pinned ? "text-gray-300" : "text-muted-foreground"}`}>
                           {task.assignees.length > 0 && (
                             <div className="flex flex-wrap gap-1">
-                              {task.assignees.map((name: string) => (
+                              {(task.assignees ?? []).map((name: string) => (
                                 <span
                                   key={name}
                                   className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.pinned ? "bg-white/10 text-gray-200" : "bg-muted text-muted-foreground"}`}

@@ -1910,7 +1910,7 @@ export default function WelcomePage() {
                         Your admin account and database tables will be created automatically on first sign-in.
                       </p>
                       <div className="mb-3">
-                        <CodeBlock language="bash" code={`# In your terminal:\n# 1. Stop the dev server with Ctrl+C\n# 2. Start it again:\n./ari start`} />
+                        <CodeBlock language="bash" code={`# In your terminal:\n# 1. Stop the dev server with Ctrl+C and then press Enter\n# 2. Start it again:\n./ari start`} />
                       </div>
                     </div>
                   )}
