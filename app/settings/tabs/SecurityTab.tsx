@@ -193,10 +193,10 @@ export function SecurityTab({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <BarChart3 className="h-5 w-5 text-purple-500" />
-            Anonymous Usage Statistics
+            Usage Statistics
           </CardTitle>
           <CardDescription>
-            Help improve ARI by sharing anonymous install and version data.
+            Help improve ARI by sharing basic install and version data.
           </CardDescription>
         </CardHeader>
         <CardContent>
