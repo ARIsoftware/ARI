@@ -753,31 +753,31 @@ function writeEnvFile(supabaseVars) {
 // ── Commands ───────────────────────────────────────────────────────────────
 
 function start() {
-  // Check Docker
+  // Check Docker — if unavailable, skip Supabase and start dev server only
   if (!isDockerRunning()) {
-    console.log('\\n  ' + YELLOW + '⚠' + RESET + ' Docker is not running.');
-    console.log('  Please start Docker and wait until it is ready.\\n');
-    process.exit(1);
-  }
-
-  // Start Supabase (idempotent)
-  if (!isSupabaseRunning()) {
-    console.log('  Starting Supabase...');
-    try {
-      execSync('supabase start', { stdio: 'inherit', cwd: ROOT });
-    } catch {
-      console.log('\\n  ' + RED + '✘' + RESET + ' Failed to start Supabase.');
-      process.exit(1);
-    }
+    console.log('  ' + YELLOW + '⚠' + RESET + ' Docker is not running — skipping local Supabase.');
+    console.log('  ' + DIM + 'Configure your database connection in the setup wizard.' + RESET);
+    console.log('');
   } else {
-    console.log('  ' + GREEN + '✔' + RESET + ' Supabase is already running');
-  }
+    // Start Supabase (idempotent)
+    if (!isSupabaseRunning()) {
+      console.log('  Starting Supabase...');
+      try {
+        execSync('supabase start', { stdio: 'inherit', cwd: ROOT });
+      } catch {
+        console.log('\\n  ' + RED + '✘' + RESET + ' Failed to start Supabase.');
+        process.exit(1);
+      }
+    } else {
+      console.log('  ' + GREEN + '✔' + RESET + ' Supabase is already running');
+    }
 
-  // Regenerate env file
-  const vars = parseSupabaseEnv();
-  if (vars) {
-    writeEnvFile(vars);
-    console.log('  ' + GREEN + '✔' + RESET + ' .env.supabase.local updated');
+    // Regenerate env file
+    const vars = parseSupabaseEnv();
+    if (vars) {
+      writeEnvFile(vars);
+      console.log('  ' + GREEN + '✔' + RESET + ' .env.supabase.local updated');
+    }
   }
 
   console.log('');

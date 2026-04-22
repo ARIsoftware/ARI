@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
@@ -83,7 +83,8 @@ const generateAuthSecret = () => {
 }
 
 // Disabled steps: "supabase", "resend", "vercel", "github" — may be restored in the future
-const STEP_ORDER = ["account", "personal", "download"]
+const STEP_ORDER_LOCAL = ["account", "personal", "download"]
+const STEP_ORDER_CLOUD = ["account", "personal", "supabase", "download"]
 
 export default function WelcomePage() {
   const [completedLines, setCompletedLines] = useState<string[]>([])
@@ -92,10 +93,11 @@ export default function WelcomePage() {
   const [isTyping, setIsTyping] = useState(false)
   const [showContinue, setShowContinue] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const animationTimeouts = useRef<NodeJS.Timeout[]>([])
 
   const [currentTab, setCurrentTab] = useState("account")
   const [localSupabaseDetected, setLocalSupabaseDetected] = useState(false)
-  const [localSupabaseStatus, setLocalSupabaseStatus] = useState<"unknown" | "detected" | "not-running" | "keys-missing">("unknown")
+  const [localSupabaseStatus, setLocalSupabaseStatus] = useState<"unknown" | "detected" | "not-running" | "keys-missing" | "cloud">("unknown")
   const [selectedOS, setSelectedOS] = useState<"mac" | "windows" | "linux" | null>(null)
 
   const [formData, setFormData] = useState<OnboardingData>({
@@ -289,8 +291,27 @@ export default function WelcomePage() {
     { delay: 1300, text: "I am yours." },
   ]
 
+  const skipAnimation = () => {
+    animationTimeouts.current.forEach(clearTimeout)
+    animationTimeouts.current = []
+    setCompletedLines(sequence.map(s => s.text))
+    setCurrentLineText("")
+    setIsTyping(false)
+    setShowContinue(true)
+  }
+
   useEffect(() => {
-    let timeouts: NodeJS.Timeout[] = []
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !showOnboarding) {
+        skipAnimation()
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [showOnboarding])
+
+  useEffect(() => {
+    const timeouts = animationTimeouts.current
 
     const typeCharacter = (text: string, charIndex: number, lineIndex: number) => {
       if (charIndex < text.length) {
@@ -360,6 +381,9 @@ export default function WelcomePage() {
           } else if (!data.localSupabase.hasKeys) {
             setLocalSupabaseStatus("keys-missing")
           }
+        } else {
+          // No .env.supabase.local — user needs to configure cloud database
+          setLocalSupabaseStatus("cloud")
         }
       })
       .catch(() => setProjectDir(null))
@@ -449,14 +473,17 @@ export default function WelcomePage() {
     setShowOnboarding(true)
   }
 
+  const showSupabaseStep = localSupabaseStatus === "cloud"
+  const stepOrder = showSupabaseStep ? STEP_ORDER_CLOUD : STEP_ORDER_LOCAL
+
   const goToPreviousStep = () => {
-    const idx = STEP_ORDER.indexOf(currentTab)
-    if (idx > 0) setCurrentTab(STEP_ORDER[idx - 1])
+    const idx = stepOrder.indexOf(currentTab)
+    if (idx > 0) setCurrentTab(stepOrder[idx - 1])
   }
 
   const goToNextStep = () => {
-    const idx = STEP_ORDER.indexOf(currentTab)
-    if (idx < STEP_ORDER.length - 1) setCurrentTab(STEP_ORDER[idx + 1])
+    const idx = stepOrder.indexOf(currentTab)
+    if (idx < stepOrder.length - 1) setCurrentTab(stepOrder[idx + 1])
   }
 
 
@@ -529,7 +556,7 @@ export default function WelcomePage() {
           </div>
 
           {/* Step Indicator */}
-          <StepIndicator currentStep={currentTab} onStepClick={setCurrentTab} />
+          <StepIndicator currentStep={currentTab} onStepClick={setCurrentTab} showSupabaseStep={showSupabaseStep} />
 
           {/* Content Card */}
           <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden">

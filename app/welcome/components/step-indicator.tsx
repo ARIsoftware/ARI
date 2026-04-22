@@ -6,16 +6,19 @@ import { cn } from "@/lib/utils"
 interface StepIndicatorProps {
   currentStep: string
   onStepClick: (step: string) => void
+  showSupabaseStep?: boolean
 }
 
-// Disabled steps: supabase, resend, vercel, github — may be restored in the future
-const STEPS = [
+const BASE_STEPS = [
   { id: "account", label: "Account" },
   { id: "personal", label: "Personal" },
-  // { id: "supabase", label: "Supabase" },
-  // { id: "resend", label: "Resend" },
-  // { id: "github", label: "GitHub" },
-  // { id: "vercel", label: "Vercel" },
+  { id: "download", label: "Save" },
+]
+
+const STEPS_WITH_SUPABASE = [
+  { id: "account", label: "Account" },
+  { id: "personal", label: "Personal" },
+  { id: "supabase", label: "Supabase" },
   { id: "download", label: "Save" },
 ]
 
@@ -77,10 +80,11 @@ const STEP_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
   install: Database,
 }
 
-export function StepIndicator({ currentStep, onStepClick }: StepIndicatorProps) {
+export function StepIndicator({ currentStep, onStepClick, showSupabaseStep }: StepIndicatorProps) {
+  const steps = showSupabaseStep ? STEPS_WITH_SUPABASE : BASE_STEPS
   return (
     <div className="mb-8 flex items-center justify-between">
-      {STEPS.map((step, index) => {
+      {steps.map((step, index) => {
         const isActive = step.id === currentStep
         const IconComponent = STEP_ICONS[step.id]
 
@@ -112,7 +116,7 @@ export function StepIndicator({ currentStep, onStepClick }: StepIndicatorProps) 
             </button>
 
             {/* Connector line */}
-            {index < STEPS.length - 1 && (
+            {index < steps.length - 1 && (
               <div className="h-0.5 flex-1 mx-2 bg-zinc-200" />
             )}
           </div>
