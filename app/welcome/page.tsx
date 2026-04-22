@@ -95,6 +95,7 @@ export default function WelcomePage() {
 
   const [currentTab, setCurrentTab] = useState("account")
   const [localSupabaseDetected, setLocalSupabaseDetected] = useState(false)
+  const [localSupabaseStatus, setLocalSupabaseStatus] = useState<"unknown" | "detected" | "not-running" | "keys-missing">("unknown")
   const [selectedOS, setSelectedOS] = useState<"mac" | "windows" | "linux" | null>(null)
 
   const [formData, setFormData] = useState<OnboardingData>({
@@ -351,6 +352,14 @@ export default function WelcomePage() {
         if (data.envFileExists) setEnvFileExists(true)
         if (data.localSupabase?.detected) {
           setLocalSupabaseDetected(true)
+          setLocalSupabaseStatus("detected")
+        } else if (data.localSupabase?.envFileExists) {
+          // .env.supabase.local exists but vars are incomplete
+          if (!data.localSupabase.hasUrl || !data.localSupabase.hasDatabaseUrl) {
+            setLocalSupabaseStatus("not-running")
+          } else if (!data.localSupabase.hasKeys) {
+            setLocalSupabaseStatus("keys-missing")
+          }
         }
       })
       .catch(() => setProjectDir(null))
@@ -1744,7 +1753,7 @@ export default function WelcomePage() {
                           <X className="w-4 h-4 text-red-500" />
                         }
                         <span className={!isDatabaseConfigured ? "text-red-600" : "text-gray-900"}>
-                          Database: {localSupabaseDetected ? "Local Supabase" : formData.databaseUrl ? "Configured" : "Required - please complete"}
+                          Database: {localSupabaseDetected ? "Local Supabase" : formData.databaseUrl ? "Configured" : localSupabaseStatus === "not-running" ? "Local Supabase not detected. Make sure Docker is running with Supabase" : localSupabaseStatus === "keys-missing" ? "Supabase is starting — please refresh the page" : "Required - please complete"}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1762,7 +1771,7 @@ export default function WelcomePage() {
                           <X className="w-4 h-4 text-red-500" />
                         }
                         <span className={!isSupabaseApiConfigured ? "text-red-600" : "text-gray-900"}>
-                          Supabase API: {localSupabaseDetected ? "Local Supabase" : (formData.supabaseUrl && formData.supabaseSecretKey) ? "Configured" : "Required - please complete"}
+                          Supabase API: {localSupabaseDetected ? "Local Supabase" : (formData.supabaseUrl && formData.supabaseSecretKey) ? "Configured" : localSupabaseStatus === "not-running" ? "Local Supabase not detected. Make sure Docker is running with Supabase" : localSupabaseStatus === "keys-missing" ? "Supabase auth service is starting — please refresh the page" : "Required - please complete"}
                         </span>
                       </div>
                       {/* Optional configurations */}
