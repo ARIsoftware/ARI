@@ -473,7 +473,7 @@ export default function WelcomePage() {
     setShowOnboarding(true)
   }
 
-  const showSupabaseStep = true // TODO: revert to localSupabaseStatus === "cloud"
+  const showSupabaseStep = localSupabaseStatus === "cloud"
   const stepOrder = showSupabaseStep ? STEP_ORDER_CLOUD : STEP_ORDER_LOCAL
 
   const goToPreviousStep = () => {
