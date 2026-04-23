@@ -18,7 +18,7 @@ export function DatabaseErrorContent({ onRetry }: { onRetry?: () => void }) {
                 1
               </span>
               <span>
-                Check your database host (e.g., Supabase) to ensure your
+                Check your database host to ensure your
                 database is running and your connection settings are correct.
               </span>
             </li>
@@ -27,12 +27,15 @@ export function DatabaseErrorContent({ onRetry }: { onRetry?: () => void }) {
                 2
               </span>
               <span>
-                <strong>Local development:</strong> Check the{" "}
+                <strong>Local development:</strong> Check your{" "}
                 <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">
-                  .env.supabase.local
+                  .env.local
                 </code>{" "}
-                file to ensure the database connection string and credentials
-                are configured properly.
+                file to ensure the{" "}
+                <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">
+                  DATABASE_URL
+                </code>{" "}
+                is configured properly.
               </span>
             </li>
             <li className="flex items-start gap-3 text-sm text-gray-700">

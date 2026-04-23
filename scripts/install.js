@@ -13,6 +13,8 @@
 const { execSync, exec: execCb, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+
+const ARI_BRANCH = process.env.ARI_BRANCH || 'main';
 const readline = require('readline');
 const os = require('os');
 
@@ -301,6 +303,23 @@ function detectPsql() {
   return { installed: true, version: match ? match[1] : null };
 }
 
+function detectPgweb() {
+  const out = run('pgweb --version');
+  if (!out) return { installed: false, version: null };
+  const match = out.match(/(\d+\.\d+(?:\.\d+)?)/);
+  return { installed: true, version: match ? match[1] : null };
+}
+
+function detectPostgresServer() {
+  // Check if pg_isready is available (server is installed and running)
+  if (run('pg_isready -q') !== null) {
+    const psqlInfo = detectPsql();
+    return { installed: true, version: psqlInfo.version ?? 'unknown' };
+  }
+  // Fallback: server may be installed but not running
+  return detectPsql();
+}
+
 function detectGhCli() {
   const out = run('gh --version');
   return { installed: !!out, version: out ? parseVersion(out) : null };
@@ -430,6 +449,23 @@ const TOOLS = [
     description: 'Database management tools for Supabase PostgreSQL.',
   },
   {
+    id: 'postgresql',
+    name: 'PostgreSQL Server',
+    required: true,
+    installCmds: {
+      darwin: 'brew install postgresql@17 && brew services start postgresql@17',
+      linux: {
+        apt: 'sudo apt-get install -y postgresql',
+        dnf: 'sudo dnf install -y postgresql-server && sudo postgresql-setup --initdb && sudo systemctl enable postgresql && sudo systemctl start postgresql',
+        pacman: 'sudo pacman -S --noconfirm postgresql && sudo -u postgres initdb -D /var/lib/postgres/data && sudo systemctl enable postgresql && sudo systemctl start postgresql',
+        zypper: 'sudo zypper install -y postgresql-server && sudo systemctl enable postgresql && sudo systemctl start postgresql',
+      },
+      win32: 'winget install -e --id PostgreSQL.PostgreSQL',
+    },
+    detect: detectPostgresServer,
+    description: 'Database server for ARI data storage.',
+  },
+  {
     id: 'psql',
     name: 'PostgreSQL Client',
     required: false,
@@ -445,6 +481,21 @@ const TOOLS = [
     },
     detect: detectPsql,
     description: 'PostgreSQL client for database operations via Claude Code.',
+  },
+  {
+    id: 'pgweb',
+    name: 'pgweb',
+    required: true,
+    installCmds: {
+      darwin: 'brew install pgweb',
+      linux: {
+        apt: 'sudo apt-get install -y pgweb',
+        dnf: 'sudo dnf install -y pgweb',
+      },
+      fallback: 'go install github.com/sosedoff/pgweb@latest',
+    },
+    detect: detectPgweb,
+    description: 'Lightweight web UI for PostgreSQL (runs on localhost:5050).',
   },
   {
     id: 'claude-code',
@@ -582,16 +633,17 @@ async function cloneAndSetup() {
   spinner.start('Cloning ARI repository…');
 
   try {
-    await runAsync(`git clone https://github.com/ARIsoftware/ARI.git "${targetDir}"`);
+    const branchFlag = ARI_BRANCH !== 'main' ? ` --branch ${ARI_BRANCH}` : '';
+    await runAsync(`git clone${branchFlag} https://github.com/ARIsoftware/ARI.git "${targetDir}"`);
     // Rename origin to upstream (public ARI repo) so user can add their own origin later
     await runAsync(`cd "${targetDir}" && git remote rename origin upstream`);
-    spinner.success(`ARI cloned to ${dim(targetDir)}`);
+    spinner.success(`ARI cloned to ${dim(targetDir)}${ARI_BRANCH !== 'main' ? ` (branch: ${ARI_BRANCH})` : ''}`);
   } catch (err) {
     spinner.error('Failed to clone ARI repository');
     console.log(`  ${dim(err.message.split('\n').slice(0, 3).join('\n  '))}`);
     console.log('');
     console.log(`  ${dim('You can try cloning manually:')}`);
-    console.log(`  ${DIM_BLUE}git clone https://github.com/ARIsoftware/ARI.git "${targetDir}"${RESET}`);
+    console.log(`  ${DIM_BLUE}git clone${ARI_BRANCH !== 'main' ? ` --branch ${ARI_BRANCH}` : ''} https://github.com/ARIsoftware/ARI.git "${targetDir}"${RESET}`);
     return { cloned: false, dir: targetDir };
   }
 
@@ -680,172 +732,14 @@ function createCliLauncher(targetDir) {
   const ariDir = path.join(targetDir, '.ari');
   if (!fs.existsSync(ariDir)) fs.mkdirSync(ariDir, { recursive: true });
 
-  // .ari/cli.js
-  const cliContent = `#!/usr/bin/env node
-
-/**
- * ARI CLI — Local development helper
- * Usage: ./ari start | stop | status
- */
-
-const { execSync, spawn } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-
-const ROOT = path.resolve(__dirname, '..');
-const ENV_FILE = path.join(ROOT, '.env.supabase.local');
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-const YELLOW = '\\x1b[1;33m';
-const GREEN = '\\x1b[1;32m';
-const RED = '\\x1b[1;31m';
-const DIM = '\\x1b[2m';
-const RESET = '\\x1b[0m';
-
-function run(cmd) {
-  try {
-    return execSync(cmd, { encoding: 'utf8', stdio: 'pipe', cwd: ROOT }).trim();
-  } catch {
-    return null;
+  // .ari/cli.js — read from the repo's scripts/cli-template.js if available,
+  // otherwise the cloned repo already has .ari/cli.js checked in.
+  // The installer always writes a fresh copy to ensure it's up to date.
+  const cliTemplatePath = path.join(targetDir, 'scripts', 'cli-template.js');
+  if (fs.existsSync(cliTemplatePath)) {
+    fs.copyFileSync(cliTemplatePath, path.join(ariDir, 'cli.js'));
   }
-}
-
-function isDockerRunning() {
-  return !!run('docker info');
-}
-
-function isSupabaseRunning() {
-  const out = run('supabase status');
-  return out && out.includes('API URL');
-}
-
-function parseSupabaseEnv() {
-  const raw = run('supabase status -o env');
-  if (!raw) return null;
-  const vars = {};
-  for (const line of raw.split('\\n')) {
-    const match = line.match(/^([A-Z_]+)="?(.*?)"?$/);
-    if (match) vars[match[1]] = match[2];
-  }
-  return vars;
-}
-
-// SYNC: env key mapping is duplicated in the installer generateEnvFile(). Keep both in sync.
-function writeEnvFile(supabaseVars) {
-  // Only write keys that have values. Writing empty \`KEY=\` lines causes
-  // dotenv (with override: true in next.config.mjs) to overwrite values from
-  // .env.local with empty strings, which would break the client bundle.
-  const mappings = [
-    ['NEXT_PUBLIC_SUPABASE_URL', supabaseVars.API_URL],
-    ['NEXT_PUBLIC_SUPABASE_ANON_KEY', supabaseVars.ANON_KEY],
-    ['SUPABASE_SERVICE_ROLE_KEY', supabaseVars.SERVICE_ROLE_KEY],
-    ['DATABASE_URL', supabaseVars.DB_URL],
-  ];
-  const content = mappings
-    .filter(([, value]) => value)
-    .map(([key, value]) => key + '=' + value)
-    .join('\\n') + '\\n';
-
-  fs.writeFileSync(ENV_FILE, content);
-}
-
-// ── Commands ───────────────────────────────────────────────────────────────
-
-function start() {
-  // Check Docker — if unavailable, skip Supabase and start dev server only
-  if (!isDockerRunning()) {
-    console.log('  ' + YELLOW + '⚠' + RESET + ' Docker is not running — skipping local Supabase.');
-    console.log('  ' + DIM + 'Configure your database connection in the setup wizard.' + RESET);
-    console.log('');
-  } else {
-    // Start Supabase (idempotent)
-    if (!isSupabaseRunning()) {
-      console.log('  Starting Supabase...');
-      try {
-        execSync('supabase start', { stdio: 'inherit', cwd: ROOT });
-      } catch {
-        console.log('\\n  ' + RED + '✘' + RESET + ' Failed to start Supabase.');
-        process.exit(1);
-      }
-    } else {
-      console.log('  ' + GREEN + '✔' + RESET + ' Supabase is already running');
-    }
-
-    // Regenerate env file
-    const vars = parseSupabaseEnv();
-    if (vars) {
-      writeEnvFile(vars);
-      console.log('  ' + GREEN + '✔' + RESET + ' .env.supabase.local updated');
-    }
-  }
-
-  console.log('');
-
-  // Start Next.js dev server (foreground)
-  const child = spawn('pnpm', ['dev'], { stdio: 'inherit', cwd: ROOT });
-
-  const cleanup = () => {
-    child.kill();
-    console.log('\\n  ' + DIM + 'Next.js stopped. Supabase containers are still running.' + RESET);
-    console.log('  ' + DIM + 'Run ./ari stop to shut them down.' + RESET + '\\n');
-    process.exit(0);
-  };
-
-  process.on('SIGINT', cleanup);
-  process.on('SIGTERM', cleanup);
-
-  child.on('exit', (code) => {
-    process.exit(code || 0);
-  });
-}
-
-function stop() {
-  console.log('  Stopping Supabase...');
-  try {
-    execSync('supabase stop', { stdio: 'inherit', cwd: ROOT });
-    console.log('  ' + GREEN + '✔' + RESET + ' Supabase stopped');
-  } catch {
-    console.log('  ' + RED + '✘' + RESET + ' Failed to stop Supabase');
-    process.exit(1);
-  }
-}
-
-function status() {
-  try {
-    execSync('supabase status', { stdio: 'inherit', cwd: ROOT });
-  } catch {
-    console.log('  Supabase is not running.');
-  }
-  console.log('');
-  if (fs.existsSync(ENV_FILE)) {
-    console.log('  ' + GREEN + '✔' + RESET + ' .env.supabase.local exists');
-  } else {
-    console.log('  ' + YELLOW + '⚠' + RESET + ' .env.supabase.local not found');
-  }
-}
-
-// ── Main ───────────────────────────────────────────────────────────────────
-
-const cmd = process.argv[2];
-const commands = { start, stop, status };
-
-if (!cmd || !commands[cmd]) {
-  console.log('');
-  console.log('  Usage: ./ari <command>');
-  console.log('');
-  console.log('  Commands:');
-  console.log('    start    Start Supabase + dev server');
-  console.log('    stop     Stop Supabase containers');
-  console.log('    status   Show Supabase status');
-  console.log('');
-  process.exit(cmd ? 1 : 0);
-}
-
-commands[cmd]();
-`;
-
-  fs.writeFileSync(path.join(ariDir, 'cli.js'), cliContent);
+  // If neither exists, the repo's .ari/cli.js will be used as-is
 
   // Unix launcher
   const unixLauncher = `#!/usr/bin/env bash\nexec node "$(dirname "$0")/.ari/cli.js" "$@"\n`;
@@ -868,6 +762,162 @@ function spawnAsync(cmd, args, opts) {
     });
     child.on('error', reject);
   });
+}
+
+function writeInstallerEnvFile(targetDir, { dbMode, dbUrl }) {
+  const crypto = require('crypto');
+  const secret = crypto.randomBytes(32).toString('base64');
+  const lines = [
+    '# ARI Environment Configuration',
+    '# Generated by ARI installer',
+    '',
+    `ARI_DB_MODE=${dbMode}`,
+    '',
+  ];
+
+  if (dbUrl) {
+    lines.push('# Database', `DATABASE_URL=${dbUrl}`, 'DATABASE_POOL_MAX=10', '');
+  }
+
+  lines.push(
+    '# Better Auth',
+    `BETTER_AUTH_SECRET=${secret}`,
+    'BETTER_AUTH_URL=http://localhost:3000',
+    '',
+    '# App URL',
+    'NEXT_PUBLIC_APP_URL=http://localhost:3000',
+    '',
+    '# Backup operations',
+    'ALLOW_BACKUP_OPERATIONS=true',
+    '',
+  );
+
+  fs.writeFileSync(path.join(targetDir, '.env.local'), lines.join('\n'));
+}
+
+async function chooseDatabaseMode() {
+  console.log('');
+  hr();
+  console.log(`  ${blue('Database Setup')}`);
+  hr();
+  console.log('');
+  console.log('  Which database setup would you like?');
+  console.log('');
+  console.log(`    ${green('1.')} Local PostgreSQL ${dim('(default)')}`);
+  console.log(`       ${dim('Uses PostgreSQL directly. No Docker required.')}`);
+  console.log('');
+  console.log(`    ${green('2.')} Local Supabase ${dim('(requires Docker)')}`);
+  console.log(`       ${dim('Runs a full Supabase stack in Docker containers.')}`);
+  console.log('');
+  console.log(`    ${green('3.')} Supabase Cloud`);
+  console.log(`       ${dim('Connect to a Supabase.com project. Configure on first launch.')}`);
+  console.log('');
+
+  const answer = await askQuestion(`  ${dim('Enter choice [1/2/3]:')} `);
+  const choice = answer.trim();
+  if (choice === '2') return 'supabaselocal';
+  if (choice === '3') return 'supabasecloud';
+  return 'postgres';
+}
+
+async function setupLocalPostgres(targetDir) {
+  console.log('');
+  hr();
+  console.log(`  ${blue('Local PostgreSQL Setup')}`);
+  hr();
+
+  const result = {
+    pgReady: false,
+    dbCreated: false,
+    schemaInitialized: false,
+    cliCreated: false,
+  };
+
+  try {
+    // 1. Check if PostgreSQL is running
+    const pgReady = run('pg_isready -q') !== null
+      || run('/opt/homebrew/opt/postgresql@17/bin/pg_isready -q') !== null;
+
+    if (!pgReady) {
+      console.log(`  ${SYM_DASH} PostgreSQL is not running. Attempting to start…`);
+      if (PLATFORM === 'darwin') {
+        run('brew services start postgresql@17');
+      } else {
+        run('sudo systemctl start postgresql');
+      }
+      // Re-check
+      const now = run('pg_isready -q') !== null;
+      if (!now) {
+        console.log(`  ${SYM_CROSS} ${red('Could not start PostgreSQL.')}`);
+        if (PLATFORM === 'darwin') {
+          console.log(`  ${dim('Try: brew services start postgresql@17')}`);
+          console.log(`  ${dim('You may need to add PostgreSQL to your PATH:')}`);
+          console.log(`  ${dim('export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"')}`);
+        } else {
+          console.log(`  ${dim('Try: sudo systemctl start postgresql')}`);
+        }
+        return result;
+      }
+    }
+    console.log(`  ${SYM_CHECK} PostgreSQL is running`);
+    result.pgReady = true;
+
+    // 2. Create database (platform-aware)
+    const spinner = new Spinner();
+    spinner.start('Creating database…');
+
+    const isLinux = PLATFORM === 'linux';
+    const dbListCmd = isLinux ? 'sudo -u postgres psql -lqt' : 'psql -lqt';
+    const dbList = run(dbListCmd) || '';
+    const dbExists = dbList.split('\n').some(line => line.trim().startsWith('ari ') || line.trim().startsWith('ari|'));
+
+    if (dbExists) {
+      spinner.success('Database "ari" already exists');
+    } else {
+      const createCmd = isLinux ? 'sudo -u postgres createdb ari' : 'createdb ari';
+      const createResult = run(createCmd);
+      if (createResult === null) {
+        spinner.error('Failed to create database "ari"');
+        console.log(`  ${dim('Try manually: ' + createCmd)}`);
+        return result;
+      }
+      spinner.success('Database "ari" created');
+    }
+    result.dbCreated = true;
+
+    // 3. Determine DATABASE_URL
+    const dbUrl = isLinux
+      ? 'postgresql://postgres@localhost:5432/ari'
+      : 'postgresql://localhost:5432/ari';
+
+    // 4. Run setup.sql
+    spinner.start('Initializing database schema…');
+    try {
+      const ok = await runSetupSql(targetDir, dbUrl);
+      if (ok) {
+        spinner.success('Database schema initialized');
+        result.schemaInitialized = true;
+      } else {
+        spinner.error('setup.sql not found');
+      }
+    } catch (err) {
+      spinner.error('Failed to initialize database schema');
+      console.log(`  ${dim(err.message.split('\n').slice(0, 3).join('\n  '))}`);
+    }
+
+    // 5. Write .env.local with ARI_DB_MODE and DATABASE_URL
+    spinner.start('Writing .env.local…');
+    writeInstallerEnvFile(targetDir, { dbMode: 'postgres', dbUrl });
+    spinner.success('.env.local generated');
+
+  } finally {
+    // Always create CLI launcher
+    createCliLauncher(targetDir);
+    result.cliCreated = true;
+    console.log(`  ${SYM_CHECK} CLI launcher created ${dim('(./ari start | stop | status)')}`);
+  }
+
+  return result;
 }
 
 async function setupLocalSupabase(targetDir) {
@@ -1088,28 +1138,48 @@ function runVerification(ariResult, supabaseResult) {
     optional: true,
   });
 
-  // Supabase Local
+  // Database setup results
   if (supabaseResult) {
-    checks.push({
-      name: 'Supabase Local',
-      ok: true,
-      detail: supabaseResult.supabaseStarted ? 'running' : 'not started',
-      optional: true,
-    });
+    // Supabase local mode
+    if (supabaseResult.supabaseStarted !== undefined) {
+      checks.push({
+        name: 'Supabase Local',
+        ok: true,
+        detail: supabaseResult.supabaseStarted ? 'running' : 'not started',
+        optional: true,
+      });
+      checks.push({
+        name: '.env.supabase.local',
+        ok: true,
+        detail: supabaseResult.envGenerated ? 'generated' : 'not generated',
+        optional: true,
+      });
+    }
 
-    checks.push({
-      name: '.env.supabase.local',
-      ok: true,
-      detail: supabaseResult.envGenerated ? 'generated' : 'not generated',
-      optional: true,
-    });
+    // PostgreSQL local mode
+    if (supabaseResult.pgReady !== undefined) {
+      checks.push({
+        name: 'PostgreSQL',
+        ok: true,
+        detail: supabaseResult.pgReady ? 'running' : 'not reachable',
+        optional: true,
+      });
+      checks.push({
+        name: 'Database "ari"',
+        ok: true,
+        detail: supabaseResult.dbCreated ? 'created' : 'not created',
+        optional: true,
+      });
+    }
 
-    checks.push({
-      name: 'Database Schema',
-      ok: true,
-      detail: supabaseResult.schemaInitialized ? 'initialized' : 'not initialized',
-      optional: true,
-    });
+    if (supabaseResult.schemaInitialized !== undefined) {
+      checks.push({
+        name: 'Database Schema',
+        ok: true,
+        detail: supabaseResult.schemaInitialized ? 'initialized' : 'not initialized',
+        optional: true,
+      });
+    }
 
     checks.push({
       name: 'ARI CLI',
@@ -1183,7 +1253,7 @@ function showCompletion(ariResult, supabaseResult) {
   } else {
     console.log(`  Clone ARI manually and run:`);
     console.log('');
-    console.log(`    ${DIM_BLUE}git clone https://github.com/ARIsoftware/ARI.git${RESET}`);
+    console.log(`    ${DIM_BLUE}git clone${ARI_BRANCH !== 'main' ? ` --branch ${ARI_BRANCH}` : ''} https://github.com/ARIsoftware/ARI.git${RESET}`);
     console.log(`    ${DIM_BLUE}cd ARI${RESET}`);
     console.log(`    ${DIM_BLUE}pnpm install${RESET}`);
     console.log(`    ${DIM_BLUE}./ari start${RESET}`);
@@ -1233,17 +1303,31 @@ async function main() {
   // Clone & setup
   const ariResult = await cloneAndSetup();
 
-  // Local Supabase setup (only if clone succeeded and deps installed)
-  let supabaseResult = null;
+  // Database mode selection and setup (only if clone succeeded and deps installed)
+  let dbResult = null;
+  let dbMode = 'postgres';
   if (ariResult && ariResult.cloned && ariResult.depsInstalled) {
-    supabaseResult = await setupLocalSupabase(ariResult.dir);
+    dbMode = await chooseDatabaseMode();
+
+    if (dbMode === 'postgres') {
+      dbResult = await setupLocalPostgres(ariResult.dir);
+    } else if (dbMode === 'supabaselocal') {
+      dbResult = await setupLocalSupabase(ariResult.dir);
+    } else {
+      // supabasecloud — user configures on /welcome
+      writeInstallerEnvFile(ariResult.dir, { dbMode: 'supabasecloud' });
+      console.log(`  ${SYM_CHECK} .env.local generated ${dim('(configure Supabase on /welcome)')}`);
+      createCliLauncher(ariResult.dir);
+      console.log(`  ${SYM_CHECK} CLI launcher created ${dim('(./ari start | stop | status)')}`);
+      dbResult = { cliCreated: true };
+    }
   }
 
   // Verification
-  runVerification(ariResult, supabaseResult);
+  runVerification(ariResult, dbResult);
 
   // Completion
-  showCompletion(ariResult, supabaseResult);
+  showCompletion(ariResult, dbResult);
 
   // Write install directory for the shell wrapper to cd into
   const dirFile = process.env.ARI_INSTALL_DIR_FILE;

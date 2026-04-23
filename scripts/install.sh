@@ -6,6 +6,9 @@
 # Usage:
 #   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/ARIsoftware/ARI/main/scripts/install.sh)"
 #
+# To install from a specific branch:
+#   ARI_BRANCH=develop /bin/bash -c "$(curl -fsSL https://ari.software/install)"
+#
 
 set -euo pipefail
 
@@ -162,7 +165,9 @@ fi
 INSTALL_JS="/tmp/ari-install-$$.js"
 INSTALL_DIR_FILE="/tmp/ari-install-dir-$$"
 export ARI_INSTALL_DIR_FILE="$INSTALL_DIR_FILE"
-INSTALL_URL="https://raw.githubusercontent.com/ARIsoftware/ARI/main/scripts/install.js"
+ARI_BRANCH="${ARI_BRANCH:-main}"
+export ARI_BRANCH
+INSTALL_URL="https://raw.githubusercontent.com/ARIsoftware/ARI/${ARI_BRANCH}/scripts/install.js"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd 2>/dev/null)" || SCRIPT_DIR=""
 LOCAL_JS="${SCRIPT_DIR:+$SCRIPT_DIR/install.js}"
 

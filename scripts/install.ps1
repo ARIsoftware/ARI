@@ -7,6 +7,9 @@
 .DESCRIPTION
   Usage (run in PowerShell):
     irm https://raw.githubusercontent.com/ARIsoftware/ARI/main/scripts/install.ps1 | iex
+
+  To install from a specific branch:
+    $env:ARI_BRANCH="develop"; irm https://raw.githubusercontent.com/ARIsoftware/ARI/main/scripts/install.ps1 | iex
 #>
 
 Set-StrictMode -Version Latest
@@ -82,7 +85,8 @@ if ($nodeVer) {
 # ── Hand off to install.js ───────────────────────────────────────────────────
 
 $installJs = Join-Path $env:TEMP "ari-install-$PID.js"
-$installUrl = "https://raw.githubusercontent.com/ARIsoftware/ARI/main/scripts/install.js"
+if (-not $env:ARI_BRANCH) { $env:ARI_BRANCH = "main" }
+$installUrl = "https://raw.githubusercontent.com/ARIsoftware/ARI/$($env:ARI_BRANCH)/scripts/install.js"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $localJs = Join-Path $scriptDir "install.js"
 

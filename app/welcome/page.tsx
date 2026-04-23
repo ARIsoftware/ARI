@@ -96,8 +96,7 @@ export default function WelcomePage() {
   const animationTimeouts = useRef<NodeJS.Timeout[]>([])
 
   const [currentTab, setCurrentTab] = useState("account")
-  const [localSupabaseDetected, setLocalSupabaseDetected] = useState(false)
-  const [localSupabaseStatus, setLocalSupabaseStatus] = useState<"unknown" | "detected" | "not-running" | "keys-missing" | "cloud">("unknown")
+  const [dbMode, setDbMode] = useState<"postgres" | "supabaselocal" | "supabasecloud">("postgres")
   const [selectedOS, setSelectedOS] = useState<"mac" | "windows" | "linux" | null>(null)
 
   const [formData, setFormData] = useState<OnboardingData>({
@@ -371,19 +370,10 @@ export default function WelcomePage() {
       .then((data) => {
         setProjectDir(data.dir)
         if (data.envFileExists) setEnvFileExists(true)
-        if (data.localSupabase?.detected) {
-          setLocalSupabaseDetected(true)
-          setLocalSupabaseStatus("detected")
-        } else if (data.localSupabase?.envFileExists) {
-          // .env.supabase.local exists but vars are incomplete
-          if (!data.localSupabase.hasUrl || !data.localSupabase.hasDatabaseUrl) {
-            setLocalSupabaseStatus("not-running")
-          } else if (!data.localSupabase.hasKeys) {
-            setLocalSupabaseStatus("keys-missing")
-          }
-        } else {
-          // No .env.supabase.local — user needs to configure cloud database
-          setLocalSupabaseStatus("cloud")
+
+        // Use ARI_DB_MODE from server (auto-detected for legacy installs)
+        if (data.dbMode) {
+          setDbMode(data.dbMode)
         }
       })
       .catch(() => setProjectDir(null))
@@ -413,8 +403,8 @@ export default function WelcomePage() {
   )
 
   const envFileContent = useMemo(
-    () => renderEnvFile(envFields, { localSupabaseDetected }),
-    [envFields, localSupabaseDetected],
+    () => renderEnvFile(envFields, { dbMode }),
+    [envFields, dbMode],
   )
 
   const [projectDir, setProjectDir] = useState<string | null>(null)
@@ -436,7 +426,7 @@ export default function WelcomePage() {
       const res = await fetch("/api/download-env", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...envFields, localSupabaseDetected }),
+        body: JSON.stringify({ ...envFields, dbMode }),
       })
       // Server can return non-JSON on hard errors (dev-mode error pages, proxy
       // failures, etc.) — fall back to raw text so the user gets something useful.
@@ -473,7 +463,7 @@ export default function WelcomePage() {
     setShowOnboarding(true)
   }
 
-  const showSupabaseStep = localSupabaseStatus === "cloud"
+  const showSupabaseStep = dbMode === "supabasecloud"
   const stepOrder = showSupabaseStep ? STEP_ORDER_CLOUD : STEP_ORDER_LOCAL
 
   const goToPreviousStep = () => {
@@ -487,9 +477,9 @@ export default function WelcomePage() {
   }
 
 
-  const isDatabaseConfigured = localSupabaseDetected || !!formData.databaseUrl
-  const isSupabaseApiConfigured = localSupabaseDetected || (!!formData.supabaseUrl && !!formData.supabaseSecretKey)
-  const isSupabaseComplete = isDatabaseConfigured && isSupabaseApiConfigured && (!!formData.supabaseAnonKey || localSupabaseDetected) && formData.betterAuthSecret
+  const isDatabaseConfigured = dbMode !== 'supabasecloud' || !!formData.databaseUrl
+  const isSupabaseApiConfigured = dbMode !== 'supabasecloud' || (!!formData.supabaseUrl && !!formData.supabaseSecretKey)
+  const isSupabaseComplete = isDatabaseConfigured && isSupabaseApiConfigured && (!!formData.supabaseAnonKey || dbMode !== 'supabasecloud') && formData.betterAuthSecret
 
   // Intro/typing animation screen
   if (!showOnboarding) {
@@ -1780,7 +1770,7 @@ export default function WelcomePage() {
                           <X className="w-4 h-4 text-red-500" />
                         }
                         <span className={!isDatabaseConfigured ? "text-red-600" : "text-gray-900"}>
-                          Database: {localSupabaseDetected ? "Local Supabase" : formData.databaseUrl ? "Configured" : localSupabaseStatus === "not-running" ? "Local Supabase not detected. Make sure Docker is running with Supabase" : localSupabaseStatus === "keys-missing" ? "Supabase is starting — please refresh the page" : "Required - please complete"}
+                          Database: {dbMode === "postgres" ? "Local PostgreSQL" : dbMode === "supabaselocal" ? "Local Supabase" : formData.databaseUrl ? "Configured" : "Required - please complete"}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
@@ -1798,7 +1788,7 @@ export default function WelcomePage() {
                           <X className="w-4 h-4 text-red-500" />
                         }
                         <span className={!isSupabaseApiConfigured ? "text-red-600" : "text-gray-900"}>
-                          Supabase API: {localSupabaseDetected ? "Local Supabase" : (formData.supabaseUrl && formData.supabaseSecretKey) ? "Configured" : localSupabaseStatus === "not-running" ? "Local Supabase not detected. Make sure Docker is running with Supabase" : localSupabaseStatus === "keys-missing" ? "Supabase auth service is starting — please refresh the page" : "Required - please complete"}
+                          Supabase API: {dbMode !== "supabasecloud" ? (dbMode === "postgres" ? "Not required" : "Local Supabase") : (formData.supabaseUrl && formData.supabaseSecretKey) ? "Configured" : "Required - please complete"}
                         </span>
                       </div>
                       {/* Optional configurations */}

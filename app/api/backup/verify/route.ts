@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { logger } from '@/lib/logger'
-import { getServiceSupabase, EXCLUDED_TABLES } from '../utils'
+import { queryRows, EXCLUDED_TABLES } from '../utils'
 
 export const debugRole = "backup-verify"
 
@@ -12,118 +12,69 @@ interface TableInfo {
   status: 'accessible' | 'inaccessible' | 'unknown'
 }
 
-// Test table discovery methods
-async function testDiscoveryMethods(client: ReturnType<typeof getServiceSupabase>) {
-  const results = {
-    method1_rpc_function: { success: false, tables: [] as string[], error: null as string | null },
-    method2_raw_sql: { success: false, tables: [] as string[], error: null as string | null },
-    method3_information_schema: { success: false, tables: [] as string[], error: null as string | null }
+// Test table discovery via direct SQL
+async function testDiscovery() {
+  const result = {
+    direct_sql: { success: false, tables: [] as string[], error: null as string | null }
   }
 
-  // Test Method 1: RPC function
   try {
-    const { data, error } = await client.rpc('get_all_user_tables')
-    if (!error && data && Array.isArray(data) && data.length > 0) {
-      results.method1_rpc_function.success = true
-      results.method1_rpc_function.tables = data
-        .map((row: any) => row.table_name)
-        .filter((name: string) => name && !EXCLUDED_TABLES.has(name))
-    } else {
-      results.method1_rpc_function.error = error?.message || 'No data returned'
-    }
-  } catch (error: unknown) {
-    results.method1_rpc_function.error = error instanceof Error ? error.message : String(error)
-  }
-
-  // Test Method 2: Raw SQL via exec_sql
-  try {
-    const query = `
+    const data = await queryRows<{ table_name: string }>(`
       SELECT table_name
       FROM information_schema.tables
       WHERE table_schema = 'public'
         AND table_type = 'BASE TABLE'
-        AND table_name NOT IN ('spatial_ref_sys', 'schema_migrations', 'pg_stat_statements')
-      ORDER BY table_name;
-    `
-    let data = null
-    let error = null
-    try {
-      const result = await client.rpc('exec_sql', { query })
-      data = result.data
-      error = result.error
-    } catch (rpcError: unknown) {
-      error = rpcError
-    }
+      ORDER BY table_name
+    `)
 
-    if (!error && data && Array.isArray(data) && data.length > 0) {
-      results.method2_raw_sql.success = true
-      results.method2_raw_sql.tables = data
-        .map((row: any) => row.table_name)
-        .filter((name: string) => name && !EXCLUDED_TABLES.has(name))
+    if (data.length > 0) {
+      result.direct_sql.success = true
+      result.direct_sql.tables = data
+        .map(row => row.table_name)
+        .filter(name => name && !EXCLUDED_TABLES.has(name))
     } else {
-      results.method2_raw_sql.error = error instanceof Error ? error.message : (error ? String(error) : 'No data returned')
+      result.direct_sql.error = 'No tables found'
     }
   } catch (error: unknown) {
-    results.method2_raw_sql.error = error instanceof Error ? error.message : String(error)
+    result.direct_sql.error = error instanceof Error ? error.message : String(error)
   }
 
-  // Test Method 3: Direct information_schema query
-  try {
-    const { data, error } = await client
-      .from('information_schema.tables')
-      .select('table_name')
-      .eq('table_schema', 'public')
-      .eq('table_type', 'BASE TABLE')
-
-    if (!error && data && data.length > 0) {
-      results.method3_information_schema.success = true
-      results.method3_information_schema.tables = data
-        .map((row: any) => row.table_name)
-        .filter((name: string) => name && !EXCLUDED_TABLES.has(name))
-    } else {
-      results.method3_information_schema.error = error?.message || 'No data returned'
-    }
-  } catch (error: unknown) {
-    results.method3_information_schema.error = error instanceof Error ? error.message : String(error)
-  }
-
-  return results
+  return result
 }
 
-// Get row counts for tables
-async function getRowCounts(client: ReturnType<typeof getServiceSupabase>, tables: string[]): Promise<Record<string, number>> {
+// Get row counts for tables using pg_class for fast approximate counts
+async function getRowCounts(tables: string[]): Promise<Record<string, number>> {
   const rowCounts: Record<string, number> = {}
 
-  // Try using RPC function first (faster)
   try {
-    const { data, error } = await client.rpc('get_table_row_counts')
-    if (!error && data && Array.isArray(data)) {
-      data.forEach((row: any) => {
-        if (tables.includes(row.table_name)) {
-          rowCounts[row.table_name] = row.row_count
-        }
-      })
+    const counts = await queryRows<{ table_name: string; row_count: number }>(`
+      SELECT c.relname as table_name, c.reltuples::bigint as row_count
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public' AND c.relkind = 'r'
+    `)
 
-      if (Object.keys(rowCounts).length > 0) {
-        return rowCounts
+    for (const row of counts) {
+      if (tables.includes(row.table_name)) {
+        rowCounts[row.table_name] = Number(row.row_count)
       }
     }
+
+    if (Object.keys(rowCounts).length > 0) {
+      return rowCounts
+    }
   } catch (error: unknown) {
-    logger.info('[Backup Verify] RPC row count function not available, using fallback')
+    logger.info('[Backup Verify] pg_class count not available, using fallback')
   }
 
   // Fallback: count individually
   for (const table of tables) {
+    if (!/^[a-z_][a-z0-9_]*$/i.test(table)) continue
     try {
-      const { count, error } = await client
-        .from(table)
-        .select('*', { count: 'exact', head: true })
-
-      if (!error && count !== null) {
-        rowCounts[table] = count
-      } else {
-        rowCounts[table] = 0
-      }
+      const result = await queryRows<{ cnt: number }>(
+        `SELECT COUNT(*)::int AS cnt FROM "${table}"`
+      )
+      rowCounts[table] = result[0]?.cnt ?? 0
     } catch {
       rowCounts[table] = 0
     }
@@ -146,40 +97,27 @@ export async function GET(req: NextRequest) {
 
     logger.info(`[Backup Verify] Verification requested by user: ${user.id.slice(0, 8)}…`)
 
-    // Get service client
-    const client = getServiceSupabase()
+    // Test discovery
+    const discoveryResults = await testDiscovery()
 
-    // Test all discovery methods
-    const discoveryResults = await testDiscoveryMethods(client)
-
-    // Determine which method works best - trust the database, not a hardcoded list
+    // Determine results
     let primaryMethod = 'none'
     let discoveredTables: string[] = []
     const warnings: string[] = []
 
-    if (discoveryResults.method1_rpc_function.success) {
-      primaryMethod = 'rpc_function'
-      discoveredTables = discoveryResults.method1_rpc_function.tables
-      logger.info(`[Backup Verify] Method 1 (RPC) found ${discoveredTables.length} tables`)
-    } else if (discoveryResults.method2_raw_sql.success) {
-      primaryMethod = 'raw_sql'
-      discoveredTables = discoveryResults.method2_raw_sql.tables
-      warnings.push('RPC function not available - using raw SQL fallback. Consider running the migration.')
-      logger.info(`[Backup Verify] Method 2 (raw SQL) found ${discoveredTables.length} tables`)
-    } else if (discoveryResults.method3_information_schema.success) {
-      primaryMethod = 'information_schema'
-      discoveredTables = discoveryResults.method3_information_schema.tables
-      warnings.push('RPC functions not available - using information_schema query')
-      logger.info(`[Backup Verify] Method 3 (information_schema) found ${discoveredTables.length} tables`)
+    if (discoveryResults.direct_sql.success) {
+      primaryMethod = 'direct_sql'
+      discoveredTables = discoveryResults.direct_sql.tables
+      logger.info(`[Backup Verify] Found ${discoveredTables.length} tables via direct SQL`)
     } else {
       primaryMethod = 'none'
-      warnings.push('CRITICAL: All discovery methods failed. Re-run lib/db/setup.sql in the Supabase SQL editor to install the backup RPC functions.')
-      logger.error('[Backup Verify] All discovery methods failed!')
+      warnings.push('CRITICAL: Table discovery failed. Check database connectivity.')
+      logger.error('[Backup Verify] Discovery failed!')
     }
 
     // Get row counts for all tables
     const rowCounts = discoveredTables.length > 0
-      ? await getRowCounts(client, discoveredTables)
+      ? await getRowCounts(discoveredTables)
       : {}
 
     // Build detailed table info
@@ -202,12 +140,12 @@ export async function GET(req: NextRequest) {
       status,
       discoveryMethod: primaryMethod,
       tablesFound: discoveredTables.length,
-      expectedTables: discoveredTables.length, // Trust what we discovered
+      expectedTables: discoveredTables.length,
       totalRows,
       tables: tableInfo,
       warnings,
-      missingTables: [], // No hardcoded list to compare against
-      extraTables: [], // No hardcoded list to compare against
+      missingTables: [],
+      extraTables: [],
       discoveryResults,
       timestamp: new Date().toISOString()
     })

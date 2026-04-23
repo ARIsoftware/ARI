@@ -1,31 +1,26 @@
 /**
  * Shared utilities for backup export, import, and verify routes.
  *
- * These routes all need access to the Supabase service client (for PostgREST
- * table/schema discovery via RPC) and share a common excluded-tables list.
+ * These routes use direct SQL via the pg pool for table/schema discovery.
+ * No Supabase client dependency — works with any PostgreSQL backend.
  */
 
-import { createClient } from "@supabase/supabase-js"
 import crypto from "crypto"
+import { pool } from "@/lib/db/pool"
 
 /**
- * Create a Supabase service-role client for direct database access.
- * Used by export and verify for table discovery via RPC functions.
+ * Execute a SQL query and return typed rows.
+ * Uses the shared pg pool from lib/db/pool.ts.
  */
-export function getServiceSupabase() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!supabaseUrl || !supabaseSecretKey) {
-    throw new Error("Missing Supabase environment variables")
+export async function queryRows<T = Record<string, unknown>>(
+  sql: string,
+  params?: unknown[],
+): Promise<T[]> {
+  if (!pool) {
+    throw new Error("Database pool not available — DATABASE_URL may not be set")
   }
-
-  return createClient(supabaseUrl, supabaseSecretKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  })
+  const result = await pool.query(sql, params)
+  return result.rows as T[]
 }
 
 /** System/internal tables that should never appear in backups. */

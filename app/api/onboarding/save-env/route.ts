@@ -46,8 +46,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { localSupabaseDetected, ...fields } = parsed.data
-    const content = renderEnvFile(fields, { localSupabaseDetected })
+    const { localSupabaseDetected: _, dbMode, ...fields } = parsed.data
+    const content = renderEnvFile(fields, { dbMode })
 
     const envPath = path.join(process.cwd(), '.env.local')
 

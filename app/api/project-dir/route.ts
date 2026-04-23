@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { existsSync } from "fs"
 import path from "path"
+import { getDbMode } from "@/lib/db/mode"
 
 export async function GET() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -12,7 +13,10 @@ export async function GET() {
 
   return NextResponse.json({
     dir: process.cwd(),
+    dbMode: getDbMode(),
     envFileExists: existsSync(path.join(process.cwd(), ".env.local")),
+    hasDatabaseUrl,
+    // Keep localSupabase for backward compat during transition
     localSupabase: {
       detected: isLocal && hasAnonKey && hasServiceKey && hasDatabaseUrl,
       envFileExists: envSupabaseLocalExists,

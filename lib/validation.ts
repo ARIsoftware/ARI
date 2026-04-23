@@ -75,8 +75,7 @@ export const emptyToNull = <T extends z.ZodTypeAny>(schema: T) =>
     schema.nullable().optional(),
   )
 
-// Env values the /welcome wizard writes. `localSupabaseDetected` is a UI hint,
-// not an env value — it lives on the save-request wrapper, not here.
+// Env values the /welcome wizard writes.
 export const welcomeEnvFieldsSchema = z.object({
   betterAuthSecret: envSafeString(200).optional(),
   databaseUrl: envSafeString(2000).optional(),
@@ -91,7 +90,8 @@ export const welcomeEnvFieldsSchema = z.object({
 export type WelcomeEnvFieldsInput = z.infer<typeof welcomeEnvFieldsSchema>
 
 export const welcomeEnvSaveRequestSchema = welcomeEnvFieldsSchema.extend({
-  localSupabaseDetected: z.boolean().optional(),
+  localSupabaseDetected: z.boolean().optional(), // backward compat
+  dbMode: z.enum(['postgres', 'supabaselocal', 'supabasecloud']).optional(),
 })
 
 // Return the first validation error message from a Zod schema, or null if the
