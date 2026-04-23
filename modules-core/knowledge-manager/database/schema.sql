@@ -52,7 +52,8 @@ BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, pg_catalog;
 
 DROP TRIGGER IF EXISTS knowledge_collections_updated_at ON knowledge_collections;
 CREATE TRIGGER knowledge_collections_updated_at
@@ -147,7 +148,8 @@ BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, pg_catalog;
 
 DROP TRIGGER IF EXISTS knowledge_articles_updated_at ON knowledge_articles;
 CREATE TRIGGER knowledge_articles_updated_at
