@@ -135,14 +135,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { download_url } = await apiResponse.json()
+    const apiData = await apiResponse.json()
+    const { download_url } = apiData
+
+    if (!download_url) {
+      console.error('[API /modules/download] No download_url in API response:', JSON.stringify(apiData))
+      return NextResponse.json(
+        { error: 'Module API did not return a download URL' },
+        { status: 502 }
+      )
+    }
 
     // Download the zip file
     const zipResponse = await fetch(download_url)
     if (!zipResponse.ok) {
+      console.error(`[API /modules/download] ZIP fetch failed: ${zipResponse.status} ${zipResponse.statusText} from ${download_url}`)
       return NextResponse.json(
-        { error: 'Failed to download module package' },
-        { status: 500 }
+        { error: `Failed to download module package (${zipResponse.status})` },
+        { status: 502 }
       )
     }
 
