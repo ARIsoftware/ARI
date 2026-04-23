@@ -2890,6 +2890,10 @@ export default function DatabaseTestPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <div className="fixed bottom-4 left-4 text-xs text-muted-foreground/50">
+        ARI {process.env.NEXT_PUBLIC_ARI_VERSION}
+      </div>
     </div>
   )
 }

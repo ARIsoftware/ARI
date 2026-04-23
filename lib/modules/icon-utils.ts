@@ -28,6 +28,7 @@ import {
   Trophy,
   Users,
   Zap,
+  PawPrint,
   BarChart3,
   Home,
   Settings,
@@ -205,6 +206,7 @@ const ICON_REGISTRY: Record<string, LucideIcon> = {
   'Grid3X3': Grid3x3, // Alias for case sensitivity
   Hand,
   Heart,
+  PawPrint,
   Plane,
   Quote,
   Snowflake,

@@ -474,7 +474,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           className="px-2 py-1 text-[10px] text-muted-foreground/60 font-mono select-none"
           title={`commit ${process.env.NEXT_PUBLIC_ARI_COMMIT}`}
         >
-          ARI v{process.env.NEXT_PUBLIC_ARI_VERSION}
+          ARI {process.env.NEXT_PUBLIC_ARI_VERSION}
         </div>
       </SidebarFooter>
       <SidebarRail />

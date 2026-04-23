@@ -29,9 +29,6 @@ const nextConfig = {
     NEXT_PUBLIC_ARI_VERSION: `${pkg.version}+${commitSha}`,
     NEXT_PUBLIC_ARI_COMMIT: commitSha,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     ignoreBuildErrors: true,
   },
