@@ -448,6 +448,11 @@ CREATE INDEX IF NOT EXISTS idx_api_key_usage_logs_key_created ON "api_key_usage_
 CREATE INDEX IF NOT EXISTS idx_api_key_usage_logs_user_id ON "api_key_usage_logs"("user_id");
 CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON "tasks"("user_id");
 CREATE INDEX IF NOT EXISTS idx_tasks_user_id_completed ON "tasks"("user_id", "completed");
+-- Drop legacy duplicate indexes (now defined in module schema.sql files)
+DROP INDEX IF EXISTS idx_tasks_completed;
+DROP INDEX IF EXISTS idx_tasks_order_index;
+DROP INDEX IF EXISTS idx_tasks_created_at;
+DROP INDEX IF EXISTS idx_quotes_user_id;
 CREATE INDEX IF NOT EXISTS idx_music_playlist_user_id ON "music_playlist"("user_id");
 CREATE INDEX IF NOT EXISTS idx_music_playlist_user_position ON "music_playlist"("user_id", "position" ASC);
 CREATE INDEX IF NOT EXISTS idx_notepad_user_id ON "notepad"("user_id");
