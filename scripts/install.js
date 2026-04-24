@@ -789,7 +789,7 @@ function writeInstallerEnvFile(targetDir, { dbMode, dbUrl }) {
   ];
 
   if (dbUrl) {
-    lines.push('# Database', `DATABASE_URL=${dbUrl}`, 'DATABASE_POOL_MAX=10', '');
+    lines.push('# Database', `DATABASE_URL=${dbUrl}`, 'DATABASE_POOL_MAX=', '');
   }
 
   lines.push(

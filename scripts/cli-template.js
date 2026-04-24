@@ -160,6 +160,18 @@ function stopPgweb() {
 
 // ── Commands ───────────────────────────────────────────────────────────────
 
+function ensureMacPostgresPath() {
+  if (process.platform !== 'darwin') return;
+  const brewPgBin = '/opt/homebrew/opt/postgresql@17/bin';
+  const brewPgBinIntel = '/usr/local/opt/postgresql@17/bin';
+  const pathEntries = process.env.PATH.split(':');
+  if (fs.existsSync(brewPgBin) && !pathEntries.includes(brewPgBin)) {
+    process.env.PATH = `${brewPgBin}:${process.env.PATH}`;
+  } else if (fs.existsSync(brewPgBinIntel) && !pathEntries.includes(brewPgBinIntel)) {
+    process.env.PATH = `${brewPgBinIntel}:${process.env.PATH}`;
+  }
+}
+
 function start() {
   const mode = getDbMode();
 
@@ -191,6 +203,7 @@ function start() {
       }
     }
   } else if (mode === 'postgres') {
+    ensureMacPostgresPath();
     const pgReady = run('pg_isready -q') !== null;
     if (pgReady) {
       console.log('  ' + GREEN + '✔' + RESET + ' PostgreSQL is running');
@@ -254,6 +267,7 @@ async function stop() {
       process.exit(1);
     }
   } else if (mode === 'postgres') {
+    ensureMacPostgresPath();
     stopPgweb();
     const pgReady = run('pg_isready -q') !== null;
     if (pgReady) {
@@ -294,6 +308,7 @@ function status() {
       console.log('  ' + YELLOW + '⚠' + RESET + ' .env.supabase.local not found');
     }
   } else if (mode === 'postgres') {
+    ensureMacPostgresPath();
     const pgReady = run('pg_isready -q') !== null;
     console.log('  PostgreSQL: ' + (pgReady ? GREEN + '✔ running' : RED + '✘ not reachable') + RESET);
     const pgwebUp = isPgwebRunning();

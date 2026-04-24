@@ -119,7 +119,7 @@ export function renderEnvFile(
     // PostgreSQL mode — DATABASE_URL only, no Supabase vars
     lines.push("# Database")
     write("DATABASE_URL", dbUrl ?? "postgresql://localhost:5432/ari")
-    lines.push("DATABASE_POOL_MAX=3")
+    lines.push("DATABASE_POOL_MAX=")
     lines.push("")
   } else if (dbMode === 'supabaselocal' && !dbUrl) {
     // Local Supabase — vars come from .env.supabase.local
@@ -137,7 +137,7 @@ export function renderEnvFile(
     // supabasecloud (or fallback) — full Supabase vars from user input
     lines.push("## PRODUCTION SUPABASE")
     write("DATABASE_URL", dbUrl ?? "")
-    lines.push("DATABASE_POOL_MAX=3")
+    lines.push("DATABASE_POOL_MAX=")
     write("NEXT_PUBLIC_SUPABASE_URL", trimmed(fields.supabaseUrl) ?? "")
     write(
       "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
