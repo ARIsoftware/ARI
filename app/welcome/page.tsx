@@ -1485,18 +1485,11 @@ export default function WelcomePage() {
                     <div className="flex items-center gap-3">
                       <button
                         onClick={goToNextStep}
-                        className="inline-flex items-center justify-center px-4 py-2 text-base font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                        disabled={!isSupabaseComplete}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
                         style={{ borderRadius: '6px' }}
                       >
-                        Skip this step
-                      </button>
-                      <button
-                        onClick={goToNextStep}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
-                        style={{ borderRadius: '6px' }}
-                      >
-                        I&apos;ve completed this step
-                        <ArrowRight className="w-4 h-4" />
+                        {isSupabaseComplete ? <>I&apos;ve completed this step <ArrowRight className="w-4 h-4" /></> : 'Fill in all fields above to continue'}
                       </button>
                     </div>
                   </div>
