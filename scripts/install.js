@@ -838,9 +838,19 @@ async function setupLocalPostgres(targetDir) {
   };
 
   try {
+    // Ensure Homebrew's keg-only PostgreSQL binaries are in PATH (macOS)
+    if (PLATFORM === 'darwin') {
+      const brewPgBin = '/opt/homebrew/opt/postgresql@17/bin';
+      const brewPgBinIntel = '/usr/local/opt/postgresql@17/bin';
+      if (fs.existsSync(brewPgBin) && !process.env.PATH.includes(brewPgBin)) {
+        process.env.PATH = `${brewPgBin}:${process.env.PATH}`;
+      } else if (fs.existsSync(brewPgBinIntel) && !process.env.PATH.includes(brewPgBinIntel)) {
+        process.env.PATH = `${brewPgBinIntel}:${process.env.PATH}`;
+      }
+    }
+
     // 1. Check if PostgreSQL is running
-    const pgReady = run('pg_isready -q') !== null
-      || run('/opt/homebrew/opt/postgresql@17/bin/pg_isready -q') !== null;
+    const pgReady = run('pg_isready -q') !== null;
 
     if (!pgReady) {
       console.log(`  ${SYM_DASH} PostgreSQL is not running. Attempting to start…`);
