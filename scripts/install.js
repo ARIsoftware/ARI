@@ -1174,32 +1174,28 @@ function runVerification(ariResult, supabaseResult) {
     if (supabaseResult.pgReady !== undefined) {
       checks.push({
         name: 'PostgreSQL',
-        ok: true,
+        ok: supabaseResult.pgReady,
         detail: supabaseResult.pgReady ? 'running' : 'not reachable',
-        optional: true,
       });
       checks.push({
         name: 'Database "ari"',
-        ok: true,
+        ok: supabaseResult.dbCreated,
         detail: supabaseResult.dbCreated ? 'created' : 'not created',
-        optional: true,
       });
     }
 
     if (supabaseResult.schemaInitialized !== undefined) {
       checks.push({
         name: 'Database Schema',
-        ok: true,
+        ok: supabaseResult.schemaInitialized,
         detail: supabaseResult.schemaInitialized ? 'initialized' : 'not initialized',
-        optional: true,
       });
     }
 
     checks.push({
       name: 'ARI CLI',
-      ok: true,
+      ok: supabaseResult.cliCreated,
       detail: supabaseResult.cliCreated ? './ari ready' : 'not created',
-      optional: true,
     });
   }
 
