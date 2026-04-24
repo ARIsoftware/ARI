@@ -315,13 +315,28 @@ function detectPgweb() {
 }
 
 function detectPostgresServer() {
-  // Check if pg_isready is available (server is installed and running)
-  if (run('pg_isready -q') !== null) {
+  // Check for actual server installation (not just libpq client)
+  if (PLATFORM === 'darwin') {
+    // On macOS, check if the postgresql@17 formula (server) is installed
+    const brewList = run('brew list --formula postgresql@17 2>/dev/null');
+    if (brewList !== null) {
+      const psqlInfo = detectPsql();
+      return { installed: true, version: psqlInfo.version ?? 'unknown' };
+    }
+    // Also check unversioned postgresql
+    const brewListUnversioned = run('brew list --formula postgresql 2>/dev/null');
+    if (brewListUnversioned !== null) {
+      const psqlInfo = detectPsql();
+      return { installed: true, version: psqlInfo.version ?? 'unknown' };
+    }
+    return { installed: false, version: null };
+  }
+  // On Linux, check if pg_isready exists (comes with server package, not client-only)
+  if (run('pg_isready --version') !== null) {
     const psqlInfo = detectPsql();
     return { installed: true, version: psqlInfo.version ?? 'unknown' };
   }
-  // Fallback: server may be installed but not running
-  return detectPsql();
+  return { installed: false, version: null };
 }
 
 function detectGhCli() {
