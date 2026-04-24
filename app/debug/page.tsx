@@ -1172,22 +1172,22 @@ export default function DatabaseTestPage() {
       })
     }
 
-    // Test 3: Check environment variables
+    // Test 3: Check environment variables (fetched from server — these are not NEXT_PUBLIC_)
     updateAuthConfigResult('Environment Variables', { status: 'testing' })
     try {
+      const res = await fetch(route('project-dir'))
+      const data = await res.json()
+
       const checks: Record<string, string> = {
-        DATABASE_URL: process.env.DATABASE_URL ? 'Set' : 'Missing',
-        BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ? 'Set' : 'Missing',
-        ARI_DB_MODE: process.env.ARI_DB_MODE || 'Not set (auto-detected)',
+        DATABASE_URL: data.hasDatabaseUrl ? 'Set' : 'Missing',
+        ARI_DB_MODE: data.dbMode || 'Not set (auto-detected)',
       }
 
-      const missingCritical = !process.env.DATABASE_URL || !process.env.BETTER_AUTH_SECRET
-
       updateAuthConfigResult('Environment Variables', {
-        status: missingCritical ? 'error' : 'success',
-        message: missingCritical
-          ? 'Critical environment variables missing'
-          : 'All required env vars configured',
+        status: data.hasDatabaseUrl ? 'success' : 'error',
+        message: data.hasDatabaseUrl
+          ? 'All required env vars configured'
+          : 'Critical environment variables missing',
         data: checks
       })
     } catch (error: unknown) {
