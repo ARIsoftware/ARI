@@ -36,6 +36,7 @@ const nextConfig = {
     unoptimized: true,
   },
   serverExternalPackages: ["@node-rs/argon2"],
+  devIndicators: false,
 }
 
 export default nextConfig
