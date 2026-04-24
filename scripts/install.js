@@ -1333,6 +1333,8 @@ async function main() {
       dbResult = await setupLocalPostgres(ariResult.dir);
     } else if (dbMode === 'supabaselocal') {
       dbResult = await setupLocalSupabase(ariResult.dir);
+      writeInstallerEnvFile(ariResult.dir, { dbMode: 'supabaselocal' });
+      console.log(`  ${SYM_CHECK} .env.local generated`);
     } else {
       // supabasecloud — user configures on /welcome
       writeInstallerEnvFile(ariResult.dir, { dbMode: 'supabasecloud' });
