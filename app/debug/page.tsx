@@ -182,7 +182,6 @@ export default function DatabaseTestPage() {
     { name: 'Database Mode', status: 'pending' },
     { name: 'Environment Variables', status: 'pending' },
     { name: 'Database Connectivity', status: 'pending' },
-    { name: 'Connection Test', status: 'pending' },
     { name: 'Authentication Status', status: 'pending' },
     { name: 'Session Status', status: 'pending' },
     ...DYNAMIC_MODULE_TESTS.map((t) => ({ name: t.name, status: 'pending' as const })),
@@ -1381,31 +1380,33 @@ export default function DatabaseTestPage() {
 
     // PHASE 1: Fast synchronous checks (run in parallel)
     const phase1Tests = [
-      // Test 1: Environment Variables
+      // Test 1: Database Mode + Environment Variables (single fetch, two results)
       (async () => {
         updateTestResult('Database Mode', { status: 'testing' })
         updateTestResult('Environment Variables', { status: 'testing' })
         try {
           const res = await fetch(route('project-dir'))
           const data = await res.json()
-          const mode = data.dbMode || 'unknown'
+          const mode = data.dbMode
 
-          updateTestResult('Database Mode', {
-            status: 'success',
-            message: `Mode: ${mode}`,
-            data: { dbMode: mode }
-          })
+          if (!mode) {
+            updateTestResult('Database Mode', { status: 'error', error: 'Server did not return dbMode' })
+          } else {
+            updateTestResult('Database Mode', {
+              status: 'success',
+              message: `Mode: ${mode}`,
+              data: { dbMode: mode }
+            })
+          }
 
           updateTestResult('Environment Variables', {
             status: data.hasDatabaseUrl ? 'success' : 'error',
             message: data.hasDatabaseUrl ? 'DATABASE_URL is set' : 'DATABASE_URL not set',
-            data: { DATABASE_URL: data.hasDatabaseUrl ? 'Set' : 'Missing', ARI_DB_MODE: mode }
+            data: { DATABASE_URL: data.hasDatabaseUrl ? 'Set' : 'Missing', ARI_DB_MODE: mode || 'not returned' }
           })
-          console.log('✅ Database mode:', mode, '| DATABASE_URL:', data.hasDatabaseUrl ? 'set' : 'missing')
         } catch (error: unknown) {
           updateTestResult('Database Mode', { status: 'error', error: errMsg(error) })
           updateTestResult('Environment Variables', { status: 'error', error: errMsg(error) })
-          console.error('❌ Database/env check failed:', error)
         }
       })()
     ]
@@ -1456,47 +1457,6 @@ export default function DatabaseTestPage() {
         }
       })(),
 
-      // Test 4: Connection Test (via health API)
-      (async () => {
-        updateTestResult('Connection Test', { status: 'testing' })
-        try {
-          console.log('🔌 Testing database connection via health API...')
-
-          const controller = new AbortController()
-          const timeoutId = setTimeout(() => controller.abort(), 5000)
-
-          const response = await fetch(route('health-database'), { signal: controller.signal })
-          clearTimeout(timeoutId)
-
-          const data = await response.json()
-
-          if (response.ok && data.checks?.database?.status === 'ok') {
-            updateTestResult('Connection Test', {
-              status: 'success',
-              message: 'Database connection verified via health check',
-              data: {
-                connected: true,
-                status: response.status,
-                database: data.checks.database
-              }
-            })
-            console.log('✅ Connection test passed')
-          } else {
-            throw new Error(data.checks?.database?.error || `Health check returned ${response.status}`)
-          }
-        } catch (error: unknown) {
-          updateTestResult('Connection Test', {
-            status: 'error',
-            error: errMsg(error),
-            data: {
-              hint: errName(error, 'AbortError')
-                ? 'Connection timed out - check your network and database'
-                : 'Check database connectivity via /api/health'
-            }
-          })
-          console.error('❌ Connection test failed:', error)
-        }
-      })()
     ]
 
     await Promise.all(phase2Tests)
