@@ -1790,7 +1790,7 @@ export default function WelcomePage() {
                           <Check className="w-4 h-4 text-green-500" /> :
                           <X className="w-4 h-4 text-gray-400" />
                         }
-                        <span className="text-gray-500">
+                        <span className={formData.adminEmail && formData.adminPassword ? "text-gray-900" : "text-gray-500"}>
                           Admin Account: {formData.adminEmail && formData.adminPassword ? "Configured" : "Skipped"}
                         </span>
                       </div>
