@@ -107,8 +107,7 @@ export default function ProfilePage() {
 
   const handleSignOut = async () => {
     await authClient.signOut()
-    // Use router.push for consistent navigation behavior
-    router.push('/sign-in')
+    window.location.href = '/sign-in'
   }
 
   if (isLoading || !user) {

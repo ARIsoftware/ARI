@@ -199,7 +199,7 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
 
   const handleSignOut = async () => {
     await authClient.signOut()
-    router.push("/sign-in")
+    window.location.href = '/sign-in'
   }
 
   // Apple-esque drag mode styling: subtle ring with glow effect
