@@ -131,6 +131,7 @@ function startPgweb() {
   const child = spawn('pgweb', [
     '--bind', 'localhost',
     '--listen', String(PGWEB_PORT),
+    '--skip-open',
     '--url', dbUrl,
   ], {
     stdio: 'ignore',
