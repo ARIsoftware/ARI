@@ -179,9 +179,9 @@ export default function DatabaseTestPage() {
   }, [])
 
   const [testResults, setTestResults] = useState<TestResult[]>(() => [
-    { name: 'Supabase Client Initialization', status: 'pending' },
+    { name: 'Database Mode', status: 'pending' },
     { name: 'Environment Variables', status: 'pending' },
-    { name: 'Network Connectivity', status: 'pending' },
+    { name: 'Database Connectivity', status: 'pending' },
     { name: 'Connection Test', status: 'pending' },
     { name: 'Authentication Status', status: 'pending' },
     { name: 'Session Status', status: 'pending' },
@@ -1411,22 +1411,23 @@ export default function DatabaseTestPage() {
 
       // Test 2: Supabase Client
       (async () => {
-        updateTestResult('Supabase Client Initialization', { status: 'testing' })
+        updateTestResult('Database Mode', { status: 'testing' })
         try {
-          if (!supabase) {
-            throw new Error('Supabase client not available from context')
-          }
-          updateTestResult('Supabase Client Initialization', {
+          const res = await fetch(route('project-dir'))
+          const data = await res.json()
+          const mode = data.dbMode || 'unknown'
+          updateTestResult('Database Mode', {
             status: 'success',
-            message: 'Client retrieved from global context'
+            message: `Mode: ${mode}`,
+            data: { dbMode: mode, hasDatabaseUrl: data.hasDatabaseUrl }
           })
-          console.log('✅ Supabase client from context')
+          console.log('✅ Database mode:', mode)
         } catch (error: unknown) {
-          updateTestResult('Supabase Client Initialization', {
+          updateTestResult('Database Mode', {
             status: 'error',
             error: errMsg(error)
           })
-          console.error('❌ Supabase client initialization failed:', error)
+          console.error('❌ Database mode check failed:', error)
         }
       })()
     ]
@@ -1438,11 +1439,11 @@ export default function DatabaseTestPage() {
 
     // PHASE 2: Network connectivity tests (run in parallel)
     const phase2Tests = [
-      // Test 3: Network Connectivity
+      // Test 3: Database Connectivity
       (async () => {
-        updateTestResult('Network Connectivity', { status: 'testing' })
+        updateTestResult('Database Connectivity', { status: 'testing' })
         try {
-          console.log('🌐 Testing network connectivity to Supabase...')
+          console.log('🌐 Testing database connectivity...')
 
           const controller = new AbortController()
           const timeoutId = setTimeout(() => controller.abort(), 5000)
@@ -1456,24 +1457,24 @@ export default function DatabaseTestPage() {
           const result = await response.json()
 
           if (result.success) {
-            updateTestResult('Network Connectivity', {
+            updateTestResult('Database Connectivity', {
               status: 'success',
-              message: 'Can reach Supabase server',
+              message: 'Database is reachable',
               data: result
             })
-            console.log('✅ Network connectivity test passed')
+            console.log('✅ Database connectivity test passed')
           } else {
-            throw new Error(result.error || 'Network test failed')
+            throw new Error(result.error || 'Connection test failed')
           }
         } catch (error: unknown) {
-          updateTestResult('Network Connectivity', {
+          updateTestResult('Database Connectivity', {
             status: 'error',
             error: errMsg(error),
             data: {
-              hint: 'Check if Supabase URL is correct and accessible'
+              hint: 'Check DATABASE_URL in .env.local'
             }
           })
-          console.error('❌ Network connectivity test failed:', error)
+          console.error('❌ Database connectivity test failed:', error)
         }
       })(),
 
