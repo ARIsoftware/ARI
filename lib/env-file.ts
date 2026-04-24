@@ -118,7 +118,7 @@ export function renderEnvFile(
   if (dbMode === 'postgres') {
     // PostgreSQL mode — DATABASE_URL only, no Supabase vars
     lines.push("# Database")
-    write("DATABASE_URL", dbUrl ?? "")
+    write("DATABASE_URL", dbUrl ?? "postgresql://localhost:5432/ari")
     lines.push("DATABASE_POOL_MAX=3")
     lines.push("")
   } else if (dbMode === 'supabaselocal' && !dbUrl) {
