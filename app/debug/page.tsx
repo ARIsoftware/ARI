@@ -1173,24 +1173,22 @@ export default function DatabaseTestPage() {
       })
     }
 
-    // Test 3: Check environment variables (client-side only)
+    // Test 3: Check environment variables
     updateAuthConfigResult('Environment Variables', { status: 'testing' })
     try {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-
-      const checks = {
-        NEXT_PUBLIC_APP_URL: appUrl ? 'Set' : 'Missing (needed for production trusted origins)',
-        NEXT_PUBLIC_SUPABASE_URL: supabaseUrl ? 'Set' : 'Missing',
+      const checks: Record<string, string> = {
+        DATABASE_URL: process.env.DATABASE_URL ? 'Set' : 'Missing',
+        BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ? 'Set' : 'Missing',
+        ARI_DB_MODE: process.env.ARI_DB_MODE || 'Not set (auto-detected)',
       }
 
-      const missingCritical = !supabaseUrl
+      const missingCritical = !process.env.DATABASE_URL || !process.env.BETTER_AUTH_SECRET
 
       updateAuthConfigResult('Environment Variables', {
-        status: missingCritical ? 'error' : (appUrl ? 'success' : 'warning'),
+        status: missingCritical ? 'error' : 'success',
         message: missingCritical
           ? 'Critical environment variables missing'
-          : (!appUrl ? 'NEXT_PUBLIC_APP_URL not set (needed for production)' : 'All client-side env vars configured'),
+          : 'All required env vars configured',
         data: checks
       })
     } catch (error: unknown) {
@@ -1387,19 +1385,18 @@ export default function DatabaseTestPage() {
       (async () => {
         updateTestResult('Environment Variables', { status: 'testing' })
         try {
-          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-          const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+          const databaseUrl = process.env.DATABASE_URL
 
-          if (!supabaseUrl || !supabaseAnonKey) {
-            throw new Error('Missing environment variables')
+          if (!databaseUrl) {
+            throw new Error('DATABASE_URL not set')
           }
 
           updateTestResult('Environment Variables', {
             status: 'success',
             message: 'Environment variables are set',
             data: {
-              url: supabaseUrl?.substring(0, 30) + '...',
-              hasAnonKey: !!supabaseAnonKey
+              DATABASE_URL: 'Set',
+              ARI_DB_MODE: process.env.ARI_DB_MODE || 'Not set (auto-detected)',
             }
           })
           console.log('✅ Environment variables check passed')
