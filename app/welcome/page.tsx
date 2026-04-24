@@ -1801,15 +1801,6 @@ export default function WelcomePage() {
                           Admin Account: {formData.adminEmail && formData.adminPassword ? "Configured" : "Skipped"}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {formData.resendApiKey ?
-                          <Check className="w-4 h-4 text-green-500" /> :
-                          <X className="w-4 h-4 text-gray-400" />
-                        }
-                        <span className="text-gray-500">
-                          Resend: {formData.resendApiKey ? "Configured" : "Skipped"}
-                        </span>
-                      </div>
                     </div>
                   </div>
 
