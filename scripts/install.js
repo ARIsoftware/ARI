@@ -201,7 +201,11 @@ function showWelcome() {
   console.log('');
   console.log(`    ${SYM_ARROW}  ${bold('Supabase CLI')}  ${dim('— database tools')}`);
   console.log('');
+  console.log(`    ${SYM_ARROW}  ${bold('PostgreSQL Server')}  ${dim('— database engine')}`);
+  console.log('');
   console.log(`    ${SYM_ARROW}  ${bold('PostgreSQL Client')}  ${dim('— database operations (optional)')}`);
+  console.log('');
+  console.log(`    ${SYM_ARROW}  ${bold('pgweb')}  ${dim('— database UI (localhost:5050)')}`);
   console.log('');
   console.log(`    ${SYM_ARROW}  ${bold('Claude Code')}  ${dim('— AI coding assistant')}`);
   console.log('');
