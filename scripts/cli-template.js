@@ -213,6 +213,14 @@ function start() {
   // Start Next.js dev server (foreground)
   const child = spawn('pnpm', ['dev'], { stdio: 'inherit', cwd: ROOT });
 
+  // Open browser after Next.js has time to start
+  setTimeout(() => {
+    const url = 'http://localhost:3000';
+    if (process.platform === 'darwin') run(`open ${url}`);
+    else if (process.platform === 'linux') run(`xdg-open ${url}`);
+    else if (process.platform === 'win32') run(`start ${url}`);
+  }, 3000);
+
   const cleanup = () => {
     child.kill();
     if (mode === 'postgres') stopPgweb();
