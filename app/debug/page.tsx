@@ -1383,51 +1383,29 @@ export default function DatabaseTestPage() {
     const phase1Tests = [
       // Test 1: Environment Variables
       (async () => {
-        updateTestResult('Environment Variables', { status: 'testing' })
-        try {
-          const databaseUrl = process.env.DATABASE_URL
-
-          if (!databaseUrl) {
-            throw new Error('DATABASE_URL not set')
-          }
-
-          updateTestResult('Environment Variables', {
-            status: 'success',
-            message: 'Environment variables are set',
-            data: {
-              DATABASE_URL: 'Set',
-              ARI_DB_MODE: process.env.ARI_DB_MODE || 'Not set (auto-detected)',
-            }
-          })
-          console.log('✅ Environment variables check passed')
-        } catch (error: unknown) {
-          updateTestResult('Environment Variables', {
-            status: 'error',
-            error: errMsg(error)
-          })
-          console.error('❌ Environment variables check failed:', error)
-        }
-      })(),
-
-      // Test 2: Supabase Client
-      (async () => {
         updateTestResult('Database Mode', { status: 'testing' })
+        updateTestResult('Environment Variables', { status: 'testing' })
         try {
           const res = await fetch(route('project-dir'))
           const data = await res.json()
           const mode = data.dbMode || 'unknown'
+
           updateTestResult('Database Mode', {
             status: 'success',
             message: `Mode: ${mode}`,
-            data: { dbMode: mode, hasDatabaseUrl: data.hasDatabaseUrl }
+            data: { dbMode: mode }
           })
-          console.log('✅ Database mode:', mode)
+
+          updateTestResult('Environment Variables', {
+            status: data.hasDatabaseUrl ? 'success' : 'error',
+            message: data.hasDatabaseUrl ? 'DATABASE_URL is set' : 'DATABASE_URL not set',
+            data: { DATABASE_URL: data.hasDatabaseUrl ? 'Set' : 'Missing', ARI_DB_MODE: mode }
+          })
+          console.log('✅ Database mode:', mode, '| DATABASE_URL:', data.hasDatabaseUrl ? 'set' : 'missing')
         } catch (error: unknown) {
-          updateTestResult('Database Mode', {
-            status: 'error',
-            error: errMsg(error)
-          })
-          console.error('❌ Database mode check failed:', error)
+          updateTestResult('Database Mode', { status: 'error', error: errMsg(error) })
+          updateTestResult('Environment Variables', { status: 'error', error: errMsg(error) })
+          console.error('❌ Database/env check failed:', error)
         }
       })()
     ]

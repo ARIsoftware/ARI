@@ -3,6 +3,8 @@ import { existsSync } from "fs"
 import path from "path"
 import { getDbMode } from "@/lib/db/mode"
 
+export const debugRole = "project-dir"
+
 export async function GET() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const hasAnonKey = !!(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
