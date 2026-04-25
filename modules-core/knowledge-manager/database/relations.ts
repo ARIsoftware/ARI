@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { knowledgeArticles, knowledgeCollections } from "@/lib/db/schema";
+import { knowledgeArticles, knowledgeCollections } from "./schema";
 
 // Knowledge Articles -> Collections (many-to-one)
 export const knowledgeArticlesRelations = relations(knowledgeArticles, ({one}) => ({

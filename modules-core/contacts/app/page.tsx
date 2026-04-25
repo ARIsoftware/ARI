@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useSupabase } from "@/components/providers"
+import { useAuth } from "@/components/providers"
 import { DM_Sans } from "next/font/google"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -33,7 +33,7 @@ const dmSans = DM_Sans({
 })
 
 export default function ContactsPage() {
-  const { session } = useSupabase()
+  const { session } = useAuth()
   const user = session?.user
   const router = useRouter()
   const { toast } = useToast()

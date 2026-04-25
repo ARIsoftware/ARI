@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect, useCallback } from "react"
-import { useSupabase } from "@/components/providers"
+import { useAuth } from "@/components/providers"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -65,7 +65,7 @@ const axisDescriptions: Record<string, string> = {
 }
 
 function QuickAddTaskForm({ onSuccess }: { onSuccess: () => void }) {
-  const { session } = useSupabase()
+  const { session } = useAuth()
   const user = session?.user
   const { toast } = useToast()
   const queryClient = useQueryClient()

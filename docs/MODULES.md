@@ -10,7 +10,7 @@
 > **Important Change in v5.0**: This document now reflects **Better Auth** + **Drizzle ORM** patterns.
 > - API routes use `withRLS()` helper instead of Supabase client
 > - Database RLS policies using `auth.uid()` do NOT work with Better Auth
-> - Client components use `useAuth()` instead of `useSupabase()`
+> - Client components use `useAuth()` for auth context
 > - Module tables must be defined in `database/schema.ts` within the module folder (auto-generated barrel re-exports them)
 
 ---

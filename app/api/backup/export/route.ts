@@ -5,6 +5,15 @@ import { logger } from '@/lib/logger'
 import { safeErrorResponse } from '@/lib/api-error'
 import { queryRows, EXCLUDED_TABLES, calculateChecksum, stripNul } from '../utils'
 
+type ColumnInfo = {
+  column_name: string
+  data_type: string
+  is_nullable: string
+  column_default: string | null
+  character_maximum_length: number | null
+  ordinal_position?: number
+}
+
 export const debugRole = "backup-export"
 
 async function discoverTables(): Promise<{ tables: string[], method: string, warnings: string[] }> {
@@ -41,8 +50,8 @@ function isValidTableName(tableName: string, validTables: string[]): boolean {
 }
 
 // Discover all table schemas upfront in a single query
-async function discoverAllSchemas(tables: string[]): Promise<Record<string, any[]>> {
-  const allSchemas: Record<string, any[]> = {}
+async function discoverAllSchemas(tables: string[]): Promise<Record<string, ColumnInfo[]>> {
+  const allSchemas: Record<string, ColumnInfo[]> = {}
 
   // Initialize empty arrays for all tables
   for (const table of tables) {
@@ -97,9 +106,9 @@ async function discoverAllSchemas(tables: string[]): Promise<Record<string, any[
 // Get schema for a single table (uses cached schemas or falls back to sample row)
 function getTableSchemaFromCache(
   tableName: string,
-  cachedSchemas: Record<string, any[]>,
-  sampleData: any[] | null
-): any[] {
+  cachedSchemas: Record<string, ColumnInfo[]>,
+  sampleData: Record<string, unknown>[] | null
+): ColumnInfo[] {
   // First check cached schemas from bulk discovery
   if (cachedSchemas[tableName] && cachedSchemas[tableName].length > 0) {
     return cachedSchemas[tableName]
@@ -288,13 +297,13 @@ function mapDataType(dataType: string, isNullable: string, columnDefault: string
 }
 
 // Fetch all rows from a table using pagination
-async function fetchTableData(tableName: string, chunkSize: number = 1000): Promise<any[]> {
+async function fetchTableData(tableName: string, chunkSize: number = 1000): Promise<Record<string, unknown>[]> {
   let offset = 0
-  let allData: any[] = []
+  let allData: Record<string, unknown>[] = []
   let hasMore = true
 
   while (hasMore) {
-    let rows: any[]
+    let rows: Record<string, unknown>[]
     try {
       // Try ordered query first
       rows = await queryRows(
@@ -359,9 +368,9 @@ export async function POST(req: NextRequest) {
     // Discover all constraints upfront (2 queries total, not 2N)
     const tableConstraints = await discoverAllConstraints(tables)
 
-    const backupData: any = {}
-    const tableSchemas: any = {}
-    const checksums: any = {}
+    const backupData: Record<string, Record<string, unknown>[]> = {}
+    const tableSchemas: Record<string, ColumnInfo[]> = {}
+    const checksums: Record<string, string> = {}
     let totalRows = 0
     let errors: string[] = [...warnings]
 
@@ -402,7 +411,7 @@ export async function POST(req: NextRequest) {
       discoveryMethod: method,
       tables: Object.keys(backupData),
       rowCounts: Object.fromEntries(
-        Object.entries(backupData).map(([k, v]) => [k, (v as any[]).length])
+        Object.entries(backupData).map(([k, v]) => [k, (v as unknown[]).length])
       ),
       totalRows,
       checksums,
@@ -495,7 +504,7 @@ export async function POST(req: NextRequest) {
       sqlContent += `DROP TABLE IF EXISTS "${tableName}" CASCADE;\n`
       sqlContent += `CREATE TABLE "${tableName}" (\n`
 
-      const columns = (schema as any[]).map((column) => {
+      const columns = schema.map((column) => {
         return `  "${column.column_name}" ${mapDataType(column.data_type, column.is_nullable, column.column_default, column.character_maximum_length)}`
       })
 
@@ -507,7 +516,7 @@ export async function POST(req: NextRequest) {
 
       // Add unique constraints
       if (constraints.uniqueKeys && constraints.uniqueKeys.length > 0) {
-        constraints.uniqueKeys.forEach((uk: any) => {
+        constraints.uniqueKeys.forEach((uk: { name: string; columns: string[] }) => {
           if (uk.columns && uk.columns.length > 0) {
             const ukColumns = uk.columns.map((col: string) => `"${col}"`).join(', ')
             columns.push(`  CONSTRAINT "${uk.name}" UNIQUE (${ukColumns})`)
@@ -538,7 +547,7 @@ export async function POST(req: NextRequest) {
 
         for (const row of batch) {
           const columns = Object.keys(row).map(col => `"${col}"`).join(', ')
-          const values = Object.values(row).map((val: any) => {
+          const values = Object.values(row).map((val: unknown) => {
             if (val === null) return 'NULL'
             if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE'
             if (typeof val === 'number') return val
@@ -572,10 +581,9 @@ export async function POST(req: NextRequest) {
     for (const [tableName, schema] of Object.entries(tableSchemas)) {
       if (!Array.isArray(schema) || schema.length === 0) continue
 
-      const columns = schema as any[]
       const indexedColumns = new Set<string>()
 
-      columns.forEach(column => {
+      schema.forEach(column => {
         const colName = column.column_name
         if (colName === 'id' || colName.endsWith('_id') || colName === 'user_id' ||
             colName === 'created_at' || colName === 'updated_at' || colName === 'completed' ||
@@ -594,7 +602,7 @@ export async function POST(req: NextRequest) {
     sqlContent += `-- Reset sequences\n`
     for (const [tableName, schema] of Object.entries(tableSchemas)) {
       if (!Array.isArray(schema)) continue
-      for (const col of schema as any[]) {
+      for (const col of schema) {
         const def = col.column_default as string | null
         // Detect serial/identity columns by their default (nextval or identity)
         if (def && (def.includes('nextval') || def.includes('identity'))) {

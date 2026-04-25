@@ -32,6 +32,9 @@ const OrderSchema = z.object({
   widgetOrder: z.record(z.string(), z.number()).optional(),
 })
 
+const orderFieldSchema = z.record(z.string(), z.number()).optional()
+const menuPrioritySchema = z.object({ menuPriority: z.number() }).partial()
+
 export async function GET() {
   const { user } = await getAuthenticatedUser()
 
@@ -49,22 +52,26 @@ export async function GET() {
 
     const specialIds = new Set([TOPBAR_ICONS_MODULE_ID, DASHBOARD_STAT_CARDS_MODULE_ID, DASHBOARD_WIDGETS_MODULE_ID])
 
-    // Extract special orders
-    const iconSettings = allSettings.find(s => s.moduleId === TOPBAR_ICONS_MODULE_ID)
-    const iconOrder = (iconSettings?.settings as Record<string, any>)?.iconOrder || null
+    // Extract special orders with validation
+    function extractOrderField(moduleId: string, field: string): Record<string, number> | null {
+      const row = allSettings.find(s => s.moduleId === moduleId)
+      if (!row?.settings || typeof row.settings !== 'object') return null
+      const val = (row.settings as Record<string, unknown>)[field]
+      const parsed = orderFieldSchema.safeParse(val)
+      return parsed.success ? parsed.data ?? null : null
+    }
 
-    const statCardSettings = allSettings.find(s => s.moduleId === DASHBOARD_STAT_CARDS_MODULE_ID)
-    const statCardOrder = (statCardSettings?.settings as Record<string, any>)?.statCardOrder || null
-
-    const widgetSettings = allSettings.find(s => s.moduleId === DASHBOARD_WIDGETS_MODULE_ID)
-    const widgetOrder = (widgetSettings?.settings as Record<string, any>)?.widgetOrder || null
+    const iconOrder = extractOrderField(TOPBAR_ICONS_MODULE_ID, 'iconOrder')
+    const statCardOrder = extractOrderField(DASHBOARD_STAT_CARDS_MODULE_ID, 'statCardOrder')
+    const widgetOrder = extractOrderField(DASHBOARD_WIDGETS_MODULE_ID, 'widgetOrder')
 
     // Build module order from all module settings that have menuPriority
     const moduleOrder: Record<string, number> = {}
     for (const setting of allSettings) {
-      const settingsObj = setting.settings as Record<string, any> | null
-      if (!specialIds.has(setting.moduleId) && settingsObj?.menuPriority !== undefined) {
-        moduleOrder[setting.moduleId] = settingsObj.menuPriority
+      if (specialIds.has(setting.moduleId)) continue
+      const parsed = menuPrioritySchema.safeParse(setting.settings)
+      if (parsed.success && parsed.data.menuPriority !== undefined) {
+        moduleOrder[setting.moduleId] = parsed.data.menuPriority
       }
     }
 
@@ -116,7 +123,7 @@ export async function POST(request: NextRequest) {
             )
           )
 
-        const merged = { ...((existing[0]?.settings as Record<string, any>) || {}), [settingsKey]: value }
+        const merged = { ...((existing[0]?.settings as Record<string, unknown>) || {}), [settingsKey]: value }
 
         await db.insert(moduleSettings)
           .values({

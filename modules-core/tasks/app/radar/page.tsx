@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/chart"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { useSupabase } from "@/components/providers"
+import { useAuth } from "@/components/providers"
 import type { Task } from "@/modules/tasks/types"
 import { transformTaskForRadar, getTaskPriorityLevel } from "@/modules/tasks/lib/priority-utils"
 import { TaskPriorityModal } from "@/modules/tasks/components/task-priority-modal"
@@ -65,7 +65,7 @@ function prepareRadarData(tasks: Task[]) {
 }
 
 export default function RadarPage() {
-  const { supabase, session } = useSupabase()
+  const { session } = useAuth()
   const [tasks, setTasks] = useState<Task[]>([])
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([])
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
+import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { logger } from '@/lib/logger'
+import { safeErrorResponse } from '@/lib/api-error'
 
 export async function POST() {
   if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
@@ -9,11 +11,8 @@ export async function POST() {
     )
   }
 
-  // Auth check - same lightweight cookie check as the module API route
-  const cookieStore = await cookies()
-  const sessionCookie = cookieStore.get('better-auth.session_token')
-    || cookieStore.get('__Secure-better-auth.session_token')
-  if (!sessionCookie) {
+  const { user } = await getAuthenticatedUser()
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -33,9 +32,9 @@ export async function POST() {
       ...(stderr ? { warnings: stderr } : {}),
     })
   } catch (error: unknown) {
-    console.error('[Module Refresh] Error:', error)
+    logger.error('[Module Refresh] Error:', error)
     return NextResponse.json(
-      { error: 'Failed to regenerate module registries', details: error instanceof Error ? error.message : String(error) },
+      { error: safeErrorResponse(error) },
       { status: 500 }
     )
   }

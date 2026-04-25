@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
 import path from 'path'
 import { getGitHubConfig, commitModuleToGitHub } from '@/lib/modules/github-sync'
+import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { logger } from '@/lib/logger'
+import { safeErrorResponse } from '@/lib/api-error'
 
 export async function POST(request: NextRequest) {
-  // Auth check
-  const cookieStore = await cookies()
-  const sessionCookie = cookieStore.get('better-auth.session_token')
-    || cookieStore.get('__Secure-better-auth.session_token')
-  if (!sessionCookie) {
+  const { user } = await getAuthenticatedUser()
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -46,22 +45,17 @@ export async function POST(request: NextRequest) {
       filesCommitted: result.filesCommitted,
     })
   } catch (error: unknown) {
-    console.error('[GitHub Sync] Error:', error)
+    logger.error('[GitHub Sync] Error:', error)
     return NextResponse.json(
-      { error: 'Failed to sync to GitHub', details: error instanceof Error ? error.message : String(error) },
+      { error: safeErrorResponse(error) },
       { status: 500 }
     )
   }
 }
 
-/**
- * GET: Check GitHub configuration status
- */
 export async function GET() {
-  const cookieStore = await cookies()
-  const sessionCookie = cookieStore.get('better-auth.session_token')
-    || cookieStore.get('__Secure-better-auth.session_token')
-  if (!sessionCookie) {
+  const { user } = await getAuthenticatedUser()
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

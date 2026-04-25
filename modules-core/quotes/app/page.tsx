@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2, Edit, AlertCircle, Quote as QuoteIcon } from "lucide-react";
-import { useSupabase } from "@/components/providers";
+import { useAuth } from "@/components/providers"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,7 @@ export default function QuotesPage() {
   const [editingQuote, setEditingQuote] = useState<Quote | null>(null);
   const [quoteText, setQuoteText] = useState("");
   const [author, setAuthor] = useState("");
-  const { supabase, session } = useSupabase();
+  const { session } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {

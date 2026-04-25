@@ -559,7 +559,7 @@ interface MyModuleHDCardProps {
  * - Use muted colors
  */
 export function MyModuleHDCard({ config }: MyModuleHDCardProps) {
-  const { session } = useSupabase()
+  const { session } = useAuth()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -866,7 +866,7 @@ import { useSupabase } from '@/components/providers'
 import { useState, useEffect } from 'react'
 
 export function WinterArcGoalsHDCard() {
-  const { session } = useSupabase()
+  const { session } = useAuth()
   const [goals, setGoals] = useState([])
 
   useEffect(() => {
@@ -954,7 +954,7 @@ import { useSupabase } from '@/components/providers'
 import { useState, useEffect } from 'react'
 
 export function MajorProjectsSummaryHDCard() {
-  const { session } = useSupabase()
+  const { session } = useAuth()
   const [stats, setStats] = useState({ total: 0, dueSoon: 0 })
 
   useEffect(() => {

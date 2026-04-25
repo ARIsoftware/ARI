@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSupabase } from '@/components/providers'
+import { useAuth } from "@/components/providers"
 import { authClient } from '@/lib/auth-client'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -14,7 +14,7 @@ import { Separator } from '@/components/ui/separator'
 import { ArrowLeft, User, Mail, Calendar, Shield } from 'lucide-react'
 
 export default function ProfilePage() {
-  const { user, isLoading } = useSupabase()
+  const { user, isLoading } = useAuth()
   const router = useRouter()
 
   const [loading, setLoading] = useState(false)

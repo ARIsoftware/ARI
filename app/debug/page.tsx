@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSupabase } from '@/components/providers'
+import { useAuth } from "@/components/providers"
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -166,7 +166,7 @@ interface SecurityTestResult {
 
 export default function DatabaseTestPage() {
   // Use the global Supabase client from context (already authenticated)
-  const { supabase, user, session } = useSupabase()
+  const { user, session } = useAuth()
   const [sessionLoading, setSessionLoading] = useState(true)
 
   // Wait for session to initialize from Providers

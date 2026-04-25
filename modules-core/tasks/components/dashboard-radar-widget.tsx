@@ -17,7 +17,7 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart'
 import { Loader2 } from 'lucide-react'
-import { useSupabase } from '@/components/providers'
+import { useAuth } from "@/components/providers"
 import type { Task } from '@/modules/tasks/types'
 import { transformTaskForRadar } from '../lib/priority-utils'
 import { RadarTaskDots } from './radar-task-dots'
@@ -55,7 +55,7 @@ function prepareRadarData(tasks: Task[]) {
 }
 
 export default function TasksDashboardRadarWidget() {
-  const { session } = useSupabase()
+  const { session } = useAuth()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [hoveredTask, setHoveredTask] = useState<string | null>(null)

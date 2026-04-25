@@ -863,7 +863,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useSupabase } from '@/components/providers'
 
 export function ModuleTemplateWidget() {
-  const { session } = useSupabase()
+  const { session } = useAuth()
   const [count, setCount] = useState(0)
   const [loading, setLoading] = useState(true)
 
@@ -926,7 +926,7 @@ interface Settings {
 }
 
 export function ModuleTemplateSettingsPanel() {
-  const { session } = useSupabase()
+  const { session } = useAuth()
   const [settings, setSettings] = useState<Settings>({
     enableNotifications: true,
     theme: 'auto'
@@ -1115,7 +1115,7 @@ mkdir -p modules/my-module/{app,api,components,lib,types,database}
 import { useSupabase } from '@/components/providers'
 
 export default function MyModulePage() {
-  const { session } = useSupabase()
+  const { session } = useAuth()
 
   return (
     <div className="p-6">

@@ -12,6 +12,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import moduleManifest from '@/lib/generated/module-manifest.json'
 
+type ApiRoute = { path: string; fullPath: string; methods: string[]; moduleId?: string }
+type PublicRoute = ApiRoute & {
+  moduleId: string
+  security: { type: string; rateLimit?: number | boolean; requiresAuthIfUsers?: boolean }
+  description?: string
+}
+
+const manifest = moduleManifest as Record<string, unknown>
+
 export const debugRole = "debug-endpoints"
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -24,18 +33,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       )
     }
 
-    const coreRoutes = (moduleManifest as any).coreApiRoutes || []
-    const moduleRoutes = (moduleManifest as any).moduleApiRoutes || []
+    const coreRoutes = (manifest.coreApiRoutes || []) as ApiRoute[]
+    const moduleRoutes = (manifest.moduleApiRoutes || []) as ApiRoute[]
 
     // Public routes from manifest
-    const publicRoutes = (moduleManifest.publicRoutes || []) as Array<{
-      moduleId: string
-      path: string
-      fullPath: string
-      methods: string[]
-      security: { type: string; rateLimit?: number | boolean; requiresAuthIfUsers?: boolean }
-      description?: string
-    }>
+    const publicRoutes = ((manifest.publicRoutes || []) as PublicRoute[])
 
     const publicEndpoints = publicRoutes.map(route => ({
       path: route.path,
@@ -50,7 +52,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     // Private module endpoints (exclude public ones)
     const publicRouteKeys = new Set(publicRoutes.map(r => `${r.moduleId}:${r.path}`))
-    const privateModuleEndpoints = moduleRoutes.filter((r: any) => {
+    const privateModuleEndpoints = moduleRoutes.filter((r: ApiRoute) => {
       const routeKey = `${r.moduleId}:${r.path === '(root)' ? '' : r.path}`
       return !publicRouteKeys.has(routeKey)
     })
@@ -91,7 +93,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   } catch (error: unknown) {
     console.error('[Debug Endpoints] Error:', error)
     return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : String(error) },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }

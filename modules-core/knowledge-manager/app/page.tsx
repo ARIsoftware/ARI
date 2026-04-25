@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useSupabase } from '@/components/providers'
+import { useAuth } from "@/components/providers"
 import { Loader2 } from 'lucide-react'
 import {
   Dialog,
@@ -37,7 +37,7 @@ import type {
 } from '../types'
 
 export default function KnowledgeManagerPage() {
-  const { session } = useSupabase()
+  const { session } = useAuth()
 
   // Data state
   const [articles, setArticles] = useState<KnowledgeArticle[]>([])

@@ -76,7 +76,7 @@ export async function getAuthenticatedUser() {
 
 ##### `/components/providers.tsx`
 - Global context provider using `authClient.useSession()`
-- Exposes `useSupabase()` hook (legacy) and `useAuth()` hook (preferred for new code) — both return the same context
+- Exposes `useAuth()` hook for accessing auth context (user, session, isLoading)
 - Note: Does NOT provide direct database access - use API routes instead
 
 ##### `/middleware.ts`
@@ -272,7 +272,7 @@ END $$;
 /components            # React components
   /ui                  # Shadcn/ui components
   /auth                # Authentication components
-  /providers.tsx       # Global providers (useAuth/useSupabase hooks)
+  /providers.tsx       # Global providers (useAuth hook)
   /app-sidebar.tsx     # Main navigation
   /query-provider.tsx  # TanStack Query provider
 

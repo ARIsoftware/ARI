@@ -29,7 +29,7 @@ function truncateTaskName(taskName: string, maxLength: number = 50): string {
   return taskName.substring(0, maxLength) + "..."
 }
 import { useIsMobile } from "@/components/ui/use-mobile"
-import { useSupabase } from "@/components/providers"
+import { useAuth } from "@/components/providers"
 import { authClient } from "@/lib/auth-client"
 import { useCommandPalette } from "@/components/command-palette"
 import { useDragDropMode } from "@/components/drag-drop-mode-context"
@@ -100,7 +100,7 @@ function SortableTopBarIcon({ id, children }: { id: string; children: React.Reac
 // Icons component for the top bar
 function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
   const router = useRouter()
-  const { session, supabase } = useSupabase()
+  const { session } = useAuth()
   const { setOpen: setCommandPaletteOpen } = useCommandPalette()
   const [mounted, setMounted] = useState(false)
   const user = session?.user
@@ -408,7 +408,7 @@ export function TaskAnnouncement() {
   const [loading, setLoading] = useState(true)
   const [focusTimer, setFocusTimer] = useState({ isActive: false, timeRemaining: 0, isComplete: false })
   const isMobile = useIsMobile()
-  const { session, supabase } = useSupabase()
+  const { session } = useAuth()
   const user = session?.user
   const { isDragMode, setDragMode, saveOrder } = useDragDropMode()
   const { modules } = useModules()

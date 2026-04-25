@@ -4,6 +4,15 @@ import { withAdminDb } from '@/lib/db'
 import { moduleSettings } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { LICENSE_MODULE_ID } from '@/lib/license-helpers'
+import { z } from 'zod'
+
+const licenseSettingsSchema = z.object({
+  key: z.string(),
+  status: z.string().optional(),
+  customer_email: z.string().optional(),
+  expires_at: z.string().optional(),
+  validated_at: z.string().optional(),
+})
 
 function maskKey(key: string): string {
   if (key.length <= 15) return key
@@ -33,20 +42,21 @@ export async function GET() {
     )
 
     const data = rows[0]
-    if (!data || !(data.settings as Record<string, any>)?.key) {
-      // If no DB license, check for env var license key
+    const parsed = licenseSettingsSchema.safeParse(data?.settings)
+    if (!parsed.success) {
+      // If no valid DB license, check for env var license key
       const envKey = process.env.ARI_LICENSE_KEY
       return NextResponse.json({ active: false, ...(envKey ? { env_key: envKey } : {}) })
     }
 
-    const settings = data.settings as Record<string, any>
+    const settings = parsed.data
     return NextResponse.json({
       active: true,
-      status: settings.status,
+      status: settings.status ?? null,
       masked_key: maskKey(settings.key),
-      customer_email: settings.customer_email || null,
-      expires_at: settings.expires_at || null,
-      validated_at: settings.validated_at || null,
+      customer_email: settings.customer_email ?? null,
+      expires_at: settings.expires_at ?? null,
+      validated_at: settings.validated_at ?? null,
     })
   } catch (error) {
     console.error('[API /license/status] Error:', error)

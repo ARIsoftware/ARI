@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useSupabase } from '@/components/providers'
+import { useAuth } from "@/components/providers"
 import { Loader2, Save, CheckCircle2 } from 'lucide-react'
 import type { QuotesSettings } from '../types'
 import { defaultQuotesSettings } from '../types'
@@ -34,7 +34,7 @@ import { defaultQuotesSettings } from '../types'
  * by the Settings page via dynamic import.
  */
 export function QuotesSettingsPanel() {
-  const { session } = useSupabase()
+  const { session } = useAuth()
   const [settings, setSettings] = useState<QuotesSettings>(defaultQuotesSettings)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)

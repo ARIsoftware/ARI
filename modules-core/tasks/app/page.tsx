@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { Fragment } from "react"
-import { useSupabase } from "@/components/providers"
+import { useAuth } from "@/components/providers"
 import { DM_Sans } from "next/font/google"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -89,7 +89,7 @@ const getProjectName = (projectId: string | null | undefined, projects: MajorPro
 }
 
 export default function TasksPage() {
-  const { session, supabase } = useSupabase()
+  const { session } = useAuth()
   const user = session?.user
   const { toast } = useToast()
   const { enabled: majorProjectsEnabled } = useModuleEnabled('major-projects')

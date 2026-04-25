@@ -1,10 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { useSupabase } from "@/components/providers"
+import { useAuth } from "@/components/providers"
 
 export default function LogsPage() {
-  const { session, supabase } = useSupabase()
+  const { session } = useAuth()
   const user = session?.user
   const isSignedIn = !!session
   const userId = user?.id

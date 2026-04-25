@@ -233,7 +233,7 @@ Users can customize:
 
 ### Authentication
 - All API routes require Bearer token authentication
-- Use `useSupabase()` hook for session management
+- Use `useAuth()` hook for session management
 - RLS policies enforce user isolation at database level
 
 ### Validation

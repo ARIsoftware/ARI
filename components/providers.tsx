@@ -1,9 +1,8 @@
 "use client"
 
-import { createContext, useContext, useEffect, useMemo } from 'react'
+import { createContext, useContext, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { authClient } from "@/lib/auth-client"
-import { createSupabaseClient } from "@/lib/supabase-auth"
 import { Toaster } from "@/components/ui/toaster"
 import { ModuleProviders } from "@/components/module-providers"
 import { ModulesProvider } from "@/lib/modules/context"
@@ -46,9 +45,6 @@ type AuthContext = {
   user: User | null
   session: Session | null
   isLoading: boolean
-  // Keep supabase client for realtime subscriptions
-  // Can be null when Supabase is not configured (setup mode)
-  supabase: ReturnType<typeof createSupabaseClient>
 }
 
 const Context = createContext<AuthContext | undefined>(undefined)
@@ -64,9 +60,6 @@ export function Providers({
 }) {
   const pathname = usePathname()
   const { data: sessionData, isPending } = authClient.useSession()
-
-  // Create supabase client for realtime subscriptions (not for auth)
-  const supabase = useMemo(() => createSupabaseClient(), [])
 
   // Map Better Auth user/session to compatible format
   // Cast to include custom fields (firstName, lastName) defined in auth.ts additionalFields
@@ -135,7 +128,7 @@ export function Providers({
   }, [user])
 
   return (
-    <Context.Provider value={{ user, session, isLoading: isPending, supabase }}>
+    <Context.Provider value={{ user, session, isLoading: isPending }}>
       <ThemeProvider isAuthenticated={!!session} isAuthLoading={isPending}>
         <ModulesProvider modules={modules} enabledModules={enabledModules}>
           <ModuleProviders isAuthenticated={!!session}>
@@ -154,16 +147,15 @@ export function Providers({
 
 /**
  * Hook to access auth context.
- * Includes supabase client for realtime subscriptions.
  * For data mutations, prefer using API routes.
  */
-export const useSupabase = () => {
+export const useAuth = () => {
   const context = useContext(Context)
   if (context === undefined) {
-    throw new Error('useSupabase must be used inside Providers')
+    throw new Error('useAuth must be used inside Providers')
   }
   return context
 }
 
-// Alias for new code
-export const useAuth = useSupabase
+/** @deprecated Use useAuth() instead */
+export const useSupabase = useAuth

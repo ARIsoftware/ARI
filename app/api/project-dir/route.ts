@@ -2,10 +2,16 @@ import { NextResponse } from "next/server"
 import { existsSync } from "fs"
 import path from "path"
 import { getDbMode } from "@/lib/db/mode"
+import { getAuthenticatedUser } from "@/lib/auth-helpers"
 
 export const debugRole = "project-dir"
 
 export async function GET() {
+  const { user } = await getAuthenticatedUser()
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const hasAnonKey = !!(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
   const hasServiceKey = !!(process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)

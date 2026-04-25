@@ -75,11 +75,11 @@ export async function bootstrapModuleSettings(
 /** Build maps from a module_settings query result */
 function buildSettingsMaps(settings: { moduleId: string; enabled: boolean | null; settings: unknown }[]) {
   const enabledMap = new Map<string, boolean>()
-  const configMap = new Map<string, Record<string, any>>()
+  const configMap = new Map<string, Record<string, unknown>>()
   for (const s of settings) {
     enabledMap.set(s.moduleId, s.enabled ?? false)
-    if (s.settings) {
-      configMap.set(s.moduleId, s.settings as Record<string, any>)
+    if (s.settings && typeof s.settings === 'object') {
+      configMap.set(s.moduleId, s.settings as Record<string, unknown>)
     }
   }
   return { enabledMap, configMap }
@@ -141,7 +141,7 @@ export async function getEnabledModules(userId?: string): Promise<ModuleMetadata
     .map(module => {
       // Merge user's custom menuPriority from settings if available
       const userSettings = moduleSettingsMap.get(module.id)
-      const customPriority = userSettings?.menuPriority
+      const customPriority = typeof userSettings?.menuPriority === 'number' ? userSettings.menuPriority : undefined
 
       if (customPriority !== undefined) {
         return {

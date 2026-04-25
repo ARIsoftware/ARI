@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useSupabase } from "@/components/providers"
+import { useAuth } from "@/components/providers"
 import { DM_Sans } from "next/font/google"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -45,7 +45,7 @@ const statusOptions = [
 ]
 
 export default function AddTaskPage() {
-  const { session, supabase, isLoading: sessionLoading } = useSupabase()
+  const { session, isLoading: sessionLoading } = useAuth()
   const user = session?.user
   const { toast } = useToast()
   const router = useRouter()

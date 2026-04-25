@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useSupabase } from "@/components/providers"
+import { useAuth } from "@/components/providers"
 import { DM_Sans } from "next/font/google"
 import { useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -61,7 +61,7 @@ export default function EditTaskPage() {
   const params = useParams()
   const id = params.id as string || (params.slug as string[])?.[1]
 
-  const { session, supabase } = useSupabase()
+  const { session } = useAuth()
   const user = session?.user
   const { toast } = useToast()
   const router = useRouter()

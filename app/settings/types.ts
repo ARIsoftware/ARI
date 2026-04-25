@@ -95,16 +95,3 @@ export interface ApiKeyCreateResponse {
   key: ApiKey
   raw_key: string
 }
-
-export interface FontOption {
-  value: string
-  label: string
-  css: string
-}
-
-export const FONT_OPTIONS: FontOption[] = [
-  { value: "Overpass Mono", label: "Overpass Mono", css: '"Overpass Mono", monospace' },
-  { value: "Outfit", label: "Outfit", css: '"Outfit", sans-serif' },
-  { value: "Open Sans", label: "Open Sans", css: '"Open Sans", sans-serif' },
-  { value: "Science Gothic", label: "Science Gothic", css: '"Science Gothic", sans-serif' },
-]

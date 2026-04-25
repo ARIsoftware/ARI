@@ -1,9 +1,9 @@
 'use client'
 
 import { TaskAnalyticsChart } from './task-analytics-chart'
-import { useSupabase } from '@/components/providers'
+import { useAuth } from "@/components/providers"
 
 export default function TasksDashboardActivityWidget() {
-  const { session } = useSupabase()
+  const { session } = useAuth()
   return <TaskAnalyticsChart token={session?.access_token || null} />
 }

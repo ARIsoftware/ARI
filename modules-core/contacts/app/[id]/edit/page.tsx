@@ -22,7 +22,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { getContact, updateContact, createContact, type Contact } from "@/modules/contacts/lib/contacts"
-import { useSupabase } from "@/components/providers"
+import { useAuth } from "@/components/providers"
 
 interface ContactFormData {
   name: string
@@ -40,7 +40,7 @@ interface ContactFormData {
 export default function EditContactPage() {
   const router = useRouter()
   const { toast } = useToast()
-  const { session, supabase } = useSupabase()
+  const { session } = useAuth()
 
   // Get params from URL - works with both direct routing and catch-all module routing
   const routeParams = useParams()
