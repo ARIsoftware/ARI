@@ -579,7 +579,7 @@ export default function TasksPage() {
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex flex-wrap gap-1">
-                              {task.assignees.length > 0 ? (
+                              {task.assignees?.length > 0 ? (
                                 (task.assignees ?? []).map((name: string) => (
                                   <span
                                     key={name}
@@ -1202,7 +1202,7 @@ export default function TasksPage() {
                         </h3>
 
                         <div className={`space-y-2 text-sm ${task.pinned ? "text-gray-300" : "text-muted-foreground"}`}>
-                          {task.assignees.length > 0 && (
+                          {task.assignees?.length > 0 && (
                             <div className="flex flex-wrap gap-1">
                               {(task.assignees ?? []).map((name: string) => (
                                 <span
