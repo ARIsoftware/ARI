@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,12 +8,20 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Plug, Eye, EyeOff, Check, FileCode } from "lucide-react"
 
+interface ProviderField {
+  envKey: string
+  placeholder: string
+  label?: string
+  optional?: boolean
+}
+
 interface ProviderConfig {
   id: string
   name: string
   description: string
   envKey: string
   placeholder: string
+  extraFields?: ProviderField[]
 }
 
 const providers: ProviderConfig[] = [
@@ -45,39 +53,198 @@ const providers: ProviderConfig[] = [
     envKey: "GOOGLE_GEMINI_API_KEY",
     placeholder: "AIza...",
   },
+  {
+    id: "resend",
+    name: "Resend",
+    description: "Transactional email API for notifications.",
+    envKey: "RESEND_API_KEY",
+    placeholder: "re_...",
+    extraFields: [
+      {
+        envKey: "RESEND_WEBHOOK_SECRET",
+        placeholder: "whsec_...",
+        label: "Webhook Secret",
+        optional: true,
+      },
+    ],
+  },
 ]
 
-export function IntegrationsTab(): React.ReactElement {
-  const [keys, setKeys] = useState<Record<string, string>>({})
-  const [visibility, setVisibility] = useState<Record<string, boolean>>({})
-  const [saved, setSaved] = useState<Record<string, boolean>>({})
+type KeyStatus = { configured: boolean; masked: string | null }
 
-  function handleKeyChange(id: string, value: string) {
-    setKeys(prev => ({ ...prev, [id]: value }))
-    setSaved(prev => ({ ...prev, [id]: false }))
+function getAllEnvKeys(provider: ProviderConfig): string[] {
+  const keys = [provider.envKey]
+  if (provider.extraFields) {
+    for (const f of provider.extraFields) keys.push(f.envKey)
+  }
+  return keys
+}
+
+export function IntegrationsTab(): React.ReactElement {
+  const [serverState, setServerState] = useState<Record<string, KeyStatus>>({})
+  const [typed, setTyped] = useState<Record<string, string>>({})
+  const [dirty, setDirty] = useState<Record<string, boolean>>({})
+  const [revealed, setRevealed] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState<Record<string, boolean>>({})
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetch("/api/settings/api-keys", { signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: Record<string, KeyStatus> | null) => {
+        if (data) setServerState(data)
+      })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [])
+
+  function handleKeyChange(envKey: string, value: string) {
+    setTyped(prev => ({ ...prev, [envKey]: value }))
+    setDirty(prev => ({ ...prev, [envKey]: true }))
+    setRevealed(prev => { const { [envKey]: _, ...rest } = prev; return rest })
+    // Clear any error for the provider this key belongs to
+    const provider = providers.find(p => p.envKey === envKey || p.extraFields?.some(f => f.envKey === envKey))
+    if (provider) clearProviderError(provider.id)
   }
 
-  function toggleVisibility(id: string) {
-    setVisibility(prev => ({ ...prev, [id]: !prev[id] }))
+  function clearProviderError(providerId: string) {
+    setErrors(prev => { const { [providerId]: _, ...rest } = prev; return rest })
+  }
+
+  async function toggleVisibility(envKey: string) {
+    if (envKey in revealed) {
+      setRevealed(prev => { const { [envKey]: _, ...rest } = prev; return rest })
+      return
+    }
+    try {
+      const res = await fetch(`/api/settings/api-keys?reveal=${encodeURIComponent(envKey)}`)
+      if (!res.ok) return
+      const data = await res.json()
+      if (!data.value) return
+      if (dirty[envKey]) return
+      setRevealed(prev => ({ ...prev, [envKey]: data.value }))
+    } catch {}
   }
 
   async function handleSave(provider: ProviderConfig) {
-    const key = keys[provider.id]?.trim()
-    if (!key) return
+    const toSave: { envKey: string; value: string }[] = []
+    for (const envKey of getAllEnvKeys(provider)) {
+      if (dirty[envKey]) toSave.push({ envKey, value: typed[envKey]?.trim() ?? "" })
+    }
+    if (toSave.length === 0) return
+
+    setSaving(prev => ({ ...prev, [provider.id]: true }))
+    clearProviderError(provider.id)
 
     try {
-      const response = await fetch("/api/settings/api-keys", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: provider.envKey, value: key }),
-      })
+      const results = await Promise.all(
+        toSave.map(async ({ envKey, value }) => {
+          const res = await fetch("/api/settings/api-keys", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ key: envKey, value }),
+          })
+          if (!res.ok) return null
+          const data = await res.json()
+          if (!value) return { envKey, masked: null, deleted: true }
+          return { envKey, masked: (data.masked ?? value.slice(0, 4) + "••••••••") as string, deleted: false }
+        })
+      )
 
-      if (response.ok) {
-        setSaved(prev => ({ ...prev, [provider.id]: true }))
+      const succeeded = results.filter(Boolean)
+      const failed = toSave.length - succeeded.length
+
+      if (failed > 0) {
+        setErrors(prev => ({ ...prev, [provider.id]: `Failed to save ${failed} key${failed > 1 ? "s" : ""}` }))
       }
-    } catch (error) {
-      console.error(`Failed to save ${provider.name} key:`, error)
+
+      const savedKeys = succeeded.map(r => r!.envKey)
+      const updates: Record<string, KeyStatus> = {}
+      for (const r of succeeded) {
+        if (r) updates[r.envKey] = r.deleted
+          ? { configured: false, masked: null }
+          : { configured: true, masked: r.masked }
+      }
+      setServerState(prev => ({ ...prev, ...updates }))
+
+      setTyped(prev => {
+        const next = { ...prev }
+        for (const k of savedKeys) delete next[k]
+        return next
+      })
+      setDirty(prev => {
+        const next = { ...prev }
+        for (const k of savedKeys) delete next[k]
+        return next
+      })
+      setRevealed(prev => {
+        const next = { ...prev }
+        for (const k of savedKeys) delete next[k]
+        return next
+      })
+    } catch {
+      setErrors(prev => ({ ...prev, [provider.id]: "Failed to save. Check your connection and try again." }))
+    } finally {
+      setSaving(prev => ({ ...prev, [provider.id]: false }))
     }
+  }
+
+  function isConfigured(envKey: string): boolean {
+    return serverState[envKey]?.configured ?? false
+  }
+
+  function getDisplayValue(envKey: string): string {
+    if (dirty[envKey]) return typed[envKey] ?? ""
+    if (envKey in revealed) return revealed[envKey]
+    return serverState[envKey]?.configured ? (serverState[envKey].masked ?? "") : ""
+  }
+
+  function isVisible(envKey: string): boolean {
+    return !!dirty[envKey] || envKey in revealed
+  }
+
+  function renderField(envKey: string, placeholder: string) {
+    const configured = isConfigured(envKey)
+    const isDirty = !!dirty[envKey]
+
+    return (
+      <div className="relative flex-1">
+        <Input
+          type={isVisible(envKey) ? "text" : "password"}
+          placeholder={placeholder}
+          value={getDisplayValue(envKey)}
+          onChange={(e) => handleKeyChange(envKey, e.target.value)}
+          className="pr-10 font-mono text-xs"
+        />
+        {configured && !isDirty && (
+          <button
+            type="button"
+            onClick={() => toggleVisibility(envKey)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            {envKey in revealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  function renderSaveButton(provider: ProviderConfig, className?: string) {
+    const anyDirty = getAllEnvKeys(provider).some(k => dirty[k])
+    const isSaving = !!saving[provider.id]
+    const showSaved = isConfigured(provider.envKey) && !anyDirty && !isSaving
+    return (
+      <Button
+        size="sm"
+        variant={showSaved ? "outline" : "default"}
+        onClick={() => handleSave(provider)}
+        disabled={!anyDirty || isSaving}
+        className={className}
+      >
+        {isSaving ? "Saving..." : showSaved ? <><Check className="h-4 w-4 mr-1" /> Saved</> : "Save"}
+      </Button>
+    )
   }
 
   return (
@@ -88,23 +255,25 @@ export function IntegrationsTab(): React.ReactElement {
             <Plug className="h-5 w-5 text-indigo-500" />
             Connected apps
           </CardTitle>
-          <CardDescription>
-            Store your AI API keys here.{" "}
-            <a
-              href="https://ari.software/docs/api-integrations"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-4 hover:text-foreground"
-            >
-              Learn more
-            </a>
+          <CardDescription className="space-y-1">
+            <span>Store your API keys here.</span>
+            <span className="block">
+              Alternatively store your API keys in your <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">.env.local</code> which is a recommended security practice.{" "}
+              <a
+                href="https://ari.software/docs/api-integrations"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-4 hover:text-foreground"
+              >
+                Learn more
+              </a>
+            </span>
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
           {providers.map((provider) => {
-            const value = keys[provider.id] || ""
-            const isVisible = visibility[provider.id] || false
-            const isSaved = saved[provider.id] || false
+            const saved = isConfigured(provider.envKey)
+            const hasExtra = !!provider.extraFields
 
             return (
               <div key={provider.id} className="rounded-xl border p-5">
@@ -113,7 +282,7 @@ export function IntegrationsTab(): React.ReactElement {
                     <p className="text-sm font-medium">{provider.name}</p>
                     <p className="text-xs text-muted-foreground">{provider.envKey}</p>
                   </div>
-                  {isSaved ? (
+                  {saved ? (
                     <Badge variant="secondary">Saved</Badge>
                   ) : (
                     <Badge variant="outline">Not configured</Badge>
@@ -123,31 +292,23 @@ export function IntegrationsTab(): React.ReactElement {
                 <p className="text-sm text-muted-foreground">
                   {provider.description}
                 </p>
-                <div className="mt-4 flex gap-2">
-                  <div className="relative flex-1">
-                    <Input
-                      type={isVisible ? "text" : "password"}
-                      placeholder={provider.placeholder}
-                      value={value}
-                      onChange={(e) => handleKeyChange(provider.id, e.target.value)}
-                      className="pr-10 font-mono text-xs"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => toggleVisibility(provider.id)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      {isVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
+                <div className="mt-4 space-y-3">
+                  <div className="flex gap-2">
+                    {renderField(provider.envKey, provider.placeholder)}
+                    {!hasExtra && renderSaveButton(provider)}
                   </div>
-                  <Button
-                    size="sm"
-                    variant={isSaved ? "outline" : "default"}
-                    onClick={() => handleSave(provider)}
-                    disabled={!value.trim()}
-                  >
-                    {isSaved ? <Check className="h-4 w-4" /> : "Save"}
-                  </Button>
+                  {provider.extraFields?.map((field) => (
+                    <div key={field.envKey}>
+                      <p className="text-xs text-muted-foreground mb-1">
+                        {field.label || field.envKey}{field.optional ? " (optional)" : ""}
+                      </p>
+                      {renderField(field.envKey, field.placeholder)}
+                    </div>
+                  ))}
+                  {hasExtra && renderSaveButton(provider, "w-full")}
+                  {errors[provider.id] && (
+                    <p className="text-xs text-red-500">{errors[provider.id]}</p>
+                  )}
                 </div>
               </div>
             )
@@ -170,7 +331,9 @@ export function IntegrationsTab(): React.ReactElement {
 {`OPENROUTER_API_KEY=sk-ajg...
 ANTHROPIC_API_KEY=sk-ant...
 OPENAI_API_KEY=sk-dfdf...
-GOOGLE_GEMINI_API_KEY=AIza...`}
+GOOGLE_GEMINI_API_KEY=AIza...
+RESEND_API_KEY=re_...
+RESEND_WEBHOOK_SECRET=whsec_...`}
           </pre>
         </CardContent>
       </Card>

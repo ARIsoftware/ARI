@@ -112,8 +112,10 @@ export function AuthForm({ mode }: AuthFormProps) {
       if (res.error) {
         if (res.error.status === 429) {
           setError("Too many login attempts. We've temporarily paused login attempts to keep your account safe. Please wait 5 minutes and try again.")
+        } else if (res.error.status === 500 || res.error.message?.includes('ECONNREFUSED') || res.error.message?.includes('connection')) {
+          setError('Could not connect to database. Ensure that it is running and try again.')
         } else {
-          setError(res.error.message || 'Sign in failed')
+          setError('Invalid email or password')
         }
         setLoading(false)
       } else if ((res.data as any)?.twoFactorRedirect) {
@@ -125,8 +127,8 @@ export function AuthForm({ mode }: AuthFormProps) {
         // to ensure session cookies are properly read
         window.location.href = '/dashboard'
       }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err))
+    } catch {
+      setError('Could not connect to database. Ensure that it is running and try again.')
       setLoading(false)
     }
   }
@@ -320,7 +322,6 @@ export function AuthForm({ mode }: AuthFormProps) {
               onChange={(e) => setPassword(e.target.value)}
               required
               disabled={loading}
-              minLength={18}
             />
           </div>
 

@@ -35,7 +35,6 @@ export function SecurityTab({
   const router = useRouter()
   const [telemetryEnabled, setTelemetryEnabled] = useState<boolean | null>(null)
   const [telemetrySaving, setTelemetrySaving] = useState(false)
-
   useEffect(() => {
     fetch("/api/telemetry")
       .then((r) => (r.ok ? r.json() : null))
@@ -189,32 +188,35 @@ export function SecurityTab({
         <TwoFactorSetup twoFactorEnabled={twoFactorEnabled} />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <BarChart3 className="h-5 w-5 text-purple-500" />
-            Usage Statistics
-          </CardTitle>
-          <CardDescription>
-            Help improve ARI by sharing basic install and version data.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-start justify-between rounded-lg border p-4">
-            <div className="pr-4">
-              <p className="text-sm font-medium">Share anonymous usage statistics</p>
-              <p className="text-sm text-muted-foreground">
-                Sends a single ping on server startup containing an opaque install ID, ARI version, platform, and the configured account email address (used only for basic instance identification). No user content is ever transmitted.
-              </p>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <BarChart3 className="h-5 w-5 text-purple-500" />
+              Usage Statistics
+            </CardTitle>
+            <CardDescription>
+              Help improve ARI by sharing basic install and version data.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-start justify-between rounded-lg border p-4">
+              <div className="pr-4">
+                <p className="text-sm font-medium">Share anonymous usage statistics</p>
+                <p className="text-sm text-muted-foreground">
+                  Sends a single ping on server startup containing an opaque install ID, ARI version, platform, and the configured account email address (used only for basic instance identification). No user content is ever transmitted.
+                </p>
+              </div>
+              <Switch
+                checked={telemetryEnabled ?? false}
+                disabled={telemetryEnabled === null || telemetrySaving}
+                onCheckedChange={handleTelemetryToggle}
+              />
             </div>
-            <Switch
-              checked={telemetryEnabled ?? false}
-              disabled={telemetryEnabled === null || telemetrySaving}
-              onCheckedChange={handleTelemetryToggle}
-            />
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+      </div>
     </div>
   )
 }

@@ -187,7 +187,6 @@ ARI features a powerful, self-contained module architecture:
 ### Better Auth
 - Modern, framework-agnostic authentication
 - Social login providers
-- Magic links and passwordless auth
 - Multi-factor authentication (MFA)
 - Session management
 
