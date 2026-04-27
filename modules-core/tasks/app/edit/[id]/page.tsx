@@ -318,7 +318,7 @@ export default function EditTaskPage() {
                         <Save className="w-4 h-4" />
                       </Button>
                     </div>
-                    {formData.assignees.length > 0 && (
+                    {formData.assignees && formData.assignees.length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-2">
                         {formData.assignees.map((assignee) => (
                           <Badge key={assignee} variant="secondary" className="flex items-center gap-1">
