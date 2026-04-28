@@ -204,6 +204,17 @@ END $$;
 - Real-time streaming responses
 - Clean, minimal chat UI with user/assistant message distinction
 
+#### ARI File Storage System
+- Central file storage with authenticated API endpoints
+- Upload: `POST /api/storage/upload` (FormData with `bucket` and `file`)
+- Serve: `GET /api/storage/serve/{bucket}/{filename}` (streams binary, auth required)
+- List: `GET /api/storage/list?bucket={name}`
+- Delete: `DELETE /api/storage/delete` (JSON body with `bucket` and `filename`)
+- Files stored at `data/storage/{user_id}/{bucket}/` on local filesystem
+- All endpoints require authentication — no public file URLs
+- Storage provider abstraction in `/lib/storage/` (currently local filesystem, extensible)
+- Configure in Settings > Integrations > File Storage
+
 #### Task Priority Radar System
 - Interactive radar chart visualization showing task priorities
 - 5-axis priority calculation: Impact, Severity, Timeliness, Effort, Strategic Fit

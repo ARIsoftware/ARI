@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
-import { Plug, Eye, EyeOff, Check, FileCode } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Plug, Eye, EyeOff, Check, FileCode, HardDrive } from "lucide-react"
 
 interface ProviderField {
   envKey: string
@@ -88,12 +90,29 @@ export function IntegrationsTab(): React.ReactElement {
   const [saving, setSaving] = useState<Record<string, boolean>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  const [storageProvider, setStorageProvider] = useState("local")
+  const [storageStatus, setStorageStatus] = useState<"active" | "not_configured" | "loading">("loading")
+
   useEffect(() => {
     const controller = new AbortController()
     fetch("/api/settings/api-keys", { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: Record<string, KeyStatus> | null) => {
         if (data) setServerState(data)
+      })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetch("/api/settings/storage", { signal: controller.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { provider?: string; status?: string } | null) => {
+        if (data) {
+          setStorageProvider(data.provider ?? "local")
+          setStorageStatus(data.status === "active" ? "active" : "not_configured")
+        }
       })
       .catch(() => {})
     return () => controller.abort()
@@ -313,6 +332,44 @@ export function IntegrationsTab(): React.ReactElement {
               </div>
             )
           })}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <HardDrive className="h-5 w-5 text-emerald-500" />
+              File Storage
+            </CardTitle>
+            {storageStatus === "active" ? (
+              <Badge variant="secondary">Active</Badge>
+            ) : storageStatus === "loading" ? null : (
+              <Badge variant="outline">Not configured</Badge>
+            )}
+          </div>
+          <CardDescription>
+            Configure where uploaded files (photos, documents, etc.) are stored.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-sm">Provider</Label>
+            <Select value={storageProvider} onValueChange={setStorageProvider}>
+              <SelectTrigger className="w-full sm:w-[280px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="local">Local Filesystem</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {storageProvider === "local" && (
+            <div className="space-y-2">
+              <Label className="text-sm">Storage Path</Label>
+              <p className="text-sm font-mono text-muted-foreground">./data/storage/</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { AlertCircle, CheckCircle2, XCircle, Loader2, Shield, ShieldAlert, ShieldCheck, Database as DatabaseIcon, Package, Save, Key, Globe, Lock, ChevronRight } from 'lucide-react'
+import { AlertCircle, CheckCircle2, XCircle, Loader2, Shield, ShieldAlert, ShieldCheck, Database as DatabaseIcon, Package, Save, Key, Globe, Lock, ChevronRight, HardDrive } from 'lucide-react'
 import moduleManifest from '@/lib/generated/module-manifest.json'
 
 type ManifestModule = { id: string; name: string; enabled?: boolean }
@@ -267,6 +267,8 @@ export default function DatabaseTestPage() {
   const [isRunningSecurityTests, setIsRunningSecurityTests] = useState(false)
   const [isRunningModuleTests, setIsRunningModuleTests] = useState(false)
   const [isRunningBackupTests, setIsRunningBackupTests] = useState(false)
+  const [storageResults, setStorageResults] = useState<TestResult[]>([])
+  const [isRunningStorageTests, setIsRunningStorageTests] = useState(false)
   const [isRunningAuthConfigTests, setIsRunningAuthConfigTests] = useState(false)
   const [isRunningEndpointsTests, setIsRunningEndpointsTests] = useState(false)
   const [isRunningPublicSecurityTests, setIsRunningPublicSecurityTests] = useState(false)
@@ -942,6 +944,136 @@ export default function DatabaseTestPage() {
 
     setIsRunningBackupTests(false)
     console.log('💾 Backup system diagnostics complete!')
+  }
+
+  const updateStorageResult = (name: string, update: Partial<TestResult>) => {
+    setStorageResults(prev => {
+      const existing = prev.find(r => r.name === name)
+      if (existing) {
+        return prev.map(r => r.name === name ? { ...r, ...update } : r)
+      } else {
+        return [...prev, { name, status: 'pending', ...update }]
+      }
+    })
+  }
+
+  const runStorageTests = async () => {
+    setIsRunningStorageTests(true)
+    setStorageResults([])
+
+    // Test 1: Storage Provider Config
+    updateStorageResult('Storage Provider', { status: 'testing' })
+    try {
+      const res = await fetch('/api/settings/storage')
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+      const data = await res.json()
+      updateStorageResult('Storage Provider', {
+        status: data.status === 'active' ? 'success' : 'warning',
+        message: `Provider: ${data.provider} — Status: ${data.status}`,
+        data: { provider: data.provider, path: data.config?.path, status: data.status },
+      })
+    } catch (error: unknown) {
+      updateStorageResult('Storage Provider', { status: 'error', error: errMsg(error) })
+    }
+
+    // Test 2: Upload
+    updateStorageResult('Upload (POST /api/storage/upload)', { status: 'testing' })
+    let uploadedFilename: string | null = null
+    try {
+      const testContent = `ARI storage test — ${new Date().toISOString()}`
+      const blob = new Blob([testContent], { type: 'text/plain' })
+      const file = new File([blob], 'ari-debug-test.txt', { type: 'text/plain' })
+      const formData = new FormData()
+      formData.append('bucket', 'debug-test')
+      formData.append('file', file)
+
+      const res = await fetch('/api/storage/upload', { method: 'POST', body: formData })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || `HTTP ${res.status}`)
+      }
+      const data = await res.json()
+      uploadedFilename = data.name
+      updateStorageResult('Upload (POST /api/storage/upload)', {
+        status: 'success',
+        message: `Uploaded successfully`,
+        data: { path: data.path, name: data.name },
+      })
+    } catch (error: unknown) {
+      updateStorageResult('Upload (POST /api/storage/upload)', { status: 'error', error: errMsg(error) })
+    }
+
+    // Test 3: List
+    updateStorageResult('List (GET /api/storage/list)', { status: 'testing' })
+    try {
+      const res = await fetch('/api/storage/list?bucket=debug-test')
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || `HTTP ${res.status}`)
+      }
+      const data = await res.json()
+      const files = data.files || []
+      const found = uploadedFilename ? files.some((f: { name: string }) => f.name === uploadedFilename) : false
+      updateStorageResult('List (GET /api/storage/list)', {
+        status: 'success',
+        message: `${files.length} file(s) in debug-test bucket${uploadedFilename ? (found ? ' — uploaded file found' : ' — uploaded file NOT found') : ''}`,
+        data: { count: files.length, files: files.map((f: { name: string; size: number }) => `${f.name} (${f.size} bytes)`) },
+      })
+    } catch (error: unknown) {
+      updateStorageResult('List (GET /api/storage/list)', { status: 'error', error: errMsg(error) })
+    }
+
+    // Test 4: Serve
+    updateStorageResult('Serve (GET /api/storage/serve/...)', { status: 'testing' })
+    if (uploadedFilename) {
+      try {
+        const res = await fetch(`/api/storage/serve/debug-test/${uploadedFilename}`)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const text = await res.text()
+        const contentType = res.headers.get('content-type') || ''
+        updateStorageResult('Serve (GET /api/storage/serve/...)', {
+          status: 'success',
+          message: `File served (${text.length} bytes, ${contentType})`,
+          data: { contentType, size: text.length, preview: text.slice(0, 100) },
+        })
+      } catch (error: unknown) {
+        updateStorageResult('Serve (GET /api/storage/serve/...)', { status: 'error', error: errMsg(error) })
+      }
+    } else {
+      updateStorageResult('Serve (GET /api/storage/serve/...)', {
+        status: 'warning',
+        message: 'Skipped — no file was uploaded to serve',
+      })
+    }
+
+    // Test 5: Delete
+    updateStorageResult('Delete (DELETE /api/storage/delete)', { status: 'testing' })
+    if (uploadedFilename) {
+      try {
+        const res = await fetch('/api/storage/delete', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bucket: 'debug-test', filename: uploadedFilename }),
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error || `HTTP ${res.status}`)
+        }
+        updateStorageResult('Delete (DELETE /api/storage/delete)', {
+          status: 'success',
+          message: 'File deleted successfully',
+        })
+      } catch (error: unknown) {
+        updateStorageResult('Delete (DELETE /api/storage/delete)', { status: 'error', error: errMsg(error) })
+      }
+    } else {
+      updateStorageResult('Delete (DELETE /api/storage/delete)', {
+        status: 'warning',
+        message: 'Skipped — no file was uploaded to delete',
+      })
+    }
+
+    setIsRunningStorageTests(false)
   }
 
   const runEndpointsTests = async () => {
@@ -1842,6 +1974,13 @@ export default function DatabaseTestPage() {
     warnings: backupResults.filter(r => r.status === 'warning').length,
   }
 
+  const storageSummary = {
+    total: storageResults.length,
+    success: storageResults.filter(r => r.status === 'success').length,
+    errors: storageResults.filter(r => r.status === 'error').length,
+    warnings: storageResults.filter(r => r.status === 'warning').length,
+  }
+
   // Calculate auth config summary
   const authConfigSummary = {
     total: authConfigResults.length,
@@ -1909,7 +2048,7 @@ export default function DatabaseTestPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="database" className="w-full">
-        <TabsList className="grid w-full grid-cols-6 mb-8">
+        <TabsList className="grid w-full grid-cols-7 mb-8">
           <TabsTrigger value="database" className="flex items-center gap-2">
             <DatabaseIcon className="h-4 w-4" />
             Database
@@ -1929,6 +2068,10 @@ export default function DatabaseTestPage() {
           <TabsTrigger value="modules" className="flex items-center gap-2">
             <Package className="h-4 w-4" />
             Modules
+          </TabsTrigger>
+          <TabsTrigger value="storage" className="flex items-center gap-2">
+            <HardDrive className="h-4 w-4" />
+            Storage
           </TabsTrigger>
           <TabsTrigger value="backup" className="flex items-center gap-2">
             <Save className="h-4 w-4" />
@@ -2462,6 +2605,108 @@ export default function DatabaseTestPage() {
               {/* Module Test Results */}
               <div className="space-y-2">
                 {moduleResults.map((test) => (
+                  <Card key={test.name} className="border">
+                    <CardContent className="p-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3 flex-1">
+                          {getStatusIcon(test.status)}
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="text-sm font-medium">{test.name}</h3>
+                              {getStatusBadge(test.status)}
+                            </div>
+
+                            {test.message && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {test.message}
+                              </p>
+                            )}
+
+                            {test.error && (
+                              <div className="mt-2 p-2 bg-red-50 dark:bg-red-950 rounded text-xs">
+                                <p className="text-red-600 dark:text-red-400 font-medium">
+                                  Error: {test.error}
+                                </p>
+                                {test.data && <DataToggle data={test.data} variant="error" />}
+                              </div>
+                            )}
+
+                            {test.data && test.status === 'success' && (
+                              <DataToggle data={test.data} variant="success" />
+                            )}
+
+                            {test.data && test.status === 'warning' && (
+                              <DataToggle data={test.data} variant="warning" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        </TabsContent>
+
+        {/* Storage Tests Tab */}
+        <TabsContent value="storage" className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl flex items-center gap-2">
+              <HardDrive className="h-6 w-6" /> File Storage Tests
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-2">
+              Test the ARI File Storage System — uploads a test file, lists, serves, and deletes it
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="space-y-3 mb-6">
+                <Button
+                  onClick={runStorageTests}
+                  disabled={isRunningStorageTests}
+                  size="lg"
+                  variant="outline"
+                  className="w-full"
+                >
+                  {isRunningStorageTests ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Testing Storage...
+                    </>
+                  ) : (
+                    <>
+                      <HardDrive className="mr-2 h-4 w-4" /> Run Storage Tests
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {storageResults.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="rounded-lg border px-4 py-3">
+                    <div className="text-2xl font-bold">{storageSummary.total}</div>
+                    <p className="text-xs text-muted-foreground">Total Tests</p>
+                  </div>
+                  <div className="rounded-lg border px-4 py-3">
+                    <div className="text-2xl font-bold text-green-500">{storageSummary.success}</div>
+                    <p className="text-xs text-muted-foreground">Passed</p>
+                  </div>
+                  <div className="rounded-lg border px-4 py-3">
+                    <div className="text-2xl font-bold text-yellow-500">{storageSummary.warnings}</div>
+                    <p className="text-xs text-muted-foreground">Warnings</p>
+                  </div>
+                  <div className="rounded-lg border px-4 py-3">
+                    <div className="text-2xl font-bold text-red-500">{storageSummary.errors}</div>
+                    <p className="text-xs text-muted-foreground">Errors</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {storageResults.map((test) => (
                   <Card key={test.name} className="border">
                     <CardContent className="p-3">
                       <div className="flex items-start justify-between">

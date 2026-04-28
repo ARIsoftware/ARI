@@ -45,6 +45,13 @@ This is a fully-featured example module demonstrating all capabilities of the AR
 - Proper state management
 - Save/load functionality
 
+### 6. **File Storage (ARI File Storage System)**
+- Example upload endpoint in `api/upload/route.ts`
+- Example file upload UI component in `components/file-upload-example.tsx`
+- TanStack Query hooks: `useUploadFile()`, `useListFiles()`, `useDeleteFile()`
+- Uses the central `/api/storage/` endpoints — no per-module storage setup needed
+- See `hooks/use-module-template.ts` for the hook implementations
+
 ## Installation
 
 This module is already installed in the `/modules` directory. To use it:

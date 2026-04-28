@@ -92,6 +92,10 @@ next-env.d.ts
 /private/*
 !/private/.gitkeep
 
+# ARI File Storage (folder tracked, contents ignored)
+/data/storage/*
+!/data/storage/.gitkeep
+
 # Drizzle generated migrations (we use lib/db/schema/ instead)
 lib/db/migrations/
 

@@ -14,6 +14,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { ModuleTemplateEntry, ModuleTemplateSettings } from '../types'
+import type { StorageFile } from '@/lib/storage'
 
 // Query keys
 const ENTRIES_KEY = ['module-template-entries']
@@ -175,6 +176,78 @@ export function useUpdateModuleTemplateSettings() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: SETTINGS_KEY })
+    },
+  })
+}
+
+// ─── ARI File Storage System hooks (example) ────────────────────────────
+// These hooks demonstrate how to use the central /api/storage/ endpoints.
+// Copy and adapt them for your own module.
+
+const STORAGE_FILES_KEY = (bucket: string) => ['storage-files', bucket]
+
+/**
+ * Upload a file to the ARI File Storage System
+ */
+export function useUploadFile(bucket: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (file: File): Promise<{ path: string; name: string }> => {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('bucket', bucket)
+      const res = await fetch('/api/storage/upload', { method: 'POST', body: formData })
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || 'Upload failed')
+      }
+      return res.json()
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: STORAGE_FILES_KEY(bucket) })
+    },
+  })
+}
+
+/**
+ * List files in a storage bucket
+ */
+export function useListFiles(bucket: string) {
+  return useQuery({
+    queryKey: STORAGE_FILES_KEY(bucket),
+    queryFn: async (): Promise<StorageFile[]> => {
+      const res = await fetch(`/api/storage/list?bucket=${encodeURIComponent(bucket)}`)
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || 'Failed to list files')
+      }
+      const data = await res.json()
+      return data.files || []
+    },
+  })
+}
+
+/**
+ * Delete a file from storage
+ */
+export function useDeleteFile(bucket: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (filename: string): Promise<void> => {
+      const res = await fetch('/api/storage/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bucket, filename }),
+      })
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || 'Failed to delete file')
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: STORAGE_FILES_KEY(bucket) })
     },
   })
 }
