@@ -2,7 +2,7 @@
 
 /**
  * ARI CLI — Local development helper
- * Usage: ./ari start | stop | status
+ * Usage: ./ari start | stop | status | update
  */
 
 const { execSync, spawn } = require('child_process');
@@ -318,10 +318,58 @@ function status() {
   }
 }
 
+function update() {
+  const UPSTREAM_URL = 'https://github.com/ARIsoftware/ARI.git';
+
+  console.log('');
+  console.log('  ' + YELLOW + 'Updating ARI...' + RESET);
+  console.log('');
+
+  // Ensure upstream remote exists
+  const remotes = run('git remote') || '';
+  if (!remotes.split('\n').includes('upstream')) {
+    console.log('  Adding upstream remote...');
+    const addResult = run(`git remote add upstream ${UPSTREAM_URL}`);
+    if (addResult === null) {
+      console.log('  ' + RED + '✘' + RESET + ' Failed to add upstream remote');
+      process.exit(1);
+    }
+    console.log('  ' + GREEN + '✔' + RESET + ' Upstream remote added');
+  } else {
+    console.log('  ' + GREEN + '✔' + RESET + ' Upstream remote exists');
+  }
+
+  // Pull latest from upstream
+  console.log('  Pulling latest changes...');
+  try {
+    execSync('git pull upstream main', { stdio: 'inherit', cwd: ROOT });
+  } catch {
+    console.log('');
+    console.log('  ' + RED + '✘' + RESET + ' Pull failed. You may have local changes that conflict.');
+    console.log('  ' + DIM + 'Commit or stash your changes, then try again.' + RESET);
+    process.exit(1);
+  }
+  console.log('  ' + GREEN + '✔' + RESET + ' Code updated');
+
+  // Install dependencies
+  console.log('  Installing dependencies...');
+  try {
+    execSync('pnpm install', { stdio: 'inherit', cwd: ROOT });
+  } catch {
+    console.log('  ' + RED + '✘' + RESET + ' pnpm install failed');
+    process.exit(1);
+  }
+  console.log('  ' + GREEN + '✔' + RESET + ' Dependencies installed');
+
+  console.log('');
+  console.log('  ' + GREEN + 'Update complete!' + RESET + ' Run ' + DIM + './ari start' + RESET + ' to launch.');
+  console.log('');
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────
 
 const cmd = process.argv[2];
-const commands = { start, stop, status };
+const commands = { start, stop, status, update };
 
 if (!cmd || !commands[cmd]) {
   console.log('');
@@ -331,6 +379,7 @@ if (!cmd || !commands[cmd]) {
   console.log('    start    Start database + dev server');
   console.log('    stop     Stop database services');
   console.log('    status   Show database status');
+  console.log('    update   Pull latest ARI updates + install dependencies');
   console.log('');
   process.exit(cmd ? 1 : 0);
 }
