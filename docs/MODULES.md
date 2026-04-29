@@ -1,10 +1,10 @@
 # ARI Module System - Technical Reference
 
 > **For Claude/AI**: This document provides the complete technical specification for creating and managing ARI modules.
-> **For Humans**: See `/docs/MODULES-GUIDE.md` for a high-level overview.
+> **For Humans**: See `/modules-core/module-template/README.md` for a high-level overview.
 
-**Version**: 5.0
-**Last Updated**: January 2026
+**Version**: 5.1
+**Last Updated**: April 2026
 **Status**: Production Ready
 
 > **Important Change in v5.0**: This document now reflects **Better Auth** + **Drizzle ORM** patterns.
@@ -119,7 +119,7 @@ const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
 
 ### Module Discovery Process
 
-1. App reads `/modules` directory
+1. App reads `/modules-custom` then `/modules-core` directories
 2. Validates each `module.json` file
 3. Checks if module is enabled for user
 4. Renders module in sidebar if routes defined
@@ -191,9 +191,9 @@ modules/[module-id]/
 │   └── index.ts            ← Type definitions
 │
 └── database/                ← Database schemas
-    ├── schema.sql          ← Table definitions + RLS
-    └── migrations/
-        └── 001_init.sql    ← Migrations
+    ├── schema.sql          ← Idempotent table definitions + RLS (auto-run on enable)
+    ├── schema.ts           ← Drizzle ORM definitions (runtime source of truth)
+    └── uninstall.sql       ← Manual-only teardown (never auto-run)
 ```
 
 ### External Registration Points (ONLY Exceptions)
@@ -386,7 +386,7 @@ Modules can add a quick access icon to the global top navigation bar:
 
 - [ ] **4.1 Create directory structure**
   ```bash
-  mkdir -p modules/my-module/{app,api/data,components,lib,types,database/migrations}
+  mkdir -p modules-custom/my-module/{app,api/data,components,hooks,types,database}
   ```
 
 - [ ] **4.2 Create `module.json`**
@@ -656,10 +656,11 @@ A sibling file `database/uninstall.sql` should also exist with `DROP TABLE IF EX
 **RLS Policy Pattern:**
 ```sql
 -- Users can view their own records
-CREATE POLICY "Users can view their own records"
-  ON table_name FOR SELECT
-  USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS my_table_rls_select ON my_table;
+CREATE POLICY my_table_rls_select ON my_table FOR SELECT
+  USING (user_id = (SELECT current_setting('app.current_user_id')));
 ```
+**Note:** Do NOT use `auth.uid()` — Better Auth doesn't populate that function. Use `current_setting('app.current_user_id')` which is set by `withRLS()`. See `modules-core/module-template/database/schema.sql` for the complete pattern with all four policies.
 
 #### Step 5.3.3: Utility Functions (`lib/utils.ts`)
 
@@ -801,8 +802,8 @@ export default ModuleWidget
 #### Step 5.6.1: Update Imports in Other Files
 
 - [ ] Search for old imports: `grep -r "@/lib/old-file" app/`
-- [ ] Update to module paths: `@/modules-core/[module-id]/lib/utils`
-- [ ] Update type imports: `@/modules-core/[module-id]/types`
+- [ ] Update to module paths: `@/modules/[module-id]/lib/utils`
+- [ ] Update type imports: `@/modules/[module-id]/types`
 - [ ] Test that imports resolve correctly
 
 **Example:**
@@ -810,9 +811,9 @@ export default ModuleWidget
 // OLD
 import { getItems, type Item } from '@/lib/old-file'
 
-// NEW
-import { getItems } from '@/modules-core/module-id/lib/utils'
-import type { Item } from '@/modules-core/module-id/types'
+// NEW — always use @/modules/ alias, not @/modules-core/ or @/modules-custom/
+import { getItems } from '@/modules/module-id/lib/utils'
+import type { Item } from '@/modules/module-id/types'
 ```
 
 #### Step 5.6.2: Remove Static Menu Entry
@@ -1003,64 +1004,46 @@ ARI uses **Better Auth** for authentication (not Supabase Auth), which means:
 - The `withRLS()` helper automatically filters queries by user_id in SELECT operations
 - For INSERT operations, you must explicitly set `user_id: user.id`
 
-### Step 1: Create SQL Schema (for reference)
+### Step 1: Create SQL Schema
 
-Create a schema file in your module for documentation and initial setup:
+Create `database/schema.sql` in your module. This is auto-executed on every module enable, so it **must be fully idempotent**:
 
 ```sql
--- modules/my-module/database/schema.sql
+-- modules-custom/my-module/database/schema.sql
+-- Idempotent: safe to run on every module enable.
 
--- =============================================================================
--- MY MODULE DATABASE SCHEMA
--- =============================================================================
--- Table: my_module_data
--- Purpose: Store module data with user isolation
---
--- NOTE: User isolation is enforced at the application level via withRLS(),
--- not via database RLS policies. Better Auth doesn't use auth.uid().
--- =============================================================================
-
--- Create table
 CREATE TABLE IF NOT EXISTS my_module_data (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id TEXT NOT NULL,  -- TEXT to match Better Auth user.id type
   title VARCHAR(255) NOT NULL,
   content TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Create indexes for common queries
-CREATE INDEX IF NOT EXISTS idx_my_module_data_user_id
-  ON my_module_data(user_id);
+CREATE INDEX IF NOT EXISTS idx_my_module_data_user_id ON my_module_data(user_id);
+CREATE INDEX IF NOT EXISTS idx_my_module_data_created_at ON my_module_data(created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_my_module_data_created_at
-  ON my_module_data(created_at DESC);
+ALTER TABLE my_module_data ENABLE ROW LEVEL SECURITY;
 
--- =============================================================================
--- TRIGGERS
--- =============================================================================
+DROP POLICY IF EXISTS my_module_data_rls_select ON my_module_data;
+CREATE POLICY my_module_data_rls_select ON my_module_data FOR SELECT
+  USING (user_id = (SELECT current_setting('app.current_user_id')));
 
--- Auto-update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_my_module_data_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
+DROP POLICY IF EXISTS my_module_data_rls_insert ON my_module_data;
+CREATE POLICY my_module_data_rls_insert ON my_module_data FOR INSERT
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
 
-CREATE TRIGGER my_module_data_updated_at
-  BEFORE UPDATE ON my_module_data
-  FOR EACH ROW
-  EXECUTE FUNCTION update_my_module_data_updated_at();
+DROP POLICY IF EXISTS my_module_data_rls_update ON my_module_data;
+CREATE POLICY my_module_data_rls_update ON my_module_data FOR UPDATE
+  USING (user_id = (SELECT current_setting('app.current_user_id')));
 
--- =============================================================================
--- VERIFICATION
--- =============================================================================
--- Run to verify table was created:
--- SELECT tablename FROM pg_tables WHERE tablename = 'my_module_data';
+DROP POLICY IF EXISTS my_module_data_rls_delete ON my_module_data;
+CREATE POLICY my_module_data_rls_delete ON my_module_data FOR DELETE
+  USING (user_id = (SELECT current_setting('app.current_user_id')));
 ```
+
+See `modules-core/module-template/database/schema.sql` for the canonical example.
 
 ### Step 2: Add Drizzle Schema Definition (REQUIRED)
 
@@ -1106,13 +1089,15 @@ export const myModuleDataRelations = relations(myModuleData, ({many}) => ({
 
 > **Important:** Relations should only reference tables owned by your module. Do not import tables from other modules — if that module isn't installed, the build will fail. If your module needs data from another module, handle that conditionally in your query code at runtime instead. The registry generator will skip any `relations.ts` that imports missing tables, but the relations in that file will be silently unavailable.
 
-### Migration Application Process
+### How Tables Are Provisioned
 
-1. Copy SQL from `modules/my-module/database/schema.sql`
-2. Open Supabase SQL Editor
-3. Paste and run the SQL to create the table
-4. Add the Drizzle schema definition to `modules/my-module/database/schema.ts`
-5. Run `npm run generate-module-registry` to regenerate the barrel
+`database/schema.sql` is **auto-executed by the module loader on every enable**, so you do NOT need to copy SQL into Supabase manually. Just enable the module in Settings → Features and the tables will be created.
+
+1. Create `database/schema.sql` (idempotent — auto-run on enable)
+2. Create `database/schema.ts` (Drizzle ORM definitions)
+3. Create `database/uninstall.sql` (manual-only teardown)
+4. Run `npm run generate-module-registry` to regenerate the schema barrel
+5. Enable the module in Settings → Features (tables are created automatically)
 6. Verify the table works by testing your API routes
 
 ### Register in module.json
@@ -1752,8 +1737,7 @@ import { useAuth } from '@/components/providers'           // Auth context (Bett
 import { Button } from '@/components/ui/button'            // UI components
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { getTasks } from '@/lib/tasks'                     // Core APIs
-import { getContacts } from '@/lib/contacts'
+import { useModuleEnabled } from '@/lib/modules/module-hooks'  // Module system hooks
 ```
 
 ---
@@ -1773,10 +1757,10 @@ ARI uses TanStack Query (React Query) for client-side data fetching. **New modul
 
 ### Creating TanStack Query Hooks
 
-Create a hooks file in `/lib/hooks/use-[module-name].ts`:
+Create a hooks file **inside the module directory** at `hooks/use-[module-name].ts`. All module hooks MUST live inside the module folder — never in `/lib/hooks/`.
 
 ```typescript
-// lib/hooks/use-my-module.ts
+// modules-custom/my-module/hooks/use-my-module.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { MyModuleEntry } from '@/modules/my-module/types'  // Always use @/modules/ alias!
 
@@ -1854,7 +1838,7 @@ import {
   useMyModuleEntries,
   useCreateMyModuleEntry,
   useDeleteMyModuleEntry
-} from '@/lib/hooks/use-my-module'
+} from '@/modules/my-module/hooks/use-my-module'
 
 export default function MyModulePage() {
   const { toast } = useToast()
@@ -1865,14 +1849,14 @@ export default function MyModulePage() {
   const deleteEntry = useDeleteMyModuleEntry()
 
   const handleCreate = () => {
-    // Close modal immediately (optimistic UX)
-    setModalOpen(false)
-
     createEntry.mutate(
       { title: newTitle },
       {
-        onError: () => {
-          toast({ variant: 'destructive', title: 'Failed to save' })
+        onSuccess: () => {
+          setModalOpen(false)  // Only close after server confirms
+        },
+        onError: (err) => {
+          toast({ variant: 'destructive', title: 'Failed to save', description: err.message })
         },
       }
     )
@@ -1893,7 +1877,7 @@ export default function MyModulePage() {
 
 For the best user experience, implement optimistic updates:
 
-1. **Close modals immediately** after user clicks save (don't wait for `onSuccess`)
+1. **Do NOT close dialogs before the server confirms** — only close in `onSuccess` callback so users don't lose form data on error
 2. **Update cache in `onMutate`** so UI reflects changes instantly
 3. **Rollback in `onError`** if the server request fails
 4. **Show toast on error** to inform user of failure
@@ -1902,16 +1886,17 @@ For the best user experience, implement optimistic updates:
 const handleAddItem = () => {
   const title = inputValue.trim()
 
-  // Close modal immediately (optimistic)
-  setModalOpen(false)
-  setInputValue('')
-
   // Mutation handles optimistic cache update via onMutate
   createItem.mutate(
     { title },
     {
-      onError: () => {
-        toast({ variant: 'destructive', title: 'Failed to save' })
+      onSuccess: () => {
+        // Only close dialog after server confirms
+        setModalOpen(false)
+        setInputValue('')
+      },
+      onError: (err) => {
+        toast({ variant: 'destructive', title: 'Failed to save', description: err.message })
       },
     }
   )
@@ -1952,9 +1937,9 @@ return (
 ### Reference Implementations
 
 See these files for complete examples:
-- `/lib/hooks/use-tasks.ts` - Full CRUD with optimistic updates
-- `/lib/hooks/use-ari-launch.ts` - Simple module example
-- `/app/tasks/page.tsx` - Page using TanStack Query hooks
+- `/modules-core/module-template/hooks/use-module-template.ts` - Full CRUD + settings + file storage hooks
+- `/modules-core/tasks/hooks/use-tasks.ts` - Full CRUD with optimistic updates
+- `/modules-core/module-template/app/page.tsx` - Page using TanStack Query hooks
 
 ---
 
@@ -2290,7 +2275,7 @@ See [Section 8: Components](#8-components) for full details.
 
 ### Template Module
 
-Use `/modules/module-template/` as a complete reference implementation. It demonstrates:
+Use `/modules-core/module-template/` as a complete reference implementation. It demonstrates:
 - Module manifest with all fields
 - Main page with authentication
 - API routes (GET, POST, DELETE)
@@ -2314,11 +2299,12 @@ Use `/modules/module-template/` as a complete reference implementation. It demon
 
 ### Documentation
 
-- **Human-readable guide**: `/docs/MODULES-GUIDE.md`
+- **Module template README**: `/modules-core/module-template/README.md`
+- **Security architecture**: `/docs/SECURITY.md`
 - **Lucide icons**: https://lucide.dev
 - **Shadcn/ui components**: https://ui.shadcn.com
 
 ---
 
-**Last Updated**: January 2026
+**Last Updated**: April 2026
 **Maintained By**: ARI Team

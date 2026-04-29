@@ -33,9 +33,9 @@ await withRLS((db) =>
     .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)))
 )
 
-// INSERT — always set user_id explicitly
+// INSERT — always set userId explicitly
 await withRLS((db) =>
-  db.insert(tasks).values({ title: 'New', user_id: user.id })
+  db.insert(tasks).values({ title: 'New', userId: user.id })
 )
 ```
 
@@ -43,11 +43,11 @@ await withRLS((db) =>
 
 RLS policies exist on all tables using `current_setting('app.current_user_id')`. These are **not enforced** with the default Supabase `postgres` role (which has `BYPASSRLS`). They serve as defense-in-depth and activate if a restricted database role is used in the future.
 
-See `migrations/fix_rls_policies.sql` for the policy definitions.
+Each module defines its own RLS policies in `database/schema.sql` (auto-run on module enable). See `modules-core/module-template/database/schema.sql` for the canonical policy pattern.
 
 ### Optional Hardening: Restricted Database Role
 
-For true DB-level enforcement, create a role without `BYPASSRLS` and use it for application connections. See the header of `migrations/fix_rls_policies.sql` for instructions. This is not required for the default setup — it adds complexity for open source deployments.
+For true DB-level enforcement, create a role without `BYPASSRLS` and use it for application connections. This is not required for the default setup — it adds complexity for open source deployments.
 
 ## Security Headers
 
@@ -75,4 +75,4 @@ When writing new API routes or module APIs:
 3. Add `.where(and(eq(table.id, id), eq(table.userId, user.id)))` to UPDATE/DELETE by ID
 4. Set `user_id: user.id` in all INSERT values
 5. Never rely on implicit RLS filtering alone
-6. Use `safeErrorResponse()` from `lib/api-error.ts` in catch blocks for production error sanitization
+6. Use `createErrorResponse()` from `lib/api-helpers.ts` or `safeErrorResponse()` from `lib/api-error.ts` in catch blocks — never expose internal error details to the client
