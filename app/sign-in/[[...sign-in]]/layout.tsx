@@ -8,10 +8,16 @@ export default async function SignInLayout({
 }) {
   const check = await checkUsersExist()
 
-  // Only redirect when env vars aren't configured yet.
-  // "no-users" and "no-table" mean setup is done but bootstrap hasn't
-  // created the admin account yet — the sign-in page handles that.
-  if (check.status === "no-env" || check.status === "no-pool") {
+  if (check.status === "has-users" || check.status === "db-error") {
+    return <>{children}</>
+  }
+
+  // No users yet. If the welcome wizard has set admin credentials,
+  // let the sign-in page render so bootstrap can create the account.
+  // Otherwise, redirect to /welcome.
+  const hasAdminCreds = !!process.env.ARI_FIRST_RUN_ADMIN_EMAIL
+    && !!process.env.ARI_FIRST_RUN_ADMIN_PASSWORD
+  if (!hasAdminCreds) {
     redirect("/welcome")
   }
 
