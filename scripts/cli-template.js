@@ -223,16 +223,28 @@ function start() {
 
   console.log('');
 
-  // Start Next.js dev server (foreground)
-  const child = spawn('pnpm', ['dev'], { stdio: 'inherit', cwd: ROOT });
+  // Start Next.js dev server — pipe stdout so we can detect the actual port
+  const child = spawn('pnpm', ['dev'], { stdio: ['inherit', 'pipe', 'inherit'], cwd: ROOT });
 
-  // Open browser after Next.js has time to start
-  setTimeout(() => {
-    const url = 'http://localhost:3000';
+  // Open browser once Next.js prints its local URL (detects correct port)
+  let browserOpened = false;
+  function openBrowser(url) {
+    if (browserOpened) return;
+    browserOpened = true;
     if (process.platform === 'darwin') run(`open ${url}`);
     else if (process.platform === 'linux') run(`xdg-open ${url}`);
     else if (process.platform === 'win32') run(`start ${url}`);
-  }, 3000);
+  }
+
+  child.stdout.on('data', (data) => {
+    process.stdout.write(data);
+    if (!browserOpened) {
+      const line = data.toString();
+      // Next.js prints "- Local: http://localhost:XXXX"
+      const match = line.match(/Local:\s+(http:\/\/localhost:\d+)/);
+      if (match) openBrowser(match[1]);
+    }
+  });
 
   const cleanup = () => {
     child.kill();
