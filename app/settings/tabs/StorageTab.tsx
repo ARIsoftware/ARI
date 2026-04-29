@@ -296,7 +296,7 @@ ARI_SUPABASE_S3_REGION=`,
           )}
 
           {provider === "filesystem" && isVercel && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-red-500">
               Local Filesystem is not available when running on Vercel because Vercel uses read-only, ephemeral serverless functions with no persistent disk storage. Please select a cloud storage provider above.
             </p>
           )}
