@@ -341,22 +341,24 @@ ARI_SUPABASE_S3_REGION=`,
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <FileCode className="h-5 w-5 text-slate-500" />
-            Using environment variables
-          </CardTitle>
-          <CardDescription>
-            Prefer managing storage config outside the UI? Add these to your <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">.env.local</code> file. Environment variables take precedence over values saved through the UI.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <pre className="rounded-lg border bg-muted/50 p-4 font-mono text-sm text-muted-foreground overflow-x-auto">
-{ENV_VARS[provider] || ENV_VARS.filesystem}
-          </pre>
-        </CardContent>
-      </Card>
+      {provider !== "filesystem" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <FileCode className="h-5 w-5 text-slate-500" />
+              Using environment variables
+            </CardTitle>
+            <CardDescription>
+              Prefer managing storage config outside the UI? Add these to your <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">.env.local</code> file. Environment variables take precedence over values saved through the UI.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <pre className="rounded-lg border bg-muted/50 p-4 font-mono text-sm text-muted-foreground overflow-x-auto">
+{ENV_VARS[provider]}
+            </pre>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
