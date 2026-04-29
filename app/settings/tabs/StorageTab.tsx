@@ -268,7 +268,7 @@ ARI_SUPABASE_S3_REGION=`,
           <div className="space-y-2">
             <Label className="text-sm font-medium">Provider</Label>
             <Select value={provider} onValueChange={handleProviderChange}>
-              <SelectTrigger className="w-full sm:w-[280px]">
+              <SelectTrigger className="w-full sm:w-[420px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -288,11 +288,17 @@ ARI_SUPABASE_S3_REGION=`,
             </Select>
           </div>
 
-          {provider === "filesystem" && (
+          {provider === "filesystem" && !isVercel && (
             <div className="space-y-2">
               <Label className="text-sm">Storage Path</Label>
               <p className="text-sm font-mono text-muted-foreground">data/storage/&#123;user_id&#125;/&#123;bucket&#125;/</p>
             </div>
+          )}
+
+          {provider === "filesystem" && isVercel && (
+            <p className="text-sm text-muted-foreground">
+              Local Filesystem is not available when running on Vercel because Vercel uses read-only, ephemeral serverless functions with no persistent disk storage. Please select a cloud storage provider above.
+            </p>
           )}
 
           {currentFields.length > 0 && (
