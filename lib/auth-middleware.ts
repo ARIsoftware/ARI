@@ -5,6 +5,8 @@
  */
 
 const BETTER_AUTH_COOKIE_NAME = "better-auth.session_token"
+const SECURE_COOKIE_NAME = `__Secure-${BETTER_AUTH_COOKIE_NAME}`
+const isProduction = process.env.NODE_ENV === 'production'
 
 // Minimum length for a valid session token (prevents obviously invalid tokens)
 const MIN_TOKEN_LENGTH = 32
@@ -24,7 +26,10 @@ const MIN_API_KEY_LENGTH = 38
  * - Cookie value doesn't contain obvious injection attempts
  */
 export function hasSessionCookie(cookies: { get: (name: string) => { value: string } | undefined }): boolean {
-  const sessionCookie = cookies.get(BETTER_AUTH_COOKIE_NAME)
+  // __Secure- cookies require HTTPS, so browsers never send them in dev (HTTP)
+  const sessionCookie = isProduction
+    ? cookies.get(SECURE_COOKIE_NAME)
+    : cookies.get(BETTER_AUTH_COOKIE_NAME)
 
   if (!sessionCookie?.value) {
     return false
