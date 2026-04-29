@@ -28,6 +28,7 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_ARI_VERSION: `${pkg.version}+${commitSha}`,
     NEXT_PUBLIC_ARI_COMMIT: commitSha,
+    NEXT_PUBLIC_IS_VERCEL: process.env.VERCEL ? '1' : '',
   },
   typescript: {
     ignoreBuildErrors: true,

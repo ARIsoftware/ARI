@@ -63,6 +63,7 @@ const PROVIDER_FIELDS: Record<string, ProviderField[]> = {
 export function StorageTab(): React.ReactElement {
   const [provider, setProvider] = useState("filesystem")
   const [providerSaved, setProviderSaved] = useState("filesystem")
+  const isVercel = !!process.env.NEXT_PUBLIC_IS_VERCEL
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -272,7 +273,16 @@ ARI_SUPABASE_S3_REGION=`,
               </SelectTrigger>
               <SelectContent>
                 {PROVIDER_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  <SelectItem
+                    key={opt.value}
+                    value={opt.value}
+                    disabled={isVercel && opt.value === "filesystem"}
+                  >
+                    {opt.label}
+                    {isVercel && opt.value === "filesystem" && (
+                      <span className="text-muted-foreground ml-1">(unavailable on Vercel)</span>
+                    )}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
