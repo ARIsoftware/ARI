@@ -318,11 +318,11 @@ function status() {
   }
 }
 
-function update() {
+async function update() {
   const UPSTREAM_URL = 'https://github.com/ARIsoftware/ARI.git';
 
   console.log('');
-  console.log('  ' + YELLOW + 'Updating ARI...' + RESET);
+  console.log('  ' + YELLOW + 'Checking for ARI updates...' + RESET);
   console.log('');
 
   // Ensure upstream remote exists
@@ -339,14 +339,68 @@ function update() {
     console.log('  ' + GREEN + '✔' + RESET + ' Upstream remote exists');
   }
 
-  // Pull latest from upstream
-  console.log('  Pulling latest changes...');
+  // Warn about uncommitted changes
+  const statusOut = run('git status --porcelain') || '';
+  if (statusOut.length > 0) {
+    const changedCount = statusOut.split('\n').filter(l => l.trim()).length;
+    console.log('  ' + YELLOW + '⚠' + RESET + ` You have ${changedCount} uncommitted change(s).`);
+    console.log('  ' + DIM + 'Consider committing or stashing before updating.' + RESET);
+    const answer = await ask('  Continue anyway? (y/N) ');
+    if (!answer || answer.toLowerCase() !== 'y') {
+      console.log('  ' + DIM + 'Update cancelled.' + RESET);
+      console.log('');
+      process.exit(0);
+    }
+    console.log('');
+  }
+
+  // Fetch upstream
+  console.log('  Fetching upstream...');
+  const fetchResult = run('git fetch upstream');
+  if (fetchResult === null) {
+    console.log('  ' + RED + '✘' + RESET + ' Failed to fetch upstream. Check your network connection.');
+    process.exit(1);
+  }
+
+  // Show what's changed
+  const newCommits = run('git log HEAD..upstream/main --oneline') || '';
+  if (!newCommits.trim()) {
+    console.log('  ' + GREEN + '✔' + RESET + ' Already up to date!');
+    console.log('');
+    process.exit(0);
+  }
+
+  const commitCount = newCommits.split('\n').filter(l => l.trim()).length;
+  const diffStat = run('git diff --stat HEAD..upstream/main') || '';
+
+  console.log('');
+  console.log('  ' + YELLOW + `${commitCount} new commit(s) available:` + RESET);
+  console.log('');
+  for (const line of newCommits.split('\n').filter(l => l.trim())) {
+    console.log('    ' + DIM + line + RESET);
+  }
+  console.log('');
+  console.log('  ' + DIM + diffStat + RESET);
+  console.log('');
+
+  // Ask for confirmation
+  const answer = await ask('  Merge these updates? (Y/n) ');
+  if (answer && answer.toLowerCase() === 'n') {
+    console.log('  ' + DIM + 'Update cancelled.' + RESET);
+    console.log('');
+    process.exit(0);
+  }
+
+  // Merge upstream
+  console.log('');
+  console.log('  Merging updates...');
   try {
-    execSync('git pull upstream main', { stdio: 'inherit', cwd: ROOT });
+    execSync('git merge upstream/main --no-edit', { stdio: 'inherit', cwd: ROOT });
   } catch {
     console.log('');
-    console.log('  ' + RED + '✘' + RESET + ' Pull failed. You may have local changes that conflict.');
-    console.log('  ' + DIM + 'Commit or stash your changes, then try again.' + RESET);
+    console.log('  ' + RED + '✘' + RESET + ' Merge failed — you likely have conflicting local changes.');
+    console.log('  ' + DIM + 'Resolve conflicts, then run: git add <file> && git commit' + RESET);
+    console.log('  ' + DIM + 'Tip: keep customizations in modules-custom/ to avoid conflicts.' + RESET);
     process.exit(1);
   }
   console.log('  ' + GREEN + '✔' + RESET + ' Code updated');
