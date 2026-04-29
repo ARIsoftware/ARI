@@ -215,24 +215,23 @@ export default function WelcomePage() {
     return Object.keys(errors).length === 0
   }
 
+  const isAdminConfigured = !!(formData.adminEmail || profileData.email) && !!formData.adminPassword
+
   const handleAdminContinue = () => {
     const effectiveEmail = formData.adminEmail || profileData.email
-    // Skipping the step (all three fields blank) is allowed.
-    if (effectiveEmail || formData.adminPassword || adminConfirmPassword) {
-      const emailError = firstZodError(welcomeEmailSchema, effectiveEmail)
-      if (emailError) {
-        setAdminStepError(`Email: ${emailError}`)
-        return
-      }
-      const pwError = firstZodError(adminPasswordSchema, formData.adminPassword)
-      if (pwError) {
-        setAdminStepError(pwError)
-        return
-      }
-      if (formData.adminPassword !== adminConfirmPassword) {
-        setAdminStepError("Passwords do not match.")
-        return
-      }
+    const emailError = firstZodError(welcomeEmailSchema, effectiveEmail)
+    if (emailError) {
+      setAdminStepError(`Email: ${emailError}`)
+      return
+    }
+    const pwError = firstZodError(adminPasswordSchema, formData.adminPassword)
+    if (pwError) {
+      setAdminStepError(pwError)
+      return
+    }
+    if (formData.adminPassword !== adminConfirmPassword) {
+      setAdminStepError("Passwords do not match.")
+      return
     }
     // Normalize to match what the server-side schema does (trim + lowercase).
     const normalized = effectiveEmail ? effectiveEmail.trim().toLowerCase() : ''
@@ -540,7 +539,17 @@ export default function WelcomePage() {
           </div>
 
           {/* Step Indicator */}
-          <StepIndicator currentStep={currentTab} onStepClick={setCurrentTab} showSupabaseStep={showSupabaseStep} />
+          <StepIndicator currentStep={currentTab} onStepClick={(step) => {
+            // Block navigation past Account tab unless admin fields are filled
+            const targetIdx = stepOrder.indexOf(step)
+            const accountIdx = stepOrder.indexOf("account")
+            if (targetIdx > accountIdx && !isAdminConfigured) {
+              setAdminStepError("Email and password are required to continue.")
+              setCurrentTab("account")
+              return
+            }
+            setCurrentTab(step)
+          }} showSupabaseStep={showSupabaseStep} />
 
           {/* Content Card */}
           <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
@@ -836,23 +845,14 @@ export default function WelcomePage() {
                       >
                         Back
                       </button>
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={goToNextStep}
-                          className="inline-flex items-center justify-center px-4 py-2 text-base font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
-                          style={{ borderRadius: '6px' }}
-                        >
-                          Skip this step
-                        </button>
-                        <button
-                          onClick={handleAdminContinue}
-                          className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
-                          style={{ borderRadius: '6px' }}
-                        >
-                          Save & Continue
-                          <ArrowRight className="w-4 h-4" />
-                        </button>
-                      </div>
+                      <button
+                        onClick={handleAdminContinue}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                        style={{ borderRadius: '6px' }}
+                      >
+                        Save & Continue
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1780,12 +1780,12 @@ export default function WelcomePage() {
                       </div>
                       {/* Optional configurations */}
                       <div className="flex items-center gap-2">
-                        {formData.adminEmail && formData.adminPassword ?
+                        {isAdminConfigured ?
                           <Check className="w-4 h-4 text-green-500" /> :
-                          <X className="w-4 h-4 text-gray-400" />
+                          <X className="w-4 h-4 text-red-500" />
                         }
-                        <span className={formData.adminEmail && formData.adminPassword ? "text-gray-900" : "text-gray-500"}>
-                          Admin Account: {formData.adminEmail && formData.adminPassword ? "Configured" : "Skipped"}
+                        <span className={isAdminConfigured ? "text-gray-900" : "text-red-600"}>
+                          Admin Account: {isAdminConfigured ? "Configured" : "Skipped"}
                         </span>
                       </div>
                     </div>
@@ -1800,7 +1800,7 @@ export default function WelcomePage() {
                   {/* Save button */}
                   <Button
                     onClick={handleSaveEnvFile}
-                    disabled={!isSupabaseComplete || envSaveStatus === 'saving'}
+                    disabled={!isSupabaseComplete || !isAdminConfigured || envSaveStatus === 'saving'}
                     className="w-full rounded-lg bg-green-600 hover:bg-green-700 text-white"
                   >
                     {envSaveStatus === 'saving' ? (
