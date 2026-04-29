@@ -27,6 +27,41 @@ import { z } from 'zod'
 import { moduleTemplateEntries } from '@/lib/db/schema'
 import { and, eq, desc } from 'drizzle-orm'
 
+// ─── Drizzle Query Quick Reference ─────────────────────────────────────
+// This route demonstrates basic CRUD. Here are additional query patterns
+// you may need (all run inside withRLS()):
+//
+// OPERATORS (import from "drizzle-orm"):
+//   or(eq(t.status, 'a'), eq(t.status, 'b'))     → status = 'a' OR status = 'b'
+//   like(t.title, '%search%')                     → title LIKE '%search%'
+//   ilike(t.title, '%search%')                    → case-insensitive LIKE
+//   isNull(t.deletedAt)                           → deleted_at IS NULL
+//   not(eq(t.status, 'archived'))                 → status != 'archived'
+//   inArray(t.id, ['a','b','c'])                  → id IN ('a','b','c')
+//   between(t.score, 1, 10)                       → score BETWEEN 1 AND 10
+//   sql`${t.name} ILIKE ${'%' + q + '%'}`         → raw SQL escape hatch
+//
+// COUNT:
+//   import { count } from 'drizzle-orm'
+//   const [{ total }] = await withRLS(db =>
+//     db.select({ total: count() }).from(myTable)
+//   )
+//
+// SELECT SPECIFIC COLUMNS:
+//   await withRLS(db =>
+//     db.select({ id: t.id, title: t.title }).from(t)
+//   )
+//
+// UPSERT (on conflict):
+//   await withRLS(db =>
+//     db.insert(t).values({ userId: user.id, key: 'k', value: 'v' })
+//       .onConflictDoUpdate({
+//         target: [t.userId, t.key],
+//         set: { value: 'v', updatedAt: sql`now()` },
+//       })
+//   )
+// ────────────────────────────────────────────────────────────────────────
+
 const CreateEntrySchema = z.object({
   message: z
     .string()
