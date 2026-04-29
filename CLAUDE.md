@@ -213,6 +213,7 @@ END $$;
 - Files stored at `data/storage/{user_id}/{bucket}/` on local filesystem
 - All endpoints require authentication — no public file URLs
 - Storage provider abstraction in `/lib/storage/` (currently local filesystem, extensible)
+- Storage provider configured in database (module_settings table, moduleId: "storage")
 - Configure in Settings > Integrations > File Storage
 
 #### Task Priority Radar System
@@ -385,6 +386,13 @@ OPENAI_API_KEY=your_openai_api_key  # For AI Assistant feature
 ```
 
 `./ari start` checks Docker, starts Supabase (idempotent), regenerates `.env.supabase.local`, and runs `pnpm dev`. On Windows, use `.\ari.cmd start`.
+
+### ARI CLI — Generated Files (Do Not Edit Directly)
+The `./ari` command runs `.ari/cli.js`, but **`.ari/cli.js` is a generated file** — do NOT edit it directly. It is copied from `scripts/cli-template.js` by the installer (`scripts/install.js` → `createCliLauncher()`). Any direct edits to `.ari/cli.js` will be overwritten on reinstall.
+
+**To modify the CLI behavior**, edit `scripts/cli-template.js` instead. The installer will copy it to `.ari/cli.js` on the next install.
+
+Files in the `.ari/` directory are gitignored and not tracked.
 
 For manual control without the CLI:
 ```bash

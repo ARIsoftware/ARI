@@ -24,6 +24,7 @@ import {
   NotificationsTab,
   SecurityTab,
   IntegrationsTab,
+  StorageTab,
   ApiTab,
   GitTab,
   BackupsTab,
@@ -415,6 +416,7 @@ export default function SettingsPage(): React.ReactElement {
                     {/* <TabsTrigger value="notifications">Notifications</TabsTrigger> */}
                     <TabsTrigger value="integrations">Integrations</TabsTrigger>
                     <TabsTrigger value="security">Security</TabsTrigger>
+                    <TabsTrigger value="storage">Storage</TabsTrigger>
                     <TabsTrigger value="api">API</TabsTrigger>
                     <TabsTrigger value="git">GIT</TabsTrigger>
                     <TabsTrigger value="backups">Backups</TabsTrigger>
@@ -470,6 +472,10 @@ export default function SettingsPage(): React.ReactElement {
                     onRevokeAllSessions={handleRevokeAllSessions}
                     twoFactorEnabled={!!(session?.user as any)?.twoFactorEnabled}
                   />
+                </TabsContent>
+
+                <TabsContent value="storage">
+                  <StorageTab />
                 </TabsContent>
 
                 <TabsContent value="integrations">

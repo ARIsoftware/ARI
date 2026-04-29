@@ -6,9 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plug, Eye, EyeOff, Check, FileCode, HardDrive } from "lucide-react"
+import { Plug, Eye, EyeOff, Check, FileCode } from "lucide-react"
 
 interface ProviderField {
   envKey: string
@@ -32,39 +30,39 @@ const providers: ProviderConfig[] = [
     name: "OpenRouter",
     description: "Unified API gateway for multiple LLM providers.",
     envKey: "OPENROUTER_API_KEY",
-    placeholder: "sk-or-...",
+    placeholder: "",
   },
   {
     id: "claude",
     name: "Claude",
     description: "Anthropic's Claude models for advanced reasoning.",
     envKey: "ANTHROPIC_API_KEY",
-    placeholder: "sk-ant-...",
+    placeholder: "",
   },
   {
     id: "openai",
     name: "OpenAI",
     description: "GPT models for chat, code, and embeddings.",
     envKey: "OPENAI_API_KEY",
-    placeholder: "sk-...",
+    placeholder: "",
   },
   {
     id: "gemini",
     name: "Google Gemini",
     description: "Google's Gemini models for multimodal tasks.",
     envKey: "GOOGLE_GEMINI_API_KEY",
-    placeholder: "AIza...",
+    placeholder: "",
   },
   {
     id: "resend",
     name: "Resend",
     description: "Transactional email API for notifications.",
     envKey: "RESEND_API_KEY",
-    placeholder: "re_...",
+    placeholder: "",
     extraFields: [
       {
         envKey: "RESEND_WEBHOOK_SECRET",
-        placeholder: "whsec_...",
+        placeholder: "",
         label: "Webhook Secret",
         optional: true,
       },
@@ -90,29 +88,12 @@ export function IntegrationsTab(): React.ReactElement {
   const [saving, setSaving] = useState<Record<string, boolean>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const [storageProvider, setStorageProvider] = useState("local")
-  const [storageStatus, setStorageStatus] = useState<"active" | "not_configured" | "loading">("loading")
-
   useEffect(() => {
     const controller = new AbortController()
     fetch("/api/settings/api-keys", { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: Record<string, KeyStatus> | null) => {
         if (data) setServerState(data)
-      })
-      .catch(() => {})
-    return () => controller.abort()
-  }, [])
-
-  useEffect(() => {
-    const controller = new AbortController()
-    fetch("/api/settings/storage", { signal: controller.signal })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: { provider?: string; status?: string } | null) => {
-        if (data) {
-          setStorageProvider(data.provider ?? "local")
-          setStorageStatus(data.status === "active" ? "active" : "not_configured")
-        }
       })
       .catch(() => {})
     return () => controller.abort()
@@ -337,44 +318,6 @@ export function IntegrationsTab(): React.ReactElement {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <HardDrive className="h-5 w-5 text-emerald-500" />
-              File Storage
-            </CardTitle>
-            {storageStatus === "active" ? (
-              <Badge variant="secondary">Active</Badge>
-            ) : storageStatus === "loading" ? null : (
-              <Badge variant="outline">Not configured</Badge>
-            )}
-          </div>
-          <CardDescription>
-            Configure where uploaded files (photos, documents, etc.) are stored.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label className="text-sm">Provider</Label>
-            <Select value={storageProvider} onValueChange={setStorageProvider}>
-              <SelectTrigger className="w-full sm:w-[280px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="local">Local Filesystem</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {storageProvider === "local" && (
-            <div className="space-y-2">
-              <Label className="text-sm">Storage Path</Label>
-              <p className="text-sm font-mono text-muted-foreground">./data/storage/</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <FileCode className="h-5 w-5 text-slate-500" />
             Using environment variables
@@ -385,12 +328,12 @@ export function IntegrationsTab(): React.ReactElement {
         </CardHeader>
         <CardContent>
           <pre className="rounded-lg border bg-muted/50 p-4 font-mono text-sm text-muted-foreground overflow-x-auto">
-{`OPENROUTER_API_KEY=sk-ajg...
-ANTHROPIC_API_KEY=sk-ant...
-OPENAI_API_KEY=sk-dfdf...
-GOOGLE_GEMINI_API_KEY=AIza...
-RESEND_API_KEY=re_...
-RESEND_WEBHOOK_SECRET=whsec_...`}
+{`OPENROUTER_API_KEY=
+ANTHROPIC_API_KEY=
+OPENAI_API_KEY=
+GOOGLE_GEMINI_API_KEY=
+RESEND_API_KEY=
+RESEND_WEBHOOK_SECRET=`}
           </pre>
         </CardContent>
       </Card>

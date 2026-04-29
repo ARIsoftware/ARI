@@ -56,6 +56,7 @@ export class LocalFilesystemProvider implements StorageProvider {
   ): Promise<UploadResult> {
     const dir = this.getUserBucketDir(userId, bucket)
     await fs.mkdir(dir, { recursive: true })
+    await this.assertWithinBase(dir)
 
     const storedName = `${Date.now()}-${filename}`
     const filePath = path.join(dir, storedName)

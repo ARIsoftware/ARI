@@ -27,17 +27,29 @@ export interface StorageProvider {
 
 export interface BucketConfig {
   maxFileSize: number          // bytes
-  allowedMimeTypes: string[]   // empty = allow all
+  allowedMimeTypes: string[]   // empty = allow all (subject to blockedExtensions)
+  blockedExtensions: string[]  // extensions that are always rejected
 }
 
+/** Executable/script extensions that should never be uploaded */
+export const BLOCKED_EXTENSIONS = [
+  '.exe', '.msi', '.dll', '.com', '.cmd', '.bat',
+  '.sh', '.bash', '.zsh', '.csh', '.ksh', '.fish',
+  '.ps1', '.psm1', '.psd1',
+  '.app', '.dmg', '.pkg',
+  '.deb', '.rpm', '.apk',
+  '.bin', '.run', '.elf',
+  '.vbs', '.vbe', '.wsf', '.wsh', '.scr', '.pif',
+  '.jar', '.class',
+  '.py', '.pyc', '.pyo',
+  '.rb', '.pl', '.php',
+  '.html', '.htm', '.xhtml', '.svg',
+  '.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx',
+  '.css', '.scss', '.less',
+]
+
 export const DEFAULT_BUCKET_CONFIG: BucketConfig = {
-  maxFileSize: 10 * 1024 * 1024,  // 10MB
-  allowedMimeTypes: [
-    'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/x-icon',
-    'application/pdf',
-    'text/plain', 'text/csv', 'application/json',
-    'audio/mpeg', 'video/mp4',
-    'application/zip',
-    'font/woff', 'font/woff2',
-  ],
+  maxFileSize: 25 * 1024 * 1024,  // 25MB
+  allowedMimeTypes: [],            // allow all (not restricted by MIME)
+  blockedExtensions: BLOCKED_EXTENSIONS,
 }

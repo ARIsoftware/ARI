@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { createErrorResponse } from '@/lib/api-helpers'
-import { getStorageProvider, sanitizeFilename } from '@/lib/storage'
+import { getStorageProvider, sanitizeFilename, readStorageConfig } from '@/lib/storage'
 
 const BUCKET = 'module-template'
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
@@ -21,10 +21,12 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
 export async function POST(request: NextRequest) {
   try {
-    const { user } = await getAuthenticatedUser()
-    if (!user) {
+    const { user, withRLS } = await getAuthenticatedUser()
+    if (!user || !withRLS) {
       return createErrorResponse('Unauthorized - Valid authentication required', 401)
     }
+
+    const storageConfig = await readStorageConfig(withRLS)
 
     const formData = await request.formData()
     const file = formData.get('file') as File | null
@@ -41,7 +43,7 @@ export async function POST(request: NextRequest) {
       return createErrorResponse(`File type "${file.type}" is not allowed. Accepted: ${ALLOWED_TYPES.join(', ')}`, 400)
     }
 
-    const storage = getStorageProvider()
+    const storage = getStorageProvider(storageConfig)
     const buffer = Buffer.from(await file.arrayBuffer())
     const sanitizedName = sanitizeFilename(file.name)
 

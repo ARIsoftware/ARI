@@ -330,8 +330,8 @@ When ready to share:
 ## Support
 
 For module development questions:
-- See `/docs/modules.md` for complete specification
-- Check ARI documentation
+- See `/docs/MODULES.md` for the complete technical specification
+- See `/docs/SECURITY.md` for the layered security model (middleware, withRLS, database RLS)
 - Open issue in ARI repository
 
 ## License

@@ -1,30 +1,27 @@
 import { NextRequest } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { createErrorResponse } from '@/lib/api-helpers'
-import { getStorageProvider, sanitizeBucketName, validateStoredFilename } from '@/lib/storage'
+import { getStorageProvider, sanitizeBucketName, validateStoredFilename, readStorageConfig } from '@/lib/storage'
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   try {
-    const { user } = await getAuthenticatedUser()
-    if (!user) {
+    const { user, withRLS } = await getAuthenticatedUser()
+    if (!user || !withRLS) {
       return createErrorResponse('Unauthorized - Valid authentication required', 401)
     }
 
+    const storageConfig = await readStorageConfig(withRLS)
+
     const { path: pathSegments } = await params
 
-    if (!pathSegments || pathSegments.length < 2) {
+    if (!pathSegments || pathSegments.length !== 2) {
       return createErrorResponse('Invalid path: expected /serve/{bucket}/{filename}', 400)
     }
 
-    const [bucketRaw, ...filenameParts] = pathSegments
-    const filename = filenameParts.join('/')
-
-    if (!filename) {
-      return createErrorResponse('Missing filename', 400)
-    }
+    const [bucketRaw, filename] = pathSegments
 
     let sanitizedBucket: string
     try {
@@ -38,7 +35,7 @@ export async function GET(
       return createErrorResponse('Invalid filename', 400)
     }
 
-    const provider = getStorageProvider()
+    const provider = getStorageProvider(storageConfig)
     const result = await provider.serve(user.id, sanitizedBucket, validFilename)
 
     if (!result) {

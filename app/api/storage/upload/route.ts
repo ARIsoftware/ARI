@@ -7,13 +7,30 @@ import {
   sanitizeFilename,
   sanitizeBucketName,
   getMimeTypeForExtension,
+  isStorageUnavailable,
+  readStorageConfig,
 } from '@/lib/storage'
 
 export async function POST(request: NextRequest) {
   try {
-    const { user } = await getAuthenticatedUser()
-    if (!user) {
+    const { user, withRLS } = await getAuthenticatedUser()
+    if (!user || !withRLS) {
       return createErrorResponse('Unauthorized - Valid authentication required', 401)
+    }
+
+    const storageConfig = await readStorageConfig(withRLS)
+
+    if (isStorageUnavailable(storageConfig)) {
+      return createErrorResponse(
+        'File storage is not available. Local filesystem storage does not persist on Vercel. Please configure an alternative storage provider in Settings > Integrations > File Storage.',
+        503
+      )
+    }
+
+    // Early rejection of oversized requests before reading the full body into memory
+    const contentLength = request.headers.get('content-length')
+    if (contentLength && parseInt(contentLength, 10) > 30 * 1024 * 1024) {
+      return createErrorResponse('Request too large', 413)
     }
 
     const formData = await request.formData()
@@ -46,7 +63,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate MIME type using extension (not client-declared type, which is easily spoofed)
+    // Block executable/script extensions (check ALL extensions, not just the last, to prevent double-extension bypass)
+    const parts = sanitizedFilename.split('.')
+    if (parts.length > 1) {
+      for (const part of parts.slice(1)) {
+        if (config.blockedExtensions.includes('.' + part.toLowerCase())) {
+          return createErrorResponse('This file type is not allowed for security reasons', 400)
+        }
+      }
+    }
+
+    // Validate MIME type using extension (if allowlist is configured)
     if (config.allowedMimeTypes.length > 0) {
       const extensionMime = getMimeTypeForExtension(sanitizedFilename)
       if (!config.allowedMimeTypes.includes(extensionMime)) {
@@ -55,7 +82,7 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer())
-    const provider = getStorageProvider()
+    const provider = getStorageProvider(storageConfig)
     const result = await provider.upload(user.id, sanitizedBucket, sanitizedFilename, buffer, file.type)
 
     return NextResponse.json({ path: result.path, name: result.name }, { status: 201 })

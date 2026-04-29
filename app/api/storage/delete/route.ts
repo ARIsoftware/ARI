@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
-import { getStorageProvider, sanitizeBucketName, validateStoredFilename } from '@/lib/storage'
+import { getStorageProvider, sanitizeBucketName, validateStoredFilename, readStorageConfig } from '@/lib/storage'
 
 const deleteSchema = z.object({
   bucket: z.string(),
@@ -11,10 +11,12 @@ const deleteSchema = z.object({
 
 export async function DELETE(request: NextRequest) {
   try {
-    const { user } = await getAuthenticatedUser()
-    if (!user) {
+    const { user, withRLS } = await getAuthenticatedUser()
+    if (!user || !withRLS) {
       return createErrorResponse('Unauthorized - Valid authentication required', 401)
     }
+
+    const storageConfig = await readStorageConfig(withRLS)
 
     const validation = await validateRequestBody(request, deleteSchema)
     if (!validation.success) {
@@ -35,7 +37,7 @@ export async function DELETE(request: NextRequest) {
       return createErrorResponse('Invalid filename', 400)
     }
 
-    const provider = getStorageProvider()
+    const provider = getStorageProvider(storageConfig)
     await provider.delete(user.id, sanitizedBucket, validFilename)
 
     return NextResponse.json({ success: true })

@@ -35,7 +35,7 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  serverExternalPackages: ["@node-rs/argon2"],
+  serverExternalPackages: ["@node-rs/argon2", "@aws-sdk/client-s3"],
   devIndicators: process.env.DEV_INDICATORS === 'true',
 }
 

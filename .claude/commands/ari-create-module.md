@@ -3,7 +3,7 @@ The user would like to create a custom module in the modules-custom directory. E
 ## Pre-flight Checks
 
 Before doing anything:
-1. Read `/docs/MODULES.md` thoroughly - this is the primary module documentation
+1. Read `/docs/SECURITY.md` - understand the layered security model (middleware, withRLS, database RLS)
 2. Read `/CLAUDE.md` for project conventions (authentication, RLS, theming)
 3. Confirm `modules-core/module-template` exists. **If it does not exist, STOP immediately. Tell the user: "The Module Template at `modules-core/module-template` is missing — this is required as the starting template for new modules. How would you like to proceed?" Wait for the user's instructions before doing anything else.**
 4. Confirm we are at the repo root and that `modules-custom` exists. If not, create it.
@@ -23,7 +23,7 @@ Before doing anything:
 - **All database operations MUST use `withRLS()`** — never use the raw Supabase client or unscoped Drizzle queries.
 - **All user input MUST be validated with Zod schemas** before use. Never trust client-provided data.
 - Never expose internal error details (stack traces, SQL errors) to the client. Return generic error messages.
-- **Public/webhook routes** require secret-based validation (HMAC signatures, bearer tokens, etc.). See `/docs/MODULES.md` section 7.5.
+- **Public/webhook routes** require secret-based validation (HMAC signatures, bearer tokens, etc.). If needed, read `/docs/MODULES.md` section 7.5 for the `publicRoutes` and `createPublicRouteHandler` patterns.
 
 ### General Security Principles
 - Never store secrets, API keys, or credentials in code or client-accessible files. Use environment variables.
@@ -219,13 +219,13 @@ When approved, create the module following this order:
     - Add `publicRoutes` array to module.json with security configuration
     - Create route handler using `createPublicRouteHandler` wrapper
     - Document the required environment variable for the secret
-    - See `/docs/MODULES.md` section 7.5 for detailed guidance
+    - If needed, read `/docs/MODULES.md` section 7.5 for the `publicRoutes` and `createPublicRouteHandler` patterns
 12. **Database tables provision automatically.** Because `schema.sql` is auto-run by the module loader on every enable, you do NOT need to ask the user to run any SQL manually. The user only needs to enable the new module from Settings → Features and the tables will be created. (Exception: if the user wants to fully remove the module's tables later, they can manually run `uninstall.sql` from Supabase.)
 13. **If file storage needed** — set up ARI File Storage. See the "ARI File Storage System" section below.
 
 ## ARI File Storage System
 
-If the module needs to store files (images, documents, audio, etc.), use the **ARI File Storage System**. This provides authenticated file upload, serving, listing, and deletion via central API endpoints. Files are stored on the local filesystem at `data/storage/{user_id}/{bucket}/` and are always scoped to the authenticated user.
+If the module needs to store files (images, documents, audio, etc.), use the **ARI File Storage System**. This provides authenticated file upload, serving, listing, and deletion via central API endpoints. The storage provider is configured in Settings > Integrations > File Storage (stored in the database). By default, files are stored on the local filesystem at `data/storage/{user_id}/{bucket}/` and are always scoped to the authenticated user.
 
 ### How It Works
 
@@ -246,6 +246,10 @@ Use TanStack Query hooks to call the central `/api/storage/` endpoints. See `mod
 **Option B: Create a module-specific upload wrapper (when you need custom validation)**
 
 Create an upload route in your module's `api/upload/route.ts` that validates files and delegates to `getStorageProvider()` from `@/lib/storage`. See `modules-core/module-template/api/upload/route.ts` for a complete example.
+
+When creating a module-specific upload route, read the storage config from the database before getting the provider:
+`const storageConfig = await readStorageConfig(withRLS)` then `const provider = getStorageProvider(storageConfig)`.
+Import both from `@/lib/storage`.
 
 ### Bucket Naming
 
@@ -315,7 +319,7 @@ Do NOT add `if (!session) return <Loading />` at the start of the page component
 - Middleware already protects routes from unauthenticated users
 - API routes use cookies/headers for auth automatically
 
-See `/docs/MODULES.md` section 9 "Data Fetching with TanStack Query" for full documentation.
+See `modules-core/module-template/hooks/use-module-template.ts` for the complete reference implementation.
 
 ## Dashboard Widgets Implementation
 
@@ -658,6 +662,47 @@ const openCreate = () => {
 ```
 
 **NEVER close the dialog before the server confirms success.** If validation fails (client or server), the dialog stays open so the user can fix their input without re-entering everything.
+
+## Input Validation & Sanitization
+
+**All input fields MUST have appropriate validation and sanitization by default.** Every field should enforce constraints that match its purpose, with clear and friendly error messages. Validation must happen on both client (for immediate feedback) and server (for security).
+
+### Rules for common field types:
+
+| Field type | Constraints |
+|------------|------------|
+| **Names/titles** | `.min(1, 'Required').max(100, '...')`, trim whitespace |
+| **Descriptions/text** | `.max(500, '...')` or appropriate limit |
+| **URLs** | `.url('Must be a valid URL')` or validate via `new URL()` |
+| **Email** | `.email('Must be a valid email')` |
+| **Bucket/slug names** | Lowercase alphanumeric + hyphens, max 63 chars, regex pattern |
+| **API keys/tokens** | Max length, no pattern restriction (secrets can contain anything) |
+| **Region/locale codes** | Lowercase alphanumeric + hyphens, max 64 chars |
+| **Numbers** | `.min()` / `.max()` with descriptive messages |
+| **Dates** | Use `.datetime()` or `.date()` |
+
+### Client-side enforcement:
+
+1. **Set `maxLength` on all `<Input>` elements** so users can't type beyond the limit
+2. **Validate patterns before submit** using a `validateForm()` function (see Dialog & Form Validation Pattern above)
+3. **Show red border + inline error** on invalid fields — never rely only on toasts
+4. **Clear errors as the user edits** the field (don't wait for re-submit)
+5. **For endpoint/URL fields**, validate with `new URL(value)` in a try/catch
+6. **For select/dropdown fields**, ensure values are from the allowed set
+
+### Server-side enforcement:
+
+1. **Zod schemas must mirror client constraints** — the server is the source of truth
+2. **Use `.regex()` with a descriptive message** for pattern-restricted fields (e.g., bucket names, regions)
+3. **Use `.max()` with a message** on every string field — never accept unbounded input
+4. **Sanitize before storage** — trim whitespace, normalize case where appropriate
+5. **Never trust client-declared MIME types** — validate file extensions server-side
+
+### Error message guidelines:
+
+- Be specific: "Bucket name must be lowercase with only letters, numbers, and hyphens" (not "Invalid format")
+- Include limits: "Name must be 100 characters or less" (not "Too long")
+- For required fields: "Name is required" (not "Required" or "Field is empty")
 
 ## Code Review & Simplification
 
