@@ -268,7 +268,7 @@ ARI_SUPABASE_S3_REGION=`,
           <div className="space-y-2">
             <Label className="text-sm font-medium">Provider</Label>
             <Select value={provider} onValueChange={handleProviderChange}>
-              <SelectTrigger className="w-full sm:w-[420px]">
+              <SelectTrigger className="w-full sm:w-[340px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
