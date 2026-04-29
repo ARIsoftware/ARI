@@ -61,6 +61,15 @@ export function Providers({
   const pathname = usePathname()
   const { data: sessionData, isPending } = authClient.useSession()
 
+  // On public/auth pages, treat the user as unauthenticated regardless of
+  // stale session data that useSession() may return from cache/cookies before
+  // the server round-trip confirms the session is invalid.  This prevents
+  // providers from firing authenticated API calls (theme, modules/order,
+  // music-player/songs, etc.) that will just 401.
+  const isPublicPage = !!(pathname?.startsWith('/sign-in') ||
+    pathname?.startsWith('/welcome') ||
+    pathname?.startsWith('/database-error'))
+
   // Map Better Auth user/session to compatible format
   // Cast to include custom fields (firstName, lastName) defined in auth.ts additionalFields
   type BetterAuthUser = {
@@ -127,13 +136,15 @@ export function Providers({
     }).catch(err => console.error('Failed to persist welcome profile:', err))
   }, [user])
 
+  const isAuthenticated = !isPublicPage && !!session
+
   return (
     <Context.Provider value={{ user, session, isLoading: isPending }}>
-      <ThemeProvider isAuthenticated={!!session} isAuthLoading={isPending}>
+      <ThemeProvider isAuthenticated={isAuthenticated} isAuthLoading={isPending}>
         <ModulesProvider modules={modules} enabledModules={enabledModules}>
-          <ModuleProviders isAuthenticated={!!session}>
+          <ModuleProviders isAuthenticated={isAuthenticated}>
             <CommandPaletteProvider>
-              <DragDropModeProvider isAuthenticated={!!session} isAuthLoading={isPending}>
+              <DragDropModeProvider isAuthenticated={isAuthenticated} isAuthLoading={isPending}>
                 {children}
                 <Toaster />
               </DragDropModeProvider>
