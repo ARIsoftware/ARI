@@ -1,6 +1,6 @@
 # ARI Module Audit (`/ari-audit-module`)
 
-Audit a single ARI module for **security vulnerabilities**, **production-readiness**, and **Supabase / Postgres best practices**. Produces one consolidated report with findings grouped by **High / Medium / Low** severity.
+Audit a single ARI module for **security vulnerabilities**, **production-readiness**, **Supabase / Postgres best practices**, and **frontend quality** (performance, data fetching patterns, UX, accessibility). Produces one consolidated report with findings grouped by **High / Medium / Low** severity.
 
 This is a **static code review**. It does not execute SQL, does not modify any files, and does not replace penetration testing or runtime monitoring.
 
@@ -35,9 +35,9 @@ All findings are normalized into three buckets. There is no "Critical" — anyth
 
 ## Execution: parallel subagents
 
-When the agent runtime supports delegation, split the audit across **3 subagents launched in parallel**. Each subagent is scoped to one concern and returns a structured list of findings. The main agent then dedupes, normalizes severities, and assembles the final report.
+When the agent runtime supports delegation, split the audit across **4 subagents launched in parallel**. Each subagent is scoped to one concern and returns a structured list of findings. The main agent then dedupes, normalizes severities, and assembles the final report.
 
-> If the current agent runtime does not support subagent dispatch (or the delegation tool is unavailable), fall back to running the three audits sequentially in the main thread. The audit must still complete — the parallelism is a performance optimization, not a hard requirement.
+> If the current agent runtime does not support subagent dispatch (or the delegation tool is unavailable), fall back to running the four audits sequentially in the main thread. The audit must still complete — the parallelism is a performance optimization, not a hard requirement.
 
 ### Subagent 1 — Security
 Scope: the entire module directory (`modules-core/[id]/**` or `modules-custom/[id]/**`) including `api/`, `components/`, `lib/`, `app/`, `hooks/`, `database/`, `module.json`, fixtures, and any docs. The hardcoded-credential scan in category 11 must cover **all file types**, not just TypeScript.
@@ -45,14 +45,18 @@ Runs Part A (Security Audit — 16 categories below). Returns findings as `{seve
 
 ### Subagent 2 — Production-Readiness
 Scope: the entire module folder plus the registration touchpoints listed in Part B.
-Runs Part B (manifest, self-containment, install SQL, registration, page hygiene, type safety).
+Runs Part B (manifest, self-containment, install SQL, API patterns, registration, page hygiene, type safety).
 
 ### Subagent 3 — Database / Supabase / Postgres
 Scope: `[module]/database/**`, any `[module]/database/migrations/**`, plus any Supabase usage in `[module]/api/**`.
 This subagent must invoke the installed `supabase` and `supabase-postgres-best-practices` skills to evaluate the SQL/schema files and any Supabase calls. Findings include: missing indexes, unsafe RLS patterns, `auth.uid()` usage, suboptimal column types, inefficient queries, missing `security definer`, etc. Also runs the Part C destructive-SQL checks listed below.
 
+### Subagent 4 — Frontend Quality
+Scope: `[module]/hooks/**`, `[module]/components/**`, `[module]/app/**`, cross-referenced with `[module]/api/**/route.ts` for query pattern alignment. Must read `modules-core/module-template/hooks/use-module-template.ts` as the gold-standard reference for TanStack Query patterns.
+Runs Part D (performance, data fetching, UX quality, accessibility). Returns findings as `{severity, file, line, category, issue, risk, recommendation}`.
+
 ### Merging
-The main agent collects all three subagent results, removes duplicates (same file+line+category), normalizes severities to High/Medium/Low, and emits a single report in the format below.
+The main agent collects all four subagent results, removes duplicates (same file+line+category), normalizes severities to High/Medium/Low, and emits a single report in the format below.
 
 ---
 
@@ -266,6 +270,11 @@ For every `[module]/api/**/route.ts`:
 - [ ] Error responses use `createErrorResponse` and don't leak stack traces, raw SQL errors, or PII — **Medium**
 - [ ] No `process.env.SUPABASE_SERVICE_ROLE_KEY` usage in module code — **High**
 - [ ] Public/webhook routes (if any) require a secret check — **High**
+- [ ] API responses wrap Drizzle output with `toSnakeCase()` from `@/lib/api-helpers` (Drizzle returns camelCase; frontend expects snake_case) — **Medium**
+- [ ] No manual field mapping where `toSnakeCase()` would suffice (e.g. `{ content: data[0].content, updated_at: data[0].updatedAt }`) — **Low**
+- [ ] POST handlers return `{ status: 201 }` for resource creation, not 200 — **Low**
+- [ ] Error responses use `createErrorResponse()` helper for consistent error shapes — **Low**
+- [ ] Specific-resource endpoints return 404 when the resource is not found (not an empty array or silent 200) — **Low**
 
 ### B5. Registration completeness
 - [ ] Module id appears in `lib/generated/module-pages-registry.ts` (`REGISTERED_MODULE_IDS`) — **Medium**
@@ -302,9 +311,50 @@ If either skill is unavailable in the current environment, skip it and note it u
 
 ---
 
+## Part D — Frontend Quality Audit
+
+This part is run by Subagent 4. Before auditing, read `modules-core/module-template/hooks/use-module-template.ts` as the gold-standard reference for TanStack Query patterns (query key constants, optimistic updates, rollback, invalidation).
+
+### D1. Performance
+- [ ] API route GET handlers for list endpoints return unbounded query results (SELECT without `.limit()`) — **Medium**
+- [ ] API route GET handlers for list endpoints missing pagination support (no `limit`/`offset` query params) — **Medium**
+- [ ] N+1 query patterns: sequential DB queries in a loop that could use `inArray()` or a single joined query — **Medium**
+- [ ] N+1 fetch patterns in client hooks: loop of individual `fetch()` calls that could be a single batch API call — **Low**
+- [ ] Wildcard icon imports (`import * as Icons from 'lucide-react'`) or importing the entire icon library instead of individual icons — **Medium**
+- [ ] Heavy synchronous imports (chart libraries, rich text editors, large dependencies) that could use `next/dynamic` or `React.lazy()` — **Low**
+
+### D2. TanStack Query / Data Fetching Patterns
+- [ ] Module has API routes but no `hooks/` directory with TanStack Query hooks — **Medium**
+- [ ] Components using raw `useState` + `useEffect` + `fetch()` for data that should use `useQuery` — **Medium**
+- [ ] Mutations missing the `onMutate` (optimistic) + `onError` (rollback) + `onSettled` (invalidate) pattern — **Low** (some mutations like settings saves legitimately don't need optimistic updates)
+- [ ] Query keys defined as inline strings (e.g. `['tasks']`) instead of constants at module level — **Low**
+- [ ] Direct `fetch()` calls in page/component files instead of going through hooks — **Medium**
+- [ ] Manual `Authorization` header in fetch calls — **Medium** (Better Auth sends cookies automatically; manual headers indicate pre-migration code)
+- [ ] Missing cache invalidation after mutations (no `invalidateQueries` call in `onSettled`) — **Medium**
+
+### D3. UX Quality
+- [ ] Main page component has no loading state (no `isLoading` check with spinner or skeleton) — **Medium**
+- [ ] Main page component has no empty state (no message or CTA when data array is empty) — **Low**
+- [ ] Main page component has no error state (no fallback display when data fetch fails) — **Medium**
+- [ ] Mutation buttons not disabled while `isPending` (double-submit risk, can create duplicate records) — **Medium**
+- [ ] Delete actions without confirmation dialog — **Low**
+- [ ] Missing toast notifications on mutation errors (user doesn't know why action failed) — **Low**
+- [ ] Dashboard widgets not handling all three states: loading, error, success — **Low**
+
+### D4. Accessibility (lightweight)
+- [ ] Interactive elements (buttons, links, icon-only controls) missing accessible labels (`aria-label`, visible text, or `sr-only` text) — **Low**
+- [ ] Form inputs not associated with `<Label>` elements (missing `htmlFor` or wrapping) — **Low**
+- [ ] Images or icons used as sole content without `alt` text or `aria-hidden` — **Low**
+- [ ] Custom modal/dialog components missing focus trap or return-focus behavior (does not apply to shadcn `Dialog`, which handles this automatically) — **Low**
+- [ ] Color-only status indicators without a text or icon alternative — **Low**
+
+---
+
 ## Output format
 
 Output a single Markdown report for the audited module. Group findings by severity (High → Medium → Low). Each finding cites file + line, category, issue, and recommendation.
+
+Category tags: `[Security]` (Part A), `[Readiness]` (Part B), `[Database]` (Part C), `[Performance]` (Part D1), `[Data Fetching]` (Part D2), `[UX]` (Part D3), `[Accessibility]` (Part D4).
 
 ```md
 # Module Audit Report — <module-name> (`modules-core/<module-id>`)
@@ -328,11 +378,26 @@ Output a single Markdown report for the audited module. Group findings by severi
 - **Issue**: `status` column is filtered in API queries but has no index.
 - **Recommendation**: `CREATE INDEX IF NOT EXISTS idx_<table>_status ON <table>(status);`
 
+### [Performance] Unbounded query on list endpoint
+- **Location**: `modules-core/<id>/api/data/route.ts:18`
+- **Issue**: GET handler returns all rows without `.limit()` or pagination params.
+- **Recommendation**: Add `limit`/`offset` query params with a sensible default (e.g. 100).
+
+### [Data Fetching] Raw fetch instead of TanStack Query hooks
+- **Location**: `modules-core/<id>/app/page.tsx:25`
+- **Issue**: Component uses `useState` + `useEffect` + `fetch()` instead of `useQuery`.
+- **Recommendation**: Create a hook in `hooks/use-<module>.ts` using `useQuery`. See `modules-core/module-template/hooks/use-module-template.ts`.
+
 ## Low
 ### [Readiness] Optional manifest field missing
 - **Location**: `modules-core/<id>/module.json`
 - **Issue**: `author` field not set.
 - **Recommendation**: Add `"author": "..."`.
+
+### [UX] No empty state
+- **Location**: `modules-core/<id>/app/page.tsx`
+- **Issue**: No message or CTA displayed when the data array is empty.
+- **Recommendation**: Add an empty state with a prompt to create the first entry.
 ```
 
 After the findings, append a one-line summary and a top-5 priority list:
@@ -363,6 +428,8 @@ When auditing, the subagents should be aware of these reference files:
 - `app/api/modules/[module]/[[...path]]/route.ts` — API registration
 - `lib/db/schema/schema.ts` — Drizzle schema barrel
 - `lib/db/schema/core-schema.ts` — Better Auth tables and system tables; source of truth that `user.id` is `text`, so all module `user_id` columns must also be `text`, not `uuid`
+- `modules-core/module-template/hooks/use-module-template.ts` — gold-standard TanStack Query patterns (query key constants, optimistic updates, rollback, cache invalidation)
+- `modules-core/module-template/components/settings-panel.tsx` — gold-standard UX patterns (loading states, `isPending` guards, toast usage)
 - A reference module like `modules-core/tasks/` for the gold-standard structure
 
 ---
