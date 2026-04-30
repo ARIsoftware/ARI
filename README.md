@@ -8,20 +8,7 @@ Engineered for those who want complete command over the software that runs their
 
 https://ari.software
 
-## Requirements
-
-ARI uses Docker for a self-contained Supabase database - local, secure, fast, and hassle-free. Download the free Docker Desktop app:
-https://www.docker.com/products/docker-desktop/
-
-When you run the ARI installer, it will automatically install all the required packages. See the Manual Setup section below if you prefer to install them yourself.
-
-- **Node.js** v18+
-- **pnpm** (package manager)
-- **Git**
-- **Docker** (for local Supabase database)
-- **Supabase CLI**
-
-## Quick Start (Recommended)
+## Quick Start
 
 Install ARI with a single command:
 
@@ -35,44 +22,14 @@ Install ARI with a single command:
 irm https://ari.software/install-win | iex
 ```
 
-The installer will:
-1. Install required tools (Git, Node.js, pnpm, Supabase CLI, etc.)
-2. Clone the ARI repository
-3. Install dependencies
-4. Set up a local Supabase database (requires [Docker](https://www.docker.com/products/docker-desktop))
-5. Initialize the database schema
-6. Create the `./ari` CLI for daily use
+The installer handles everything — dependencies, database setup, and configuration.
 
-## Accessing ARI:
-**To view ARI visit:** http://localhost:3000
+## Documentation
 
-**Access the Database Studio:** http://localhost:54323/
+Full documentation, guides, and module development resources:
 
-## Useful Commands:
+https://ari.software/docs
 
-When you want to start ARI, change into your ARI directory (`cd ~/ARI`) and then run:
-
-```bash
-./ari start
-```
-
-To view the status of ARI, run:
-
-```bash
-./ari status
-```
-
-When you want to stop ARI:
-
-```
-Ctrl+C          # Stop the dev server
-./ari stop      # Stop Supabase containers
-```
-
-On Windows, use `.\ari.cmd start` `.\ari.cmd status` and `.\ari.cmd stop`
-
----
-
-## 🤝 Need Help?
+## Need Help?
 
 Reach out to us at hello@ari.software
