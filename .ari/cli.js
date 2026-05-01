@@ -176,12 +176,7 @@ function ensureMacPostgresPath() {
 function start() {
   const mode = getDbMode();
 
-  // Ensure ARI File Storage directory exists
-  const storageDir = path.join(ROOT, 'data', 'storage');
-  if (!fs.existsSync(storageDir)) {
-    fs.mkdirSync(storageDir, { recursive: true });
-    console.log('  ' + GREEN + '✔' + RESET + ' Created data/storage directory');
-  }
+  fs.mkdirSync(path.join(ROOT, 'data', 'storage'), { recursive: true });
 
   if (mode === 'supabaselocal') {
     // Check Docker — if unavailable, skip Supabase and start dev server only

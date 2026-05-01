@@ -819,7 +819,6 @@ async function setupLocalPostgres(targetDir) {
     pgReady: false,
     dbCreated: false,
     schemaInitialized: false,
-    cliCreated: true,
   };
 
   // Ensure Homebrew's keg-only PostgreSQL binaries are in PATH (macOS)
@@ -922,7 +921,6 @@ async function setupLocalSupabase(targetDir) {
     supabaseStarted: false,
     envGenerated: false,
     schemaInitialized: false,
-    cliCreated: true,
   };
 
   // Check Docker
@@ -1163,10 +1161,11 @@ function runVerification(ariResult, supabaseResult) {
       });
     }
 
+    const ariLauncherExists = ariResult && ariResult.dir && fs.existsSync(path.join(ariResult.dir, 'ari'));
     checks.push({
       name: 'ARI CLI',
-      ok: supabaseResult.cliCreated,
-      detail: supabaseResult.cliCreated ? './ari ready' : 'not created',
+      ok: !!ariLauncherExists,
+      detail: ariLauncherExists ? './ari ready' : 'not found',
     });
   }
 
@@ -1300,7 +1299,7 @@ async function main() {
       // supabasecloud — user configures on /welcome
       writeInstallerEnvFile(ariResult.dir, { dbMode: 'supabasecloud' });
       console.log(`  ${SYM_CHECK} .env.local generated ${dim('(configure Supabase on /welcome)')}`);
-      dbResult = { cliCreated: true };
+      dbResult = {};
     }
   }
 
