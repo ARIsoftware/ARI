@@ -681,7 +681,7 @@ export default function ModulesPage() {
         badgeText = 'OVERRIDDEN'
       } else if (mod.isCustomModule) {
         badgeColor = '#07be07'
-        badgeText = 'USER MODULE'
+        badgeText = 'CUSTOM MODULE'
       } else {
         badgeColor = '#000000'
         badgeText = 'CORE MODULE'
