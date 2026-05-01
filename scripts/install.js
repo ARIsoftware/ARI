@@ -741,30 +741,6 @@ async function runSetupSql(targetDir, databaseUrl) {
   }
 }
 
-function createCliLauncher(targetDir) {
-  const ariDir = path.join(targetDir, '.ari');
-  if (!fs.existsSync(ariDir)) fs.mkdirSync(ariDir, { recursive: true });
-
-  // .ari/cli.js — read from the repo's scripts/cli-template.js if available,
-  // otherwise the cloned repo already has .ari/cli.js checked in.
-  // The installer always writes a fresh copy to ensure it's up to date.
-  const cliTemplatePath = path.join(targetDir, 'scripts', 'cli-template.js');
-  if (fs.existsSync(cliTemplatePath)) {
-    fs.copyFileSync(cliTemplatePath, path.join(ariDir, 'cli.js'));
-  }
-  // If neither exists, the repo's .ari/cli.js will be used as-is
-
-  // Unix launcher
-  const unixLauncher = `#!/usr/bin/env bash\nexec node "$(dirname "$0")/.ari/cli.js" "$@"\n`;
-  const unixPath = path.join(targetDir, 'ari');
-  fs.writeFileSync(unixPath, unixLauncher);
-  try { fs.chmodSync(unixPath, 0o755); } catch { /* Windows */ }
-
-  // Windows launcher
-  const winLauncher = `@echo off\r\nnode "%~dp0.ari\\cli.js" %*\r\n`;
-  fs.writeFileSync(path.join(targetDir, 'ari.cmd'), winLauncher);
-}
-
 // Like runAsync but streams output to terminal (stdio: 'inherit') instead of capturing it
 function spawnAsync(cmd, args, opts) {
   return new Promise((resolve, reject) => {
@@ -843,103 +819,95 @@ async function setupLocalPostgres(targetDir) {
     pgReady: false,
     dbCreated: false,
     schemaInitialized: false,
-    cliCreated: false,
+    cliCreated: true,
   };
 
-  try {
-    // Ensure Homebrew's keg-only PostgreSQL binaries are in PATH (macOS)
-    if (PLATFORM === 'darwin') {
-      const brewPgBin = '/opt/homebrew/opt/postgresql@17/bin';
-      const brewPgBinIntel = '/usr/local/opt/postgresql@17/bin';
-      const pathEntries = process.env.PATH.split(':');
-      if (fs.existsSync(brewPgBin) && !pathEntries.includes(brewPgBin)) {
-        process.env.PATH = `${brewPgBin}:${process.env.PATH}`;
-      } else if (fs.existsSync(brewPgBinIntel) && !pathEntries.includes(brewPgBinIntel)) {
-        process.env.PATH = `${brewPgBinIntel}:${process.env.PATH}`;
-      }
+  // Ensure Homebrew's keg-only PostgreSQL binaries are in PATH (macOS)
+  if (PLATFORM === 'darwin') {
+    const brewPgBin = '/opt/homebrew/opt/postgresql@17/bin';
+    const brewPgBinIntel = '/usr/local/opt/postgresql@17/bin';
+    const pathEntries = process.env.PATH.split(':');
+    if (fs.existsSync(brewPgBin) && !pathEntries.includes(brewPgBin)) {
+      process.env.PATH = `${brewPgBin}:${process.env.PATH}`;
+    } else if (fs.existsSync(brewPgBinIntel) && !pathEntries.includes(brewPgBinIntel)) {
+      process.env.PATH = `${brewPgBinIntel}:${process.env.PATH}`;
     }
-
-    // 1. Check if PostgreSQL is running
-    const pgReady = run('pg_isready -q') !== null;
-
-    if (!pgReady) {
-      console.log(`  ${SYM_DASH} PostgreSQL is not running. Attempting to start…`);
-      if (PLATFORM === 'darwin') {
-        run('brew services start postgresql@17');
-      } else {
-        run('sudo systemctl start postgresql');
-      }
-      // Re-check
-      const now = run('pg_isready -q') !== null;
-      if (!now) {
-        console.log(`  ${SYM_CROSS} ${red('Could not start PostgreSQL.')}`);
-        if (PLATFORM === 'darwin') {
-          console.log(`  ${dim('Try: brew services start postgresql@17')}`);
-          console.log(`  ${dim('You may need to add PostgreSQL to your PATH:')}`);
-          console.log(`  ${dim('export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"')}`);
-        } else {
-          console.log(`  ${dim('Try: sudo systemctl start postgresql')}`);
-        }
-        return result;
-      }
-    }
-    console.log(`  ${SYM_CHECK} PostgreSQL is running`);
-    result.pgReady = true;
-
-    // 2. Create database (platform-aware)
-    const spinner = new Spinner();
-    spinner.start('Creating database…');
-
-    const isLinux = PLATFORM === 'linux';
-    const dbListCmd = isLinux ? 'sudo -u postgres psql -lqt' : 'psql -lqt';
-    const dbList = run(dbListCmd) || '';
-    const dbExists = dbList.split('\n').some(line => line.trim().startsWith('ari ') || line.trim().startsWith('ari|'));
-
-    if (dbExists) {
-      spinner.success('Database "ari" already exists');
-    } else {
-      const createCmd = isLinux ? 'sudo -u postgres createdb ari' : 'createdb ari';
-      const createResult = run(createCmd);
-      if (createResult === null) {
-        spinner.error('Failed to create database "ari"');
-        console.log(`  ${dim('Try manually: ' + createCmd)}`);
-        return result;
-      }
-      spinner.success('Database "ari" created');
-    }
-    result.dbCreated = true;
-
-    // 3. Determine DATABASE_URL
-    const dbUrl = isLinux
-      ? 'postgresql://postgres@localhost:5432/ari'
-      : 'postgresql://localhost:5432/ari';
-
-    // 4. Run setup.sql
-    spinner.start('Initializing database schema…');
-    try {
-      const ok = await runSetupSql(targetDir, dbUrl);
-      if (ok) {
-        spinner.success('Database schema initialized');
-        result.schemaInitialized = true;
-      } else {
-        spinner.error('setup.sql not found');
-      }
-    } catch (err) {
-      spinner.error('Failed to initialize database schema');
-      console.log(`  ${dim(err.message.split('\n').slice(0, 3).join('\n  '))}`);
-    }
-
-    // 5. Write .env.local with ARI_DB_MODE and DATABASE_URL
-    spinner.start('Writing .env.local…');
-    writeInstallerEnvFile(targetDir, { dbMode: 'postgres', dbUrl });
-    spinner.success('.env.local generated');
-
-  } finally {
-    // Always create CLI launcher
-    createCliLauncher(targetDir);
-    result.cliCreated = true;
-    console.log(`  ${SYM_CHECK} CLI launcher created ${dim('(./ari start | stop | status)')}`);
   }
+
+  // 1. Check if PostgreSQL is running
+  const pgReady = run('pg_isready -q') !== null;
+
+  if (!pgReady) {
+    console.log(`  ${SYM_DASH} PostgreSQL is not running. Attempting to start…`);
+    if (PLATFORM === 'darwin') {
+      run('brew services start postgresql@17');
+    } else {
+      run('sudo systemctl start postgresql');
+    }
+    // Re-check
+    const now = run('pg_isready -q') !== null;
+    if (!now) {
+      console.log(`  ${SYM_CROSS} ${red('Could not start PostgreSQL.')}`);
+      if (PLATFORM === 'darwin') {
+        console.log(`  ${dim('Try: brew services start postgresql@17')}`);
+        console.log(`  ${dim('You may need to add PostgreSQL to your PATH:')}`);
+        console.log(`  ${dim('export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"')}`);
+      } else {
+        console.log(`  ${dim('Try: sudo systemctl start postgresql')}`);
+      }
+      return result;
+    }
+  }
+  console.log(`  ${SYM_CHECK} PostgreSQL is running`);
+  result.pgReady = true;
+
+  // 2. Create database (platform-aware)
+  const spinner = new Spinner();
+  spinner.start('Creating database…');
+
+  const isLinux = PLATFORM === 'linux';
+  const dbListCmd = isLinux ? 'sudo -u postgres psql -lqt' : 'psql -lqt';
+  const dbList = run(dbListCmd) || '';
+  const dbExists = dbList.split('\n').some(line => line.trim().startsWith('ari ') || line.trim().startsWith('ari|'));
+
+  if (dbExists) {
+    spinner.success('Database "ari" already exists');
+  } else {
+    const createCmd = isLinux ? 'sudo -u postgres createdb ari' : 'createdb ari';
+    const createResult = run(createCmd);
+    if (createResult === null) {
+      spinner.error('Failed to create database "ari"');
+      console.log(`  ${dim('Try manually: ' + createCmd)}`);
+      return result;
+    }
+    spinner.success('Database "ari" created');
+  }
+  result.dbCreated = true;
+
+  // 3. Determine DATABASE_URL
+  const dbUrl = isLinux
+    ? 'postgresql://postgres@localhost:5432/ari'
+    : 'postgresql://localhost:5432/ari';
+
+  // 4. Run setup.sql
+  spinner.start('Initializing database schema…');
+  try {
+    const ok = await runSetupSql(targetDir, dbUrl);
+    if (ok) {
+      spinner.success('Database schema initialized');
+      result.schemaInitialized = true;
+    } else {
+      spinner.error('setup.sql not found');
+    }
+  } catch (err) {
+    spinner.error('Failed to initialize database schema');
+    console.log(`  ${dim(err.message.split('\n').slice(0, 3).join('\n  '))}`);
+  }
+
+  // 5. Write .env.local with ARI_DB_MODE and DATABASE_URL
+  spinner.start('Writing .env.local…');
+  writeInstallerEnvFile(targetDir, { dbMode: 'postgres', dbUrl });
+  spinner.success('.env.local generated');
 
   return result;
 }
@@ -954,89 +922,82 @@ async function setupLocalSupabase(targetDir) {
     supabaseStarted: false,
     envGenerated: false,
     schemaInitialized: false,
-    cliCreated: false,
+    cliCreated: true,
   };
 
-  try {
-    // Check Docker
-    const docker = detectDocker();
-    if (!docker.running) {
-      const dockerReady = await waitForDocker(docker);
-      if (!dockerReady) {
-        console.log(`  ${SYM_DASH} Skipping local Supabase setup`);
-        console.log(`  ${dim('You can set up Supabase Cloud manually or run ./ari start later.')}`);
-        return result;
-      }
-    } else {
-      console.log(`  ${SYM_CHECK} Docker is running`);
-    }
-
-    // Ask user
-    const shouldSetup = await askYesNo('Set up local Supabase database?', true);
-    if (!shouldSetup) {
-      console.log(`  ${SYM_DASH} Skipped local Supabase setup`);
+  // Check Docker
+  const docker = detectDocker();
+  if (!docker.running) {
+    const dockerReady = await waitForDocker(docker);
+    if (!dockerReady) {
+      console.log(`  ${SYM_DASH} Skipping local Supabase setup`);
+      console.log(`  ${dim('You can set up Supabase Cloud manually or run ./ari start later.')}`);
       return result;
     }
+  } else {
+    console.log(`  ${SYM_CHECK} Docker is running`);
+  }
 
-    // Start Supabase
-    const spinner = new Spinner();
-    const alreadyRunning = !!run(`cd "${targetDir}" && supabase status 2>/dev/null | grep "API URL"`);
+  // Ask user
+  const shouldSetup = await askYesNo('Set up local Supabase database?', true);
+  if (!shouldSetup) {
+    console.log(`  ${SYM_DASH} Skipped local Supabase setup`);
+    return result;
+  }
 
-    if (alreadyRunning) {
-      console.log(`  ${SYM_CHECK} Supabase is already running`);
-      result.supabaseStarted = true;
-    } else {
-      console.log('');
-      console.log(`  ${dim('Starting Supabase (first run downloads images — this may take a few minutes)…')}`);
-      console.log('');
-      try {
-        await spawnAsync('supabase', ['start'], { stdio: 'inherit', cwd: targetDir });
-        console.log('');
-        console.log(`  ${SYM_CHECK} Supabase started`);
-        result.supabaseStarted = true;
-      } catch (err) {
-        console.log('');
-        console.log(`  ${SYM_CROSS} ${red('Failed to start Supabase')}`);
-        console.log(`  ${dim(err.message)}`);
-        console.log(`  ${dim('You can try running: cd ' + shortenPath(targetDir) + ' && supabase start')}`);
-        return result;
-      }
-    }
+  // Start Supabase
+  const spinner = new Spinner();
+  const alreadyRunning = !!run(`cd "${targetDir}" && supabase status 2>/dev/null | grep "API URL"`);
 
-    // Parse env and generate .env.supabase.local
-    spinner.start('Generating .env.supabase.local…');
-    const supabaseVars = parseSupabaseEnv(targetDir);
-    if (!supabaseVars || !supabaseVars.DB_URL) {
-      spinner.error('Failed to read Supabase status');
-      return result;
-    }
-
-    const envResult = generateEnvFile(targetDir, supabaseVars);
-    spinner.success('.env.supabase.local generated');
-    result.envGenerated = true;
-
-    // Run setup.sql
-    spinner.start('Initializing database schema…');
+  if (alreadyRunning) {
+    console.log(`  ${SYM_CHECK} Supabase is already running`);
+    result.supabaseStarted = true;
+  } else {
+    console.log('');
+    console.log(`  ${dim('Starting Supabase (first run downloads images — this may take a few minutes)…')}`);
+    console.log('');
     try {
-      const ok = await runSetupSql(targetDir, envResult.databaseUrl);
-      if (ok) {
-        spinner.success('Database schema initialized');
-        result.schemaInitialized = true;
-      } else {
-        spinner.error('setup.sql not found');
-      }
-    } catch (err) {
-      spinner.error('Failed to initialize database schema');
-      console.log(`  ${dim(err.message.split('\n').slice(0, 3).join('\n  '))}`);
+      await spawnAsync('supabase', ['start'], { stdio: 'inherit', cwd: targetDir });
       console.log('');
-      console.log(`  ${dim('You can run it manually via Supabase Studio:')}`);
-      console.log(`  ${DIM_BLUE}http://127.0.0.1:54323${RESET}`);
+      console.log(`  ${SYM_CHECK} Supabase started`);
+      result.supabaseStarted = true;
+    } catch (err) {
+      console.log('');
+      console.log(`  ${SYM_CROSS} ${red('Failed to start Supabase')}`);
+      console.log(`  ${dim(err.message)}`);
+      console.log(`  ${dim('You can try running: cd ' + shortenPath(targetDir) + ' && supabase start')}`);
+      return result;
     }
-  } finally {
-    // Always create CLI launcher regardless of how far setup got
-    createCliLauncher(targetDir);
-    result.cliCreated = true;
-    console.log(`  ${SYM_CHECK} CLI launcher created ${dim('(./ari start | stop | status)')}`);
+  }
+
+  // Parse env and generate .env.supabase.local
+  spinner.start('Generating .env.supabase.local…');
+  const supabaseVars = parseSupabaseEnv(targetDir);
+  if (!supabaseVars || !supabaseVars.DB_URL) {
+    spinner.error('Failed to read Supabase status');
+    return result;
+  }
+
+  const envResult = generateEnvFile(targetDir, supabaseVars);
+  spinner.success('.env.supabase.local generated');
+  result.envGenerated = true;
+
+  // Run setup.sql
+  spinner.start('Initializing database schema…');
+  try {
+    const ok = await runSetupSql(targetDir, envResult.databaseUrl);
+    if (ok) {
+      spinner.success('Database schema initialized');
+      result.schemaInitialized = true;
+    } else {
+      spinner.error('setup.sql not found');
+    }
+  } catch (err) {
+    spinner.error('Failed to initialize database schema');
+    console.log(`  ${dim(err.message.split('\n').slice(0, 3).join('\n  '))}`);
+    console.log('');
+    console.log(`  ${dim('You can run it manually via Supabase Studio:')}`);
+    console.log(`  ${DIM_BLUE}http://127.0.0.1:54323${RESET}`);
   }
 
   return result;
@@ -1339,8 +1300,6 @@ async function main() {
       // supabasecloud — user configures on /welcome
       writeInstallerEnvFile(ariResult.dir, { dbMode: 'supabasecloud' });
       console.log(`  ${SYM_CHECK} .env.local generated ${dim('(configure Supabase on /welcome)')}`);
-      createCliLauncher(ariResult.dir);
-      console.log(`  ${SYM_CHECK} CLI launcher created ${dim('(./ari start | stop | status)')}`);
       dbResult = { cliCreated: true };
     }
   }

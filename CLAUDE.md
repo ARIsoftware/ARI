@@ -387,12 +387,12 @@ OPENAI_API_KEY=your_openai_api_key  # For AI Assistant feature
 
 `./ari start` checks Docker, starts Supabase (idempotent), regenerates `.env.supabase.local`, and runs `pnpm dev`. On Windows, use `.\ari.cmd start`.
 
-### ARI CLI — Generated Files (Do Not Edit Directly)
-The `./ari` command runs `.ari/cli.js`, but **`.ari/cli.js` is a generated file** — do NOT edit it directly. It is copied from `scripts/cli-template.js` by the installer (`scripts/install.js` → `createCliLauncher()`). Any direct edits to `.ari/cli.js` will be overwritten on reinstall.
+### ARI CLI — Tracked in Git
+The `./ari` command runs `.ari/cli.js`. All three files (`./ari`, `./ari.cmd`, `.ari/cli.js`) are **tracked in git** — `git pull` keeps the CLI fresh. To modify CLI behavior, edit `.ari/cli.js` directly.
 
-**To modify the CLI behavior**, edit `scripts/cli-template.js` instead. The installer will copy it to `.ari/cli.js` on the next install.
+Line endings and the executable bit are pinned via `.gitattributes` (`ari` = LF, `ari.cmd` = CRLF) and `git update-index --chmod=+x ari`. Don't normalize line endings or strip the +x bit.
 
-Files in the `.ari/` directory are gitignored and not tracked.
+Other files inside `.ari/` (e.g. `.ari/pgweb.pid`) are runtime state and remain gitignored via `.ari/*` + `!.ari/cli.js`.
 
 For manual control without the CLI:
 ```bash

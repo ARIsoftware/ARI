@@ -140,6 +140,7 @@ function startPgweb() {
   });
 
   child.unref();
+  fs.mkdirSync(path.dirname(PGWEB_PID_FILE), { recursive: true });
   fs.writeFileSync(PGWEB_PID_FILE, String(child.pid));
   console.log('  ' + GREEN + '✔' + RESET + ' pgweb started ' + DIM + `http://localhost:${PGWEB_PORT}` + RESET);
 }
@@ -174,6 +175,13 @@ function ensureMacPostgresPath() {
 
 function start() {
   const mode = getDbMode();
+
+  // Ensure ARI File Storage directory exists
+  const storageDir = path.join(ROOT, 'data', 'storage');
+  if (!fs.existsSync(storageDir)) {
+    fs.mkdirSync(storageDir, { recursive: true });
+    console.log('  ' + GREEN + '✔' + RESET + ' Created data/storage directory');
+  }
 
   if (mode === 'supabaselocal') {
     // Check Docker — if unavailable, skip Supabase and start dev server only
