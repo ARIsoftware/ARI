@@ -163,6 +163,11 @@ export function renderEnvFile(
   lines.push("ALLOWED_IPS=")
   lines.push("")
 
+  lines.push("# Show Next.js dev indicators (the floating overlay in dev mode).")
+  lines.push("# Set to true to enable. Default: false.")
+  lines.push("DEV_INDICATORS=false")
+  lines.push("")
+
   lines.push("# Top Bar Customization (optional)")
   lines.push('# NEXT_PUBLIC_TOP_BAR_MESSAGE="Custom Message"')
   lines.push('# NEXT_PUBLIC_TOP_BAR_COLOR="#c00"')
