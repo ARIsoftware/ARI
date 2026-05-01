@@ -1,2 +1,3 @@
-ari        text eol=lf
-ari.cmd    text eol=crlf
+ari            text eol=lf
+ari.cmd        text eol=crlf
+.ari/cli.js    text eol=lf
