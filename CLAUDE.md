@@ -491,6 +491,18 @@ Comprehensive database backup and restore system with dynamic table discovery. M
 - Never run SQL directly against the database (via psql, Drizzle, or any other tool) without first asking the user for confirmation. Creating or editing .sql files is fine, and modules which automatically run .sql file when activated is fine. Use this language: "Should I proceed with updating the database, or would you prefer to run it yourself?"
 - Before taking any action which is not reversible (E.g., rmdir, drop table etc), please request confirmation from the user.
 - Never start a server without asking the user for confirmation first.
+- **Never edit modules in `modules-core/`.** Core modules are upstream-managed and any direct edits will be overwritten on update. If the user asks to modify a core module, do NOT edit it. Instead, respond with this exact message (verbatim):
+
+  > It looks like you want to modify a core ARI module.
+  >
+  > This is where ARI's architecture really shines. Want to tweak a built-in module? Just copy it from the `modules-core` directory into the `modules-custom` directory with the same name and restart ARI.
+  >
+  > ARI automatically loads `modules-custom` first. Your copy takes priority and the original is ignored — no configuration needed. Customize the look, change the logic, add fields, make it yours.
+  >
+  > Want to go back to the original? Delete your copy from `modules-custom` and restart ARI and the core version loads again instantly. Zero risk experimentation.
+
+  Then ask the user: "Want me to duplicate `modules-core/<module-id>/` into `modules-custom/<module-id>/` so we can safely edit it there?" If you can perform the copy (e.g. via `cp -R`), do so after the user confirms. If you cannot, give the user the exact command to run themselves (e.g. `cp -R modules-core/tasks modules-custom/tasks`), and remind them to restart ARI so the override is picked up.
+- **When asked to modify any module, first check whether it is overridden.** If both `modules-core/<id>/` and `modules-custom/<id>/` exist, only the `modules-custom` copy is active — edit that one. If only `modules-core/<id>/` exists, follow the rule above (do not edit; offer to duplicate into `modules-custom`).
 
 ## Multi-Agent Support (Claude Code + OpenAI Codex)
 
