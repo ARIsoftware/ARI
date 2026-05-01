@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { GitBranch, Check } from "lucide-react"
+import { GitBranch } from "lucide-react"
 import { CodeBlock } from "@/app/welcome/components/code-block"
 
 export function GitTab(): React.ReactElement {
@@ -17,6 +17,10 @@ export function GitTab(): React.ReactElement {
   const [githubToken, setGithubToken] = useState("")
   const [githubRepoOwner, setGithubRepoOwner] = useState("")
   const [githubRepoName, setGithubRepoName] = useState("")
+  const [clearTokenOnSave, setClearTokenOnSave] = useState(false)
+  const [tokenDirty, setTokenDirty] = useState(false)
+
+  const TOKEN_MASK = "••••••••••••••"
 
   const loadConfig = useCallback(async () => {
     try {
@@ -38,6 +42,14 @@ export function GitTab(): React.ReactElement {
     loadConfig()
   }, [loadConfig])
 
+  function handleClear(): void {
+    setGithubToken("")
+    setGithubRepoOwner("")
+    setGithubRepoName("")
+    setClearTokenOnSave(true)
+    setTokenDirty(true)
+  }
+
   async function handleSave(): Promise<void> {
     setSaving(true)
     try {
@@ -48,6 +60,7 @@ export function GitTab(): React.ReactElement {
           githubToken,
           githubRepoOwner,
           githubRepoName,
+          clearToken: clearTokenOnSave,
         }),
       })
 
@@ -61,7 +74,11 @@ export function GitTab(): React.ReactElement {
       // If a new token was submitted, mark as set
       if (githubToken.trim() !== "") {
         setHasToken(true)
+      } else if (clearTokenOnSave) {
+        setHasToken(false)
       }
+      setClearTokenOnSave(false)
+      setTokenDirty(false)
 
       toast({
         title: "GitHub Sync saved",
@@ -205,20 +222,24 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
               </Label>
               <Input
                 id="githubToken"
-                type="password"
-                value={githubToken}
-                onChange={(e) => setGithubToken(e.target.value)}
-                placeholder={hasToken ? "•••••••••••••• (saved — type a new token to replace)" : "github_pat_xxxxxxxxxxxx"}
+                type={hasToken && !tokenDirty ? "text" : "password"}
+                value={hasToken && !tokenDirty ? TOKEN_MASK : githubToken}
+                onChange={(e) => {
+                  // First edit while showing the mask: discard the mask entirely
+                  // and start from whatever the user actually typed/kept.
+                  let next = e.target.value
+                  if (hasToken && !tokenDirty) {
+                    next = next.replace(/•/g, "")
+                  }
+                  setTokenDirty(true)
+                  setGithubToken(next)
+                  if (next !== "") setClearTokenOnSave(false)
+                }}
+                placeholder={hasToken ? "" : "github_pat_xxxxxxxxxxxx"}
                 className="font-mono text-sm"
                 disabled={loading}
                 autoComplete="off"
               />
-              {hasToken && (
-                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Check className="h-3.5 w-3.5 text-green-600" />
-                  A token is currently configured. Leave this field blank to keep it unchanged.
-                </p>
-              )}
             </div>
 
             <div className="space-y-2">
@@ -248,15 +269,27 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                 disabled={loading}
               />
             </div>
+
+            <p className="text-sm text-red-600">
+              Values entered here will be saved to your <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">.env.local</code> file.
+            </p>
           </div>
 
-          <div className="flex justify-end pt-2">
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={handleClear}
+              disabled={saving || loading}
+            >
+              Clear
+            </Button>
             <Button onClick={handleSave} disabled={saving || loading}>
               {saving ? "Saving..." : "Save"}
             </Button>
           </div>
         </CardContent>
       </Card>
+
     </div>
   )
 }
