@@ -181,7 +181,7 @@ export function renderEnvFile(
       "# These credentials are used ONLY to create your admin account when the user table is empty.",
     )
     lines.push(
-      "# After your account is created on first run, you can safely delete these two lines.",
+      "# These two lines are removed automatically by the app once your admin account is created.",
     )
     write("ARI_FIRST_RUN_ADMIN_EMAIL", adminEmail)
     write("ARI_FIRST_RUN_ADMIN_PASSWORD", adminPassword)
