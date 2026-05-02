@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { writeFile, copyFile, access } from "fs/promises"
 import path from "path"
 import { requireAuthIfUsersExist } from "@/lib/auth-helpers"
-import { checkRateLimit, getClientIp } from "@/lib/modules/public-route-security"
+import { checkRateLimit, getClientIp, isSameOriginRequest } from "@/lib/modules/public-route-security"
 import { welcomeEnvSaveRequestSchema, flattenZodErrors } from "@/lib/validation"
 import { renderEnvFile } from "@/lib/env-file"
 
@@ -17,10 +17,8 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const origin = request.headers.get("origin")
-  const referer = request.headers.get("referer")
-  if (!origin && !referer) {
-    return NextResponse.json({ error: "Missing origin header" }, { status: 400 })
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ error: "Cross-origin request rejected" }, { status: 403 })
   }
 
   const denied = await requireAuthIfUsersExist(request.headers)

@@ -4,7 +4,7 @@ import { MODULES_API_BASE, buildClientInfo } from '@/lib/license-helpers'
 import { getLicenseKey } from '@/lib/license-helpers-server'
 import { z } from 'zod'
 import { writeFile, mkdir, rm, readdir, cp, readFile } from 'fs/promises'
-import { join, dirname } from 'path'
+import { join, dirname, resolve, relative, isAbsolute, sep } from 'path'
 import { getGitHubConfig, commitModuleToGitHub } from '@/lib/modules/github-sync'
 import { tmpdir } from 'os'
 import { inflateRawSync } from 'zlib'
@@ -14,6 +14,21 @@ import { inflateRawSync } from 'zlib'
  * Uses the central directory (at end of file) for reliable metadata,
  * which correctly handles ZIPs with data descriptors (bit 3 flag).
  */
+// Block ZIP entries that escape the extraction directory (Zip Slip).
+function isUnsafeZipEntry(fileName: string): boolean {
+  if (fileName === '' || isAbsolute(fileName)) return true
+  if (/^[a-zA-Z]:[\\/]/.test(fileName)) return true // Windows drive letter
+  return fileName.split(/[/\\]/).some(seg => seg === '..')
+}
+
+function isPathInside(child: string, parent: string): boolean {
+  const resolvedChild = resolve(child)
+  const resolvedParent = resolve(parent)
+  if (resolvedChild === resolvedParent) return true
+  const rel = relative(resolvedParent, resolvedChild)
+  return !!rel && !rel.startsWith('..' + sep) && rel !== '..' && !isAbsolute(rel)
+}
+
 async function extractZip(zipBuffer: Buffer, targetDir: string): Promise<void> {
   const JUNK_PREFIXES = ['__MACOSX/', '__MACOSX']
 
@@ -55,7 +70,16 @@ async function extractZip(zipBuffer: Buffer, targetDir: string): Promise<void> {
       continue
     }
 
+    // Reject Zip Slip: absolute paths, drive letters, or .. segments.
+    if (isUnsafeZipEntry(fileName)) {
+      throw new Error(`Unsafe ZIP entry rejected: ${fileName}`)
+    }
+
     const filePath = join(targetDir, fileName)
+    // Defense-in-depth: confirm the resolved path stays inside targetDir.
+    if (!isPathInside(filePath, targetDir)) {
+      throw new Error(`ZIP entry escapes target directory: ${fileName}`)
+    }
 
     // Directory entry
     if (fileName.endsWith('/')) {

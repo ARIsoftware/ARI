@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { access, rename, writeFile } from 'fs/promises'
 import path from 'path'
-import { checkRateLimit, getClientIp } from '@/lib/modules/public-route-security'
+import { checkRateLimit, getClientIp, isSameOriginRequest } from '@/lib/modules/public-route-security'
 import { requireAuthIfUsersExist } from '@/lib/auth-helpers'
 import { welcomeEnvSaveRequestSchema, flattenZodErrors } from '@/lib/validation'
 import { renderEnvFile } from '@/lib/env-file'
@@ -18,12 +18,10 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const origin = request.headers.get("origin")
-  const referer = request.headers.get("referer")
-  if (!origin && !referer) {
+  if (!isSameOriginRequest(request)) {
     return NextResponse.json(
-      { error: 'Missing origin header' },
-      { status: 400 }
+      { error: 'Cross-origin request rejected' },
+      { status: 403 }
     )
   }
 

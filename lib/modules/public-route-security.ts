@@ -56,6 +56,38 @@ export function checkRateLimit(identifier: string, maxRequests: number): boolean
 }
 
 /**
+ * Same-origin gate for public-during-setup endpoints.
+ *
+ * The presence-only Origin/Referer check used previously is bypassable: any
+ * cross-origin browser request also carries an Origin header. We compare
+ * against the server's own origin (and any configured app URLs) so a
+ * malicious page on another origin can't drive `.env.local` writes or
+ * bootstrap on the user's local instance.
+ */
+export function isSameOriginRequest(request: NextRequest): boolean {
+  const trusted = new Set<string>()
+  trusted.add(request.nextUrl.origin)
+  for (const envVar of ['NEXT_PUBLIC_APP_URL', 'BETTER_AUTH_URL']) {
+    const value = process.env[envVar]
+    if (!value) continue
+    try {
+      trusted.add(new URL(value).origin)
+    } catch { /* ignore malformed env */ }
+  }
+
+  const origin = request.headers.get('origin')
+  if (origin && trusted.has(origin)) return true
+
+  const referer = request.headers.get('referer')
+  if (referer) {
+    try {
+      if (trusted.has(new URL(referer).origin)) return true
+    } catch { /* malformed referer */ }
+  }
+  return false
+}
+
+/**
  * Get client IP from request
  */
 export function getClientIp(request: NextRequest): string {
