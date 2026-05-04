@@ -2,6 +2,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
+// `received` only exists on a subset of ZodIssue union members
+// (e.g. ZodInvalidTypeIssue) — narrow before access.
+function formatZodIssue(err: z.ZodIssue) {
+  return {
+    field: err.path.join('.'),
+    message: err.message,
+    received: 'received' in err ? err.received : undefined,
+  }
+}
+
 /**
  * Validates request JSON body against a Zod schema
  */
@@ -15,11 +25,7 @@ export async function validateRequestBody<T>(
     return { success: true, data: validatedData }
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const errorMessages = error.errors.map(err => ({
-        field: err.path.join('.'),
-        message: err.message,
-        received: 'received' in err ? err.received : undefined
-      }))
+      const errorMessages = error.errors.map(formatZodIssue)
       
       return {
         success: false,
@@ -56,11 +62,7 @@ export function validatePathParams<T>(
     return { success: true, data: validatedData }
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const errorMessages = error.errors.map(err => ({
-        field: err.path.join('.'),
-        message: err.message,
-        received: 'received' in err ? err.received : undefined
-      }))
+      const errorMessages = error.errors.map(formatZodIssue)
       
       return {
         success: false,
@@ -97,11 +99,7 @@ export function validateQueryParams<T>(
     return { success: true, data: validatedData }
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const errorMessages = error.errors.map(err => ({
-        field: err.path.join('.'),
-        message: err.message,
-        received: 'received' in err ? err.received : undefined
-      }))
+      const errorMessages = error.errors.map(formatZodIssue)
       
       return {
         success: false,
