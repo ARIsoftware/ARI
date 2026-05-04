@@ -76,7 +76,7 @@ export async function readStorageConfig(
   // Read from database
   let dbConfig: StorageConfig = { ...DEFAULT_CONFIG }
   try {
-    const rows = await withRLS((db: any) =>
+    const rows = await withRLS<Array<{ settings: unknown }>>((db: any) =>
       db.select({ settings: moduleSettings.settings })
         .from(moduleSettings)
         .where(eq(moduleSettings.moduleId, STORAGE_MODULE_ID))
@@ -94,7 +94,7 @@ export async function readStorageConfig(
       for (const field of SENSITIVE_FIELDS) {
         const val = dbConfig[field]
         if (typeof val === 'string' && isEncrypted(val)) {
-          try { dbConfig[field] = decrypt(val) } catch { dbConfig[field] = undefined }
+          try { dbConfig[field] = decrypt(val) } catch { delete dbConfig[field] }
         }
       }
     }

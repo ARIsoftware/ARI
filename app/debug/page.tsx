@@ -211,6 +211,7 @@ export default function DatabaseTestPage() {
       securityType: string
       description?: string
       hasRateLimit: boolean
+      requiresAuthIfUsers?: boolean
     }>
     summary: {
       totalCore: number

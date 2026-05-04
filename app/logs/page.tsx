@@ -153,7 +153,7 @@ export default function LogsPage() {
               addLog(`   - Backup table count: ${debugData.tests.backupTable.count}`)
               if (debugData.tests.backupTable.sampleData && debugData.tests.backupTable.sampleData.length > 0) {
                 addLog(`   - Found ${debugData.tests.backupTable.sampleData.length} records in backup table:`)
-                debugData.tests.backupTable.sampleData.slice(0, 3).forEach((task, i) => {
+                debugData.tests.backupTable.sampleData.slice(0, 3).forEach((task: { title: string; status: string; user_email: string }, i: number) => {
                   addLog(`     ${i + 1}. ${task.title} (${task.status}) - email: ${task.user_email}`)
                 })
               }

@@ -74,11 +74,12 @@ export async function withUserContext<T>(
     throw new Error('Database pool not initialized')
   }
 
+  const p = pool // narrowed to non-null by the guard above
   const attempt = async (isRetry: boolean): Promise<T> => {
     let client: PoolClient | null = null
 
     try {
-      const rawClient = await pool.connect()
+      const rawClient = await p.connect()
       client = pgBouncerCompat(rawClient)
 
       // Begin transaction - SET LOCAL only lasts within transaction

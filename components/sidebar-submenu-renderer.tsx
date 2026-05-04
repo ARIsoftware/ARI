@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/sidebar'
 import { MODULE_SUBMENUS } from '@/lib/generated/module-submenu-registry'
 import type { ModuleSubmenuProps } from '@/lib/modules/submenu-types'
+import type { ModuleMetadata } from '@/lib/modules/module-types'
 
 // Re-export so existing consumer imports from this file keep working
 export type { ModuleSubmenuProps }

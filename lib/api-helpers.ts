@@ -18,7 +18,7 @@ export async function validateRequestBody<T>(
       const errorMessages = error.errors.map(err => ({
         field: err.path.join('.'),
         message: err.message,
-        received: err.received
+        received: 'received' in err ? err.received : undefined
       }))
       
       return {
@@ -59,7 +59,7 @@ export function validatePathParams<T>(
       const errorMessages = error.errors.map(err => ({
         field: err.path.join('.'),
         message: err.message,
-        received: err.received
+        received: 'received' in err ? err.received : undefined
       }))
       
       return {
@@ -100,7 +100,7 @@ export function validateQueryParams<T>(
       const errorMessages = error.errors.map(err => ({
         field: err.path.join('.'),
         message: err.message,
-        received: err.received
+        received: 'received' in err ? err.received : undefined
       }))
       
       return {

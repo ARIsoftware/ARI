@@ -19,8 +19,10 @@ export function hashApiKey(rawKey: string): string {
 }
 
 
+type ApiKeyRow = typeof apiKeys.$inferSelect
+
 // Short-lived cache to avoid duplicate DB lookups within the same request cycle
-const keyCache = new Map<string, { result: Awaited<ReturnType<typeof lookupApiKey>>; ts: number }>()
+const keyCache = new Map<string, { result: ApiKeyRow | null; ts: number }>()
 const KEY_CACHE_TTL_MS = 5000
 
 /**
@@ -28,7 +30,7 @@ const KEY_CACHE_TTL_MS = 5000
  * we don't know the user yet. Cached briefly to avoid duplicate
  * lookups when auth + logging both need the key in the same request.
  */
-export async function lookupApiKey(keyHash: string) {
+export async function lookupApiKey(keyHash: string): Promise<ApiKeyRow | null> {
   const cached = keyCache.get(keyHash)
   if (cached && Date.now() - cached.ts < KEY_CACHE_TTL_MS) {
     return cached.result
