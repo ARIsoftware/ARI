@@ -79,7 +79,7 @@ export default function EditContactPage() {
         setFormData({
           name: contact.name,
           email: contact.email,
-          phone: contact.phone,
+          phone: contact.phone ?? "",
           category: contact.category,
           description: contact.description || "",
           company: contact.company || "",

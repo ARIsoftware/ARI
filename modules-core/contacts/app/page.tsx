@@ -51,7 +51,7 @@ export default function ContactsPage() {
     const matchesSearch = 
       contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       contact.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contact.phone.includes(searchQuery)
+      (contact.phone ?? "").includes(searchQuery)
     
     const matchesCategory = 
       selectedCategory === "All Categories" || contact.category === selectedCategory

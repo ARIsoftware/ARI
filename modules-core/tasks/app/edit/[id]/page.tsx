@@ -80,8 +80,8 @@ export default function EditTaskPage() {
   const [formData, setFormData] = useState({
     title: "",
     assignees: [] as string[],
-    status: "Pending" as const,
-    priority: "Medium" as const,
+    status: "Pending" as "Pending" | "In Progress" | "Completed",
+    priority: "Medium" as "Low" | "Medium" | "High",
     pinned: false,
     completed: false,
     impact: 3,

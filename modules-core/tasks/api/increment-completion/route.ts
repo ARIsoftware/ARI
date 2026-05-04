@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     // Increment the completion count with validation
     const currentCount = taskData[0].completionCount ?? 0
-    const newCount = currentCount + increment
+    const newCount = currentCount + (increment ?? 1)
 
     // Prevent excessive completion counts
     if (newCount > 10000) {

@@ -2,7 +2,7 @@ export type Contact = {
   id: string
   name: string
   email: string
-  phone: string
+  phone: string | null
   category: string
   description: string | null
   company: string | null
