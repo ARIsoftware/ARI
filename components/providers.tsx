@@ -22,22 +22,12 @@ type User = {
   emailVerified: boolean
   createdAt: Date
   updatedAt: Date
-  // Compatibility shim for old code expecting user_metadata
-  user_metadata?: {
-    first_name?: string | null
-    last_name?: string | null
-    full_name?: string | null
-    avatar_url?: string | null
-  }
 }
 
-// Session type with compatibility mappings
 type Session = {
   token: string
   userId: string
   expiresAt: Date
-  // Compatibility shim for old code
-  access_token: string
   user: User
 }
 
@@ -95,19 +85,10 @@ export function Providers({
     emailVerified: rawUser.emailVerified,
     createdAt: rawUser.createdAt,
     updatedAt: rawUser.updatedAt,
-    // Add compatibility shim for old code
-    user_metadata: {
-      first_name: rawUser.firstName,
-      last_name: rawUser.lastName,
-      full_name: rawUser.name,
-      avatar_url: rawUser.image,
-    }
   } : null
 
   const session: Session | null = sessionData?.session && user ? {
     ...sessionData.session,
-    // Compatibility mappings
-    access_token: sessionData.session.token,
     user: user,
   } : null
 
@@ -168,5 +149,3 @@ export const useAuth = () => {
   return context
 }
 
-/** @deprecated Use useAuth() instead */
-export const useSupabase = useAuth

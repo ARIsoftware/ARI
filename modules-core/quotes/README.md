@@ -232,7 +232,7 @@ Users can customize:
 ## Development Notes
 
 ### Authentication
-- All API routes require Bearer token authentication
+- All API routes require authentication via Better Auth session cookies (sent automatically by the browser)
 - Use `useAuth()` hook for session management
 - RLS policies enforce user isolation at database level
 

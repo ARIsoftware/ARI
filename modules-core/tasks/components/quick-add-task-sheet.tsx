@@ -164,8 +164,7 @@ function QuickAddTaskForm({ onSuccess }: { onSuccess: () => void }) {
         return
       }
 
-      const tokenFn = async () => session?.access_token || null
-      await createTask(taskData, tokenFn)
+      await createTask(taskData)
 
       toast({ title: "Success", description: "Task created successfully!" })
 

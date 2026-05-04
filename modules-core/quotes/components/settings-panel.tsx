@@ -22,7 +22,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useAuth } from "@/components/providers"
 import { Loader2, Save, CheckCircle2 } from 'lucide-react'
 import type { QuotesSettings } from '../types'
 import { defaultQuotesSettings } from '../types'
@@ -34,7 +33,6 @@ import { defaultQuotesSettings } from '../types'
  * by the Settings page via dynamic import.
  */
 export function QuotesSettingsPanel() {
-  const { session } = useAuth()
   const [settings, setSettings] = useState<QuotesSettings>(defaultQuotesSettings)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -42,10 +40,8 @@ export function QuotesSettingsPanel() {
 
   // Load settings on mount
   useEffect(() => {
-    if (session?.access_token) {
-      loadSettings()
-    }
-  }, [session])
+    loadSettings()
+  }, [])
 
   /**
    * Load settings from API
@@ -54,11 +50,7 @@ export function QuotesSettingsPanel() {
     try {
       setLoading(true)
 
-      const response = await fetch('/api/modules/quotes/settings', {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`
-        }
-      })
+      const response = await fetch('/api/modules/quotes/settings')
 
       if (response.ok) {
         const data = await response.json()
@@ -87,7 +79,6 @@ export function QuotesSettingsPanel() {
       const response = await fetch('/api/modules/quotes/settings', {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(settings)

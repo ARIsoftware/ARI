@@ -265,8 +265,7 @@ export default function TasksPage() {
     try {
       // Update order in database
       if (user?.id) {
-        const tokenFn = async () => session?.access_token || null
-        await reorderTasks(updatedTasks.map((task) => task.id), tokenFn)
+        await reorderTasks(updatedTasks.map((task) => task.id))
         invalidateTasks() // Sync with server
       }
     } catch (error) {
@@ -309,8 +308,7 @@ export default function TasksPage() {
 
     try {
       if (user?.id) {
-        const tokenFn = async () => session?.access_token || null
-        await updateTask(taskId, updates, tokenFn)
+        await updateTask(taskId, updates)
         invalidateTasks() // Sync with server
       }
       toast({
@@ -345,8 +343,7 @@ export default function TasksPage() {
         // Wait for animation to complete before updating
         setTimeout(async () => {
           if (user?.id) {
-            const tokenFn = async () => session?.access_token || null
-            await toggleTaskCompletion(taskId, tokenFn)
+            await toggleTaskCompletion(taskId)
             invalidateTasks() // Sync with server
           }
           setFadingTasks(prev => {
@@ -362,8 +359,7 @@ export default function TasksPage() {
       } else {
         // If uncompleting or in Completed view, update immediately
         if (user?.id) {
-          const tokenFn = async () => session?.access_token || null
-          const updatedTask = await toggleTaskCompletion(taskId, tokenFn)
+          const updatedTask = await toggleTaskCompletion(taskId)
           invalidateTasks() // Sync with server
 
           // Trigger confetti only if completing (not uncompleting) - with 1 second delay
@@ -393,8 +389,7 @@ export default function TasksPage() {
     if (!user?.id) return
 
     try {
-      const tokenFn = async () => session?.access_token || null
-      await toggleTaskPin(taskId, tokenFn)
+      await toggleTaskPin(taskId)
       invalidateTasks() // Sync with server
     } catch (error) {
       console.error("Failed to toggle task pin:", error)
@@ -419,8 +414,7 @@ export default function TasksPage() {
 
     try {
       if (user?.id) {
-        const tokenFn = async () => session?.access_token || null
-        await deleteTask(taskToDelete.id, tokenFn)
+        await deleteTask(taskToDelete.id)
         invalidateTasks() // Sync with server
       }
       toast({

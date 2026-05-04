@@ -28,8 +28,7 @@ export default function LogsPage() {
     try {
       addLog("🚀 Starting comprehensive authentication test...")
       
-      // Step 1: Check Clerk authentication state
-      addLog("📋 STEP 1: Checking Clerk authentication state")
+      addLog("📋 STEP 1: Checking Better Auth session state")
       addLog(`   - isSignedIn: ${isSignedIn}`)
       addLog(`   - userId: ${userId || 'null'}`)
       addLog(`   - user.id: ${user?.id || 'null'}`)
@@ -40,36 +39,10 @@ export default function LogsPage() {
         return
       }
       
-      // Step 2: Test JWT token generation
-      addLog("📋 STEP 2: Testing JWT token generation")
-      try {
-        const token = session?.access_token
-        addLog(`   - Token generated: ${token ? 'SUCCESS' : 'FAILED'}`)
-        if (token) {
-          addLog(`   - Token length: ${token.length}`)
-          
-          // Decode and show token payload
-          try {
-            const parts = token.split('.')
-            if (parts.length === 3) {
-              const payload = JSON.parse(atob(parts[1]))
-              addLog(`   - Token payload:`)
-              addLog(`     * email: ${payload.email || 'missing'}`)
-              addLog(`     * aud: ${payload.aud || 'missing'}`)
-              addLog(`     * role: ${payload.role || 'missing'}`)
-              addLog(`     * sub: ${payload.sub || 'missing'}`)
-              addLog(`     * exp: ${payload.exp || 'missing'}`)
-              addLog(`     * iat: ${payload.iat || 'missing'}`)
-            } else {
-              addLog(`   - Invalid JWT format: ${parts.length} parts (expected 3)`)
-            }
-          } catch (decodeErr) {
-            addLog(`   - Failed to decode JWT: ${decodeErr}`)
-          }
-        }
-      } catch (tokenErr) {
-        addLog(`   - JWT token generation failed: ${tokenErr}`)
-      }
+      // Step 2: Better Auth uses HTTP-only cookies (no client-readable token)
+      addLog("📋 STEP 2: Better Auth session check")
+      addLog(`   - Session present: ${session ? 'YES' : 'NO'}`)
+      addLog(`   - Note: Better Auth uses HTTP-only cookies; tokens are not readable client-side.`)
       
       // Step 3: Test API authentication
       addLog("📋 STEP 3: Testing API authentication")
@@ -99,43 +72,8 @@ export default function LogsPage() {
         addLog(`   - API call failed: ${apiErr}`)
       }
       
-      // Step 4: Test with authentication header
-      addLog("📋 STEP 4: Testing API with explicit authentication header")
-      try {
-        const token = session?.access_token
-        if (token) {
-          const response = await fetch('/api/modules/tasks', {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            }
-          })
-          
-          addLog(`   - API response status (with auth): ${response.status}`)
-          const responseText = await response.text()
-          addLog(`   - API response body (with auth): ${responseText}`)
-          
-          if (response.ok) {
-            try {
-              const data = JSON.parse(responseText)
-              addLog(`   - Tasks returned: ${Array.isArray(data) ? data.length : 'not an array'}`)
-              if (Array.isArray(data) && data.length > 0) {
-                addLog(`   - First 3 tasks:`)
-                data.slice(0, 3).forEach((task, i) => {
-                  addLog(`     ${i + 1}. ${task.title} (${task.status}) - email: ${task.user_email}`)
-                })
-              }
-            } catch (parseErr) {
-              addLog(`   - Failed to parse JSON response: ${parseErr}`)
-            }
-          }
-        } else {
-          addLog("   - No token available for authenticated request")
-        }
-      } catch (authApiErr) {
-        addLog(`   - Authenticated API call failed: ${authApiErr}`)
-      }
+      // Step 4: Same fetch as Step 3 — Better Auth cookies are sent automatically
+      addLog("📋 STEP 4: Skipped — Better Auth cookies are sent automatically with same-origin fetch (see Step 3)")
       
       // Step 5: Test database debug endpoint
       addLog("📋 STEP 5: Testing database debug endpoint (including backup table)")

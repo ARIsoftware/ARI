@@ -14,19 +14,9 @@ export type Contact = {
   updated_at: string
 }
 
-export async function getContacts(getToken: () => Promise<string | null>): Promise<Contact[]> {
-  const token = await getToken()
-  
-  if (!token) {
-    throw new Error('Authentication required')
-  }
+export async function getContacts(): Promise<Contact[]> {
+  const response = await fetch('/api/modules/contacts')
 
-  const response = await fetch('/api/modules/contacts', {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  })
-  
   if (!response.ok) {
     const error = await response.json()
     console.error("Error fetching contacts:", error)
@@ -37,19 +27,9 @@ export async function getContacts(getToken: () => Promise<string | null>): Promi
   return result.data ?? result
 }
 
-export async function getContact(id: string, getToken: () => Promise<string | null>): Promise<Contact | null> {
-  const token = await getToken()
-  
-  if (!token) {
-    throw new Error('Authentication required')
-  }
+export async function getContact(id: string): Promise<Contact | null> {
+  const response = await fetch(`/api/modules/contacts/${id}`)
 
-  const response = await fetch(`/api/modules/contacts/${id}`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  })
-  
   if (!response.ok) {
     const error = await response.json()
     console.error("Error fetching contact:", error)
@@ -61,19 +41,11 @@ export async function getContact(id: string, getToken: () => Promise<string | nu
 
 export async function createContact(
   contact: Omit<Contact, "id" | "created_at" | "updated_at">,
-  getToken: () => Promise<string | null>
 ): Promise<Contact> {
-  const token = await getToken()
-  
-  if (!token) {
-    throw new Error('Authentication required')
-  }
-
   const response = await fetch('/api/modules/contacts', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
     },
     body: JSON.stringify({ contact }),
   })
@@ -90,19 +62,11 @@ export async function createContact(
 export async function updateContact(
   id: string,
   updates: Partial<Omit<Contact, "id" | "created_at" | "updated_at">>,
-  getToken: () => Promise<string | null>
 ): Promise<Contact> {
-  const token = await getToken()
-  
-  if (!token) {
-    throw new Error('Authentication required')
-  }
-
   const response = await fetch(`/api/modules/contacts/${id}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
     },
     body: JSON.stringify({ contact: updates }),
   })
@@ -116,18 +80,9 @@ export async function updateContact(
   return await response.json()
 }
 
-export async function deleteContact(id: string, getToken: () => Promise<string | null>): Promise<void> {
-  const token = await getToken()
-  
-  if (!token) {
-    throw new Error('Authentication required')
-  }
-
+export async function deleteContact(id: string): Promise<void> {
   const response = await fetch(`/api/modules/contacts/${id}`, {
     method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
   })
 
   if (!response.ok) {

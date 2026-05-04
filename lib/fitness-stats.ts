@@ -1,15 +1,8 @@
-export async function incrementTaskCompletion(taskId: string, getToken: () => Promise<string | null>): Promise<void> {
-  const token = await getToken()
-
-  if (!token) {
-    throw new Error('Authentication required')
-  }
-
+export async function incrementTaskCompletion(taskId: string): Promise<void> {
   const response = await fetch('/api/modules/tasks/increment-completion', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
     },
     body: JSON.stringify({ taskId }),
   })

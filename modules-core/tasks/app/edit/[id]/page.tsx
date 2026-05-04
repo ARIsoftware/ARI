@@ -101,8 +101,7 @@ export default function EditTaskPage() {
 
       try {
         // Load task
-        const tokenFn = async () => session?.access_token || null
-        const tasks = await getTasks(tokenFn)
+        const tasks = await getTasks()
         const foundTask = tasks.find((t) => t.id === id)
 
         if (!foundTask) {
@@ -229,8 +228,7 @@ export default function EditTaskPage() {
         // northstar_ids: selectedNorthStars,
       }
 
-      const tokenFn = async () => session?.access_token || null
-      await updateTask(id, updates, tokenFn)
+      await updateTask(id, updates)
 
       await queryClient.invalidateQueries({ queryKey: ['tasks'] })
 

@@ -365,9 +365,9 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
                 size="icon"
                 className="h-8 w-8 rounded-full overflow-hidden p-0 hover:ring-2 hover:ring-white/20"
               >
-                {user?.user_metadata?.avatar_url ? (
+                {user?.image ? (
                   <img
-                    src={user.user_metadata.avatar_url}
+                    src={user.image}
                     alt="Profile"
                     className="h-8 w-8 rounded-full object-cover"
                   />
@@ -417,9 +417,8 @@ export function TaskAnnouncement() {
   useEffect(() => {
     // Load last completed task
     const abortController = new AbortController()
-    if (session?.access_token && isTasksEnabled) {
+    if (session && isTasksEnabled) {
       fetch('/api/modules/tasks/last-completed', {
-        headers: { 'Authorization': `Bearer ${session.access_token}` },
         signal: abortController.signal,
       })
         .then(res => res.ok ? res.json() : null)
@@ -447,7 +446,7 @@ export function TaskAnnouncement() {
       abortController.abort()
       removeFocusTimerListener(listener)
     }
-  }, [user?.id, session?.access_token, isTasksEnabled])
+  }, [user?.id, session, isTasksEnabled])
 
   // Run the countdown interval when timer is active
   // This is the main timer that decrements every second

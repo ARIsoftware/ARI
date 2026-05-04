@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2, Edit, AlertCircle, Quote as QuoteIcon } from "lucide-react";
-import { useAuth } from "@/components/providers"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -21,25 +20,18 @@ export default function QuotesPage() {
   const [editingQuote, setEditingQuote] = useState<Quote | null>(null);
   const [quoteText, setQuoteText] = useState("");
   const [author, setAuthor] = useState("");
-  const { session } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (session) {
-      loadQuotes();
-    }
-  }, [session]);
+    loadQuotes();
+  }, []);
 
   const loadQuotes = async () => {
     try {
       setError(null);
       setLoading(true);
 
-      const response = await fetch("/api/modules/quotes/quotes", {
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`,
-        },
-      });
+      const response = await fetch("/api/modules/quotes/quotes");
 
       if (!response.ok) {
         throw new Error("Failed to load quotes");
@@ -70,7 +62,6 @@ export default function QuotesPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token}`,
         },
         body: JSON.stringify({
           quote: {
@@ -118,7 +109,6 @@ export default function QuotesPage() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token}`,
         },
         body: JSON.stringify({
           id: editingQuote.id,
@@ -161,9 +151,6 @@ export default function QuotesPage() {
     try {
       const response = await fetch(`/api/modules/quotes/quotes?id=${id}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${session?.access_token}`,
-        },
       });
 
       if (!response.ok) {

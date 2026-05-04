@@ -73,8 +73,7 @@ export default function EditContactPage() {
   const loadContact = async (id: string) => {
     try {
       setLoading(true)
-      const tokenFn = async () => session?.access_token || null
-      const contact = await getContact(id, tokenFn)
+      const contact = await getContact(id)
       if (contact) {
         setFormData({
           name: contact.name,
@@ -185,16 +184,14 @@ export default function EditContactPage() {
         next_contact_date: formData.nextContactDate ? formData.nextContactDate.toISOString() : null
       }
 
-      const tokenFn = async () => session?.access_token || null
-      
       if (isNewContact) {
-        await createContact(contactData, tokenFn)
+        await createContact(contactData)
         toast({
           title: "Success",
           description: "Contact created successfully",
         })
       } else if (id) {
-        await updateContact(id, contactData, tokenFn)
+        await updateContact(id, contactData)
         toast({
           title: "Success",
           description: "Contact updated successfully",

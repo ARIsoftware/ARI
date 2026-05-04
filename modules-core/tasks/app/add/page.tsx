@@ -167,8 +167,7 @@ export default function AddTaskPage() {
         return
       }
 
-      const tokenFn = async () => session?.access_token || null
-      await createTask(taskData, tokenFn)
+      await createTask(taskData)
 
       await queryClient.invalidateQueries({ queryKey: ['tasks'] })
 

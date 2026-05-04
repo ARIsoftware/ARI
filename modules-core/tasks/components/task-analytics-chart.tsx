@@ -45,30 +45,19 @@ interface AnalyticsSummary {
   days: number
 }
 
-interface TaskAnalyticsChartProps {
-  token: string | null
-}
-
-export function TaskAnalyticsChart({ token }: TaskAnalyticsChartProps) {
+export function TaskAnalyticsChart() {
   const [data, setData] = useState<TaskAnalyticsData[]>([])
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!token) return
-
     const fetchAnalytics = async () => {
       try {
         setLoading(true)
         setError(null)
 
-        const response = await fetch('/api/modules/tasks/analytics?days=30', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        })
+        const response = await fetch('/api/modules/tasks/analytics?days=30')
 
         if (!response.ok) {
           throw new Error('Failed to fetch analytics data')
@@ -100,7 +89,7 @@ export function TaskAnalyticsChart({ token }: TaskAnalyticsChartProps) {
     }
 
     fetchAnalytics()
-  }, [token])
+  }, [])
 
   if (loading) {
     return (

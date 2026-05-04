@@ -15,7 +15,6 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { useAuth } from "@/components/providers"
 import { Quote, Loader2, AlertCircle } from 'lucide-react'
 import type { Quote as QuoteType } from '../types'
 
@@ -31,16 +30,13 @@ interface WidgetStats {
  * by the dashboard via dynamic import.
  */
 export function QuotesWidget() {
-  const { session } = useAuth()
   const [stats, setStats] = useState<WidgetStats>({ quoteCount: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
 
   useEffect(() => {
-    if (!session?.access_token) return
-
     loadStats()
-  }, [session])
+  }, [])
 
   const loadStats = async () => {
     try {
@@ -48,11 +44,7 @@ export function QuotesWidget() {
       setError(false)
 
       // Fetch data from module API
-      const response = await fetch('/api/modules/quotes/quotes', {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`
-        }
-      })
+      const response = await fetch('/api/modules/quotes/quotes')
 
       if (!response.ok) {
         throw new Error('Failed to load quotes')

@@ -598,9 +598,6 @@ export default function DatabaseTestPage() {
       // parallel. No module IDs are hardcoded.
       updateModuleResult('Module API Routes', { status: 'testing' })
       const enabledModuleIds = new Set<string>(enabledModules.map((m: any) => m.id))
-      const authHeaders = session?.access_token
-        ? { 'Authorization': `Bearer ${session.access_token}` }
-        : undefined
 
       type ApiRouteTest = { module: string; route: string; status: string; message?: string }
       const probeJobs: Array<Promise<ApiRouteTest>> = []
@@ -624,7 +621,7 @@ export default function DatabaseTestPage() {
             continue
           }
           probeJobs.push(
-            fetch(r.fullPath, { method: 'HEAD', headers: authHeaders })
+            fetch(r.fullPath, { method: 'HEAD' })
               .then((response): ApiRouteTest => {
                 // 200 = ok, 401 = auth wall reached, 405 = method-only endpoint
                 const success = response.status === 200 || response.status === 401 || response.status === 405
@@ -1643,7 +1640,7 @@ export default function DatabaseTestPage() {
             email: session.user.email,
             expires_at: expiresAt?.toISOString() || 'Unknown',
             is_expired: isExpired,
-            access_token: session.access_token ? 'Present (truncated)' : 'Missing',
+            session_token: session.token ? 'Present (cookie-based)' : 'Missing',
             refresh_token: 'N/A (cookie-based auth)',
             note: 'Session retrieved from global context (instant, no network call)',
             user_from_context: user ? `Present (${user.email})` : 'Missing'
@@ -1685,8 +1682,7 @@ export default function DatabaseTestPage() {
           status: 'success',
           message: 'Active Better Auth session found',
           data: {
-            access_token: session.access_token ? 'Present' : 'Missing',
-            token: session.token ? 'Present' : 'Missing',
+            token: session.token ? 'Present (cookie-based)' : 'Missing',
             expiresAt: session.expiresAt ? new Date(session.expiresAt).toISOString() : 'Unknown',
             user_id: session.user?.id || 'Unknown',
             note: 'Using Better Auth (not Supabase Auth)'
