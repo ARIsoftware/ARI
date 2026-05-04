@@ -66,6 +66,7 @@ interface GeneratedManifest {
     path: string
     sourceDir: string
     isOverridden: boolean
+    schemaSha256?: string
   }>
 }
 

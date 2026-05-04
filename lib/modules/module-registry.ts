@@ -17,29 +17,78 @@ import { runModuleSchemaInstall } from './schema-installer'
 import type { ModuleMetadata } from './module-types'
 
 /**
- * JSONB key inside `module_settings.settings` that records when the module's
- * schema.sql was last successfully installed. Used by the self-healing gate
- * (see `ensureSchemaInstalled`) so a row that says `enabled: true` but never
- * had its tables provisioned auto-heals on next access. The `__` prefix
- * marks it as system-managed (don't expose in user config UIs).
+ * JSONB keys inside `module_settings.settings` that track schema-install
+ * state per (user, module). The `__` prefix marks them as system-managed —
+ * don't expose them in user-facing config UIs.
+ *
+ * - `__schema_installed_hash`: SHA-256 of the schema.sql that was last
+ *   successfully installed. The runtime gate compares this against the
+ *   current manifest hash; mismatch triggers a re-run, so additive schema
+ *   changes (added ALTER, new tables) auto-apply on next page load.
+ * - `__schema_installed_at`: diagnostic-only ISO timestamp of the last
+ *   successful install. Not used by the gate.
  */
-const SCHEMA_INSTALLED_KEY = '__schema_installed_at'
+const SCHEMA_INSTALLED_HASH_KEY = '__schema_installed_hash'
+const SCHEMA_INSTALLED_AT_KEY = '__schema_installed_at'
 
-/**
- * True if the module declares any database tables in its manifest. Modules
- * without tables (pure UI/API modules) skip the schema gate entirely.
- */
 function moduleHasTables(module: ModuleMetadata): boolean {
   return (module.database?.tables?.length ?? 0) > 0
 }
 
 /**
- * Merge the schema-install timestamp into a module_settings row's JSONB
- * `settings`. Atomic via Postgres `||` jsonb merge so concurrent writes to
- * other keys (e.g. `menuPriority`) aren't clobbered.
+ * True iff the module declares tables in its manifest but ships no
+ * `schema.sql` for the registry generator to hash. This is almost always
+ * a developer error — the manifest promises tables that nothing creates.
  */
-async function persistSchemaInstalledAt(userId: string, moduleId: string): Promise<void> {
-  const patch = JSON.stringify({ [SCHEMA_INSTALLED_KEY]: new Date().toISOString() })
+function isMisconfiguredSchemaModule(module: ModuleMetadata): boolean {
+  return moduleHasTables(module) && !module.schemaSha256
+}
+
+const warnedMisconfigured = new Set<string>()
+function warnIfMisconfiguredSchema(module: ModuleMetadata): void {
+  if (!isMisconfiguredSchemaModule(module)) return
+  if (warnedMisconfigured.has(module.id)) return
+  warnedMisconfigured.add(module.id)
+  console.warn(
+    `[Modules] ${module.id}: module.json declares database.tables but database/schema.sql is missing or unreadable. ` +
+    `Tables won't be auto-provisioned. Add the file, or remove database.tables from the manifest.`
+  )
+}
+
+/**
+ * True if the user's stored hash matches the manifest's current hash —
+ * i.e. schema.sql has not changed since this user last installed it.
+ *
+ * - `expectedHash` undefined → module has no schema.sql; nothing to install.
+ * - `settings` null/undefined → no row yet → not up to date.
+ * - Stored hash absent or different → schema.sql changed → re-run needed.
+ */
+function isSchemaUpToDate(
+  settings: Record<string, unknown> | null | undefined,
+  expectedHash: string | undefined,
+): boolean {
+  if (!expectedHash) return true
+  if (!settings) return false
+  return settings[SCHEMA_INSTALLED_HASH_KEY] === expectedHash
+}
+
+/**
+ * Atomically write the schema-install marker into a module_settings row's
+ * JSONB `settings`. The Postgres `||` merge preserves concurrent writes to
+ * other keys (e.g. `menuPriority`).
+ *
+ * Both the hash (used by the gate) and a timestamp (diagnostic) are written
+ * in a single SQL UPDATE.
+ */
+async function persistSchemaInstalled(
+  userId: string,
+  moduleId: string,
+  hash: string,
+): Promise<void> {
+  const patch = JSON.stringify({
+    [SCHEMA_INSTALLED_HASH_KEY]: hash,
+    [SCHEMA_INSTALLED_AT_KEY]: new Date().toISOString(),
+  })
   try {
     await withAdminDb(async (db) =>
       db.update(moduleSettingsTable)
@@ -55,38 +104,38 @@ async function persistSchemaInstalledAt(userId: string, moduleId: string): Promi
         )
     )
   } catch (error) {
-    console.error(`[Modules] Failed to persist ${SCHEMA_INSTALLED_KEY} for ${moduleId}:`, error)
+    console.error(`[Modules] Failed to persist schema-install marker for ${moduleId}:`, error)
     // Non-fatal — gate will retry next access.
   }
 }
 
 /**
- * True iff the row's settings already record a successful schema install.
- */
-function isSchemaInstalledMarked(settings: Record<string, unknown> | null | undefined): boolean {
-  return !!settings && !!settings[SCHEMA_INSTALLED_KEY]
-}
-
-/**
- * Run the schema installer once and persist the `__schema_installed_at`
- * marker on success or "already exists" (harmless) results. Errors are
- * logged but never thrown — a failed install must not break a page load,
- * and the gate will retry on subsequent access until install succeeds.
+ * Run the schema installer once and persist the install hash on success or
+ * "already exists" (harmless) results. Errors are logged but never thrown —
+ * a failed install must not break a page load. The gate retries on
+ * subsequent access until install succeeds.
  *
- * Idempotent: safe to call concurrently — the underlying installer is
- * itself idempotent (CREATE TABLE IF NOT EXISTS, DROP POLICY IF EXISTS …).
+ * Idempotent: safe to call concurrently — the underlying installer itself
+ * uses CREATE TABLE IF NOT EXISTS, DROP POLICY IF EXISTS, etc.
+ *
+ * Callers must only invoke this when they have a hash to persist. The hash
+ * is required (no longer optional) so call sites must explicitly handle
+ * "module has no schema" by skipping the call.
  */
-async function installAndMark(userId: string, moduleId: string): Promise<void> {
+async function installAndMark(
+  userId: string,
+  moduleId: string,
+  expectedHash: string,
+): Promise<void> {
   const result = await runModuleSchemaInstall(moduleId)
   if (!result.ok && !result.alreadyExisted) {
     console.error(`[Modules] Schema install failed for ${moduleId}: ${result.error}`)
     return
   }
-  if (result.ok === false) {
-    // Harmless "already exists" — log a hint and proceed to mark installed.
+  if (result.alreadyExisted) {
     console.warn(`[Modules] Schema install warning for ${moduleId}: ${result.error}`)
   }
-  await persistSchemaInstalledAt(userId, moduleId)
+  await persistSchemaInstalled(userId, moduleId, expectedHash)
 }
 
 /**
@@ -136,8 +185,17 @@ export async function bootstrapModuleSettings(
         })
     })
 
-    const enabledRecords = records.filter(r => r.enabled)
-    await Promise.all(enabledRecords.map(r => installAndMark(userId, r.moduleId)))
+    // Iterate the rich `unseeded` modules directly — `records` carries only
+    // the bare DB columns. Skip modules that are disabled or have no schema
+    // to install; warn loudly when a module declares tables but ships no SQL.
+    await Promise.all(unseeded.map(async (m) => {
+      const isCustom = m.path?.includes('modules-custom')
+      const enabled = isCustom ? false : (m.enabled ?? true)
+      if (!enabled) return
+      warnIfMisconfiguredSchema(m)
+      if (!m.schemaSha256) return
+      await installAndMark(userId, m.id, m.schemaSha256)
+    }))
   } catch (error) {
     console.error('[Modules] Bootstrap failed:', error)
     // Non-fatal — modules will appear disabled until next load
@@ -207,14 +265,19 @@ export async function getEnabledModules(userId?: string): Promise<ModuleMetadata
     return settingsMap.get(module.id) === true
   })
 
-  // Self-healing schema gate. Fast-path: only modules that own tables AND
-  // lack the marker need an install attempt. On a healthy install this is
-  // an empty list, so we skip the Promise.all + microtask hops entirely.
+  // Self-healing schema gate. Fast-path: only modules whose stored install
+  // hash differs from the current manifest hash need a re-run. Healthy
+  // installs (hashes match) produce an empty list, so we skip the
+  // Promise.all + microtask hops entirely.
+  for (const m of enabledModules) warnIfMisconfiguredSchema(m)
   const needsInstall = enabledModules.filter(module =>
-    moduleHasTables(module) && !isSchemaInstalledMarked(moduleSettingsMap.get(module.id))
+    !!module.schemaSha256 &&
+    !isSchemaUpToDate(moduleSettingsMap.get(module.id), module.schemaSha256)
   )
   if (needsInstall.length > 0) {
-    await Promise.all(needsInstall.map(module => installAndMark(currentUserId, module.id)))
+    await Promise.all(needsInstall.map(module =>
+      installAndMark(currentUserId, module.id, module.schemaSha256!)
+    ))
   }
 
   return enabledModules.map(module => {
@@ -287,8 +350,11 @@ export async function getEnabledModule(
             target: [moduleSettingsTable.userId, moduleSettingsTable.moduleId],
           })
       })
-      if (defaultEnabled && moduleHasTables(module)) {
-        await installAndMark(currentUserId, moduleId)
+      if (defaultEnabled) {
+        warnIfMisconfiguredSchema(module)
+        if (module.schemaSha256) {
+          await installAndMark(currentUserId, moduleId, module.schemaSha256)
+        }
       }
     } catch (error) {
       console.error(`[Modules] Bootstrap for ${moduleId} failed:`, error)
@@ -299,9 +365,10 @@ export async function getEnabledModule(
 
   if (!setting.enabled) return null
 
+  warnIfMisconfiguredSchema(module)
   const settingJsonb = (setting.settings as Record<string, unknown> | null) ?? null
-  if (moduleHasTables(module) && !isSchemaInstalledMarked(settingJsonb)) {
-    await installAndMark(currentUserId, moduleId)
+  if (module.schemaSha256 && !isSchemaUpToDate(settingJsonb, module.schemaSha256)) {
+    await installAndMark(currentUserId, moduleId, module.schemaSha256)
   }
 
   return module
@@ -374,8 +441,8 @@ export async function setModuleEnabled(
   }
 
   // Persist the marker after the row exists so the JSONB merge has a target.
-  if (schemaProvisioned) {
-    await persistSchemaInstalledAt(userId, moduleId)
+  if (schemaProvisioned && module.schemaSha256) {
+    await persistSchemaInstalled(userId, moduleId, module.schemaSha256)
   }
 
   return { success: true, warning: schemaWarning }

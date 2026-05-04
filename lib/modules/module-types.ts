@@ -16,8 +16,8 @@ export interface ModuleRoute {
   label: string
   /** Lucide icon name (e.g., "Package", "Zap") */
   icon?: string
-  /** Where to place in sidebar: "main", "bottom", or "secondary" */
-  sidebarPosition?: 'main' | 'bottom' | 'secondary'
+  /** Where to place in sidebar: "main", "bottom", "secondary", or hidden ("hidden" / "none") */
+  sidebarPosition?: 'main' | 'bottom' | 'secondary' | 'hidden' | 'none'
   /** Child routes (sub-pages) */
   children?: ModuleRoute[]
 }
@@ -41,7 +41,7 @@ export interface ModuleDatabaseConfig {
   /** List of table names this module creates */
   tables?: string[]
   /** Path to migrations directory (relative to module root) */
-  migrations?: string
+  migrations?: string | null
 }
 
 /**
@@ -182,6 +182,12 @@ export interface ModuleManifest {
   submenu?: ModuleSubmenuConfig
   /** Public (unauthenticated) API routes with mandatory security configuration */
   publicRoutes?: PublicRouteConfig[]
+  /**
+   * SHA-256 of database/schema.sql at manifest-generation time.
+   * Omitted if the module has no schema.sql. Runtime gate uses this to
+   * detect when schema.sql has changed and a re-run is needed.
+   */
+  schemaSha256?: string
 }
 
 /**

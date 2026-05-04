@@ -13,6 +13,27 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+
+/**
+ * Compute the SHA-256 hash of a module's database/schema.sql, hex-encoded.
+ * Returns undefined if the file doesn't exist or can't be read — modules
+ * without tables pass through cleanly without a marker.
+ *
+ * The runtime self-heal gate (lib/modules/module-registry.ts) compares this
+ * hash against the user's stored marker in module_settings.settings; a
+ * mismatch triggers a re-run of schema.sql, which is how schema migrations
+ * (added ALTER, new tables, etc.) auto-apply on next page load.
+ */
+function computeSchemaHash(modulePath) {
+  const schemaPath = path.join(modulePath, 'database', 'schema.sql');
+  try {
+    const sqlText = fs.readFileSync(schemaPath, 'utf-8');
+    return crypto.createHash('sha256').update(sqlText).digest('hex');
+  } catch {
+    return undefined;
+  }
+}
 
 // Module directories in priority order (first = highest priority)
 const MODULE_DIRECTORIES = ['modules-custom', 'modules-core'];
@@ -278,11 +299,13 @@ function generateManifest(moduleMap, moduleApiMap) {
   // First pass: collect all modules using cached manifests
   for (const [id, { dirName, folder, manifest }] of moduleMap) {
     const modulePath = path.join(process.cwd(), dirName, folder);
+    const schemaSha256 = computeSchemaHash(modulePath);
     modules.push({
       ...manifest,
       path: modulePath,
       sourceDir: dirName,
-      isOverridden: false
+      isOverridden: false,
+      ...(schemaSha256 ? { schemaSha256 } : {}),
     });
     addedIds.add(id);
   }
@@ -303,11 +326,14 @@ function generateManifest(moduleMap, moduleApiMap) {
         const existingModule = modules.find(m => m.id === manifest.id);
         if (existingModule && existingModule.sourceDir === 'modules-custom') {
           // This core module was overridden - add it as overridden
+          const overriddenPath = path.join(coreDir, entry.name);
+          const schemaSha256 = computeSchemaHash(overriddenPath);
           modules.push({
             ...manifest,
-            path: path.join(coreDir, entry.name),
+            path: overriddenPath,
             sourceDir: 'modules-core',
-            isOverridden: true
+            isOverridden: true,
+            ...(schemaSha256 ? { schemaSha256 } : {}),
           });
         }
       } catch (e) {
