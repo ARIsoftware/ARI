@@ -23,8 +23,9 @@ import { getModuleById } from './module-loader'
 import { getPoolClient } from '@/lib/db'
 
 export type SchemaInstallResult =
-  | { ok: true }
-  | { ok: false; error: string }
+  | { ok: true; alreadyExisted?: false }
+  | { ok: false; alreadyExisted: true; error: string }
+  | { ok: false; alreadyExisted: false; error: string }
 
 /**
  * Forbidden patterns in schema.sql. These would let an enable destroy
@@ -63,7 +64,7 @@ export async function runModuleSchemaInstall(
 ): Promise<SchemaInstallResult> {
   const mod = await getModuleById(moduleId)
   if (!mod) {
-    return { ok: false, error: `Module '${moduleId}' not found in manifest` }
+    return { ok: false, alreadyExisted: false, error: `Module '${moduleId}' not found in manifest` }
   }
 
   const schemaPath = join(mod.path, 'database', 'schema.sql')
@@ -79,6 +80,7 @@ export async function runModuleSchemaInstall(
     }
     return {
       ok: false,
+      alreadyExisted: false,
       error: `Failed to read ${schemaPath}: ${(err as Error).message}`,
     }
   }
@@ -89,7 +91,7 @@ export async function runModuleSchemaInstall(
     if (regex.test(scanText)) {
       const msg = `refused — forbidden destructive statement detected (${name})`
       console.error(`[module-installer] ${moduleId}: ${msg}`)
-      return { ok: false, error: msg }
+      return { ok: false, alreadyExisted: false, error: msg }
     }
   }
 
@@ -100,6 +102,7 @@ export async function runModuleSchemaInstall(
   } catch (err) {
     return {
       ok: false,
+      alreadyExisted: false,
       error: `Failed to acquire DB connection: ${(err as Error).message}`,
     }
   }
@@ -117,8 +120,11 @@ export async function runModuleSchemaInstall(
       // ignore rollback errors
     }
     const msg = (err as Error).message
+    // "already exists" is harmless — tables/policies/indexes are already in place.
+    // Caller can treat this the same as a successful install.
+    const alreadyExisted = msg.includes('already exists')
     console.error(`[module-installer] ${moduleId} schema.sql failed: ${msg}`)
-    return { ok: false, error: msg }
+    return { ok: false, alreadyExisted, error: msg }
   } finally {
     try {
       client.release()

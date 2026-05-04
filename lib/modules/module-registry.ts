@@ -11,10 +11,83 @@ import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
 import { withAdminDb } from '@/lib/db'
 import { moduleSettings as moduleSettingsTable } from '@/lib/db/schema'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, sql } from 'drizzle-orm'
 import { loadModules } from './module-loader'
 import { runModuleSchemaInstall } from './schema-installer'
 import type { ModuleMetadata } from './module-types'
+
+/**
+ * JSONB key inside `module_settings.settings` that records when the module's
+ * schema.sql was last successfully installed. Used by the self-healing gate
+ * (see `ensureSchemaInstalled`) so a row that says `enabled: true` but never
+ * had its tables provisioned auto-heals on next access. The `__` prefix
+ * marks it as system-managed (don't expose in user config UIs).
+ */
+const SCHEMA_INSTALLED_KEY = '__schema_installed_at'
+
+/**
+ * True if the module declares any database tables in its manifest. Modules
+ * without tables (pure UI/API modules) skip the schema gate entirely.
+ */
+function moduleHasTables(module: ModuleMetadata): boolean {
+  return (module.database?.tables?.length ?? 0) > 0
+}
+
+/**
+ * Merge the schema-install timestamp into a module_settings row's JSONB
+ * `settings`. Atomic via Postgres `||` jsonb merge so concurrent writes to
+ * other keys (e.g. `menuPriority`) aren't clobbered.
+ */
+async function persistSchemaInstalledAt(userId: string, moduleId: string): Promise<void> {
+  const patch = JSON.stringify({ [SCHEMA_INSTALLED_KEY]: new Date().toISOString() })
+  try {
+    await withAdminDb(async (db) =>
+      db.update(moduleSettingsTable)
+        .set({
+          settings: sql`COALESCE(${moduleSettingsTable.settings}, '{}'::jsonb) || ${patch}::jsonb`,
+          updatedAt: new Date().toISOString(),
+        })
+        .where(
+          and(
+            eq(moduleSettingsTable.userId, userId),
+            eq(moduleSettingsTable.moduleId, moduleId),
+          ),
+        )
+    )
+  } catch (error) {
+    console.error(`[Modules] Failed to persist ${SCHEMA_INSTALLED_KEY} for ${moduleId}:`, error)
+    // Non-fatal — gate will retry next access.
+  }
+}
+
+/**
+ * True iff the row's settings already record a successful schema install.
+ */
+function isSchemaInstalledMarked(settings: Record<string, unknown> | null | undefined): boolean {
+  return !!settings && !!settings[SCHEMA_INSTALLED_KEY]
+}
+
+/**
+ * Run the schema installer once and persist the `__schema_installed_at`
+ * marker on success or "already exists" (harmless) results. Errors are
+ * logged but never thrown — a failed install must not break a page load,
+ * and the gate will retry on subsequent access until install succeeds.
+ *
+ * Idempotent: safe to call concurrently — the underlying installer is
+ * itself idempotent (CREATE TABLE IF NOT EXISTS, DROP POLICY IF EXISTS …).
+ */
+async function installAndMark(userId: string, moduleId: string): Promise<void> {
+  const result = await runModuleSchemaInstall(moduleId)
+  if (!result.ok && !result.alreadyExisted) {
+    console.error(`[Modules] Schema install failed for ${moduleId}: ${result.error}`)
+    return
+  }
+  if (result.ok === false) {
+    // Harmless "already exists" — log a hint and proceed to mark installed.
+    console.warn(`[Modules] Schema install warning for ${moduleId}: ${result.error}`)
+  }
+  await persistSchemaInstalledAt(userId, moduleId)
+}
 
 /**
  * Get all discovered modules (regardless of enabled state)
@@ -63,9 +136,8 @@ export async function bootstrapModuleSettings(
         })
     })
 
-    // Run schema installer for modules being bootstrapped as enabled (parallel)
     const enabledRecords = records.filter(r => r.enabled)
-    await Promise.all(enabledRecords.map(r => runModuleSchemaInstall(r.moduleId)))
+    await Promise.all(enabledRecords.map(r => installAndMark(userId, r.moduleId)))
   } catch (error) {
     console.error('[Modules] Bootstrap failed:', error)
     // Non-fatal — modules will appear disabled until next load
@@ -130,27 +202,29 @@ export async function getEnabledModules(userId?: string): Promise<ModuleMetadata
     ;({ enabledMap: settingsMap, configMap: moduleSettingsMap } = buildSettingsMaps(refreshed))
   }
 
-  // Filter modules based on enabled state and merge user's custom menuPriority
-  // Require explicit DB record — default to disabled
-  // Exclude overridden modules - they should never appear in enabled list
-  return allModules
-    .filter(module => {
-      if (module.isOverridden) return false
-      return settingsMap.get(module.id) === true
-    })
-    .map(module => {
-      // Merge user's custom menuPriority from settings if available
-      const userSettings = moduleSettingsMap.get(module.id)
-      const customPriority = typeof userSettings?.menuPriority === 'number' ? userSettings.menuPriority : undefined
+  const enabledModules = allModules.filter(module => {
+    if (module.isOverridden) return false
+    return settingsMap.get(module.id) === true
+  })
 
-      if (customPriority !== undefined) {
-        return {
-          ...module,
-          menuPriority: customPriority
-        }
-      }
-      return module
-    })
+  // Self-healing schema gate. Fast-path: only modules that own tables AND
+  // lack the marker need an install attempt. On a healthy install this is
+  // an empty list, so we skip the Promise.all + microtask hops entirely.
+  const needsInstall = enabledModules.filter(module =>
+    moduleHasTables(module) && !isSchemaInstalledMarked(moduleSettingsMap.get(module.id))
+  )
+  if (needsInstall.length > 0) {
+    await Promise.all(needsInstall.map(module => installAndMark(currentUserId, module.id)))
+  }
+
+  return enabledModules.map(module => {
+    const userSettings = moduleSettingsMap.get(module.id)
+    const customPriority = typeof userSettings?.menuPriority === 'number' ? userSettings.menuPriority : undefined
+    if (customPriority !== undefined) {
+      return { ...module, menuPriority: customPriority }
+    }
+    return module
+  })
 }
 
 /**
@@ -189,7 +263,7 @@ export async function getEnabledModule(
 
   // Check if module is enabled for this user (Drizzle via PG pool)
   const settingRows = await withAdminDb(async (db) =>
-    db.select({ enabled: moduleSettingsTable.enabled })
+    db.select({ enabled: moduleSettingsTable.enabled, settings: moduleSettingsTable.settings })
       .from(moduleSettingsTable)
       .where(
         and(
@@ -213,7 +287,9 @@ export async function getEnabledModule(
             target: [moduleSettingsTable.userId, moduleSettingsTable.moduleId],
           })
       })
-      if (defaultEnabled) await runModuleSchemaInstall(moduleId)
+      if (defaultEnabled && moduleHasTables(module)) {
+        await installAndMark(currentUserId, moduleId)
+      }
     } catch (error) {
       console.error(`[Modules] Bootstrap for ${moduleId} failed:`, error)
     }
@@ -221,7 +297,14 @@ export async function getEnabledModule(
     return defaultEnabled ? module : null
   }
 
-  return setting.enabled ? module : null
+  if (!setting.enabled) return null
+
+  const settingJsonb = (setting.settings as Record<string, unknown> | null) ?? null
+  if (moduleHasTables(module) && !isSchemaInstalledMarked(settingJsonb)) {
+    await installAndMark(currentUserId, moduleId)
+  }
+
+  return module
 }
 
 /**
@@ -249,27 +332,22 @@ export async function setModuleEnabled(
     }
   }
 
-  // When enabling, run the module's schema.sql to provision its tables.
-  // This is idempotent — re-runs are no-ops. uninstall.sql is never run.
-  // "already exists" errors are harmless warnings; other failures block the enable.
+  // Run the schema installer when enabling. Tables-already-exist is a
+  // recoverable warning; any other install failure blocks the enable.
   let schemaWarning: string | undefined
+  let schemaProvisioned = false
   if (enabled) {
-    const installResult = await runModuleSchemaInstall(moduleId)
-    if (!installResult.ok) {
-      const isHarmless = installResult.error?.includes('already exists')
-      if (isHarmless) {
-        console.warn(`[Modules] Schema install warning for ${moduleId}: ${installResult.error}`)
-        schemaWarning = `Schema install failed: ${installResult.error}`
-      } else {
-        return {
-          success: false,
-          error: `Schema install failed: ${installResult.error}`
-        }
-      }
+    const result = await runModuleSchemaInstall(moduleId)
+    if (!result.ok && !result.alreadyExisted) {
+      return { success: false, error: `Schema install failed: ${result.error}` }
     }
+    if (result.ok === false) {
+      console.warn(`[Modules] Schema install warning for ${moduleId}: ${result.error}`)
+      schemaWarning = `Schema install failed: ${result.error}`
+    }
+    schemaProvisioned = true
   }
 
-  // Upsert module setting via Drizzle (replaces legacy Supabase REST upsert)
   try {
     await withAdminDb(async (db) => {
       await db.insert(moduleSettingsTable)
@@ -293,6 +371,11 @@ export async function setModuleEnabled(
       success: false,
       error: (error as Error).message
     }
+  }
+
+  // Persist the marker after the row exists so the JSONB merge has a target.
+  if (schemaProvisioned) {
+    await persistSchemaInstalledAt(userId, moduleId)
   }
 
   return { success: true, warning: schemaWarning }
