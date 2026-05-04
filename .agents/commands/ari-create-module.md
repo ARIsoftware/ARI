@@ -663,6 +663,10 @@ const openCreate = () => {
 
 **NEVER close the dialog before the server confirms success.** If validation fails (client or server), the dialog stays open so the user can fix their input without re-entering everything.
 
+## Dialog/Drawer Accessibility
+
+Every `DialogContent`/`DrawerContent` must include a `DialogTitle`/`DrawerTitle` (Radix logs a console error otherwise). When the design has no visible title, wrap the title in `VisuallyHidden` from `@radix-ui/react-visually-hidden` rather than omitting it.
+
 ## Input Validation & Sanitization
 
 **All input fields MUST have appropriate validation and sanitization by default.** Every field should enforce constraints that match its purpose, with clear and friendly error messages. Validation must happen on both client (for immediate feedback) and server (for security).
@@ -747,6 +751,7 @@ Before marking complete, verify:
 - [ ] **Mutation hooks surface API error details** (parse `err.details` from Zod validation responses)
 - [ ] **All create/edit dialogs have inline validation** (red outlines + error text below fields)
 - [ ] **Dialogs only close on `onSuccess`** (never before API confirms - user must not lose form data on error)
+- [ ] **Every `DialogContent`/`DrawerContent` includes a `DialogTitle`/`DrawerTitle`** (use `VisuallyHidden` if the design has no visible title)
 - [ ] **Random quote displayed under page title** when Quotes module is enabled (follows Module Template pattern)
 - [ ] Page does NOT block on session check (no "Authenticating..." spinner)
 - [ ] **Page does NOT include layout wrappers** (no SidebarProvider, AppSidebar, DarkModeProvider, SidebarInset, or header with breadcrumbs - these are already provided by the module routing system)
