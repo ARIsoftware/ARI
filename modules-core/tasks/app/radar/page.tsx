@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/chart"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { useAuth } from "@/components/providers"
 import type { Task } from "@/modules/tasks/types"
 import { transformTaskForRadar, getTaskPriorityLevel } from "@/modules/tasks/lib/priority-utils"
 import { TaskPriorityModal } from "@/modules/tasks/components/task-priority-modal"
@@ -65,7 +64,6 @@ function prepareRadarData(tasks: Task[]) {
 }
 
 export default function RadarPage() {
-  const { session } = useAuth()
   const [tasks, setTasks] = useState<Task[]>([])
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([])
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
@@ -74,23 +72,16 @@ export default function RadarPage() {
   const [filterStatus, setFilterStatus] = useState<string>("all")
   const [hoveredTask, setHoveredTask] = useState<string | null>(null)
 
-  // Fetch tasks with priority data
   useEffect(() => {
     fetchTasks()
-  }, [session])
+  }, [])
 
   const fetchTasks = async () => {
-    if (!session?.access_token) return
-    
     try {
-      const response = await fetch('/api/modules/tasks/priorities', {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      })
-      
+      // Better Auth uses HTTP-only cookies — sent automatically with
+      // same-origin fetch. No Authorization header needed.
+      const response = await fetch('/api/modules/tasks/priorities')
       if (!response.ok) throw new Error('Failed to fetch tasks')
-      
       const data = await response.json()
       setTasks(data)
       setFilteredTasks(data)
@@ -132,15 +123,10 @@ export default function RadarPage() {
   }
 
   const handleTaskUpdate = async (taskId: string, axes: any) => {
-    if (!session?.access_token) return
-    
     try {
       const response = await fetch('/api/modules/tasks/priorities', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ taskId, axes })
       })
       

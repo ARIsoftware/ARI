@@ -33,7 +33,13 @@ export const createTaskSchema = z.object({
     timeliness: z.number().min(1).max(5).default(3).optional(),
     effort: z.number().min(1).max(5).default(3).optional(),
     strategic_fit: z.number().min(1).max(5).default(3).optional(),
-    project_id: z.union([uuidSchema, z.null()]).optional()
+    project_id: z.union([uuidSchema, z.null()]).optional(),
+    assigned_agent_id: z.union([z.string().max(120, 'Invalid agent id'), z.null()]).optional(),
+    monster_type: z.union([z.string().max(50, 'Monster type too long'), z.null()]).optional(),
+    monster_colors: z.union([
+      z.object({ primary: z.string().max(32), secondary: z.string().max(32) }),
+      z.null()
+    ]).optional()
   })
 }).refine(
   (data) => data.task.subtasks_completed <= data.task.subtasks_total,
@@ -65,7 +71,14 @@ export const updateTaskSchema = z.object({
     effort: z.number().min(1).max(5).optional(),
     strategic_fit: z.number().min(1).max(5).optional(),
     priority_score: z.number().optional(),
-    project_id: z.union([uuidSchema, z.null()]).optional()
+    project_id: z.union([uuidSchema, z.null()]).optional(),
+    assigned_agent_id: z.union([z.string().max(120, 'Invalid agent id'), z.null()]).optional(),
+    monster_type: z.union([z.string().max(50, 'Monster type too long'), z.null()]).optional(),
+    monster_colors: z.union([
+      z.object({ primary: z.string().max(32), secondary: z.string().max(32) }),
+      z.null()
+    ]).optional(),
+    order_index: z.number().int().nonnegative().optional()
   }).refine(
     (data) => !data.subtasks_completed || !data.subtasks_total || data.subtasks_completed <= data.subtasks_total,
     {

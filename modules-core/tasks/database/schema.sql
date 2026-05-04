@@ -40,6 +40,7 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS priority_score NUMERIC(10, 4) DEFAULT
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS project_id UUID;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS monster_type TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS monster_colors JSONB;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assigned_agent_id TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_user_id_completed ON tasks(user_id, completed);

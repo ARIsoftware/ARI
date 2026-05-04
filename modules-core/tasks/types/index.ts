@@ -22,6 +22,8 @@ export type Task = {
   // Task Monsters fields
   monster_type?: string | null
   monster_colors?: { primary: string; secondary: string } | null
+  // Agent assignment (set by the Agents module)
+  assigned_agent_id?: string | null
 }
 
 export interface MajorProject {

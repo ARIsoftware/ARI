@@ -88,6 +88,56 @@ const getProjectName = (projectId: string | null | undefined, projects: MajorPro
   return project ? project.project_name : null
 }
 
+/**
+ * AssignedAgentBadge — renders the assigned agent's pixel face if the Agents
+ * module is enabled. Decoupled from the Agents module by design: only
+ * fetches metadata + uses the SVG avatar endpoint, never imports any
+ * Agents components. Renders nothing when the module is disabled or the
+ * fetch fails (so this page works whether or not Agents is installed).
+ */
+function AssignedAgentBadge({ agentId }: { agentId: string }) {
+  const { enabled: agentsEnabled } = useModuleEnabled('agents')
+  const [agent, setAgent] = useState<{ name: string; status: string } | null>(null)
+  useEffect(() => {
+    if (!agentsEnabled) return
+    let cancelled = false
+    fetch(`/api/modules/agents/agents/${encodeURIComponent(agentId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled) return
+        if (data?.agent) setAgent({ name: data.agent.name, status: data.agent.status })
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [agentId, agentsEnabled])
+  if (!agentsEnabled || !agent) return null
+  const dot = agent.status === 'working'
+    ? 'bg-emerald-500'
+    : agent.status === 'blocked'
+      ? 'bg-red-500'
+      : 'bg-muted-foreground'
+  return (
+    <span
+      title={`Assigned to ${agent.name}`}
+      className="inline-flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-full bg-muted/50 border border-border text-xs"
+    >
+      <span className="relative inline-block">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`/api/modules/agents/agents/${encodeURIComponent(agentId)}/avatar`}
+          alt=""
+          aria-hidden
+          width={20}
+          height={20}
+          style={{ width: 20, height: 20, imageRendering: 'pixelated', borderRadius: 4, display: 'block' }}
+        />
+        <span className={`absolute -bottom-0.5 -right-0.5 inline-block h-1.5 w-1.5 rounded-full ring-1 ring-background ${dot}`} />
+      </span>
+      <span className="font-medium">{agent.name}</span>
+    </span>
+  )
+}
+
 export default function TasksPage() {
   const { session } = useAuth()
   const user = session?.user
@@ -578,7 +628,8 @@ export default function TasksPage() {
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                            <div className="flex flex-wrap gap-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {task.assigned_agent_id && <AssignedAgentBadge agentId={task.assigned_agent_id} />}
                               {task.assignees?.length > 0 ? (
                                 (task.assignees ?? []).map((name: string) => (
                                   <span
@@ -588,9 +639,9 @@ export default function TasksPage() {
                                     {name}
                                   </span>
                                 ))
-                              ) : (
+                              ) : !task.assigned_agent_id ? (
                                 <span className="text-xs text-muted-foreground">—</span>
-                              )}
+                              ) : null}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -1079,7 +1130,8 @@ export default function TasksPage() {
                         <div
                           className={`flex items-center flex-wrap gap-x-4 gap-y-2 text-sm ${task.pinned ? "text-gray-300" : "text-muted-foreground"}`}
                         >
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {task.assigned_agent_id && <AssignedAgentBadge agentId={task.assigned_agent_id} />}
                             {(task.assignees ?? []).map((name: string) => (
                               <span
                                 key={name}
@@ -1202,8 +1254,9 @@ export default function TasksPage() {
                         </h3>
 
                         <div className={`space-y-2 text-sm ${task.pinned ? "text-gray-300" : "text-muted-foreground"}`}>
-                          {task.assignees?.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
+                          {(task.assigned_agent_id || (task.assignees?.length ?? 0) > 0) && (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {task.assigned_agent_id && <AssignedAgentBadge agentId={task.assigned_agent_id} />}
                               {(task.assignees ?? []).map((name: string) => (
                                 <span
                                   key={name}

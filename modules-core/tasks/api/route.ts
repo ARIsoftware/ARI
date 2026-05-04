@@ -89,6 +89,7 @@ export async function POST(request: NextRequest) {
         projectId: task.project_id,
         monsterType: task.monster_type,
         monsterColors: task.monster_colors,
+        assignedAgentId: task.assigned_agent_id ?? null,
       }).returning()
     )
 
@@ -180,6 +181,7 @@ export async function PUT(request: NextRequest) {
     if (updates.project_id !== undefined) updateData.projectId = updates.project_id
     if (updates.monster_type !== undefined) updateData.monsterType = updates.monster_type
     if (updates.monster_colors !== undefined) updateData.monsterColors = updates.monster_colors
+    if (updates.assigned_agent_id !== undefined) updateData.assignedAgentId = updates.assigned_agent_id
 
     const data = await withRLS((db) =>
       db.update(tasks)

@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useAuth } from "@/components/providers"
 import { Loader2 } from 'lucide-react'
 import {
   Dialog,
@@ -37,8 +36,6 @@ import type {
 } from '../types'
 
 export default function KnowledgeManagerPage() {
-  const { session } = useAuth()
-
   // Data state
   const [articles, setArticles] = useState<KnowledgeArticle[]>([])
   const [collections, setCollections] = useState<KnowledgeCollection[]>([])
@@ -79,10 +76,10 @@ export default function KnowledgeManagerPage() {
     recent: 0
   })
 
-  // Load data
+  // Load data. Better Auth uses HTTP-only cookies — sent automatically with
+  // same-origin fetch. No Authorization header needed; the page is gated by
+  // middleware so we know the user is signed in.
   const loadArticles = useCallback(async () => {
-    if (!session?.access_token) return
-
     try {
       setLoading(true)
       const params = new URLSearchParams()
@@ -95,18 +92,13 @@ export default function KnowledgeManagerPage() {
       params.set('sort_by', sortBy)
       params.set('sort_dir', sortDir)
 
-      const url = `/api/modules/knowledge-manager/data?${params}`
-      const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${session.access_token}` }
-      })
-
+      const response = await fetch(`/api/modules/knowledge-manager/data?${params}`)
       if (!response.ok) throw new Error('Failed to load articles')
 
       const data = await response.json()
       setArticles(data.articles || [])
       setAllTags(data.allTags || [])
 
-      // Update selected article if it changed
       if (selectedArticle) {
         const updated = data.articles?.find((a: KnowledgeArticle) => a.id === selectedArticle.id)
         if (updated) setSelectedArticle(updated)
@@ -117,40 +109,25 @@ export default function KnowledgeManagerPage() {
     } finally {
       setLoading(false)
     }
-  }, [session, searchQuery, activeTag, activeCollectionId, activeView, sortBy, sortDir, selectedArticle])
+  }, [searchQuery, activeTag, activeCollectionId, activeView, sortBy, sortDir, selectedArticle])
 
   const loadCollections = useCallback(async () => {
-    if (!session?.access_token) return
-
     try {
-      const response = await fetch('/api/modules/knowledge-manager/collections', {
-        headers: { 'Authorization': `Bearer ${session.access_token}` }
-      })
-
+      const response = await fetch('/api/modules/knowledge-manager/collections')
       if (!response.ok) throw new Error('Failed to load collections')
-
       const data = await response.json()
       setCollections(data.collections || [])
     } catch (err) {
       console.error('Error loading collections:', err)
     }
-  }, [session])
+  }, [])
 
   const loadCounts = useCallback(async () => {
-    if (!session?.access_token) return
-
     try {
-      // Fetch all articles to calculate counts
       const [allRes, favRes, trashRes] = await Promise.all([
-        fetch('/api/modules/knowledge-manager/data', {
-          headers: { 'Authorization': `Bearer ${session.access_token}` }
-        }),
-        fetch('/api/modules/knowledge-manager/data?is_favorite=true', {
-          headers: { 'Authorization': `Bearer ${session.access_token}` }
-        }),
-        fetch('/api/modules/knowledge-manager/data?is_deleted=true', {
-          headers: { 'Authorization': `Bearer ${session.access_token}` }
-        })
+        fetch('/api/modules/knowledge-manager/data'),
+        fetch('/api/modules/knowledge-manager/data?is_favorite=true'),
+        fetch('/api/modules/knowledge-manager/data?is_deleted=true'),
       ])
 
       const [allData, favData, trashData] = await Promise.all([
@@ -168,21 +145,21 @@ export default function KnowledgeManagerPage() {
     } catch (err) {
       console.error('Error loading counts:', err)
     }
-  }, [session])
+  }, [])
 
   useEffect(() => {
-    if (session?.access_token) {
-      loadArticles()
-      loadCollections()
-      loadCounts()
-    }
-  }, [session])
+    loadArticles()
+    loadCollections()
+    loadCounts()
+    // Run once on mount; subsequent loads are triggered by the search/filter
+    // effect below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
-    if (session?.access_token) {
-      const debounce = setTimeout(loadArticles, 300)
-      return () => clearTimeout(debounce)
-    }
+    const debounce = setTimeout(loadArticles, 300)
+    return () => clearTimeout(debounce)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, activeTag, activeCollectionId, activeView, sortBy, sortDir])
 
   // Handlers
@@ -200,15 +177,10 @@ export default function KnowledgeManagerPage() {
   }
 
   const handleToggleFavorite = async (article: KnowledgeArticle) => {
-    if (!session?.access_token) return
-
     try {
       const response = await fetch(`/api/modules/knowledge-manager/data/${article.id}`, {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_favorite: !article.is_favorite })
       })
 
@@ -222,15 +194,12 @@ export default function KnowledgeManagerPage() {
   }
 
   const handleSaveArticle = async (updates: Partial<KnowledgeArticle>) => {
-    if (!session?.access_token || !selectedArticle) return
+    if (!selectedArticle) return
 
     try {
       const response = await fetch(`/api/modules/knowledge-manager/data/${selectedArticle.id}`, {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates)
       })
 
@@ -244,15 +213,12 @@ export default function KnowledgeManagerPage() {
   }
 
   const handleCreateArticle = async () => {
-    if (!session?.access_token || !newArticleTitle.trim()) return
+    if (!newArticleTitle.trim()) return
 
     try {
       const response = await fetch('/api/modules/knowledge-manager/data', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: newArticleTitle,
           collection_id: activeCollectionId
@@ -274,17 +240,14 @@ export default function KnowledgeManagerPage() {
   }
 
   const handleDeleteArticle = async () => {
-    if (!session?.access_token || !deleteArticleId) return
+    if (!deleteArticleId) return
 
     try {
       const url = isPermanentDelete
         ? `/api/modules/knowledge-manager/data/${deleteArticleId}?permanent=true`
         : `/api/modules/knowledge-manager/data/${deleteArticleId}`
 
-      const response = await fetch(url, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${session.access_token}` }
-      })
+      const response = await fetch(url, { method: 'DELETE' })
 
       if (!response.ok) throw new Error('Failed to delete article')
 
@@ -301,15 +264,12 @@ export default function KnowledgeManagerPage() {
   }
 
   const handleRestoreArticle = async () => {
-    if (!session?.access_token || !selectedArticle) return
+    if (!selectedArticle) return
 
     try {
       const response = await fetch(`/api/modules/knowledge-manager/data/${selectedArticle.id}`, {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_deleted: false })
       })
 
@@ -324,15 +284,12 @@ export default function KnowledgeManagerPage() {
   }
 
   const handleCreateCollection = async () => {
-    if (!session?.access_token || !collectionName.trim()) return
+    if (!collectionName.trim()) return
 
     try {
       const response = await fetch('/api/modules/knowledge-manager/collections', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: collectionName,
           color: collectionColor
@@ -351,15 +308,12 @@ export default function KnowledgeManagerPage() {
   }
 
   const handleUpdateCollection = async () => {
-    if (!session?.access_token || !editingCollection) return
+    if (!editingCollection) return
 
     try {
       const response = await fetch(`/api/modules/knowledge-manager/collections/${editingCollection.id}`, {
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: collectionName,
           color: collectionColor
@@ -379,12 +333,11 @@ export default function KnowledgeManagerPage() {
   }
 
   const handleDeleteCollection = async () => {
-    if (!session?.access_token || !deleteCollectionId) return
+    if (!deleteCollectionId) return
 
     try {
       const response = await fetch(`/api/modules/knowledge-manager/collections/${deleteCollectionId}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${session.access_token}` }
       })
 
       if (!response.ok) throw new Error('Failed to delete collection')
@@ -405,10 +358,6 @@ export default function KnowledgeManagerPage() {
     setEditingCollection(collection)
     setCollectionName(collection.name)
     setCollectionColor(collection.color)
-  }
-
-  if (!session) {
-    return null
   }
 
   return (

@@ -17,7 +17,6 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart'
 import { Loader2 } from 'lucide-react'
-import { useAuth } from "@/components/providers"
 import type { Task } from '@/modules/tasks/types'
 import { transformTaskForRadar } from '../lib/priority-utils'
 import { RadarTaskDots } from './radar-task-dots'
@@ -55,30 +54,30 @@ function prepareRadarData(tasks: Task[]) {
 }
 
 export default function TasksDashboardRadarWidget() {
-  const { session } = useAuth()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [hoveredTask, setHoveredTask] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!session?.access_token) return
-
+    let cancelled = false
     const fetchTasks = async () => {
       try {
-        const response = await fetch('/api/modules/tasks/priorities', {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        })
+        // Better Auth uses HTTP-only cookies — sent automatically with
+        // same-origin fetch. Don't pass an Authorization header.
+        const response = await fetch('/api/modules/tasks/priorities')
         if (!response.ok) throw new Error('Failed to fetch tasks')
-        setTasks(await response.json())
+        const json = await response.json()
+        if (!cancelled) setTasks(json)
       } catch (error) {
         console.error('Error fetching tasks:', error)
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
 
     fetchTasks()
-  }, [session])
+    return () => { cancelled = true }
+  }, [])
 
   const priorityTasks = tasks
     .filter((task) => !task.completed)

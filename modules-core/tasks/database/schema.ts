@@ -27,6 +27,7 @@ export const tasks = pgTable("tasks", {
 	projectId: uuid("project_id"),
 	monsterType: text("monster_type"),
 	monsterColors: jsonb("monster_colors"),
+	assignedAgentId: text("assigned_agent_id"),
 }, (table) => [
 	index("idx_ari_database_completed").using("btree", table.completed.asc().nullsLast().op("bool_ops")),
 	index("idx_ari_database_completion_count").using("btree", table.completionCount.asc().nullsLast().op("int4_ops")),
