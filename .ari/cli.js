@@ -173,61 +173,100 @@ function ensureMacPostgresPath() {
   }
 }
 
-function start() {
+function startQuiet() {
+  return start({ quiet: true });
+}
+
+function start(opts = {}) {
   const mode = getDbMode();
+  const quiet = !!opts.quiet;
+  const log = (...args) => { if (!quiet) console.log(...args); };
+
+  // Spinner — only used in quiet mode
+  const spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  let spinnerIdx = 0;
+  let spinnerTimer = null;
+  let spinnerLabel = 'Starting ARI';
+  function startSpinner(label) {
+    if (!quiet || spinnerTimer) return;
+    spinnerLabel = label || spinnerLabel;
+    process.stdout.write('\x1B[?25l'); // hide cursor
+    spinnerTimer = setInterval(() => {
+      const frame = spinnerFrames[spinnerIdx++ % spinnerFrames.length];
+      process.stdout.write(`\r  ${frame} ${spinnerLabel}   `);
+    }, 80);
+  }
+  function stopSpinner(finalLine) {
+    if (!spinnerTimer) return;
+    clearInterval(spinnerTimer);
+    spinnerTimer = null;
+    process.stdout.write('\r\x1B[2K'); // clear line
+    process.stdout.write('\x1B[?25h'); // show cursor
+    if (finalLine) process.stdout.write(finalLine + '\n');
+  }
 
   fs.mkdirSync(path.join(ROOT, 'data', 'storage'), { recursive: true });
+
+  if (quiet) startSpinner('Starting ARI');
 
   if (mode === 'supabaselocal') {
     // Check Docker — if unavailable, skip Supabase and start dev server only
     if (!isDockerRunning()) {
-      console.log('  ' + YELLOW + '⚠' + RESET + ' Docker is not running — skipping local Supabase.');
-      console.log('  ' + DIM + 'Configure your database connection in the setup wizard.' + RESET);
-      console.log('');
+      log('  ' + YELLOW + '⚠' + RESET + ' Docker is not running — skipping local Supabase.');
+      log('  ' + DIM + 'Configure your database connection in the setup wizard.' + RESET);
+      log('');
     } else {
       // Start Supabase (idempotent)
       if (!isSupabaseRunning()) {
-        console.log('  Starting Supabase...');
+        log('  Starting Supabase...');
         try {
-          execSync('supabase start', { stdio: 'inherit', cwd: ROOT });
+          execSync('supabase start', {
+            stdio: quiet ? 'ignore' : 'inherit',
+            cwd: ROOT,
+          });
         } catch {
+          stopSpinner();
           console.log('\n  ' + RED + '✘' + RESET + ' Failed to start Supabase.');
           process.exit(1);
         }
       } else {
-        console.log('  ' + GREEN + '✔' + RESET + ' Supabase is already running');
+        log('  ' + GREEN + '✔' + RESET + ' Supabase is already running');
       }
 
       // Regenerate env file
       const vars = parseSupabaseEnv();
       if (vars) {
         writeEnvFile(vars);
-        console.log('  ' + GREEN + '✔' + RESET + ' .env.supabase.local updated');
+        log('  ' + GREEN + '✔' + RESET + ' .env.supabase.local updated');
       }
     }
   } else if (mode === 'postgres') {
     ensureMacPostgresPath();
     const pgReady = run('pg_isready -q') !== null;
     if (pgReady) {
-      console.log('  ' + GREEN + '✔' + RESET + ' PostgreSQL is running');
-      startPgweb();
+      log('  ' + GREEN + '✔' + RESET + ' PostgreSQL is running');
+      if (!quiet) startPgweb();
     } else {
-      console.log('  ' + YELLOW + '⚠' + RESET + ' PostgreSQL is not running.');
+      log('  ' + YELLOW + '⚠' + RESET + ' PostgreSQL is not running.');
       if (process.platform === 'darwin') {
-        console.log('  ' + DIM + 'Start it with: brew services start postgresql@17' + RESET);
+        log('  ' + DIM + 'Start it with: brew services start postgresql@17' + RESET);
       } else {
-        console.log('  ' + DIM + 'Start it with: sudo systemctl start postgresql' + RESET);
+        log('  ' + DIM + 'Start it with: sudo systemctl start postgresql' + RESET);
       }
     }
   } else {
     // supabasecloud — no local DB to manage
-    console.log('  ' + DIM + 'Cloud database mode — no local database to start' + RESET);
+    log('  ' + DIM + 'Cloud database mode — no local database to start' + RESET);
   }
 
-  console.log('');
+  log('');
 
-  // Start Next.js dev server — pipe stdout so we can detect the actual port
-  const child = spawn('pnpm', ['dev'], { stdio: ['inherit', 'pipe', 'inherit'], cwd: ROOT });
+  // Start Next.js dev server — pipe stdout (and stderr in quiet mode) so we can suppress.
+  const child = spawn('pnpm', ['dev'], {
+    stdio: ['inherit', 'pipe', quiet ? 'pipe' : 'inherit'],
+    cwd: ROOT,
+  });
+  if (quiet && child.stderr) child.stderr.on('data', () => {}); // drain
 
   // Open browser once Next.js prints its local URL (detects correct port)
   let browserOpened = false;
@@ -240,23 +279,34 @@ function start() {
   }
 
   child.stdout.on('data', (data) => {
-    process.stdout.write(data);
+    const text = data.toString();
+
     if (!browserOpened) {
-      const line = data.toString();
-      // Next.js prints "- Local: http://localhost:XXXX"
-      const match = line.match(/Local:\s+(http:\/\/localhost:\d+)/);
-      if (match) openBrowser(match[1]);
+      const match = text.match(/Local:\s+(http:\/\/localhost:\d+)/);
+      if (match) {
+        openBrowser(match[1]);
+        if (quiet) {
+          stopSpinner('  ' + GREEN + '✔' + RESET + ' ARI is running at ' + DIM + match[1] + RESET);
+          process.stdout.write('    ' + DIM + 'Press Ctrl+C to stop ARI.' + RESET + '\n');
+        }
+      }
     }
+
+    if (!quiet) process.stdout.write(data);
+    // In quiet mode, all child stdout is dropped.
   });
 
   const cleanup = () => {
+    stopSpinner();
     child.kill();
     if (mode === 'postgres') stopPgweb();
-    if (mode === 'supabaselocal') {
-      console.log('\n  ' + DIM + 'Next.js stopped. Supabase containers are still running.' + RESET);
-      console.log('  ' + DIM + 'Run ./ari stop to shut them down.' + RESET + '\n');
-    } else {
-      console.log('\n  ' + DIM + 'Next.js stopped.' + RESET + '\n');
+    if (!quiet) {
+      if (mode === 'supabaselocal') {
+        console.log('\n  ' + DIM + 'Next.js stopped. Supabase containers are still running.' + RESET);
+        console.log('  ' + DIM + 'Run ./ari stop to shut them down.' + RESET + '\n');
+      } else {
+        console.log('\n  ' + DIM + 'Next.js stopped.' + RESET + '\n');
+      }
     }
     process.exit(0);
   };
@@ -438,17 +488,18 @@ async function update() {
 // ── Main ───────────────────────────────────────────────────────────────────
 
 const cmd = process.argv[2];
-const commands = { start, stop, status, update };
+const commands = { start, startquiet: startQuiet, stop, status, update };
 
 if (!cmd || !commands[cmd]) {
   console.log('');
   console.log('  Usage: ./ari <command>');
   console.log('');
   console.log('  Commands:');
-  console.log('    start    Start database + dev server');
-  console.log('    stop     Stop database services');
-  console.log('    status   Show database status');
-  console.log('    update   Pull latest ARI updates + install dependencies');
+  console.log('    start         Start database + dev server');
+  console.log('    startquiet    Same as start, but hides logs (just a spinner + browser)');
+  console.log('    stop          Stop database services');
+  console.log('    status        Show database status');
+  console.log('    update        Pull latest ARI updates + install dependencies');
   console.log('');
   process.exit(cmd ? 1 : 0);
 }

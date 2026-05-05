@@ -1224,6 +1224,10 @@ function showCompletion(ariResult, supabaseResult) {
     console.log('');
     console.log(`    ${DIM_BLUE}./ari start${RESET}`);
     console.log('');
+    console.log(`  Or prefer a cleaner terminal with fewer logs? Run in quiet mode:`);
+    console.log('');
+    console.log(`    ${DIM_BLUE}./ari startquiet${RESET}`);
+    console.log('');
     console.log(`  Then open ${blue('http://localhost:3000')}`);
     console.log('');
     console.log(`  To stop ARI, press Ctrl+C and run:`);
