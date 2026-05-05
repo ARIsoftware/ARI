@@ -236,9 +236,14 @@ export default function DatabaseTestPage() {
     setHealthChecks(prev => ({ ...prev, domain: { status: 'ok', hostname: origin } }))
 
     async function runHealthChecks() {
+      // Resend health route is optional — fall back to 'not_set' if it was
+      // never registered (no API route exports debugRole = "health-resend").
+      let resendUrl: string | null = null
+      try { resendUrl = route('health-resend') } catch { /* not configured */ }
+
       const [dbResult, resendResult] = await Promise.allSettled([
         fetch(route('health-database')).then(r => r.json()),
-        fetch(route('health-resend')).then(r => r.json()),
+        resendUrl ? fetch(resendUrl).then(r => r.json()) : Promise.resolve({ status: 'not_set' }),
       ])
 
       setHealthChecks(prev => ({
