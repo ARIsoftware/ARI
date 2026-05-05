@@ -181,6 +181,11 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
+  // Node runtime so middleware sees env vars loaded by next.config.mjs's dotenv
+  // override (e.g. DATABASE_URL from .env.supabase.local). Edge runtime only
+  // exposes vars from Next's standard .env files, which would make
+  // isSetupComplete falsely false and cause a /sign-in ↔ /welcome redirect loop.
+  runtime: 'nodejs',
   matcher: [
     // Skip Next.js internals and all static files, unless found in search params
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
