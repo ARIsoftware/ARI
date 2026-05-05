@@ -54,21 +54,15 @@ function stripSqlComments(sql: string): string {
 }
 
 /**
- * Run a module's schema.sql against the database. Idempotent and safe to
- * call on every module enable.
- *
- * @param moduleId - kebab-case module id (e.g. "module-template")
+ * Run a schema.sql file at the given path against the database. Idempotent
+ * and safe to call repeatedly. Used by both `runModuleSchemaInstall` (which
+ * resolves the path via the manifest) and the download flow (which has the
+ * path directly because the manifest cache hasn't seen the new module yet).
  */
-export async function runModuleSchemaInstall(
-  moduleId: string
+export async function runSchemaSqlAtPath(
+  moduleId: string,
+  schemaPath: string
 ): Promise<SchemaInstallResult> {
-  const mod = await getModuleById(moduleId)
-  if (!mod) {
-    return { ok: false, alreadyExisted: false, error: `Module '${moduleId}' not found in manifest` }
-  }
-
-  const schemaPath = join(mod.path, 'database', 'schema.sql')
-
   let sqlText: string
   try {
     sqlText = await readFile(schemaPath, 'utf-8')
@@ -132,4 +126,20 @@ export async function runModuleSchemaInstall(
       // ignore release errors
     }
   }
+}
+
+/**
+ * Run a module's schema.sql against the database. Idempotent and safe to
+ * call on every module enable.
+ *
+ * @param moduleId - kebab-case module id (e.g. "module-template")
+ */
+export async function runModuleSchemaInstall(
+  moduleId: string
+): Promise<SchemaInstallResult> {
+  const mod = await getModuleById(moduleId)
+  if (!mod) {
+    return { ok: false, alreadyExisted: false, error: `Module '${moduleId}' not found in manifest` }
+  }
+  return runSchemaSqlAtPath(moduleId, join(mod.path, 'database', 'schema.sql'))
 }

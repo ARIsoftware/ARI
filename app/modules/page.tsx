@@ -38,6 +38,22 @@ import {
   X,
 } from "lucide-react"
 import { LICENSE_CACHE_KEY, LIBRARY_CACHE_KEY, CACHE_TTL } from "@/lib/license-helpers"
+import type { SchemaInstallResult } from "@/lib/modules/schema-installer"
+
+type SchemaStatus = 'success' | 'skipped' | 'failed' | 'none'
+
+function decodeSchemaStatus(s: SchemaInstallResult | null | undefined): SchemaStatus {
+  if (!s) return 'none'
+  if (s.ok) return 'success'
+  if (s.alreadyExisted) return 'skipped'
+  return 'failed'
+}
+
+const SCHEMA_DISPLAY: Record<Exclude<SchemaStatus, 'none'>, { Icon: typeof CheckCircle2; iconClass: string; label: string }> = {
+  success: { Icon: CheckCircle2, iconClass: 'text-green-600', label: 'Database schema installed' },
+  skipped: { Icon: Info, iconClass: 'text-blue-500', label: 'Database already up to date' },
+  failed: { Icon: AlertCircle, iconClass: 'text-red-600', label: 'Schema install failed' },
+}
 
 // Strip HTML tags from module names for safe display
 function sanitizeDisplayName(name: string): string {
@@ -158,9 +174,8 @@ export default function ModulesPage() {
     moduleDir: string
     vercel?: boolean
     githubSync?: { success: boolean; commitSha?: string; error?: string; message?: string } | null
-    migrationResult?: {
-      status: 'running' | 'success' | 'skipped' | 'failed' | 'none'
-      results?: Array<{ name: string; status: string; error?: string }>
+    schemaInstallResult?: {
+      status: SchemaStatus
       error?: string
     }
   } | null>(null)
@@ -486,57 +501,20 @@ export default function ModulesPage() {
       // Clear download banner — the success modal replaces it
       setDownloadResult(null)
 
-      const hasMigrations = data.sqlMigrations && data.sqlMigrations.length > 0
+      const schema = (data.schemaInstall ?? null) as SchemaInstallResult | null
 
-      // Show install success screen
       setInstallSuccess({
         moduleId: mod.id,
         moduleName: sanitizeDisplayName(mod.name),
         moduleDir: data.moduleDir || `modules-core/${mod.id}`,
         vercel: data.vercel,
         githubSync: data.githubSync || null,
-        migrationResult: hasMigrations
-          ? { status: 'running' }
-          : { status: 'none' },
+        schemaInstallResult: {
+          status: decodeSchemaStatus(schema),
+          error: schema && !schema.ok ? schema.error : undefined,
+        },
       })
       setSyncResult(null)
-
-      // Auto-run database migrations if present
-      if (hasMigrations) {
-        try {
-          const migrateResponse = await fetch('/api/modules/migrate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              moduleId: mod.id,
-              migrations: data.sqlMigrations,
-            }),
-          })
-          const migrateData = await migrateResponse.json()
-
-          if (!migrateResponse.ok) {
-            setInstallSuccess(prev => prev ? {
-              ...prev,
-              migrationResult: { status: 'failed', error: migrateData.error || 'Migration request failed' },
-            } : null)
-          } else {
-            const allSkipped = migrateData.results?.every((r: any) => r.status === 'skipped')
-            setInstallSuccess(prev => prev ? {
-              ...prev,
-              migrationResult: {
-                status: migrateData.success ? (allSkipped ? 'skipped' : 'success') : 'failed',
-                results: migrateData.results,
-                error: migrateData.results?.find((r: any) => r.status === 'failed')?.error,
-              },
-            } : null)
-          }
-        } catch (err: unknown) {
-          setInstallSuccess(prev => prev ? {
-            ...prev,
-            migrationResult: { status: 'failed', error: 'Failed to connect to migration endpoint' },
-          } : null)
-        }
-      }
 
       // On Vercel, GitHub sync is required to persist the module
       if (data.vercel) {
@@ -1079,49 +1057,26 @@ export default function ModulesPage() {
                     </label>
                   )}
 
-                  {/* Database Migration Section */}
-                  {installSuccess?.migrationResult?.status && installSuccess.migrationResult.status !== 'none' && (
-                    <div className="flex items-center gap-3">
-                      {installSuccess.migrationResult.status === 'running' ? (
-                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground shrink-0" />
-                      ) : installSuccess.migrationResult.status === 'success' ? (
-                        <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
-                      ) : installSuccess.migrationResult.status === 'skipped' ? (
-                        <Info className="h-5 w-5 text-blue-500 shrink-0" />
-                      ) : installSuccess.migrationResult.status === 'failed' ? (
-                        <AlertCircle className="h-5 w-5 text-red-600 shrink-0" />
-                      ) : null}
-                      <div className="text-left">
-                        <div className="flex items-center gap-2">
-                          <Database className="h-4 w-4" />
-                          <span className="text-sm font-medium">
-                            {installSuccess.migrationResult.status === 'running'
-                              ? 'Running database migrations...'
-                              : installSuccess.migrationResult.status === 'success'
-                              ? 'Database updated'
-                              : installSuccess.migrationResult.status === 'skipped'
-                              ? 'Database already up to date'
-                              : installSuccess.migrationResult.status === 'failed'
-                              ? 'Database migration failed'
-                              : ''}
-                          </span>
+                  {/* Schema Install Section */}
+                  {installSuccess?.schemaInstallResult && installSuccess.schemaInstallResult.status !== 'none' && (() => {
+                    const { status, error } = installSuccess.schemaInstallResult
+                    const display = SCHEMA_DISPLAY[status]
+                    const { Icon, iconClass, label } = display
+                    return (
+                      <div className="flex items-center gap-3">
+                        <Icon className={`h-5 w-5 shrink-0 ${iconClass}`} />
+                        <div className="text-left">
+                          <div className="flex items-center gap-2">
+                            <Database className="h-4 w-4" />
+                            <span className="text-sm font-medium">{label}</span>
+                          </div>
+                          {status === 'failed' && error && (
+                            <p className="text-xs text-red-600 mt-0.5">{error}</p>
+                          )}
                         </div>
-                        {installSuccess.migrationResult.status === 'success' && installSuccess.migrationResult.results && (() => {
-                          const appliedCount = installSuccess.migrationResult!.results!.filter(r => r.status === 'applied').length
-                          return (
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {appliedCount} migration{appliedCount !== 1 ? 's' : ''} applied
-                            </p>
-                          )
-                        })()}
-                        {installSuccess.migrationResult.status === 'failed' && installSuccess.migrationResult.error && (
-                          <p className="text-xs text-red-600 mt-0.5">
-                            {installSuccess.migrationResult.error}
-                          </p>
-                        )}
                       </div>
-                    </div>
-                  )}
+                    )
+                  })()}
 
                   {/* Vercel rebuilding notice */}
                   {installSuccess?.vercel && installSuccess?.githubSync?.success === true && (

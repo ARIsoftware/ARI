@@ -1458,7 +1458,83 @@ export default function DatabaseTestPage() {
       })
     }
 
-    // Test 6: Session management features
+    // Authorization Tier (Privileged Routes)
+    //
+    // "Authorization Patterns" above only verifies routes require
+    // authentication — but auth ≠ authz. A route can require auth yet still
+    // grant admin-tier privilege to any signed-up user (e.g. arbitrary-SQL
+    // endpoints). This test sends a SIGNED-IN request and asserts the route
+    // refuses the privileged operation. Add routes here when they grant
+    // admin-only capability.
+    updateAuthConfigResult('Authorization Tier (Privileged Routes)', { status: 'testing' })
+    try {
+      if (!session) {
+        updateAuthConfigResult('Authorization Tier (Privileged Routes)', {
+          status: 'warning',
+          message: 'Not authenticated — cannot probe authorization tier',
+          data: { hint: 'Sign in to verify privileged routes refuse ordinary-user requests' }
+        })
+      } else {
+        const ADMIN_TIER_ROUTES: Array<{
+          path: string
+          method: string
+          name: string
+          expectStatus: number
+          body?: unknown
+        }> = [
+          {
+            path: '/api/modules/migrate',
+            method: 'POST',
+            name: '/api/modules/migrate (deprecated, must return 410)',
+            expectStatus: 410,
+            body: { moduleId: 'probe', migrations: [] }
+          }
+        ]
+
+        const results = await Promise.all(ADMIN_TIER_ROUTES.map(async (route) => {
+          try {
+            const response = await fetch(route.path, {
+              method: route.method,
+              credentials: 'include',
+              redirect: 'manual',
+              headers: { 'Content-Type': 'application/json' },
+              body: route.body !== undefined ? JSON.stringify(route.body) : undefined
+            })
+            return {
+              name: route.name,
+              path: route.path,
+              expected: route.expectStatus,
+              actual: response.status,
+              secure: response.status === route.expectStatus
+            }
+          } catch {
+            return {
+              name: route.name,
+              path: route.path,
+              expected: route.expectStatus,
+              actual: 0,
+              secure: true
+            }
+          }
+        }))
+
+        const allSecure = results.every(r => r.secure)
+        updateAuthConfigResult('Authorization Tier (Privileged Routes)', {
+          status: allSecure ? 'success' : 'error',
+          message: allSecure
+            ? 'Privileged routes refuse ordinary-user requests'
+            : 'A privileged route accepted an ordinary-user request — investigate immediately',
+          data: { results, hint: 'This test sends a SIGNED-IN request and asserts the route returns 403/410, not 200/201/400. Authentication is not authorization.' }
+        })
+      }
+    } catch (error: unknown) {
+      updateAuthConfigResult('Authorization Tier (Privileged Routes)', {
+        status: 'error',
+        error: errMsg(error)
+      })
+    }
+
+    // Session management features
     updateAuthConfigResult('Session Management', { status: 'testing' })
     try {
       if (session) {
