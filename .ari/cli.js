@@ -268,27 +268,42 @@ function start(opts = {}) {
   });
   if (quiet && child.stderr) child.stderr.on('data', () => {}); // drain
 
-  // Open browser once Next.js prints its local URL (detects correct port)
-  let browserOpened = false;
+  // Next.js prints "Local:" before any route is compiled, so opening the
+  // browser immediately shows a 2-3s white page while routes JIT-compile.
+  // We GET the URL first (following redirects) to force compilation of the
+  // landing route, then open the browser to a ready page.
+  let browserScheduled = false;
   function openBrowser(url) {
-    if (browserOpened) return;
-    browserOpened = true;
     if (process.platform === 'darwin') run(`open ${url}`);
     else if (process.platform === 'linux') run(`xdg-open ${url}`);
     else if (process.platform === 'win32') run(`start ${url}`);
+  }
+  async function waitForReady(url) {
+    const deadline = Date.now() + 30_000;
+    while (Date.now() < deadline) {
+      try {
+        const res = await fetch(url, { redirect: 'follow' });
+        if (res.status < 500) return;
+      } catch {}
+      await new Promise(r => setTimeout(r, 150));
+    }
   }
 
   child.stdout.on('data', (data) => {
     const text = data.toString();
 
-    if (!browserOpened) {
+    if (!browserScheduled) {
       const match = text.match(/Local:\s+(http:\/\/localhost:\d+)/);
       if (match) {
-        openBrowser(match[1]);
-        if (quiet) {
-          stopSpinner('  ' + GREEN + '✔' + RESET + ' ARI is running at ' + DIM + match[1] + RESET);
-          process.stdout.write('    ' + DIM + 'Press Ctrl+C to stop ARI.' + RESET + '\n');
-        }
+        browserScheduled = true;
+        const url = match[1];
+        waitForReady(url).then(() => {
+          openBrowser(url);
+          if (quiet) {
+            stopSpinner('  ' + GREEN + '✔' + RESET + ' ARI is running at ' + DIM + url + RESET);
+            process.stdout.write('    ' + DIM + 'Press Ctrl+C to stop ARI.' + RESET + '\n');
+          }
+        });
       }
     }
 
