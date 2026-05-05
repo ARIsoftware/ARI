@@ -2,13 +2,12 @@
  * Next.js Instrumentation Hook
  *
  * This file runs when the Next.js server starts, regardless of how it's started:
- * - npm run dev
  * - pnpm run dev
  * - pnpm next dev --turbo
- * - npm run build
+ * - pnpm run build
  *
  * We use it to auto-generate the module registry so you never have to remember
- * to run `npm run generate-module-registry` manually.
+ * to run `pnpm run generate-module-registry` manually.
  */
 
 export async function register() {

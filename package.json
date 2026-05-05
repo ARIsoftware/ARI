@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "generate-module-registry": "node scripts/generate-module-registry.js",
-    "prebuild": "npm run generate-module-registry",
+    "prebuild": "pnpm run generate-module-registry",
     "build": "next build",
-    "predev": "npm run generate-module-registry",
+    "predev": "pnpm run generate-module-registry",
     "dev": "next dev",
     "start": "next start",
     "setup": "node scripts/install.js"

@@ -849,7 +849,7 @@ import type { Item } from '@/modules/module-id/types'
 
 #### Step 5.7.1: Verify Module Loads
 
-- [ ] Run `npm run generate-module-registry`
+- [ ] Run `pnpm generate-module-registry`
 - [ ] Verify module appears in registry file
 - [ ] Start dev server
 - [ ] Navigate to module URL
@@ -1068,7 +1068,7 @@ export const myModuleData = pgTable("my_module_data", {
 ]);
 ```
 
-After creating the file, run `npm run generate-module-registry` to regenerate the schema barrel. Your table will be automatically exported from `@/lib/db/schema` and available to all code that imports from there.
+After creating the file, run `pnpm generate-module-registry` to regenerate the schema barrel. Your table will be automatically exported from `@/lib/db/schema` and available to all code that imports from there.
 
 **If your module needs to reference core tables** (e.g., `user` for a foreign key), import from `@/lib/db/schema/core-schema`:
 
@@ -1096,7 +1096,7 @@ export const myModuleDataRelations = relations(myModuleData, ({many}) => ({
 1. Create `database/schema.sql` (idempotent — auto-run on enable)
 2. Create `database/schema.ts` (Drizzle ORM definitions)
 3. Create `database/uninstall.sql` (manual-only teardown)
-4. Run `npm run generate-module-registry` to regenerate the schema barrel
+4. Run `pnpm generate-module-registry` to regenerate the schema barrel
 5. Enable the module in Settings → Features (tables are created automatically)
 6. Verify the table works by testing your API routes
 
@@ -1494,7 +1494,7 @@ The correct format is auto-detected based on which headers are present.
 
 After configuring public routes:
 
-1. Run `npm run generate-module-registry` to update the manifest
+1. Run `pnpm generate-module-registry` to update the manifest
 2. Restart the dev server
 3. Navigate to `/debug` → **Endpoints** tab
 4. Verify your public endpoint appears with the correct security type
@@ -2111,7 +2111,7 @@ Run through this checklist after creating or updating a module:
 - [ ] No console errors in browser
 - [ ] No errors in terminal/server logs
 - [ ] Module can be disabled and re-enabled without issues
-- [ ] Build succeeds: `npm run build`
+- [ ] Build succeeds: `pnpm build`
 
 ---
 
@@ -2218,7 +2218,7 @@ SELECT * FROM pg_policies WHERE tablename = 'my_module_data';
 **Fix:**
 ```bash
 # Check for type errors
-npm run build 2>&1 | head -50
+pnpm build 2>&1 | head -50
 ```
 
 ### Duplicate Toolbar / Header (Nested Layout Bug)

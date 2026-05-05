@@ -225,7 +225,7 @@ api/
 
 ```bash
 # Start dev server
-npm run dev
+pnpm dev
 
 # Visit http://localhost:3000/module-template
 # Changes to files will hot-reload automatically
@@ -286,7 +286,7 @@ Check terminal for:
 ### API Routes Returning 404
 - Verify file path: `api/[route]/route.ts`
 - Check `permissions.api: true` in manifest
-- Clear `.next` folder: `rm -rf .next && npm run dev`
+- Clear `.next` folder: `rm -rf .next && pnpm dev`
 
 ### Database Errors
 - Ensure migrations are applied

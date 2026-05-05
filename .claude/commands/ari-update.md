@@ -85,15 +85,15 @@ If they say no, stop.
 After a successful merge:
 
 1. **Check if dependencies changed**: Run `git diff HEAD~1..HEAD --name-only` and look for `package.json` or `package-lock.json`.
-   - If changed, ask the user: "Dependencies have changed. Run `npm install` now?"
-   - If they confirm, run `npm install`.
+   - If changed, ask the user: "Dependencies have changed. Run `pnpm install` now?"
+   - If they confirm, run `pnpm install`.
 
 2. **Check for new SQL migrations**: Look for any new or changed `.sql` files in the diff.
    - If found, list them and tell the user:
      > "New database migration files were detected. Please review and run them manually in your Supabase SQL Editor."
 
 3. **Check if module files changed**: Look for changes in `modules-core/` or `module.json` files.
-   - If changed, run `npm run generate-module-registry` automatically.
+   - If changed, run `pnpm generate-module-registry` automatically.
 
 4. **Check for new environment variables**: Run `git diff HEAD~1..HEAD -- .env.example` to see if new env vars were added.
    - If changed, tell the user:
@@ -103,7 +103,7 @@ After a successful merge:
 
 Show a final summary:
 > "ARI has been updated successfully!"
-> Include: number of new commits merged, any action items remaining (npm install, SQL migrations, env vars).
+> Include: number of new commits merged, any action items remaining (pnpm install, SQL migrations, env vars).
 > Remind the user to restart their dev server if it's running.
 
 ## Important Rules

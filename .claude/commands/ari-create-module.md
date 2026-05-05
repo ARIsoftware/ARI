@@ -106,7 +106,7 @@ Analyze all provided v0 code and extract:
 2. Check which components exist in `components/ui/` directory (use `ls components/ui/`)
 3. Report any missing components to the user
 4. With user approval, install missing components: `npx shadcn@latest add [component1] [component2] ...`
-5. Check for non-standard npm package imports and install with `npm install` if needed
+5. Check for non-standard npm package imports and install with `pnpm install` if needed
 6. Note: if v0 imports `recharts` directly, prefer ARI's existing `@/components/ui/chart` wrapper
 
 ### Code Restructuring Rules
@@ -214,7 +214,7 @@ When approved, create the module following this order:
    - Add optimistic updates following the patterns in "Optimistic Updates Pattern" section
    - Ensure dialogs follow the "Dialog & Form Validation Pattern" section
    - Verify no hardcoded mock data remains in any component
-10. **Run `npm run generate-module-registry`** to register the new module (pages only - API routes were registered in step 5)
+10. **Run `pnpm generate-module-registry`** to register the new module (pages only - API routes were registered in step 5)
 11. **If public routes needed** (webhooks, external API access):
     - Add `publicRoutes` array to module.json with security configuration
     - Create route handler using `createPublicRouteHandler` wrapper
@@ -349,7 +349,7 @@ If the user wants their module to contribute cards or widgets to the main Dashbo
 - See `modules-core/tasks/components/dashboard-stat-card.tsx` as a stat card reference
 - See `modules-core/daily-fitness/components/dashboard-widget.tsx` as a widget reference
 
-After creating dashboard components, run `npm run generate-module-registry` to register them in the auto-generated dashboard registry.
+After creating dashboard components, run `pnpm generate-module-registry` to register them in the auto-generated dashboard registry.
 
 ## Submenu Implementation
 

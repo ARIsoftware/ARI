@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Get ALL discovered modules (regardless of enabled state)
-    // Registry is generated at build time via npm run generate-module-registry
+    // Registry is generated at build time via pnpm run generate-module-registry
     const allModules = await getModules()
 
     const settings = await withRLS((db) =>

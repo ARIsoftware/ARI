@@ -9,7 +9,7 @@
  * 2. Add publicRoutes to your module.json (see example below)
  * 3. Set the required environment variable
  * 4. Register the route in MODULE_API_ROUTES
- * 5. Run `npm run generate-module-registry`
+ * 5. Run `pnpm generate-module-registry`
  *
  * Example module.json publicRoutes configuration:
  * ```json

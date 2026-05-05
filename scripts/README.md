@@ -32,12 +32,12 @@ This script scans `/modules` directory before each build and generates a static 
 ### When It Runs
 
 **Automatically:**
-- Before `npm run dev` (via `predev` hook)
-- Before `npm run build` (via `prebuild` hook)
+- Before `pnpm dev` (via `predev` hook)
+- Before `pnpm build` (via `prebuild` hook)
 
 **Manually:**
 ```bash
-npm run generate-module-registry
+pnpm generate-module-registry
 ```
 
 ### Adding a New Module
@@ -53,7 +53,7 @@ Just create the module directory structure:
 
 Then run:
 ```bash
-npm run dev
+pnpm dev
 ```
 
 The script will automatically detect and register your new module!
