@@ -37,7 +37,13 @@ const nextConfig = {
     unoptimized: true,
   },
   serverExternalPackages: ["@node-rs/argon2", "@aws-sdk/client-s3"],
-  devIndicators: process.env.DEV_INDICATORS === 'true',
+  // Show the Next.js dev indicator overlay when either env var is "true".
+  // `devIndicators` is the preferred name (matches the Next.js config key);
+  // `DEV_INDICATORS` is kept for backwards compatibility with older .env.local files.
+  devIndicators:
+    process.env.devIndicators === 'true' || process.env.DEV_INDICATORS === 'true'
+      ? {}
+      : false,
 }
 
 export default nextConfig

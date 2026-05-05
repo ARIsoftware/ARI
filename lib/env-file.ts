@@ -163,9 +163,9 @@ export function renderEnvFile(
   lines.push("ALLOWED_IPS=")
   lines.push("")
 
-  lines.push("# Show Next.js dev indicators (the floating overlay in dev mode).")
-  lines.push("# Set to true to enable. Default: false.")
-  lines.push("DEV_INDICATORS=false")
+  lines.push("# Show the Next.js dev indicator overlay (the floating badge shown in dev mode).")
+  lines.push("# Set to true to show it, false to hide it. Default: false (hidden).")
+  lines.push("devIndicators=false")
   lines.push("")
 
   lines.push("# Top Bar Customization (optional)")
