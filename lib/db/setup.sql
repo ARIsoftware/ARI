@@ -1,7 +1,7 @@
 -- ================================================================
 -- ARI Database Setup
 -- Creates all required tables with Row Level Security (RLS)
--- Run this in the Supabase SQL Editor before first use
+-- Run this in your SQL client (Supabase Studio, pgweb, or psql) before first use
 -- NOTE: Keep in sync with lib/db/setup-sql.ts (TS export for /welcome)
 -- ================================================================
 

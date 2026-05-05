@@ -74,7 +74,7 @@ To ship a schema change in a module update, edit `schema.sql` additively (`ALTER
 
 ### Manual uninstall
 
-`database/uninstall.sql` is **never** run by the module loader. It exists only as a manual teardown script — open it in the Supabase SQL editor and run it yourself if you want to permanently drop this module's tables.
+`database/uninstall.sql` is **never** run by the module loader. It exists only as a manual teardown script — open it in your SQL client of choice (Supabase Studio, pgweb, or `psql`) and run it yourself if you want to permanently drop this module's tables.
 
 ## File Structure
 

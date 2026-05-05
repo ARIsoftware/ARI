@@ -1,8 +1,8 @@
 -- Havoc Companions Module — Uninstall
 --
 -- WARNING: This file is MANUAL ONLY. It is never auto-run by the module
--- system. Run it from the Supabase SQL editor only when you want to wipe
--- havoc-companions settings.
+-- system. Run it from your SQL client (Supabase Studio, pgweb, or psql)
+-- only when you want to wipe havoc-companions settings.
 --
 -- This module does not own any tables, so the only state to remove is the
 -- per-user row(s) in the shared `module_settings` table.

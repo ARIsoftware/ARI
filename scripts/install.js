@@ -994,8 +994,9 @@ async function setupLocalSupabase(targetDir) {
     spinner.error('Failed to initialize database schema');
     console.log(`  ${dim(err.message.split('\n').slice(0, 3).join('\n  '))}`);
     console.log('');
-    console.log(`  ${dim('You can run it manually via Supabase Studio:')}`);
-    console.log(`  ${DIM_BLUE}http://127.0.0.1:54323${RESET}`);
+    console.log(`  ${dim('You can run lib/db/setup.sql manually in your SQL client.')}`);
+    console.log(`  ${dim('For local Supabase: open Studio at')} ${DIM_BLUE}http://127.0.0.1:54323${RESET}`);
+    console.log(`  ${dim('For local Postgres: pgweb, psql, or any other SQL client.')}`);
   }
 
   return result;

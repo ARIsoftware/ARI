@@ -827,7 +827,7 @@ export default function DatabaseTestPage() {
           message: 'No tables discovered - all discovery methods failed',
           data: {
             found: 0,
-            hint: 'Check database connection and re-run lib/db/setup.sql in the Supabase SQL editor to install the backup RPC functions'
+            hint: 'Check database connection and re-run lib/db/setup.sql in your SQL client (Supabase Studio, pgweb, or psql) to install the backup RPC functions'
           }
         })
         console.error('❌ No tables discovered')

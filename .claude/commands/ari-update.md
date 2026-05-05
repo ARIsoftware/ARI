@@ -90,7 +90,7 @@ After a successful merge:
 
 2. **Check for new SQL migrations**: Look for any new or changed `.sql` files in the diff.
    - If found, list them and tell the user:
-     > "New database migration files were detected. Please review and run them manually in your Supabase SQL Editor."
+     > "New database migration files were detected. Please review and run them manually in your SQL client of choice — Supabase Studio, pgweb, or `psql`."
 
 3. **Check if module files changed**: Look for changes in `modules-core/` or `module.json` files.
    - If changed, run `pnpm generate-module-registry` automatically.

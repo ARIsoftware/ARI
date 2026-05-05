@@ -2,8 +2,8 @@
 -- MANUAL TEARDOWN SCRIPT — DO NOT RUN AUTOMATICALLY
 -- ============================================================================
 -- This file is NEVER executed by the ARI module loader.
--- It exists only so a user can manually remove this module's tables from
--- the database via the Supabase SQL editor if they want a clean uninstall.
+-- It exists only so a user can run it in their SQL client of choice
+-- (Supabase Studio, pgweb, or psql) to remove this module's tables.
 --
 -- Running this will PERMANENTLY DELETE all data in the listed tables.
 -- ============================================================================

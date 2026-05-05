@@ -8,9 +8,9 @@
  *   (CREATE TABLE IF NOT EXISTS, CREATE INDEX IF NOT EXISTS,
  *    DROP POLICY IF EXISTS … CREATE POLICY …, ALTER TABLE … ADD COLUMN IF NOT EXISTS).
  * - This file NEVER reads or executes `uninstall.sql`. uninstall.sql is a
- *   manual-only teardown script that the user runs themselves in the
- *   Supabase SQL editor. There is no code path here, in the module loader,
- *   or in any API route that touches uninstall.sql.
+ *   manual-only teardown script that the user runs themselves in their SQL
+ *   client of choice (Supabase Studio, pgweb, or psql). There is no code
+ *   path here, in the module loader, or in any API route that touches it.
  * - Before executing, the SQL is scanned for forbidden destructive
  *   statements. If any are found, execution is refused.
  *

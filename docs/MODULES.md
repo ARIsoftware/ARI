@@ -651,7 +651,7 @@ mkdir -p modules-core/[module-id]/{app,api/data,api/settings,components,lib,type
 - [ ] Add indexes for common queries
 - [ ] Document each column with inline comments
 
-A sibling file `database/uninstall.sql` should also exist with `DROP TABLE IF EXISTS … CASCADE` statements for every table the module owns. **`uninstall.sql` is never auto-run** — it's a manual teardown the user can run themselves in the Supabase SQL editor.
+A sibling file `database/uninstall.sql` should also exist with `DROP TABLE IF EXISTS … CASCADE` statements for every table the module owns. **`uninstall.sql` is never auto-run** — it's a manual teardown the user can run themselves in their SQL client of choice (Supabase Studio for cloud Supabase, the local Studio at `http://127.0.0.1:54323` when running `./ari start`, pgweb for standalone local Postgres, or `psql` directly).
 
 **RLS Policy Pattern:**
 ```sql

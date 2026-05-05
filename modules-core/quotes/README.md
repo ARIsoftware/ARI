@@ -49,12 +49,12 @@ The Quotes module allows users to:
 
 ### 1. Database Setup
 
-Run the schema SQL file in Supabase SQL Editor:
+Schema is auto-installed when the module is enabled (Settings → Features). For manual install, run the schema SQL in your SQL client of choice — Supabase Studio, pgweb, or `psql`:
 
 ```bash
-# Copy the contents of /modules-core/quotes/database/schema.sql
-# Paste into Supabase Dashboard → SQL Editor
-# Execute the SQL
+# Copy the contents of /modules-core/quotes/database/schema.sql into your
+# SQL client and execute. (You normally don't need this — enabling the
+# module creates the tables automatically.)
 ```
 
 This creates:

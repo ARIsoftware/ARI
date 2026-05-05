@@ -235,7 +235,7 @@ Every confirmed hardcoded secret must appear in the report with file + line and 
 **Required database files.** Every module that owns tables must ship all three of these files inside `[module]/database/`:
 - [ ] `database/schema.sql` — the canonical CREATE TABLE / CREATE INDEX / RLS policy script that the module loader runs at install time. **High** if missing.
 - [ ] `database/schema.ts` — the Drizzle ORM table definitions used by API routes via `withRLS()`. **High** if missing.
-- [ ] `database/uninstall.sql` — a manual-only teardown script (DROP TABLE statements). This file is **never executed automatically**; it exists only so a user can manually run it from the Supabase SQL editor if they want to fully remove the module's tables. **Medium** if missing.
+- [ ] `database/uninstall.sql` — a manual-only teardown script (DROP TABLE statements). This file is **never executed automatically**; it exists only so a user can manually run it from their SQL client of choice (Supabase Studio, pgweb, or `psql`) if they want to fully remove the module's tables. **Medium** if missing.
 
 **Install SQL must run every time the module is enabled.** The module loader is expected to execute `schema.sql` on every enable (not just first install), so the script must be fully idempotent. Verify by reading `lib/modules/module-loader.ts`:
 - [ ] Confirm `schema.sql` is executed on enable, not gated behind a "first install only" check. **High** if not executed on enable.
@@ -250,7 +250,7 @@ Every confirmed hardcoded secret must appear in the report with file + line and 
 
 **`uninstall.sql` is manual-only.** This file is allowed (and expected) to contain `DROP TABLE` statements, but it must never be wired into the module loader, an enable hook, a disable hook, or any API route:
 - [ ] Confirm `uninstall.sql` is NOT referenced from `lib/modules/module-loader.ts`, `module.json`, or any code path that runs on enable/disable. **High** if it is auto-executed anywhere.
-- [ ] The file should be clearly labeled at the top as a manual-only teardown script (comment block explaining the user must run it themselves in the Supabase SQL editor). **Low** if the warning comment is missing.
+- [ ] The file should be clearly labeled at the top as a manual-only teardown script (comment block explaining the user must run it themselves in their SQL client — Supabase Studio, pgweb, or `psql`). **Low** if the warning comment is missing.
 - [ ] All `CREATE INDEX` statements use `IF NOT EXISTS` — **Low**
 - [ ] Every table has `user_id TEXT NOT NULL` in `schema.sql` — **High**. Must be `TEXT`, **not** `UUID`. Better Auth stores user IDs as text (see `core-schema.ts`: `session.userId`, `account.userId`, `moduleSettings.userId`, `userPreferences.userId` are all `text()`). Using `UUID` causes a type mismatch with `current_setting('app.current_user_id')` and with `user.id` returned by `getAuthenticatedUser()`.
 - [ ] Every table has `userId: text("user_id").notNull()` in `schema.ts` (Drizzle) — **High**. Must be `text()`, **not** `uuid()`, for the same reason above. A `uuid("user_id")` column will silently accept inserts but may cause cast errors or comparison failures with the text-typed user ID from Better Auth.
