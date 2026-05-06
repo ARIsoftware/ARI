@@ -65,7 +65,7 @@ const protectedRoutes = [
 // Static public routes that the manifest cannot describe:
 //   /sign-in, /auth, /database-error — UI pages (not API routes)
 //   /api/auth — Better Auth's catch-all (owned by Better Auth, can't be tagged)
-const staticPublicRoutes = ["/sign-in", "/auth", "/api/auth", "/database-error", "/welcome", "/robots.txt"]
+const staticPublicRoutes = ["/sign-in", "/auth", "/api/auth", "/database-error", "/welcome", "/setup-error", "/robots.txt"]
 
 // All other public API routes are sourced from the manifest. Both module
 // routes (declared in module.json) and core routes (declared via
@@ -86,6 +86,7 @@ export async function middleware(req: NextRequest) {
     const setupApiRoutes = ["/api/download-env", "/api/project-dir"]
     const isSetupAllowed = pathname === "/welcome" ||
                            pathname.startsWith("/welcome/") ||
+                           pathname === "/setup-error" ||
                            pathname.startsWith("/api/auth") ||
                            setupApiRoutes.includes(pathname)
 

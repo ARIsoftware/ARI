@@ -6,19 +6,11 @@ import { auth } from "@/lib/auth"
 import { setupSql } from "@/lib/db/setup-sql"
 import { upsertEnvVars } from "@/lib/env-file"
 import { checkRateLimit, getClientIp, isSameOriginRequest } from "@/lib/modules/public-route-security"
+import { getPgCode } from "@/lib/db/postgres-error"
 
 export const debugRole = "auth-bootstrap"
 // Intentionally public — only succeeds when zero users exist (first-run admin setup)
 export const isPublic = true
-
-export type BootstrapStatus =
-  | "already_initialized"
-  | "created"
-  | "installed"
-  | "no_users"
-  | "no_database"
-  | "install_failed"
-  | "error"
 
 // Fast-path flag: skip all DB work once we've confirmed init in this process.
 let initialized = false
@@ -94,9 +86,10 @@ export async function POST(request: NextRequest) {
         await client.query(setupSql)
       } catch (installError: unknown) {
         const message = installError instanceof Error ? installError.message : String(installError)
+        const pgCode = getPgCode(installError)
         console.error("Bootstrap install failed:", installError)
         return NextResponse.json(
-          { status: "install_failed", error: message },
+          { status: "install_failed", error: message, pgCode },
           { status: 500 }
         )
       }
@@ -148,7 +141,7 @@ export async function POST(request: NextRequest) {
     } catch (error: unknown) {
       // Race-safety: another request created the user between our count and signUp.
       const message = error instanceof Error ? error.message : ""
-      const code = (error as { code?: string } | null)?.code
+      const code = getPgCode(error)
       if (message.includes("already exists") || code === "23505") {
         initialized = true
         // The unique-constraint violation proves the row exists, so credential
@@ -160,8 +153,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "error" }, { status: 500 })
     }
   } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    const pgCode = getPgCode(error)
     console.error("Bootstrap error:", error)
-    return NextResponse.json({ status: "error" }, { status: 500 })
+    return NextResponse.json({ status: "error", error: message, pgCode }, { status: 500 })
   } finally {
     if (lockHeld) {
       try {

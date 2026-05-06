@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp'
 import { Shield, ArrowLeft } from 'lucide-react'
-import type { BootstrapStatus } from '@/app/api/auth/bootstrap/route'
+import type { BootstrapStatus } from '@/lib/types/bootstrap'
 
 // Statuses that should NOT be cached because they're transient — the user
 // can fix the underlying issue (set env vars, restart server, fix DB url)
@@ -33,8 +33,6 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
-  const [installError, setInstallError] = useState<string | null>(null)
-  const [bootstrapNonce, setBootstrapNonce] = useState(0)
   const [twoFactorRequired, setTwoFactorRequired] = useState(false)
   const [totpCode, setTotpCode] = useState('')
   const [useBackupCode, setUseBackupCode] = useState(false)
@@ -66,11 +64,15 @@ export function AuthForm({ mode }: AuthFormProps) {
           sessionStorage.setItem('ari:bootstrap', status)
         }
         if (status === 'no_users') {
-          // No users exist — redirect to welcome wizard for first-time setup
           window.location.href = '/welcome'
           return
         }
-        if (status === 'install_failed') setInstallError(data.error || 'Database setup failed')
+        if (status === 'install_failed' || status === 'no_database' || status === 'error') {
+          const params = new URLSearchParams({ status })
+          if (data.error) params.set('error', data.error)
+          if (data.pgCode) params.set('pgCode', data.pgCode)
+          window.location.href = `/setup-error?${params.toString()}`
+        }
       })
       .catch(() => {
         // Timeout or network error — don't cache, allow retry on next mount
@@ -81,13 +83,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       controller.abort()
       clearTimeout(timeout)
     }
-  }, [bootstrapNonce])
-
-  const retryBootstrap = () => {
-    sessionStorage.removeItem('ari:bootstrap')
-    setInstallError(null)
-    setBootstrapNonce(n => n + 1)
-  }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -289,17 +285,6 @@ export function AuthForm({ mode }: AuthFormProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {installError && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertDescription>
-              <div className="font-medium mb-1">Database setup failed</div>
-              <div className="text-sm mb-3">{installError}</div>
-              <Button type="button" size="sm" variant="outline" onClick={retryBootstrap}>
-                Retry
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
