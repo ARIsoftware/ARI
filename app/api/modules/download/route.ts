@@ -154,8 +154,12 @@ export async function POST(request: NextRequest) {
 
     if (!apiResponse.ok) {
       const errorData = await apiResponse.json().catch(() => ({}))
+      const upstreamError = errorData.error
+      const errorPayload = upstreamError?.code
+        ? { code: upstreamError.code, message: upstreamError.message ?? 'Failed to get download URL' }
+        : { message: upstreamError?.message ?? 'Failed to get download URL' }
       return NextResponse.json(
-        { error: errorData.error?.message || 'Failed to get download URL' },
+        { error: errorPayload },
         { status: apiResponse.status }
       )
     }

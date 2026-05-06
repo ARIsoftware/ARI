@@ -30,21 +30,30 @@ export async function POST(request: NextRequest) {
 
     const { key } = parseResult.data
     // Validate against Polar API
-    const polarResponse = await fetch('https://api.polar.sh/v1/customer-portal/license-keys/validate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        key,
-        organization_id: POLAR_ORGANIZATION_ID,
-      }),
-    })
+    let polarResponse: Response
+    try {
+      polarResponse = await fetch('https://api.polar.sh/v1/customer-portal/license-keys/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key,
+          organization_id: POLAR_ORGANIZATION_ID,
+        }),
+      })
+    } catch (fetchError) {
+      console.error('[API /license/validate] Polar fetch failed:', fetchError)
+      return NextResponse.json(
+        { error: { code: 'UPSTREAM_UNAVAILABLE', message: 'License validation service unavailable' } },
+        { status: 503 }
+      )
+    }
 
     if (!polarResponse.ok) {
       const errorText = await polarResponse.text()
       console.error('[API /license/validate] Polar API error:', polarResponse.status, errorText)
       return NextResponse.json(
-        { error: 'Invalid license key' },
-        { status: 400 }
+        { error: { code: 'UPSTREAM_UNAVAILABLE', message: 'License validation service unavailable' } },
+        { status: 503 }
       )
     }
 
@@ -53,7 +62,7 @@ export async function POST(request: NextRequest) {
     // Check if key is valid
     if (polarData.status !== 'granted' && polarData.status !== 'active') {
       return NextResponse.json(
-        { error: `License key is ${polarData.status || 'invalid'}` },
+        { error: { code: 'LICENSE_INVALID', message: `License key is ${polarData.status || 'invalid'}` } },
         { status: 400 }
       )
     }

@@ -28,8 +28,12 @@ export async function GET() {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
+      const upstreamError = errorData.error
+      const errorPayload = upstreamError?.code
+        ? { code: upstreamError.code, message: upstreamError.message ?? 'Failed to fetch module library' }
+        : { message: upstreamError?.message ?? 'Failed to fetch module library' }
       return NextResponse.json(
-        { error: errorData.error?.message || 'Failed to fetch module library' },
+        { error: errorPayload },
         { status: response.status }
       )
     }

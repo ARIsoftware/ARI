@@ -101,6 +101,26 @@ interface LibraryModule {
   locked: boolean
 }
 
+type ApiErrorPayload = { code?: string; message?: string } | string | undefined
+
+function parseApiError(raw: ApiErrorPayload, fallbackMessage: string): { code: string | null; message: string } {
+  if (!raw) return { code: null, message: fallbackMessage }
+  if (typeof raw === 'string') return { code: null, message: raw }
+  return { code: raw.code ?? null, message: raw.message ?? fallbackMessage }
+}
+
+function getErrorCopy(code: string, fallback: string): string {
+  if (code === 'UPSTREAM_UNAVAILABLE') {
+    return "We couldn't validate your license right now, please try again in a few minutes."
+  }
+  if (code === 'RATE_LIMITED') {
+    return `${fallback}, try again in a few minutes.`
+  }
+  return fallback
+}
+
+const PAGE_ERROR_CODES = new Set(['UPSTREAM_UNAVAILABLE', 'RATE_LIMITED'])
+
 function getCached<T>(key: string): T | null {
   try {
     const cached = sessionStorage.getItem(key)
@@ -166,6 +186,7 @@ export default function ModulesPage() {
     env_key?: string
   } | null>(null)
   const [licenseError, setLicenseError] = useState<string | null>(null)
+  const [pageError, setPageError] = useState<{ code: string; message: string } | null>(null)
 
   // Install success screen state
   const [installSuccess, setInstallSuccess] = useState<{
@@ -224,6 +245,7 @@ export default function ModulesPage() {
     if (!licenseKey.trim()) return
     setLicenseActivating(true)
     setLicenseError(null)
+    setPageError(null)
 
     try {
       const response = await fetch('/api/license/validate', {
@@ -235,7 +257,12 @@ export default function ModulesPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        setLicenseError(data.error || 'Failed to validate license key')
+        const { code, message } = parseApiError(data.error, 'Failed to validate license key')
+        if (code && PAGE_ERROR_CODES.has(code)) {
+          setPageError({ code, message: getErrorCopy(code, message) })
+        } else {
+          setLicenseError(message)
+        }
         return
       }
 
@@ -315,6 +342,7 @@ export default function ModulesPage() {
     try {
       setLibraryLoading(true)
       setLibraryError(null)
+      setPageError(null)
       const response = await fetch('/api/modules/library')
       if (response.ok) {
         const data = await response.json()
@@ -322,7 +350,14 @@ export default function ModulesPage() {
         setCache(LIBRARY_CACHE_KEY, data)
       } else {
         const err = await response.json().catch(() => ({}))
-        setLibraryError(err.error || 'Failed to load module library')
+        const { code, message } = parseApiError(err.error, 'Failed to load module library')
+        if (code && PAGE_ERROR_CODES.has(code)) {
+          setPageError({ code, message: getErrorCopy(code, message) })
+          // Fail-closed: keep whatever is already in libraryModules (empty or stale cache)
+          // so commercial modules remain locked from their prior render.
+        } else {
+          setLibraryError(message)
+        }
       }
     } catch (error) {
       console.error('Error loading module library:', error)
@@ -480,6 +515,7 @@ export default function ModulesPage() {
 
     setDownloading(mod.id)
     setDownloadResult(null)
+    setPageError(null)
 
     try {
       const response = await fetch('/api/modules/download', {
@@ -494,7 +530,12 @@ export default function ModulesPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        setDownloadResult({ module: mod.id, type: 'error', message: data.error || 'Download failed' })
+        const { code, message } = parseApiError(data.error, 'Download failed')
+        if (code && PAGE_ERROR_CODES.has(code)) {
+          setPageError({ code, message: getErrorCopy(code, message) })
+        } else {
+          setDownloadResult({ module: mod.id, type: 'error', message })
+        }
         return
       }
 
@@ -710,6 +751,24 @@ export default function ModulesPage() {
                   <br /><span className="text-red-600">Note: Always assess third-party modules to ensure they are trustworthy and secure.</span>
                 </p>
               </div>
+
+              {pageError && (
+                <div
+                  role="alert"
+                  className="relative rounded-md"
+                  style={{ backgroundColor: '#c00', color: '#fff', fontSize: '1rem', padding: '20px' }}
+                >
+                  <span className="pr-8">{pageError.message}</span>
+                  <button
+                    type="button"
+                    aria-label="Dismiss error"
+                    onClick={() => setPageError(null)}
+                    className="absolute right-3 top-3 inline-flex h-6 w-6 items-center justify-center rounded-sm hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                  >
+                    <X className="h-4 w-4" color="#fff" />
+                  </button>
+                </div>
+              )}
 
               {message && (
                 <Alert variant={message.type === 'error' ? 'destructive' : 'default'}>
