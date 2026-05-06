@@ -32,8 +32,8 @@ const ROLE_MISSING: SetupErrorExplanation = {
   title: COMMON_TITLE,
   summary: SAFE_SUMMARY,
   diagnosis:
-    "A SQL statement referenced a database role that doesn't exist on this server — typically `anon`, `authenticated`, or `service_role` (Supabase-managed roles). " +
-    "ARI supports plain Postgres, local Supabase, and Supabase Cloud, so this usually means a module's SQL assumes Supabase roles and is running on plain Postgres. " +
+    "A SQL statement referenced a database role that doesn't exist — typically `anon`, `authenticated`, or `service_role` (Supabase-managed roles). " +
+    "This usually happens when a module's SQL assumes Supabase roles but is running on plain Postgres. " +
     "The core schema may still be installed correctly; clicking Retry often succeeds.",
   actions: [
     {
