@@ -51,9 +51,23 @@ export async function POST(request: NextRequest) {
     if (!polarResponse.ok) {
       const errorText = await polarResponse.text()
       console.error('[API /license/validate] Polar API error:', polarResponse.status, errorText)
+
+      if (polarResponse.status >= 500) {
+        return NextResponse.json(
+          { error: { code: 'UPSTREAM_UNAVAILABLE', message: 'License validation service unavailable' } },
+          { status: 503 }
+        )
+      }
+      if (polarResponse.status === 429) {
+        return NextResponse.json(
+          { error: { code: 'RATE_LIMITED', message: 'Too many validation attempts' } },
+          { status: 429 }
+        )
+      }
+      // 4xx from Polar (404, 422, etc.) means the key itself is bad — not an outage.
       return NextResponse.json(
-        { error: { code: 'UPSTREAM_UNAVAILABLE', message: 'License validation service unavailable' } },
-        { status: 503 }
+        { error: { code: 'LICENSE_INVALID', message: 'License key is invalid' } },
+        { status: 400 }
       )
     }
 
