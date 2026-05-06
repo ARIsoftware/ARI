@@ -574,5 +574,13 @@ END;
 $$;
 
 -- Restrict exec_sql to service role only (defense in depth).
+-- The anon/authenticated REVOKE is wrapped in a DO/EXCEPTION block because
+-- those roles only exist in Supabase modes; on plain Postgres the REVOKE
+-- would raise 42704 and abort the install.
 REVOKE ALL ON FUNCTION public.exec_sql(text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.exec_sql(text) FROM anon, authenticated;
+DO $$
+BEGIN
+  REVOKE ALL ON FUNCTION public.exec_sql(text) FROM anon, authenticated;
+EXCEPTION
+  WHEN undefined_object THEN NULL;
+END $$;
