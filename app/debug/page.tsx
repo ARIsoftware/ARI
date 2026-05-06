@@ -2011,11 +2011,10 @@ export default function DatabaseTestPage() {
   }
 
   useEffect(() => {
-    // Log initial page load
     console.log('🚀 Database Test Page loaded')
     console.log('Environment:', {
-      url: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + '...',
-      hasAnonKey: !!(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+      supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30),
+      hasAnonKey: !!(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
     })
   }, [])
 

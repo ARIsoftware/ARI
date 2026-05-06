@@ -3,12 +3,12 @@
 This documentation reflects the current state of the ARI application, including Better Auth authentication and the module system.
 
 ## Overview
-ARI is a Next.js 16 (React 19) application using Better Auth for authentication and Supabase PostgreSQL for database operations.
+ARI is a Next.js 16 (React 19) application using Better Auth for authentication and PostgreSQL for database operations. The database can run as plain local Postgres, local Supabase, or Supabase Cloud — selected at install time via `ARI_DB_MODE` in `.env.local`. Authentication is always Better Auth regardless of which database mode is active; Supabase Auth is never used.
 
 ## Tech Stack
 - **Framework**: Next.js 16 with React 19
 - **Authentication**: Better Auth (email/password with Argon2 hashing)
-- **Database**: Supabase PostgreSQL (with application-level security)
+- **Database**: PostgreSQL — plain local Postgres, local Supabase, or Supabase Cloud (with application-level security via `withRLS()`)
 - **ORM**: Drizzle ORM (with RLS support via `withRLS()`)
 - **Data Fetching**: TanStack Query (React Query) for client-side data fetching with optimistic updates
 - **Styling**: Tailwind CSS + Shadcn/ui components
@@ -94,6 +94,20 @@ export async function getAuthenticatedUser() {
 - Handles sign-in, sign-out, session management
 
 ## Database Schema
+
+### Database Modes
+
+ARI supports three Postgres backends, all using the same schema and the same Drizzle pool. The mode is set via `ARI_DB_MODE` in `.env.local`:
+
+| `ARI_DB_MODE` | Backend | Notes |
+|---|---|---|
+| `postgres` | Plain local PostgreSQL | Default. No Docker required. |
+| `supabaselocal` | Local Supabase stack | Requires Docker; managed by `./ari start`. |
+| `supabasecloud` | Supabase.com hosted project | User configures in `/welcome`. |
+
+The single source of truth for mode detection is `getDbMode()` in `lib/db/mode.ts`. There is also `isSupabaseMode()` for the common "either Supabase variant" check. **Use these helpers** in any new conditional logic instead of inspecting env vars directly.
+
+For installs that predate `ARI_DB_MODE`, mode is inferred from `NEXT_PUBLIC_SUPABASE_URL`. Supabase Auth is **never** used — Better Auth handles all auth in every mode.
 
 ### Main Tables
 

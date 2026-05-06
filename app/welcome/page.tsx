@@ -1205,10 +1205,10 @@ export default function WelcomePage() {
                   {/* Header section with gradient background */}
                   <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
                     <div className="flex items-center gap-2.5">
-                      <h2 className="text-2xl font-semibold text-zinc-900">Database &amp; Authentication</h2>
+                      <h2 className="text-2xl font-semibold text-zinc-900">Supabase Cloud Database</h2>
                     </div>
                     <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
-                      Configure your Supabase.com database connection and authentication. You&apos;ll need API keys, the database connection string, and we&apos;ll generate a secure auth secret for you. Supabase offers a free tier. Please check their website for details.
+                      Configure your Supabase.com database connection. You&apos;ll need API keys and the database connection string, and we&apos;ll generate a secure Better Auth secret for you. Authentication is handled by Better Auth in every mode &mdash; Supabase Auth is not used. Supabase offers a free tier; check their website for details.
                     </p>
                   </div>
 
@@ -1245,7 +1245,7 @@ export default function WelcomePage() {
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
                           3
                         </span>
-                        <span className="text-black">Ensure <strong className="text-zinc-700">Enable Data API</strong> and <strong className="text-zinc-700">Enable automatic RLS</strong> are turned on in your project settings</span>
+                        <span className="text-black">Ensure <strong className="text-zinc-700">Enable Data API</strong> is turned on in your project settings</span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
                         <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
