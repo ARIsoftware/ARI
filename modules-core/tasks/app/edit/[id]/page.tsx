@@ -117,7 +117,7 @@ export default function EditTaskPage() {
         setTask(foundTask)
         setFormData({
           title: foundTask.title,
-          assignees: foundTask.assignees,
+          assignees: foundTask.assignees ?? [],
           status: foundTask.status,
           priority: foundTask.priority,
           pinned: foundTask.pinned,

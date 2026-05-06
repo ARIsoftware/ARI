@@ -229,7 +229,7 @@ CREATE POLICY "api_key_usage_logs_rls_delete" ON "api_key_usage_logs" FOR DELETE
 CREATE TABLE IF NOT EXISTS "tasks" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "title" TEXT NOT NULL,
-  "assignees" TEXT[],
+  "assignees" TEXT[] DEFAULT '{}'::TEXT[],
   "due_date" DATE,
   "subtasks_completed" INTEGER DEFAULT 0,
   "subtasks_total" INTEGER DEFAULT 0,

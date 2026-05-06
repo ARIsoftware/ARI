@@ -5,7 +5,7 @@
 CREATE TABLE IF NOT EXISTS tasks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
-  assignees TEXT[] DEFAULT ARRAY['']::TEXT[],
+  assignees TEXT[] DEFAULT '{}'::TEXT[],
   due_date DATE,
   subtasks_completed INTEGER DEFAULT 0,
   subtasks_total INTEGER DEFAULT 0,
@@ -41,6 +41,13 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS project_id UUID;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS monster_type TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS monster_colors JSONB;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assigned_agent_id TEXT;
+
+-- Older installs ran CREATE TABLE with no default (or DEFAULT ARRAY['']::TEXT[]),
+-- leaving rows with NULL or the [""] sentinel that fail array validation on edit.
+-- CREATE TABLE IF NOT EXISTS skips on those installs, so fix the default and rows here.
+ALTER TABLE tasks ALTER COLUMN assignees SET DEFAULT '{}'::TEXT[];
+UPDATE tasks SET assignees = '{}'::TEXT[]
+  WHERE assignees IS NULL OR assignees = ARRAY['']::TEXT[];
 
 CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_user_id_completed ON tasks(user_id, completed);
@@ -92,10 +99,10 @@ BEGIN
     RETURN;
   END IF;
 
-  INSERT INTO tasks (user_id, title, status, priority, impact, severity, timeliness, effort, strategic_fit, priority_score, order_index)
+  INSERT INTO tasks (user_id, title, assignees, status, priority, impact, severity, timeliness, effort, strategic_fit, priority_score, order_index)
   VALUES
-    (my_user_id, 'Finalize Pitch Deck Draft', 'Pending', 'High', 5, 3, 2, 4, 5, 4.9, 0),
-    (my_user_id, 'Build MVP Landing Page', 'Pending', 'High', 5, 4, 3, 4, 5, 6.1, 1),
-    (my_user_id, 'Customer Discovery Interviews', 'Pending', 'Low', 3, 2, 1, 5, 2, 1.9, 2);
+    (my_user_id, 'Finalize Pitch Deck Draft', '{}'::TEXT[], 'Pending', 'High', 5, 3, 2, 4, 5, 4.9, 0),
+    (my_user_id, 'Build MVP Landing Page', '{}'::TEXT[], 'Pending', 'High', 5, 4, 3, 4, 5, 6.1, 1),
+    (my_user_id, 'Customer Discovery Interviews', '{}'::TEXT[], 'Pending', 'Low', 3, 2, 1, 5, 2, 1.9, 2);
 
 END $$;
