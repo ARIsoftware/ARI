@@ -159,6 +159,35 @@ function stopPgweb() {
   }
 }
 
+const UPSTREAM_REPO = 'ARIsoftware/ARI';
+const UPSTREAM_URL = `https://github.com/${UPSTREAM_REPO}.git`;
+const UPDATE_DOCS_URL = 'https://ari.software/docs/updating';
+
+// Best-effort upstream check. Returns false on any failure so startup is never blocked or false-alarmed.
+async function checkForUpdates() {
+  if (run('git rev-parse --git-dir') === null) return false;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 2000);
+  try {
+    const res = await fetch(`https://api.github.com/repos/${UPSTREAM_REPO}/commits/main`, {
+      headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'ari-cli' },
+      signal: controller.signal,
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    const sha = data && data.sha;
+    if (typeof sha !== 'string' || !/^[0-9a-f]{40}$/.test(sha)) return false;
+
+    // cat-file -e returns nonzero (null) when the commit isn't in our local object DB → upstream is ahead.
+    return run(`git cat-file -e ${sha}`) === null;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ── Commands ───────────────────────────────────────────────────────────────
 
 function ensureMacPostgresPath() {
@@ -173,8 +202,8 @@ function ensureMacPostgresPath() {
   }
 }
 
-function startQuiet() {
-  return start({ quiet: true });
+function startDefault() {
+  return start({ quiet: !process.argv.includes('--verbose') });
 }
 
 function start(opts = {}) {
@@ -206,6 +235,8 @@ function start(opts = {}) {
   }
 
   fs.mkdirSync(path.join(ROOT, 'data', 'storage'), { recursive: true });
+
+  const updateCheck = checkForUpdates();
 
   if (quiet) startSpinner('Starting ARI');
 
@@ -297,10 +328,17 @@ function start(opts = {}) {
       if (match) {
         browserScheduled = true;
         const url = match[1];
-        waitForReady(url).then(() => {
+        waitForReady(url).then(async () => {
           openBrowser(url);
+          const updateAvailable = await updateCheck;
           if (quiet) {
             stopSpinner('  ' + GREEN + '✔' + RESET + ' ARI is running at ' + DIM + url + RESET);
+          }
+          if (updateAvailable) {
+            const line = '  ↑ ARI update available  ' + DIM + UPDATE_DOCS_URL + RESET + '\n';
+            process.stdout.write(quiet ? line : '\n' + line + '\n');
+          }
+          if (quiet) {
             process.stdout.write('    ' + DIM + 'Press Ctrl+C to stop ARI.' + RESET + '\n');
           }
         });
@@ -399,8 +437,6 @@ function status() {
 }
 
 async function update() {
-  const UPSTREAM_URL = 'https://github.com/ARIsoftware/ARI.git';
-
   console.log('');
   console.log('  ' + YELLOW + 'Checking for ARI updates...' + RESET);
   console.log('');
@@ -503,18 +539,19 @@ async function update() {
 // ── Main ───────────────────────────────────────────────────────────────────
 
 const cmd = process.argv[2];
-const commands = { start, startquiet: startQuiet, stop, status, update };
+const commands = { start: startDefault, startquiet: startDefault, stop, status, update };
 
 if (!cmd || !commands[cmd]) {
   console.log('');
   console.log('  Usage: ./ari <command>');
   console.log('');
   console.log('  Commands:');
-  console.log('    start         Start database + dev server');
-  console.log('    startquiet    Same as start, but hides logs (just a spinner + browser)');
-  console.log('    stop          Stop database services');
-  console.log('    status        Show database status');
-  console.log('    update        Pull latest ARI updates + install dependencies');
+  console.log('    start              Start database + dev server (hides logs)');
+  console.log('    start --verbose    Same as start, but shows full server logs');
+  console.log('    startquiet         Alias for start (kept for backwards compatibility)');
+  console.log('    stop               Stop database services');
+  console.log('    status             Show database status');
+  console.log('    update             Pull latest ARI updates + install dependencies');
   console.log('');
   process.exit(cmd ? 1 : 0);
 }
