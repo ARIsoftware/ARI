@@ -84,7 +84,7 @@ If they say no, stop.
 
 After a successful merge:
 
-1. **Check if dependencies changed**: Run `git diff HEAD~1..HEAD --name-only` and look for `package.json` or `package-lock.json`.
+1. **Check if dependencies changed**: Run `git diff ORIG_HEAD..HEAD --name-only` and look for `package.json` or `package-lock.json`. (Use `ORIG_HEAD`, not `HEAD~1` — fast-forward merges advance HEAD across multiple commits, so `HEAD~1` would only see the last one and miss earlier dependency changes.)
    - If changed, ask the user: "Dependencies have changed. Run `pnpm install` now?"
    - If they confirm, run `pnpm install`.
 
@@ -95,7 +95,7 @@ After a successful merge:
 3. **Check if module files changed**: Look for changes in `modules-core/` or `module.json` files.
    - If changed, run `pnpm generate-module-registry` automatically.
 
-4. **Check for new environment variables**: Run `git diff HEAD~1..HEAD -- .env.example` to see if new env vars were added.
+4. **Check for new environment variables**: Run `git diff ORIG_HEAD..HEAD -- .env.example` to see if new env vars were added.
    - If changed, tell the user:
      > "`.env.example` has been updated with new environment variables. Please review and update your `.env` file."
 
