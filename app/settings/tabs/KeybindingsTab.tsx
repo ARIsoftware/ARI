@@ -81,6 +81,44 @@ export function KeybindingsTab(): React.ReactElement {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
+            <Server className="h-5 w-5 text-indigo-500" />
+            Server
+          </CardTitle>
+          <CardDescription>
+            Manage your local ARI server from the terminal.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3">
+            <div>
+              <span className="text-sm font-medium text-slate-700">./ari start</span>
+              <p className="text-xs text-slate-500 mt-0.5">Start ARI</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3">
+            <div>
+              <span className="text-sm font-medium text-slate-700">./ari start --verbose</span>
+              <p className="text-xs text-slate-500 mt-0.5">Start ARI and display full server logs in terminal</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3">
+            <div>
+              <span className="text-sm font-medium text-slate-700">./ari status</span>
+              <p className="text-xs text-slate-500 mt-0.5">Check the status of ARI and the database</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3">
+            <div>
+              <span className="text-sm font-medium text-slate-700">./ari update</span>
+              <p className="text-xs text-slate-500 mt-0.5">Pull latest ARI updates and install dependencies</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
             <Terminal className="h-5 w-5 text-indigo-500" />
             Claude Commands
           </CardTitle>
@@ -105,38 +143,6 @@ export function KeybindingsTab(): React.ReactElement {
             <div>
               <span className="text-sm font-medium text-slate-700">/ari-update</span>
               <p className="text-xs text-slate-500 mt-0.5">Pull the latest ARI updates from the official upstream repository</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Server className="h-5 w-5 text-indigo-500" />
-            Server
-          </CardTitle>
-          <CardDescription>
-            Manage your local ARI server from the terminal.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3">
-            <div>
-              <span className="text-sm font-medium text-slate-700">./ari start</span>
-              <p className="text-xs text-slate-500 mt-0.5">Start Supabase and the development server</p>
-            </div>
-          </div>
-          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3">
-            <div>
-              <span className="text-sm font-medium text-slate-700">./ari status</span>
-              <p className="text-xs text-slate-500 mt-0.5">Check if Supabase and Docker are running</p>
-            </div>
-          </div>
-          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3">
-            <div>
-              <span className="text-sm font-medium text-slate-700">./ari update</span>
-              <p className="text-xs text-slate-500 mt-0.5">Pull latest ARI updates and install dependencies</p>
             </div>
           </div>
         </CardContent>
