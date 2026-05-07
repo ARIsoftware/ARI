@@ -15,6 +15,11 @@ interface ProviderField {
   optional?: boolean
 }
 
+interface ModelField {
+  envKey: string
+  placeholder: string
+}
+
 interface ProviderConfig {
   id: string
   name: string
@@ -22,6 +27,7 @@ interface ProviderConfig {
   envKey: string
   placeholder: string
   extraFields?: ProviderField[]
+  modelField?: ModelField
 }
 
 const providers: ProviderConfig[] = [
@@ -31,6 +37,7 @@ const providers: ProviderConfig[] = [
     description: "Unified API gateway for multiple LLM providers.",
     envKey: "OPENROUTER_API_KEY",
     placeholder: "",
+    modelField: { envKey: "OPENROUTER_MODEL", placeholder: "openrouter/auto" },
   },
   {
     id: "claude",
@@ -38,6 +45,7 @@ const providers: ProviderConfig[] = [
     description: "Anthropic's Claude models for advanced reasoning.",
     envKey: "ANTHROPIC_API_KEY",
     placeholder: "",
+    modelField: { envKey: "ANTHROPIC_MODEL", placeholder: "claude-sonnet-4-5" },
   },
   {
     id: "openai",
@@ -45,6 +53,7 @@ const providers: ProviderConfig[] = [
     description: "GPT models for chat, code, and embeddings.",
     envKey: "OPENAI_API_KEY",
     placeholder: "",
+    modelField: { envKey: "OPENAI_MODEL", placeholder: "gpt-5" },
   },
   {
     id: "gemini",
@@ -52,6 +61,7 @@ const providers: ProviderConfig[] = [
     description: "Google's Gemini models for multimodal tasks.",
     envKey: "GOOGLE_GEMINI_API_KEY",
     placeholder: "",
+    modelField: { envKey: "GOOGLE_GEMINI_MODEL", placeholder: "gemini-2.5-flash" },
   },
   {
     id: "resend",
@@ -77,6 +87,7 @@ function getAllEnvKeys(provider: ProviderConfig): string[] {
   if (provider.extraFields) {
     for (const f of provider.extraFields) keys.push(f.envKey)
   }
+  if (provider.modelField) keys.push(provider.modelField.envKey)
   return keys
 }
 
@@ -230,6 +241,20 @@ export function IntegrationsTab(): React.ReactElement {
     )
   }
 
+  // Plaintext input for model name. Not a secret; placeholder shows the
+  // hardcoded default that takes effect when the field is left blank.
+  function renderModelField(envKey: string, placeholder: string) {
+    return (
+      <Input
+        type="text"
+        placeholder={placeholder}
+        value={getDisplayValue(envKey)}
+        onChange={(e) => handleKeyChange(envKey, e.target.value)}
+        className="font-mono text-xs"
+      />
+    )
+  }
+
   function renderSaveButton(provider: ProviderConfig, className?: string) {
     const anyDirty = getAllEnvKeys(provider).some(k => dirty[k])
     const isSaving = !!saving[provider.id]
@@ -274,6 +299,10 @@ export function IntegrationsTab(): React.ReactElement {
           {providers.map((provider) => {
             const saved = isConfigured(provider.envKey)
             const hasExtra = !!provider.extraFields
+            const hasModel = !!provider.modelField
+            // The Save button moves under the inputs whenever the card has
+            // additional fields below the API key (extraFields or a model field).
+            const buttonInline = !hasExtra && !hasModel
 
             return (
               <div key={provider.id} className="rounded-xl border p-5">
@@ -295,8 +324,19 @@ export function IntegrationsTab(): React.ReactElement {
                 <div className="mt-4 space-y-3">
                   <div className="flex gap-2">
                     {renderField(provider.envKey, provider.placeholder)}
-                    {!hasExtra && renderSaveButton(provider)}
+                    {buttonInline && renderSaveButton(provider)}
                   </div>
+                  {provider.modelField && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">
+                        Model <span className="font-mono">({provider.modelField.envKey})</span>
+                      </p>
+                      {renderModelField(provider.modelField.envKey, provider.modelField.placeholder)}
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Leave blank to use the default ({provider.modelField.placeholder}).
+                      </p>
+                    </div>
+                  )}
                   {provider.extraFields?.map((field) => (
                     <div key={field.envKey}>
                       <p className="text-xs text-muted-foreground mb-1">
@@ -305,7 +345,7 @@ export function IntegrationsTab(): React.ReactElement {
                       {renderField(field.envKey, field.placeholder)}
                     </div>
                   ))}
-                  {hasExtra && renderSaveButton(provider, "w-full")}
+                  {!buttonInline && renderSaveButton(provider, "w-full")}
                   {errors[provider.id] && (
                     <p className="text-xs text-red-500">{errors[provider.id]}</p>
                   )}
@@ -329,9 +369,13 @@ export function IntegrationsTab(): React.ReactElement {
         <CardContent>
           <pre className="rounded-lg border bg-muted/50 p-4 font-mono text-sm text-muted-foreground overflow-x-auto">
 {`OPENROUTER_API_KEY=
+OPENROUTER_MODEL=
 ANTHROPIC_API_KEY=
+ANTHROPIC_MODEL=
 OPENAI_API_KEY=
+OPENAI_MODEL=
 GOOGLE_GEMINI_API_KEY=
+GOOGLE_GEMINI_MODEL=
 RESEND_API_KEY=
 RESEND_WEBHOOK_SECRET=`}
           </pre>

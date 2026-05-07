@@ -6,7 +6,7 @@ import { eq, and } from "drizzle-orm"
 import { encrypt, decrypt, isEncrypted } from "@/lib/crypto"
 import { INTEGRATIONS_MODULE_ID } from "@/lib/constants"
 
-const ALLOWED_KEYS = new Set([
+const SECRET_KEYS = new Set([
   "OPENROUTER_API_KEY",
   "ANTHROPIC_API_KEY",
   "OPENAI_API_KEY",
@@ -14,6 +14,15 @@ const ALLOWED_KEYS = new Set([
   "RESEND_API_KEY",
   "RESEND_WEBHOOK_SECRET",
 ])
+
+const MODEL_KEYS = new Set([
+  "OPENROUTER_MODEL",
+  "ANTHROPIC_MODEL",
+  "OPENAI_MODEL",
+  "GOOGLE_GEMINI_MODEL",
+])
+
+const ALLOWED_KEYS = new Set([...SECRET_KEYS, ...MODEL_KEYS])
 
 function maskValue(value: string): string {
   if (value.length <= 6) return "••••••••"
@@ -69,8 +78,9 @@ export async function GET(request: NextRequest) {
 
   const saved = await readSettings(user.id)
 
-  // Reveal a specific key's decrypted value
-  if (reveal && ALLOWED_KEYS.has(reveal)) {
+  // Reveal a specific secret key's decrypted value (model keys aren't secret —
+  // their plaintext value is already in the masked field of the status response).
+  if (reveal && SECRET_KEYS.has(reveal)) {
     const headers = { "Cache-Control": "no-store", "Pragma": "no-cache" }
     const raw = saved[reveal]
     if (typeof raw === "string") {
@@ -83,9 +93,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ key: reveal, value: null }, { headers })
   }
 
-  // Return status for all keys
+  // Return status for all keys.
+  // Secret keys: { configured, masked: "abcd••••wxyz" }
+  // Model keys:  { configured, masked: "claude-sonnet-4-5" } — plaintext, not a secret.
   const result: Record<string, { configured: boolean; masked: string | null }> = {}
-  for (const key of ALLOWED_KEYS) {
+  for (const key of SECRET_KEYS) {
     const raw = saved[key]
     const envVal = process.env[key]
     if (typeof raw === "string") {
@@ -95,6 +107,14 @@ export async function GET(request: NextRequest) {
     } else {
       result[key] = { configured: false, masked: null }
     }
+  }
+  for (const key of MODEL_KEYS) {
+    const raw = saved[key]
+    const envVal = process.env[key]
+    const value = typeof raw === "string" ? raw : (envVal ?? null)
+    result[key] = value
+      ? { configured: true, masked: value }
+      : { configured: false, masked: null }
   }
 
   return NextResponse.json(result)
@@ -130,8 +150,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, deleted: true })
   }
 
-  const merged = { ...existing, [key]: encrypt(value) }
+  // Model values are not secrets — store plaintext so the UI can show them.
+  // API keys are encrypted at rest.
+  const stored = MODEL_KEYS.has(key) ? value : encrypt(value)
+  const merged = { ...existing, [key]: stored }
   await writeSettings(user.id, merged)
 
-  return NextResponse.json({ success: true, masked: maskValue(value) })
+  return NextResponse.json({
+    success: true,
+    masked: MODEL_KEYS.has(key) ? value : maskValue(value),
+  })
 }
