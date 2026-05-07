@@ -15,6 +15,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
+import { useUserPreferences } from "@/hooks/use-user-preferences"
 import { getNotepad, saveNotepad, getNotepadRevisions, restoreNotepadRevision, NotepadRevision } from "@/modules/notepad/lib/notepad"
 
 interface NotepadProps {
@@ -37,15 +38,11 @@ export function Notepad({ isOpen, onClose }: NotepadProps) {
   const [isViewingHistory, setIsViewingHistory] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false)
-  const [userTimezone, setUserTimezone] = useState("UTC")
 
-  // Load user timezone preference
-  useEffect(() => {
-    fetch("/api/user-preferences")
-      .then(res => res.ok ? res.json() : null)
-      .then(data => { if (data?.timezone) setUserTimezone(data.timezone) })
-      .catch(() => {})
-  }, [])
+  // Notepad is mounted on every page via the top-bar portal but stays closed by
+  // default — only fetch prefs when the slide-out actually opens.
+  const { data: userPrefs } = useUserPreferences({ enabled: isOpen })
+  const userTimezone = userPrefs?.timezone ?? "UTC"
 
   // Load saved content and revisions from database when component mounts
   useEffect(() => {

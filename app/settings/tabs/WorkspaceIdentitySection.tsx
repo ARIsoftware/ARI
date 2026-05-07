@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -10,6 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { User, Info, Loader2, Save, Check } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import {
+  useUserPreferences,
+  useUpdateUserPreferences,
+  toProfileForm,
+  type UserProfileForm,
+} from "@/hooks/use-user-preferences"
 import { profileFieldSchemas, firstZodError, type ProfileFieldName } from "@/lib/validation"
 
 // Common timezones for the dropdown
@@ -37,115 +43,74 @@ const COMMON_TIMEZONES = [
   { value: 'Africa/Johannesburg', label: 'Johannesburg' },
 ]
 
-interface UserPreferencesData {
-  name: string
-  email: string
-  title: string
-  company_name: string
-  country: string
-  city: string
-  linkedin_url: string
-  timezone: string
-}
-
 export function WorkspaceIdentitySection(): React.ReactElement {
   const { toast } = useToast()
-  const [isLoading, setIsLoading] = useState(true)
+  const { data: serverPrefs, isLoading } = useUserPreferences()
+  const updatePrefs = useUpdateUserPreferences()
   const [isSaving, setIsSaving] = useState(false)
-  const [hasChanges, setHasChanges] = useState(false)
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof UserPreferencesData, string>>>({})
-  const [formData, setFormData] = useState<UserPreferencesData>({
-    name: '',
-    email: '',
-    title: '',
-    company_name: '',
-    country: '',
-    city: '',
-    linkedin_url: '',
-    timezone: 'UTC',
-  })
-  const [originalData, setOriginalData] = useState<UserPreferencesData | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof UserProfileForm, string>>>({})
+  const [formData, setFormData] = useState<UserProfileForm>(() => toProfileForm(null))
 
+  // Populate the form once when server prefs first arrive. The ref guard
+  // keeps subsequent refetches (window focus, post-save cache writes) from
+  // overwriting in-progress edits.
+  const hasPopulated = useRef(false)
   useEffect(() => {
-    async function loadPreferences() {
+    if (hasPopulated.current || !serverPrefs) return
+
+    const prefs = toProfileForm(serverPrefs)
+
+    // If DB came back empty, migrate any unsaved welcome profile from
+    // localStorage on first sight.
+    const isEmpty = !prefs.name && !prefs.title && !prefs.company_name && !prefs.country && !prefs.city && !prefs.linkedin_url
+    if (isEmpty) {
       try {
-        const response = await fetch('/api/user-preferences')
-        if (response.ok) {
-          const data = await response.json()
-          const prefs = {
-            name: data.name || '',
-            email: data.email || '',
-            title: data.title || '',
-            company_name: data.company_name || '',
-            country: data.country || '',
-            city: data.city || '',
-            linkedin_url: data.linkedin_url || '',
-            timezone: data.timezone || 'UTC',
+        const stored = localStorage.getItem('ari_welcome_profile')
+        if (stored) {
+          const welcomeData = JSON.parse(stored) as Partial<UserProfileForm>
+          const merged: UserProfileForm = {
+            name:         welcomeData.name         || prefs.name,
+            email:        welcomeData.email        || prefs.email,
+            title:        welcomeData.title        || prefs.title,
+            company_name: welcomeData.company_name || prefs.company_name,
+            country:      welcomeData.country      || prefs.country,
+            city:         welcomeData.city         || prefs.city,
+            linkedin_url: welcomeData.linkedin_url || prefs.linkedin_url,
+            timezone:     welcomeData.timezone     || prefs.timezone,
           }
+          setFormData(merged)
+          hasPopulated.current = true
 
-          // If DB returned empty data, check localStorage for unsaved welcome profile
-          const isEmpty = !prefs.name && !prefs.title && !prefs.company_name && !prefs.country && !prefs.city && !prefs.linkedin_url
-          if (isEmpty) {
-            try {
-              const stored = localStorage.getItem('ari_welcome_profile')
-              if (stored) {
-                const welcomeData = JSON.parse(stored)
-                const merged = {
-                  name: welcomeData.name || prefs.name,
-                  email: welcomeData.email || prefs.email,
-                  title: welcomeData.title || prefs.title,
-                  company_name: welcomeData.company_name || prefs.company_name,
-                  country: welcomeData.country || prefs.country,
-                  city: welcomeData.city || prefs.city,
-                  linkedin_url: welcomeData.linkedin_url || prefs.linkedin_url,
-                  timezone: welcomeData.timezone || prefs.timezone,
-                }
-                setFormData(merged)
-                setOriginalData(merged)
-
-                // Sync to DB and clear localStorage
-                fetch('/api/user-preferences', {
-                  method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: stored,
-                }).then(res => {
-                  if (res.ok) localStorage.removeItem('ari_welcome_profile')
-                }).catch((err) => console.warn('Failed to sync welcome profile to DB:', err))
-
-                return
-              }
-            } catch {}
-          }
-
-          setFormData(prefs)
-          setOriginalData(prefs)
+          updatePrefs.mutate(welcomeData, {
+            onSuccess: () => localStorage.removeItem('ari_welcome_profile'),
+            onError: (err) => console.warn('Failed to sync welcome profile to DB:', err),
+          })
+          return
         }
-      } catch (error) {
-        console.error('Failed to load user preferences:', error)
-      } finally {
-        setIsLoading(false)
-      }
+      } catch {}
     }
-    loadPreferences()
-  }, [])
 
-  useEffect(() => {
-    if (originalData) {
-      const changed = JSON.stringify(formData) !== JSON.stringify(originalData)
-      setHasChanges(changed)
-    }
-  }, [formData, originalData])
+    setFormData(prefs)
+    hasPopulated.current = true
+    // updatePrefs intentionally omitted: useMutation returns a new wrapper
+    // every render; we only want to run when serverPrefs first arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverPrefs])
 
-  const handleChange = (field: keyof UserPreferencesData, value: string) => {
+  // Diff against the cached server state. After a successful save the cache
+  // is updated via setQueryData → baseline updates → hasChanges flips false.
+  const baseline = toProfileForm(serverPrefs)
+  const hasChanges = JSON.stringify(formData) !== JSON.stringify(baseline)
+
+  const handleChange = (field: keyof UserProfileForm, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
-    // Clear error for field when user edits it
     if (fieldErrors[field]) {
       setFieldErrors(prev => { const next = { ...prev }; delete next[field]; return next })
     }
   }
 
   const validateForm = (): boolean => {
-    const errors: Partial<Record<keyof UserPreferencesData, string>> = {}
+    const errors: Partial<Record<keyof UserProfileForm, string>> = {}
     for (const [field, schema] of Object.entries(profileFieldSchemas) as Array<[ProfileFieldName, (typeof profileFieldSchemas)[ProfileFieldName]]>) {
       const value = formData[field]
       if (!value || value.trim() === '') continue
@@ -161,28 +126,20 @@ export function WorkspaceIdentitySection(): React.ReactElement {
 
     setIsSaving(true)
     try {
-      const response = await fetch('/api/user-preferences', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name || null,
-          email: formData.email || null,
-          title: formData.title || null,
-          company_name: formData.company_name || null,
-          country: formData.country || null,
-          city: formData.city || null,
-          linkedin_url: formData.linkedin_url || null,
-          timezone: formData.timezone,
-        }),
+      const saved = await updatePrefs.mutateAsync({
+        name: formData.name || null,
+        email: formData.email || null,
+        title: formData.title || null,
+        company_name: formData.company_name || null,
+        country: formData.country || null,
+        city: formData.city || null,
+        linkedin_url: formData.linkedin_url || null,
+        timezone: formData.timezone,
       })
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || 'Failed to save preferences')
-      }
-
-      setOriginalData(formData)
-      setHasChanges(false)
+      // Snap form to the canonical server response — picks up any normalization
+      // (trim, lowercasing, default fills) so the form reflects what's stored.
+      setFormData(toProfileForm(saved))
       toast({
         title: 'Preferences saved',
         description: 'Your profile information has been updated.',

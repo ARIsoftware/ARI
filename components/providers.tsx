@@ -92,9 +92,13 @@ export function Providers({
     user: user,
   } : null
 
-  // Persist welcome profile from localStorage to DB on first authenticated load
+  // Persist welcome profile from localStorage to DB on first authenticated load.
+  // Dep is user?.id (a stable primitive) rather than the user object itself —
+  // the object is rebuilt every render, so [user] would re-fire this effect on
+  // every render and (depending on what's inside) hammer the API.
+  const userId = user?.id
   useEffect(() => {
-    if (!user) return
+    if (!userId) return
     const stored = localStorage.getItem('ari_welcome_profile')
     if (!stored) return
     try {
@@ -115,7 +119,7 @@ export function Providers({
     }).then(res => {
       if (res.ok) localStorage.removeItem('ari_welcome_profile')
     }).catch(err => console.error('Failed to persist welcome profile:', err))
-  }, [user])
+  }, [userId])
 
   const isAuthenticated = !isPublicPage && !!session
 

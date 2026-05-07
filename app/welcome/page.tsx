@@ -29,6 +29,7 @@ import {
   firstZodError,
   type ProfileFieldName,
 } from "@/lib/validation"
+import { useUserPreferences, toProfileForm } from "@/hooks/use-user-preferences"
 
 // Common timezones (shared with settings page)
 const COMMON_TIMEZONES = [
@@ -140,39 +141,27 @@ export default function WelcomePage() {
     }
   }, [])
 
-  // Prefill profile from DB when user navigates to the personal tab
+  // Lazy-load profile from DB only when the user reaches the personal tab.
+  // The shared hook dedupes against any other consumers (notepad, settings).
+  const { data: profilePrefs } = useUserPreferences({ enabled: currentTab === 'personal' })
+
   useEffect(() => {
     if (currentTab !== 'personal') return
-    // Prefill email from account tab if not already set
     if (formData.adminEmail && !profileData.email) {
       setProfileData(prev => ({ ...prev, email: formData.adminEmail }))
     }
-    async function loadProfile() {
-      try {
-        const res = await fetch('/api/user-preferences')
-        if (!res.ok) return
-        const contentType = res.headers.get('content-type') || ''
-        if (!contentType.includes('application/json')) return
-        const data = await res.json()
-        if (data.error) return
-        const merged = {
-          name: data.name || '',
-          email: data.email || '',
-          title: data.title || '',
-          company_name: data.company_name || '',
-          country: data.country || '',
-          city: data.city || '',
-          linkedin_url: data.linkedin_url || '',
-          timezone: data.timezone || 'UTC',
-        }
-        const hasData = Object.values(merged).some(v => v && v !== 'UTC')
-        if (hasData) setProfileData(merged)
-      } catch (error) {
-        console.error('Failed to load profile:', error)
-      }
-    }
-    loadProfile()
-  }, [currentTab])
+  }, [currentTab, formData.adminEmail, profileData.email])
+
+  // Populate once on first arrival of server prefs. The ref guard prevents
+  // window-focus refetches from clobbering in-progress edits.
+  const profilePopulated = useRef(false)
+  useEffect(() => {
+    if (profilePopulated.current || !profilePrefs) return
+    const merged = toProfileForm(profilePrefs)
+    const hasData = Object.values(merged).some(v => v && v !== 'UTC')
+    if (hasData) setProfileData(merged)
+    profilePopulated.current = true
+  }, [profilePrefs])
 
   // Blank input counts as "not filled in" (the whole Personal step is optional).
   const validateProfileField = (field: ProfileFieldName, value: string): string | null => {
