@@ -1,11 +1,9 @@
 "use client"
 
-import { TetrisGame } from "@/components/tetris-game"
-
 export function DatabaseErrorContent({ onRetry }: { onRetry?: () => void }) {
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center p-8">
-      <div className="text-center mb-8 max-w-2xl">
+      <div className="text-center max-w-2xl">
         <h1 className="text-6xl font-bold mb-4">Database</h1>
         <p className="text-base font-normal text-gray-600 mb-6">
           The application cannot connect to the database. Please verify that
@@ -59,7 +57,6 @@ export function DatabaseErrorContent({ onRetry }: { onRetry?: () => void }) {
           </button>
         )}
       </div>
-      <TetrisGame />
     </div>
   )
 }
