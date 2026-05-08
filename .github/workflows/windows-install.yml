@@ -35,19 +35,10 @@ jobs:
       - name: Show preinstalled tool versions (for context)
         shell: pwsh
         run: |
-          function Show-Tool($label, $cmd) {
-            if (Get-Command $cmd -ErrorAction SilentlyContinue) {
-              try { Write-Host "$label $(& $cmd --version 2>&1 | Select-Object -First 1)" }
-              catch { Write-Host "$label installed (version probe failed)" }
-            } else {
-              Write-Host "$label not installed"
-            }
-          }
-          Show-Tool 'Node:   ' 'node'
-          Show-Tool 'Git:    ' 'git'
-          Show-Tool 'pnpm:   ' 'pnpm'
-          Show-Tool 'gh:     ' 'gh'
-          Show-Tool 'winget: ' 'winget'
+          Write-Host "Node:    $(node --version 2>$null)"
+          Write-Host "Git:     $(git --version 2>$null)"
+          Write-Host "pnpm:    $(pnpm --version 2>$null)"
+          Write-Host "winget:  $(winget --version 2>$null)"
 
       - name: Run ARI installer
         shell: pwsh
