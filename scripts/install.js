@@ -303,10 +303,13 @@ class Spinner {
 
   start(text = '') {
     this.text = text;
+    this.startedAt = Date.now();
     process.stdout.write(HIDE_CURSOR);
     this.timer = setInterval(() => {
+      const elapsedSec = Math.floor((Date.now() - this.startedAt) / 1000);
+      const elapsedTag = elapsedSec >= 5 ? ` ${DIM}(${elapsedSec}s)${RESET}` : '';
       const frame = `${BLUE}${this.frames[this.i]}${RESET}`;
-      process.stdout.write(`\r  ${frame} ${this.text}`);
+      process.stdout.write(`\r  ${frame} ${this.text}${elapsedTag}   `);
       this.i = (this.i + 1) % this.frames.length;
     }, 80);
   }
@@ -730,6 +733,10 @@ const TOOLS = [
     },
     detect: detectPostgresServer,
     description: 'Database server for ARI data storage.',
+    // Stream installer output instead of using a spinner — winget download
+    // progress + EDB unpacking progress are useful signal during a multi-
+    // minute install.
+    streamOutput: true,
   },
   // psql is a separate tool on macOS/Linux but bundled with PostgreSQL.PostgreSQL
   // on Windows (no separate winget package exists). On Windows we skip this
@@ -834,12 +841,20 @@ async function installTools() {
     }
 
     const spinner = new Spinner();
-    spinner.start(`Installing ${tool.name}…`);
+    const streamMode = !!tool.streamOutput && !isWinGithubBinary;
+    if (streamMode) {
+      console.log(`  ${dim('Installing ' + tool.name + ' — this can take a few minutes…')}`);
+      console.log('');
+    } else {
+      spinner.start(`Installing ${tool.name}…`);
+    }
 
     try {
       if (isWinGithubBinary) {
         if (tool.id === 'pgweb') await installPgwebWindows();
         else if (tool.id === 'supabase') await installSupabaseCliWindows();
+      } else if (streamMode) {
+        await spawnShellAsync(cmd);
       } else {
         await runAsync(cmd);
       }
@@ -1045,6 +1060,23 @@ function spawnAsync(cmd, args, opts) {
     child.on('close', (code) => {
       if (code === 0) resolve();
       else reject(new Error(`${cmd} exited with code ${code}`));
+    });
+    child.on('error', reject);
+  });
+}
+
+// Run a full shell command string with stdout/stderr streamed live to the
+// user's terminal. Used for slow installs (e.g. Postgres) where winget +
+// installer progress is the most informative thing we can show.
+function spawnShellAsync(cmdString, opts = {}) {
+  return new Promise((resolve, reject) => {
+    const isWin = process.platform === 'win32';
+    const shell = isWin ? 'cmd.exe' : '/bin/sh';
+    const flag = isWin ? '/c' : '-c';
+    const child = spawn(shell, [flag, cmdString], { stdio: 'inherit', ...opts });
+    child.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`Exit code: ${code}`));
     });
     child.on('error', reject);
   });
