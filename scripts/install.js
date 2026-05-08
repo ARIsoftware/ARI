@@ -308,27 +308,23 @@ function stripAnsi(s) {
 }
 
 function showWelcome() {
-  // Logo and welcome text are shown by install.sh (bash) before Node.js runs.
-  // When run directly via node (e.g. on Windows), show the logo here.
-  if (!process.env.ARI_PLATFORM) {
-    console.log('');
-    console.log(`  ${CYAN}╔═══╗   ╔════╗   ═╗${RESET}`);
-    console.log(`  ${CYAN}║   ║   ║    ║    ║${RESET}`);
-    console.log(`  ${CYAN}╠═══╣   ╠════╝    ║${RESET}`);
-    console.log(`  ${CYAN}║   ║   ║  ╚═╗    ║${RESET}`);
-    console.log(`  ${CYAN}╩   ╩   ╩    ╩   ═╩═${RESET}`);
-    console.log('');
-    console.log(`  ${DIM}P R E M I E R   P E R S O N A L   P R O D U C T I V I T Y${RESET}`);
-    console.log('');
-    console.log(`  Platform: ${bold(platformLabel())}`);
-    console.log('');
-    console.log(`  Welcome to ARI. Engineered for those who want complete command over the`);
-    console.log(`  software that runs their life. The first AI-enabled No Code workspace that`);
-    console.log(`  can be completely customized to your workflow and grows with you. Build`);
-    console.log(`  entirely new modules in minutes. Where mastery, modularity, and AI work in`);
-    console.log(`  your favour so you can do your best work and live your best life.`);
-    console.log('');
-  }
+  console.log('');
+  console.log(`  ${CYAN}╔═══╗   ╔════╗   ═╗${RESET}`);
+  console.log(`  ${CYAN}║   ║   ║    ║    ║${RESET}`);
+  console.log(`  ${CYAN}╠═══╣   ╠════╝    ║${RESET}`);
+  console.log(`  ${CYAN}║   ║   ║  ╚═╗    ║${RESET}`);
+  console.log(`  ${CYAN}╩   ╩   ╩    ╩   ═╩═${RESET}`);
+  console.log('');
+  console.log(`  ${DIM}P R E M I E R   P E R S O N A L   P R O D U C T I V I T Y${RESET}`);
+  console.log('');
+  console.log(`  Platform: ${bold(platformLabel())}`);
+  console.log('');
+  console.log(`  Welcome to ARI. Engineered for those who want complete command over the`);
+  console.log(`  software that runs their life. The first AI-enabled No Code workspace that`);
+  console.log(`  can be completely customized to your workflow and grows with you. Build`);
+  console.log(`  entirely new modules in minutes. Where mastery, modularity, and AI work in`);
+  console.log(`  your favour so you can do your best work and live your best life.`);
+  console.log('');
 
   console.log(`  This installer will set up everything you need to run ARI. The installer is`);
   console.log(`  open source as can be viewed on our Github repo.`);
@@ -1525,8 +1521,11 @@ async function main() {
     process.exit(0);
   });
 
-  // Welcome screen (skip if install.sh already showed it)
-  if (!process.env.ARI_PLATFORM) {
+  // install.sh (bash, used on macOS + Linux) prints the logo and welcome text
+  // before invoking node, so skip it here to avoid double-printing. install.ps1
+  // does not, so on Windows we print it here.
+  const parentPrintedWelcome = process.env.ARI_PLATFORM === 'darwin' || process.env.ARI_PLATFORM === 'linux';
+  if (!parentPrintedWelcome) {
     showWelcome();
     await pressEnter('Ready to start? Press ENTER');
   }
