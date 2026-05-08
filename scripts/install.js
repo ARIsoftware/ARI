@@ -1102,12 +1102,15 @@ function spawnAsync(cmd, args, opts) {
 // Run a full shell command string with stdout/stderr streamed live to the
 // user's terminal. Used for slow installs (e.g. Postgres) where winget +
 // installer progress is the most informative thing we can show.
+//
+// shell: true is critical — it tells Node to hand the command string to
+// the platform shell (cmd.exe on Windows, /bin/sh on Unix) without
+// applying CRT-style argument escaping. That preserves nested quotes in
+// patterns like `winget --override "--mode unattended ..."` which would
+// otherwise be mangled when bouncing through `spawn('cmd', ['/c', ...])`.
 function spawnShellAsync(cmdString, opts = {}) {
   return new Promise((resolve, reject) => {
-    const isWin = process.platform === 'win32';
-    const shell = isWin ? 'cmd.exe' : '/bin/sh';
-    const flag = isWin ? '/c' : '-c';
-    const child = spawn(shell, [flag, cmdString], { stdio: 'inherit', ...opts });
+    const child = spawn(cmdString, [], { shell: true, stdio: 'inherit', ...opts });
     child.on('close', (code) => {
       if (code === 0) resolve();
       else reject(new Error(`Exit code: ${code}`));
