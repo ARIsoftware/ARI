@@ -886,7 +886,8 @@ async function installTools() {
     const spinner = new Spinner();
     const streamMode = !!tool.streamOutput && !isWinGithubBinary;
     if (streamMode) {
-      console.log(`  ${dim('Installing ' + tool.name + ' — this can take a few minutes…')}`);
+      console.log(`  ${dim('Installing ' + tool.name + '…')}`);
+      console.log(`  ${dim('Note: The windows PostgreSQL installer can be silent for 1–5 minutes while the installer unpacks. This is normal.')}`);
       console.log('');
     } else {
       spinner.start(`Installing ${tool.name}…`);
