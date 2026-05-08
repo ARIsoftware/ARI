@@ -208,6 +208,32 @@ async function installPgwebWindows() {
   return flat;
 }
 
+async function installSupabaseCliWindows() {
+  const binDir = getWindowsAriBinDir();
+  fs.mkdirSync(binDir, { recursive: true });
+
+  const release = await httpGetJson('https://api.github.com/repos/supabase/cli/releases/latest');
+  // Asset name pattern: supabase_<version>_windows_amd64.zip
+  const asset = release.assets && release.assets.find(a => /^supabase_.*windows_amd64\.zip$/i.test(a.name));
+  if (!asset) throw new Error('No Windows amd64 zip in supabase/cli latest release');
+
+  const zipPath = path.join(os.tmpdir(), `supabase-${process.pid}.zip`);
+  await httpDownload(asset.browser_download_url, zipPath);
+
+  execSync(
+    `powershell -NoProfile -Command "Expand-Archive -Force -Path '${zipPath}' -DestinationPath '${binDir}'"`,
+    { stdio: 'pipe' }
+  );
+
+  const flat = path.join(binDir, 'supabase.exe');
+  try { fs.unlinkSync(zipPath); } catch {}
+
+  if (!fs.existsSync(flat)) {
+    throw new Error(`supabase.exe not found after extraction in ${binDir}`);
+  }
+  return flat;
+}
+
 function findWindowsPsqlExe() {
   for (const v of findWindowsPostgresVersions()) {
     const exe = path.join(WIN_POSTGRES_BASE, v, 'bin', 'psql.exe');
@@ -434,7 +460,11 @@ function detectVercelCli() {
 }
 
 function detectSupabaseCli() {
-  const out = run('supabase --version');
+  let out = run('supabase --version');
+  if (!out && process.platform === 'win32') {
+    const exe = path.join(getWindowsAriBinDir(), 'supabase.exe');
+    if (fs.existsSync(exe)) out = run(`"${exe}" --version`);
+  }
   return { installed: !!out, version: out ? parseVersion(out) : null };
 }
 
@@ -629,13 +659,14 @@ const TOOLS = [
   {
     id: 'supabase',
     // Supabase explicitly disabled `npm install -g supabase` (it exits non-zero
-    // by design). On Windows we use their winget package; on Linux there's no
-    // clean prebuilt path so we leave it skippable. Required only on macOS.
+    // by design). brew works on macOS. On Windows we download the prebuilt
+    // amd64 binary from their GitHub releases (handled as a special case in
+    // installTools) since their winget id is unreliable. Required only on
+    // macOS — Local Postgres mode (Windows default) doesn't need it.
     name: 'Supabase CLI',
     required: PLATFORM === 'darwin',
     installCmds: {
       darwin: 'brew install supabase/tap/supabase',
-      win32: 'winget install -e --id Supabase.CLI --source winget --accept-source-agreements --accept-package-agreements',
     },
     detect: detectSupabaseCli,
     description: 'Database management tools for Supabase PostgreSQL.',
@@ -741,11 +772,12 @@ async function installTools() {
     console.log(`  ${dim(tool.description)}`);
     console.log('');
 
-    // pgweb on Windows: no winget/choco package and no Go toolchain assumed.
-    // Download the prebuilt release ZIP from GitHub instead.
-    const isWinPgweb = tool.id === 'pgweb' && PLATFORM === 'win32';
+    // Windows tools without a reliable winget/choco package: download the
+    // prebuilt amd64 binary directly from the project's GitHub releases.
+    const isWinGithubBinary =
+      PLATFORM === 'win32' && (tool.id === 'pgweb' || tool.id === 'supabase');
 
-    const cmd = isWinPgweb ? '<download from GitHub releases>' : getInstallCmd(tool.installCmds);
+    const cmd = isWinGithubBinary ? '<download from GitHub releases>' : getInstallCmd(tool.installCmds);
     if (!cmd) {
       console.log(`  ${SYM_WARN} ${yellow(`No install method for ${tool.name} on ${platformLabel()}.`)}`);
       results.push({ ...tool, status: 'skipped', version: null });
@@ -772,8 +804,9 @@ async function installTools() {
     spinner.start(`Installing ${tool.name}…`);
 
     try {
-      if (isWinPgweb) {
-        await installPgwebWindows();
+      if (isWinGithubBinary) {
+        if (tool.id === 'pgweb') await installPgwebWindows();
+        else if (tool.id === 'supabase') await installSupabaseCliWindows();
       } else {
         await runAsync(cmd);
       }
