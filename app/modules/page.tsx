@@ -932,7 +932,7 @@ export default function ModulesPage() {
 
                     return (
                       <Card
-                        key={mod.id}
+                        key={mod.path || mod.id}
                         className={`flex flex-col transition-colors ${
                           hasChanged ? 'border-amber-400 bg-amber-50/50 dark:bg-amber-950/20' : 'hover:border-foreground/20'
                         } ${mod.status === "locked" ? 'opacity-60' : ''}`}
@@ -977,7 +977,7 @@ export default function ModulesPage() {
 
                     return (
                       <div
-                        key={mod.id}
+                        key={mod.path || mod.id}
                         className={`flex items-center gap-4 rounded-lg border p-4 transition-colors ${
                           hasChanged ? 'border-amber-400 bg-amber-50/50 dark:bg-amber-950/20' : ''
                         } ${mod.status === "locked" ? 'opacity-60' : ''}`}
