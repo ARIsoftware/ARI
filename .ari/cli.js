@@ -342,12 +342,15 @@ function start(opts = {}) {
   log('');
 
   // Start Next.js dev server — pipe stdout (and stderr in quiet mode) so we
-  // can suppress. On Windows, pnpm ships as pnpm.cmd; spawn() with no shell
-  // resolves .cmd via PATH if we name it explicitly. Avoids DEP0190 from
-  // Node 22+ on the spawn(cmd, args, { shell: true }) pattern.
-  const child = spawn(IS_WIN ? 'pnpm.cmd' : 'pnpm', ['dev'], {
+  // can suppress. Use shell:true with the command as a single string so:
+  //   - Windows resolves pnpm.cmd via cmd.exe (CreateProcess can't run .cmd
+  //     files directly — that path returns EINVAL).
+  //   - DEP0190 doesn't fire (the deprecation only triggers when args are
+  //     passed alongside shell:true; an empty args array avoids it).
+  const child = spawn('pnpm dev', [], {
     stdio: ['inherit', 'pipe', quiet ? 'pipe' : 'inherit'],
     cwd: ROOT,
+    shell: true,
   });
 
   // In quiet mode, buffer stderr instead of dropping it. If the child exits
