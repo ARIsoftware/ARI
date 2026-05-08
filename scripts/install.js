@@ -716,16 +716,17 @@ const TOOLS = [
       // to match the rest of the codebase (postgresql@17 on macOS,
       // postgresql-x64-17 service name on Windows, setup.sql expectations).
       //
-      // --override replaces winget's default install args. The minimum the
-      // EDB installer needs for an unattended run is unattended mode + a
-      // superpassword. We leave --enable-components and --serviceaccount at
-      // EDB's defaults; specifying them has been brittle across versions.
+      // --enable-components server,commandlinetools skips pgAdmin (~600 MB
+      // Python+Flask GUI we don't use; ARI talks to Postgres via the pg Node
+      // module) and StackBuilder (extension picker GUI). Cuts install time
+      // from ~3 minutes to ~30 seconds.
       win32:
         `winget install -e --id PostgreSQL.PostgreSQL.17 --source winget ` +
         `--accept-source-agreements --accept-package-agreements ` +
         `--override "--mode unattended --unattendedmodeui none ` +
         `--superpassword ${POSTGRES_PASSWORD} ` +
-        `--servicepassword ${POSTGRES_PASSWORD}"`,
+        `--servicepassword ${POSTGRES_PASSWORD} ` +
+        `--enable-components server,commandlinetools"`,
     },
     detect: detectPostgresServer,
     description: 'Database server for ARI data storage.',
