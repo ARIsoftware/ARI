@@ -215,16 +215,18 @@ async function installPgwebWindows() {
     { stdio: 'pipe' }
   );
 
-  // Releases usually extract to a nested pgweb_windows_amd64/ folder. Flatten.
+  // The pgweb zip contains a single file named like 'pgweb_windows_amd64'
+  // (no .exe extension). Some GoReleaser builds nest under a folder of the
+  // same name. Find anything pgweb-shaped and rename to pgweb.exe so cli.js
+  // can spawn it without guessing.
   const flat = path.join(binDir, 'pgweb.exe');
   if (!fs.existsSync(flat)) {
-    const candidates = fs.readdirSync(binDir);
-    for (const name of candidates) {
-      const nested = path.join(binDir, name, 'pgweb.exe');
-      if (fs.existsSync(nested)) {
-        fs.renameSync(nested, flat);
-        try { fs.rmdirSync(path.join(binDir, name)); } catch {}
-        break;
+    const found = findFileMatching(binDir, /^pgweb[\w.-]*$/i);
+    if (found) {
+      fs.renameSync(found, flat);
+      const parent = path.dirname(found);
+      if (parent !== binDir) {
+        try { fs.rmdirSync(parent); } catch {}
       }
     }
   }
@@ -232,9 +234,30 @@ async function installPgwebWindows() {
   try { fs.unlinkSync(zipPath); } catch {}
 
   if (!fs.existsSync(flat)) {
-    throw new Error(`pgweb.exe not found after extraction in ${binDir}`);
+    throw new Error(`pgweb binary not found after extraction in ${binDir}`);
   }
   return flat;
+}
+
+// Walk a directory tree (one level deep is enough for our archives) and
+// return the first file whose name matches `pattern`. Used by the Windows
+// release extractors to locate binaries that may or may not be nested and
+// may or may not have a .exe extension.
+function findFileMatching(dir, pattern) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isFile() && pattern.test(entry.name)) return full;
+    if (entry.isDirectory()) {
+      try {
+        for (const nested of fs.readdirSync(full, { withFileTypes: true })) {
+          if (nested.isFile() && pattern.test(nested.name)) {
+            return path.join(full, nested.name);
+          }
+        }
+      } catch { /* unreadable subdir, skip */ }
+    }
+  }
+  return null;
 }
 
 async function installSupabaseCliWindows() {
@@ -254,10 +277,21 @@ async function installSupabaseCliWindows() {
   execSync(`tar -xzf "${tarPath}" -C "${binDir}"`, { stdio: 'pipe' });
 
   const flat = path.join(binDir, 'supabase.exe');
+  if (!fs.existsSync(flat)) {
+    const found = findFileMatching(binDir, /^supabase[\w.-]*$/i);
+    if (found) {
+      fs.renameSync(found, flat);
+      const parent = path.dirname(found);
+      if (parent !== binDir) {
+        try { fs.rmdirSync(parent); } catch {}
+      }
+    }
+  }
+
   try { fs.unlinkSync(tarPath); } catch {}
 
   if (!fs.existsSync(flat)) {
-    throw new Error(`supabase.exe not found after extraction in ${binDir}`);
+    throw new Error(`supabase binary not found after extraction in ${binDir}`);
   }
   return flat;
 }
