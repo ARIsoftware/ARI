@@ -123,10 +123,29 @@ function ensureWindowsPostgresPath() {
   }
 }
 
-// Where Windows-only binaries we download (pgweb) live. Independent of the
-// ARI clone location since installTools() runs before cloneAndSetup().
+// Where Windows-only binaries we download (pgweb, supabase) live. Independent
+// of the ARI clone location since installTools() runs before cloneAndSetup().
 function getWindowsAriBinDir() {
   return path.join(process.env.LOCALAPPDATA || os.homedir(), 'ARI', 'bin');
+}
+
+// Map Node's process.arch to the convention used in GitHub release asset names.
+function getWindowsReleaseArch() {
+  return process.arch === 'arm64' ? 'arm64' : 'amd64';
+}
+
+// Find a release asset by arch, falling back to amd64 if no arch-specific one
+// is published. amd64 binaries run on Windows ARM64 via emulation.
+function findWindowsArchAsset(release, namePattern) {
+  const arch = getWindowsReleaseArch();
+  const archPattern = new RegExp(namePattern.replace('{arch}', arch), 'i');
+  const direct = release.assets && release.assets.find(a => archPattern.test(a.name));
+  if (direct) return direct;
+  if (arch !== 'amd64') {
+    const amdPattern = new RegExp(namePattern.replace('{arch}', 'amd64'), 'i');
+    return release.assets && release.assets.find(a => amdPattern.test(a.name));
+  }
+  return null;
 }
 
 function httpGetJson(url, headers = {}) {
@@ -174,8 +193,8 @@ async function installPgwebWindows() {
   fs.mkdirSync(binDir, { recursive: true });
 
   const release = await httpGetJson('https://api.github.com/repos/sosedoff/pgweb/releases/latest');
-  const asset = release.assets && release.assets.find(a => /pgweb_windows_amd64\.zip$/i.test(a.name));
-  if (!asset) throw new Error('pgweb release has no Windows amd64 asset');
+  const asset = findWindowsArchAsset(release, '^pgweb_windows_{arch}\\.zip$');
+  if (!asset) throw new Error('pgweb release has no Windows zip asset for this architecture');
 
   const zipPath = path.join(os.tmpdir(), `pgweb-${process.pid}.zip`);
   await httpDownload(asset.browser_download_url, zipPath);
@@ -213,9 +232,9 @@ async function installSupabaseCliWindows() {
   fs.mkdirSync(binDir, { recursive: true });
 
   const release = await httpGetJson('https://api.github.com/repos/supabase/cli/releases/latest');
-  // Asset name pattern: supabase_<version>_windows_amd64.zip
-  const asset = release.assets && release.assets.find(a => /^supabase_.*windows_amd64\.zip$/i.test(a.name));
-  if (!asset) throw new Error('No Windows amd64 zip in supabase/cli latest release');
+  // Asset name pattern: supabase_<version>_windows_<arch>.zip
+  const asset = findWindowsArchAsset(release, '^supabase_.*windows_{arch}\\.zip$');
+  if (!asset) throw new Error('supabase/cli release has no Windows zip asset for this architecture');
 
   const zipPath = path.join(os.tmpdir(), `supabase-${process.pid}.zip`);
   await httpDownload(asset.browser_download_url, zipPath);
