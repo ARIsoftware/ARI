@@ -10,6 +10,9 @@
 
   To install from a specific branch:
     $env:ARI_BRANCH="develop"; irm https://raw.githubusercontent.com/ARIsoftware/ARI/main/scripts/install.ps1 | iex
+
+  To capture a full log of the install (for debugging or sharing):
+    $env:ARI_LOG="1"; irm https://raw.githubusercontent.com/ARIsoftware/ARI/main/scripts/install.ps1 | iex
 #>
 
 # Wrapped in a scriptblock so that `return` and `throw` exit cleanly when
@@ -86,6 +89,22 @@
             return $ver
         } catch {
             return $null
+        }
+    }
+
+    # ── Logging (opt-in via $env:ARI_LOG) ────────────────────────────────────
+
+    $logPath = $null
+    if ($env:ARI_LOG) {
+        $logPath = Join-Path $env:TEMP "ari-install-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
+        try {
+            Start-Transcript -Path $logPath -Force | Out-Null
+            Write-Host "  Logging this session to:" -ForegroundColor Cyan
+            Write-Host "    $logPath" -ForegroundColor Cyan
+            Write-Host ""
+        } catch {
+            Write-Warn "Could not start log: $($_.Exception.Message)"
+            $logPath = $null
         }
     }
 
@@ -166,5 +185,13 @@
         Write-Host ""
         Write-Err $_.Exception.Message
         Write-Host ""
+    } finally {
+        if ($logPath) {
+            try { Stop-Transcript | Out-Null } catch {}
+            Write-Host ""
+            Write-Host "  Log saved to: $logPath" -ForegroundColor Cyan
+            Write-Host "  Share this file when reporting issues." -ForegroundColor Gray
+            Write-Host ""
+        }
     }
 }
