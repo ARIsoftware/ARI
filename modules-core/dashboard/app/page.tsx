@@ -1,12 +1,10 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   Plus,
   BarChart3,
   Activity,
-  Info,
   Loader2,
 } from 'lucide-react'
 import { useDashboardData } from '@/modules/dashboard/hooks/use-dashboard'
@@ -29,33 +27,6 @@ export default function DashboardPage() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
-  // Show alert if Tasks module is not enabled
-  if (!tasksEnabled) {
-    return (
-      <div className="p-6 max-w-2xl mx-auto">
-        <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
-          <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-          <AlertTitle className="text-blue-900 dark:text-blue-100 text-lg font-medium">
-            Tasks Module Required
-          </AlertTitle>
-          <AlertDescription className="text-blue-700 dark:text-blue-300 mt-2">
-            <p className="mb-4">
-              The Dashboard requires the <strong>Tasks</strong> module to be enabled.
-              The Tasks module provides the core task data that powers the dashboard analytics and overview.
-            </p>
-            <Button
-              variant="outline"
-              className="border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-600 dark:text-blue-300 dark:hover:bg-blue-900/30"
-              onClick={() => (window.location.href = '/modules')}
-            >
-              Go to the Module Library to Enable Tasks
-            </Button>
-          </AlertDescription>
-        </Alert>
       </div>
     )
   }
@@ -86,20 +57,22 @@ export default function DashboardPage() {
                 )}
               </p>
             </div>
-            <div className="flex gap-2">
-              <Button size="sm" onClick={() => (window.location.href = '/tasks')}>
-                <Plus className="w-4 h-4 mr-2" />
-                New Task
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => (window.location.href = '/tasks/radar')}
-              >
-                <BarChart3 className="w-4 h-4 mr-2" />
-                Priority Radar
-              </Button>
-            </div>
+            {tasksEnabled && (
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => (window.location.href = '/tasks')}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Task
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => (window.location.href = '/tasks/radar')}
+                >
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  Priority Radar
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Quick Stats Section */}

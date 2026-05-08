@@ -36,7 +36,7 @@ export function ModulesProvider({ modules, enabledModules = [], children }: Modu
 
 /**
  * Hook to access the modules context
- * For internal use - most components should use isModuleInstalled() from '@/lib/modules/client'
+ * For internal use - most components should use useModuleEnabled() from '@/lib/modules/module-hooks'
  */
 function useModulesContext(): ModulesContextType {
   const context = useContext(ModulesContext);
