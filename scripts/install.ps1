@@ -43,36 +43,7 @@ Write-Host ""
 
 # ── Node.js ──────────────────────────────────────────────────────────────────
 
-function Install-NodeJS {
-    Write-Info "Node.js (v18+) is required but not installed or outdated."
-    Write-Host "  Node.js is the JavaScript runtime that powers ARI."
-    Write-Host ""
-    $yn = Read-Host "  Install Node.js via winget? [Y/n]"
-    if ([string]::IsNullOrWhiteSpace($yn)) { $yn = "Y" }
-    if ($yn -match "^[Yy]") {
-        winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
-        # Refresh PATH so node is available immediately
-        $machinePath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
-        $userPath    = [System.Environment]::GetEnvironmentVariable("Path", "User")
-        $env:Path = (@($machinePath, $userPath) | Where-Object { $_ }) -join ";"
-        # The MSI registers PATH asynchronously and the registry write isn't
-        # always visible immediately. Prepend the standard install dir if we
-        # find node.exe there but it isn't on PATH yet.
-        $nodeStd = "$env:ProgramFiles\nodejs"
-        if ((Test-Path "$nodeStd\node.exe") -and ($env:Path -notlike "*$nodeStd*")) {
-            $env:Path = "$nodeStd;$env:Path"
-        }
-        Write-OK "Node.js installed"
-    } else {
-        Write-Err "Node.js v18+ is required. Cannot continue without it."
-        exit 1
-    }
-}
-
-# Resolve a runnable `node` command. Returns the path/name to invoke, or $null.
-function Resolve-NodeCommand {
-    $cmd = Get-Command node -ErrorAction SilentlyContinue
-    if ($cmd) { return $cmd.Source }
+function Find-NodeExe {
     foreach ($candidate in @(
         "$env:ProgramFiles\nodejs\node.exe",
         "${env:ProgramFiles(x86)}\nodejs\node.exe",
@@ -81,6 +52,40 @@ function Resolve-NodeCommand {
         if ($candidate -and (Test-Path $candidate)) { return $candidate }
     }
     return $null
+}
+
+function Install-NodeJS {
+    Write-Info "Node.js (v18+) is required but not installed or outdated."
+    Write-Host "  Node.js is the JavaScript runtime that powers ARI."
+    Write-Host ""
+    $yn = Read-Host "  Install Node.js via winget? [Y/n]"
+    if ([string]::IsNullOrWhiteSpace($yn)) { $yn = "Y" }
+    if ($yn -match "^[Yy]") {
+        winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
+        # Refresh PATH from the registry. winget's MSI registers PATH
+        # asynchronously, so as a fallback we also prepend the install dir
+        # directly when node.exe is on disk but the registry hasn't caught up.
+        $machinePath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+        $userPath    = [System.Environment]::GetEnvironmentVariable("Path", "User")
+        $env:Path = (@($machinePath, $userPath) | Where-Object { $_ }) -join ";"
+        $nodeExe = Find-NodeExe
+        if ($nodeExe) {
+            $nodeDir = Split-Path -Parent $nodeExe
+            if (($env:Path -split ';') -notcontains $nodeDir) {
+                $env:Path = "$nodeDir;$env:Path"
+            }
+        }
+        Write-OK "Node.js installed"
+    } else {
+        Write-Err "Node.js v18+ is required. Cannot continue without it."
+        exit 1
+    }
+}
+
+function Resolve-NodeCommand {
+    $cmd = Get-Command node -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    return Find-NodeExe
 }
 
 function Get-NodeVersion {
