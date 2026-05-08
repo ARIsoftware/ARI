@@ -175,6 +175,9 @@
 
         $env:ARI_PLATFORM = "win32"
         $env:ARI_PKG_MGR = "winget"
+        # install.js writes the install path here when the clone succeeds, so
+        # the outer scope can cd the user into it after this scriptblock exits.
+        $env:ARI_INSTALL_DIR_FILE = [System.IO.Path]::GetTempFileName()
 
         $nodeCmd = Resolve-NodeCommand
         if (-not $nodeCmd) {
@@ -201,4 +204,17 @@
             Write-Host ""
         }
     }
+}
+
+# Outside the scriptblock so Set-Location lands in the caller's PowerShell
+# scope and survives `irm | iex`. Mirrors the bash installer's `cd` behavior.
+if ($env:ARI_INSTALL_DIR_FILE -and (Test-Path $env:ARI_INSTALL_DIR_FILE)) {
+    try {
+        $installedDir = (Get-Content $env:ARI_INSTALL_DIR_FILE -Raw -ErrorAction Stop).Trim()
+        if ($installedDir -and (Test-Path $installedDir)) {
+            Set-Location $installedDir
+        }
+    } catch { }
+    Remove-Item $env:ARI_INSTALL_DIR_FILE -Force -ErrorAction SilentlyContinue
+    Remove-Item Env:\ARI_INSTALL_DIR_FILE -ErrorAction SilentlyContinue
 }
