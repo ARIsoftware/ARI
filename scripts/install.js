@@ -232,20 +232,19 @@ async function installSupabaseCliWindows() {
   fs.mkdirSync(binDir, { recursive: true });
 
   const release = await httpGetJson('https://api.github.com/repos/supabase/cli/releases/latest');
-  // Asset name pattern: supabase_<version>_windows_<arch>.zip
-  const asset = findWindowsArchAsset(release, '^supabase_.*windows_{arch}\\.zip$');
-  if (!asset) throw new Error('supabase/cli release has no Windows zip asset for this architecture');
+  // Asset name pattern: supabase_<version>_windows_<arch>.tar.gz
+  // (Supabase publishes only tar.gz for Windows, not zip.)
+  const asset = findWindowsArchAsset(release, '^supabase_.*windows_{arch}\\.tar\\.gz$');
+  if (!asset) throw new Error('supabase/cli release has no Windows tar.gz asset for this architecture');
 
-  const zipPath = path.join(os.tmpdir(), `supabase-${process.pid}.zip`);
-  await httpDownload(asset.browser_download_url, zipPath);
+  const tarPath = path.join(os.tmpdir(), `supabase-${process.pid}.tar.gz`);
+  await httpDownload(asset.browser_download_url, tarPath);
 
-  execSync(
-    `powershell -NoProfile -Command "Expand-Archive -Force -Path '${zipPath}' -DestinationPath '${binDir}'"`,
-    { stdio: 'pipe' }
-  );
+  // Windows 10 1803+ ships bsdtar as tar.exe in System32; -xzf handles tar.gz.
+  execSync(`tar -xzf "${tarPath}" -C "${binDir}"`, { stdio: 'pipe' });
 
   const flat = path.join(binDir, 'supabase.exe');
-  try { fs.unlinkSync(zipPath); } catch {}
+  try { fs.unlinkSync(tarPath); } catch {}
 
   if (!fs.existsSync(flat)) {
     throw new Error(`supabase.exe not found after extraction in ${binDir}`);
@@ -848,7 +847,9 @@ async function installTools() {
         results.push({ ...tool, status: 'installed', version: recheck.version });
       } else {
         spinner.error(`Failed to install ${tool.name}`);
-        console.log(`  ${dim(err.message.split('\n').slice(0, 3).join('\n  '))}`);
+        // Show enough lines to surface the underlying installer error (winget,
+        // EDB, etc.) without flooding the screen.
+        console.log(`  ${dim(err.message.split('\n').slice(0, 12).join('\n  '))}`);
         console.log('');
         console.log(`  ${dim('You can try running this manually:')}`);
         console.log(`  ${DIM_BLUE}${cmd}${RESET}`);
