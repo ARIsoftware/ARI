@@ -1,0 +1,158 @@
+name: Windows install test
+
+# End-to-end test of the Windows installer. Runs on every push that touches
+# install scripts so we catch regressions like quote-escaping or wrong winget
+# package ids without making a human play test pilot.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/install.ps1'
+      - 'scripts/install.js'
+      - '.ari/cli.js'
+      - 'ari.cmd'
+      - '.github/workflows/windows-install.yml'
+  pull_request:
+    paths:
+      - 'scripts/install.ps1'
+      - 'scripts/install.js'
+      - '.ari/cli.js'
+      - 'ari.cmd'
+      - '.github/workflows/windows-install.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    name: Run installer end-to-end on windows-latest
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Show preinstalled tool versions (for context)
+        shell: pwsh
+        run: |
+          Write-Host "Node:    $(node --version 2>$null)"
+          Write-Host "Git:     $(git --version 2>$null)"
+          Write-Host "pnpm:    $(pnpm --version 2>$null)"
+          Write-Host "winget:  $(winget --version 2>$null)"
+
+      - name: Run ARI installer
+        shell: pwsh
+        env:
+          ARI_NONINTERACTIVE: '1'
+          ARI_LOG: '1'
+          # Pin to the exact commit being tested so we don't race on caches.
+          ARI_BRANCH: ${{ github.sha }}
+          # Deterministic password lets the verify step assert against it later.
+          ARI_POSTGRES_PASSWORD: 'ari-ci-test-password'
+        run: |
+          $url = "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/scripts/install.ps1"
+          Write-Host "Fetching installer: $url"
+          irm $url | iex
+
+      - name: Capture install transcript for upload
+        if: always()
+        shell: pwsh
+        run: |
+          $logs = Get-ChildItem -Path $env:TEMP -Filter 'ari-install-*.log' -ErrorAction SilentlyContinue
+          if ($logs) {
+            $latest = $logs | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+            Copy-Item $latest.FullName -Destination "$env:GITHUB_WORKSPACE\ari-install.log"
+            Write-Host "Captured: $($latest.FullName)"
+          } else {
+            Write-Host "No transcript log found in $env:TEMP"
+          }
+
+      - name: Verify installation
+        shell: pwsh
+        run: |
+          $errors = @()
+
+          $svc = Get-Service postgresql-x64-17 -ErrorAction SilentlyContinue
+          if (-not $svc) {
+            $errors += "postgresql-x64-17 service not registered"
+          } elseif ($svc.Status -ne 'Running') {
+            $errors += "postgresql-x64-17 service is $($svc.Status), not Running"
+          }
+
+          $ariDir = Join-Path $env:USERPROFILE 'ARI'
+          if (-not (Test-Path (Join-Path $ariDir 'package.json'))) {
+            $errors += "ARI package.json not found at $ariDir"
+          }
+          if (-not (Test-Path (Join-Path $ariDir 'node_modules'))) {
+            $errors += "node_modules not present in $ariDir"
+          }
+
+          $envPath = Join-Path $ariDir '.env.local'
+          if (Test-Path $envPath) {
+            $envContent = Get-Content $envPath -Raw
+            if ($envContent -notmatch 'DATABASE_URL=postgresql://') {
+              $errors += ".env.local missing DATABASE_URL=postgresql:// line"
+            }
+            if ($envContent -notmatch 'BETTER_AUTH_SECRET=.+') {
+              $errors += ".env.local missing BETTER_AUTH_SECRET"
+            }
+          } else {
+            $errors += ".env.local not generated at $envPath"
+          }
+
+          $pgwebExe = Join-Path $env:LOCALAPPDATA 'ARI\bin\pgweb.exe'
+          if (-not (Test-Path $pgwebExe)) {
+            $errors += "pgweb.exe not found at $pgwebExe"
+          }
+
+          $supabaseExe = Join-Path $env:LOCALAPPDATA 'ARI\bin\supabase.exe'
+          if (-not (Test-Path $supabaseExe)) {
+            $errors += "supabase.exe not found at $supabaseExe"
+          }
+
+          if ($errors.Count -eq 0) {
+            Write-Host "All install verification checks passed" -ForegroundColor Green
+          } else {
+            Write-Host "Install verification FAILED:" -ForegroundColor Red
+            foreach ($e in $errors) { Write-Host "  - $e" -ForegroundColor Red }
+            exit 1
+          }
+
+      - name: Verify ./ari start brings up the dev server
+        shell: pwsh
+        run: |
+          $ariDir = Join-Path $env:USERPROFILE 'ARI'
+          Set-Location $ariDir
+
+          $proc = Start-Process -FilePath 'powershell' `
+                                -ArgumentList '-NoProfile', '-Command', '.\ari.cmd start' `
+                                -WorkingDirectory $ariDir `
+                                -PassThru `
+                                -WindowStyle Hidden
+
+          $ready = $false
+          for ($i = 0; $i -lt 90; $i++) {
+            try {
+              $resp = Invoke-WebRequest -Uri http://localhost:3000 -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
+              if ($resp.StatusCode -lt 500) { $ready = $true; break }
+            } catch { }
+            Start-Sleep -Seconds 1
+          }
+
+          if ($proc -and -not $proc.HasExited) {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          }
+
+          if (-not $ready) {
+            Write-Error "Dev server did not respond on http://localhost:3000 within 90s"
+            exit 1
+          }
+          Write-Host "Dev server responded successfully" -ForegroundColor Green
+
+      - name: Upload install transcript log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ari-install-log
+          path: ari-install.log
+          if-no-files-found: warn

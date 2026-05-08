@@ -304,7 +304,16 @@ function findWindowsPsqlExe() {
   return null;
 }
 
+// CI / non-interactive mode: skip prompts and use defaults. Set by GitHub
+// Actions and our own Windows install workflow. Lets us run the installer
+// end-to-end without a TTY for automated regression tests.
+const NON_INTERACTIVE = process.env.ARI_NONINTERACTIVE === '1' || process.env.CI === 'true';
+
 function askQuestion(prompt) {
+  if (NON_INTERACTIVE) {
+    process.stdout.write(prompt + dim('(auto: default)') + '\n');
+    return Promise.resolve('');
+  }
   return new Promise((resolve) => {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     rl.question(prompt, (answer) => {
@@ -316,12 +325,17 @@ function askQuestion(prompt) {
 
 async function askYesNo(question, defaultYes = true) {
   const hint = defaultYes ? '[Y/n]' : '[y/N]';
+  if (NON_INTERACTIVE) {
+    process.stdout.write(`  ${question} ${dim(hint)} ${defaultYes ? 'Y' : 'N'} ${dim('(auto)')}\n`);
+    return defaultYes;
+  }
   const answer = await askQuestion(`  ${question} ${dim(hint)} `);
   if (answer === '') return defaultYes;
   return /^[Yy]/.test(answer);
 }
 
 async function pressEnter(msg = 'Press ENTER to continue') {
+  if (NON_INTERACTIVE) return;
   await askQuestion(`  ${dim(msg)} `);
 }
 
@@ -1671,8 +1685,9 @@ async function main() {
     process.exit(1);
   }
 
-  // Non-interactive terminal check
-  if (!process.stdin.isTTY) {
+  // Non-interactive terminal check (skipped when ARI_NONINTERACTIVE / CI is
+  // set — we explicitly want to run without a TTY in those contexts).
+  if (!process.stdin.isTTY && !NON_INTERACTIVE) {
     console.log(`\n  ${SYM_CROSS} ${red('This installer requires an interactive terminal.')}`);
     console.log(`  Run it directly in your terminal (not piped).\n`);
     process.exit(1);
