@@ -717,6 +717,12 @@ const TOOLS = [
 // ── Installation Loop ───────────────────────────────────────────────────────
 
 async function installTools() {
+  // Pick up tools installed in a previous run of this script — Node inherits
+  // process.env.PATH from the parent shell at startup, which may predate
+  // those installs.
+  refreshWindowsPath();
+  ensureWindowsPostgresPath();
+
   const results = [];
   const total = TOOLS.length;
 
@@ -779,12 +785,23 @@ async function installTools() {
       spinner.success(`${tool.name} ${after.version ? `v${after.version}` : ''} installed`);
       results.push({ ...tool, status: 'installed', version: after.version });
     } catch (err) {
-      spinner.error(`Failed to install ${tool.name}`);
-      console.log(`  ${dim(err.message.split('\n').slice(0, 3).join('\n  '))}`);
-      console.log('');
-      console.log(`  ${dim('You can try running this manually:')}`);
-      console.log(`  ${DIM_BLUE}${cmd}${RESET}`);
-      results.push({ ...tool, status: 'failed', version: null });
+      // winget returns non-zero when the package is already installed at the
+      // current version. Re-detect: if the binary is actually there, the
+      // "failure" was just winget being noisy about a no-op.
+      refreshWindowsPath();
+      ensureWindowsPostgresPath();
+      const recheck = tool.detect();
+      if (recheck.installed) {
+        spinner.success(`${tool.name} ${recheck.version ? `v${recheck.version}` : ''} already installed`);
+        results.push({ ...tool, status: 'installed', version: recheck.version });
+      } else {
+        spinner.error(`Failed to install ${tool.name}`);
+        console.log(`  ${dim(err.message.split('\n').slice(0, 3).join('\n  '))}`);
+        console.log('');
+        console.log(`  ${dim('You can try running this manually:')}`);
+        console.log(`  ${DIM_BLUE}${cmd}${RESET}`);
+        results.push({ ...tool, status: 'failed', version: null });
+      }
     }
   }
 
