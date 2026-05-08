@@ -711,13 +711,17 @@ const TOOLS = [
         pacman: 'sudo pacman -S --noconfirm postgresql && sudo -u postgres initdb -D /var/lib/postgres/data && sudo systemctl enable postgresql && sudo systemctl start postgresql',
         zypper: 'sudo zypper install -y postgresql-server && sudo systemctl enable postgresql && sudo systemctl start postgresql',
       },
+      // winget-pkgs organizes Postgres by major version (PostgreSQL.PostgreSQL.17,
+      // .18, etc.) — there is no bare PostgreSQL.PostgreSQL id. We pin to v17
+      // to match the rest of the codebase (postgresql@17 on macOS,
+      // postgresql-x64-17 service name on Windows, setup.sql expectations).
+      //
       // --override replaces winget's default install args. The minimum the
       // EDB installer needs for an unattended run is unattended mode + a
-      // superpassword. Anything else (--enable-components, --serviceaccount)
-      // has historically been brittle across EDB versions, so we let the
-      // installer use its own defaults for those.
+      // superpassword. We leave --enable-components and --serviceaccount at
+      // EDB's defaults; specifying them has been brittle across versions.
       win32:
-        `winget install -e --id PostgreSQL.PostgreSQL --source winget ` +
+        `winget install -e --id PostgreSQL.PostgreSQL.17 --source winget ` +
         `--accept-source-agreements --accept-package-agreements ` +
         `--override "--mode unattended --unattendedmodeui none ` +
         `--superpassword ${POSTGRES_PASSWORD} ` +
