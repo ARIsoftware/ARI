@@ -1006,7 +1006,7 @@ async function installDependencies(targetDir) {
   console.log('');
 
   try {
-    await spawnAsync('pnpm', ['install'], { stdio: 'inherit', cwd: targetDir });
+    await spawnAsync('pnpm', ['install'], { stdio: 'inherit', cwd: targetDir, shell: PLATFORM === 'win32' });
     console.log('');
     console.log(`  ${SYM_CHECK} Dependencies installed`);
     return { cloned: true, dir: targetDir, depsInstalled: true };
@@ -1341,7 +1341,7 @@ async function setupLocalSupabase(targetDir) {
     console.log(`  ${dim('Starting Supabase (first run downloads images — this may take a few minutes)…')}`);
     console.log('');
     try {
-      await spawnAsync('supabase', ['start'], { stdio: 'inherit', cwd: targetDir });
+      await spawnAsync('supabase', ['start'], { stdio: 'inherit', cwd: targetDir, shell: PLATFORM === 'win32' });
       console.log('');
       console.log(`  ${SYM_CHECK} Supabase started`);
       result.supabaseStarted = true;

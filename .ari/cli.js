@@ -342,9 +342,12 @@ function start(opts = {}) {
   log('');
 
   // Start Next.js dev server — pipe stdout (and stderr in quiet mode) so we can suppress.
+  // shell: true on Windows so spawn finds pnpm.cmd via PATHEXT (Node 24+ no
+  // longer auto-resolves .cmd extensions for security — CVE-2024-27980).
   const child = spawn('pnpm', ['dev'], {
     stdio: ['inherit', 'pipe', quiet ? 'pipe' : 'inherit'],
     cwd: ROOT,
+    shell: IS_WIN,
   });
   if (quiet && child.stderr) child.stderr.on('data', () => {}); // drain
 
