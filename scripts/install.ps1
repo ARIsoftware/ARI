@@ -55,11 +55,32 @@ function Install-NodeJS {
         $machinePath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
         $userPath    = [System.Environment]::GetEnvironmentVariable("Path", "User")
         $env:Path = (@($machinePath, $userPath) | Where-Object { $_ }) -join ";"
+        # The MSI registers PATH asynchronously and the registry write isn't
+        # always visible immediately. Prepend the standard install dir if we
+        # find node.exe there but it isn't on PATH yet.
+        $nodeStd = "$env:ProgramFiles\nodejs"
+        if ((Test-Path "$nodeStd\node.exe") -and ($env:Path -notlike "*$nodeStd*")) {
+            $env:Path = "$nodeStd;$env:Path"
+        }
         Write-OK "Node.js installed"
     } else {
         Write-Err "Node.js v18+ is required. Cannot continue without it."
         exit 1
     }
+}
+
+# Resolve a runnable `node` command. Returns the path/name to invoke, or $null.
+function Resolve-NodeCommand {
+    $cmd = Get-Command node -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    foreach ($candidate in @(
+        "$env:ProgramFiles\nodejs\node.exe",
+        "${env:ProgramFiles(x86)}\nodejs\node.exe",
+        "$env:LOCALAPPDATA\Programs\nodejs\node.exe"
+    )) {
+        if ($candidate -and (Test-Path $candidate)) { return $candidate }
+    }
+    return $null
 }
 
 function Get-NodeVersion {
@@ -120,7 +141,17 @@ Write-Host ""
 $env:ARI_PLATFORM = "win32"
 $env:ARI_PKG_MGR = "winget"
 
-node $installJs
+$nodeCmd = Resolve-NodeCommand
+if (-not $nodeCmd) {
+    Write-Err "Node.js was installed but 'node' is not on PATH yet."
+    Write-Host ""
+    Write-Host "  Close this PowerShell window, open a new Administrator PowerShell, and re-run:"
+    Write-Host "    irm https://ari.software/install-win | iex" -ForegroundColor Cyan
+    Write-Host ""
+    exit 1
+}
+
+& $nodeCmd $installJs
 $exitCode = $LASTEXITCODE
 
 Remove-Item $installJs -Force -ErrorAction SilentlyContinue
