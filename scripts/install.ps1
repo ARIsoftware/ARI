@@ -60,10 +60,13 @@
             throw "Node.js v18+ is required. Cannot continue without it."
         }
 
-        winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
-        # Refresh PATH from the registry. winget's MSI registers PATH
-        # asynchronously, so as a fallback we also prepend the install dir
-        # directly when node.exe is on disk but the registry hasn't caught up.
+        # --source winget pins to the community source and avoids the multi-
+        # source ambiguity that happens when msstore's cert validation fails
+        # (common on AMIs / corporate-proxied boxes). Without this winget
+        # exits with "specify --source" and never installs anything.
+        winget install -e --id OpenJS.NodeJS.LTS --source winget --accept-source-agreements --accept-package-agreements
+        $wingetExit = $LASTEXITCODE
+
         $machinePath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
         $userPath    = [System.Environment]::GetEnvironmentVariable("Path", "User")
         $env:Path = (@($machinePath, $userPath) | Where-Object { $_ }) -join ";"
@@ -73,8 +76,12 @@
             if (($env:Path -split ';') -notcontains $nodeDir) {
                 $env:Path = "$nodeDir;$env:Path"
             }
+            Write-OK "Node.js installed"
+            return
         }
-        Write-OK "Node.js installed"
+
+        # winget exited but node.exe isn't where we expected.
+        throw "winget did not install Node.js (exit code $wingetExit). Install Node.js manually from https://nodejs.org/ and re-run."
     }
 
     function Resolve-NodeCommand {

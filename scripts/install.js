@@ -573,7 +573,7 @@ const TOOLS = [
         pacman: 'sudo pacman -S --noconfirm nodejs npm',
         zypper: 'sudo zypper install -y nodejs',
       },
-      win32: 'winget install -e --id OpenJS.NodeJS.LTS',
+      win32: 'winget install -e --id OpenJS.NodeJS.LTS --source winget --accept-source-agreements --accept-package-agreements',
     },
     detect: detectNode,
     description: 'JavaScript runtime that powers ARI.',
@@ -590,7 +590,7 @@ const TOOLS = [
         pacman: 'sudo pacman -S --noconfirm git',
         zypper: 'sudo zypper install -y git',
       },
-      win32: 'winget install -e --id Git.Git --accept-source-agreements --accept-package-agreements',
+      win32: 'winget install -e --id Git.Git --source winget --accept-source-agreements --accept-package-agreements',
     },
     detect: detectGit,
     description: 'Version control system for managing source code.',
@@ -606,7 +606,7 @@ const TOOLS = [
         dnf: 'sudo dnf install -y gh',
         pacman: 'sudo pacman -S --noconfirm github-cli',
       },
-      win32: 'winget install -e --id GitHub.cli',
+      win32: 'winget install -e --id GitHub.cli --source winget --accept-source-agreements --accept-package-agreements',
     },
     detect: detectGhCli,
     description: 'GitHub CLI for creating and managing your private repository.',
@@ -657,7 +657,7 @@ const TOOLS = [
       // flags, EDB's installer leaves the postgres superuser with no usable
       // password, which breaks createdb/psql later.
       win32:
-        `winget install -e --id PostgreSQL.PostgreSQL --silent ` +
+        `winget install -e --id PostgreSQL.PostgreSQL --source winget --silent ` +
         `--accept-source-agreements --accept-package-agreements ` +
         `--override "--mode unattended --unattendedmodeui none ` +
         `--superpassword ${POSTGRES_PASSWORD} ` +
