@@ -753,9 +753,12 @@ const TOOLS = [
       // to match the rest of the codebase (postgresql@17 on macOS,
       // postgresql-x64-17 service name on Windows, setup.sql expectations).
       //
-      // --enable-components server,commandlinetools skips pgAdmin (~600 MB
-      // Python+Flask GUI we don't use; ARI talks to Postgres via the pg Node
-      // module) and StackBuilder (extension picker GUI). Cuts install time
+      // --disable-components pgAdmin,stackbuilder explicitly skips the
+      // ~600 MB pgAdmin Python/Flask GUI (ARI talks to Postgres via the pg
+      // Node module — pgweb is the user-facing DB UI on both platforms)
+      // and StackBuilder (extension picker GUI). EDB treats
+      // --enable-components additively rather than restrictively, so
+      // --disable-components is the unambiguous form. Cuts install time
       // from ~3 minutes to ~30 seconds.
       //
       // --force bypasses winget's "already installed" check, which fires
@@ -769,7 +772,7 @@ const TOOLS = [
         `--override "--mode unattended --unattendedmodeui none ` +
         `--superpassword ${POSTGRES_PASSWORD} ` +
         `--servicepassword ${POSTGRES_PASSWORD} ` +
-        `--enable-components server,commandlinetools"`,
+        `--disable-components pgAdmin,stackbuilder"`,
     },
     detect: detectPostgresServer,
     description: 'Database server for ARI data storage.',
