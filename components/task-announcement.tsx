@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef, useMemo, type ComponentType } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import {
   ArrowUpRight,
@@ -110,35 +110,6 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
   // Filter modules that have topBarIcon configured
   const moduleIcons = modules.filter(m => m.topBarIcon && (m.topBarIcon.icon || m.topBarIcon.component))
 
-  // Track dynamically loaded top bar icon components from the registry
-  const [loadedTopBarComponents, setLoadedTopBarComponents] = useState<Record<string, ComponentType<any>>>({})
-  const loadingRef = useRef<Set<string>>(new Set())
-
-  useEffect(() => {
-    // Load component-based top bar icons from the registry
-    const componentModules = modules.filter(m => m.topBarIcon?.component && m.id in MODULE_TOPBAR_ICONS)
-    const toLoad = componentModules.filter(m => !loadingRef.current.has(m.id))
-    if (toLoad.length === 0) return
-
-    toLoad.forEach(m => loadingRef.current.add(m.id))
-
-    Promise.all(
-      toLoad.map(m =>
-        MODULE_TOPBAR_ICONS[m.id]()
-          .then((mod: any) => ({ id: m.id, component: mod.default as ComponentType<any> | undefined }))
-          .catch(() => ({ id: m.id, component: undefined }))
-      )
-    ).then(results => {
-      const loaded: Record<string, ComponentType<any>> = {}
-      for (const { id, component } of results) {
-        if (component) loaded[id] = component
-      }
-      if (Object.keys(loaded).length > 0) {
-        setLoadedTopBarComponents(prev => ({ ...prev, ...loaded }))
-      }
-    })
-  }, [modules])
-
   // Build all icons list with their IDs
   const allIcons = [
     ...moduleIcons.map(m => ({ id: `module-${m.id}`, type: "module" as const, module: m })),
@@ -170,13 +141,13 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
 
   const renderedDragIcons = useMemo(() => dragIcons.filter(icon => {
     if (icon.type === "module" && icon.module.topBarIcon?.component) {
-      return !!loadedTopBarComponents[icon.module.id]
+      return icon.module.id in MODULE_TOPBAR_ICONS
     }
     if (icon.type === "module") {
       return !!(icon.module.topBarIcon?.icon && icon.module.topBarIcon?.route)
     }
     return true
-  }), [dragIcons, loadedTopBarComponents])
+  }), [dragIcons])
   const dragIconIds = useMemo(() => renderedDragIcons.map(i => i.id), [renderedDragIcons])
 
   const handleIconDragEnd = (event: DragEndEvent) => {
@@ -294,7 +265,7 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
     if (icon.type === "module") {
       const module = icon.module
       if (module.topBarIcon!.component) {
-        const TopBarComponent = loadedTopBarComponents[module.id]
+        const TopBarComponent = MODULE_TOPBAR_ICONS[module.id]
         if (!TopBarComponent) return null
         return <TopBarComponent isDragMode={isDragMode} />
       }

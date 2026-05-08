@@ -8,7 +8,6 @@ import { Notepad } from "./notepad"
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
@@ -28,23 +27,21 @@ export default function NotepadTopBarIcon({ isDragMode = false }: { isDragMode?:
 
   return (
     <>
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 ${dragItemClass}`}
-              onClick={isDragMode ? undefined : () => setIsNotepadOpen(true)}
-            >
-              <StickyNote className="h-5 w-5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Notepad</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 hover:text-topbar-foreground ${dragItemClass}`}
+            onClick={isDragMode ? undefined : () => setIsNotepadOpen(true)}
+          >
+            <StickyNote className="h-5 w-5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Notepad</p>
+        </TooltipContent>
+      </Tooltip>
 
       {mounted && createPortal(
         <Notepad isOpen={isNotepadOpen} onClose={() => setIsNotepadOpen(false)} />,
