@@ -17,6 +17,14 @@ const path = require('path');
 const ARI_BRANCH = process.env.ARI_BRANCH || 'main';
 const readline = require('readline');
 const os = require('os');
+const crypto = require('crypto');
+
+// Local-dev Postgres password used on Windows. EDB's installer leaves the
+// postgres superuser with no usable password unless we pass one via --override
+// at install time. Generated once per run so multiple winget calls and the
+// later setupLocalPostgres() step share the same value.
+const POSTGRES_PASSWORD = process.env.ARI_POSTGRES_PASSWORD
+  || crypto.randomBytes(12).toString('base64').replace(/[+/=]/g, '');
 
 // ── ANSI Colors & Symbols ───────────────────────────────────────────────────
 
@@ -47,17 +55,17 @@ function red(s) { return `${RED}${s}${RESET}`; }
 function yellow(s) { return `${YELLOW}${s}${RESET}`; }
 function bold(s) { return `${BOLD}${s}${RESET}`; }
 
-function run(cmd) {
+function run(cmd, opts = {}) {
   try {
-    return execSync(cmd, { encoding: 'utf8', stdio: 'pipe' }).trim();
+    return execSync(cmd, { encoding: 'utf8', stdio: 'pipe', ...opts }).trim();
   } catch {
     return null;
   }
 }
 
-function runAsync(cmd) {
+function runAsync(cmd, opts = {}) {
   return new Promise((resolve, reject) => {
-    execCb(cmd, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+    execCb(cmd, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024, ...opts }, (error, stdout, stderr) => {
       if (error) {
         reject(new Error(stderr || error.message));
       } else {
@@ -65,6 +73,147 @@ function runAsync(cmd) {
       }
     });
   });
+}
+
+// ── Windows PATH helpers ────────────────────────────────────────────────────
+// Node captures process.env.PATH at startup. After `winget install <tool>`,
+// the new binary is on the system PATH but NOT in this process's PATH. These
+// helpers re-read PATH from the registry / known install dirs so subsequent
+// detect() calls actually see the just-installed tools.
+
+function refreshWindowsPath() {
+  if (process.platform !== 'win32') return;
+  try {
+    const cmd =
+      'powershell -NoProfile -Command "' +
+      "[System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + " +
+      "[System.Environment]::GetEnvironmentVariable('Path','User')\"";
+    const merged = execSync(cmd, { encoding: 'utf8', stdio: 'pipe' }).trim();
+    if (merged) process.env.PATH = merged;
+  } catch { /* best-effort */ }
+}
+
+const WIN_POSTGRES_BASE = 'C:\\Program Files\\PostgreSQL';
+
+// Versions are stable for the duration of an install run — winget can't add a
+// new EDB Postgres mid-process. Cache the readdir result.
+let _winPostgresVersionsCache = null;
+function findWindowsPostgresVersions() {
+  if (process.platform !== 'win32') return [];
+  if (_winPostgresVersionsCache) return _winPostgresVersionsCache;
+  if (!fs.existsSync(WIN_POSTGRES_BASE)) return [];
+  try {
+    _winPostgresVersionsCache = fs.readdirSync(WIN_POSTGRES_BASE)
+      .filter(d => /^\d+$/.test(d))
+      .sort((a, b) => Number(b) - Number(a));
+    return _winPostgresVersionsCache;
+  } catch {
+    return [];
+  }
+}
+
+function ensureWindowsPostgresPath() {
+  if (process.platform !== 'win32') return;
+  for (const v of findWindowsPostgresVersions()) {
+    const bin = path.join(WIN_POSTGRES_BASE, v, 'bin');
+    const entries = (process.env.PATH || '').split(';');
+    if (fs.existsSync(bin) && !entries.includes(bin)) {
+      process.env.PATH = bin + ';' + (process.env.PATH || '');
+    }
+  }
+}
+
+// Where Windows-only binaries we download (pgweb) live. Independent of the
+// ARI clone location since installTools() runs before cloneAndSetup().
+function getWindowsAriBinDir() {
+  return path.join(process.env.LOCALAPPDATA || os.homedir(), 'ARI', 'bin');
+}
+
+function httpGetJson(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const https = require('https');
+    https.get(url, { headers: { 'User-Agent': 'ari-installer', ...headers } }, (res) => {
+      // Follow redirects
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        return resolve(httpGetJson(res.headers.location, headers));
+      }
+      if (res.statusCode !== 200) {
+        return reject(new Error(`GET ${url} returned ${res.statusCode}`));
+      }
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => {
+        try { resolve(JSON.parse(body)); }
+        catch (e) { reject(new Error(`Invalid JSON from ${url}: ${e.message}`)); }
+      });
+    }).on('error', reject);
+  });
+}
+
+function httpDownload(url, destPath) {
+  return new Promise((resolve, reject) => {
+    const https = require('https');
+    https.get(url, { headers: { 'User-Agent': 'ari-installer' } }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        return resolve(httpDownload(res.headers.location, destPath));
+      }
+      if (res.statusCode !== 200) {
+        return reject(new Error(`GET ${url} returned ${res.statusCode}`));
+      }
+      const file = fs.createWriteStream(destPath);
+      res.pipe(file);
+      file.on('finish', () => file.close(resolve));
+      file.on('error', (err) => { try { fs.unlinkSync(destPath); } catch {} reject(err); });
+    }).on('error', reject);
+  });
+}
+
+async function installPgwebWindows() {
+  const binDir = getWindowsAriBinDir();
+  fs.mkdirSync(binDir, { recursive: true });
+
+  const release = await httpGetJson('https://api.github.com/repos/sosedoff/pgweb/releases/latest');
+  const asset = release.assets && release.assets.find(a => /pgweb_windows_amd64\.zip$/i.test(a.name));
+  if (!asset) throw new Error('pgweb release has no Windows amd64 asset');
+
+  const zipPath = path.join(os.tmpdir(), `pgweb-${process.pid}.zip`);
+  await httpDownload(asset.browser_download_url, zipPath);
+
+  // Expand-Archive ships with PowerShell 5.1+ (Win10+).
+  execSync(
+    `powershell -NoProfile -Command "Expand-Archive -Force -Path '${zipPath}' -DestinationPath '${binDir}'"`,
+    { stdio: 'pipe' }
+  );
+
+  // Releases usually extract to a nested pgweb_windows_amd64/ folder. Flatten.
+  const flat = path.join(binDir, 'pgweb.exe');
+  if (!fs.existsSync(flat)) {
+    const candidates = fs.readdirSync(binDir);
+    for (const name of candidates) {
+      const nested = path.join(binDir, name, 'pgweb.exe');
+      if (fs.existsSync(nested)) {
+        fs.renameSync(nested, flat);
+        try { fs.rmdirSync(path.join(binDir, name)); } catch {}
+        break;
+      }
+    }
+  }
+
+  try { fs.unlinkSync(zipPath); } catch {}
+
+  if (!fs.existsSync(flat)) {
+    throw new Error(`pgweb.exe not found after extraction in ${binDir}`);
+  }
+  return flat;
+}
+
+function findWindowsPsqlExe() {
+  for (const v of findWindowsPostgresVersions()) {
+    const exe = path.join(WIN_POSTGRES_BASE, v, 'bin', 'psql.exe');
+    if (fs.existsSync(exe)) return exe;
+  }
+  return null;
 }
 
 function askQuestion(prompt) {
@@ -299,8 +448,16 @@ function detectClaudeCode() {
 }
 
 function detectPsql() {
-  // Check standard PATH first, then common Homebrew keg-only location
-  const out = run('psql --version') || run('/opt/homebrew/opt/libpq/bin/psql --version');
+  // Check standard PATH, then platform-specific known locations.
+  let out = run('psql --version');
+  if (!out) {
+    if (process.platform === 'darwin') {
+      out = run('/opt/homebrew/opt/libpq/bin/psql --version');
+    } else if (process.platform === 'win32') {
+      const exe = findWindowsPsqlExe();
+      if (exe) out = run(`"${exe}" --version`);
+    }
+  }
   if (!out) return { installed: false, version: null };
   // psql outputs "psql (PostgreSQL) 18.3" — only two version parts, so parseVersion won't match
   const match = out.match(/(\d+\.\d+(?:\.\d+)?)/);
@@ -308,7 +465,11 @@ function detectPsql() {
 }
 
 function detectPgweb() {
-  const out = run('pgweb --version');
+  let out = run('pgweb --version');
+  if (!out && process.platform === 'win32') {
+    const exe = path.join(getWindowsAriBinDir(), 'pgweb.exe');
+    if (fs.existsSync(exe)) out = run(`"${exe}" --version`);
+  }
   if (!out) return { installed: false, version: null };
   const match = out.match(/(\d+\.\d+(?:\.\d+)?)/);
   return { installed: true, version: match ? match[1] : null };
@@ -322,6 +483,16 @@ function detectPostgresServer() {
         const psqlInfo = detectPsql();
         return { installed: true, version: psqlInfo.version ?? 'unknown' };
       }
+    }
+    return { installed: false, version: null };
+  }
+  // On Windows, the EDB installer drops binaries under C:\Program Files\PostgreSQL\<v>\bin.
+  // pg_isready isn't on PATH after winget install, so we check the install dir directly.
+  if (PLATFORM === 'win32') {
+    const exe = findWindowsPsqlExe();
+    if (exe) {
+      const psqlInfo = detectPsql();
+      return { installed: true, version: psqlInfo.version ?? 'unknown' };
     }
     return { installed: false, version: null };
   }
@@ -348,7 +519,16 @@ function detectDocker() {
 async function waitForDocker(initialStatus) {
   if (!initialStatus.installed) {
     console.log(`  ${SYM_WARN} ${yellow('Docker is not installed.')}`);
-    console.log(`  ${dim('Install Docker Desktop: https://www.docker.com/products/docker-desktop')}`);
+    if (PLATFORM === 'win32') {
+      console.log('');
+      console.log(`  Local Supabase needs Docker Desktop, which isn't installed.`);
+      console.log(`    1. Install Docker Desktop: ${blue('https://www.docker.com/products/docker-desktop')}`);
+      console.log(`    2. Reboot if prompted.`);
+      console.log(`    3. Launch Docker Desktop and wait for the whale icon to be steady.`);
+      console.log(`    4. Re-run this installer and pick "Local Supabase" again.`);
+    } else {
+      console.log(`  ${dim('Install Docker Desktop: https://www.docker.com/products/docker-desktop')}`);
+    }
     return false;
   }
 
@@ -473,12 +653,24 @@ const TOOLS = [
         pacman: 'sudo pacman -S --noconfirm postgresql && sudo -u postgres initdb -D /var/lib/postgres/data && sudo systemctl enable postgresql && sudo systemctl start postgresql',
         zypper: 'sudo zypper install -y postgresql-server && sudo systemctl enable postgresql && sudo systemctl start postgresql',
       },
-      win32: 'winget install -e --id PostgreSQL.PostgreSQL',
+      // --override replaces winget's default unattended args. Without these
+      // flags, EDB's installer leaves the postgres superuser with no usable
+      // password, which breaks createdb/psql later.
+      win32:
+        `winget install -e --id PostgreSQL.PostgreSQL --silent ` +
+        `--accept-source-agreements --accept-package-agreements ` +
+        `--override "--mode unattended --unattendedmodeui none ` +
+        `--superpassword ${POSTGRES_PASSWORD} ` +
+        `--serviceaccount postgres --servicepassword ${POSTGRES_PASSWORD} ` +
+        `--enable-components server,commandlinetools"`,
     },
     detect: detectPostgresServer,
     description: 'Database server for ARI data storage.',
   },
-  {
+  // psql is a separate tool on macOS/Linux but bundled with PostgreSQL.PostgreSQL
+  // on Windows (no separate winget package exists). On Windows we skip this
+  // entry entirely — detectPsql() picks up the bundled binary.
+  ...(PLATFORM === 'win32' ? [] : [{
     id: 'psql',
     name: 'PostgreSQL Client',
     required: false,
@@ -490,11 +682,10 @@ const TOOLS = [
         pacman: 'sudo pacman -S --noconfirm postgresql-libs',
         zypper: 'sudo zypper install -y postgresql',
       },
-      win32: 'winget install -e --id PostgreSQL.psql',
     },
     detect: detectPsql,
     description: 'PostgreSQL client for database operations via Claude Code.',
-  },
+  }]),
   {
     id: 'pgweb',
     name: 'pgweb',
@@ -544,7 +735,11 @@ async function installTools() {
     console.log(`  ${dim(tool.description)}`);
     console.log('');
 
-    const cmd = getInstallCmd(tool.installCmds);
+    // pgweb on Windows: no winget/choco package and no Go toolchain assumed.
+    // Download the prebuilt release ZIP from GitHub instead.
+    const isWinPgweb = tool.id === 'pgweb' && PLATFORM === 'win32';
+
+    const cmd = isWinPgweb ? '<download from GitHub releases>' : getInstallCmd(tool.installCmds);
     if (!cmd) {
       console.log(`  ${SYM_WARN} ${yellow(`No install method for ${tool.name} on ${platformLabel()}.`)}`);
       results.push({ ...tool, status: 'skipped', version: null });
@@ -571,7 +766,15 @@ async function installTools() {
     spinner.start(`Installing ${tool.name}…`);
 
     try {
-      await runAsync(cmd);
+      if (isWinPgweb) {
+        await installPgwebWindows();
+      } else {
+        await runAsync(cmd);
+      }
+      // Refresh PATH so the just-installed binary is visible to subsequent
+      // detect()/run() calls in this same Node process.
+      refreshWindowsPath();
+      ensureWindowsPostgresPath();
       const after = tool.detect();
       spinner.success(`${tool.name} ${after.version ? `v${after.version}` : ''} installed`);
       results.push({ ...tool, status: 'installed', version: after.version });
@@ -649,7 +852,7 @@ async function cloneAndSetup() {
     const branchFlag = ARI_BRANCH !== 'main' ? ` --branch ${ARI_BRANCH}` : '';
     await runAsync(`git clone${branchFlag} https://github.com/ARIsoftware/ARI.git "${targetDir}"`);
     // Rename origin to upstream (public ARI repo) so user can add their own origin later
-    await runAsync(`cd "${targetDir}" && git remote rename origin upstream`);
+    await runAsync('git remote rename origin upstream', { cwd: targetDir });
     spinner.success(`ARI cloned to ${dim(targetDir)}${ARI_BRANCH !== 'main' ? ` (branch: ${ARI_BRANCH})` : ''}`);
   } catch (err) {
     spinner.error('Failed to clone ARI repository');
@@ -679,7 +882,8 @@ async function installDependencies(targetDir) {
     console.log(`  ${dim(err.message)}`);
     console.log('');
     console.log(`  ${dim('You can try running this manually:')}`);
-    console.log(`  ${DIM_BLUE}cd "${targetDir}" && pnpm install${RESET}`);
+    const cdFlag = PLATFORM === 'win32' ? 'cd /d' : 'cd';
+    console.log(`  ${DIM_BLUE}${cdFlag} "${targetDir}" && pnpm install${RESET}`);
     return { cloned: true, dir: targetDir, depsInstalled: false };
   }
 }
@@ -687,7 +891,7 @@ async function installDependencies(targetDir) {
 // ── Local Supabase Setup ───────────────────────────────────────────────────
 
 function parseSupabaseEnv(targetDir) {
-  const raw = run(`cd "${targetDir}" && supabase status -o env`);
+  const raw = run('supabase status -o env', { cwd: targetDir });
   if (!raw) return null;
 
   const vars = {};
@@ -733,10 +937,18 @@ async function runSetupSql(targetDir, databaseUrl) {
     await client.end();
     return true;
   } catch (err) {
-    // Fallback: try psql
-    const psqlResult = run(`psql "${databaseUrl}" -f "${setupSqlPath}"`)
-      || run(`/opt/homebrew/opt/libpq/bin/psql "${databaseUrl}" -f "${setupSqlPath}"`);
-    if (psqlResult !== null) return true;
+    // Fallback: try psql at known locations.
+    const candidates = ['psql'];
+    if (process.platform === 'darwin') {
+      candidates.push('/opt/homebrew/opt/libpq/bin/psql');
+    } else if (process.platform === 'win32') {
+      const winExe = findWindowsPsqlExe();
+      if (winExe) candidates.push(`"${winExe}"`);
+    }
+    for (const psql of candidates) {
+      const psqlResult = run(`${psql} "${databaseUrl}" -f "${setupSqlPath}"`);
+      if (psqlResult !== null) return true;
+    }
     throw err;
   }
 }
@@ -797,6 +1009,9 @@ async function chooseDatabaseMode() {
   console.log('');
   console.log(`    ${green('2.')} Local Supabase ${dim('(requires Docker)')}`);
   console.log(`       ${dim('Runs a full Supabase stack in Docker containers.')}`);
+  if (PLATFORM === 'win32') {
+    console.log(`       ${dim('On Windows: install Docker Desktop first and have it running.')}`);
+  }
   console.log('');
   console.log(`    ${green('3.')} Supabase Cloud`);
   console.log(`       ${dim('Connect to a Supabase.com project. Configure on first launch.')}`);
@@ -821,7 +1036,7 @@ async function setupLocalPostgres(targetDir) {
     schemaInitialized: false,
   };
 
-  // Ensure Homebrew's keg-only PostgreSQL binaries are in PATH (macOS)
+  // Ensure platform-specific PostgreSQL binaries are visible in this process.
   if (PLATFORM === 'darwin') {
     const brewPgBin = '/opt/homebrew/opt/postgresql@17/bin';
     const brewPgBinIntel = '/usr/local/opt/postgresql@17/bin';
@@ -831,26 +1046,43 @@ async function setupLocalPostgres(targetDir) {
     } else if (fs.existsSync(brewPgBinIntel) && !pathEntries.includes(brewPgBinIntel)) {
       process.env.PATH = `${brewPgBinIntel}:${process.env.PATH}`;
     }
+  } else if (PLATFORM === 'win32') {
+    refreshWindowsPath();
+    ensureWindowsPostgresPath();
   }
 
+  const isLinux = PLATFORM === 'linux';
+  const isWin = PLATFORM === 'win32';
+  // On Windows we authenticate with the password we set during winget install.
+  const childEnv = isWin ? { ...process.env, PGPASSWORD: POSTGRES_PASSWORD } : process.env;
+  // Use 127.0.0.1 explicitly on Windows: pg_hba.conf is host-based on IPv4.
+  const hostArg = isWin ? '-h 127.0.0.1' : '';
+  const userArg = isWin ? '-U postgres' : '';
+  const sudo = isLinux ? 'sudo -u postgres ' : '';
+  const pgIsReadyCmd = isWin ? 'pg_isready -h 127.0.0.1 -q' : 'pg_isready -q';
+
   // 1. Check if PostgreSQL is running
-  const pgReady = run('pg_isready -q') !== null;
+  const pgReady = run(pgIsReadyCmd, { env: childEnv }) !== null;
 
   if (!pgReady) {
     console.log(`  ${SYM_DASH} PostgreSQL is not running. Attempting to start…`);
     if (PLATFORM === 'darwin') {
       run('brew services start postgresql@17');
+    } else if (isWin) {
+      run('powershell -NoProfile -Command "Get-Service postgresql-x64-* | Start-Service"');
     } else {
       run('sudo systemctl start postgresql');
     }
     // Re-check
-    const now = run('pg_isready -q') !== null;
+    const now = run(pgIsReadyCmd, { env: childEnv }) !== null;
     if (!now) {
       console.log(`  ${SYM_CROSS} ${red('Could not start PostgreSQL.')}`);
       if (PLATFORM === 'darwin') {
         console.log(`  ${dim('Try: brew services start postgresql@17')}`);
         console.log(`  ${dim('You may need to add PostgreSQL to your PATH:')}`);
         console.log(`  ${dim('export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"')}`);
+      } else if (isWin) {
+        console.log(`  ${dim('Try: net start postgresql-x64-17  (or open Services.msc)')}`);
       } else {
         console.log(`  ${dim('Try: sudo systemctl start postgresql')}`);
       }
@@ -864,16 +1096,15 @@ async function setupLocalPostgres(targetDir) {
   const spinner = new Spinner();
   spinner.start('Creating database…');
 
-  const isLinux = PLATFORM === 'linux';
-  const dbListCmd = isLinux ? 'sudo -u postgres psql -lqt' : 'psql -lqt';
-  const dbList = run(dbListCmd) || '';
+  const dbListCmd = [sudo.trim(), 'psql', userArg, hostArg, '-lqt'].filter(Boolean).join(' ');
+  const dbList = run(dbListCmd, { env: childEnv }) || '';
   const dbExists = dbList.split('\n').some(line => line.trim().startsWith('ari ') || line.trim().startsWith('ari|'));
 
   if (dbExists) {
     spinner.success('Database "ari" already exists');
   } else {
-    const createCmd = isLinux ? 'sudo -u postgres createdb ari' : 'createdb ari';
-    const createResult = run(createCmd);
+    const createCmd = [sudo.trim(), 'createdb', userArg, hostArg, 'ari'].filter(Boolean).join(' ');
+    const createResult = run(createCmd, { env: childEnv });
     if (createResult === null) {
       spinner.error('Failed to create database "ari"');
       console.log(`  ${dim('Try manually: ' + createCmd)}`);
@@ -884,9 +1115,11 @@ async function setupLocalPostgres(targetDir) {
   result.dbCreated = true;
 
   // 3. Determine DATABASE_URL
-  const dbUrl = isLinux
-    ? 'postgresql://postgres@localhost:5432/ari'
-    : 'postgresql://localhost:5432/ari';
+  const dbUrl = isWin
+    ? `postgresql://postgres:${encodeURIComponent(POSTGRES_PASSWORD)}@127.0.0.1:5432/ari`
+    : isLinux
+      ? 'postgresql://postgres@localhost:5432/ari'
+      : 'postgresql://localhost:5432/ari';
 
   // 4. Run setup.sql
   spinner.start('Initializing database schema…');
@@ -945,7 +1178,9 @@ async function setupLocalSupabase(targetDir) {
 
   // Start Supabase
   const spinner = new Spinner();
-  const alreadyRunning = !!run(`cd "${targetDir}" && supabase status 2>/dev/null | grep "API URL"`);
+  // run() already swallows stderr via stdio:pipe; check the captured stdout for "API URL".
+  const supabaseStatusOut = run('supabase status', { cwd: targetDir }) || '';
+  const alreadyRunning = supabaseStatusOut.includes('API URL');
 
   if (alreadyRunning) {
     console.log(`  ${SYM_CHECK} Supabase is already running`);
@@ -1005,6 +1240,11 @@ async function setupLocalSupabase(targetDir) {
 // ── Verification Tests ──────────────────────────────────────────────────────
 
 function runVerification(ariResult, supabaseResult) {
+  // Make sure detect() calls below see binaries that were just installed in this
+  // same Node process (winget mutates Machine PATH but not process.env.PATH).
+  refreshWindowsPath();
+  ensureWindowsPostgresPath();
+
   console.log('');
   hr();
   console.log(`  ${blue('Verification Tests')}`);
@@ -1220,20 +1460,24 @@ function showCompletion(ariResult, supabaseResult) {
   ]);
   console.log('');
 
+  const ariStart = PLATFORM === 'win32' ? '.\\ari.cmd start' : './ari start';
+  const ariStartVerbose = PLATFORM === 'win32' ? '.\\ari.cmd start --verbose' : './ari start --verbose';
+  const ariStop = PLATFORM === 'win32' ? '.\\ari.cmd stop' : './ari stop';
+
   if (ariResult && ariResult.dir) {
     console.log(`  To start ARI, navigate to the directory where you installed ARI and run:`);
     console.log('');
-    console.log(`    ${DIM_BLUE}./ari start${RESET}`);
+    console.log(`    ${DIM_BLUE}${ariStart}${RESET}`);
     console.log('');
     console.log(`  Or if you prefer to see full server logs, run it in verbose mode:`);
     console.log('');
-    console.log(`    ${DIM_BLUE}./ari start --verbose${RESET}`);
+    console.log(`    ${DIM_BLUE}${ariStartVerbose}${RESET}`);
     console.log('');
     console.log(`  Then open ${blue('http://localhost:3000')}`);
     console.log('');
     console.log(`  To stop ARI, press Ctrl+C and run:`);
     console.log('');
-    console.log(`    ${DIM_BLUE}./ari stop${RESET}`);
+    console.log(`    ${DIM_BLUE}${ariStop}${RESET}`);
 
   } else {
     console.log(`  Clone ARI manually and run:`);
@@ -1241,7 +1485,12 @@ function showCompletion(ariResult, supabaseResult) {
     console.log(`    ${DIM_BLUE}git clone${ARI_BRANCH !== 'main' ? ` --branch ${ARI_BRANCH}` : ''} https://github.com/ARIsoftware/ARI.git${RESET}`);
     console.log(`    ${DIM_BLUE}cd ARI${RESET}`);
     console.log(`    ${DIM_BLUE}pnpm install${RESET}`);
-    console.log(`    ${DIM_BLUE}./ari start${RESET}`);
+    console.log(`    ${DIM_BLUE}${ariStart}${RESET}`);
+  }
+
+  if (PLATFORM === 'win32' && supabaseResult && supabaseResult.dbCreated) {
+    console.log('');
+    console.log(`  ${dim('Postgres password is saved in .env.local (DATABASE_URL).')}`);
   }
 
   console.log('');

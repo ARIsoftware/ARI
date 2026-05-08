@@ -9,11 +9,19 @@ const { execSync, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
+const os = require('os');
 
 const ROOT = path.resolve(__dirname, '..');
 const ENV_FILE = path.join(ROOT, '.env.supabase.local');
 const PGWEB_PID_FILE = path.join(ROOT, '.ari', 'pgweb.pid');
 const PGWEB_PORT = 5050;
+const IS_WIN = process.platform === 'win32';
+const PG_IS_READY = IS_WIN ? 'pg_isready -h 127.0.0.1 -q' : 'pg_isready -q';
+
+// On Windows, the installer downloads pgweb.exe here (no winget package exists).
+const WIN_PGWEB_EXE = IS_WIN
+  ? path.join(process.env.LOCALAPPDATA || os.homedir(), 'ARI', 'bin', 'pgweb.exe')
+  : null;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -23,9 +31,9 @@ const RED = '\x1b[1;31m';
 const DIM = '\x1b[2m';
 const RESET = '\x1b[0m';
 
-function run(cmd) {
+function run(cmd, opts = {}) {
   try {
-    return execSync(cmd, { encoding: 'utf8', stdio: 'pipe', cwd: ROOT }).trim();
+    return execSync(cmd, { encoding: 'utf8', stdio: 'pipe', cwd: ROOT, ...opts }).trim();
   } catch {
     return null;
   }
@@ -110,10 +118,26 @@ function isPgwebRunning() {
   }
 }
 
+function commandExists(cmd) {
+  return !!run(IS_WIN ? `where ${cmd}` : `command -v ${cmd}`);
+}
+
+function pgwebExecutable() {
+  if (WIN_PGWEB_EXE && fs.existsSync(WIN_PGWEB_EXE)) return WIN_PGWEB_EXE;
+  return commandExists('pgweb') ? 'pgweb' : null;
+}
+
 function startPgweb() {
-  if (!run('command -v pgweb')) {
+  const pgwebExe = pgwebExecutable();
+  if (!pgwebExe) {
     console.log('  ' + DIM + 'pgweb not installed — skip database UI' + RESET);
-    console.log('  ' + DIM + 'Install with: brew install pgweb' + RESET);
+    if (process.platform === 'darwin') {
+      console.log('  ' + DIM + 'Install with: brew install pgweb' + RESET);
+    } else if (process.platform === 'win32') {
+      console.log('  ' + DIM + 'Re-run the ARI installer to download pgweb.' + RESET);
+    } else {
+      console.log('  ' + DIM + 'Install pgweb from https://github.com/sosedoff/pgweb' + RESET);
+    }
     return;
   }
 
@@ -128,7 +152,7 @@ function startPgweb() {
     return;
   }
 
-  const child = spawn('pgweb', [
+  const child = spawn(pgwebExe, [
     '--bind', 'localhost',
     '--listen', String(PGWEB_PORT),
     '--skip-open',
@@ -190,15 +214,34 @@ async function checkForUpdates() {
 
 // ── Commands ───────────────────────────────────────────────────────────────
 
-function ensureMacPostgresPath() {
-  if (process.platform !== 'darwin') return;
-  const brewPgBin = '/opt/homebrew/opt/postgresql@17/bin';
-  const brewPgBinIntel = '/usr/local/opt/postgresql@17/bin';
-  const pathEntries = process.env.PATH.split(':');
-  if (fs.existsSync(brewPgBin) && !pathEntries.includes(brewPgBin)) {
-    process.env.PATH = `${brewPgBin}:${process.env.PATH}`;
-  } else if (fs.existsSync(brewPgBinIntel) && !pathEntries.includes(brewPgBinIntel)) {
-    process.env.PATH = `${brewPgBinIntel}:${process.env.PATH}`;
+function ensurePostgresPath() {
+  if (process.platform === 'darwin') {
+    const brewPgBin = '/opt/homebrew/opt/postgresql@17/bin';
+    const brewPgBinIntel = '/usr/local/opt/postgresql@17/bin';
+    const pathEntries = (process.env.PATH || '').split(':');
+    if (fs.existsSync(brewPgBin) && !pathEntries.includes(brewPgBin)) {
+      process.env.PATH = `${brewPgBin}:${process.env.PATH}`;
+    } else if (fs.existsSync(brewPgBinIntel) && !pathEntries.includes(brewPgBinIntel)) {
+      process.env.PATH = `${brewPgBinIntel}:${process.env.PATH}`;
+    }
+    return;
+  }
+  if (IS_WIN) {
+    const base = 'C:\\Program Files\\PostgreSQL';
+    if (!fs.existsSync(base)) return;
+    let versions;
+    try {
+      versions = fs.readdirSync(base)
+        .filter(d => /^\d+$/.test(d))
+        .sort((a, b) => Number(b) - Number(a));
+    } catch { return; }
+    for (const v of versions) {
+      const bin = path.join(base, v, 'bin');
+      const entries = (process.env.PATH || '').split(';');
+      if (fs.existsSync(bin) && !entries.includes(bin)) {
+        process.env.PATH = bin + ';' + (process.env.PATH || '');
+      }
+    }
   }
 }
 
@@ -272,8 +315,12 @@ function start(opts = {}) {
       }
     }
   } else if (mode === 'postgres') {
-    ensureMacPostgresPath();
-    const pgReady = run('pg_isready -q') !== null;
+    ensurePostgresPath();
+    let pgReady = run(PG_IS_READY) !== null;
+    if (!pgReady && IS_WIN) {
+      run('powershell -NoProfile -Command "Get-Service postgresql-x64-* | Start-Service"');
+      pgReady = run(PG_IS_READY) !== null;
+    }
     if (pgReady) {
       log('  ' + GREEN + '✔' + RESET + ' PostgreSQL is running');
       if (!quiet) startPgweb();
@@ -281,6 +328,8 @@ function start(opts = {}) {
       log('  ' + YELLOW + '⚠' + RESET + ' PostgreSQL is not running.');
       if (process.platform === 'darwin') {
         log('  ' + DIM + 'Start it with: brew services start postgresql@17' + RESET);
+      } else if (IS_WIN) {
+        log('  ' + DIM + 'Start it with: net start postgresql-x64-17  (or open Services.msc)' + RESET);
       } else {
         log('  ' + DIM + 'Start it with: sudo systemctl start postgresql' + RESET);
       }
@@ -307,7 +356,9 @@ function start(opts = {}) {
   function openBrowser(url) {
     if (process.platform === 'darwin') run(`open ${url}`);
     else if (process.platform === 'linux') run(`xdg-open ${url}`);
-    else if (process.platform === 'win32') run(`start ${url}`);
+    // 'start' is a cmd.exe builtin, not a binary — must invoke via cmd /c.
+    // Empty quoted "" is the title argument, required when the URL is quoted.
+    else if (IS_WIN) run(`cmd /c start "" "${url}"`);
   }
   async function waitForReady(url) {
     const deadline = Date.now() + 30_000;
@@ -385,14 +436,16 @@ async function stop() {
       process.exit(1);
     }
   } else if (mode === 'postgres') {
-    ensureMacPostgresPath();
+    ensurePostgresPath();
     stopPgweb();
-    const pgReady = run('pg_isready -q') !== null;
+    const pgReady = run(PG_IS_READY) !== null;
     if (pgReady) {
       const answer = await ask('  Your PostgreSQL database is running. Stop it now? (Y/n) ');
       if (!answer || answer.toLowerCase() === 'y') {
         if (process.platform === 'darwin') {
           run('brew services stop postgresql@17');
+        } else if (IS_WIN) {
+          run('powershell -NoProfile -Command "Get-Service postgresql-x64-* | Stop-Service"');
         } else {
           run('sudo systemctl stop postgresql');
         }
@@ -426,8 +479,8 @@ function status() {
       console.log('  ' + YELLOW + '⚠' + RESET + ' .env.supabase.local not found');
     }
   } else if (mode === 'postgres') {
-    ensureMacPostgresPath();
-    const pgReady = run('pg_isready -q') !== null;
+    ensurePostgresPath();
+    const pgReady = run(PG_IS_READY) !== null;
     console.log('  PostgreSQL: ' + (pgReady ? GREEN + '✔ running' : RED + '✘ not reachable') + RESET);
     const pgwebUp = isPgwebRunning();
     console.log('  pgweb:      ' + (pgwebUp ? GREEN + '✔ running ' + DIM + 'http://localhost:' + PGWEB_PORT + RESET : DIM + '✘ not running' + RESET));

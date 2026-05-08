@@ -52,7 +52,9 @@ function Install-NodeJS {
     if ($yn -match "^[Yy]") {
         winget install -e --id OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
         # Refresh PATH so node is available immediately
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+        $machinePath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+        $userPath    = [System.Environment]::GetEnvironmentVariable("Path", "User")
+        $env:Path = (@($machinePath, $userPath) | Where-Object { $_ }) -join ";"
         Write-OK "Node.js installed"
     } else {
         Write-Err "Node.js v18+ is required. Cannot continue without it."
@@ -87,15 +89,22 @@ if ($nodeVer) {
 $installJs = Join-Path $env:TEMP "ari-install-$PID.js"
 if (-not $env:ARI_BRANCH) { $env:ARI_BRANCH = "main" }
 $installUrl = "https://raw.githubusercontent.com/ARIsoftware/ARI/$($env:ARI_BRANCH)/scripts/install.js"
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$localJs = Join-Path $scriptDir "install.js"
+$scriptDir = $null
+try {
+    if ($MyInvocation.MyCommand.Path) {
+        $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    }
+} catch {
+    $scriptDir = $null
+}
+$localJs = if ($scriptDir) { Join-Path $scriptDir "install.js" } else { $null }
 
 $downloaded = $false
 try {
     Invoke-WebRequest -Uri $installUrl -OutFile $installJs -UseBasicParsing -ErrorAction Stop
     $downloaded = $true
 } catch {
-    if (Test-Path $localJs) {
+    if ($localJs -and (Test-Path $localJs)) {
         Copy-Item $localJs $installJs
         $downloaded = $true
     }
