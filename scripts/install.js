@@ -628,11 +628,14 @@ const TOOLS = [
   },
   {
     id: 'supabase',
+    // Supabase explicitly disabled `npm install -g supabase` (it exits non-zero
+    // by design). On Windows we use their winget package; on Linux there's no
+    // clean prebuilt path so we leave it skippable. Required only on macOS.
     name: 'Supabase CLI',
-    required: true,
+    required: PLATFORM === 'darwin',
     installCmds: {
       darwin: 'brew install supabase/tap/supabase',
-      fallback: 'npm install -g supabase',
+      win32: 'winget install -e --id Supabase.CLI --source winget --accept-source-agreements --accept-package-agreements',
     },
     detect: detectSupabaseCli,
     description: 'Database management tools for Supabase PostgreSQL.',
@@ -649,16 +652,17 @@ const TOOLS = [
         pacman: 'sudo pacman -S --noconfirm postgresql && sudo -u postgres initdb -D /var/lib/postgres/data && sudo systemctl enable postgresql && sudo systemctl start postgresql',
         zypper: 'sudo zypper install -y postgresql-server && sudo systemctl enable postgresql && sudo systemctl start postgresql',
       },
-      // --override replaces winget's default unattended args. Without these
-      // flags, EDB's installer leaves the postgres superuser with no usable
-      // password, which breaks createdb/psql later.
+      // --override replaces winget's default install args. The minimum the
+      // EDB installer needs for an unattended run is unattended mode + a
+      // superpassword. Anything else (--enable-components, --serviceaccount)
+      // has historically been brittle across EDB versions, so we let the
+      // installer use its own defaults for those.
       win32:
-        `winget install -e --id PostgreSQL.PostgreSQL --source winget --silent ` +
+        `winget install -e --id PostgreSQL.PostgreSQL --source winget ` +
         `--accept-source-agreements --accept-package-agreements ` +
         `--override "--mode unattended --unattendedmodeui none ` +
         `--superpassword ${POSTGRES_PASSWORD} ` +
-        `--serviceaccount postgres --servicepassword ${POSTGRES_PASSWORD} ` +
-        `--enable-components server,commandlinetools"`,
+        `--servicepassword ${POSTGRES_PASSWORD}"`,
     },
     detect: detectPostgresServer,
     description: 'Database server for ARI data storage.',
