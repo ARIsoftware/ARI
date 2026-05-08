@@ -67,7 +67,17 @@ function runAsync(cmd, opts = {}) {
   return new Promise((resolve, reject) => {
     execCb(cmd, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024, ...opts }, (error, stdout, stderr) => {
       if (error) {
-        reject(new Error(stderr || error.message));
+        // Some installers (winget, EDB) exit non-zero with empty stderr but
+        // useful info in stdout — and the exit code itself is often the real
+        // signal. Surface all three so failures are debuggable.
+        const parts = [];
+        if (typeof error.code !== 'undefined') parts.push(`Exit code: ${error.code}`);
+        const trimmedStderr = (stderr || '').trim();
+        const trimmedStdout = (stdout || '').trim();
+        if (trimmedStderr) parts.push(`stderr: ${trimmedStderr}`);
+        if (trimmedStdout) parts.push(`stdout: ${trimmedStdout}`);
+        if (parts.length === 0) parts.push(error.message);
+        reject(new Error(parts.join('\n')));
       } else {
         resolve(stdout.trim());
       }
