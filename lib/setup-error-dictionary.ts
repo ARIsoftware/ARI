@@ -32,20 +32,21 @@ const ROLE_MISSING: SetupErrorExplanation = {
   title: COMMON_TITLE,
   summary: SAFE_SUMMARY,
   diagnosis:
-    "Your database is missing one of the roles ARI's setup script depends on (typically `anon`, `authenticated`, or `service_role`). " +
-    "This usually means `DATABASE_URL` is pointing at a regular Postgres instance instead of a Supabase Postgres — those roles are created automatically by Supabase.",
+    "A SQL statement referenced a database role that doesn't exist — typically `anon`, `authenticated`, or `service_role` (Supabase-managed roles). " +
+    "This usually happens when a module's SQL assumes Supabase roles but is running on plain Postgres. " +
+    "The core schema may still be installed correctly; clicking Retry often succeeds.",
   actions: [
     {
-      heading: "Use the bundled Supabase",
-      body: "Run `./ari start` in your terminal, then click Retry below.",
-    },
-    {
-      heading: "Point at a Supabase project",
-      body: "Update `DATABASE_URL` in `.env.local` to a Supabase connection string, then restart the dev server before retrying.",
-    },
-    {
       heading: "Try again",
-      body: "If you've fixed the database, click Retry to re-run the install.",
+      body: "Click Retry — the failing statement may be the only one left, and the rest of the install likely committed.",
+    },
+    {
+      heading: "Switch database modes",
+      body: "If retrying keeps failing, you can move to a Supabase backend by updating `ARI_DB_MODE` and `DATABASE_URL` in `.env.local`, then restarting the dev server.",
+    },
+    {
+      heading: "Report it",
+      body: "If neither works, copy the raw error below and open an issue — the offending SQL statement should be made mode-agnostic.",
     },
   ],
   retryable: true,
