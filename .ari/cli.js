@@ -341,15 +341,28 @@ function start(opts = {}) {
 
   log('');
 
-  // Start Next.js dev server — pipe stdout (and stderr in quiet mode) so we can suppress.
-  // shell: true on Windows so spawn finds pnpm.cmd via PATHEXT (Node 24+ no
-  // longer auto-resolves .cmd extensions for security — CVE-2024-27980).
-  const child = spawn('pnpm', ['dev'], {
+  // Start Next.js dev server — pipe stdout (and stderr in quiet mode) so we
+  // can suppress. On Windows, pnpm ships as pnpm.cmd; spawn() with no shell
+  // resolves .cmd via PATH if we name it explicitly. Avoids DEP0190 from
+  // Node 22+ on the spawn(cmd, args, { shell: true }) pattern.
+  const child = spawn(IS_WIN ? 'pnpm.cmd' : 'pnpm', ['dev'], {
     stdio: ['inherit', 'pipe', quiet ? 'pipe' : 'inherit'],
     cwd: ROOT,
-    shell: IS_WIN,
   });
-  if (quiet && child.stderr) child.stderr.on('data', () => {}); // drain
+
+  // In quiet mode, buffer stderr instead of dropping it. If the child exits
+  // non-zero we print what we captured so failures aren't silent.
+  let stderrBuffer = '';
+  const STDERR_BUFFER_LIMIT = 64 * 1024;
+  if (quiet && child.stderr) {
+    child.stderr.on('data', (chunk) => {
+      if (stderrBuffer.length >= STDERR_BUFFER_LIMIT) return;
+      stderrBuffer += chunk.toString();
+      if (stderrBuffer.length > STDERR_BUFFER_LIMIT) {
+        stderrBuffer = stderrBuffer.slice(0, STDERR_BUFFER_LIMIT) + '\n[stderr truncated]';
+      }
+    });
+  }
 
   // Next.js prints "Local:" before any route is compiled, so opening the
   // browser immediately shows a 2-3s white page while routes JIT-compile.
@@ -422,6 +435,11 @@ function start(opts = {}) {
   process.on('SIGTERM', cleanup);
 
   child.on('exit', (code) => {
+    if (code && code !== 0 && stderrBuffer.trim()) {
+      process.stderr.write('\n  ' + RED + '✘' + RESET + ' Dev server failed. stderr:\n');
+      process.stderr.write(stderrBuffer);
+      process.stderr.write('\n');
+    }
     process.exit(code || 0);
   });
 }
