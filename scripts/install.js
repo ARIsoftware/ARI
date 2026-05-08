@@ -757,8 +757,14 @@ const TOOLS = [
       // Python+Flask GUI we don't use; ARI talks to Postgres via the pg Node
       // module) and StackBuilder (extension picker GUI). Cuts install time
       // from ~3 minutes to ~30 seconds.
+      //
+      // --force bypasses winget's "already installed" check, which fires
+      // when EDB's uninstaller leaves an Add/Remove Programs registry entry
+      // behind — common after partial cleanups. Without this, a re-install
+      // attempt fails with 0x8A15002B (no upgrade available) even though
+      // the binaries are gone.
       win32:
-        `winget install -e --id PostgreSQL.PostgreSQL.17 --source winget ` +
+        `winget install -e --id PostgreSQL.PostgreSQL.17 --source winget --force ` +
         `--accept-source-agreements --accept-package-agreements ` +
         `--override "--mode unattended --unattendedmodeui none ` +
         `--superpassword ${POSTGRES_PASSWORD} ` +
