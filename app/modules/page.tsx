@@ -21,6 +21,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { Input } from "@/components/ui/input"
 import {
   AlertCircle,
+  ArrowRight,
   CheckCircle2,
   Database,
   Download,
@@ -743,13 +744,33 @@ export default function ModulesPage() {
           <main className="flex-1 bg-background">
             <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8 lg:px-8 pb-24">
               {/* Header */}
-              <div className="flex flex-col gap-3">
-                <Badge className="w-fit text-sm font-medium bg-[#148962] hover:bg-[#117a56] text-white">Browse & Install</Badge>
-                <h1 className="text-3xl font-semibold tracking-tight text-foreground">Module Library</h1>
-                <p className="max-w-2xl text-sm text-muted-foreground">
-                  Discover, install, and manage modules to extend your app. Free modules can be downloaded instantly. Premium modules require a license key.
-                  <br /><span className="text-red-600">Note: Always assess third-party modules to ensure they are trustworthy and secure.</span>
-                </p>
+              <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between md:gap-8">
+                <div className="flex flex-col gap-3">
+                  <Badge className="w-fit text-sm font-medium bg-[#148962] hover:bg-[#117a56] text-white">Browse & Install</Badge>
+                  <h1 className="text-3xl font-semibold tracking-tight text-foreground">Module Library</h1>
+                  <p className="max-w-2xl text-sm text-muted-foreground">
+                    Discover, install, and manage modules to extend your app. Free modules can be downloaded instantly. Premium modules require a license key.
+                    <br /><span className="text-red-600">Note: Always assess third-party modules to ensure they are trustworthy and secure.</span>
+                  </p>
+                </div>
+
+                <a
+                  href="https://ari.software/docs/creating-modules"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group relative flex h-[138px] w-full shrink-0 flex-col justify-between gap-3 overflow-hidden rounded-xl border border-foreground/10 bg-transparent p-5 transition-all hover:border-[#148962]/40 hover:shadow-md md:w-80"
+                >
+                  <div className="flex flex-col gap-1">
+                    <p className="text-sm font-semibold text-foreground">Build your own modules</p>
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      Extend ARI with custom features tailored to your workflow.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-[#148962] transition-transform group-hover:translate-x-0.5">
+                    Learn how
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </div>
+                </a>
               </div>
 
               {pageError && (
