@@ -1167,6 +1167,31 @@ function spawnShellAsync(cmdString, opts = {}) {
   });
 }
 
+// Printed when the Windows installer detects an EDB no-op password mismatch
+// (winget --force re-runs the EDB installer, but EDB unattended mode silently
+// no-ops on existing installs — so --superpassword we just passed never reached
+// the running service). Hoisted out of setupLocalPostgres to keep that function
+// scannable.
+function printWindowsAuthRecovery() {
+  console.log(`  ${SYM_CROSS} ${red("Postgres is running but our password didn't authenticate.")}`);
+  console.log(`  ${dim('This usually means PostgreSQL was already installed on this machine')}`);
+  console.log(`  ${dim('and winget did not replay --superpassword on re-install. The running')}`);
+  console.log(`  ${dim('service still has the password from the original install.')}`);
+  console.log('');
+  console.log(`  ${dim('Recovery options:')}`);
+  console.log(`  ${dim('  1. Uninstall PostgreSQL and re-run this installer:')}`);
+  console.log(`  ${dim('       winget uninstall PostgreSQL.PostgreSQL.17')}`);
+  console.log('');
+  console.log(`  ${dim('  2. Reset the postgres password manually (as Administrator):')}`);
+  console.log(`  ${dim('       Stop-Service postgresql-x64-17')}`);
+  console.log(`  ${dim('       # In C:\\Program Files\\PostgreSQL\\17\\data\\pg_hba.conf,')}`);
+  console.log(`  ${dim('       # change "scram-sha-256" → "trust" on host/local lines.')}`);
+  console.log(`  ${dim('       Start-Service postgresql-x64-17')}`);
+  console.log(`  ${dim('       psql -U postgres -h 127.0.0.1 -d postgres -c \"ALTER USER postgres PASSWORD \'<pwd>\';\"')}`);
+  console.log(`  ${dim('       # Revert pg_hba.conf, restart service.')}`);
+  console.log(`  ${dim('       # Update DATABASE_URL in .env.local with the new password.')}`);
+}
+
 function writeInstallerEnvFile(targetDir, { dbMode, dbUrl }) {
   const crypto = require('crypto');
   const secret = crypto.randomBytes(32).toString('base64');
@@ -1264,6 +1289,21 @@ async function setupLocalPostgres(targetDir) {
   const sudo = isLinux ? 'sudo -u postgres ' : '';
   const pgIsReadyCmd = isWin ? 'pg_isready -h 127.0.0.1 -q' : 'pg_isready -q';
 
+  // Compute the target DATABASE_URL up front. We persist it to .env.local on
+  // every exit path (success or failure) so the user always has a working
+  // starting point — /welcome and ./ari doctor can take over even if a later
+  // step (createdb, setup.sql) fails.
+  const dbUrl = isWin
+    ? `postgresql://postgres:${encodeURIComponent(POSTGRES_PASSWORD)}@127.0.0.1:5432/ari`
+    : isLinux
+      ? 'postgresql://postgres@localhost:5432/ari'
+      : 'postgresql://localhost:5432/ari';
+
+  const writeIncompleteEnv = () => {
+    writeInstallerEnvFile(targetDir, { dbMode: 'postgres', dbUrl });
+    console.log(`  ${SYM_DASH} .env.local generated (database setup incomplete)`);
+  };
+
   // 1. Check if PostgreSQL is running
   const pgReady = run(pgIsReadyCmd, { env: childEnv }) !== null;
 
@@ -1286,6 +1326,7 @@ async function setupLocalPostgres(targetDir) {
         console.log(`  ${dim('export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"')}`);
       } else if (isWin) {
         console.log(`  ${dim('Try: net start postgresql-x64-17  (or open Services.msc)')}`);
+        writeIncompleteEnv();
       } else {
         console.log(`  ${dim('Try: sudo systemctl start postgresql')}`);
       }
@@ -1294,6 +1335,29 @@ async function setupLocalPostgres(targetDir) {
   }
   console.log(`  ${SYM_CHECK} PostgreSQL is running`);
   result.pgReady = true;
+
+  // Windows only: probe auth with PGPASSWORD before doing anything that relies
+  // on it. If EDB Postgres was already installed (e.g. from a previous failed
+  // run or a pre-existing PostgreSQL.PostgreSQL.17 install), `winget --force`
+  // re-runs the installer but EDB's unattended mode silently no-ops on
+  // existing installs — so --superpassword we just passed never reached the
+  // running service, and the freshly-generated POSTGRES_PASSWORD won't auth.
+  // Detect this now and surface a clear recovery path instead of failing
+  // silently at createdb later.
+  if (isWin) {
+    try {
+      await runAsync(`psql ${userArg} ${hostArg} -d postgres -w -c "SELECT 1"`, { env: childEnv });
+    } catch (e) {
+      // Only claim "EDB no-op password mismatch" when the error is actually an
+      // auth failure. Other probe failures (psql missing, connection refused)
+      // get a generic message and fall through to createdb's own diagnostics.
+      if (/password authentication failed|FATAL:/i.test(e.message)) {
+        printWindowsAuthRecovery();
+        writeIncompleteEnv();
+        return result;
+      }
+    }
+  }
 
   // 2. Create database (platform-aware)
   const spinner = new Spinner();
@@ -1307,24 +1371,20 @@ async function setupLocalPostgres(targetDir) {
     spinner.success('Database "ari" already exists');
   } else {
     const createCmd = [sudo.trim(), 'createdb', userArg, hostArg, 'ari'].filter(Boolean).join(' ');
-    const createResult = run(createCmd, { env: childEnv });
-    if (createResult === null) {
+    try {
+      await runAsync(createCmd, { env: childEnv });
+      spinner.success('Database "ari" created');
+    } catch (e) {
       spinner.error('Failed to create database "ari"');
+      console.log(`  ${dim(e.message.split('\n').slice(0, 3).map(l => l.trim()).filter(Boolean).join('\n  '))}`);
       console.log(`  ${dim('Try manually: ' + createCmd)}`);
+      if (isWin) writeIncompleteEnv();
       return result;
     }
-    spinner.success('Database "ari" created');
   }
   result.dbCreated = true;
 
-  // 3. Determine DATABASE_URL
-  const dbUrl = isWin
-    ? `postgresql://postgres:${encodeURIComponent(POSTGRES_PASSWORD)}@127.0.0.1:5432/ari`
-    : isLinux
-      ? 'postgresql://postgres@localhost:5432/ari'
-      : 'postgresql://localhost:5432/ari';
-
-  // 4. Run setup.sql
+  // 3. Run setup.sql
   spinner.start('Initializing database schema…');
   try {
     const ok = await runSetupSql(targetDir, dbUrl);
@@ -1339,7 +1399,7 @@ async function setupLocalPostgres(targetDir) {
     console.log(`  ${dim(err.message.split('\n').slice(0, 3).join('\n  '))}`);
   }
 
-  // 5. Write .env.local with ARI_DB_MODE and DATABASE_URL
+  // 4. Write .env.local with ARI_DB_MODE and DATABASE_URL
   spinner.start('Writing .env.local…');
   writeInstallerEnvFile(targetDir, { dbMode: 'postgres', dbUrl });
   spinner.success('.env.local generated');
