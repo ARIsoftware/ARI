@@ -639,10 +639,109 @@ async function update() {
   console.log('');
 }
 
+// ── Doctor ─────────────────────────────────────────────────────────────────
+
+// Mask the password segment in postgresql:// URLs so it's safe to print.
+function redactDbUrl(url) {
+  if (!url) return url;
+  return url.replace(/^(postgresql:\/\/[^:]+):[^@]+@/, '$1:***@');
+}
+
+async function doctor() {
+  ensurePostgresPath();
+  ensureAriBinPath();
+
+  console.log('');
+  console.log('  ARI Doctor — diagnostic report');
+  console.log('  ' + DIM + 'Copy this output if you need help.' + RESET);
+  console.log('');
+
+  const lines = [];
+  const ok   = (label, val) => lines.push('  ' + GREEN  + '✔' + RESET + ' ' + label.padEnd(28) + ' ' + (val || ''));
+  const warn = (label, val) => lines.push('  ' + YELLOW + '⚠' + RESET + ' ' + label.padEnd(28) + ' ' + (val || ''));
+  const fail = (label, val) => lines.push('  ' + RED    + '✘' + RESET + ' ' + label.padEnd(28) + ' ' + (val || ''));
+
+  lines.push('  ' + DIM + 'Platform: ' + process.platform + ' ' + os.release() + RESET);
+
+  const nodeV = run('node --version');
+  if (nodeV) {
+    const major = Number(nodeV.replace(/^v/, '').split('.')[0]);
+    if (major >= 18) ok('Node', nodeV);
+    else fail('Node', nodeV + ' (need >= 18)');
+  } else fail('Node', 'not found');
+
+  const pnpmV = run('pnpm --version');
+  pnpmV ? ok('pnpm', 'v' + pnpmV) : fail('pnpm', 'not found');
+
+  const gitV = run('git --version');
+  gitV ? ok('Git', gitV) : warn('Git', 'not found');
+
+  // Postgres service / connectivity
+  if (IS_WIN) {
+    const svc = run('powershell -NoProfile -Command "Get-Service postgresql-x64-* -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Status"') || '';
+    if (svc.includes('Running')) ok('Postgres service', 'Running');
+    else if (svc.trim()) warn('Postgres service', svc.trim());
+    else warn('Postgres service', 'not installed');
+  }
+  const pgReady = run(PG_IS_READY) !== null;
+  pgReady ? ok('Postgres reachable', PG_IS_READY) : fail('Postgres reachable', PG_IS_READY + ' returned non-zero');
+
+  // .env.local presence + required keys
+  const envPath = path.join(ROOT, '.env.local');
+  if (!fs.existsSync(envPath)) {
+    fail('.env.local', 'missing — run the installer or /welcome wizard');
+  } else {
+    ok('.env.local', envPath);
+    const content = fs.readFileSync(envPath, 'utf8');
+    for (const key of ['ARI_DB_MODE', 'DATABASE_URL', 'BETTER_AUTH_SECRET', 'BETTER_AUTH_URL', 'NEXT_PUBLIC_APP_URL']) {
+      const m = content.match(new RegExp('^' + key + '=(.*)$', 'm'));
+      const val = m ? m[1].trim() : '';
+      if (!val) fail('  ' + key, 'missing or empty');
+      else if (key === 'DATABASE_URL') ok('  ' + key, redactDbUrl(val));
+      else if (key === 'BETTER_AUTH_SECRET') ok('  ' + key, '(set, ' + val.length + ' chars)');
+      else ok('  ' + key, val);
+    }
+  }
+
+  // Live DB connectivity
+  const dbUrl = getDatabaseUrl();
+  if (dbUrl) {
+    try {
+      const pg = require(path.join(ROOT, 'node_modules', 'pg'));
+      const client = new pg.Client({ connectionString: dbUrl, ssl: false, connectionTimeoutMillis: 3000 });
+      await client.connect();
+      const r = await client.query('SELECT 1 AS ok');
+      await client.end();
+      r.rows[0].ok === 1 ? ok('DB connect', 'SELECT 1 succeeded') : fail('DB connect', 'unexpected result');
+    } catch (e) {
+      fail('DB connect', (e.message || String(e)).split('\n')[0]);
+    }
+  } else {
+    warn('DB connect', 'no DATABASE_URL to test against');
+  }
+
+  // pgweb
+  const pgwebExe = pgwebExecutable();
+  pgwebExe ? ok('pgweb', pgwebExe) : warn('pgweb', 'not installed (DB UI unavailable)');
+
+  // Mode-specific
+  const mode = getDbMode();
+  if (mode === 'supabaselocal') {
+    const supaV = run('supabase --version');
+    supaV ? ok('supabase CLI', 'v' + (supaV.match(/(\d+\.\d+\.\d+)/) || [, '?'])[1]) : fail('supabase CLI', 'not found on PATH');
+    isDockerRunning() ? ok('Docker', 'running') : fail('Docker', 'not running');
+  }
+
+  console.log(lines.join('\n'));
+  console.log('');
+  console.log('  ' + DIM + 'Mode: ' + mode + RESET);
+  console.log('');
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────
 
 const cmd = process.argv[2];
-const commands = { start: startDefault, startquiet: startDefault, stop, status, update };
+const commands = { start: startDefault, startquiet: startDefault, stop, status, update, doctor };
 
 if (!cmd || !commands[cmd]) {
   console.log('');
@@ -655,6 +754,7 @@ if (!cmd || !commands[cmd]) {
   console.log('    stop               Stop database services');
   console.log('    status             Show database status');
   console.log('    update             Pull latest ARI updates + install dependencies');
+  console.log('    doctor             Print diagnostic report (paste this when asking for help)');
   console.log('');
   process.exit(cmd ? 1 : 0);
 }
