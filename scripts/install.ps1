@@ -11,8 +11,13 @@
   To install from a specific branch:
     $env:ARI_BRANCH="develop"; irm https://raw.githubusercontent.com/ARIsoftware/ARI/main/scripts/install.ps1 | iex
 
-  To capture a full log of the install (for debugging or sharing):
-    $env:ARI_LOG="1"; irm https://raw.githubusercontent.com/ARIsoftware/ARI/main/scripts/install.ps1 | iex
+  Install transcripts are written by default to $env:TEMP\ari-install-*.log so
+  you can paste them when asking for help. To disable transcript logging:
+    $env:ARI_LOG="0"; irm https://raw.githubusercontent.com/ARIsoftware/ARI/main/scripts/install.ps1 | iex
+
+  Note: the transcript may contain your local Postgres password if winget
+  echoes its command line. Skim before sharing publicly; redact any line
+  containing "--superpassword" or "DATABASE_URL".
 #>
 
 # Wrapped in a scriptblock so that `return` and `throw` exit cleanly when
@@ -99,10 +104,12 @@
         }
     }
 
-    # ── Logging (opt-in via $env:ARI_LOG) ────────────────────────────────────
+    # ── Logging (default-on; disable with $env:ARI_LOG="0") ─────────────────
 
+    # Default-on for hackathon support: every install writes a transcript so
+    # participants can paste it when stuck. Set $env:ARI_LOG="0" to disable.
     $logPath = $null
-    if ($env:ARI_LOG) {
+    if ($env:ARI_LOG -ne "0") {
         $logPath = Join-Path $env:TEMP "ari-install-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
         try {
             Start-Transcript -Path $logPath -Force | Out-Null
