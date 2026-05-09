@@ -779,10 +779,12 @@ export default function DatabaseTestPage() {
       }
 
       const methodLabels: Record<string, string> = {
-        'rpc_function': 'RPC Function (Optimal)',
-        'raw_sql': 'Raw SQL (Fallback)',
-        'individual_validation': 'Individual Validation (Manual)',
-        'hardcoded_fallback': 'Hardcoded List (Critical)'
+        'direct_sql': 'Direct SQL (information_schema)',
+        'rpc_function': 'RPC Function (legacy)',
+        'raw_sql': 'Raw SQL (legacy)',
+        'individual_validation': 'Individual Validation (legacy)',
+        'hardcoded_fallback': 'Hardcoded List (legacy fallback)',
+        'none': 'None — discovery failed',
       }
 
       const methodLabel = methodLabels[result.discoveryMethod] || result.discoveryMethod
@@ -793,9 +795,9 @@ export default function DatabaseTestPage() {
         data: {
           method: result.discoveryMethod,
           methodsAvailable: result.discoveryResults,
-          recommendation: result.discoveryMethod === 'rpc_function'
-            ? 'Optimal - database functions working correctly'
-            : 'Re-run lib/db/setup.sql in Supabase to install the backup RPC functions for optimal performance'
+          recommendation: result.discoveryMethod === 'direct_sql'
+            ? 'Backup uses direct information_schema queries — works on any PostgreSQL backend.'
+            : 'If discovery shows zero tables, check that DATABASE_URL connects as a role that can read information_schema and bypass RLS (typically the database owner or a superuser).'
         }
       })
       console.log('✅ Table discovery test complete:', methodLabel)
@@ -829,10 +831,10 @@ export default function DatabaseTestPage() {
       } else {
         updateBackupResult('Table Discovery Results', {
           status: 'error',
-          message: 'No tables discovered - all discovery methods failed',
+          message: 'No tables discovered — discovery query returned zero rows',
           data: {
             found: 0,
-            hint: 'Check database connection and re-run lib/db/setup.sql in your SQL client (Supabase Studio, pgweb, or psql) to install the backup RPC functions'
+            hint: 'Check that DATABASE_URL is set, the database is reachable, and the connection role can read information_schema. If the role is RLS-restricted (e.g. Supabase anon/authenticated), backup will be empty — switch to a role that owns the tables or has BYPASSRLS.'
           }
         })
         console.error('❌ No tables discovered')

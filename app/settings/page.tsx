@@ -37,6 +37,8 @@ import {
   type ImportProgress,
   type ValidationResult,
   type VerificationResult,
+  type ExportFailure,
+  type DbMode,
 } from "./types"
 
 export default function SettingsPage(): React.ReactElement {
@@ -76,10 +78,22 @@ export default function SettingsPage(): React.ReactElement {
   const [importProgress, setImportProgress] = useState<ImportProgress | null>(null)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
+  const [exportFailure, setExportFailure] = useState<ExportFailure | null>(null)
+  const [dbMode, setDbMode] = useState<DbMode | null>(null)
 
   // Load sessions on mount
   useEffect(() => {
     loadSessions()
+  }, [])
+
+  // Fetch database mode on mount for the Backups tab badge
+  useEffect(() => {
+    fetch("/api/system/db-mode")
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.mode) setDbMode(data.mode as DbMode)
+      })
+      .catch(() => {/* badge is purely informational; ignore failures */})
   }, [])
 
   // Set current session token from context when available
@@ -180,19 +194,32 @@ export default function SettingsPage(): React.ReactElement {
     }
   }
 
-  async function handleExport(): Promise<void> {
+  async function handleExport(force: boolean = false): Promise<void> {
     try {
       setExportLoading(true)
       setMessage(null)
       setBackupStats(null)
+      if (!force) setExportFailure(null)
 
-      const response = await fetch("/api/backup/export", {
+      const url = force ? "/api/backup/export?force=true" : "/api/backup/export"
+      const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       })
 
       if (!response.ok) {
-        const error = await response.json()
+        const error = await response.json().catch(() => ({}))
+        if (response.status === 500 && Array.isArray(error.failedTables)) {
+          setExportFailure({
+            failedTables: error.failedTables,
+            details: Array.isArray(error.details) ? error.details : [],
+          })
+          setMessage({
+            type: "error",
+            text: `Export aborted: ${error.failedTables.length} table(s) failed. Backup was not downloaded — restoring an incomplete backup would leave your database in an inconsistent state.`,
+          })
+          return
+        }
         throw new Error(error.error || "Export failed")
       }
 
@@ -207,9 +234,9 @@ export default function SettingsPage(): React.ReactElement {
       }
 
       const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
+      const objectUrl = URL.createObjectURL(blob)
       const a = document.createElement("a")
-      a.href = url
+      a.href = objectUrl
 
       const contentDisposition = response.headers.get("Content-Disposition")
       let filename = `database-backup-${new Date().toISOString().split("T")[0]}.sql`
@@ -224,7 +251,7 @@ export default function SettingsPage(): React.ReactElement {
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      URL.revokeObjectURL(objectUrl)
 
       if (metadata.tables && metadata.rows) {
         setBackupStats({
@@ -234,25 +261,18 @@ export default function SettingsPage(): React.ReactElement {
           warnings: metadata.warnings as number | undefined,
         })
 
-        let messageText = `Database exported successfully! ${(metadata.rows as number).toLocaleString()} rows from ${metadata.tables} tables.`
+        const isPartial = metadata.partial === true
+        let messageText = isPartial
+          ? `Partial backup downloaded: ${(metadata.rows as number).toLocaleString()} rows from ${metadata.tables} tables, but ${metadata.failedTables} table(s) were skipped.`
+          : `Database exported successfully! ${(metadata.rows as number).toLocaleString()} rows from ${metadata.tables} tables.`
 
-        if (metadata.discoveryMethod) {
-          const methodLabels: Record<string, string> = {
-            rpc_function: "RPC function (optimal)",
-            raw_sql: "Raw SQL",
-            individual_validation: "Individual validation",
-            hardcoded_fallback: "Hardcoded list (needs migration)",
-          }
-          messageText += ` Discovery: ${methodLabels[metadata.discoveryMethod as string] || metadata.discoveryMethod}.`
-        }
-
-        let messageType: BackupMessage["type"] = "success"
+        let messageType: BackupMessage["type"] = isPartial ? "error" : "success"
 
         if ((metadata.warnings as number) > 0) {
           messageText += ` ${metadata.warnings} warning(s) detected.`
-          messageType = "warning"
+          if (!isPartial) messageType = "warning"
         }
-        if ((metadata.errors as number) > 0) {
+        if ((metadata.errors as number) > 0 && !isPartial) {
           messageText += ` ${metadata.errors} error(s) occurred during export.`
           messageType = "error"
         }
@@ -502,8 +522,11 @@ export default function SettingsPage(): React.ReactElement {
                     exportLoading={exportLoading}
                     importLoading={importLoading}
                     verifyLoading={verifyLoading}
+                    exportFailure={exportFailure}
+                    dbMode={dbMode}
                     onVerify={handleVerify}
-                    onExport={handleExport}
+                    onExport={() => handleExport(false)}
+                    onForceExport={() => handleExport(true)}
                     onImportClick={handleImportClick}
                     onConfirmedImport={handleConfirmedImport}
                     onFileSelect={setSelectedFile}

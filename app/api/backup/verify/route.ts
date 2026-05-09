@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { logger } from '@/lib/logger'
 import { queryRows, EXCLUDED_TABLES } from '../utils'
+import type { RoleCheck } from '@/app/settings/types'
 
 export const debugRole = "backup-verify"
 
@@ -10,6 +11,69 @@ interface TableInfo {
   rowCount: number
   lastModified?: string
   status: 'accessible' | 'inaccessible' | 'unknown'
+}
+
+// Probe the connection's role and ability to read all rows. Catches the
+// nightmare scenario where DATABASE_URL connects as a role that RLS would
+// filter (e.g. a Supabase Cloud user who pasted the anon/authenticated
+// pooler URL by mistake), which would silently produce a zero-row backup.
+async function checkConnectionRole(): Promise<RoleCheck> {
+  // The three probes are independent — run them in parallel and tolerate
+  // individual failures (row_security may not be exposed on every Postgres
+  // build, and the user-table read tells us about RLS rather than crashing).
+  const [userResult, rsResult, countResult] = await Promise.allSettled([
+    queryRows<{ current_user: string }>(`SELECT current_user`),
+    queryRows<{ row_security: string }>(`SHOW row_security`),
+    queryRows<{ cnt: number }>(`SELECT COUNT(*)::int AS cnt FROM public."user"`),
+  ])
+
+  if (userResult.status === 'rejected') {
+    const err = userResult.reason
+    return {
+      status: 'critical',
+      currentUser: null,
+      rowSecurity: null,
+      userTableCount: null,
+      message: `Could not query current_user: ${err instanceof Error ? err.message : String(err)}`,
+    }
+  }
+
+  const currentUser = userResult.value[0]?.current_user ?? null
+  const rowSecurity = rsResult.status === 'fulfilled' ? rsResult.value[0]?.row_security ?? null : null
+
+  if (countResult.status === 'rejected') {
+    const err = countResult.reason
+    return {
+      status: 'critical',
+      currentUser,
+      rowSecurity,
+      userTableCount: null,
+      message: `Cannot read public."user": ${err instanceof Error ? err.message : String(err)}. The DATABASE_URL role likely cannot bypass RLS — backup would be empty.`,
+    }
+  }
+
+  const userTableCount = countResult.value[0]?.cnt ?? 0
+
+  // The route requires an authenticated session, so by definition there is
+  // at least one user in public."user". A zero count from the admin pool is
+  // a strong signal RLS is filtering.
+  if (userTableCount === 0) {
+    return {
+      status: 'critical',
+      currentUser,
+      rowSecurity,
+      userTableCount,
+      message: `Connection role "${currentUser}" sees 0 users but you are signed in. RLS is filtering the pool — DATABASE_URL must connect as a role that owns the tables or has BYPASSRLS. Backup would be incomplete.`,
+    }
+  }
+
+  return {
+    status: 'ok',
+    currentUser,
+    rowSecurity,
+    userTableCount,
+    message: `Connection role "${currentUser}" can read all rows.`,
+  }
 }
 
 // Test table discovery via direct SQL
@@ -97,8 +161,11 @@ export async function GET(req: NextRequest) {
 
     logger.info(`[Backup Verify] Verification requested by user: ${user.id.slice(0, 8)}…`)
 
-    // Test discovery
-    const discoveryResults = await testDiscovery()
+    // Role probe and table discovery hit independent SQL — run concurrently.
+    const [roleCheck, discoveryResults] = await Promise.all([
+      checkConnectionRole(),
+      testDiscovery(),
+    ])
 
     // Determine results
     let primaryMethod = 'none'
@@ -113,6 +180,10 @@ export async function GET(req: NextRequest) {
       primaryMethod = 'none'
       warnings.push('CRITICAL: Table discovery failed. Check database connectivity.')
       logger.error('[Backup Verify] Discovery failed!')
+    }
+
+    if (roleCheck.status === 'critical') {
+      warnings.push(`CRITICAL: ${roleCheck.message}`)
     }
 
     // Get row counts for all tables
@@ -147,6 +218,7 @@ export async function GET(req: NextRequest) {
       missingTables: [],
       extraTables: [],
       discoveryResults,
+      roleCheck,
       timestamp: new Date().toISOString()
     })
 

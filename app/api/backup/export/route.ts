@@ -312,15 +312,10 @@ async function fetchTableData(tableName: string, chunkSize: number = 1000): Prom
       )
     } catch {
       // Fallback: some tables may not have created_at or id columns
-      try {
-        rows = await queryRows(
-          `SELECT * FROM "${tableName}" LIMIT $1 OFFSET $2`,
-          [chunkSize, offset]
-        )
-      } catch (fallbackError: unknown) {
-        logger.warn(`Could not fetch data from ${tableName}:`, fallbackError)
-        return allData
-      }
+      rows = await queryRows(
+        `SELECT * FROM "${tableName}" LIMIT $1 OFFSET $2`,
+        [chunkSize, offset]
+      )
     }
 
     allData = allData.concat(rows)
@@ -351,6 +346,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const force = req.nextUrl.searchParams.get('force') === 'true'
+
     // Discover all tables
     const { tables, method, warnings } = await discoverTables()
     logger.info(`Exporting ${tables.length} tables using discovery method: ${method}`)
@@ -359,25 +356,28 @@ export async function POST(req: NextRequest) {
       logger.warn('Discovery warnings:', warnings)
     }
 
-    // Discover all schemas upfront in a single query
-    logger.info('Discovering all table schemas upfront...')
-    const cachedSchemas = await discoverAllSchemas(tables)
+    // Schema and constraint discovery hit independent information_schema
+    // queries — run concurrently before the per-table fetch loop.
+    logger.info('Discovering all table schemas and constraints...')
+    const [cachedSchemas, tableConstraints] = await Promise.all([
+      discoverAllSchemas(tables),
+      discoverAllConstraints(tables),
+    ])
     const tablesWithCachedSchema = Object.entries(cachedSchemas).filter(([_, cols]) => cols.length > 0).length
     logger.info(`Cached schemas for ${tablesWithCachedSchema}/${tables.length} tables`)
-
-    // Discover all constraints upfront (2 queries total, not 2N)
-    const tableConstraints = await discoverAllConstraints(tables)
 
     const backupData: Record<string, Record<string, unknown>[]> = {}
     const tableSchemas: Record<string, ColumnInfo[]> = {}
     const checksums: Record<string, string> = {}
     let totalRows = 0
     let errors: string[] = [...warnings]
+    const failedTables: string[] = []
 
     // Process each table
     for (const table of tables) {
       if (!isValidTableName(table, tables)) {
         errors.push(`Skipping invalid table name: ${table}`)
+        failedTables.push(table)
         continue
       }
 
@@ -399,8 +399,25 @@ export async function POST(req: NextRequest) {
         logger.info(`Exported ${table}: ${allData.length} rows`)
       } catch (tableError: unknown) {
         logger.error(`Error exporting table ${table}:`, tableError)
-        errors.push(`Error exporting ${table}: ${tableError instanceof Error ? tableError.message : String(tableError)}`)
+        const message = tableError instanceof Error ? tableError.message : String(tableError)
+        errors.push(`Error exporting ${table}: ${message}`)
+        failedTables.push(table)
       }
+    }
+
+    // Default behavior: fail loudly if any table errored. Users explicitly
+    // opt into a partial backup with ?force=true after seeing the error.
+    if (failedTables.length > 0 && !force) {
+      logger.error(`Export aborted: ${failedTables.length} tables failed`, failedTables)
+      return NextResponse.json(
+        {
+          error: "Backup is incomplete: one or more tables failed to export.",
+          failedTables,
+          details: errors,
+          hint: "Retry with ?force=true to download a partial backup anyway. Use only for debugging — restoring a partial backup will leave your database in an inconsistent state.",
+        },
+        { status: 500 }
+      )
     }
 
     // Create metadata with checksums and discovery method
@@ -650,7 +667,9 @@ export async function POST(req: NextRequest) {
           timestamp: metadata.timestamp,
           discoveryMethod: method,
           warnings: warnings.length,
-          errors: errors.length
+          errors: errors.length,
+          failedTables: failedTables.length,
+          partial: failedTables.length > 0,
         })
       }
     })

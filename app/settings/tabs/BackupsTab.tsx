@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { AlertCircle, CheckCircle2, Download, Eye, Loader2, Upload } from "lucide-react"
-import type { BackupStats, BackupMessage, ImportProgress, ValidationResult, VerificationResult } from "../types"
+import type { BackupStats, BackupMessage, ImportProgress, ValidationResult, VerificationResult, ExportFailure, DbMode } from "../types"
 
 interface BackupsTabProps {
   message: BackupMessage | null
@@ -21,12 +21,21 @@ interface BackupsTabProps {
   exportLoading: boolean
   importLoading: boolean
   verifyLoading: boolean
+  exportFailure: ExportFailure | null
+  dbMode: DbMode | null
   onVerify: () => void
   onExport: () => void
+  onForceExport: () => void
   onImportClick: () => void
   onConfirmedImport: () => void
   onFileSelect: (file: File | null) => void
   onConfirmDialogChange: (open: boolean) => void
+}
+
+const DB_MODE_LABELS: Record<DbMode, string> = {
+  postgres: "Local PostgreSQL",
+  supabaselocal: "Local Supabase",
+  supabasecloud: "Supabase Cloud",
 }
 
 function getMessageIcon(type: BackupMessage["type"]): React.ReactElement {
@@ -95,13 +104,17 @@ export function BackupsTab({
   exportLoading,
   importLoading,
   verifyLoading,
+  exportFailure,
+  dbMode,
   onVerify,
   onExport,
+  onForceExport,
   onImportClick,
   onConfirmedImport,
   onFileSelect,
   onConfirmDialogChange,
 }: BackupsTabProps): React.ReactElement {
+  const roleCheck = verificationResult?.roleCheck
   return (
     <div className="space-y-6">
       {message && (
@@ -144,6 +157,26 @@ export function BackupsTab({
                 </Badge>
               </div>
             </div>
+
+            {roleCheck && roleCheck.status === "critical" && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Database role cannot read all rows</AlertTitle>
+                <AlertDescription className="space-y-1">
+                  <p>{roleCheck.message}</p>
+                  <p className="text-xs">
+                    Connection role: <span className="font-mono">{roleCheck.currentUser ?? "unknown"}</span>
+                    {roleCheck.rowSecurity ? <> · row_security: <span className="font-mono">{roleCheck.rowSecurity}</span></> : null}
+                  </p>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {roleCheck && roleCheck.status === "ok" && (
+              <p className="text-xs text-muted-foreground">
+                Connection role <span className="font-mono">{roleCheck.currentUser}</span> can read all rows.
+              </p>
+            )}
 
             {verificationResult.warnings && verificationResult.warnings.length > 0 && (
               <div className="space-y-2">
@@ -288,12 +321,74 @@ export function BackupsTab({
         </AlertDialogContent>
       </AlertDialog>
 
+      {exportFailure && (
+        <Card className="border-red-500">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2 text-red-600">
+              <AlertCircle className="h-5 w-5" />
+              Export aborted: incomplete backup
+            </CardTitle>
+            <CardDescription>
+              {exportFailure.failedTables.length} table(s) failed to export. The backup was not downloaded
+              because restoring an incomplete backup would leave your database in an inconsistent state.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <p className="font-medium text-sm">Failed tables:</p>
+              <p className="text-sm text-muted-foreground font-mono">
+                {exportFailure.failedTables.join(", ")}
+              </p>
+            </div>
+            {exportFailure.details.length > 0 && (
+              <div>
+                <p className="font-medium text-sm">Details:</p>
+                <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
+                  {exportFailure.details.slice(0, 5).map((detail, idx) => (
+                    <li key={idx} className="break-all">{detail}</li>
+                  ))}
+                  {exportFailure.details.length > 5 && (
+                    <li>... and {exportFailure.details.length - 5} more</li>
+                  )}
+                </ul>
+              </div>
+            )}
+            <Button
+              onClick={onForceExport}
+              disabled={exportLoading}
+              variant="outline"
+              size="sm"
+            >
+              {exportLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Downloading partial backup…
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-4 w-4" />
+                  Download partial backup anyway
+                </>
+              )}
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Use only for debugging. Do not restore a partial backup to a production database.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Download className="h-5 w-5" />
               Export Database
+              {dbMode && (
+                <Badge variant="secondary" className="ml-auto text-xs font-normal">
+                  {DB_MODE_LABELS[dbMode]}
+                </Badge>
+              )}
             </CardTitle>
             <CardDescription>
               Automatically discovers and exports ALL tables in your database as an SQL file

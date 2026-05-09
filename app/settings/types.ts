@@ -56,6 +56,14 @@ export interface ValidationResult {
   metadata?: Record<string, unknown>
 }
 
+export interface RoleCheck {
+  status: "ok" | "critical"
+  currentUser: string | null
+  rowSecurity: string | null
+  userTableCount: number | null
+  message: string
+}
+
 export interface VerificationResult {
   status: "ok" | "warning" | "critical"
   timestamp: string
@@ -66,7 +74,15 @@ export interface VerificationResult {
   warnings: string[]
   missingTables: string[]
   extraTables: string[]
+  roleCheck?: RoleCheck
 }
+
+export interface ExportFailure {
+  failedTables: string[]
+  details: string[]
+}
+
+export type DbMode = "postgres" | "supabaselocal" | "supabasecloud"
 
 // API Key types
 export interface ApiKey {
