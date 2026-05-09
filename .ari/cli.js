@@ -251,6 +251,20 @@ function ensurePostgresPath() {
   }
 }
 
+// supabase.exe and pgweb.exe were dropped into %LOCALAPPDATA%\ARI\bin by the
+// installer, but Windows PATH was never updated. Prepend the bin dir so bare
+// `supabase`/`pgweb` calls in this process resolve. Mirrors install.js's
+// ensureWindowsAriBinPath().
+function ensureAriBinPath() {
+  if (!IS_WIN) return;
+  const binDir = path.join(process.env.LOCALAPPDATA || os.homedir(), 'ARI', 'bin');
+  if (!fs.existsSync(binDir)) return;
+  const entries = (process.env.PATH || '').split(';');
+  if (!entries.includes(binDir)) {
+    process.env.PATH = binDir + ';' + (process.env.PATH || '');
+  }
+}
+
 function startDefault() {
   return start({ quiet: !process.argv.includes('--verbose') });
 }
@@ -259,6 +273,10 @@ function start(opts = {}) {
   const mode = getDbMode();
   const quiet = !!opts.quiet;
   const log = (...args) => { if (!quiet) console.log(...args); };
+
+  // Make sure ARI-bundled binaries (supabase.exe, pgweb.exe) are reachable
+  // regardless of mode. Postgres path is mode-specific and stays inline below.
+  ensureAriBinPath();
 
   // Spinner — only used in quiet mode
   const spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
@@ -455,6 +473,7 @@ function start(opts = {}) {
 
 async function stop() {
   const mode = getDbMode();
+  ensureAriBinPath();
 
   if (mode === 'supabaselocal') {
     console.log('  Stopping Supabase...');
@@ -493,6 +512,7 @@ async function stop() {
 
 function status() {
   const mode = getDbMode();
+  ensureAriBinPath();
   console.log('  Database mode: ' + mode);
   console.log('');
 

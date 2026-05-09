@@ -139,6 +139,22 @@ function getWindowsAriBinDir() {
   return path.join(process.env.LOCALAPPDATA || os.homedir(), 'ARI', 'bin');
 }
 
+// We download supabase.exe and pgweb.exe into getWindowsAriBinDir() but never
+// mutate the user's PATH. detect*() helpers paper over this with absolute-path
+// fallbacks, but downstream `run()`/`spawn()` calls (e.g. `supabase status`,
+// `supabase start`, `pgweb --version`) don't — they fail to resolve the bare
+// name. Prepend the bin dir to this process's PATH so those calls find the
+// just-installed binaries.
+function ensureWindowsAriBinPath() {
+  if (process.platform !== 'win32') return;
+  const binDir = getWindowsAriBinDir();
+  if (!fs.existsSync(binDir)) return;
+  const entries = (process.env.PATH || '').split(';');
+  if (!entries.includes(binDir)) {
+    process.env.PATH = binDir + ';' + (process.env.PATH || '');
+  }
+}
+
 // Map Node's process.arch to the convention used in GitHub release asset names.
 function getWindowsReleaseArch() {
   return process.arch === 'arm64' ? 'arm64' : 'amd64';
@@ -836,6 +852,7 @@ async function installTools() {
   // those installs.
   refreshWindowsPath();
   ensureWindowsPostgresPath();
+  ensureWindowsAriBinPath();
 
   const results = [];
   const total = TOOLS.length;
@@ -906,6 +923,7 @@ async function installTools() {
       // detect()/run() calls in this same Node process.
       refreshWindowsPath();
       ensureWindowsPostgresPath();
+      ensureWindowsAriBinPath();
       const after = tool.detect();
       spinner.success(`${tool.name} ${after.version ? `v${after.version}` : ''} installed`);
       results.push({ ...tool, status: 'installed', version: after.version });
@@ -915,6 +933,7 @@ async function installTools() {
       // "failure" was just winget being noisy about a no-op.
       refreshWindowsPath();
       ensureWindowsPostgresPath();
+      ensureWindowsAriBinPath();
       const recheck = tool.detect();
       if (recheck.installed) {
         spinner.success(`${tool.name} ${recheck.version ? `v${recheck.version}` : ''} already installed`);
@@ -1213,6 +1232,7 @@ async function setupLocalPostgres(targetDir) {
   } else if (PLATFORM === 'win32') {
     refreshWindowsPath();
     ensureWindowsPostgresPath();
+    ensureWindowsAriBinPath();
   }
 
   const isLinux = PLATFORM === 'linux';
@@ -1314,6 +1334,11 @@ async function setupLocalSupabase(targetDir) {
   console.log(`  ${blue('Local Supabase Setup')}`);
   hr();
 
+  // supabase.exe was downloaded into %LOCALAPPDATA%\ARI\bin earlier in the
+  // installer flow, but the user's PATH never picked it up. Make sure this
+  // process can resolve `supabase` for the run/spawn calls below.
+  ensureWindowsAriBinPath();
+
   const result = {
     supabaseStarted: false,
     envGenerated: false,
@@ -1408,6 +1433,7 @@ function runVerification(ariResult, supabaseResult) {
   // same Node process (winget mutates Machine PATH but not process.env.PATH).
   refreshWindowsPath();
   ensureWindowsPostgresPath();
+  ensureWindowsAriBinPath();
 
   console.log('');
   hr();
