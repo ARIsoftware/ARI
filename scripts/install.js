@@ -21,10 +21,29 @@ const crypto = require('crypto');
 
 // Local-dev Postgres password used on Windows. EDB's installer leaves the
 // postgres superuser with no usable password unless we pass one via --override
-// at install time. Generated once per run so multiple winget calls and the
-// later setupLocalPostgres() step share the same value.
-const POSTGRES_PASSWORD = process.env.ARI_POSTGRES_PASSWORD
-  || crypto.randomBytes(12).toString('base64').replace(/[+/=]/g, '');
+// at install time. Resolution order:
+//   1. $ARI_POSTGRES_PASSWORD              (explicit override for CI/scripting)
+//   2. password parsed from ~/ARI/.env.local DATABASE_URL  (re-run case)
+//   3. fresh crypto.randomBytes            (first run)
+//
+// On re-run we MUST reuse the existing password — the EDB-installed Postgres
+// service still has the old one, and a new winget --override will silently
+// no-op because winget already considers the package "installed". Probing
+// the default install dir's .env.local lets us recover that value without
+// requiring the user to set an env var manually.
+const DEFAULT_INSTALL_DIR = path.join(os.homedir(), 'ARI');
+const POSTGRES_PASSWORD = (() => {
+  if (process.env.ARI_POSTGRES_PASSWORD) return process.env.ARI_POSTGRES_PASSWORD;
+  const envPath = path.join(DEFAULT_INSTALL_DIR, '.env.local');
+  if (fs.existsSync(envPath)) {
+    try {
+      const m = fs.readFileSync(envPath, 'utf8')
+        .match(/^DATABASE_URL=postgresql:\/\/postgres:([^@]+)@/m);
+      if (m) return decodeURIComponent(m[1]);
+    } catch { /* fall through to fresh */ }
+  }
+  return crypto.randomBytes(12).toString('base64').replace(/[+/=]/g, '');
+})();
 
 // ── ANSI Colors & Symbols ───────────────────────────────────────────────────
 
