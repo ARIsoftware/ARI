@@ -266,12 +266,16 @@ function ensureAriBinPath() {
 }
 
 function startDefault() {
-  return start({ quiet: !process.argv.includes('--verbose') });
+  return start({
+    quiet: !process.argv.includes('--verbose'),
+    lan: process.argv.includes('--lan'),
+  });
 }
 
 function start(opts = {}) {
   const mode = getDbMode();
   const quiet = !!opts.quiet;
+  const lan = !!opts.lan;
   const log = (...args) => { if (!quiet) console.log(...args); };
 
   // Make sure ARI-bundled binaries (supabase.exe, pgweb.exe) are reachable
@@ -371,7 +375,11 @@ function start(opts = {}) {
   //     files directly — that path returns EINVAL).
   //   - DEP0190 doesn't fire (the deprecation only triggers when args are
   //     passed alongside shell:true; an empty args array avoids it).
-  const child = spawn('pnpm dev', [], {
+  // Default binds to localhost only — keeps the dev server off the LAN.
+  // `--lan` keeps the original behavior (Next defaults to 0.0.0.0 and
+  // auto-detects the LAN IP for its banner).
+  const devCmd = lan ? 'pnpm dev' : 'pnpm exec next dev -H localhost';
+  const child = spawn(devCmd, [], {
     stdio: ['inherit', 'pipe', quiet ? 'pipe' : 'inherit'],
     cwd: ROOT,
     shell: true,
@@ -415,7 +423,10 @@ function start(opts = {}) {
   }
 
   child.stdout.on('data', (data) => {
-    const text = data.toString();
+    let text = data.toString();
+    // Without --lan, Next still prints a "Network:" line that just echoes
+    // the loopback hostname — strip it to avoid the duplicate.
+    if (!lan) text = text.replace(/^.*Network:.*\r?\n?/m, '');
 
     if (!browserScheduled) {
       const match = text.match(/Local:\s+(http:\/\/localhost:\d+)/);
@@ -439,7 +450,7 @@ function start(opts = {}) {
       }
     }
 
-    if (!quiet) process.stdout.write(data);
+    if (!quiet) process.stdout.write(text);
     // In quiet mode, all child stdout is dropped.
   });
 
@@ -748,7 +759,8 @@ if (!cmd || !commands[cmd]) {
   console.log('  Usage: ./ari <command>');
   console.log('');
   console.log('  Commands:');
-  console.log('    start              Start database + dev server (hides logs)');
+  console.log('    start              Start database + dev server (binds to localhost only)');
+  console.log('    start --lan        Also accept connections from other devices on your LAN');
   console.log('    start --verbose    Same as start, but shows full server logs');
   console.log('    startquiet         Alias for start (kept for backwards compatibility)');
   console.log('    stop               Stop database services');
