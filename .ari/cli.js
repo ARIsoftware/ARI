@@ -422,11 +422,18 @@ function start(opts = {}) {
     }
   }
 
+  let networkUrl = null;
   child.stdout.on('data', (data) => {
     let text = data.toString();
     // Without --lan, Next still prints a "Network:" line that just echoes
     // the loopback hostname — strip it to avoid the duplicate.
     if (!lan) text = text.replace(/^.*Network:.*\r?\n?/m, '');
+
+    // Capture Next's auto-detected LAN URL so we can show it in quiet mode.
+    if (lan && !networkUrl) {
+      const netMatch = text.match(/Network:\s+(http:\/\/[\w.-]+:\d+)/);
+      if (netMatch && !netMatch[1].includes('localhost')) networkUrl = netMatch[1];
+    }
 
     if (!browserScheduled) {
       const match = text.match(/Local:\s+(http:\/\/localhost:\d+)/);
@@ -437,14 +444,18 @@ function start(opts = {}) {
           openBrowser(url);
           const updateAvailable = await updateCheck;
           if (quiet) {
-            stopSpinner('  ' + GREEN + '✔' + RESET + ' ARI is running at ' + DIM + url + RESET);
+            stopSpinner(GREEN + '✔' + RESET + ' ARI is running');
+            process.stdout.write(DIM + '- Local:         ' + RESET + url + '\n');
+            if (networkUrl) {
+              process.stdout.write(DIM + '- Network:       ' + RESET + networkUrl + '\n');
+            }
           }
           if (updateAvailable) {
             const line = '  ↑ ARI update available  ' + DIM + UPDATE_DOCS_URL + RESET + '\n';
             process.stdout.write(quiet ? line : '\n' + line + '\n');
           }
           if (quiet) {
-            process.stdout.write('    ' + DIM + 'Press Ctrl+C to stop ARI.' + RESET + '\n');
+            process.stdout.write(DIM + 'Press Ctrl+C to stop ARI.' + RESET + '\n');
           }
         });
       }
