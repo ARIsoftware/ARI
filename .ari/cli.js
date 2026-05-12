@@ -282,30 +282,6 @@ function start(opts = {}) {
   // regardless of mode. Postgres path is mode-specific and stays inline below.
   ensureAriBinPath();
 
-  // Keep node_modules in sync with package.json so new/updated modules don't
-  // crash the dev server with "Module not found". --prefer-offline keeps this
-  // working without internet when everything is already in the pnpm store. On
-  // failure we warn and continue — Turbopack will surface any genuinely
-  // missing dep clearly enough that blocking startup would be worse.
-  if (!quiet) console.log('  Installing dependencies...');
-  try {
-    const out = execSync('pnpm install --prefer-offline', {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      cwd: ROOT,
-      encoding: 'utf8',
-    });
-    if (!quiet) {
-      const label = out.includes('Already up to date')
-        ? 'Dependencies already up to date'
-        : 'Dependencies installed';
-      console.log('  ' + GREEN + '✔' + RESET + ' ' + label);
-    }
-  } catch {
-    console.log('  ' + YELLOW + '⚠' + RESET + ' pnpm install failed — continuing with existing node_modules');
-    console.log('  ' + DIM + 'Likely offline or registry unreachable. If the dev server hits a' + RESET);
-    console.log('  ' + DIM + '"Module not found" error, run `pnpm install` manually.' + RESET);
-  }
-
   // Spinner — only used in quiet mode
   const spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
   let spinnerIdx = 0;
@@ -329,11 +305,39 @@ function start(opts = {}) {
     if (finalLine) process.stdout.write(finalLine + '\n');
   }
 
+  // Start the spinner immediately so the user sees feedback during the
+  // ~1s pnpm install that follows.
+  if (quiet) startSpinner('Starting ARI');
+
+  // Keep node_modules in sync with package.json so new/updated modules don't
+  // crash the dev server with "Module not found". --prefer-offline keeps this
+  // working without internet when everything is already in the pnpm store. On
+  // failure we warn and continue — Turbopack will surface any genuinely
+  // missing dep clearly enough that blocking startup would be worse.
+  if (!quiet) console.log('  Installing dependencies...');
+  try {
+    const out = execSync('pnpm install --prefer-offline', {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      cwd: ROOT,
+      encoding: 'utf8',
+    });
+    if (!quiet) {
+      const label = out.includes('Already up to date')
+        ? 'Dependencies already up to date'
+        : 'Dependencies installed';
+      console.log('  ' + GREEN + '✔' + RESET + ' ' + label);
+    }
+  } catch {
+    stopSpinner();
+    console.log('  ' + YELLOW + '⚠' + RESET + ' pnpm install failed — continuing with existing node_modules');
+    console.log('  ' + DIM + 'Likely offline or registry unreachable. If the dev server hits a' + RESET);
+    console.log('  ' + DIM + '"Module not found" error, run `pnpm install` manually.' + RESET);
+    if (quiet) startSpinner('Starting ARI');
+  }
+
   fs.mkdirSync(path.join(ROOT, 'data', 'storage'), { recursive: true });
 
   const updateCheck = checkForUpdates();
-
-  if (quiet) startSpinner('Starting ARI');
 
   if (mode === 'supabaselocal') {
     // Check Docker — if unavailable, skip Supabase and start dev server only
