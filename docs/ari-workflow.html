@@ -1,0 +1,949 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ARI Architecture & Workflows</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #080b12;
+      --panel: #121721;
+      --panel-2: #171d29;
+      --line: #283140;
+      --muted: #8f9bad;
+      --text: #e6ebf3;
+      --dim: #4f5a69;
+      --actor: #ef72b8;
+      --client: #59b6f7;
+      --auth: #9b7cff;
+      --data: #f2aa3c;
+      --module: #63c88d;
+      --api: #58c7df;
+      --external: #9dadc2;
+      --active: #f4cf43;
+      --danger: #ff6b6b;
+      --radius: 8px;
+      --shadow: 0 0 0 1px rgba(244, 207, 67, .65), 0 0 22px rgba(244, 207, 67, .16);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at 35% -20%, rgba(76, 104, 160, .18), transparent 34rem), var(--bg);
+      color: var(--text);
+    }
+
+    .page {
+      min-height: 100vh;
+      padding: 20px;
+      display: grid;
+      grid-template-columns: minmax(900px, 1fr) 360px;
+      gap: 18px;
+    }
+
+    header {
+      grid-column: 1 / -1;
+      max-width: 1180px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 26px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    .intro {
+      margin: 0;
+      max-width: 960px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+
+    main.diagram-shell {
+      position: relative;
+      min-height: 710px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(18, 23, 33, .78);
+      overflow: hidden;
+    }
+
+    .lane {
+      position: absolute;
+      inset-block: 0;
+      border-right: 1px dashed rgba(143, 155, 173, .12);
+      padding: 18px 16px;
+    }
+
+    .lane:last-of-type { border-right: 0; }
+
+    .lane h2 {
+      margin: 0;
+      color: rgba(143, 155, 173, .28);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    #edges {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .edge {
+      stroke: rgba(124, 136, 154, .22);
+      stroke-width: 2;
+      fill: none;
+      transition: stroke .15s ease, opacity .15s ease, stroke-width .15s ease;
+    }
+
+    .edge.active {
+      stroke: var(--active);
+      stroke-width: 2.5;
+      filter: drop-shadow(0 0 5px rgba(244, 207, 67, .35));
+    }
+
+    .edge.faded { opacity: .12; }
+
+    .edge-label {
+      fill: #10141d;
+      stroke: var(--active);
+      stroke-width: 1.5;
+    }
+
+    .edge-label-text {
+      fill: #10141d;
+      font-size: 11px;
+      font-weight: 800;
+      text-anchor: middle;
+      dominant-baseline: central;
+    }
+
+    .node {
+      position: absolute;
+      z-index: 3;
+      width: 166px;
+      min-height: 48px;
+      padding: 10px 11px;
+      border: 1px solid rgba(143, 155, 173, .18);
+      border-left-width: 3px;
+      border-radius: var(--radius);
+      background: rgba(19, 25, 36, .92);
+      color: var(--dim);
+      transition: border-color .15s ease, box-shadow .15s ease, color .15s ease, opacity .15s ease, transform .15s ease;
+    }
+
+    .node.active {
+      border-color: var(--active);
+      color: var(--text);
+      box-shadow: var(--shadow);
+      transform: translateY(-1px);
+    }
+
+    .node.faded {
+      opacity: .34;
+    }
+
+    .node .title {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.2;
+      word-break: break-word;
+    }
+
+    .node .meta {
+      margin-top: 4px;
+      color: currentColor;
+      opacity: .66;
+      font-size: 11px;
+      line-height: 1.25;
+    }
+
+    .node[data-type="actor"] { border-left-color: var(--actor); }
+    .node[data-type="client"] { border-left-color: var(--client); }
+    .node[data-type="auth"] { border-left-color: var(--auth); }
+    .node[data-type="data"] { border-left-color: var(--data); }
+    .node[data-type="module"] { border-left-color: var(--module); }
+    .node[data-type="api"] { border-left-color: var(--api); }
+    .node[data-type="external"] { border-left-color: var(--external); }
+
+    aside {
+      display: grid;
+      grid-template-rows: minmax(260px, auto) minmax(360px, 1fr);
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(18, 23, 33, .9);
+      padding: 14px;
+      min-width: 0;
+    }
+
+    .panel h2 {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .flow-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .flow-button {
+      width: 100%;
+      border: 1px solid rgba(143, 155, 173, .16);
+      border-radius: var(--radius);
+      background: rgba(23, 29, 41, .88);
+      color: var(--text);
+      padding: 11px 12px;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+    }
+
+    .flow-button:hover,
+    .flow-button:focus-visible {
+      border-color: rgba(244, 207, 67, .5);
+      outline: none;
+    }
+
+    .flow-button.active {
+      border-color: var(--active);
+      box-shadow: inset 0 0 0 1px rgba(244, 207, 67, .45);
+      background: rgba(41, 35, 19, .56);
+    }
+
+    .flow-title {
+      display: block;
+      font-size: 13px;
+      line-height: 1.25;
+      font-weight: 800;
+    }
+
+    .flow-summary {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .ghost-button {
+      border: 1px dashed rgba(143, 155, 173, .35);
+      border-radius: 7px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      padding: 7px 9px;
+      cursor: pointer;
+    }
+
+    .step-list {
+      display: grid;
+      gap: 8px;
+      max-height: calc(100vh - 440px);
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 9px;
+      border: 1px solid rgba(143, 155, 173, .15);
+      border-radius: var(--radius);
+      background: rgba(23, 29, 41, .88);
+      padding: 10px;
+    }
+
+    .badge {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      display: inline-grid;
+      place-items: center;
+      background: var(--active);
+      color: #121721;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .step-title {
+      margin: 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      line-height: 1.4;
+      font-weight: 800;
+    }
+
+    .step-body {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .empty {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 1280px) {
+      .page {
+        grid-template-columns: 1fr;
+      }
+
+      main.diagram-shell {
+        min-width: 1120px;
+      }
+
+      .scroll-wrap {
+        overflow-x: auto;
+      }
+
+      aside {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto;
+      }
+
+      .step-list {
+        max-height: 420px;
+      }
+    }
+
+    @media (max-width: 820px) {
+      .page {
+        padding: 14px;
+      }
+
+      aside {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <h1>ARI Architecture & Workflows</h1>
+      <p class="intro">Every major package, route group, module surface, storage layer, and external service in ARI is shown below. Pick a workflow on the right to highlight the runtime path and see what each component passes to the next step.</p>
+      <div class="legend" id="legend"></div>
+    </header>
+
+    <div class="scroll-wrap">
+      <main class="diagram-shell" id="diagram" aria-label="ARI workflow diagram">
+        <svg id="edges" aria-hidden="true"></svg>
+      </main>
+    </div>
+
+    <aside>
+      <section class="panel">
+        <h2>Flows</h2>
+        <div class="flow-list" id="flowList"></div>
+        <div class="actions">
+          <button class="ghost-button" type="button" id="clearSelection">Clear selection</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Steps</h2>
+        <div class="step-list" id="stepList">
+          <p class="empty">Select a workflow to see the annotated handoffs between packages and components.</p>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <script type="application/json" id="workflow-data">
+  {
+    "types": {
+      "actor": { "label": "Actor", "color": "#ef72b8" },
+      "client": { "label": "Client surface", "color": "#59b6f7" },
+      "auth": { "label": "Auth + request guard", "color": "#9b7cff" },
+      "data": { "label": "Database + files", "color": "#f2aa3c" },
+      "module": { "label": "Module system", "color": "#63c88d" },
+      "api": { "label": "API route / server code", "color": "#58c7df" },
+      "external": { "label": "External service", "color": "#9dadc2" }
+    },
+    "lanes": [
+      { "id": "actors", "title": "Actors", "x": 0, "w": 14 },
+      { "id": "client", "title": "Client surfaces", "x": 14, "w": 16 },
+      { "id": "auth", "title": "Auth + guards", "x": 30, "w": 14 },
+      { "id": "api", "title": "API routes", "x": 44, "w": 16 },
+      { "id": "modules", "title": "Modules + registries", "x": 60, "w": 16 },
+      { "id": "data", "title": "Storage / data", "x": 76, "w": 12 },
+      { "id": "external", "title": "External services", "x": 88, "w": 12 }
+    ],
+    "nodes": [
+      { "id": "user", "type": "actor", "title": "End user", "meta": "Browser session", "lane": "actors", "y": 9 },
+      { "id": "admin", "type": "actor", "title": "Admin user", "meta": "Settings + module control", "lane": "actors", "y": 28 },
+      { "id": "cli-user", "type": "actor", "title": "Developer", "meta": "./ari and pnpm scripts", "lane": "actors", "y": 47 },
+      { "id": "api-client", "type": "actor", "title": "External app", "meta": "x-api-key requests", "lane": "actors", "y": 66 },
+
+      { "id": "next-app", "type": "client", "title": "Next.js app", "meta": "app router + layouts", "lane": "client", "y": 6 },
+      { "id": "providers", "type": "client", "title": "components/providers.tsx", "meta": "session, theme, modules", "lane": "client", "y": 20 },
+      { "id": "sidebar", "type": "client", "title": "app sidebar", "meta": "enabled routes + order", "lane": "client", "y": 34 },
+      { "id": "module-page", "type": "client", "title": "module page", "meta": "/tasks, /fitness, etc.", "lane": "client", "y": 49 },
+      { "id": "settings-ui", "type": "client", "title": "settings screens", "meta": "modules, storage, backups", "lane": "client", "y": 64 },
+      { "id": "welcome", "type": "client", "title": "welcome setup", "meta": "first-run config", "lane": "client", "y": 79 },
+
+      { "id": "middleware", "type": "auth", "title": "middleware.ts", "meta": "route protection + headers", "lane": "auth", "y": 8 },
+      { "id": "better-auth", "type": "auth", "title": "lib/auth.ts", "meta": "Better Auth + Argon2", "lane": "auth", "y": 24 },
+      { "id": "auth-client", "type": "auth", "title": "lib/auth-client.ts", "meta": "client sign-in/session", "lane": "auth", "y": 40 },
+      { "id": "auth-helper", "type": "auth", "title": "lib/auth-helpers.ts", "meta": "session or API key", "lane": "auth", "y": 56 },
+      { "id": "rls", "type": "auth", "title": "withUserContext()", "meta": "SET LOCAL app.current_user_id", "lane": "auth", "y": 72 },
+
+      { "id": "auth-api", "type": "api", "title": "/api/auth/[...all]", "meta": "Better Auth handler", "lane": "api", "y": 6 },
+      { "id": "module-proxy", "type": "api", "title": "/api/modules/[module]", "meta": "registry proxy", "lane": "api", "y": 20 },
+      { "id": "module-handler", "type": "api", "title": "module api/route.ts", "meta": "feature route handlers", "lane": "api", "y": 34 },
+      { "id": "storage-api", "type": "api", "title": "/api/storage/*", "meta": "upload, list, serve, delete", "lane": "api", "y": 49 },
+      { "id": "backup-api", "type": "api", "title": "/api/backup/*", "meta": "verify, export, import", "lane": "api", "y": 64 },
+      { "id": "settings-api", "type": "api", "title": "/api/settings/*", "meta": "integrations + keys", "lane": "api", "y": 79 },
+
+      { "id": "manifest", "type": "module", "title": "module-manifest.json", "meta": "generated metadata", "lane": "modules", "y": 7 },
+      { "id": "pages-registry", "type": "module", "title": "module page registry", "meta": "dynamic page imports", "lane": "modules", "y": 21 },
+      { "id": "api-registry", "type": "module", "title": "module API registry", "meta": "dynamic handler imports", "lane": "modules", "y": 35 },
+      { "id": "module-loader", "type": "module", "title": "lib/modules/*", "meta": "enable, migrate, order", "lane": "modules", "y": 49 },
+      { "id": "custom-modules", "type": "module", "title": "modules-custom/*", "meta": "active overrides + custom modules", "lane": "modules", "y": 63 },
+      { "id": "core-modules", "type": "module", "title": "modules-core/*", "meta": "upstream modules", "lane": "modules", "y": 77 },
+
+      { "id": "postgres", "type": "data", "title": "PostgreSQL", "meta": "Drizzle schema + user tables", "lane": "data", "y": 8 },
+      { "id": "module-settings", "type": "data", "title": "module_settings", "meta": "enabled, order, storage config", "lane": "data", "y": 25 },
+      { "id": "user-prefs", "type": "data", "title": "user_preferences", "meta": "theme + profile settings", "lane": "data", "y": 42 },
+      { "id": "file-storage", "type": "data", "title": "data/storage", "meta": "user_id/bucket/files", "lane": "data", "y": 59 },
+      { "id": "backup-sql", "type": "data", "title": "SQL backup file", "meta": "executable export/import", "lane": "data", "y": 76 },
+
+      { "id": "openai", "type": "external", "title": "OpenAI API", "meta": "assistant features", "lane": "external", "y": 12 },
+      { "id": "github", "type": "external", "title": "GitHub", "meta": "module sync", "lane": "external", "y": 31 },
+      { "id": "supabase", "type": "external", "title": "Supabase / local PG", "meta": "selected DB backend", "lane": "external", "y": 50 },
+      { "id": "filesystem", "type": "external", "title": "filesystem", "meta": ".env.local, .env.supabase.local", "lane": "external", "y": 69 }
+    ],
+    "flows": [
+      {
+        "id": "signin",
+        "title": "User sign-in",
+        "summary": "Email/password login through Better Auth and provider session hydration.",
+        "edges": [
+          { "from": "user", "to": "next-app", "label": "1" },
+          { "from": "next-app", "to": "auth-client", "label": "2" },
+          { "from": "auth-client", "to": "auth-api", "label": "3" },
+          { "from": "auth-api", "to": "better-auth", "label": "4" },
+          { "from": "better-auth", "to": "postgres", "label": "5" },
+          { "from": "better-auth", "to": "providers", "label": "6" },
+          { "from": "providers", "to": "next-app", "label": "7" }
+        ],
+        "steps": [
+          { "title": "End user -> Next.js app", "body": "The user submits email and password from the sign-in surface." },
+          { "title": "Next.js app -> lib/auth-client.ts", "body": "The client calls authClient.signIn.email() with credentials." },
+          { "title": "lib/auth-client.ts -> /api/auth/[...all]", "body": "Better Auth's client sends the sign-in request to the catch-all auth handler." },
+          { "title": "/api/auth/[...all] -> lib/auth.ts", "body": "Server auth validates the account, applies rate limits, and verifies the Argon2 password hash." },
+          { "title": "lib/auth.ts -> PostgreSQL", "body": "Better Auth reads user/account rows and writes the session row." },
+          { "title": "lib/auth.ts -> components/providers.tsx", "body": "A secure cookie backs authClient.useSession(), which hydrates the app auth context." },
+          { "title": "components/providers.tsx -> Next.js app", "body": "Authenticated layouts can render protected ARI screens with user, session, theme, modules, and command providers." }
+        ]
+      },
+      {
+        "id": "invite-user",
+        "title": "Invite new user",
+        "summary": "Admin creates or prepares a user invitation through authenticated settings and auth data.",
+        "edges": [
+          { "from": "admin", "to": "settings-ui", "label": "1" },
+          { "from": "settings-ui", "to": "auth-helper", "label": "2" },
+          { "from": "auth-helper", "to": "better-auth", "label": "3" },
+          { "from": "auth-helper", "to": "rls", "label": "4" },
+          { "from": "rls", "to": "postgres", "label": "5" },
+          { "from": "postgres", "to": "better-auth", "label": "6" },
+          { "from": "better-auth", "to": "settings-ui", "label": "7" }
+        ],
+        "steps": [
+          { "title": "Admin user -> settings screens", "body": "The admin starts an invite or user-management action from an authenticated settings surface." },
+          { "title": "settings screens -> lib/auth-helpers.ts", "body": "The request is treated as an authenticated server operation, not direct client database access." },
+          { "title": "lib/auth-helpers.ts -> lib/auth.ts", "body": "Better Auth session data identifies the acting admin user." },
+          { "title": "lib/auth-helpers.ts -> withUserContext()", "body": "The helper exposes withRLS so user-scoped writes run with app.current_user_id set." },
+          { "title": "withUserContext() -> PostgreSQL", "body": "ARI writes or reads invitation/user-related rows inside a transaction scoped to the current user." },
+          { "title": "PostgreSQL -> lib/auth.ts", "body": "Better Auth remains the source of truth for user, account, verification, and session records." },
+          { "title": "lib/auth.ts -> settings screens", "body": "The client gets a success/error response and refreshes the relevant user or settings view." }
+        ]
+      },
+      {
+        "id": "module-open",
+        "title": "Open a module page",
+        "summary": "Route protection, generated registries, custom overrides, and module rendering.",
+        "edges": [
+          { "from": "user", "to": "next-app", "label": "1" },
+          { "from": "next-app", "to": "middleware", "label": "2" },
+          { "from": "middleware", "to": "better-auth", "label": "3" },
+          { "from": "next-app", "to": "pages-registry", "label": "4" },
+          { "from": "pages-registry", "to": "custom-modules", "label": "5" },
+          { "from": "pages-registry", "to": "core-modules", "label": "6" },
+          { "from": "custom-modules", "to": "module-page", "label": "7" },
+          { "from": "module-page", "to": "providers", "label": "8" }
+        ],
+        "steps": [
+          { "title": "End user -> Next.js app", "body": "The user navigates to a module route such as /tasks or /fitness." },
+          { "title": "Next.js app -> middleware.ts", "body": "Middleware checks protected route access and attaches security headers." },
+          { "title": "middleware.ts -> lib/auth.ts", "body": "auth.api.getSession() validates the Better Auth session cookie before the route renders." },
+          { "title": "Next.js app -> module page registry", "body": "The generated registry maps the route to a static import so serverless builds can find module pages." },
+          { "title": "module page registry -> modules-custom/*", "body": "Custom modules and overrides are preferred first. In this repo, tasks and fitness are active custom copies." },
+          { "title": "module page registry -> modules-core/*", "body": "If no custom module exists, the upstream core module is loaded." },
+          { "title": "modules-custom/* -> module page", "body": "The selected module page component renders its feature UI." },
+          { "title": "module page -> components/providers.tsx", "body": "The page runs inside auth, theme, module, command palette, drag-drop, and module-specific providers." }
+        ]
+      },
+      {
+        "id": "todesktop-build",
+        "title": "ARI module registry build",
+        "summary": "The closest ARI equivalent to a package build flow: pnpm build generates registries before Next builds.",
+        "edges": [
+          { "from": "cli-user", "to": "manifest", "label": "1" },
+          { "from": "manifest", "to": "custom-modules", "label": "2" },
+          { "from": "manifest", "to": "core-modules", "label": "3" },
+          { "from": "custom-modules", "to": "pages-registry", "label": "4" },
+          { "from": "custom-modules", "to": "api-registry", "label": "5" },
+          { "from": "custom-modules", "to": "module-loader", "label": "6" },
+          { "from": "pages-registry", "to": "next-app", "label": "7" }
+        ],
+        "steps": [
+          { "title": "Developer -> module-manifest.json", "body": "pnpm dev and pnpm build run the predev/prebuild generate-module-registry script." },
+          { "title": "module-manifest.json -> modules-custom/*", "body": "The scanner reads custom module.json files first so overrides win." },
+          { "title": "module-manifest.json -> modules-core/*", "body": "The scanner then reads core modules and skips any core module already provided by modules-custom." },
+          { "title": "modules-custom/* -> module page registry", "body": "Page imports are emitted for /app/[module]/[[...slug]]/page.tsx routing." },
+          { "title": "modules-custom/* -> module API registry", "body": "API imports are emitted for /api/modules/[module]/[[...path]]/route.ts routing." },
+          { "title": "modules-custom/* -> lib/modules/*", "body": "The manifest carries metadata such as routes, permissions, database tables, dashboards, and schema hashes." },
+          { "title": "module page registry -> Next.js app", "body": "Next.js builds against generated static imports instead of runtime filesystem scanning." }
+        ]
+      },
+      {
+        "id": "module-api",
+        "title": "Module data mutation",
+        "summary": "Client module action through the module proxy, auth helper, RLS, and Postgres.",
+        "edges": [
+          { "from": "user", "to": "module-page", "label": "1" },
+          { "from": "module-page", "to": "module-proxy", "label": "2" },
+          { "from": "module-proxy", "to": "api-registry", "label": "3" },
+          { "from": "api-registry", "to": "module-handler", "label": "4" },
+          { "from": "module-handler", "to": "auth-helper", "label": "5" },
+          { "from": "auth-helper", "to": "rls", "label": "6" },
+          { "from": "rls", "to": "postgres", "label": "7" },
+          { "from": "postgres", "to": "module-page", "label": "8" }
+        ],
+        "steps": [
+          { "title": "End user -> module page", "body": "The user creates, edits, deletes, or reads feature data from a module UI." },
+          { "title": "module page -> /api/modules/[module]", "body": "The module calls the shared module API proxy path instead of importing server code directly." },
+          { "title": "/api/modules/[module] -> module API registry", "body": "The proxy resolves the requested module and nested path from the generated registry." },
+          { "title": "module API registry -> module api/route.ts", "body": "The actual module route handler is dynamically imported and invoked for the HTTP method." },
+          { "title": "module api/route.ts -> lib/auth-helpers.ts", "body": "The handler verifies a Better Auth session or x-api-key and gets the current user." },
+          { "title": "lib/auth-helpers.ts -> withUserContext()", "body": "withRLS wraps Drizzle operations in the user's transaction context." },
+          { "title": "withUserContext() -> PostgreSQL", "body": "SELECT queries are user-filtered, and INSERT values must explicitly include user_id." },
+          { "title": "PostgreSQL -> module page", "body": "The API returns JSON and TanStack Query refreshes or applies optimistic updates in the UI." }
+        ]
+      },
+      {
+        "id": "enable-module",
+        "title": "Enable or reorder modules",
+        "summary": "Settings and sidebar preferences persisted per user in module_settings.",
+        "edges": [
+          { "from": "admin", "to": "settings-ui", "label": "1" },
+          { "from": "settings-ui", "to": "settings-api", "label": "2" },
+          { "from": "settings-api", "to": "auth-helper", "label": "3" },
+          { "from": "auth-helper", "to": "rls", "label": "4" },
+          { "from": "rls", "to": "module-settings", "label": "5" },
+          { "from": "module-settings", "to": "module-loader", "label": "6" },
+          { "from": "module-loader", "to": "sidebar", "label": "7" }
+        ],
+        "steps": [
+          { "title": "Admin user -> settings screens", "body": "The user enables modules, changes module preferences, or saves menu priority." },
+          { "title": "settings screens -> /api/settings/*", "body": "The client sends an authenticated settings update." },
+          { "title": "/api/settings/* -> lib/auth-helpers.ts", "body": "The route validates the current user before touching per-user settings." },
+          { "title": "lib/auth-helpers.ts -> withUserContext()", "body": "The write is scoped to the authenticated user." },
+          { "title": "withUserContext() -> module_settings", "body": "ARI stores enabled state, menuPriority, storage provider settings, and module-specific JSONB preferences." },
+          { "title": "module_settings -> lib/modules/*", "body": "Module registry helpers combine generated metadata with stored per-user settings." },
+          { "title": "lib/modules/* -> app sidebar", "body": "The sidebar renders enabled routes in the saved group/order configuration." }
+        ]
+      },
+      {
+        "id": "upload-file",
+        "title": "Upload and serve a file",
+        "summary": "Authenticated file upload through storage settings and local provider.",
+        "edges": [
+          { "from": "user", "to": "module-page", "label": "1" },
+          { "from": "module-page", "to": "storage-api", "label": "2" },
+          { "from": "storage-api", "to": "auth-helper", "label": "3" },
+          { "from": "auth-helper", "to": "rls", "label": "4" },
+          { "from": "rls", "to": "module-settings", "label": "5" },
+          { "from": "storage-api", "to": "file-storage", "label": "6" },
+          { "from": "file-storage", "to": "module-page", "label": "7" }
+        ],
+        "steps": [
+          { "title": "End user -> module page", "body": "A feature UI submits FormData with bucket and file." },
+          { "title": "module page -> /api/storage/*", "body": "Upload, list, serve, and delete operations use authenticated storage endpoints." },
+          { "title": "/api/storage/* -> lib/auth-helpers.ts", "body": "The route requires a valid user before reading request body data." },
+          { "title": "lib/auth-helpers.ts -> withUserContext()", "body": "Storage configuration is read with the user's RLS context." },
+          { "title": "withUserContext() -> module_settings", "body": "The storage module settings determine whether local filesystem storage is available." },
+          { "title": "/api/storage/* -> data/storage", "body": "The local provider sanitizes bucket and filename, validates size/type, then stores under user_id/bucket." },
+          { "title": "data/storage -> module page", "body": "The API returns a storage path or streams the binary through /api/storage/serve." }
+        ]
+      },
+      {
+        "id": "backup-export",
+        "title": "Export a backup",
+        "summary": "Authenticated backup export discovers public tables and writes executable SQL.",
+        "edges": [
+          { "from": "admin", "to": "settings-ui", "label": "1" },
+          { "from": "settings-ui", "to": "backup-api", "label": "2" },
+          { "from": "backup-api", "to": "auth-helper", "label": "3" },
+          { "from": "backup-api", "to": "postgres", "label": "4" },
+          { "from": "postgres", "to": "backup-sql", "label": "5" },
+          { "from": "backup-sql", "to": "settings-ui", "label": "6" }
+        ],
+        "steps": [
+          { "title": "Admin user -> settings screens", "body": "The user starts backup verify or export from Settings > Backups." },
+          { "title": "settings screens -> /api/backup/*", "body": "The client calls backup routes for preview, export, or import." },
+          { "title": "/api/backup/* -> lib/auth-helpers.ts", "body": "Backup routes require authentication and production-safety checks before database access." },
+          { "title": "/api/backup/* -> PostgreSQL", "body": "Export discovers public tables and schemas via information_schema, excluding system tables." },
+          { "title": "PostgreSQL -> SQL backup file", "body": "Rows, CREATE TABLE statements, constraints, and checksums are serialized into executable SQL." },
+          { "title": "SQL backup file -> settings screens", "body": "The browser receives the generated backup for download or displays verification results." }
+        ]
+      },
+      {
+        "id": "api-key",
+        "title": "External API key request",
+        "summary": "Non-browser caller authenticates with x-api-key and reaches module APIs.",
+        "edges": [
+          { "from": "api-client", "to": "module-proxy", "label": "1" },
+          { "from": "module-proxy", "to": "api-registry", "label": "2" },
+          { "from": "api-registry", "to": "module-handler", "label": "3" },
+          { "from": "module-handler", "to": "auth-helper", "label": "4" },
+          { "from": "auth-helper", "to": "postgres", "label": "5" },
+          { "from": "auth-helper", "to": "rls", "label": "6" },
+          { "from": "rls", "to": "postgres", "label": "7" }
+        ],
+        "steps": [
+          { "title": "External app -> /api/modules/[module]", "body": "The caller sends x-api-key instead of a Better Auth session cookie." },
+          { "title": "/api/modules/[module] -> module API registry", "body": "The proxy checks the registry for the target module and route." },
+          { "title": "module API registry -> module api/route.ts", "body": "The feature-specific handler receives the request." },
+          { "title": "module api/route.ts -> lib/auth-helpers.ts", "body": "getAuthenticatedUser() falls back from session auth to API key auth." },
+          { "title": "lib/auth-helpers.ts -> PostgreSQL", "body": "The hashed key is looked up, IP allowlist is checked, and the owning user is loaded." },
+          { "title": "lib/auth-helpers.ts -> withUserContext()", "body": "The resulting withRLS helper scopes the request to the API key owner." },
+          { "title": "withUserContext() -> PostgreSQL", "body": "The module operation reads or writes user-owned data and logs API key usage." }
+        ]
+      },
+      {
+        "id": "first-run",
+        "title": "First-run welcome setup",
+        "summary": "Initial environment and profile setup before normal authenticated use.",
+        "edges": [
+          { "from": "user", "to": "welcome", "label": "1" },
+          { "from": "welcome", "to": "settings-api", "label": "2" },
+          { "from": "settings-api", "to": "filesystem", "label": "3" },
+          { "from": "welcome", "to": "auth-client", "label": "4" },
+          { "from": "auth-client", "to": "auth-api", "label": "5" },
+          { "from": "auth-api", "to": "better-auth", "label": "6" },
+          { "from": "better-auth", "to": "postgres", "label": "7" },
+          { "from": "providers", "to": "user-prefs", "label": "8" }
+        ],
+        "steps": [
+          { "title": "End user -> welcome setup", "body": "On a new install, the user chooses database mode and enters first-run account details." },
+          { "title": "welcome setup -> /api/settings/*", "body": "Setup routes save environment settings and validate connectivity." },
+          { "title": "/api/settings/* -> filesystem", "body": "ARI writes local configuration such as .env.local or generated Supabase-local env files." },
+          { "title": "welcome setup -> lib/auth-client.ts", "body": "After configuration, the user creates or signs into the initial Better Auth account." },
+          { "title": "lib/auth-client.ts -> /api/auth/[...all]", "body": "The auth handler receives sign-up/sign-in requests." },
+          { "title": "/api/auth/[...all] -> lib/auth.ts", "body": "Better Auth applies password rules, hashing, session cookies, and user fields." },
+          { "title": "lib/auth.ts -> PostgreSQL", "body": "Better Auth system tables persist the first user and session." },
+          { "title": "components/providers.tsx -> user_preferences", "body": "The welcome profile cached in localStorage is persisted to user_preferences on the first authenticated load." }
+        ]
+      },
+      {
+        "id": "github-sync",
+        "title": "GitHub module sync",
+        "summary": "Settings-triggered module library sync against GitHub-backed sources.",
+        "edges": [
+          { "from": "admin", "to": "settings-ui", "label": "1" },
+          { "from": "settings-ui", "to": "settings-api", "label": "2" },
+          { "from": "settings-api", "to": "auth-helper", "label": "3" },
+          { "from": "settings-api", "to": "github", "label": "4" },
+          { "from": "github", "to": "module-loader", "label": "5" },
+          { "from": "module-loader", "to": "manifest", "label": "6" },
+          { "from": "manifest", "to": "sidebar", "label": "7" }
+        ],
+        "steps": [
+          { "title": "Admin user -> settings screens", "body": "The user opens module library or GitHub integration settings." },
+          { "title": "settings screens -> /api/settings/*", "body": "The UI calls ARI's settings or module sync routes." },
+          { "title": "/api/settings/* -> lib/auth-helpers.ts", "body": "The request is authenticated before any GitHub or module-library work begins." },
+          { "title": "/api/settings/* -> GitHub", "body": "ARI fetches module metadata or repository content through the configured GitHub integration." },
+          { "title": "GitHub -> lib/modules/*", "body": "Module sync helpers normalize downloaded module metadata and local availability." },
+          { "title": "lib/modules/* -> module-manifest.json", "body": "A refresh regenerates the manifest and registries after local module files change." },
+          { "title": "module-manifest.json -> app sidebar", "body": "The next render uses the updated module list and route metadata." }
+        ]
+      },
+      {
+        "id": "assistant",
+        "title": "AI assistant request",
+        "summary": "Authenticated assistant-style features call OpenAI while keeping app data server-side.",
+        "edges": [
+          { "from": "user", "to": "module-page", "label": "1" },
+          { "from": "module-page", "to": "module-proxy", "label": "2" },
+          { "from": "module-proxy", "to": "module-handler", "label": "3" },
+          { "from": "module-handler", "to": "auth-helper", "label": "4" },
+          { "from": "auth-helper", "to": "rls", "label": "5" },
+          { "from": "rls", "to": "postgres", "label": "6" },
+          { "from": "module-handler", "to": "openai", "label": "7" },
+          { "from": "openai", "to": "module-page", "label": "8" }
+        ],
+        "steps": [
+          { "title": "End user -> module page", "body": "The user submits an AI-assisted prompt or chat message from a module surface." },
+          { "title": "module page -> /api/modules/[module]", "body": "The client sends prompt context to a server-side module route." },
+          { "title": "/api/modules/[module] -> module api/route.ts", "body": "The proxy invokes the module handler that owns the AI workflow." },
+          { "title": "module api/route.ts -> lib/auth-helpers.ts", "body": "The server validates the user before loading private context." },
+          { "title": "lib/auth-helpers.ts -> withUserContext()", "body": "Database reads for context or history run under the user RLS context." },
+          { "title": "withUserContext() -> PostgreSQL", "body": "The handler loads only user-owned records needed for the prompt." },
+          { "title": "module api/route.ts -> OpenAI API", "body": "The server sends the prepared prompt using the configured OPENAI_API_KEY." },
+          { "title": "OpenAI API -> module page", "body": "The response is streamed or returned to the client UI without exposing server secrets." }
+        ]
+      }
+    ]
+  }
+  </script>
+
+  <script>
+    const data = JSON.parse(document.getElementById('workflow-data').textContent);
+    const diagram = document.getElementById('diagram');
+    const svg = document.getElementById('edges');
+    const flowList = document.getElementById('flowList');
+    const stepList = document.getElementById('stepList');
+    const clearSelection = document.getElementById('clearSelection');
+    const legend = document.getElementById('legend');
+    const nodeById = new Map(data.nodes.map(node => [node.id, node]));
+    let selectedFlow = null;
+
+    function laneById(id) {
+      return data.lanes.find(lane => lane.id === id);
+    }
+
+    function renderLegend() {
+      legend.innerHTML = Object.entries(data.types).map(([type, info]) =>
+        `<span><i class="swatch" style="background:${info.color}"></i>${info.label}</span>`
+      ).join('');
+    }
+
+    function renderLanes() {
+      data.lanes.forEach(lane => {
+        const el = document.createElement('section');
+        el.className = 'lane';
+        el.style.left = lane.x + '%';
+        el.style.width = lane.w + '%';
+        el.innerHTML = `<h2>${lane.title}</h2>`;
+        diagram.appendChild(el);
+      });
+    }
+
+    function renderNodes() {
+      data.nodes.forEach(node => {
+        const lane = laneById(node.lane);
+        const el = document.createElement('article');
+        el.className = 'node';
+        el.id = 'node-' + node.id;
+        el.dataset.nodeId = node.id;
+        el.dataset.type = node.type;
+        el.style.left = `calc(${lane.x}% + 16px)`;
+        el.style.top = node.y + '%';
+        el.innerHTML = `<div class="title">${node.title}</div><div class="meta">${node.meta}</div>`;
+        diagram.appendChild(el);
+      });
+    }
+
+    function pointFor(nodeId, side) {
+      const nodeEl = document.getElementById('node-' + nodeId);
+      const shell = diagram.getBoundingClientRect();
+      const box = nodeEl.getBoundingClientRect();
+      const x = side === 'left' ? box.left - shell.left : box.right - shell.left;
+      const y = box.top - shell.top + box.height / 2;
+      return { x, y };
+    }
+
+    function edgePath(fromId, toId) {
+      const fromNode = nodeById.get(fromId);
+      const toNode = nodeById.get(toId);
+      const fromLane = laneById(fromNode.lane);
+      const toLane = laneById(toNode.lane);
+      const forward = toLane.x >= fromLane.x;
+      const start = pointFor(fromId, forward ? 'right' : 'left');
+      const end = pointFor(toId, forward ? 'left' : 'right');
+      const dx = Math.max(70, Math.abs(end.x - start.x) * 0.45);
+      const c1x = start.x + (forward ? dx : -dx);
+      const c2x = end.x - (forward ? dx : -dx);
+      return {
+        d: `M ${start.x} ${start.y} C ${c1x} ${start.y}, ${c2x} ${end.y}, ${end.x} ${end.y}`,
+        mid: {
+          x: (start.x + end.x) / 2,
+          y: (start.y + end.y) / 2
+        }
+      };
+    }
+
+    function renderEdges(flow) {
+      svg.innerHTML = `
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="rgba(124, 136, 154, .55)"></path>
+          </marker>
+          <marker id="arrowActive" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#f4cf43"></path>
+          </marker>
+        </defs>
+      `;
+
+      if (!flow) return;
+
+      flow.edges.forEach(edge => {
+        const pathData = edgePath(edge.from, edge.to);
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('class', 'edge active');
+        path.setAttribute('d', pathData.d);
+        path.setAttribute('marker-end', 'url(#arrowActive)');
+        svg.appendChild(path);
+
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('class', 'edge-label');
+        circle.setAttribute('cx', pathData.mid.x);
+        circle.setAttribute('cy', pathData.mid.y);
+        circle.setAttribute('r', 10);
+        svg.appendChild(circle);
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('class', 'edge-label-text');
+        text.setAttribute('x', pathData.mid.x);
+        text.setAttribute('y', pathData.mid.y + 0.5);
+        text.textContent = edge.label;
+        svg.appendChild(text);
+      });
+    }
+
+    function renderFlows() {
+      flowList.innerHTML = '';
+      data.flows.forEach(flow => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'flow-button';
+        button.dataset.flowId = flow.id;
+        button.innerHTML = `<span class="flow-title">${flow.title}</span><span class="flow-summary">${flow.summary}</span>`;
+        button.addEventListener('click', () => selectFlow(flow.id));
+        flowList.appendChild(button);
+      });
+    }
+
+    function renderSteps(flow) {
+      if (!flow) {
+        stepList.innerHTML = '<p class="empty">Select a workflow to see the annotated handoffs between packages and components.</p>';
+        return;
+      }
+
+      stepList.innerHTML = flow.steps.map((step, index) => `
+        <article class="step">
+          <span class="badge">${index + 1}</span>
+          <div>
+            <p class="step-title">${step.title}</p>
+            <p class="step-body">${step.body}</p>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function selectFlow(flowId) {
+      selectedFlow = data.flows.find(flow => flow.id === flowId) || null;
+      const activeIds = new Set();
+
+      if (selectedFlow) {
+        selectedFlow.edges.forEach(edge => {
+          activeIds.add(edge.from);
+          activeIds.add(edge.to);
+        });
+      }
+
+      document.querySelectorAll('.node').forEach(node => {
+        const active = activeIds.has(node.dataset.nodeId);
+        node.classList.toggle('active', active);
+        node.classList.toggle('faded', selectedFlow && !active);
+      });
+
+      document.querySelectorAll('.flow-button').forEach(button => {
+        button.classList.toggle('active', button.dataset.flowId === flowId);
+      });
+
+      renderEdges(selectedFlow);
+      renderSteps(selectedFlow);
+    }
+
+    function clearFlow() {
+      selectedFlow = null;
+      document.querySelectorAll('.node').forEach(node => {
+        node.classList.remove('active', 'faded');
+      });
+      document.querySelectorAll('.flow-button').forEach(button => {
+        button.classList.remove('active');
+      });
+      renderEdges(null);
+      renderSteps(null);
+    }
+
+    function redrawSelected() {
+      if (selectedFlow) renderEdges(selectedFlow);
+    }
+
+    renderLegend();
+    renderLanes();
+    renderNodes();
+    renderFlows();
+    clearSelection.addEventListener('click', clearFlow);
+    window.addEventListener('resize', redrawSelected);
+    requestAnimationFrame(() => selectFlow('module-api'));
+  </script>
+</body>
+</html>
