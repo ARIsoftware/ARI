@@ -30,7 +30,9 @@ const SAFE_SUMMARY = "ARI couldn't install its schema into your database. Your d
 const ROLE_MISSING: SetupErrorExplanation = {
   code: "role_missing",
   title: COMMON_TITLE,
-  summary: SAFE_SUMMARY,
+  summary:
+    "ARI's schema may be partially installed — your existing data wasn't intentionally modified. " +
+    "Retrying usually finishes the job.",
   diagnosis:
     "A SQL statement referenced a database role that doesn't exist — typically `anon`, `authenticated`, or `service_role` (Supabase-managed roles). " +
     "This usually happens when a module's SQL assumes Supabase roles but is running on plain Postgres. " +

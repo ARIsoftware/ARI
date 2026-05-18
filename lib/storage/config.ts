@@ -62,17 +62,9 @@ function readEnvConfig(): Partial<StorageConfig> {
   return env
 }
 
-// In-memory cache — cleared on write, TTL 60s
-let _cache: { config: StorageConfig; ts: number } | null = null
-const CACHE_TTL = 60_000
-
 export async function readStorageConfig(
   withRLS: <T>(op: (db: any) => Promise<T>) => Promise<T>
 ): Promise<StorageConfig> {
-  if (_cache && Date.now() - _cache.ts < CACHE_TTL) {
-    return _cache.config
-  }
-
   // Read from database
   let dbConfig: StorageConfig = { ...DEFAULT_CONFIG }
   try {
@@ -109,7 +101,6 @@ export async function readStorageConfig(
     if (envConfig[key]) config[key] = envConfig[key]
   }
 
-  _cache = { config, ts: Date.now() }
   return config
 }
 
@@ -134,10 +125,4 @@ export async function writeStorageConfig(
         },
       })
   )
-
-  _cache = null
-}
-
-export function clearStorageConfigCache(): void {
-  _cache = null
 }

@@ -23,9 +23,12 @@ export async function GET() {
       checks.database = { status: "error", message: "DATABASE_URL not configured" }
     } else {
       const client = await pool.connect()
-      await client.query("SELECT 1")
-      client.release()
-      checks.database = { status: "ok" }
+      try {
+        await client.query("SELECT 1")
+        checks.database = { status: "ok" }
+      } finally {
+        client.release()
+      }
     }
   } catch (err) {
     checks.database = {

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { StorageProvider, BucketConfig } from './types'
 import { DEFAULT_BUCKET_CONFIG } from './types'
 import { LocalFilesystemProvider } from './local'
@@ -7,17 +8,22 @@ import type { StorageConfig } from './config'
 export * from './types'
 export { sanitizeFilename, sanitizeBucketName, validateStoredFilename } from './sanitize'
 export { getMimeTypeForExtension } from './local'
-export { readStorageConfig, writeStorageConfig, clearStorageConfigCache } from './config'
+export { readStorageConfig, writeStorageConfig } from './config'
 export type { StorageConfig } from './config'
 
 let _filesystemProvider: StorageProvider | null = null
 let _s3Provider: { provider: StorageProvider; key: string } | null = null
 
+/**
+ * Build a cache key over every StorageConfig field. Sorting keys keeps the hash stable
+ * regardless of object construction order, and including all fields means new ones are
+ * picked up automatically (no positional list to maintain). Hashed so raw secrets aren't
+ * retained as plain object keys.
+ */
 function s3CacheKey(config: StorageConfig): string {
-  const bucket = config.s3Bucket || config.r2Bucket || config.supabaseS3Bucket
-  const keyId = config.s3AccessKeyId || config.r2AccessKeyId || config.supabaseS3AccessKeyId
-  const endpoint = config.s3Endpoint || config.supabaseS3Endpoint || config.r2AccountId
-  return `${config.provider}:${bucket}:${keyId}:${endpoint}`
+  const keys = Object.keys(config).sort() as (keyof StorageConfig)[]
+  const serialized = keys.map(k => `${k}=${config[k] ?? ''}`).join('|')
+  return createHash('sha256').update(serialized).digest('hex')
 }
 
 /** Clear cached provider instances (call when config changes) */

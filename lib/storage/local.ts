@@ -3,6 +3,7 @@ import * as fsSync from 'fs'
 import * as path from 'path'
 import { Readable } from 'stream'
 import type { StorageProvider, StorageFile, UploadResult, ServeResult } from './types'
+import { sanitizeFilename } from './sanitize'
 
 /**
  * Safe MIME map — excludes executable types (HTML, SVG, JS, CSS) to prevent stored XSS.
@@ -38,6 +39,7 @@ export function getMimeTypeForExtension(filename: string): string {
 
 export class LocalFilesystemProvider implements StorageProvider {
   private basePath: string
+  private realBasePathPromise: Promise<string> | null = null
 
   constructor(basePath?: string) {
     this.basePath = basePath ?? path.join(process.cwd(), 'data', 'storage')
@@ -47,6 +49,21 @@ export class LocalFilesystemProvider implements StorageProvider {
     return path.join(this.basePath, userId, bucket)
   }
 
+  /**
+   * Ensure the storage root exists and return its realpath. Memoized as a promise so
+   * concurrent first callers don't all race mkdir+realpath. mkdir is required because
+   * fs.realpath would otherwise ENOENT on a fresh install before any upload.
+   */
+  private ensureRealBasePath(): Promise<string> {
+    if (!this.realBasePathPromise) {
+      this.realBasePathPromise = (async () => {
+        await fs.mkdir(this.basePath, { recursive: true })
+        return fs.realpath(this.basePath)
+      })()
+    }
+    return this.realBasePathPromise
+  }
+
   async upload(
     userId: string,
     bucket: string,
@@ -54,12 +71,15 @@ export class LocalFilesystemProvider implements StorageProvider {
     data: Buffer,
     _contentType: string
   ): Promise<UploadResult> {
+    // Defense-in-depth: callers (e.g. upload route) already sanitize, but the provider
+    // contract should not trust unvalidated input. Reject any traversal-bearing filename.
+    const safeName = sanitizeFilename(filename)
     const dir = this.getUserBucketDir(userId, bucket)
     await fs.mkdir(dir, { recursive: true })
-    await this.assertWithinBase(dir)
 
-    const storedName = `${Date.now()}-${filename}`
+    const storedName = `${Date.now()}-${safeName}`
     const filePath = path.join(dir, storedName)
+    await this.assertWithinBase(filePath)
     await fs.writeFile(filePath, data)
 
     return {
@@ -68,10 +88,25 @@ export class LocalFilesystemProvider implements StorageProvider {
     }
   }
 
-  /** Verify resolved path stays within the base storage directory (prevents symlink escape) */
+  /**
+   * Verify resolved path stays within the base storage directory. Uses path.relative
+   * against the realpathed base so sibling-prefix paths (e.g. /tmp/storage-escape vs
+   * /tmp/storage) and symlink escapes are rejected.
+   */
   private async assertWithinBase(filePath: string): Promise<void> {
-    const real = await fs.realpath(filePath)
-    if (!real.startsWith(this.basePath)) {
+    const realBase = await this.ensureRealBasePath()
+    let real: string
+    try {
+      real = await fs.realpath(filePath)
+    } catch (err: unknown) {
+      // Only fall back to parent-realpath when the file itself doesn't exist (upload case).
+      // Any other error (e.g. EACCES on a parent) must propagate, not be swallowed.
+      if ((err as NodeJS.ErrnoException)?.code !== 'ENOENT') throw err
+      const parent = await fs.realpath(path.dirname(filePath))
+      real = path.join(parent, path.basename(filePath))
+    }
+    const rel = path.relative(realBase, real)
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
       throw new Error('Path resolves outside storage directory')
     }
   }
