@@ -38,14 +38,20 @@ const BINARY_EXTENSIONS = /\.(png|jpg|jpeg|gif|ico|webp|bmp|avif|woff|woff2|ttf|
 
 function collectFiles(dir: string, basePath: string = ''): { path: string; content: string; encoding: 'utf-8' | 'base64' }[] {
   const files: { path: string; content: string; encoding: 'utf-8' | 'base64' }[] = []
-  const resolvedDir = path.resolve(dir)
-  if (!fs.existsSync(resolvedDir)) return files
+  if (!fs.existsSync(dir)) return files
+  // realpathSync resolves symlinks once at the root so the iteration anchor
+  // is a real on-disk directory; combined with the per-entry symlink skip
+  // below this prevents a symlink inside a module from exfiltrating files
+  // outside the module tree when the result is committed to GitHub.
+  const resolvedDir = fs.realpathSync(path.resolve(dir))
 
   for (const entry of fs.readdirSync(resolvedDir, { withFileTypes: true })) {
+    if (entry.isSymbolicLink()) continue
+
     const fullPath = path.resolve(resolvedDir, entry.name)
     const relativePath = basePath ? `${basePath}/${entry.name}` : entry.name
 
-    // Guard against path traversal — resolved path must stay within the base directory
+    // Defense-in-depth: readdir shouldn't return ../ but verify containment anyway
     if (!fullPath.startsWith(resolvedDir + path.sep) && fullPath !== resolvedDir) {
       continue
     }
@@ -53,7 +59,7 @@ function collectFiles(dir: string, basePath: string = ''): { path: string; conte
     if (entry.isDirectory()) {
       if (entry.name === 'node_modules' || entry.name === '.git') continue
       files.push(...collectFiles(fullPath, relativePath))
-    } else {
+    } else if (entry.isFile()) {
       const isBinary = BINARY_EXTENSIONS.test(entry.name)
       const encoding = isBinary ? 'base64' : 'utf-8'
       files.push({ path: relativePath, content: fs.readFileSync(fullPath, encoding), encoding })

@@ -104,7 +104,7 @@ async function persistSchemaInstalled(
         )
     )
   } catch (error) {
-    console.error(`[Modules] Failed to persist schema-install marker for ${moduleId}:`, error)
+    console.error('[Modules] Failed to persist schema-install marker for %s:', moduleId, error)
     // Non-fatal — gate will retry next access.
   }
 }
