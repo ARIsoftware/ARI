@@ -214,13 +214,18 @@ export default function ModulesPage() {
   // Track current toggle states (local, may differ from server)
   const [toggleStates, setToggleStates] = useState<Record<string, boolean>>({})
 
+  const syncLicenseKeyFromStatus = (status: NonNullable<typeof licenseStatus>) => {
+    if (status.active && status.masked_key) setLicenseKey(status.masked_key)
+    else if (!status.active && status.env_key) setLicenseKey(status.env_key)
+  }
+
   // Load license status
   useEffect(() => {
     async function loadLicenseStatus() {
       const cached = getCached<typeof licenseStatus>(LICENSE_CACHE_KEY)
       if (cached) {
         setLicenseStatus(cached)
-        if (!cached.active && cached.env_key) setLicenseKey(cached.env_key)
+        syncLicenseKeyFromStatus(cached)
         setLicenseLoading(false)
         return
       }
@@ -230,7 +235,7 @@ export default function ModulesPage() {
         if (response.ok) {
           const data = await response.json()
           setLicenseStatus(data)
-          if (!data.active && data.env_key) setLicenseKey(data.env_key)
+          syncLicenseKeyFromStatus(data)
           setCache(LICENSE_CACHE_KEY, data)
         }
       } catch (error) {
@@ -273,8 +278,8 @@ export default function ModulesPage() {
         const statusData = await statusResponse.json()
         setLicenseStatus(statusData)
         setCache(LICENSE_CACHE_KEY, statusData)
+        syncLicenseKeyFromStatus(statusData)
       }
-      setLicenseKey("")
 
       // Refresh library with new license (bypass cache)
       sessionStorage.removeItem(LIBRARY_CACHE_KEY)
@@ -293,6 +298,7 @@ export default function ModulesPage() {
       if (response.ok) {
         setLicenseStatus({ active: false })
         setLicenseError(null)
+        setLicenseKey("")
         try {
           sessionStorage.removeItem(LICENSE_CACHE_KEY)
           sessionStorage.removeItem(LIBRARY_CACHE_KEY)
@@ -817,30 +823,6 @@ export default function ModulesPage() {
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Checking license status...
                     </div>
-                  ) : licenseStatus?.active ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-green-600">
-                        <CheckCircle2 className="h-5 w-5" />
-                        <span className="text-sm font-medium">License is active</span>
-                      </div>
-                      <div className="text-sm text-muted-foreground space-y-1">
-                        <p>Key: <code className="px-1 py-0.5 bg-muted rounded text-xs">{licenseStatus.masked_key}</code></p>
-                        {licenseStatus.customer_email && (
-                          <p>Email: {licenseStatus.customer_email}</p>
-                        )}
-                        {licenseStatus.expires_at && (
-                          <p>Expires: {new Date(licenseStatus.expires_at).toLocaleDateString()}</p>
-                        )}
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-destructive border-destructive/30 hover:bg-destructive/10"
-                        onClick={deactivateLicense}
-                      >
-                        Deactivate
-                      </Button>
-                    </div>
                   ) : (
                     <div className="space-y-3">
                       <div className="flex gap-2">
@@ -849,41 +831,58 @@ export default function ModulesPage() {
                           <Input
                             placeholder="XXXX-XXXX-XXXX-XXXX"
                             value={licenseKey}
+                            readOnly={!!licenseStatus?.active}
                             onChange={(e) => {
                               setLicenseKey(e.target.value)
                               setLicenseError(null)
                             }}
-                            onKeyDown={(e) => e.key === 'Enter' && activateLicense()}
+                            onKeyDown={(e) => e.key === 'Enter' && !licenseStatus?.active && activateLicense()}
                             className="pl-9"
                           />
                         </div>
-                        <Button
-                          onClick={activateLicense}
-                          disabled={licenseActivating || !licenseKey.trim()}
-                        >
-                          {licenseActivating ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Validating...
-                            </>
-                          ) : (
-                            'Activate'
-                          )}
-                        </Button>
+                        {licenseStatus?.active ? (
+                          <Button
+                            variant="outline"
+                            className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                            onClick={deactivateLicense}
+                          >
+                            Deactivate
+                          </Button>
+                        ) : (
+                          <Button
+                            onClick={activateLicense}
+                            disabled={licenseActivating || !licenseKey.trim()}
+                          >
+                            {licenseActivating ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Validating...
+                              </>
+                            ) : (
+                              'Activate'
+                            )}
+                          </Button>
+                        )}
                       </div>
-                      {licenseError && (
+                      {!licenseStatus?.active && licenseError && (
                         <p className="text-sm text-destructive">{licenseError}</p>
                       )}
                       <p className="mt-[20px]" style={{ color: '#222', fontSize: '.85rem' }}>
-                        Your license key was sent to your email after purchase.{' '}
-                        <a
-                          href="https://ari.software/#download"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="underline hover:text-foreground"
-                        >
-                          Need a license key?
-                        </a>
+                        {licenseStatus?.active ? (
+                          'License key valid.'
+                        ) : (
+                          <>
+                            Your license key was sent to your email after purchase.{' '}
+                            <a
+                              href="https://ari.software/#download"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline hover:text-foreground"
+                            >
+                              Need a license key?
+                            </a>
+                          </>
+                        )}
                       </p>
                     </div>
                   )}

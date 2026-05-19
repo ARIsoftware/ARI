@@ -8,18 +8,15 @@ import { z } from 'zod'
 
 const licenseSettingsSchema = z.object({
   key: z.string(),
-  status: z.string().optional(),
-  customer_email: z.string().optional(),
-  expires_at: z.string().optional(),
-  validated_at: z.string().optional(),
+  status: z.string().nullish(),
+  customer_email: z.string().nullish(),
+  expires_at: z.string().nullish(),
+  validated_at: z.string().nullish(),
 })
 
 function maskKey(key: string): string {
-  if (key.length <= 15) return key
-  const first = key.slice(0, 11)
-  const lastFour = key.slice(-4)
-  const middle = key.slice(11, -4).replace(/[A-Za-z0-9]/g, 'X')
-  return first + middle + lastFour
+  if (key.length <= 18) return '*'.repeat(key.length)
+  return key.slice(0, -18) + '*'.repeat(18)
 }
 
 export async function GET() {
