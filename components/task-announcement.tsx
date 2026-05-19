@@ -3,7 +3,6 @@
 import { useEffect, useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import {
-  ArrowUpRight,
   Command,
   Settings,
   Package,
@@ -22,13 +21,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { DM_Sans } from "next/font/google"
-import { Announcement, AnnouncementTag, AnnouncementTitle } from "@/components/ui/kibo-ui/announcement"
-
-function truncateTaskName(taskName: string, maxLength: number = 50): string {
-  if (taskName.length <= maxLength) return taskName
-  return taskName.substring(0, maxLength) + "..."
-}
-import { useIsMobile } from "@/components/ui/use-mobile"
 import { useAuth } from "@/components/providers"
 import { authClient } from "@/lib/auth-client"
 import { useCommandPalette } from "@/components/command-palette"
@@ -69,7 +61,11 @@ const dmSans = DM_Sans({
   weight: ["400", "500", "600", "700"],
 })
 
-// Define the order of built-in icons
+const customMessage = process.env.NEXT_PUBLIC_TOP_BAR_MESSAGE
+const customColor = process.env.NEXT_PUBLIC_TOP_BAR_COLOR || '#000000'
+const bgStyle: React.CSSProperties = customColor !== '#000000' ? { backgroundColor: customColor } : {}
+const bgClass = customColor === '#000000' ? 'bg-topbar text-topbar-foreground' : ''
+
 const BUILTIN_ICONS = [
   { id: "icon-theme", label: "Theme" },
   { id: "icon-command", label: "Command" },
@@ -375,49 +371,24 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
 }
 
 export function TaskAnnouncement() {
-  const [lastTask, setLastTask] = useState<{ title: string } | null>(null)
-  const [loading, setLoading] = useState(true)
   const [focusTimer, setFocusTimer] = useState({ isActive: false, timeRemaining: 0, isComplete: false })
-  const isMobile = useIsMobile()
-  const { session } = useAuth()
-  const user = session?.user
   const { isDragMode, setDragMode, saveOrder } = useDragDropMode()
-  const { modules } = useModules()
-  const isTasksEnabled = modules.some(m => m.id === 'tasks')
 
   useEffect(() => {
-    // Load last completed task
-    const abortController = new AbortController()
-    if (session && isTasksEnabled) {
-      fetch('/api/modules/tasks/last-completed', {
-        signal: abortController.signal,
-      })
-        .then(res => res.ok ? res.json() : null)
-        .then(task => { if (task && !abortController.signal.aborted) setLastTask(task) })
-        .catch(() => {})
-        .finally(() => { if (!abortController.signal.aborted) setLoading(false) })
-    } else {
-      setLoading(false)
-    }
-
-    // Set up focus timer listener
     const listener = (isActive: boolean, timeRemaining: number) => {
-      if (!isActive && timeRemaining === 0 && focusTimer.isActive) {
-        setFocusTimer({ isActive: false, timeRemaining: 0, isComplete: true })
-        setTimeout(() => {
-          setFocusTimer({ isActive: false, timeRemaining: 0, isComplete: false })
-        }, 5000)
-      } else {
-        setFocusTimer({ isActive, timeRemaining, isComplete: false })
-      }
+      setFocusTimer(prev => {
+        if (!isActive && timeRemaining === 0 && prev.isActive) {
+          setTimeout(() => {
+            setFocusTimer({ isActive: false, timeRemaining: 0, isComplete: false })
+          }, 5000)
+          return { isActive: false, timeRemaining: 0, isComplete: true }
+        }
+        return { isActive, timeRemaining, isComplete: false }
+      })
     }
     addFocusTimerListener(listener)
-
-    return () => {
-      abortController.abort()
-      removeFocusTimerListener(listener)
-    }
-  }, [user?.id, session, isTasksEnabled])
+    return () => removeFocusTimerListener(listener)
+  }, [])
 
   // Run the countdown interval when timer is active
   // This is the main timer that decrements every second
@@ -449,10 +420,6 @@ export function TaskAnnouncement() {
     const secs = seconds % 60
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
-
-  // Get custom top bar settings from environment variables
-  const customMessage = process.env.NEXT_PUBLIC_TOP_BAR_MESSAGE
-  const customColor = process.env.NEXT_PUBLIC_TOP_BAR_COLOR || '#000000'
 
   // Stop the focus timer
   const stopFocusTimer = () => {
@@ -503,17 +470,6 @@ export function TaskAnnouncement() {
     )
   }
 
-  // Determine background color class or inline style
-  const getBgStyle = () => {
-    return customColor !== '#000000'
-      ? { backgroundColor: customColor }
-      : {};
-  };
-
-  const getBgClass = () => {
-    return customColor === '#000000' ? 'bg-topbar text-topbar-foreground' : '';
-  };
-
   // Handle exit drag mode - optimistic UI, save in background
   const handleExitDragMode = () => {
     saveOrder() // Fire and forget - saves in background
@@ -523,12 +479,12 @@ export function TaskAnnouncement() {
   // Show drag mode UI
   if (isDragMode) {
     return (
-      <div className={`topbar h-[45px] w-full relative z-50 flex items-center justify-between px-4 overflow-visible ${getBgClass()}`} style={getBgStyle()}>
+      <div className={`topbar h-[45px] w-full relative z-50 flex items-center justify-between px-4 overflow-visible ${bgClass}`} style={bgStyle}>
         <div className="flex-1" />
         <button
           onClick={handleExitDragMode}
           className="px-4 py-1.5 rounded-full bg-topbar hover:brightness-110 border border-white/30 text-white font-normal transition-colors cursor-pointer translate-y-[20px] z-50 font-sans"
-          style={getBgStyle()}
+          style={bgStyle}
         >
           Drag the highlighted items to reorder. Press here to SAVE and EXIT.
         </button>
@@ -539,54 +495,15 @@ export function TaskAnnouncement() {
     )
   }
 
-  // If custom message is set, show it instead of task completion
-  if (customMessage) {
-    return (
-      <div
-        className={`topbar h-[45px] w-full relative z-50 flex items-center justify-between px-4 ${getBgClass()}`}
-        style={getBgStyle()}
-      >
-        <div className="flex-1" />
-        <span className={`text-topbar-foreground font-medium ${dmSans.className}`}>
-          {customMessage}
-        </span>
-        <div className="flex-1 flex justify-end">
-          <TopBarIcons />
-        </div>
-      </div>
-    )
-  }
-
-  if (loading || !lastTask) {
-    return (
-      <div
-        className={`topbar h-[45px] w-full relative z-50 flex items-center justify-between px-4 ${getBgClass()}`}
-        style={getBgStyle()}
-      >
-        <div className="flex-1" />
-        <span className={`text-topbar-foreground font-medium ${dmSans.className}`}>ARI</span>
-        <div className="flex-1 flex justify-end">
-          <TopBarIcons />
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div
-      className={`topbar h-[45px] w-full relative z-50 flex items-center justify-between px-4 ${getBgClass()}`}
-      style={getBgStyle()}
+      className={`topbar h-[45px] w-full relative z-50 flex items-center justify-between px-4 ${bgClass}`}
+      style={bgStyle}
     >
       <div className="flex-1" />
-      <Announcement className="bg-white border-gray-200 hover:bg-gray-50 shadow-sm">
-        <AnnouncementTag className="bg-gray-100 text-gray-700 font-medium">
-          Task Complete
-        </AnnouncementTag>
-        <AnnouncementTitle className="text-gray-900">
-          {truncateTaskName(lastTask.title, isMobile ? 20 : 50)}
-          <ArrowUpRight className="ml-1 h-3 w-3 text-gray-500" />
-        </AnnouncementTitle>
-      </Announcement>
+      <span className={`text-topbar-foreground font-medium ${dmSans.className}`}>
+        {customMessage ?? "ARI"}
+      </span>
       <div className="flex-1 flex justify-end">
         <TopBarIcons />
       </div>
