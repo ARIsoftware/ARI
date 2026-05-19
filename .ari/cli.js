@@ -406,7 +406,7 @@ function start(opts = {}) {
   // Default binds to localhost only — keeps the dev server off the LAN.
   // `--lan` keeps the original behavior (Next defaults to 0.0.0.0 and
   // auto-detects the LAN IP for its banner).
-  const devCmd = lan ? 'pnpm dev' : 'pnpm exec next dev -H localhost';
+  const devCmd = lan ? 'pnpm dev' : 'pnpm dev -H localhost';
   const child = spawn(devCmd, [], {
     stdio: ['inherit', 'pipe', quiet ? 'pipe' : 'inherit'],
     cwd: ROOT,
