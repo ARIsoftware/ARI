@@ -27,15 +27,16 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/components/providers'
 import { useModuleEnabled } from '@/lib/modules/module-hooks'
 import { useToast } from '@/hooks/use-toast'
+import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Loader2, Package, Plus, Trash2, BarChart3, Sparkles } from 'lucide-react'
+import { CheckCircle2, Loader2, Package, Plus, Trash2, BarChart3, Sparkles } from 'lucide-react'
 import {
   useModuleTemplateEntries,
   useCreateModuleTemplateEntry,
@@ -44,6 +45,21 @@ import {
   useUpdateModuleTemplateSettings,
 } from '../hooks/use-module-template'
 import type { ModuleTemplateEntry } from '../types'
+
+// Onboarding question config — drives both the JSX render and validation.
+// `max` mirrors the server Zod schema in api/settings/route.ts (defense-in-depth).
+type QuestionField = 'sampleQuestion1' | 'sampleQuestion2' | 'sampleQuestion3'
+const QUESTION_MAX = 500
+const QUESTIONS: Array<{ field: QuestionField; label: string; placeholder: string; required: boolean }> = [
+  { field: 'sampleQuestion1', label: 'Sample Question 1 *', placeholder: 'Your answer here...', required: true },
+  { field: 'sampleQuestion2', label: 'Sample Question 2', placeholder: 'Optional answer...', required: false },
+  { field: 'sampleQuestion3', label: 'Sample Question 3', placeholder: 'Optional answer...', required: false },
+]
+const EMPTY_ANSWERS: Record<QuestionField, string> = {
+  sampleQuestion1: '',
+  sampleQuestion2: '',
+  sampleQuestion3: '',
+}
 
 export default function ModuleTemplatePage() {
   const { user } = useAuth()
@@ -65,14 +81,32 @@ export default function ModuleTemplatePage() {
   const [newMessage, setNewMessage] = useState('')
   const [randomQuote, setRandomQuote] = useState<{ quote: string; author?: string } | null>(null)
 
-  // Onboarding form state
-  const [setupQuestion1, setSetupQuestion1] = useState('')
-  const [setupQuestion2, setSetupQuestion2] = useState('')
-  const [setupQuestion3, setSetupQuestion3] = useState('')
+  const [answers, setAnswers] = useState<Record<QuestionField, string>>(EMPTY_ANSWERS)
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<QuestionField, string>>>({})
+  const [justSaved, setJustSaved] = useState(false)
+  const transitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // TEMPLATE MODULE: Always show onboarding by default so users can see the pattern
-  // FOR REAL MODULES: Remove this state and use `!settings?.onboardingCompleted` instead
+  // TEMPLATE MODULE: Always show onboarding by default so users can see the pattern.
+  // FOR REAL MODULES: Remove this state and use `!settings?.onboardingCompleted` instead.
   const [showOnboardingDemo, setShowOnboardingDemo] = useState(true)
+
+  // Hydrate the form from saved settings once. Guarded so background refetches
+  // (e.g. after the mutation's onSettled invalidate) don't stomp keystrokes.
+  const hydrated = useRef(false)
+  useEffect(() => {
+    if (settings && !hydrated.current) {
+      setAnswers({
+        sampleQuestion1: settings.sampleQuestion1 ?? '',
+        sampleQuestion2: settings.sampleQuestion2 ?? '',
+        sampleQuestion3: settings.sampleQuestion3 ?? '',
+      })
+      hydrated.current = true
+    }
+  }, [settings])
+
+  useEffect(() => () => {
+    if (transitionTimer.current) clearTimeout(transitionTimer.current)
+  }, [])
 
   // Load random quote when quotes module is enabled
   useEffect(() => {
@@ -89,29 +123,61 @@ export default function ModuleTemplatePage() {
     return () => { cancelled = true }
   }, [quotesEnabled, quotesLoading])
 
-  /**
-   * Handle onboarding setup completion
-   * Saves the user's answers and marks onboarding as complete
-   */
-  const handleSetup = () => {
-    if (!setupQuestion1.trim()) {
-      toast({ variant: 'destructive', title: 'Please answer Sample Question 1' })
-      return
+  // Mirrors the server Zod schema in api/settings/route.ts. Server is still the
+  // source of truth — these checks just give immediate inline feedback.
+  const validateForm = () => {
+    const errs: Partial<Record<QuestionField, string>> = {}
+    for (const { field, required } of QUESTIONS) {
+      const value = answers[field].trim()
+      if (required && !value) {
+        errs[field] = 'This question is required'
+      } else if (value.length > QUESTION_MAX) {
+        errs[field] = `Must be ${QUESTION_MAX} characters or fewer`
+      }
     }
+    return errs
+  }
+
+  const handleSetup = () => {
+    const errs = validateForm()
+    setFieldErrors(errs)
+    if (Object.keys(errs).length > 0) return
 
     updateSettings.mutate(
       {
         onboardingCompleted: true,
-        sampleQuestion1: setupQuestion1.trim(),
-        sampleQuestion2: setupQuestion2.trim(),
-        sampleQuestion3: setupQuestion3.trim(),
+        sampleQuestion1: answers.sampleQuestion1.trim(),
+        sampleQuestion2: answers.sampleQuestion2.trim(),
+        sampleQuestion3: answers.sampleQuestion3.trim(),
       },
       {
-        onError: () => {
-          toast({ variant: 'destructive', title: 'Failed to save settings' })
+        onSuccess: () => {
+          setJustSaved(true)
+          toast({ title: 'Onboarding complete', description: 'Your answers were saved.' })
+          // FOR REAL MODULES: drop the timer — the transition is reactive once
+          // the page renders against `!settings?.onboardingCompleted`.
+          transitionTimer.current = setTimeout(() => {
+            setJustSaved(false)
+            setShowOnboardingDemo(false)
+          }, 900)
         },
-      }
+        onError: (err: unknown) => {
+          const message = err instanceof Error ? err.message : 'Please try again.'
+          toast({ variant: 'destructive', title: 'Failed to save settings', description: message })
+        },
+      },
     )
+  }
+
+  const updateAnswer = (field: QuestionField, value: string) => {
+    setAnswers((prev) => ({ ...prev, [field]: value }))
+    if (fieldErrors[field]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev }
+        delete next[field]
+        return next
+      })
+    }
   }
 
   /**
@@ -190,40 +256,47 @@ export default function ModuleTemplatePage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="question1">Sample Question 1 *</Label>
-              <Input
-                id="question1"
-                value={setupQuestion1}
-                onChange={(e) => setSetupQuestion1(e.target.value)}
-                placeholder="Your answer here..."
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="question2">Sample Question 2</Label>
-              <Input
-                id="question2"
-                value={setupQuestion2}
-                onChange={(e) => setSetupQuestion2(e.target.value)}
-                placeholder="Optional answer..."
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="question3">Sample Question 3</Label>
-              <Input
-                id="question3"
-                value={setupQuestion3}
-                onChange={(e) => setSetupQuestion3(e.target.value)}
-                placeholder="Optional answer..."
-              />
-            </div>
+            {QUESTIONS.map(({ field, label, placeholder }) => {
+              const error = fieldErrors[field]
+              const errorId = error ? `${field}-error` : undefined
+              return (
+                <div key={field} className="space-y-2">
+                  <Label htmlFor={field}>{label}</Label>
+                  <Input
+                    id={field}
+                    value={answers[field]}
+                    onChange={(e) => updateAnswer(field, e.target.value)}
+                    placeholder={placeholder}
+                    maxLength={QUESTION_MAX}
+                    disabled={updateSettings.isPending}
+                    aria-invalid={!!error}
+                    aria-describedby={errorId}
+                    className={cn(error && 'border-red-500 focus-visible:ring-red-500')}
+                  />
+                  {error && (
+                    <p id={errorId} className="text-xs text-red-500">{error}</p>
+                  )}
+                </div>
+              )
+            })}
             <Button
               className="w-full"
               onClick={handleSetup}
-              disabled={updateSettings.isPending}
+              disabled={updateSettings.isPending || justSaved}
             >
-              {updateSettings.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              Get Started
+              {updateSettings.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Saving...
+                </>
+              ) : justSaved ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 mr-2 text-green-600" />
+                  Saved!
+                </>
+              ) : (
+                'Get Started'
+              )}
             </Button>
 
             {/* TEMPLATE MODULE ONLY: Skip button to view main content */}
@@ -231,6 +304,7 @@ export default function ModuleTemplatePage() {
               variant="ghost"
               className="w-full text-muted-foreground"
               onClick={() => setShowOnboardingDemo(false)}
+              disabled={updateSettings.isPending}
             >
               Skip to Module Demo
             </Button>
