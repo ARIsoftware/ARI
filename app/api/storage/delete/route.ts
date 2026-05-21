@@ -42,7 +42,11 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error: unknown) {
-    console.error('[Storage Delete]', error instanceof Error ? error.message : error)
-    return createErrorResponse('Internal server error', 500)
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('[Storage Delete]', message, error instanceof Error ? error.stack : undefined)
+    const exposed = process.env.NODE_ENV !== 'production'
+      ? `Storage delete failed: ${message}`
+      : 'Internal server error'
+    return createErrorResponse(exposed, 500)
   }
 }

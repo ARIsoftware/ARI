@@ -43,7 +43,11 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ files, total: allFiles.length })
   } catch (error: unknown) {
-    console.error('[Storage List]', error instanceof Error ? error.message : error)
-    return createErrorResponse('Internal server error', 500)
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('[Storage List]', message, error instanceof Error ? error.stack : undefined)
+    const exposed = process.env.NODE_ENV !== 'production'
+      ? `Storage list failed: ${message}`
+      : 'Internal server error'
+    return createErrorResponse(exposed, 500)
   }
 }

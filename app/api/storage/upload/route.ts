@@ -87,7 +87,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ path: result.path, name: result.name }, { status: 201 })
   } catch (error: unknown) {
-    console.error('[Storage Upload]', error instanceof Error ? error.message : error)
-    return createErrorResponse('Internal server error', 500)
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('[Storage Upload]', message, error instanceof Error ? error.stack : undefined)
+    const exposed = process.env.NODE_ENV !== 'production'
+      ? `Storage upload failed: ${message}`
+      : 'Internal server error'
+    return createErrorResponse(exposed, 500)
   }
 }
