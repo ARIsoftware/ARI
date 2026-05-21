@@ -9,6 +9,7 @@ import { ModulesProvider } from "@/lib/modules/context"
 import { CommandPaletteProvider } from "@/components/command-palette"
 import { DragDropModeProvider } from "@/components/drag-drop-mode-context"
 import { ThemeProvider } from "@/lib/theme/theme-context"
+import { isPublicPathname } from "@/lib/route-helpers"
 import type { ModuleMetadata } from '@/lib/modules/module-types'
 
 // Define types matching Better Auth session structure
@@ -56,9 +57,7 @@ export function Providers({
   // the server round-trip confirms the session is invalid.  This prevents
   // providers from firing authenticated API calls (theme, modules/order,
   // music-player/songs, etc.) that will just 401.
-  const isPublicPage = !!(pathname?.startsWith('/sign-in') ||
-    pathname?.startsWith('/welcome') ||
-    pathname?.startsWith('/database-error'))
+  const isPublicPage = isPublicPathname(pathname)
 
   // Map Better Auth user/session to compatible format
   // Cast to include custom fields (firstName, lastName) defined in auth.ts additionalFields

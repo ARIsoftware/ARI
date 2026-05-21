@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import {
   CommandDialog,
   CommandEmpty,
@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
 import { useModules } from "@/lib/modules/module-hooks"
+import { isPublicPathname } from "@/lib/route-helpers"
 
 interface CommandPaletteProps {
   open?: boolean
@@ -31,13 +32,18 @@ interface CommandPaletteProps {
 export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPaletteProps) {
   const [internalOpen, setInternalOpen] = React.useState(false)
   const router = useRouter()
+  const pathname = usePathname()
   const { modules, loading: modulesLoading } = useModules()
 
   // Use controlled state if provided, otherwise use internal state
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen
   const setOpen = onOpenChange || setInternalOpen
 
+  const isPublicPage = isPublicPathname(pathname)
+
   React.useEffect(() => {
+    if (isPublicPage) return
+
     const down = (e: KeyboardEvent) => {
       if (e.key === "k" && e.metaKey && !e.shiftKey) {
         e.preventDefault()
@@ -47,7 +53,7 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
 
     document.addEventListener("keydown", down)
     return () => document.removeEventListener("keydown", down)
-  }, [open, setOpen])
+  }, [open, setOpen, isPublicPage])
 
   const runCommand = React.useCallback((command: () => void) => {
     setOpen(false)
@@ -68,6 +74,8 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
 
   // Check if Tasks module is enabled for Quick Actions
   const tasksEnabled = modules.some(m => m.id === 'tasks')
+
+  if (isPublicPage) return null
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
