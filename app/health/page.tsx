@@ -65,7 +65,7 @@ const CORE_ROUTE_BY_ROLE = new Map<string, string>(
 /**
  * Look up a core API route by its debug role. Throws loudly if the role is
  * unknown — renaming or deleting a tagged route file without updating its
- * `debugRole` export breaks /debug at the call site instead of silently 404ing.
+ * `debugRole` export breaks /health at the call site instead of silently 404ing.
  */
 const route = (role: string): string => {
   if (role in BETTER_AUTH_ROUTES) {
@@ -74,7 +74,7 @@ const route = (role: string): string => {
   const path = CORE_ROUTE_BY_ROLE.get(role)
   if (!path) {
     throw new Error(
-      `/debug: no core route tagged with debugRole='${role}' — add 'export const debugRole = "${role}"' to the relevant route.ts file and regenerate the manifest`
+      `/health: no core route tagged with debugRole='${role}' — add 'export const debugRole = "${role}"' to the relevant route.ts file and regenerate the manifest`
     )
   }
   return path
@@ -86,7 +86,7 @@ const MODULE_NAME_BY_ID = new Map(MANIFEST.modules.map((m) => [m.id, m.name]))
 
 /**
  * Group every manifest API route by its enabled moduleId. Single source of
- * truth for /debug — used both to seed the per-module fetch tests below and
+ * truth for /health — used both to seed the per-module fetch tests below and
  * to drive the Modules tab's API-route probing loop.
  */
 const ENABLED_MODULE_API_ROUTES: ReadonlyMap<string, readonly ManifestApiRoute[]> = (() => {
@@ -257,7 +257,7 @@ export default function DatabaseTestPage() {
     // Auto-fetch endpoint summary on mount
     async function fetchEndpointSummary() {
       try {
-        const response = await fetch(route('debug-endpoints'))
+        const response = await fetch(route('health-endpoints'))
         if (response.ok) {
           const data = await response.json()
           setEndpointsData(data)
@@ -311,7 +311,7 @@ export default function DatabaseTestPage() {
     updateSecurityResult(endpoint, method, { status: 'testing' })
 
     // Skip routes that are intentionally public — sourced from the manifest
-    // via /api/debug/endpoints (auto-fetched on mount). No hardcoded list.
+    // via /api/health/endpoints (auto-fetched on mount). No hardcoded list.
     const knownPublic = endpointsData?.publicEndpoints?.some((e) => e.fullPath === endpoint)
     if (knownPublic) {
       updateSecurityResult(endpoint, method, {
@@ -405,7 +405,7 @@ export default function DatabaseTestPage() {
       // Reuse already-fetched data or fetch fresh
       let data = endpointsData
       if (!data) {
-        const response = await fetch(route('debug-endpoints'))
+        const response = await fetch(route('health-endpoints'))
         if (!response.ok) throw new Error(`Failed to fetch endpoints: ${response.status}`)
         data = await response.json()
         setEndpointsData(data)
@@ -492,7 +492,7 @@ export default function DatabaseTestPage() {
       // Dynamically fetch the generated registry to compare against discovered modules
       updateModuleResult('Registry Completeness', { status: 'testing' })
       try {
-        const statusResponse = await fetch(route('debug-module-status'))
+        const statusResponse = await fetch(route('health-module-status'))
         const statusData = statusResponse.ok ? await statusResponse.json() : null
 
         // Modules with routes defined should have pages registered
@@ -679,7 +679,7 @@ export default function DatabaseTestPage() {
       // Test 6: Module Enabled/Disabled Status
       updateModuleResult('Module Status Check', { status: 'testing' })
       try {
-        const response = await fetch(route('debug-module-status'))
+        const response = await fetch(route('health-module-status'))
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`)
         }
@@ -716,7 +716,7 @@ export default function DatabaseTestPage() {
           status: 'error',
           error: errMsg(error),
           data: {
-            hint: 'Check if /api/debug/module-status endpoint exists'
+            hint: 'Check if /api/health/module-status endpoint exists'
           }
         })
         console.error('❌ Module status check failed:', error)
@@ -968,24 +968,45 @@ export default function DatabaseTestPage() {
 
     // Test 1: Storage Provider Config
     updateStorageResult('Storage Provider', { status: 'testing' })
+    let envVars: Array<{ name: string; set: boolean; required: boolean }> = []
     try {
       const res = await fetch('/api/settings/storage')
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
       const data = await res.json()
+      const label = data.providerLabel ?? data.provider ?? 'unknown'
+      envVars = Array.isArray(data.envVars) ? data.envVars : []
       updateStorageResult('Storage Provider', {
-        status: data.status === 'active' ? 'success' : 'warning',
-        message: `Provider: ${data.provider} — Status: ${data.status}`,
-        data: { provider: data.provider, path: data.config?.path, status: data.status },
+        status: 'success',
+        message: `Active: ${label} (source: ${data.source})`,
+        data: { provider: data.provider, providerLabel: data.providerLabel, source: data.source },
       })
     } catch (error: unknown) {
       updateStorageResult('Storage Provider', { status: 'error', error: errMsg(error) })
     }
 
-    // Test 2: Upload
-    updateStorageResult('Upload (POST /api/storage/upload)', { status: 'testing' })
+    // Env var presence — one row per var, so missing required vars show red
+    for (const v of envVars) {
+      const testName = `Env: ${v.name}`
+      let status: TestResult['status']
+      let message: string
+      if (v.set) {
+        status = 'success'
+        message = v.required ? 'Set (required)' : 'Set'
+      } else if (v.required) {
+        status = 'error'
+        message = 'Missing — required for this provider'
+      } else {
+        status = 'warning'
+        message = 'Not set (optional)'
+      }
+      updateStorageResult(testName, { status, message })
+    }
+
+    // Test 2: Upload (text)
+    updateStorageResult('Upload text file (POST /api/storage/upload)', { status: 'testing' })
     let uploadedFilename: string | null = null
+    const testContent = `ARI storage test — ${new Date().toISOString()}`
     try {
-      const testContent = `ARI storage test — ${new Date().toISOString()}`
       const blob = new Blob([testContent], { type: 'text/plain' })
       const file = new File([blob], 'ari-debug-test.txt', { type: 'text/plain' })
       const formData = new FormData()
@@ -999,13 +1020,13 @@ export default function DatabaseTestPage() {
       }
       const data = await res.json()
       uploadedFilename = data.name
-      updateStorageResult('Upload (POST /api/storage/upload)', {
+      updateStorageResult('Upload text file (POST /api/storage/upload)', {
         status: 'success',
-        message: `Uploaded successfully`,
+        message: `Uploaded ${testContent.length} bytes`,
         data: { path: data.path, name: data.name },
       })
     } catch (error: unknown) {
-      updateStorageResult('Upload (POST /api/storage/upload)', { status: 'error', error: errMsg(error) })
+      updateStorageResult('Upload text file (POST /api/storage/upload)', { status: 'error', error: errMsg(error) })
     }
 
     // Test 3: List
@@ -1020,7 +1041,7 @@ export default function DatabaseTestPage() {
       const files = data.files || []
       const found = uploadedFilename ? files.some((f: { name: string }) => f.name === uploadedFilename) : false
       updateStorageResult('List (GET /api/storage/list)', {
-        status: 'success',
+        status: uploadedFilename && !found ? 'error' : 'success',
         message: `${files.length} file(s) in debug-test bucket${uploadedFilename ? (found ? ' — uploaded file found' : ' — uploaded file NOT found') : ''}`,
         data: { count: files.length, files: files.map((f: { name: string; size: number }) => `${f.name} (${f.size} bytes)`) },
       })
@@ -1028,24 +1049,27 @@ export default function DatabaseTestPage() {
       updateStorageResult('List (GET /api/storage/list)', { status: 'error', error: errMsg(error) })
     }
 
-    // Test 4: Serve
-    updateStorageResult('Serve (GET /api/storage/serve/...)', { status: 'testing' })
+    // Test 4: Serve + content integrity
+    updateStorageResult('Serve + content integrity (GET /api/storage/serve/...)', { status: 'testing' })
     if (uploadedFilename) {
       try {
         const res = await fetch(`/api/storage/serve/debug-test/${uploadedFilename}`)
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const text = await res.text()
         const contentType = res.headers.get('content-type') || ''
-        updateStorageResult('Serve (GET /api/storage/serve/...)', {
-          status: 'success',
-          message: `File served (${text.length} bytes, ${contentType})`,
-          data: { contentType, size: text.length, preview: text.slice(0, 100) },
+        const integrityOk = text === testContent
+        updateStorageResult('Serve + content integrity (GET /api/storage/serve/...)', {
+          status: integrityOk ? 'success' : 'error',
+          message: integrityOk
+            ? `File served (${text.length} bytes, ${contentType}) — bytes match upload`
+            : `Content mismatch — uploaded ${testContent.length}B / served ${text.length}B`,
+          data: { contentType, servedBytes: text.length, uploadedBytes: testContent.length, integrityOk, preview: text.slice(0, 100) },
         })
       } catch (error: unknown) {
-        updateStorageResult('Serve (GET /api/storage/serve/...)', { status: 'error', error: errMsg(error) })
+        updateStorageResult('Serve + content integrity (GET /api/storage/serve/...)', { status: 'error', error: errMsg(error) })
       }
     } else {
-      updateStorageResult('Serve (GET /api/storage/serve/...)', {
+      updateStorageResult('Serve + content integrity (GET /api/storage/serve/...)', {
         status: 'warning',
         message: 'Skipped — no file was uploaded to serve',
       })
@@ -1066,7 +1090,7 @@ export default function DatabaseTestPage() {
         }
         updateStorageResult('Delete (DELETE /api/storage/delete)', {
           status: 'success',
-          message: 'File deleted successfully',
+          message: 'Delete request succeeded',
         })
       } catch (error: unknown) {
         updateStorageResult('Delete (DELETE /api/storage/delete)', { status: 'error', error: errMsg(error) })
@@ -1078,6 +1102,88 @@ export default function DatabaseTestPage() {
       })
     }
 
+    // Test 6: Verify delete (re-list, confirm gone)
+    updateStorageResult('Verify delete (file removed from list)', { status: 'testing' })
+    if (uploadedFilename) {
+      try {
+        const res = await fetch('/api/storage/list?bucket=debug-test')
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json()
+        const files = data.files || []
+        const stillPresent = files.some((f: { name: string }) => f.name === uploadedFilename)
+        updateStorageResult('Verify delete (file removed from list)', {
+          status: stillPresent ? 'error' : 'success',
+          message: stillPresent
+            ? 'File still present after delete — provider may have eventual consistency or delete silently failed'
+            : 'File no longer appears in list — delete confirmed',
+          data: { stillPresent, listedCount: files.length },
+        })
+      } catch (error: unknown) {
+        updateStorageResult('Verify delete (file removed from list)', { status: 'error', error: errMsg(error) })
+      }
+    } else {
+      updateStorageResult('Verify delete (file removed from list)', {
+        status: 'warning',
+        message: 'Skipped — no file was uploaded to verify',
+      })
+    }
+
+    // Test 7: Binary round-trip (PNG bytes)
+    updateStorageResult('Binary round-trip (PNG bytes)', { status: 'testing' })
+    let binaryFilename: string | null = null
+    // Minimal valid 1x1 transparent PNG
+    const pngBytes = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+      0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+      0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+      0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89,
+      0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41, 0x54,
+      0x78, 0x9c, 0x62, 0x00, 0x01, 0x00, 0x00, 0x05,
+      0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00,
+      0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+    ])
+    try {
+      const file = new File([pngBytes], 'ari-debug-test.png', { type: 'image/png' })
+      const formData = new FormData()
+      formData.append('bucket', 'debug-test')
+      formData.append('file', file)
+
+      const upRes = await fetch('/api/storage/upload', { method: 'POST', body: formData })
+      if (!upRes.ok) {
+        const err = await upRes.json().catch(() => ({}))
+        throw new Error(`upload: ${err.error || `HTTP ${upRes.status}`}`)
+      }
+      const upData = await upRes.json()
+      binaryFilename = upData.name
+
+      const dlRes = await fetch(`/api/storage/serve/debug-test/${binaryFilename}`)
+      if (!dlRes.ok) throw new Error(`serve: HTTP ${dlRes.status}`)
+      const dlBuffer = await dlRes.arrayBuffer()
+      const dlBytes = new Uint8Array(dlBuffer)
+
+      const sameLength = dlBytes.length === pngBytes.length
+      const sameBytes = sameLength && dlBytes.every((b, i) => b === pngBytes[i])
+
+      updateStorageResult('Binary round-trip (PNG bytes)', {
+        status: sameBytes ? 'success' : 'error',
+        message: sameBytes
+          ? `Binary file round-tripped intact (${pngBytes.length} bytes)`
+          : `Binary mismatch — uploaded ${pngBytes.length}B / served ${dlBytes.length}B`,
+        data: { uploadedBytes: pngBytes.length, servedBytes: dlBytes.length, sameLength, sameBytes },
+      })
+    } catch (error: unknown) {
+      updateStorageResult('Binary round-trip (PNG bytes)', { status: 'error', error: errMsg(error) })
+    } finally {
+      // Best-effort cleanup so the test is repeatable
+      if (binaryFilename) {
+        await fetch('/api/storage/delete', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bucket: 'debug-test', filename: binaryFilename }),
+        }).catch(() => {})
+      }
+    }
+
     setIsRunningStorageTests(false)
   }
 
@@ -1087,7 +1193,7 @@ export default function DatabaseTestPage() {
     console.log('🌐 Fetching endpoints data...')
 
     try {
-      const response = await fetch(route('debug-endpoints'))
+      const response = await fetch(route('health-endpoints'))
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
@@ -1112,7 +1218,7 @@ export default function DatabaseTestPage() {
       // Reuse already-fetched data or fetch fresh
       let data = endpointsData
       if (!data) {
-        const response = await fetch(route('debug-endpoints'))
+        const response = await fetch(route('health-endpoints'))
         if (!response.ok) throw new Error(`Failed to fetch endpoints: ${response.status}`)
         data = await response.json()
         setEndpointsData(data)
@@ -1367,7 +1473,7 @@ export default function DatabaseTestPage() {
         updateAuthConfigResult('Auth Configuration', {
           status: 'warning',
           message: 'Auth config endpoint not available',
-          data: { hint: 'Create /api/debug/auth-config for detailed checks' }
+          data: { hint: 'Create /api/health/auth-config for detailed checks' }
         })
       } else {
         throw new Error(`HTTP ${response.status}`)
@@ -1863,7 +1969,7 @@ export default function DatabaseTestPage() {
           try {
             // POST because the endpoint inserts/deletes a sentinel row —
             // it's not a safe/idempotent GET.
-            const response = await fetch(route('debug-rls-test'), { method: 'POST' })
+            const response = await fetch(route('health-rls-test'), { method: 'POST' })
             if (!response.ok) {
               throw new Error(`HTTP ${response.status}: ${response.statusText}`)
             }
@@ -1904,7 +2010,7 @@ export default function DatabaseTestPage() {
               status: 'warning',
               message: 'No installed module returned user-scoped rows — fallback RLS check failed',
               data: {
-                note: 'RLS test requires at least one module API to return rows containing user_id/userId, or a working /api/debug/rls-test endpoint',
+                note: 'RLS test requires at least one module API to return rows containing user_id/userId, or a working /api/health/rls-test endpoint',
                 checkedModules: Array.from(phase3Summaries.keys()),
                 fallbackError: errMsg(fallbackError)
               }
@@ -2072,7 +2178,7 @@ export default function DatabaseTestPage() {
     <div className="container mx-auto p-6 max-w-7xl">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-4xl font-bold tracking-tight">System Testing</h1>
+        <h1 className="text-4xl font-bold tracking-tight">Health Check</h1>
         <p className="text-muted-foreground mt-2">Comprehensive system testing and diagnostics</p>
       </div>
 
@@ -2737,7 +2843,9 @@ export default function DatabaseTestPage() {
               <HardDrive className="h-6 w-6" /> File Storage Tests
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-2">
-              Test the ARI File Storage System — uploads a test file, lists, serves, and deletes it
+              Exercises the active storage provider end-to-end: provider config, upload, list,
+              serve with content integrity check, delete, post-delete verification, and a binary
+              (PNG) round-trip.
             </p>
           </CardHeader>
           <CardContent>
@@ -2764,24 +2872,39 @@ export default function DatabaseTestPage() {
               </div>
 
               {storageResults.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div className="rounded-lg border px-4 py-3">
-                    <div className="text-2xl font-bold">{storageSummary.total}</div>
-                    <p className="text-xs text-muted-foreground">Total Tests</p>
+                <>
+                  {(() => {
+                    const cfg = storageResults.find(r => r.name === 'Storage Provider')?.data as
+                      | { providerLabel?: string; provider?: string; source?: string }
+                      | undefined
+                    const label = cfg?.providerLabel ?? cfg?.provider
+                    if (!label) return null
+                    return (
+                      <div className="rounded-lg border bg-muted/30 px-4 py-2 text-sm">
+                        Tests ran against <span className="font-medium">{label}</span>
+                        {cfg?.source ? <span className="text-muted-foreground"> (source: {cfg.source})</span> : null}
+                      </div>
+                    )
+                  })()}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="rounded-lg border px-4 py-3">
+                      <div className="text-2xl font-bold">{storageSummary.total}</div>
+                      <p className="text-xs text-muted-foreground">Total Tests</p>
+                    </div>
+                    <div className="rounded-lg border px-4 py-3">
+                      <div className="text-2xl font-bold text-green-500">{storageSummary.success}</div>
+                      <p className="text-xs text-muted-foreground">Passed</p>
+                    </div>
+                    <div className="rounded-lg border px-4 py-3">
+                      <div className="text-2xl font-bold text-yellow-500">{storageSummary.warnings}</div>
+                      <p className="text-xs text-muted-foreground">Warnings</p>
+                    </div>
+                    <div className="rounded-lg border px-4 py-3">
+                      <div className="text-2xl font-bold text-red-500">{storageSummary.errors}</div>
+                      <p className="text-xs text-muted-foreground">Errors</p>
+                    </div>
                   </div>
-                  <div className="rounded-lg border px-4 py-3">
-                    <div className="text-2xl font-bold text-green-500">{storageSummary.success}</div>
-                    <p className="text-xs text-muted-foreground">Passed</p>
-                  </div>
-                  <div className="rounded-lg border px-4 py-3">
-                    <div className="text-2xl font-bold text-yellow-500">{storageSummary.warnings}</div>
-                    <p className="text-xs text-muted-foreground">Warnings</p>
-                  </div>
-                  <div className="rounded-lg border px-4 py-3">
-                    <div className="text-2xl font-bold text-red-500">{storageSummary.errors}</div>
-                    <p className="text-xs text-muted-foreground">Errors</p>
-                  </div>
-                </div>
+                </>
               )}
 
               <div className="space-y-2">

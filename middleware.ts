@@ -58,7 +58,7 @@ const protectedRoutes = [
   "/modules",
   "/profile",
   "/logs",
-  "/debug",
+  "/health",
   "/api" // All API routes require authentication (defense-in-depth)
 ]
 

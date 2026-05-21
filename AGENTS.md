@@ -475,7 +475,7 @@ Comprehensive database backup and restore system with dynamic table discovery. M
 - **Import**: `/app/api/backup/import/route.ts` — restores from SQL backup with transaction rollback on error
 - **Verify**: `/app/api/backup/verify/route.ts` — preview what will be backed up before exporting
 - **Setup**: Backup RPC functions (`get_all_user_tables`, `get_all_table_columns`, `get_table_row_counts`, `exec_sql`) are installed automatically by `lib/db/setup.sql` during initial setup. Re-run that file if discovery ever fails on an existing install.
-- **Debug**: `/debug` page includes backup system diagnostic tests
+- **Health**: `/health` page includes backup system diagnostic tests
 
 ## Troubleshooting
 
@@ -489,7 +489,7 @@ Comprehensive database backup and restore system with dynamic table discovery. M
 ### Debug Tools
 - Browser DevTools for network requests and cookies
 - Check `public."user"` and `public."session"` tables for auth state
-- `/debug` page for system diagnostics
+- `/health` page for system diagnostics
 - Next.js error overlay in development
 
 ## Performance Optimizations

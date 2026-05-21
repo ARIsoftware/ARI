@@ -783,7 +783,7 @@ Before marking complete, verify:
 - [ ] Page loads without errors in dev server (no duplicate toolbars)
 - [ ] **If public routes exist**: `publicRoutes` configured in module.json with security
 - [ ] **If public routes exist**: Route handler uses `createPublicRouteHandler` wrapper
-- [ ] **If public routes exist**: Endpoint visible in `/debug` → Endpoints tab
+- [ ] **If public routes exist**: Endpoint visible in `/health` → Endpoints tab
 - [ ] **If onboarding exists**: Settings types include `onboardingCompleted` flag
 - [ ] **If onboarding exists**: Settings API with GET (fetch) and PUT (upsert) endpoints
 - [ ] **If onboarding exists**: Conditional render shows onboarding when `!settings?.onboardingCompleted`

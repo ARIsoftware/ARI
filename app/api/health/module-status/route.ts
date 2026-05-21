@@ -1,8 +1,8 @@
 /**
- * Debug endpoint to check module status
+ * Health endpoint to check module status
  *
  * Returns detailed information about why modules might not be loading
- * Used by /debug page to diagnose module issues
+ * Used by /health page to diagnose module issues
  */
 
 import { NextResponse } from 'next/server'
@@ -12,7 +12,7 @@ import { getModules } from '@/lib/modules/module-registry'
 import { safeErrorResponse } from '@/lib/api-error'
 import { eq } from 'drizzle-orm'
 
-export const debugRole = "debug-module-status"
+export const debugRole = "health-module-status"
 
 export async function GET() {
   try {

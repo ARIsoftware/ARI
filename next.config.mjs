@@ -44,6 +44,11 @@ const nextConfig = {
     process.env.devIndicators === 'true' || process.env.DEV_INDICATORS === 'true'
       ? {}
       : false,
+  async redirects() {
+    return [
+      { source: '/debug', destination: '/health', permanent: false },
+    ]
+  },
 }
 
 export default nextConfig

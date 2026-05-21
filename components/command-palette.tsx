@@ -18,7 +18,7 @@ import {
   Radar,
   Plus,
   Loader2,
-  Bug,
+  Activity,
 } from "lucide-react"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
 import { useModules } from "@/lib/modules/module-hooks"
@@ -114,9 +114,9 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
             <Package className="mr-2 h-4 w-4" />
             <span>Modules</span>
           </CommandItem>
-          <CommandItem onSelect={() => runCommand(() => router.push("/debug"))}>
-            <Bug className="mr-2 h-4 w-4" />
-            <span>Debug</span>
+          <CommandItem onSelect={() => runCommand(() => router.push("/health"))}>
+            <Activity className="mr-2 h-4 w-4" />
+            <span>Health Check</span>
           </CommandItem>
         </CommandGroup>
 

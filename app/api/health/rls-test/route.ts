@@ -1,5 +1,5 @@
 /**
- * Debug endpoint to verify RLS policies are actually enforcing row isolation.
+ * Health endpoint to verify RLS policies are actually enforcing row isolation.
  *
  * Performs an end-to-end test using the `module_settings` table (which has
  * proper per-user RLS policies). Works even on a fresh install with no
@@ -9,7 +9,7 @@
  * Negative test: a different user's context sees 0 rows for that sentinel
  * (proving RLS actually filters, not just relies on WHERE clauses).
  *
- * Used by /debug page when no module has user-scoped data to probe.
+ * Used by /health page when no module has user-scoped data to probe.
  */
 
 import { NextResponse } from 'next/server'
@@ -20,7 +20,7 @@ import { moduleSettings } from '@/lib/db/schema'
 import { safeErrorResponse } from '@/lib/api-error'
 import { and, eq } from 'drizzle-orm'
 
-export const debugRole = "debug-rls-test"
+export const debugRole = "health-rls-test"
 
 // Sentinel module_id used exclusively by this diagnostic. Chosen to be
 // visually obvious and unlikely to collide with any real module id.

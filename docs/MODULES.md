@@ -205,7 +205,7 @@ These are the ONLY places where code/configuration must exist outside the module
 | `/lib/generated/module-pages-registry.ts` | Page import in `MODULE_PAGES` + ID in `REGISTERED_MODULE_IDS` | Always |
 | `/app/api/modules/[module]/[[...path]]/route.ts` | API route imports in `MODULE_API_ROUTES` | If module has API |
 | `/lib/db/schema/schema.ts` | Drizzle table definition (see [Database Integration](#6-database-integration)) | If module has DB table |
-| `/app/debug/page.tsx` (~line 274) | Module ID to `registeredModules` array | Always |
+| `/app/health/page.tsx` (~line 274) | Module ID to `registeredModules` array | Always |
 
 **Developer must be informed**: When creating documentation or explaining module creation, always clearly list these external registration points.
 
@@ -500,9 +500,9 @@ Modules can add a quick access icon to the global top navigation bar:
   }
   ```
 
-- [ ] **4.8 Update debug page**
+- [ ] **4.8 Update health page**
 
-  Edit `/app/debug/page.tsx`:
+  Edit `/app/health/page.tsx`:
   - Add module ID to `registeredModules` array (~line 274):
     ```typescript
     const registeredModules = [
@@ -829,10 +829,10 @@ import type { Item } from '@/modules/module-id/types'
 - [ ] Ensure route is in `protectedRoutes` array
 - [ ] Test that unauthenticated users are redirected
 
-#### Step 5.6.4: Update Debug Page
+#### Step 5.6.4: Update Health Page
 
-- [ ] Add module ID to `registeredModules` array in `/app/debug/page.tsx` (~line 274)
-- [ ] Run debug tests to verify module is recognized
+- [ ] Add module ID to `registeredModules` array in `/app/health/page.tsx` (~line 274)
+- [ ] Run health tests to verify module is recognized
 
 #### Step 5.6.5: Register Module (Steps 4.6 - 4.8)
 
@@ -1496,7 +1496,7 @@ After configuring public routes:
 
 1. Run `pnpm generate-module-registry` to update the manifest
 2. Restart the dev server
-3. Navigate to `/debug` → **Endpoints** tab
+3. Navigate to `/health` → **Endpoints** tab
 4. Verify your public endpoint appears with the correct security type
 5. Test the endpoint:
    - **Without signature**: Should return 400/401
@@ -1510,7 +1510,7 @@ After configuring public routes:
 - [ ] Environment variable for secret is set
 - [ ] `rateLimit` configured to prevent abuse
 - [ ] Route handler uses `createPublicRouteHandler` wrapper
-- [ ] Route appears in `/debug` → Endpoints tab
+- [ ] Route appears in `/health` → Endpoints tab
 - [ ] Tested without authentication (should fail without proper security headers)
 - [ ] Tested with valid security headers (should succeed)
 

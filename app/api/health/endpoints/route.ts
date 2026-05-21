@@ -1,10 +1,10 @@
 /**
- * Debug Endpoints API
+ * Health Endpoints API
  *
  * Returns all API endpoints discovered at build time from the module manifest.
  * Includes core routes (app/api/), module routes, and public routes with security info.
  *
- * Endpoint: GET /api/debug/endpoints
+ * Endpoint: GET /api/health/endpoints
  * Requires: Authentication
  */
 
@@ -21,7 +21,7 @@ type PublicRoute = ApiRoute & {
 
 const manifest = moduleManifest as Record<string, unknown>
 
-export const debugRole = "debug-endpoints"
+export const debugRole = "health-endpoints"
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   try {

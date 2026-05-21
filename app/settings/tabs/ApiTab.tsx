@@ -87,7 +87,7 @@ export function ApiTab(): React.ReactElement {
   const fetchEndpoints = useCallback(async () => {
     setEndpointsLoading(true)
     try {
-      const res = await fetch("/api/debug/endpoints")
+      const res = await fetch("/api/health/endpoints")
       if (res.ok) {
         setEndpointsData(await res.json())
       }

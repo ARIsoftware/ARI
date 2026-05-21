@@ -4,7 +4,7 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 export const debugRole = "auth-config"
 
 /**
- * GET /api/debug/auth-config
+ * GET /api/health/auth-config
  * Returns non-sensitive auth configuration details for debugging.
  * Does NOT expose secrets.
  */

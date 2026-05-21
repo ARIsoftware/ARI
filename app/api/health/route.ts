@@ -4,7 +4,7 @@ import { getAuthenticatedUser } from "@/lib/auth-helpers"
 import { safeErrorResponse } from "@/lib/api-error"
 
 export const dynamic = "force-dynamic"
-// Identifier consumed by /debug via the manifest — do not rename without
+// Identifier consumed by /health via the manifest — do not rename without
 // updating any callers that look this role up.
 export const debugRole = "health-database"
 
