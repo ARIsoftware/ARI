@@ -278,3 +278,21 @@
 [data-theme="terminal"] header.border-b {
   border-bottom: 1px solid hsl(120 100% 50%) !important;
 }
+
+/* Grayscale theme - subtle ruled-paper background pattern on main areas */
+[data-theme="grayscale"] main {
+  background-image: repeating-linear-gradient(
+    rgba(0, 0, 0, 0.04) 0px,
+    rgba(0, 0, 0, 0.04) 1px,
+    transparent 1px,
+    transparent 10px
+  );
+}
+
+/* Grayscale theme - strip color from every element, including hardcoded inline colors
+ * (e.g. dashboard widgets using text-red-500, bg-emerald-500 directly). The theme
+ * promise is "no colours anywhere", so we desaturate the entire UI at the body level. */
+[data-theme="grayscale"] body {
+  filter: grayscale(1);
+}
+
