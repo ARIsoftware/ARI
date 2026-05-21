@@ -16,7 +16,7 @@ export async function DELETE(request: NextRequest) {
       return createErrorResponse('Unauthorized - Valid authentication required', 401)
     }
 
-    const storageConfig = await readStorageConfig(withRLS)
+    const storageConfig = readStorageConfig()
 
     const validation = await validateRequestBody(request, deleteSchema)
     if (!validation.success) {

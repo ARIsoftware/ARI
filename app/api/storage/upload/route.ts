@@ -18,11 +18,11 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Unauthorized - Valid authentication required', 401)
     }
 
-    const storageConfig = await readStorageConfig(withRLS)
+    const storageConfig = readStorageConfig()
 
     if (isStorageUnavailable(storageConfig)) {
       return createErrorResponse(
-        'File storage is not available. Local filesystem storage does not persist on Vercel. Please configure an alternative storage provider in Settings > Integrations > File Storage.',
+        'File storage is not available. Local filesystem storage does not persist on Vercel. Set ARI_STORAGE_PROVIDER and the corresponding credentials in your environment to use a cloud provider.',
         503
       )
     }

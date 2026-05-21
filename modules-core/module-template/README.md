@@ -52,6 +52,13 @@ This is a fully-featured example module demonstrating all capabilities of the AR
 - Uses the central `/api/storage/` endpoints — no per-module storage setup needed
 - See `hooks/use-module-template.ts` for the hook implementations
 
+**Storage configuration:** the active backend is selected by `ARI_STORAGE_PROVIDER`
+in `.env.local` (`filesystem` is the default if unset). Provider credentials
+(`ARI_S3_*`, `ARI_R2_*`, `ARI_SUPABASE_S3_*`) also live in `.env.local`. Modules
+do not configure storage themselves — `getStorageProvider(readStorageConfig())`
+returns the right backend automatically. If your module needs provider-aware
+behavior, read `process.env.ARI_STORAGE_PROVIDER` directly.
+
 ## Installation
 
 This module is already installed in the `/modules` directory. To use it:

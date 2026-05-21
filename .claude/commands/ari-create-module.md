@@ -225,7 +225,18 @@ When approved, create the module following this order:
 
 ## ARI File Storage System
 
-If the module needs to store files (images, documents, audio, etc.), use the **ARI File Storage System**. This provides authenticated file upload, serving, listing, and deletion via central API endpoints. The storage provider is configured in Settings > Integrations > File Storage (stored in the database). By default, files are stored on the local filesystem at `data/storage/{user_id}/{bucket}/` and are always scoped to the authenticated user.
+If the module needs to store files (images, documents, audio, etc.), use the **ARI File Storage System**. This provides authenticated file upload, serving, listing, and deletion via central API endpoints. The storage backend is selected by the `ARI_STORAGE_PROVIDER` env var in `.env.local` (defaults to `filesystem` when unset). By default, files are stored on the local filesystem at `data/storage/{user_id}/{bucket}/` and are always scoped to the authenticated user.
+
+### Storage configuration (env vars)
+
+Storage is configured entirely via environment variables — there is no UI form. Users add these to `.env.local`:
+
+- `ARI_STORAGE_PROVIDER` → `filesystem` (default) | `s3` | `r2` | `supabase-s3`
+- `ARI_S3_*` — AWS S3 credentials (access key, secret, bucket, region, endpoint)
+- `ARI_R2_*` — Cloudflare R2 credentials (account ID, access key, secret, bucket)
+- `ARI_SUPABASE_S3_*` — Supabase Storage S3 credentials (endpoint, access key, secret, bucket, region)
+
+Modules do NOT configure storage themselves. The Settings → Storage tab is documentation-only and shows the active provider plus the env-var names.
 
 ### How It Works
 
@@ -247,9 +258,20 @@ Use TanStack Query hooks to call the central `/api/storage/` endpoints. See `mod
 
 Create an upload route in your module's `api/upload/route.ts` that validates files and delegates to `getStorageProvider()` from `@/lib/storage`. See `modules-core/module-template/api/upload/route.ts` for a complete example.
 
-When creating a module-specific upload route, read the storage config from the database before getting the provider:
-`const storageConfig = await readStorageConfig(withRLS)` then `const provider = getStorageProvider(storageConfig)`.
-Import both from `@/lib/storage`.
+Resolve the active provider with `readStorageConfig()` (sync, env-only) and pass it to `getStorageProvider()`:
+
+```ts
+import { getStorageProvider, readStorageConfig } from '@/lib/storage'
+
+const storageConfig = readStorageConfig()
+const provider = getStorageProvider(storageConfig)
+```
+
+The same code works for `filesystem`, `s3`, `r2`, and `supabase-s3` with zero conditional logic. If your module truly needs provider-aware behavior (e.g., a feature that only makes sense on S3-compatible storage), read `process.env.ARI_STORAGE_PROVIDER` directly:
+
+```ts
+if (process.env.ARI_STORAGE_PROVIDER === 's3') { ... }
+```
 
 ### Bucket Naming
 
@@ -774,7 +796,8 @@ Before marking complete, verify:
 - [ ] **If v0 import used**: Any non-standard npm dependencies installed
 - [ ] **If v0 import used**: v0 layout wrappers removed (no extra html/body wrappers)
 - [ ] **If v0 import used**: Component has default export and 'use client' directive
-- [ ] **If file storage needed**: Module uses `/api/storage/upload` or a module-specific wrapper using `getStorageProvider()`
+- [ ] **If file storage needed**: Module uses `/api/storage/upload` or a module-specific wrapper using `getStorageProvider(readStorageConfig())`
+- [ ] **If file storage needed**: Module does NOT read or write storage credentials anywhere — `ARI_STORAGE_PROVIDER` and provider env vars are the only configuration surface
 - [ ] **If file storage needed**: Upload validates file type and size server-side
 - [ ] **If file storage needed**: Files served via authenticated `/api/storage/serve/[...path]` (never public URLs)
 - [ ] **If file storage needed**: File upload UI uses TanStack Query mutations with error handling

@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       return createErrorResponse('Unauthorized - Valid authentication required', 401)
     }
 
-    const storageConfig = await readStorageConfig(withRLS)
+    const storageConfig = readStorageConfig()
 
     const validation = validateQueryParams(request.nextUrl.searchParams, listSchema)
     if (!validation.success) {

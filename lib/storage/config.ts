@@ -1,15 +1,3 @@
-import { moduleSettings } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
-import { decrypt, isEncrypted } from '@/lib/crypto'
-
-const STORAGE_MODULE_ID = 'storage'
-
-export const SENSITIVE_FIELDS: (keyof StorageConfig)[] = [
-  's3SecretAccessKey',
-  'r2SecretAccessKey',
-  'supabaseS3SecretAccessKey',
-]
-
 export interface StorageConfig {
   provider: string  // 'filesystem' | 's3' | 'r2' | 'supabase-s3'
   // AWS S3
@@ -33,8 +21,16 @@ export interface StorageConfig {
 
 const DEFAULT_CONFIG: StorageConfig = { provider: 'filesystem' }
 
+/** Human-readable labels for each storage provider. */
+export const PROVIDER_LABELS: Record<string, string> = {
+  filesystem: 'Local Filesystem',
+  s3: 'AWS S3',
+  r2: 'Cloudflare R2',
+  'supabase-s3': 'Supabase Storage (S3)',
+}
+
 /** Map StorageConfig fields to environment variable names */
-const ENV_MAP: Record<keyof StorageConfig, string> = {
+export const ENV_MAP: Record<keyof StorageConfig, string> = {
   provider: 'ARI_STORAGE_PROVIDER',
   s3AccessKeyId: 'ARI_S3_ACCESS_KEY_ID',
   s3SecretAccessKey: 'ARI_S3_SECRET_ACCESS_KEY',
@@ -52,77 +48,20 @@ const ENV_MAP: Record<keyof StorageConfig, string> = {
   supabaseS3Region: 'ARI_SUPABASE_S3_REGION',
 }
 
-/** Read storage config from environment variables. Returns values for any env vars that are set. */
-function readEnvConfig(): Partial<StorageConfig> {
-  const env: Partial<StorageConfig> = {}
+/**
+ * Read storage config from environment variables only.
+ *
+ * Source of truth: `.env.local` (or platform env, e.g. Vercel).
+ * - `ARI_STORAGE_PROVIDER` selects the backend: 'filesystem' (default) | 's3' | 'r2' | 'supabase-s3'.
+ * - `ARI_S3_*`, `ARI_R2_*`, `ARI_SUPABASE_S3_*` provide credentials for the chosen backend.
+ *
+ * Modules that need provider-aware behavior can read `process.env.ARI_STORAGE_PROVIDER` directly.
+ */
+export function readStorageConfig(): StorageConfig {
+  const config: StorageConfig = { ...DEFAULT_CONFIG }
   for (const key of Object.keys(ENV_MAP) as (keyof StorageConfig)[]) {
     const val = process.env[ENV_MAP[key]]
-    if (val) env[key] = val
+    if (val) config[key] = val
   }
-  return env
-}
-
-export async function readStorageConfig(
-  withRLS: <T>(op: (db: any) => Promise<T>) => Promise<T>
-): Promise<StorageConfig> {
-  // Read from database
-  let dbConfig: StorageConfig = { ...DEFAULT_CONFIG }
-  try {
-    const rows = await withRLS<Array<{ settings: unknown }>>((db: any) =>
-      db.select({ settings: moduleSettings.settings })
-        .from(moduleSettings)
-        .where(eq(moduleSettings.moduleId, STORAGE_MODULE_ID))
-        .limit(1)
-    )
-    const settings = rows[0]?.settings as Record<string, unknown> | null
-    if (settings) {
-      dbConfig = { provider: (typeof settings.provider === 'string' && settings.provider) || 'filesystem' }
-      for (const key of Object.keys(ENV_MAP) as (keyof StorageConfig)[]) {
-        if (key === 'provider') continue
-        const val = settings[key]
-        if (typeof val === 'string') dbConfig[key] = val
-      }
-      // Decrypt sensitive fields
-      for (const field of SENSITIVE_FIELDS) {
-        const val = dbConfig[field]
-        if (typeof val === 'string' && isEncrypted(val)) {
-          try { dbConfig[field] = decrypt(val) } catch { delete dbConfig[field] }
-        }
-      }
-    }
-  } catch {
-    // DB read failed — fall through to env vars / defaults
-  }
-
-  // Environment variables take precedence over DB values
-  const envConfig = readEnvConfig()
-  const config: StorageConfig = { ...dbConfig }
-  for (const key of Object.keys(envConfig) as (keyof StorageConfig)[]) {
-    if (envConfig[key]) config[key] = envConfig[key]
-  }
-
   return config
-}
-
-export async function writeStorageConfig(
-  withRLS: <T>(op: (db: any) => Promise<T>) => Promise<T>,
-  userId: string,
-  config: StorageConfig
-): Promise<void> {
-  await withRLS((db: any) =>
-    db.insert(moduleSettings)
-      .values({
-        userId,
-        moduleId: STORAGE_MODULE_ID,
-        settings: config,
-        enabled: true,
-      })
-      .onConflictDoUpdate({
-        target: [moduleSettings.userId, moduleSettings.moduleId],
-        set: {
-          settings: config,
-          updatedAt: new Date().toISOString(),
-        },
-      })
-  )
 }

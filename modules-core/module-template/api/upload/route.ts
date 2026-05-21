@@ -1,13 +1,16 @@
 /**
  * Module Template — File Upload Example
  *
- * Demonstrates how a module can wrap the ARI File Storage System
- * with module-specific validation and logic.
- *
- * For simple uploads, modules can also call /api/storage/upload directly
- * from the client without creating a module-specific endpoint.
+ * Wraps the ARI File Storage System with module-specific validation.
+ * For simple uploads, modules can call /api/storage/upload directly instead.
  *
  * Endpoint: POST /api/modules/module-template/upload
+ *
+ * Storage backend is selected by ARI_STORAGE_PROVIDER in .env.local
+ * (filesystem | s3 | r2 | supabase-s3; filesystem is the default).
+ * Modules never configure storage themselves — getStorageProvider() returns
+ * the right backend automatically. For provider-aware logic, read
+ * process.env.ARI_STORAGE_PROVIDER directly.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -26,7 +29,8 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Unauthorized - Valid authentication required', 401)
     }
 
-    const storageConfig = await readStorageConfig(withRLS)
+    // Resolves the active provider + credentials from process.env. Sync, no DB.
+    const storageConfig = readStorageConfig()
 
     const formData = await request.formData()
     const file = formData.get('file') as File | null

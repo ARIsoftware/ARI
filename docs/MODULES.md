@@ -1941,6 +1941,15 @@ See these files for complete examples:
 - `/modules-core/tasks/hooks/use-tasks.ts` - Full CRUD with optimistic updates
 - `/modules-core/module-template/app/page.tsx` - Page using TanStack Query hooks
 
+### File storage in modules
+
+File storage is configured entirely via env vars in `.env.local`:
+
+- `ARI_STORAGE_PROVIDER` selects the backend (`filesystem` default, or `s3` / `r2` / `supabase-s3`).
+- Provider credentials live in `ARI_S3_*`, `ARI_R2_*`, or `ARI_SUPABASE_S3_*`.
+
+Modules should never read or write storage credentials. To get a provider, call `getStorageProvider(readStorageConfig())` from `@/lib/storage` — the same code works against every backend. If a module legitimately needs provider-aware behavior (e.g. an S3-only feature), check `process.env.ARI_STORAGE_PROVIDER` directly. The Settings → Storage tab is documentation-only.
+
 ---
 
 ## 10. Module Utility Functions

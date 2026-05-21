@@ -226,9 +226,10 @@ END $$;
 - Delete: `DELETE /api/storage/delete` (JSON body with `bucket` and `filename`)
 - Files stored at `data/storage/{user_id}/{bucket}/` on local filesystem
 - All endpoints require authentication — no public file URLs
-- Storage provider abstraction in `/lib/storage/` (currently local filesystem, extensible)
-- Storage provider configured in database (module_settings table, moduleId: "storage")
-- Configure in Settings > Integrations > File Storage
+- Storage provider abstraction in `/lib/storage/` (local filesystem, S3, R2, Supabase Storage S3)
+- Storage provider configured via env vars (`ARI_STORAGE_PROVIDER` + `ARI_S3_*` / `ARI_R2_*` / `ARI_SUPABASE_S3_*`). Defaults to `filesystem` when unset.
+- Settings → Storage tab is documentation-only; it shows the active provider and the env-var names. There is no DB-backed config and no save button.
+- Modules can read `process.env.ARI_STORAGE_PROVIDER` directly for provider-aware logic; otherwise `getStorageProvider(readStorageConfig())` returns the right backend automatically.
 
 #### Task Priority Radar System
 - Interactive radar chart visualization showing task priorities

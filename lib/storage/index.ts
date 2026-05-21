@@ -8,7 +8,7 @@ import type { StorageConfig } from './config'
 export * from './types'
 export { sanitizeFilename, sanitizeBucketName, validateStoredFilename } from './sanitize'
 export { getMimeTypeForExtension } from './local'
-export { readStorageConfig, writeStorageConfig } from './config'
+export { readStorageConfig, ENV_MAP, PROVIDER_LABELS } from './config'
 export type { StorageConfig } from './config'
 
 let _filesystemProvider: StorageProvider | null = null
@@ -24,11 +24,6 @@ function s3CacheKey(config: StorageConfig): string {
   const keys = Object.keys(config).sort() as (keyof StorageConfig)[]
   const serialized = keys.map(k => `${k}=${config[k] ?? ''}`).join('|')
   return createHash('sha256').update(serialized).digest('hex')
-}
-
-/** Clear cached provider instances (call when config changes) */
-export function clearProviderCache(): void {
-  _s3Provider = null
 }
 
 export function getStorageProvider(config: StorageConfig | string = 'filesystem'): StorageProvider {
@@ -52,7 +47,7 @@ export function getStorageProvider(config: StorageConfig | string = 'filesystem'
 
   if (providerType === 's3') {
     if (!config.s3AccessKeyId || !config.s3SecretAccessKey || !config.s3Bucket) {
-      throw new Error('AWS S3 storage requires Access Key ID, Secret Access Key, and Bucket Name. Configure in Settings > Storage.')
+      throw new Error('AWS S3 storage requires Access Key ID, Secret Access Key, and Bucket Name. Set ARI_S3_ACCESS_KEY_ID, ARI_S3_SECRET_ACCESS_KEY, and ARI_S3_BUCKET in .env.local.')
     }
     s3Config = {
       accessKeyId: config.s3AccessKeyId,
@@ -63,7 +58,7 @@ export function getStorageProvider(config: StorageConfig | string = 'filesystem'
     }
   } else if (providerType === 'r2') {
     if (!config.r2AccessKeyId || !config.r2SecretAccessKey || !config.r2Bucket || !config.r2AccountId) {
-      throw new Error('Cloudflare R2 storage requires Account ID, Access Key ID, Secret Access Key, and Bucket Name. Configure in Settings > Storage.')
+      throw new Error('Cloudflare R2 storage requires Account ID, Access Key ID, Secret Access Key, and Bucket Name. Set ARI_R2_ACCOUNT_ID, ARI_R2_ACCESS_KEY_ID, ARI_R2_SECRET_ACCESS_KEY, and ARI_R2_BUCKET in .env.local.')
     }
     s3Config = {
       accessKeyId: config.r2AccessKeyId,
@@ -74,7 +69,7 @@ export function getStorageProvider(config: StorageConfig | string = 'filesystem'
     }
   } else if (providerType === 'supabase-s3') {
     if (!config.supabaseS3AccessKeyId || !config.supabaseS3SecretAccessKey || !config.supabaseS3Bucket || !config.supabaseS3Endpoint) {
-      throw new Error('Supabase Storage (S3) requires S3 Endpoint, Access Key ID, Secret Access Key, and Bucket Name. Configure in Settings > Storage.')
+      throw new Error('Supabase Storage (S3) requires S3 Endpoint, Access Key ID, Secret Access Key, and Bucket Name. Set ARI_SUPABASE_S3_ENDPOINT, ARI_SUPABASE_S3_ACCESS_KEY_ID, ARI_SUPABASE_S3_SECRET_ACCESS_KEY, and ARI_SUPABASE_S3_BUCKET in .env.local.')
     }
     s3Config = {
       accessKeyId: config.supabaseS3AccessKeyId,

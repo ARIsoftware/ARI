@@ -13,7 +13,7 @@ export async function GET(
       return createErrorResponse('Unauthorized - Valid authentication required', 401)
     }
 
-    const storageConfig = await readStorageConfig(withRLS)
+    const storageConfig = readStorageConfig()
 
     const { path: pathSegments } = await params
 
