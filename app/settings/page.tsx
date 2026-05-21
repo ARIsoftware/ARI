@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { Suspense, useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { AppSidebar } from "@/components/app-sidebar"
 import { TaskAnnouncement } from "@/components/task-announcement"
 import { authClient } from "@/lib/auth-client"
@@ -41,10 +42,45 @@ import {
   type DbMode,
 } from "./types"
 
-export default function SettingsPage(): React.ReactElement {
+const SETTINGS_TABS = [
+  "general",
+  "themes",
+  "keybindings",
+  "notifications",
+  "integrations",
+  "security",
+  "storage",
+  "api",
+  "git",
+  "backups",
+] as const
+type SettingsTab = (typeof SETTINGS_TABS)[number]
+const DEFAULT_TAB: SettingsTab = "general"
+
+function isSettingsTab(value: string | null): value is SettingsTab {
+  return value !== null && (SETTINGS_TABS as readonly string[]).includes(value)
+}
+
+function SettingsPageContent(): React.ReactElement {
   // Get session from context (avoids redundant API call)
   const { session } = useAuth()
   const { toast } = useToast()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get("tab")
+  const activeTab: SettingsTab = isSettingsTab(tabParam) ? tabParam : DEFAULT_TAB
+
+  function handleTabChange(value: string): void {
+    const next = isSettingsTab(value) ? value : DEFAULT_TAB
+    const params = new URLSearchParams(searchParams.toString())
+    if (next === DEFAULT_TAB) {
+      params.delete("tab")
+    } else {
+      params.set("tab", next)
+    }
+    const query = params.toString()
+    router.replace(query ? `/settings?${query}` : "/settings", { scroll: false })
+  }
 
   // General tab state
   const [themePreference, setThemePreference] = useState("system")
@@ -427,7 +463,7 @@ export default function SettingsPage(): React.ReactElement {
                 </p>
               </div>
 
-              <Tabs defaultValue="general" className="w-full">
+              <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
                 <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
                   <TabsList>
                     <TabsTrigger value="general">General</TabsTrigger>
@@ -442,11 +478,11 @@ export default function SettingsPage(): React.ReactElement {
                     <TabsTrigger value="backups">Backups</TabsTrigger>
                   </TabsList>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => window.location.href = "/welcome"}>
-                      Rerun Setup
+                    <Button variant="outline" size="sm" className="w-[125px]" onClick={() => window.location.href = "/health"}>
+                      Health Check
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => window.location.href = "/debug"}>
-                      Debug
+                    <Button variant="outline" size="sm" className="w-[125px]" onClick={() => window.location.href = "/welcome"}>
+                      Rerun Setup
                     </Button>
                   </div>
                 </div>
@@ -540,5 +576,13 @@ export default function SettingsPage(): React.ReactElement {
         </SidebarInset>
       </SidebarProvider>
     </div>
+  )
+}
+
+export default function SettingsPage(): React.ReactElement {
+  return (
+    <Suspense fallback={null}>
+      <SettingsPageContent />
+    </Suspense>
   )
 }
