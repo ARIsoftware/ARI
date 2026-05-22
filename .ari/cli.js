@@ -133,29 +133,29 @@ function pgwebExecutable() {
   return commandExists('pgweb') ? 'pgweb' : null;
 }
 
-function startPgweb() {
+function startPgweb(log = console.log) {
   const pgwebExe = pgwebExecutable();
   if (!pgwebExe) {
-    console.log('  ' + DIM + 'pgweb not installed — skip database UI' + RESET);
+    log('  ' + DIM + 'pgweb not installed — skip database UI' + RESET);
     if (process.platform === 'darwin') {
-      console.log('  ' + DIM + 'Install with: brew install pgweb' + RESET);
+      log('  ' + DIM + 'Install with: brew install pgweb' + RESET);
     } else if (process.platform === 'win32') {
-      console.log('  ' + DIM + 'Re-run the ARI installer to download pgweb.' + RESET);
+      log('  ' + DIM + 'Re-run the ARI installer to download pgweb.' + RESET);
     } else {
-      console.log('  ' + DIM + 'Install pgweb from https://github.com/sosedoff/pgweb' + RESET);
+      log('  ' + DIM + 'Install pgweb from https://github.com/sosedoff/pgweb' + RESET);
     }
-    return;
+    return false;
   }
 
   if (isPgwebRunning()) {
-    console.log('  ' + GREEN + '✔' + RESET + ' pgweb is already running ' + DIM + `http://localhost:${PGWEB_PORT}` + RESET);
-    return;
+    log('  ' + GREEN + '✔' + RESET + ' Database UI is already running ' + DIM + `http://localhost:${PGWEB_PORT}` + RESET);
+    return true;
   }
 
   const dbUrl = getDatabaseUrl();
   if (!dbUrl) {
-    console.log('  ' + YELLOW + '⚠' + RESET + ' No DATABASE_URL found — skipping pgweb');
-    return;
+    log('  ' + YELLOW + '⚠' + RESET + ' No DATABASE_URL found — skipping pgweb');
+    return false;
   }
 
   const child = spawn(pgwebExe, [
@@ -172,16 +172,17 @@ function startPgweb() {
   child.unref();
   fs.mkdirSync(path.dirname(PGWEB_PID_FILE), { recursive: true });
   fs.writeFileSync(PGWEB_PID_FILE, String(child.pid));
-  console.log('  ' + GREEN + '✔' + RESET + ' pgweb started ' + DIM + `http://localhost:${PGWEB_PORT}` + RESET);
+  log('  ' + GREEN + '✔' + RESET + ' Database UI started ' + DIM + `http://localhost:${PGWEB_PORT}` + RESET);
+  return true;
 }
 
-function stopPgweb() {
+function stopPgweb(log = console.log) {
   if (!isPgwebRunning()) return false;
   const pid = fs.readFileSync(PGWEB_PID_FILE, 'utf8').trim();
   try {
     process.kill(Number(pid), 'SIGTERM');
     try { fs.unlinkSync(PGWEB_PID_FILE); } catch {}
-    console.log('  ' + GREEN + '✔' + RESET + ' pgweb stopped');
+    log('  ' + GREEN + '✔' + RESET + ' Database UI stopped');
     return true;
   } catch {
     try { fs.unlinkSync(PGWEB_PID_FILE); } catch {}
@@ -277,6 +278,7 @@ function start(opts = {}) {
   const quiet = !!opts.quiet;
   const lan = !!opts.lan;
   const log = (...args) => { if (!quiet) console.log(...args); };
+  let pgwebRunning = false;
 
   // Make sure ARI-bundled binaries (supabase.exe, pgweb.exe) are reachable
   // regardless of mode. Postgres path is mode-specific and stays inline below.
@@ -379,7 +381,7 @@ function start(opts = {}) {
     }
     if (pgReady) {
       log('  ' + GREEN + '✔' + RESET + ' PostgreSQL is running');
-      if (!quiet) startPgweb();
+      pgwebRunning = startPgweb(log);
     } else {
       log('  ' + YELLOW + '⚠' + RESET + ' PostgreSQL is not running.');
       if (process.platform === 'darwin') {
@@ -478,6 +480,9 @@ function start(opts = {}) {
               process.stdout.write(DIM + '- Network:       ' + RESET + networkUrl + '\n');
             }
           }
+          if (pgwebRunning) {
+            process.stdout.write(DIM + '- Database UI:   ' + RESET + `http://localhost:${PGWEB_PORT}` + '\n');
+          }
           if (updateAvailable) {
             const line = '  ↑ ARI update available  ' + DIM + UPDATE_DOCS_URL + RESET + '\n';
             process.stdout.write(quiet ? line : '\n' + line + '\n');
@@ -496,7 +501,7 @@ function start(opts = {}) {
   const cleanup = () => {
     stopSpinner();
     child.kill();
-    if (mode === 'postgres') stopPgweb();
+    if (mode === 'postgres') stopPgweb(log);
     if (!quiet) {
       if (mode === 'supabaselocal') {
         console.log('\n  ' + DIM + 'Next.js stopped. Supabase containers are still running.' + RESET);
