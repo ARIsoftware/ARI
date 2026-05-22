@@ -272,6 +272,10 @@ These are the ONLY places where code/configuration must exist outside the module
     "icon": "Zap",
     "route": "/my-module",
     "tooltip": "Quick Access"
+  },
+  "npmDependencies": {
+    "lodash": "^4.17.21",
+    "three": "^0.184.0"
   }
 }
 ```
@@ -287,6 +291,40 @@ These are the ONLY places where code/configuration must exist outside the module
 | `dashboard` | `object` | Dashboard widget configuration |
 | `settings` | `object` | Settings panel configuration |
 | `topBarIcon` | `object` | Top bar icon shortcut configuration |
+| `npmDependencies` | `object` | npm packages the module imports at runtime. Auto-installed during marketplace install. See [npm Dependencies](#npm-dependencies) below. |
+
+### npm Dependencies
+
+Modules declare their runtime npm imports under `npmDependencies` in `module.json`. The shape is the same as `package.json` `dependencies` — a flat map of `"package-name": "version-range"`. When a user installs the module from the marketplace, these packages are added to the host project automatically.
+
+```json
+{
+  "npmDependencies": {
+    "@react-three/fiber": "^9.6.1",
+    "@react-three/drei": "^10.7.7",
+    "three": "^0.184.0"
+  }
+}
+```
+
+**Install behavior:**
+
+- **Local dev**: the install API spawns `pnpm add <pkg>@<ver> ...` against the project root. Progress streams to the /modules UI as NDJSON. After the install, files in the new module that import any of the new packages get their mtimes bumped to nudge Turbopack's resolution cache; the success modal offers an "Open module" button that navigates to the module's first route (forcing a fresh route compile). If Turbopack's cache still surfaces the old "Module not found" error, restart the dev server.
+- **Vercel**: the filesystem is read-only outside `/tmp`, so we cannot run `pnpm add` server-side. Instead, the route merges the new dependencies into the user's `package.json` in memory and includes the modified file in the same GitHub commit as the module sources (via `lib/modules/github-sync.ts`'s `extraFiles` parameter). The next Vercel deploy's `pnpm install` picks them up. This requires `GITHUB_TOKEN` to be configured — the existing UI guard at `/modules` already blocks installs on Vercel without GitHub.
+
+**Conflict policy:**
+
+If a declared dependency conflicts with an incompatible version already in root `package.json` (e.g. the module wants `react@^18` but your project has `react@^19`), **the install aborts before any side effect**. No silent upgrades to framework dependencies from inside a module install. The UI surfaces the conflict with the package name, declared range, and existing version. Resolve manually, then re-install.
+
+**Validation:**
+
+- **Install time**: package names are checked against the npm spec regex; version specifiers containing `git:`, `http:`, `file:`, `link:`, `workspace:`, `npm:`, or `..` are rejected. Cap of 25 entries per module.
+- **Build time**: `scripts/generate-module-registry.js` (runs on `predev` and `prebuild`) cross-references each module's declared `npmDependencies` against root `package.json` and warns on mismatches. Warnings only — the build still succeeds, so a dev server stays up while the user re-installs via /modules.
+
+**Unsupported (v1):**
+
+- `devDependencies` / `peerDependencies` — not modeled. Modules ship type imports for compile-time use only, so the host project's existing `@types/*` install is responsible.
+- Non-semver specifiers (git URLs, local paths) — rejected for safety. Modules should pin to published npm packages.
 
 ### Route Configuration
 

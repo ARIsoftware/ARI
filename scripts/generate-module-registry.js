@@ -14,6 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { satisfies, rangeAnchor } = require('./lib/semver-range');
 
 /**
  * Compute the SHA-256 hash of a module's database/schema.sql, hex-encoded.
@@ -37,6 +38,68 @@ function computeSchemaHash(modulePath) {
 
 // Module directories in priority order (first = highest priority)
 const MODULE_DIRECTORIES = ['modules-custom', 'modules-core'];
+
+/**
+ * Memoized root package.json reader. Used by validateNpmDeps to check each
+ * module's declared npmDependencies against what's actually installed.
+ */
+let _rootPkgJsonCache = null;
+function getRootPackageJson() {
+  if (_rootPkgJsonCache !== null) return _rootPkgJsonCache;
+  try {
+    _rootPkgJsonCache = JSON.parse(
+      fs.readFileSync(path.join(process.cwd(), 'package.json'), 'utf-8')
+    );
+  } catch {
+    _rootPkgJsonCache = {};
+  }
+  return _rootPkgJsonCache;
+}
+
+/**
+ * Warn (but never fail the build) when a module's declared npmDependencies
+ * are missing from or conflict with the root package.json. Catches drift
+ * between marketplace zips and the host project before the user hits a
+ * cryptic Turbopack "Module not found" at runtime.
+ *
+ * Local-dev rationale: warning instead of failing keeps `pnpm dev` alive so
+ * the user can fix it from the /modules UI. Vercel's `next build` will
+ * naturally fail on unresolved imports, which is the right hard signal there.
+ */
+function validateNpmDeps(manifest, source) {
+  const deps = manifest.npmDependencies;
+  if (!deps || typeof deps !== 'object' || Object.keys(deps).length === 0) return;
+  const rootPkg = getRootPackageJson();
+  const rootDeps = rootPkg.dependencies || {};
+
+  const missing = [];
+  const conflicts = [];
+
+  for (const [name, declared] of Object.entries(deps)) {
+    const existing = rootDeps[name];
+    if (!existing) {
+      missing.push(`${name}@${declared}`);
+      continue;
+    }
+    const anchor = rangeAnchor(existing);
+    if (!anchor) continue; // unable to compare; assume satisfied
+    const result = satisfies(anchor, declared);
+    if (result === false) {
+      conflicts.push(`${name}: needs ${declared}, root has ${existing}`);
+    }
+  }
+
+  if (missing.length > 0) {
+    console.warn(
+      `⚠️  ${source}: missing npm deps in root package.json: ${missing.join(', ')}. Re-install via /modules to fix.`
+    );
+  }
+  if (conflicts.length > 0) {
+    console.warn(
+      `⚠️  ${source}: npm dep version conflict — ${conflicts.join('; ')}.`
+    );
+  }
+}
 const OUTPUT_FILE = path.join(process.cwd(), 'lib/generated/module-pages-registry.ts');
 const SUBMENU_OUTPUT_FILE = path.join(process.cwd(), 'lib/generated/module-submenu-registry.ts');
 const API_REGISTRY_FILE = path.join(process.cwd(), 'lib/generated/module-api-registry.ts');
@@ -124,6 +187,8 @@ function scanModulesDirectory(dirName) {
       console.warn(`⚠️  Skipping ${dirName}/${moduleFolder}: Invalid module.json`);
       continue;
     }
+
+    validateNpmDeps(manifest, `${dirName}/${moduleFolder}`);
 
     // Scan for pages if app directory exists
     let subRoutes = [];

@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { AppSidebar } from "@/components/app-sidebar"
 import { TaskAnnouncement } from "@/components/task-announcement"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
@@ -100,6 +101,47 @@ interface LibraryModule {
   latest_version: string
   download_enabled: boolean
   locked: boolean
+  /**
+   * Optional. Set by the marketplace upstream when a module declares
+   * npmDependencies in its module.json. When present and non-empty, the
+   * install flow shows a confirmation dialog listing the packages before
+   * pnpm runs. Absent on older marketplace responses — install proceeds
+   * without a dialog in that case (graceful degrade).
+   */
+  npm_dependencies?: Record<string, string>
+}
+
+type StageKey = 'extract' | 'npm' | 'github' | 'schema'
+type StageStatus = 'pending' | 'running' | 'done' | 'skipped' | 'error'
+
+type InstallProgress = {
+  moduleId: string
+  moduleName: string
+  stages: {
+    extract: { status: StageStatus }
+    npm: {
+      status: StageStatus
+      packages?: string[]
+      detail?: string
+      installed?: string[]
+      error?: string
+      conflict?: { name: string; declared: string; existing: string }
+    }
+    github: { status: StageStatus; commitSha?: string; filesCommitted?: number; error?: string }
+    schema: { status: StageStatus; alreadyExisted?: boolean; error?: string }
+  }
+  log: string[]      // recent stderr/spawn lines from the installer
+  fatalError?: string
+  finished?: boolean
+  vercel?: boolean
+  firstRoute?: string
+}
+
+const STAGE_LABELS: Record<StageKey, string> = {
+  extract: 'Extracting module files',
+  npm: 'Installing dependencies',
+  github: 'Saving to GitHub',
+  schema: 'Setting up database',
 }
 
 type ApiErrorPayload = { code?: string; message?: string } | string | undefined
@@ -200,7 +242,19 @@ export default function ModulesPage() {
       status: SchemaStatus
       error?: string
     }
+    npmInstall?: {
+      installed: string[]
+      alreadySatisfied?: string[]
+    }
+    firstRoute?: string
   } | null>(null)
+  const router = useRouter()
+  // Pre-install confirmation dialog state. When non-null, an AlertDialog
+  // listing the module's declared npm packages is shown. Confirming kicks
+  // off runInstall(); cancelling clears.
+  const [pendingInstall, setPendingInstall] = useState<UnifiedModule | null>(null)
+  const [installProgress, setInstallProgress] = useState<InstallProgress | null>(null)
+  const installAbortRef = useRef<AbortController | null>(null)
   const [githubSyncEnabled, setGithubSyncEnabled] = useState(true)
   const [githubConfigured, setGithubConfigured] = useState<boolean | null>(null)
   const [githubConfig, setGithubConfig] = useState<{ owner?: string; repo?: string; branch?: string } | null>(null)
@@ -511,18 +565,133 @@ export default function ModulesPage() {
     }
   }
 
+  /**
+   * Entry point for installing a downloadable module. Performs pre-flight
+   * checks (Vercel+GitHub guard, license), then either:
+   *   - opens the npm-dependency confirmation dialog (if the module declares
+   *     non-empty npm_dependencies in the library response), OR
+   *   - calls runInstall directly (for dep-less modules, or marketplace
+   *     responses that haven't yet been extended with the npm field).
+   */
   const downloadModule = async (mod: UnifiedModule) => {
     if (!mod.libraryModule) return
 
-    // On Vercel without GitHub configured, show warning instead of proceeding
     if (isVercel && githubConfigured === false) {
       setShowVercelGithubWarning(true)
       return
     }
 
+    const declaredDeps = mod.libraryModule.npm_dependencies
+    if (declaredDeps && Object.keys(declaredDeps).length > 0) {
+      setPendingInstall(mod)
+      return
+    }
+
+    await runInstall(mod)
+  }
+
+  /**
+   * Stream the install over NDJSON. The route emits one JSON object per line
+   * across five stages: extract, npm, github, schema, finalize. We update
+   * per-stage state as events arrive and roll the final state into
+   * `installSuccess` so the existing success modal renders without changes.
+   */
+  const runInstall = async (mod: UnifiedModule) => {
+    if (!mod.libraryModule) return
+
     setDownloading(mod.id)
     setDownloadResult(null)
     setPageError(null)
+
+    const initialProgress: InstallProgress = {
+      moduleId: mod.id,
+      moduleName: sanitizeDisplayName(mod.name),
+      stages: {
+        extract: { status: 'pending' },
+        npm: { status: 'pending' },
+        github: { status: 'pending' },
+        schema: { status: 'pending' },
+      },
+      log: [],
+    }
+    setInstallProgress(initialProgress)
+
+    // Capture start time so we can hold the progress overlay open for a
+    // minimum duration when the install is faster than the human eye.
+    // Without this, all-deps-already-satisfied installs flash by in <200ms.
+    const installStartedAt = Date.now()
+    const MIN_OVERLAY_MS = 1500
+
+    const controller = new AbortController()
+    installAbortRef.current = controller
+
+    // Local mutable copy mirroring state. Avoids the "stale state in async
+    // loop" trap — every NDJSON event reads/writes this object, then we sync
+    // it into React state.
+    const progress: InstallProgress = JSON.parse(JSON.stringify(initialProgress))
+    const syncProgress = () => setInstallProgress({ ...progress, stages: { ...progress.stages }, log: [...progress.log] })
+
+    const finalize = async (event: any) => {
+      progress.finished = true
+      progress.vercel = !!event.vercel
+      progress.firstRoute = event.firstRoute
+      // Push the finished state to the overlay so the spinner becomes a
+      // checkmark and the header swaps to "Module Installed" *before* we
+      // hold for the minimum display duration below.
+      syncProgress()
+      // Roll the streamed state into the existing installSuccess shape so
+      // the existing success modal (with GitHub sync flow, etc.) keeps working.
+      const schemaState = progress.stages.schema
+      const githubState = progress.stages.github
+      const successPayload = {
+        moduleId: mod.id,
+        moduleName: sanitizeDisplayName(mod.name),
+        moduleDir: event.moduleDir || `modules-core/${mod.id}`,
+        vercel: !!event.vercel,
+        githubSync:
+          githubState.status === 'done'
+            ? {
+                success: true,
+                commitSha: githubState.commitSha,
+                message: `Module committed to GitHub${githubState.filesCommitted ? ` (${githubState.filesCommitted} files)` : ''}.`,
+              }
+            : githubState.status === 'error'
+              ? { success: false, error: githubState.error || 'Failed to commit module to GitHub.' }
+              : null,
+        schemaInstallResult: {
+          status: (
+            schemaState.status === 'done'
+              ? (schemaState.alreadyExisted ? 'skipped' : 'success')
+              : schemaState.status === 'error'
+                ? 'failed'
+                : 'none'
+          ) as SchemaStatus,
+          error: schemaState.error,
+        },
+        npmInstall:
+          progress.stages.npm.status === 'done' || progress.stages.npm.status === 'skipped'
+            ? {
+                installed: progress.stages.npm.installed ?? [],
+              }
+            : undefined,
+        firstRoute: event.firstRoute,
+      }
+
+      // Hold the progress overlay visible for at least MIN_OVERLAY_MS total.
+      // Fast installs (deps already satisfied) would otherwise blip past
+      // before the user can read the stages.
+      const elapsed = Date.now() - installStartedAt
+      const remaining = MIN_OVERLAY_MS - elapsed
+      if (remaining > 0) {
+        await new Promise((r) => setTimeout(r, remaining))
+      }
+
+      setInstallSuccess(successPayload)
+      setSyncResult(null)
+      if (event.vercel) setGithubSyncEnabled(true)
+      sessionStorage.removeItem(LIBRARY_CACHE_KEY)
+      await Promise.all([loadInstalledModules(), loadLibrary(false)])
+    }
 
     try {
       const response = await fetch('/api/modules/download', {
@@ -532,59 +701,136 @@ export default function ModulesPage() {
           module: mod.libraryModule.name,
           version: mod.libraryModule.latest_version,
         }),
+        signal: controller.signal,
       })
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        const { code, message } = parseApiError(data.error, 'Download failed')
+      // Pre-stream errors come back as JSON, not NDJSON. The route uses
+      // proper HTTP status codes for auth/validation/upstream failures.
+      const contentType = response.headers.get('content-type') || ''
+      if (!response.ok || !contentType.includes('application/x-ndjson')) {
+        const data = await response.json().catch(() => ({} as any))
+        const { code, message } = parseApiError(data?.error, 'Download failed')
         if (code && PAGE_ERROR_CODES.has(code)) {
           setPageError({ code, message: getErrorCopy(code, message) })
         } else {
           setDownloadResult({ module: mod.id, type: 'error', message })
         }
+        setInstallProgress(null)
         return
       }
 
-      // Clear download banner — the success modal replaces it
-      setDownloadResult(null)
-
-      const schema = (data.schemaInstall ?? null) as SchemaInstallResult | null
-
-      setInstallSuccess({
-        moduleId: mod.id,
-        moduleName: sanitizeDisplayName(mod.name),
-        moduleDir: data.moduleDir || `modules-core/${mod.id}`,
-        vercel: data.vercel,
-        githubSync: data.githubSync || null,
-        schemaInstallResult: {
-          status: decodeSchemaStatus(schema),
-          error: schema && !schema.ok ? schema.error : undefined,
-        },
-      })
-      setSyncResult(null)
-
-      // On Vercel, GitHub sync is required to persist the module
-      if (data.vercel) {
-        setGithubSyncEnabled(true)
+      if (!response.body) {
+        setDownloadResult({ module: mod.id, type: 'error', message: 'Empty response from install route' })
+        setInstallProgress(null)
+        return
       }
 
-      // Re-fetch both APIs to reflect the newly installed module
-      sessionStorage.removeItem(LIBRARY_CACHE_KEY)
-      await Promise.all([loadInstalledModules(), loadLibrary(false)])
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        let newlineIdx
+        while ((newlineIdx = buffer.indexOf('\n')) !== -1) {
+          const line = buffer.slice(0, newlineIdx).trim()
+          buffer = buffer.slice(newlineIdx + 1)
+          if (!line) continue
+          let event: any
+          try {
+            event = JSON.parse(line)
+          } catch {
+            console.warn('[install] Could not parse NDJSON line:', line)
+            continue
+          }
+
+          // Translate the stream event into our progress shape.
+          if (event.stage === 'extract') {
+            progress.stages.extract.status = event.status === 'done' ? 'done' : 'running'
+          } else if (event.stage === 'npm') {
+            const s = progress.stages.npm
+            if (event.status === 'start') {
+              s.status = 'running'
+              s.packages = event.packages ?? []
+            } else if (event.status === 'progress') {
+              s.status = 'running'
+              if (event.detail) {
+                progress.log.push(event.detail)
+                if (progress.log.length > 8) progress.log.shift()
+              }
+            } else if (event.status === 'done') {
+              s.status = 'done'
+              s.installed = event.packages ?? s.installed
+              s.detail = event.detail
+            } else if (event.status === 'skipped') {
+              s.status = 'skipped'
+              s.detail = event.detail
+            } else if (event.status === 'error') {
+              s.status = 'error'
+              s.error = event.error
+              s.conflict = event.conflict
+            }
+          } else if (event.stage === 'github') {
+            const s = progress.stages.github
+            if (event.status === 'start') s.status = 'running'
+            else if (event.status === 'done') {
+              s.status = 'done'
+              s.commitSha = event.commitSha
+              s.filesCommitted = event.filesCommitted
+            } else if (event.status === 'skipped') s.status = 'skipped'
+            else if (event.status === 'error') {
+              s.status = 'error'
+              s.error = event.error
+            }
+          } else if (event.stage === 'schema') {
+            const s = progress.stages.schema
+            if (event.status === 'start') s.status = 'running'
+            else if (event.status === 'done') {
+              s.status = 'done'
+              s.alreadyExisted = event.alreadyExisted
+            } else if (event.status === 'skipped') s.status = 'skipped'
+            else if (event.status === 'error') {
+              s.status = 'error'
+              s.error = event.error
+            }
+          } else if (event.stage === 'finalize') {
+            await finalize(event)
+          } else if (event.stage === 'fatal') {
+            progress.fatalError = event.error
+            progress.finished = true
+          }
+
+          syncProgress()
+        }
+      }
     } catch (error) {
+      if ((error as any)?.name === 'AbortError') {
+        // User aborted; quietly clear UI.
+        setInstallProgress(null)
+        return
+      }
       console.error('Error downloading module:', error)
       setDownloadResult({ module: mod.id, type: 'error', message: 'Failed to download module' })
+      setInstallProgress(null)
     } finally {
       setDownloading(null)
+      installAbortRef.current = null
     }
   }
 
-  const handleInstallDone = async () => {
+  const abortInstall = () => {
+    installAbortRef.current?.abort()
+  }
+
+  const handleInstallDone = async (opts?: { openRoute?: string }) => {
     // If already synced server-side (Vercel auto-sync), skip client-side github-sync call
     if (installSuccess?.githubSync?.success) {
       try { await fetch('/api/modules/refresh', { method: 'POST' }) } catch (err) { console.warn('Failed to refresh module registry:', err) }
       setInstallSuccess(null)
+      setInstallProgress(null)
+      if (opts?.openRoute) router.push(opts.openRoute)
       return
     }
 
@@ -625,6 +871,8 @@ export default function ModulesPage() {
     } catch (err) { console.warn('Failed to refresh module registry:', err) }
 
     setInstallSuccess(null)
+    setInstallProgress(null)
+    if (opts?.openRoute) router.push(opts.openRoute)
   }
 
   const renderModuleAction = (mod: UnifiedModule) => {
@@ -1055,6 +1303,28 @@ export default function ModulesPage() {
 
                 {/* Status card */}
                 <div className="w-full rounded-lg border p-4 space-y-3 mb-8">
+                  {/* npm install row — only when the module declared deps */}
+                  {installSuccess?.npmInstall && (installSuccess.npmInstall.installed.length > 0 || installSuccess.npmInstall.alreadySatisfied?.length) ? (
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                      <div className="text-left">
+                        <div className="flex items-center gap-2">
+                          <Package className="h-4 w-4" />
+                          <span className="text-sm font-medium">
+                            {installSuccess.npmInstall.installed.length > 0
+                              ? `Installed ${installSuccess.npmInstall.installed.length} npm package${installSuccess.npmInstall.installed.length === 1 ? '' : 's'}`
+                              : 'Dependencies already satisfied'}
+                          </span>
+                        </div>
+                        {installSuccess.npmInstall.installed.length > 0 && (
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                            {installSuccess.npmInstall.installed.join(', ')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+
                   {/* GitHub Sync Section — three states */}
                   {installSuccess?.githubSync?.success === true ? (
                     <div className="flex items-center gap-3">
@@ -1201,6 +1471,7 @@ export default function ModulesPage() {
                     onClick={() => {
                       const moduleId = installSuccess?.moduleId
                       setInstallSuccess(null)
+                      setInstallProgress(null)
                       const mod = moduleId ? unifiedModules.find(m => m.id === moduleId) : null
                       if (mod) downloadModule(mod)
                     }}
@@ -1208,19 +1479,188 @@ export default function ModulesPage() {
                     Retry Install
                   </Button>
                 ) : (
-                  <Button
-                    className="w-full bg-foreground text-background hover:bg-foreground/90"
-                    onClick={handleInstallDone}
-                    disabled={syncing}
-                  >
-                    {syncing ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Syncing to GitHub...
-                      </>
-                    ) : (
-                      'Close Window'
+                  <div className="w-full flex gap-2">
+                    {installSuccess?.firstRoute && (
+                      <Button
+                        className="flex-1 bg-[#148962] hover:bg-[#117a56] text-white"
+                        onClick={() => handleInstallDone({ openRoute: installSuccess.firstRoute })}
+                        disabled={syncing}
+                      >
+                        Open module
+                      </Button>
                     )}
+                    <Button
+                      className={`${installSuccess?.firstRoute ? 'flex-1' : 'w-full'} bg-foreground text-background hover:bg-foreground/90`}
+                      onClick={() => handleInstallDone()}
+                      disabled={syncing}
+                    >
+                      {syncing ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Syncing to GitHub...
+                        </>
+                      ) : (
+                        'Close Window'
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* npm Dependency Confirmation */}
+          <AlertDialog
+            open={!!pendingInstall}
+            onOpenChange={(open) => { if (!open) setPendingInstall(null) }}
+          >
+            <AlertDialogContent className="max-w-md">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Install Module</AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-3">
+                    <p>
+                      <span className="font-medium text-foreground">{pendingInstall ? sanitizeDisplayName(pendingInstall.name) : ''}</span>{' '}
+                      will add the following npm packages to your project:
+                    </p>
+                    <div className="rounded-md bg-muted p-3 space-y-1 text-xs font-mono">
+                      {pendingInstall?.libraryModule?.npm_dependencies && Object.entries(pendingInstall.libraryModule.npm_dependencies).map(([name, version]) => (
+                        <p key={name}>{name}@{version}</p>
+                      ))}
+                    </div>
+                    {isVercel ? (
+                      <p className="text-xs text-muted-foreground">
+                        On Vercel, these packages will be added to your repository&apos;s <code className="px-1 py-0.5 bg-muted rounded">package.json</code> via the same GitHub commit as the module files. Vercel will auto-deploy.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Packages are installed with <code className="px-1 py-0.5 bg-muted rounded">pnpm add</code>. If any conflict with versions already in your project, the install will abort safely before changing anything.
+                      </p>
+                    )}
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-[#148962] hover:bg-[#117a56] text-white"
+                  onClick={() => {
+                    const mod = pendingInstall
+                    setPendingInstall(null)
+                    if (mod) void runInstall(mod)
+                  }}
+                >
+                  Install
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Live Install Progress (visible while running OR after a fatal error) */}
+          {installProgress && !installSuccess && (
+            <div className="fixed inset-0 z-50 bg-background flex items-center justify-center">
+              <div className="flex flex-col items-center text-center w-full max-w-md px-6">
+                {installProgress.fatalError ? (
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30 ring-4 ring-red-200/50 dark:ring-red-800/30 shadow-lg mb-6">
+                    <AlertCircle className="h-10 w-10 text-red-600" />
+                  </div>
+                ) : installProgress.finished ? (
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30 ring-4 ring-green-200/50 dark:ring-green-800/30 shadow-lg mb-6">
+                    <CheckCircle2 className="h-10 w-10 text-green-600" />
+                  </div>
+                ) : (
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30 ring-4 ring-blue-200/50 dark:ring-blue-800/30 shadow-lg mb-6">
+                    <Loader2 className="h-10 w-10 text-blue-600 animate-spin" />
+                  </div>
+                )}
+
+                <h1 className="text-2xl font-bold tracking-tight mb-2">
+                  {installProgress.fatalError
+                    ? 'Install Failed'
+                    : installProgress.finished
+                      ? 'Module Installed'
+                      : 'Installing Module'}
+                </h1>
+                <p className="text-muted-foreground mb-6">{installProgress.moduleName}</p>
+
+                <div className="w-full rounded-lg border p-4 space-y-2 mb-6">
+                  {(['extract', 'npm', 'github', 'schema'] as const).map((key) => {
+                    const stage = installProgress.stages[key]
+                    const label = STAGE_LABELS[key]
+                    let Icon = Loader2
+                    let iconClass = 'text-muted-foreground'
+                    let spin = false
+                    if (stage.status === 'done') { Icon = CheckCircle2; iconClass = 'text-green-600' }
+                    else if (stage.status === 'error') { Icon = AlertCircle; iconClass = 'text-red-600' }
+                    else if (stage.status === 'skipped') { Icon = Info; iconClass = 'text-muted-foreground/60' }
+                    else if (stage.status === 'running') { spin = true; iconClass = 'text-blue-600' }
+                    else { Icon = Info; iconClass = 'text-muted-foreground/40' }
+
+                    return (
+                      <div key={key} className="flex items-start gap-3 text-left">
+                        <Icon className={`h-5 w-5 shrink-0 mt-0.5 ${iconClass} ${spin ? 'animate-spin' : ''}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium ${stage.status === 'pending' ? 'text-muted-foreground/60' : ''}`}>{label}</p>
+                          {key === 'npm' && stage.status === 'running' && (stage as any).packages && (
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                              {((stage as any).packages as string[]).join(', ')}
+                            </p>
+                          )}
+                          {(stage as any).detail && stage.status !== 'error' && (
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">{(stage as any).detail}</p>
+                          )}
+                          {(stage as any).error && (
+                            <p className="text-xs text-red-600 mt-0.5">{(stage as any).error}</p>
+                          )}
+                          {key === 'npm' && (stage as any).conflict && (
+                            <p className="text-xs text-red-600 mt-0.5">
+                              Needs {(stage as any).conflict.name}@{(stage as any).conflict.declared}, you have {(stage as any).conflict.existing}.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {installProgress.log.length > 0 && !installProgress.fatalError && (
+                  <div className="w-full rounded-md bg-muted/40 p-3 mb-6 max-h-32 overflow-y-auto">
+                    {installProgress.log.map((line, i) => (
+                      <p key={i} className="text-[11px] font-mono text-muted-foreground text-left truncate">{line}</p>
+                    ))}
+                  </div>
+                )}
+
+                {installProgress.fatalError ? (
+                  <div className="w-full flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => { setInstallProgress(null); setDownloadResult(null) }}
+                    >
+                      Close
+                    </Button>
+                    <Button
+                      className="flex-1 bg-[#148962] hover:bg-[#117a56] text-white"
+                      onClick={() => {
+                        const mod = unifiedModules.find(m => m.id === installProgress.moduleId)
+                        if (mod) {
+                          setInstallProgress(null)
+                          void runInstall(mod)
+                        }
+                      }}
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                ) : installProgress.finished ? (
+                  // Brief "finishing up" state — the hold timer will switch
+                  // to the full success modal in ~1.5s. No action needed
+                  // from the user during this window.
+                  <p className="text-xs text-muted-foreground">Finishing up…</p>
+                ) : (
+                  <Button variant="outline" className="w-full" onClick={abortInstall}>
+                    Cancel install
                   </Button>
                 )}
               </div>

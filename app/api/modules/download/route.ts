@@ -3,12 +3,14 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { MODULES_API_BASE, buildClientInfo } from '@/lib/license-helpers'
 import { getLicenseKey } from '@/lib/license-helpers-server'
 import { z } from 'zod'
-import { writeFile, mkdir, rm, readdir, cp } from 'fs/promises'
+import { writeFile, mkdir, rm, readFile, readdir, cp } from 'fs/promises'
 import { join, dirname, resolve, relative, isAbsolute, sep } from 'path'
-import { getGitHubConfig, commitModuleToGitHub } from '@/lib/modules/github-sync'
+import { getGitHubConfig, commitModuleToGitHub, type ExtraCommitFile } from '@/lib/modules/github-sync'
 import { tmpdir } from 'os'
 import { inflateRawSync } from 'zlib'
 import { runSchemaSqlAtPath } from '@/lib/modules/schema-installer'
+import { installModuleNpmDeps, type NpmInstallEvent, type NpmInstallResult } from '@/lib/modules/npm-installer'
+import type { ModuleManifest } from '@/lib/modules/module-types'
 
 /**
  * Pure Node.js ZIP extractor using built-in zlib.
@@ -116,170 +118,336 @@ const DownloadSchema = z.object({
   version: z.string().regex(/^\d+\.\d+\.\d+$/),
 })
 
+/**
+ * Streamed install event. Emitted as newline-delimited JSON (NDJSON) so the
+ * UI can show per-stage progress for installs that take 30s+ (pnpm download).
+ *
+ * Stages run in order: extract → npm → github → schema → finalize. A
+ * `fatal` event ends the stream early on unrecoverable failure.
+ */
+export type InstallEvent =
+  | { stage: 'extract'; status: 'start' | 'done' }
+  | {
+      stage: 'npm'
+      status: 'start' | 'progress' | 'done' | 'skipped' | 'error'
+      packages?: string[]
+      detail?: string
+      error?: string
+      conflict?: { name: string; declared: string; existing: string }
+    }
+  | {
+      stage: 'github'
+      status: 'start' | 'done' | 'skipped' | 'error'
+      commitSha?: string
+      filesCommitted?: number
+      error?: string
+    }
+  | {
+      stage: 'schema'
+      status: 'start' | 'done' | 'skipped' | 'error'
+      alreadyExisted?: boolean
+      error?: string
+    }
+  | {
+      stage: 'finalize'
+      status: 'done'
+      module: string
+      version: string
+      moduleDir: string
+      installed_to: string
+      vercel: boolean
+      firstRoute?: string
+    }
+  | { stage: 'fatal'; error: string; code?: string }
+
 export async function POST(request: NextRequest) {
+  // ─────────────────────────────────────────────────────────────────────
+  // Pre-stream phase: anything that could legitimately return a non-200
+  // status (auth, validation, upstream API errors) runs here. Once we
+  // start streaming, all errors become fatal events with HTTP 200.
+  // ─────────────────────────────────────────────────────────────────────
+
   const { user } = await getAuthenticatedUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  let body: unknown
   try {
-    const body = await request.json()
-    const parseResult = DownloadSchema.safeParse(body)
-    if (!parseResult.success) {
-      return NextResponse.json(
-        { error: 'Invalid request', details: parseResult.error.flatten() },
-        { status: 400 }
-      )
-    }
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
 
-    const { module: moduleName, version } = parseResult.data
-    const licenseKey = await getLicenseKey(user.id)
-
-    // Get presigned download URL from external API
-    const downloadBody: { module: string; version: string; client_info: ReturnType<typeof buildClientInfo>; license_key?: string } = {
-      module: moduleName,
-      version,
-      client_info: buildClientInfo(),
-    }
-
-    if (licenseKey) {
-      downloadBody.license_key = licenseKey
-    }
-
-    const apiResponse = await fetch(`${MODULES_API_BASE}/modules/download`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(downloadBody),
-    })
-
-    if (!apiResponse.ok) {
-      const errorData = await apiResponse.json().catch(() => ({}))
-      const upstreamError = errorData.error
-      const errorPayload = upstreamError?.code
-        ? { code: upstreamError.code, message: upstreamError.message ?? 'Failed to get download URL' }
-        : { message: upstreamError?.message ?? 'Failed to get download URL' }
-      return NextResponse.json(
-        { error: errorPayload },
-        { status: apiResponse.status }
-      )
-    }
-
-    const apiData = await apiResponse.json()
-    const { download_url } = apiData
-
-    if (!download_url) {
-      console.error('[API /modules/download] No download_url in API response:', JSON.stringify(apiData))
-      return NextResponse.json(
-        { error: 'Module API did not return a download URL' },
-        { status: 502 }
-      )
-    }
-
-    // Download the zip file
-    const zipResponse = await fetch(download_url)
-    if (!zipResponse.ok) {
-      console.error(`[API /modules/download] ZIP fetch failed: ${zipResponse.status} ${zipResponse.statusText} from ${download_url}`)
-      return NextResponse.json(
-        { error: `Failed to download module package (${zipResponse.status})` },
-        { status: 502 }
-      )
-    }
-
-    const zipBuffer = Buffer.from(await zipResponse.arrayBuffer())
-
-    // Save to temp file and extract
-    const isVercel = !!process.env.VERCEL
-    const tempExtractDir = join(tmpdir(), `ari-module-extract-${moduleName}-${Date.now()}`)
-    const targetDir = isVercel
-      ? join(tmpdir(), 'ari-modules', moduleName)
-      : join(process.cwd(), 'modules-core', moduleName)
-
-    try {
-      await mkdir(tempExtractDir, { recursive: true })
-
-      // Extract zip using pure Node.js (no CLI dependency)
-      await extractZip(zipBuffer, tempExtractDir)
-
-      // Check if the zip contained a single top-level directory (e.g., baseball/baseball/)
-      const extractedEntries = (await readdir(tempExtractDir, { withFileTypes: true }))
-      const dirs = extractedEntries.filter(e => e.isDirectory())
-      const files = extractedEntries.filter(e => e.isFile())
-
-      let sourceDir: string
-
-      if (dirs.length === 1 && files.length === 0) {
-        // Single top-level directory — use its contents to avoid nesting
-        sourceDir = join(tempExtractDir, dirs[0].name)
-      } else {
-        // Contents are already flat — use the extract dir directly
-        sourceDir = tempExtractDir
-      }
-
-      // Move contents to the target directory
-      await rm(targetDir, { recursive: true, force: true })
-      await mkdir(targetDir, { recursive: true })
-
-      const sourceEntries = await readdir(sourceDir)
-      await Promise.all(sourceEntries.map(entry =>
-        cp(join(sourceDir, entry), join(targetDir, entry), { recursive: true })
-      ))
-    } catch (extractError) {
-      // Clean up partial extraction on failure
-      await rm(targetDir, { recursive: true, force: true }).catch(() => {})
-      await rm(tempExtractDir, { recursive: true, force: true }).catch(() => {})
-      console.error('[API /modules/download] Extract failed:', extractError)
-      return NextResponse.json(
-        { error: 'Failed to extract module package' },
-        { status: 500 }
-      )
-    }
-
-    // Clean up temp files
-    await rm(tempExtractDir, { recursive: true, force: true }).catch(() => {})
-
-    // On Vercel, auto-sync to GitHub in the same request (targetDir still exists)
-    let githubSync = null
-    if (isVercel) {
-      const ghConfig = getGitHubConfig()
-      if (ghConfig) {
-        try {
-          const result = await commitModuleToGitHub(moduleName, targetDir, ghConfig)
-          githubSync = {
-            success: true,
-            commitSha: result.commitSha,
-            filesCommitted: result.filesCommitted,
-            message: result.message,
-          }
-        } catch (err: unknown) {
-          console.error('[API /modules/download] GitHub sync failed:', err)
-          githubSync = { success: false, error: err instanceof Error ? err.message : String(err) }
-        }
-      }
-    }
-
-    // Path is passed directly because the in-memory module manifest cache
-    // won't have this freshly-downloaded module yet. ENOENT is handled
-    // inside runSchemaSqlAtPath (returns { ok: true } if no schema.sql).
-    const schemaInstall = await runSchemaSqlAtPath(
-      moduleName,
-      join(targetDir, 'database', 'schema.sql'),
-    )
-
-    return NextResponse.json({
-      success: true,
-      module: moduleName,
-      version,
-      installed_to: isVercel ? targetDir : `modules-core/${moduleName}`,
-      moduleDir: targetDir,
-      vercel: isVercel,
-      githubSync,
-      schemaInstall,
-    })
-  } catch (error) {
-    console.error('[API /modules/download] Error:', error)
+  const parseResult = DownloadSchema.safeParse(body)
+  if (!parseResult.success) {
     return NextResponse.json(
-      { error: 'Failed to download and install module' },
-      { status: 500 }
+      { error: 'Invalid request', details: parseResult.error.flatten() },
+      { status: 400 }
     )
   }
+
+  const { module: moduleName, version } = parseResult.data
+  const licenseKey = await getLicenseKey(user.id)
+
+  const downloadBody: { module: string; version: string; client_info: ReturnType<typeof buildClientInfo>; license_key?: string } = {
+    module: moduleName,
+    version,
+    client_info: buildClientInfo(),
+  }
+  if (licenseKey) downloadBody.license_key = licenseKey
+
+  const apiResponse = await fetch(`${MODULES_API_BASE}/modules/download`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(downloadBody),
+  })
+
+  if (!apiResponse.ok) {
+    const errorData = await apiResponse.json().catch(() => ({}))
+    const upstreamError = errorData.error
+    const errorPayload = upstreamError?.code
+      ? { code: upstreamError.code, message: upstreamError.message ?? 'Failed to get download URL' }
+      : { message: upstreamError?.message ?? 'Failed to get download URL' }
+    return NextResponse.json({ error: errorPayload }, { status: apiResponse.status })
+  }
+
+  const apiData = await apiResponse.json()
+  const { download_url } = apiData
+  if (!download_url) {
+    console.error('[API /modules/download] No download_url in API response:', JSON.stringify(apiData))
+    return NextResponse.json({ error: 'Module API did not return a download URL' }, { status: 502 })
+  }
+
+  const zipResponse = await fetch(download_url)
+  if (!zipResponse.ok) {
+    console.error(`[API /modules/download] ZIP fetch failed: ${zipResponse.status} ${zipResponse.statusText} from ${download_url}`)
+    return NextResponse.json(
+      { error: `Failed to download module package (${zipResponse.status})` },
+      { status: 502 }
+    )
+  }
+
+  const zipBuffer = Buffer.from(await zipResponse.arrayBuffer())
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Stream phase: all subsequent progress and errors are emitted as
+  // newline-delimited JSON events.
+  // ─────────────────────────────────────────────────────────────────────
+
+  const encoder = new TextEncoder()
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const emit = (event: InstallEvent) => {
+        try {
+          controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'))
+        } catch {
+          // controller already closed; nothing to do
+        }
+      }
+
+      const aborted = () => request.signal.aborted
+
+      // ── 1. Extract ────────────────────────────────────────────────
+      emit({ stage: 'extract', status: 'start' })
+
+      const isVercel = !!process.env.VERCEL
+      const tempExtractDir = join(tmpdir(), `ari-module-extract-${moduleName}-${Date.now()}`)
+      const targetDir = isVercel
+        ? join(tmpdir(), 'ari-modules', moduleName)
+        : join(process.cwd(), 'modules-core', moduleName)
+
+      try {
+        await mkdir(tempExtractDir, { recursive: true })
+        await extractZip(zipBuffer, tempExtractDir)
+
+        const extractedEntries = await readdir(tempExtractDir, { withFileTypes: true })
+        const dirs = extractedEntries.filter((e) => e.isDirectory())
+        const files = extractedEntries.filter((e) => e.isFile())
+        const sourceDir =
+          dirs.length === 1 && files.length === 0
+            ? join(tempExtractDir, dirs[0].name)
+            : tempExtractDir
+
+        await rm(targetDir, { recursive: true, force: true })
+        await mkdir(targetDir, { recursive: true })
+        const sourceEntries = await readdir(sourceDir)
+        await Promise.all(
+          sourceEntries.map((entry) =>
+            cp(join(sourceDir, entry), join(targetDir, entry), { recursive: true })
+          )
+        )
+      } catch (extractError) {
+        await rm(targetDir, { recursive: true, force: true }).catch(() => {})
+        await rm(tempExtractDir, { recursive: true, force: true }).catch(() => {})
+        console.error('[API /modules/download] Extract failed:', extractError)
+        emit({ stage: 'fatal', error: 'Failed to extract module package' })
+        controller.close()
+        return
+      }
+      await rm(tempExtractDir, { recursive: true, force: true }).catch(() => {})
+
+      emit({ stage: 'extract', status: 'done' })
+      if (aborted()) {
+        emit({ stage: 'fatal', error: 'aborted' })
+        controller.close()
+        return
+      }
+
+      // ── Read the freshly-extracted manifest ───────────────────────
+      let manifest: ModuleManifest | null = null
+      try {
+        const manifestText = await readFile(join(targetDir, 'module.json'), 'utf-8')
+        manifest = JSON.parse(manifestText) as ModuleManifest
+      } catch (err) {
+        console.warn('[API /modules/download] Could not read extracted module.json:', err)
+        // Proceed without a manifest — module may still be valid for downstream
+        // steps (schema install is path-driven, not manifest-driven).
+      }
+
+      // ── 2. npm dependencies ──────────────────────────────────────
+      let mutatedPackageJson: string | undefined
+      const npmDeps = manifest?.npmDependencies
+      if (npmDeps && Object.keys(npmDeps).length > 0) {
+        emit({ stage: 'npm', status: 'start', packages: Object.entries(npmDeps).map(([n, v]) => `${n}@${v}`) })
+
+        const ghConfig = isVercel ? getGitHubConfig() : null
+
+        const npmResult: NpmInstallResult = await installModuleNpmDeps(moduleName, npmDeps, targetDir, {
+          isVercel,
+          githubConfigured: isVercel ? !!ghConfig : undefined,
+          abortSignal: request.signal,
+          onEvent: (e: NpmInstallEvent) => {
+            // Forward installer events as `progress` so the UI gets live output.
+            if (e.type === 'stderr' || e.type === 'spawn' || e.type === 'cache-bust' || e.type === 'already-satisfied') {
+              emit({
+                stage: 'npm',
+                status: 'progress',
+                detail:
+                  e.type === 'stderr' ? e.line :
+                  e.type === 'spawn' ? e.command :
+                  e.type === 'cache-bust' ? `cache-bust: touched ${e.touched} file(s)` :
+                  `already-satisfied: ${e.packages.join(', ')}`,
+              })
+            }
+          },
+        })
+
+        if (!npmResult.ok) {
+          emit({
+            stage: 'npm',
+            status: 'error',
+            error: npmResult.error,
+            ...(npmResult.conflict ? { conflict: npmResult.conflict } : {}),
+          })
+          emit({ stage: 'fatal', error: npmResult.error })
+          controller.close()
+          return
+        }
+
+        if (npmResult.skipped === 'vercel') {
+          mutatedPackageJson = npmResult.mutatedPackageJson
+          emit({ stage: 'npm', status: 'skipped', detail: 'Vercel — package.json will be committed to GitHub' })
+        } else if (npmResult.skipped === 'empty' || (npmResult.installed.length === 0 && npmResult.alreadySatisfied.length === Object.keys(npmDeps).length)) {
+          emit({ stage: 'npm', status: 'done', detail: 'all dependencies already satisfied' })
+        } else {
+          emit({ stage: 'npm', status: 'done', packages: npmResult.installed })
+        }
+      } else {
+        emit({ stage: 'npm', status: 'skipped', detail: 'no declared dependencies' })
+      }
+      if (aborted()) {
+        emit({ stage: 'fatal', error: 'aborted' })
+        controller.close()
+        return
+      }
+
+      // ── 3. GitHub sync (Vercel only) ──────────────────────────────
+      if (isVercel) {
+        const ghConfig = getGitHubConfig()
+        if (ghConfig) {
+          emit({ stage: 'github', status: 'start' })
+          try {
+            const extraFiles: ExtraCommitFile[] = mutatedPackageJson
+              ? [{ repoPath: 'package.json', content: mutatedPackageJson, encoding: 'utf-8' }]
+              : []
+            const result = await commitModuleToGitHub(moduleName, targetDir, ghConfig, extraFiles)
+            emit({
+              stage: 'github',
+              status: 'done',
+              commitSha: result.commitSha,
+              filesCommitted: result.filesCommitted,
+            })
+          } catch (err: unknown) {
+            console.error('[API /modules/download] GitHub sync failed:', err)
+            emit({
+              stage: 'github',
+              status: 'error',
+              error: err instanceof Error ? err.message : String(err),
+            })
+            // GitHub sync failure on Vercel is fatal: without it, the
+            // freshly-installed module disappears on the next deploy.
+            emit({ stage: 'fatal', error: 'GitHub sync failed; module will not persist past next deploy' })
+            controller.close()
+            return
+          }
+        } else {
+          emit({ stage: 'github', status: 'skipped', error: 'GitHub not configured' })
+        }
+      } else {
+        emit({ stage: 'github', status: 'skipped' })
+      }
+      if (aborted()) {
+        emit({ stage: 'fatal', error: 'aborted' })
+        controller.close()
+        return
+      }
+
+      // ── 4. Schema install ────────────────────────────────────────
+      emit({ stage: 'schema', status: 'start' })
+      const schemaInstall = await runSchemaSqlAtPath(
+        moduleName,
+        join(targetDir, 'database', 'schema.sql')
+      )
+      if (schemaInstall.ok) {
+        emit({ stage: 'schema', status: 'done' })
+      } else if (schemaInstall.alreadyExisted) {
+        // Tables already exist — treat as success for UI purposes.
+        emit({ stage: 'schema', status: 'done', alreadyExisted: true })
+      } else {
+        // Schema failure is non-fatal: module files are installed and the
+        // user can re-run via Settings → Backup or by re-enabling the module.
+        emit({ stage: 'schema', status: 'error', error: schemaInstall.error })
+      }
+
+      // ── 5. Finalize ──────────────────────────────────────────────
+      const firstRoute = manifest?.routes?.[0]?.path
+      emit({
+        stage: 'finalize',
+        status: 'done',
+        module: moduleName,
+        version,
+        moduleDir: targetDir,
+        installed_to: isVercel ? targetDir : `modules-core/${moduleName}`,
+        vercel: isVercel,
+        ...(firstRoute ? { firstRoute } : {}),
+      })
+
+      controller.close()
+    },
+    cancel() {
+      // Client disconnected. installModuleNpmDeps observes request.signal
+      // and kills the pnpm child process.
+    },
+  })
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/x-ndjson; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Accel-Buffering': 'no', // hint to disable proxy buffering (e.g. nginx)
+    },
+  })
 }

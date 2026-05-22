@@ -103,16 +103,31 @@ async function commitTree(
 }
 
 /**
+ * Extra file payload committed alongside the module directory. Used by the
+ * download flow to ship a mutated root `package.json` (when a module's
+ * npmDependencies are merged in) in the same atomic commit as the module
+ * files. `repoPath` is repo-root-relative — no `modules-core/` prefix.
+ */
+export type ExtraCommitFile = {
+  repoPath: string
+  content: string
+  encoding?: 'utf-8' | 'base64'
+}
+
+/**
  * Commit module files to GitHub.
  * @param moduleId - The module identifier (e.g., "baseball")
  * @param sourceDir - The local directory containing the module files
  * @param config - GitHub configuration
- * @returns Commit result with sha and file count
+ * @param extraFiles - Optional repo-root-relative files to include in the
+ *                    same commit (e.g. an updated `package.json`).
+ * @returns Commit result with sha and file count (module files + extras)
  */
 export async function commitModuleToGitHub(
   moduleId: string,
   sourceDir: string,
-  config: GitHubConfig
+  config: GitHubConfig,
+  extraFiles: ExtraCommitFile[] = []
 ): Promise<{ commitSha: string; filesCommitted: number; message: string }> {
   const files = collectFiles(sourceDir)
   if (files.length === 0) {
@@ -122,8 +137,20 @@ export async function commitModuleToGitHub(
   const commitPath = `modules-core/${moduleId}`
   const { currentSha, baseTreeSha } = await getHeadAndTree(config)
 
-  // Create blobs for each file
-  const treeEntries = await Promise.all(
+  // Defense-in-depth: extra files must be repo-root-relative and must not
+  // climb out of the repo or alias to the module directory.
+  for (const extra of extraFiles) {
+    if (
+      typeof extra.repoPath !== 'string' ||
+      extra.repoPath.length === 0 ||
+      extra.repoPath.startsWith('/') ||
+      extra.repoPath.split('/').some((seg) => seg === '..' || seg === '')
+    ) {
+      throw new Error(`Invalid extra file path: ${extra.repoPath}`)
+    }
+  }
+
+  const moduleEntries = await Promise.all(
     files.map(async (file) => {
       const blob = await githubApi('/git/blobs', config, {
         method: 'POST',
@@ -139,11 +166,33 @@ export async function commitModuleToGitHub(
     })
   )
 
-  const commitSha = await commitTree(config, baseTreeSha, treeEntries, currentSha, `Add module: ${moduleId}`)
+  const extraEntries = await Promise.all(
+    extraFiles.map(async (file) => {
+      const blob = await githubApi('/git/blobs', config, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: file.content, encoding: file.encoding ?? 'utf-8' }),
+      })
+      return {
+        path: file.repoPath,
+        mode: '100644' as const,
+        type: 'blob' as const,
+        sha: blob.sha,
+      }
+    })
+  )
+
+  const treeEntries = [...moduleEntries, ...extraEntries]
+  const commitMessage =
+    extraFiles.length > 0
+      ? `Add module: ${moduleId} (+ ${extraFiles.map((f) => f.repoPath).join(', ')})`
+      : `Add module: ${moduleId}`
+
+  const commitSha = await commitTree(config, baseTreeSha, treeEntries, currentSha, commitMessage)
 
   return {
     commitSha,
-    filesCommitted: files.length,
+    filesCommitted: files.length + extraFiles.length,
     message: `Module "${moduleId}" committed to ${config.owner}/${config.repo}@${config.branch}`,
   }
 }

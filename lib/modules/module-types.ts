@@ -170,6 +170,16 @@ export interface ModuleManifest {
   routes?: ModuleRoute[]
   /** Module dependencies */
   dependencies?: ModuleDependencies
+  /**
+   * npm packages this module imports at runtime. Same shape as a
+   * package.json `dependencies` block (e.g. `{ "three": "^0.184.0" }`).
+   * Installed into the root project's package.json by the marketplace
+   * install flow. Capped at 25 entries per module. Version specifiers
+   * containing `git:`, `http:`, `file:`, `link:`, `workspace:`, `npm:`,
+   * or `..` are rejected at install time. devDependencies and peer
+   * specifiers are not supported.
+   */
+  npmDependencies?: Record<string, string>
   /** Database configuration */
   database?: ModuleDatabaseConfig
   /** Dashboard widget configuration */
