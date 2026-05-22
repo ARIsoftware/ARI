@@ -226,6 +226,30 @@ api/
 3. Create migration file if updating existing module
 4. Users apply migration via Settings → Features
 
+### Adding npm Packages
+
+If your module imports npm packages that aren't already in the host project's `package.json` (e.g., a charting library, a 3D engine), declare them in `module.json` under `npmDependencies`:
+
+```json
+{
+  "npmDependencies": {
+    "lodash": "^4.17.21",
+    "three": "^0.184.0"
+  }
+}
+```
+
+When a user installs your module from `/modules`, the install flow:
+
+- **Locally**: runs `pnpm add <pkg>@<ver> ...` against the host project root
+- **On Vercel**: merges the entries into the user's root `package.json` and commits the update alongside your module files via GitHub. Vercel auto-rebuilds.
+
+If a declared dep conflicts with a different version already in the host's `package.json` (e.g., your module wants `react@^18` but the host has `react@^19`), the install aborts safely before changing anything. Do **not** declare framework deps like `react`, `next`, or `react-dom` — those come from the host project.
+
+The build-time validator (`scripts/generate-module-registry.js`, runs on `predev`/`prebuild`) warns when declared deps are missing from the host `package.json`, so authors notice drift early.
+
+For the full spec — Vercel flow, conflict policy, security validation — see `docs/MODULES.md` § npm Dependencies.
+
 ## Development Workflow
 
 ### Testing Locally

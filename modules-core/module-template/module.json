@@ -29,6 +29,7 @@
   "database": {
     "tables": ["module_template_entries"]
   },
+  "npmDependencies": {},
   "dashboard": {
     "widgets": true,
     "widgetComponents": ["./components/widget.tsx"]
