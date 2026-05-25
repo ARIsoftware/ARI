@@ -139,7 +139,7 @@ async function commitTree(
  * Extra file payload committed alongside the module directory. Used by the
  * download flow to ship a mutated root `package.json` (when a module's
  * npmDependencies are merged in) in the same atomic commit as the module
- * files. `repoPath` is repo-root-relative — no `modules-core/` prefix.
+ * files. `repoPath` is repo-root-relative — no `modules-custom/` prefix.
  */
 export type ExtraCommitFile = {
   repoPath: string
@@ -167,7 +167,7 @@ export async function commitModuleToGitHub(
     throw new Error('No files found in module directory')
   }
 
-  const commitPath = `modules-core/${moduleId}`
+  const commitPath = `modules-custom/${moduleId}`
   const { currentSha, baseTreeSha } = await getHeadAndTree(config)
 
   // Defense-in-depth: extra files must be repo-root-relative and must not

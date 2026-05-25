@@ -41,6 +41,7 @@ import {
 } from "lucide-react"
 import { LICENSE_CACHE_KEY, LIBRARY_CACHE_KEY, CACHE_TTL } from "@/lib/license-helpers"
 import type { SchemaInstallResult } from "@/lib/modules/schema-installer"
+import { TARGET_EXISTS_CODE, type ConflictType } from "@/lib/modules/install-types"
 
 type SchemaStatus = 'success' | 'skipped' | 'failed' | 'none'
 
@@ -253,6 +254,11 @@ export default function ModulesPage() {
   // listing the module's declared npm packages is shown. Confirming kicks
   // off runInstall(); cancelling clears.
   const [pendingInstall, setPendingInstall] = useState<UnifiedModule | null>(null)
+  const [conflictDialog, setConflictDialog] = useState<{
+    mod: UnifiedModule
+    type: ConflictType
+    moduleDir: string
+  } | null>(null)
   const [installProgress, setInstallProgress] = useState<InstallProgress | null>(null)
   const installAbortRef = useRef<AbortController | null>(null)
   const [githubSyncEnabled, setGithubSyncEnabled] = useState(true)
@@ -596,7 +602,7 @@ export default function ModulesPage() {
    * per-stage state as events arrive and roll the final state into
    * `installSuccess` so the existing success modal renders without changes.
    */
-  const runInstall = async (mod: UnifiedModule) => {
+  const runInstall = async (mod: UnifiedModule, force: boolean = false) => {
     if (!mod.libraryModule) return
 
     setDownloading(mod.id)
@@ -646,7 +652,7 @@ export default function ModulesPage() {
       const successPayload = {
         moduleId: mod.id,
         moduleName: sanitizeDisplayName(mod.name),
-        moduleDir: event.moduleDir || `modules-core/${mod.id}`,
+        moduleDir: event.moduleDir || `modules-custom/${mod.id}`,
         vercel: !!event.vercel,
         githubSync:
           githubState.status === 'done'
@@ -700,6 +706,7 @@ export default function ModulesPage() {
         body: JSON.stringify({
           module: mod.libraryModule.name,
           version: mod.libraryModule.latest_version,
+          ...(force ? { force: true } : {}),
         }),
         signal: controller.signal,
       })
@@ -709,6 +716,13 @@ export default function ModulesPage() {
       const contentType = response.headers.get('content-type') || ''
       if (!response.ok || !contentType.includes('application/x-ndjson')) {
         const data = await response.json().catch(() => ({} as any))
+        // Surface the confirmation dialog instead of a generic error toast.
+        if (response.status === 409 && data?.error?.code === TARGET_EXISTS_CODE && data?.conflict) {
+          setInstallProgress(null)
+          setDownloading(null)
+          setConflictDialog({ mod, type: data.conflict.type, moduleDir: data.conflict.moduleDir })
+          return
+        }
         const { code, message } = parseApiError(data?.error, 'Download failed')
         if (code && PAGE_ERROR_CODES.has(code)) {
           setPageError({ code, message: getErrorCopy(code, message) })
@@ -1385,7 +1399,7 @@ export default function ModulesPage() {
                             <p className="text-xs text-muted-foreground">
                               {installSuccess?.vercel
                                 ? 'GitHub sync is required on Vercel to persist modules. Without it, this module will be lost on the next deployment.'
-                                : 'To keep this module permanently, save it to GitHub. Otherwise it will be removed the next time your app rebuilds from GitHub.'
+                                : `This module lives in modules-custom/${installSuccess?.moduleId}/ on disk. Optionally save to GitHub for backup and version control.`
                               }
                             </p>
                             <p className="text-xs text-muted-foreground">
@@ -1551,6 +1565,58 @@ export default function ModulesPage() {
                   }}
                 >
                   Install
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Install Target Conflict Confirmation */}
+          <AlertDialog
+            open={!!conflictDialog}
+            onOpenChange={(open) => { if (!open) setConflictDialog(null) }}
+          >
+            <AlertDialogContent className="max-w-md">
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  {conflictDialog?.type === 'custom_exists'
+                    ? 'Module directory already exists'
+                    : 'Override built-in module?'}
+                </AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-3">
+                    {conflictDialog?.type === 'custom_exists' ? (
+                      <>
+                        <p>
+                          The directory <code className="px-1 py-0.5 bg-muted rounded text-[11px]">{conflictDialog.moduleDir}</code> already exists.
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Continuing will replace its contents on disk. Any local edits to that module will be lost. Database tables from a previous install are kept.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p>
+                          A module with this ID already ships with ARI in <code className="px-1 py-0.5 bg-muted rounded text-[11px]">modules-core/{conflictDialog?.mod.id}</code>.
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Continuing will create <code className="px-1 py-0.5 bg-muted rounded text-[11px]">{conflictDialog?.moduleDir}</code>, which automatically overrides the built-in version. The built-in copy stays on disk but becomes inactive.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-[#148962] hover:bg-[#117a56] text-white"
+                  onClick={() => {
+                    const mod = conflictDialog!.mod
+                    setConflictDialog(null)
+                    void runInstall(mod, true)
+                  }}
+                >
+                  Continue
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

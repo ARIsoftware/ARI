@@ -3,7 +3,7 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { MODULES_API_BASE, buildClientInfo } from '@/lib/license-helpers'
 import { getLicenseKey } from '@/lib/license-helpers-server'
 import { z } from 'zod'
-import { writeFile, mkdir, rm, readFile, readdir, cp } from 'fs/promises'
+import { writeFile, mkdir, rm, readFile, readdir, cp, stat } from 'fs/promises'
 import { join, dirname, resolve, relative, isAbsolute, sep } from 'path'
 import { getGitHubConfig, commitModuleToGitHub, type ExtraCommitFile } from '@/lib/modules/github-sync'
 import { tmpdir } from 'os'
@@ -11,6 +11,7 @@ import { inflateRawSync } from 'zlib'
 import { runSchemaSqlAtPath } from '@/lib/modules/schema-installer'
 import { installModuleNpmDeps, type NpmInstallEvent, type NpmInstallResult } from '@/lib/modules/npm-installer'
 import type { ModuleManifest } from '@/lib/modules/module-types'
+import { TARGET_EXISTS_CODE, type ConflictType } from '@/lib/modules/install-types'
 
 /**
  * Pure Node.js ZIP extractor using built-in zlib.
@@ -113,9 +114,23 @@ async function extractZip(zipBuffer: Buffer, targetDir: string): Promise<void> {
   }
 }
 
+function conflictResponse(type: ConflictType, moduleName: string): NextResponse {
+  const message = type === 'custom_exists'
+    ? `modules-custom/${moduleName} already exists`
+    : `built-in modules-core/${moduleName} would be overridden`
+  return NextResponse.json(
+    {
+      error: { code: TARGET_EXISTS_CODE, message },
+      conflict: { type, moduleDir: `modules-custom/${moduleName}` },
+    },
+    { status: 409 }
+  )
+}
+
 const DownloadSchema = z.object({
   module: z.string().regex(/^[a-z0-9-]{1,64}$/),
   version: z.string().regex(/^\d+\.\d+\.\d+$/),
+  force: z.boolean().optional(),
 })
 
 /**
@@ -187,7 +202,25 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { module: moduleName, version } = parseResult.data
+  const { module: moduleName, version, force } = parseResult.data
+
+  // Conflict gate: if the install target already exists on disk, return 409
+  // and let the client confirm before we hit the upstream API or touch files.
+  // Skipped on Vercel because the deployed bundle's modules-custom/ entries
+  // come from prior GitHub commits — a fresh re-install can't be reliably
+  // distinguished from a redeploy and the GitHub-sync flow already gates
+  // persistence there.
+  if (!force && !process.env.VERCEL) {
+    const customPath = join(process.cwd(), 'modules-custom', moduleName)
+    if (await stat(customPath).then(() => true).catch(() => false)) {
+      return conflictResponse('custom_exists', moduleName)
+    }
+    const corePath = join(process.cwd(), 'modules-core', moduleName)
+    if (await stat(corePath).then(() => true).catch(() => false)) {
+      return conflictResponse('core_override', moduleName)
+    }
+  }
+
   const licenseKey = await getLicenseKey(user.id)
 
   const downloadBody: { module: string; version: string; client_info: ReturnType<typeof buildClientInfo>; license_key?: string } = {
@@ -255,7 +288,7 @@ export async function POST(request: NextRequest) {
       const tempExtractDir = join(tmpdir(), `ari-module-extract-${moduleName}-${Date.now()}`)
       const targetDir = isVercel
         ? join(tmpdir(), 'ari-modules', moduleName)
-        : join(process.cwd(), 'modules-core', moduleName)
+        : join(process.cwd(), 'modules-custom', moduleName)
 
       try {
         await mkdir(tempExtractDir, { recursive: true })
@@ -428,7 +461,7 @@ export async function POST(request: NextRequest) {
         module: moduleName,
         version,
         moduleDir: targetDir,
-        installed_to: isVercel ? targetDir : `modules-core/${moduleName}`,
+        installed_to: isVercel ? targetDir : `modules-custom/${moduleName}`,
         vercel: isVercel,
         ...(firstRoute ? { firstRoute } : {}),
       })
