@@ -59,12 +59,5 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   const serverUrl = process.env.BETTER_AUTH_URL ?? new URL(request.url).origin
-  return NextResponse.json(
-    { ...cachedSpec, servers: [{ url: serverUrl }] },
-    {
-      // Spec is static across the process lifetime. Private cache only —
-      // response is auth-gated so it must not be stored by shared caches.
-      headers: { 'Cache-Control': 'private, max-age=300' },
-    }
-  )
+  return NextResponse.json({ ...cachedSpec, servers: [{ url: serverUrl }] })
 }

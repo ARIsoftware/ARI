@@ -420,8 +420,11 @@ export default function DatabaseTestPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        // Force browser to omit cookies so we truly test unauthenticated access
+        // Force browser to omit cookies so we truly test unauthenticated access.
+        // no-store bypasses any HTTP cache so we don't get a previously-authed
+        // 200 served back to us.
         credentials: 'omit',
+        cache: 'no-store',
         redirect: 'manual'
       }
 
