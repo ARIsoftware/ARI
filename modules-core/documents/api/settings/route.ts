@@ -13,19 +13,48 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
-import { z } from 'zod'
 import { moduleSettings } from '@/lib/db/schema'
 import { eq, and, sql } from 'drizzle-orm'
 import { readStorageConfig, PROVIDER_LABELS } from '@/lib/storage'
-import { DEFAULT_DOCUMENTS_SETTINGS, MODULE_ID, MAX_UPLOAD_MB } from '../../types'
+import { DEFAULT_DOCUMENTS_SETTINGS, MODULE_ID } from '../../types'
 import { getActiveProvider } from '../../lib/providers'
+import {
+  DocumentSettingsBodySchema as SettingsSchema,
+  DocumentSettingsResponseSchema,
+  DocumentSettingsSaveResponseSchema,
+} from '../../lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 
-const SettingsSchema = z.object({
-  onboardingCompleted: z.boolean().optional(),
-  defaultView: z.enum(['cards', 'table']).optional(),
-  maxFileSizeMb: z.number().min(1).max(MAX_UPLOAD_MB).optional(),
-  allowedFileTypes: z.array(z.string()).optional(),
-}).strict()
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/documents/settings',
+  operationId: 'getDocumentsSettings',
+  summary: "Fetch the user's Documents module settings plus the active global storage provider info",
+  tags: ['documents'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'Settings (with global provider info appended)', content: { 'application/json': { schema: DocumentSettingsResponseSchema } } },
+    401: UnauthorizedResponse,
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'put',
+  path: '/api/modules/documents/settings',
+  operationId: 'updateDocumentsSettings',
+  summary: 'JSON-merge update of Documents module settings',
+  tags: ['documents'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: SettingsSchema } } } },
+  responses: {
+    200: { description: 'Settings saved', content: { 'application/json': { schema: DocumentSettingsSaveResponseSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    500: InternalServerErrorResponse,
+  },
+})
 
 export async function GET(_request: NextRequest) {
   try {

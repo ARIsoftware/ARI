@@ -1,16 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
 import { desc } from 'drizzle-orm'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
 import { generateApiKey } from '@/lib/api-keys'
 import { apiKeys } from '@/lib/db/schema/core-schema'
 import crypto from 'crypto'
+import {
+  createApiKeySchema,
+  ApiKeyListResponseSchema,
+  ApiKeyCreatedResponseSchema,
+} from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 
-const createApiKeySchema = z.object({
-  label: z.string().min(1).max(255),
-  expiresAt: z.string().datetime().nullable().optional(),
-  allowedIps: z.array(z.string().max(45)).max(20).nullable().optional(),
+registry.registerPath({
+  method: 'get',
+  path: '/api/api-keys',
+  operationId: 'listApiKeys',
+  summary: "List the user's API keys (key hashes never returned)",
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'API keys (newest first)', content: { 'application/json': { schema: ApiKeyListResponseSchema } } },
+    401: UnauthorizedResponse,
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/api-keys',
+  operationId: 'createApiKey',
+  summary: 'Create a new API key (raw_key returned once and only once)',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: createApiKeySchema } } } },
+  responses: {
+    201: { description: 'Created key + raw value (store immediately, never recoverable)', content: { 'application/json': { schema: ApiKeyCreatedResponseSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    500: InternalServerErrorResponse,
+  },
 })
 
 export async function GET() {

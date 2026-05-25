@@ -7,10 +7,29 @@ import { setupSql } from "@/lib/db/setup-sql"
 import { upsertEnvVars } from "@/lib/env-file"
 import { checkRateLimit, getClientIp, isSameOriginRequest } from "@/lib/modules/public-route-security"
 import { getPgCode } from "@/lib/db/postgres-error"
+import { BootstrapStatusSchema } from "@/lib/openapi/app-schemas"
+import { registry } from "@/lib/openapi/registry"
+import { ErrorResponseSchema } from "@/lib/openapi/common"
 
 export const debugRole = "auth-bootstrap"
 // Intentionally public — only succeeds when zero users exist (first-run admin setup)
 export const isPublic = true
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/auth/bootstrap',
+  operationId: 'authBootstrap',
+  summary: 'First-run admin setup — installs schema (if missing) and creates initial admin from ARI_FIRST_RUN_ADMIN_EMAIL/PASSWORD env vars',
+  description: 'Intentionally public, but only succeeds when zero users exist. Rate-limited and same-origin enforced.',
+  tags: ['auth'],
+  responses: {
+    200: { description: 'Status object describing what happened', content: { 'application/json': { schema: BootstrapStatusSchema } } },
+    403: { description: 'Cross-origin rejected', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    429: { description: 'Rate limit exceeded', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: { description: 'Install or signup error', content: { 'application/json': { schema: BootstrapStatusSchema } } },
+    503: { description: 'Database not configured', content: { 'application/json': { schema: BootstrapStatusSchema } } },
+  },
+})
 
 // Fast-path flag: skip all DB work once we've confirmed init in this process.
 let initialized = false

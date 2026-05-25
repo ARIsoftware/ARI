@@ -3,11 +3,28 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { withAdminDb } from '@/lib/db'
 import { moduleSettings } from '@/lib/db/schema'
 import { LICENSE_MODULE_ID } from '@/lib/license-helpers'
-import { z } from 'zod'
+import { validateLicenseSchema as ValidateSchema, ValidateLicenseResponseSchema } from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+
 const POLAR_ORGANIZATION_ID = "b1e4ddc2-774b-4bfb-aedd-5ffb0f67e8e3"
 
-const ValidateSchema = z.object({
-  key: z.string().min(1, "License key is required"),
+registry.registerPath({
+  method: 'post',
+  path: '/api/license/validate',
+  operationId: 'validateLicense',
+  summary: 'Validate a license key against the Polar API and store the result',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: ValidateSchema } } } },
+  responses: {
+    200: { description: 'Valid license — stored', content: { 'application/json': { schema: ValidateLicenseResponseSchema } } },
+    400: { description: 'Invalid license key', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    429: { description: 'Rate limited by upstream Polar API', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    503: { description: 'License service unavailable', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
 export async function POST(request: NextRequest) {

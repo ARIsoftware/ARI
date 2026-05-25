@@ -3,6 +3,23 @@ import { sql } from 'drizzle-orm'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { brainstormBoards, brainstormNodes } from '@/lib/db/schema'
 import { toSnakeCase } from '@/lib/api-helpers'
+import { BrainstormStatsResponseSchema } from '@/modules/brainstorm/lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/brainstorm/stats',
+  operationId: 'getBrainstormStats',
+  summary: 'Aggregate counts of brainstorm ideas (nodes) and boards for the user',
+  tags: ['brainstorm'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'Stats counters', content: { 'application/json': { schema: BrainstormStatsResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
 
 export async function GET() {
   try {

@@ -1,13 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
-import { z } from 'zod'
+import {
+  MusicPlayerSettingsSchema as SettingsSchema,
+  SuccessResponseSchema,
+} from '@/modules/music-player/lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { moduleSettings } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 
-const SettingsSchema = z.object({
-  onboardingCompleted: z.boolean().optional(),
-}).strict()
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/music-player/settings',
+  operationId: 'getMusicPlayerSettings',
+  summary: "Fetch the user's Music Player module settings (or empty object)",
+  tags: ['music-player'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'Settings object (all fields optional)', content: { 'application/json': { schema: SettingsSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'put',
+  path: '/api/modules/music-player/settings',
+  operationId: 'updateMusicPlayerSettings',
+  summary: 'Partial-merge update of Music Player module settings',
+  tags: ['music-player'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: SettingsSchema } } } },
+  responses: {
+    200: { description: 'Settings saved', content: { 'application/json': { schema: SuccessResponseSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
 
 export async function GET(request: NextRequest) {
   try {

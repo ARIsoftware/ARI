@@ -4,6 +4,42 @@ import { isProductionSafeOperation } from '@/lib/admin-helpers'
 import { getPoolClient } from '@/lib/db'
 import { logger } from '@/lib/logger'
 import { safeErrorResponse } from '@/lib/api-error'
+import { BackupImportRequestSchema, BackupImportResponseSchema } from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, UnauthorizedResponse } from '@/lib/openapi/common'
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/backup/import',
+  operationId: 'importBackup',
+  summary: 'Restore from a SQL backup file (transactional; rolls back on error)',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: BackupImportRequestSchema } } } },
+  responses: {
+    200: { description: 'Import result', content: { 'application/json': { schema: BackupImportResponseSchema } } },
+    400: { description: 'Invalid backup file', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    403: { description: 'Not allowed in production', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: { description: 'Import failed', content: { 'application/json': { schema: ErrorResponseSchema } } },
+  },
+})
+
+registry.registerPath({
+  method: 'put',
+  path: '/api/backup/import',
+  operationId: 'validateBackupFile',
+  summary: 'Validate a backup file without applying it',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'multipart/form-data': { schema: BackupImportRequestSchema } } } },
+  responses: {
+    200: { description: 'Validation result', content: { 'application/json': { schema: BackupImportResponseSchema } } },
+    400: { description: 'No file provided', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    500: { description: 'Validation failed', content: { 'application/json': { schema: ErrorResponseSchema } } },
+  },
+})
 
 // Validate SQL file structure and content
 async function validateSQLFile(content: string): Promise<{

@@ -1,13 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateQueryParams, createErrorResponse } from '@/lib/api-helpers'
 import { getStorageProvider, sanitizeBucketName, readStorageConfig } from '@/lib/storage'
+import { storageListQuerySchema as listSchema, StorageListResponseSchema } from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 
-const listSchema = z.object({
-  bucket: z.string(),
-  limit: z.coerce.number().int().min(1).max(500).optional(),
-  offset: z.coerce.number().int().min(0).optional(),
+registry.registerPath({
+  method: 'get',
+  path: '/api/storage/list',
+  operationId: 'listStorageFiles',
+  summary: "List files in a bucket (paginated in-memory)",
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  request: { query: listSchema },
+  responses: {
+    200: { description: 'Bucket file listing', content: { 'application/json': { schema: StorageListResponseSchema } } },
+    400: { description: 'Validation error or invalid bucket', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
 export async function GET(request: NextRequest) {

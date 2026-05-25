@@ -11,31 +11,86 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { toSnakeCase } from '@/lib/api-helpers'
 import { z } from 'zod'
+import {
+  updateArticleSchema,
+  articleIdParamSchema,
+  deleteArticleQuerySchema,
+  ArticleSingleResponseSchema,
+  ArticleDeleteResponseSchema,
+} from '@/modules/knowledge-manager/lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { knowledgeArticles, knowledgeCollections } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 
-/**
- * Validation Schema for PATCH requests
- */
-const UpdateArticleSchema = z.object({
-  title: z.string()
-    .min(1, 'Title is required')
-    .max(255, 'Title must be less than 255 characters')
-    .optional(),
-  content: z.string().optional(),
+// Runtime schema adds tag normalization transform that the OpenAPI schema omits
+// so the spec describes the raw input shape.
+const UpdateArticleSchema = updateArticleSchema.extend({
   tags: z.array(z.string().max(50))
     .transform(tags =>
       [...new Set(tags.map(tag => tag.toLowerCase().trim().replace(/^#/, '')))]
         .filter(tag => tag.length > 0)
     )
     .optional(),
-  collection_id: z.string().uuid().nullable().optional(),
-  status: z.enum(['draft', 'published']).optional(),
-  is_favorite: z.boolean().optional(),
-  is_deleted: z.boolean().optional()
 })
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/knowledge-manager/data/{id}',
+  operationId: 'getKnowledgeArticle',
+  summary: 'Get a single article by id (with joined collection ref)',
+  tags: ['knowledge-manager'],
+  security: DEFAULT_SECURITY,
+  request: { params: articleIdParamSchema },
+  responses: {
+    200: { description: 'Article', content: { 'application/json': { schema: ArticleSingleResponseSchema } } },
+    400: { description: 'Invalid id format', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    404: { description: 'Article not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'patch',
+  path: '/api/modules/knowledge-manager/data/{id}',
+  operationId: 'updateKnowledgeArticle',
+  summary: 'Update an article. Tags get normalized when present.',
+  tags: ['knowledge-manager'],
+  security: DEFAULT_SECURITY,
+  request: {
+    params: articleIdParamSchema,
+    body: { content: { 'application/json': { schema: updateArticleSchema } } },
+  },
+  responses: {
+    200: { description: 'Updated article (with joined collection ref)', content: { 'application/json': { schema: ArticleSingleResponseSchema } } },
+    400: { description: 'Validation error, invalid id, or no fields to update', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    404: { description: 'Article not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'delete',
+  path: '/api/modules/knowledge-manager/data/{id}',
+  operationId: 'deleteKnowledgeArticle',
+  summary: 'Delete an article. Default is soft delete (moves to trash); ?permanent=true hard-deletes.',
+  tags: ['knowledge-manager'],
+  security: DEFAULT_SECURITY,
+  request: {
+    params: articleIdParamSchema,
+    query: deleteArticleQuerySchema,
+  },
+  responses: {
+    200: { description: 'Deletion acknowledged', content: { 'application/json': { schema: ArticleDeleteResponseSchema } } },
+    400: { description: 'Invalid id format', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
 
 /**
  * GET Handler - Fetch a single article by ID

@@ -4,6 +4,42 @@ import { getGitHubConfig, commitModuleToGitHub } from '@/lib/modules/github-sync
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { logger } from '@/lib/logger'
 import { safeErrorResponse } from '@/lib/api-error'
+import {
+  githubSyncSchema,
+  GithubSyncResponseSchema,
+  GithubSyncStatusSchema,
+} from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema } from '@/lib/openapi/common'
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/github-sync',
+  operationId: 'getModulesGithubSyncStatus',
+  summary: 'Current GitHub sync configuration (no token returned)',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'GitHub sync config', content: { 'application/json': { schema: GithubSyncStatusSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+  },
+})
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/github-sync',
+  operationId: 'commitModuleToGithub',
+  summary: 'Commit a module directory to the configured GitHub repository (Vercel deploys require this)',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: githubSyncSchema } } } },
+  responses: {
+    200: { description: 'Commit successful', content: { 'application/json': { schema: GithubSyncResponseSchema } } },
+    400: { description: 'GitHub not configured or invalid directory', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: { description: 'Sync failed', content: { 'application/json': { schema: ErrorResponseSchema } } },
+  },
+})
 
 export async function POST(request: NextRequest) {
   const { user } = await getAuthenticatedUser()

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AlertCircle, CheckCircle2, XCircle, Loader2, Shield, ShieldAlert, ShieldCheck, Database as DatabaseIcon, Package, Save, Key, Globe, Lock, ChevronRight, HardDrive } from 'lucide-react'
 import moduleManifest from '@/lib/generated/module-manifest.json'
+import { HTTP_METHODS, NON_MODULE_TAGS, X_ARI, type OpenApiSpec } from '@/lib/openapi/types'
 
 type ManifestModule = { id: string; name: string; enabled?: boolean }
 type ManifestApiRoute = { path: string; fullPath: string; moduleId: string; methods: string[] }
@@ -164,6 +165,130 @@ interface SecurityTestResult {
   error?: string
 }
 
+// Security metadata (isPublic, rate-limit, etc.) is carried on the spec as
+// path-level x-ari-* extensions, set in buildSpec.ts from manifest.publicRoutes.
+
+interface EndpointsData {
+  coreEndpoints: Array<{ path: string; fullPath: string; methods: string[] }>
+  moduleEndpoints: Array<{ path: string; fullPath: string; moduleId: string; methods: string[] }>
+  publicEndpoints: Array<{
+    path: string
+    fullPath: string
+    moduleId: string
+    methods: string[]
+    securityType: string
+    description?: string
+    hasRateLimit: boolean
+    requiresAuthIfUsers?: boolean
+  }>
+  summary: {
+    totalCore: number
+    totalModule: number
+    totalPublic: number
+    totalPrivate: number
+    modulesWithPublicRoutes: string[]
+    securityCoverage: Record<string, number>
+  }
+  warnings: string[]
+}
+
+function specToEndpointsData(spec: OpenApiSpec): EndpointsData {
+  const coreEndpoints: EndpointsData['coreEndpoints'] = []
+  const moduleEndpoints: EndpointsData['moduleEndpoints'] = []
+  const publicEndpoints: EndpointsData['publicEndpoints'] = []
+
+  for (const [fullPath, pathItem] of Object.entries(spec.paths ?? {})) {
+    const methods = HTTP_METHODS.filter((m) => m in pathItem).map((m) => m.toUpperCase())
+    if (methods.length === 0) continue
+
+    // Classify by operation tag, not URL prefix — file-system core routes
+    // (like /api/modules/all) live under /api/modules/* but are not module
+    // routes. We tag them 'app' in their registerPath calls; module routes
+    // are tagged with their module id (e.g. 'contacts', 'fitness').
+    const firstMethodKey = HTTP_METHODS.find((m) => m in pathItem)
+    const firstTag = firstMethodKey ? pathItem[firstMethodKey]?.tags?.[0] : undefined
+    const isModuleRoute = !!firstTag && !NON_MODULE_TAGS.has(firstTag)
+    const isPublic = pathItem[X_ARI.PUBLIC] === true
+    const moduleId = isModuleRoute ? firstTag! : String(pathItem[X_ARI.MODULE_ID] ?? 'core')
+
+    if (isModuleRoute && !isPublic) {
+      moduleEndpoints.push({ path: fullPath, fullPath, moduleId, methods })
+    } else if (!isModuleRoute) {
+      // Public core routes (e.g. /api/auth/bootstrap) appear in BOTH lists —
+      // coreEndpoints drives the inventory, publicEndpoints lets the security
+      // tester skip them without flagging them as unauthenticated.
+      coreEndpoints.push({ path: fullPath, fullPath, methods })
+    }
+
+    if (isPublic) {
+      publicEndpoints.push({
+        path: fullPath,
+        fullPath,
+        moduleId,
+        methods,
+        securityType: String(pathItem[X_ARI.SECURITY_TYPE] ?? 'unknown'),
+        hasRateLimit: pathItem[X_ARI.RATE_LIMIT] === true,
+        requiresAuthIfUsers: pathItem[X_ARI.REQUIRES_AUTH_IF_USERS] === true,
+        description: typeof pathItem[X_ARI.DESCRIPTION] === 'string' ? (pathItem[X_ARI.DESCRIPTION] as string) : undefined,
+      })
+    }
+  }
+
+  const securityCoverage: Record<string, number> = {}
+  for (const ep of publicEndpoints) {
+    securityCoverage[ep.securityType] = (securityCoverage[ep.securityType] ?? 0) + 1
+  }
+  const modulesWithPublicRoutes = Array.from(new Set(publicEndpoints.map((e) => e.moduleId).filter(Boolean)))
+
+  const warnings: string[] = []
+  const rateLimitOnly = publicEndpoints.filter((e) => e.securityType === 'rate_limit_only')
+  if (rateLimitOnly.length > 0) {
+    warnings.push(`${rateLimitOnly.length} endpoint(s) use rate_limit_only security - consider adding stronger protection`)
+  }
+  const noRateLimit = publicEndpoints.filter((e) => !e.hasRateLimit && e.securityType !== 'rate_limit_only')
+  if (noRateLimit.length > 0) {
+    warnings.push(`${noRateLimit.length} public endpoint(s) have no rate limiting configured`)
+  }
+
+  return {
+    coreEndpoints,
+    moduleEndpoints,
+    publicEndpoints,
+    summary: {
+      totalCore: coreEndpoints.length,
+      totalModule: moduleEndpoints.length,
+      totalPublic: publicEndpoints.length,
+      totalPrivate: coreEndpoints.length + moduleEndpoints.length,
+      modulesWithPublicRoutes,
+      securityCoverage,
+    },
+    warnings,
+  }
+}
+
+// Spec is regenerated only at server boot, so cache across the session.
+// pendingFetch dedupes overlapping callers so the four call sites here can't
+// race (e.g. mount + security-test button before the first resolves).
+let endpointsCache: EndpointsData | null = null
+let pendingFetch: Promise<EndpointsData | null> | null = null
+
+async function fetchEndpointsFromSpec(): Promise<EndpointsData | null> {
+  if (endpointsCache) return endpointsCache
+  if (pendingFetch) return pendingFetch
+  pendingFetch = (async () => {
+    try {
+      const response = await fetch('/api/openapi.json')
+      if (!response.ok) return null
+      const spec = (await response.json()) as OpenApiSpec
+      endpointsCache = specToEndpointsData(spec)
+      return endpointsCache
+    } finally {
+      pendingFetch = null
+    }
+  })()
+  return pendingFetch
+}
+
 export default function DatabaseTestPage() {
   // Use the global Supabase client from context (already authenticated)
   const { user, session } = useAuth()
@@ -191,38 +316,7 @@ export default function DatabaseTestPage() {
   const [moduleResults, setModuleResults] = useState<TestResult[]>([])
   const [backupResults, setBackupResults] = useState<TestResult[]>([])
   const [authConfigResults, setAuthConfigResults] = useState<TestResult[]>([])
-  const [endpointsData, setEndpointsData] = useState<{
-    coreEndpoints: Array<{
-      path: string
-      fullPath: string
-      methods: string[]
-    }>
-    moduleEndpoints: Array<{
-      path: string
-      fullPath: string
-      moduleId: string
-      methods: string[]
-    }>
-    publicEndpoints: Array<{
-      path: string
-      fullPath: string
-      moduleId: string
-      methods: string[]
-      securityType: string
-      description?: string
-      hasRateLimit: boolean
-      requiresAuthIfUsers?: boolean
-    }>
-    summary: {
-      totalCore: number
-      totalModule: number
-      totalPublic: number
-      totalPrivate: number
-      modulesWithPublicRoutes: string[]
-      securityCoverage: Record<string, number>
-    }
-    warnings: string[]
-  } | null>(null)
+  const [endpointsData, setEndpointsData] = useState<EndpointsData | null>(null)
   const [healthChecks, setHealthChecks] = useState<{
     database: 'loading' | 'ok' | 'error'
     domain: { status: 'loading' | 'ok'; hostname: string }
@@ -254,14 +348,11 @@ export default function DatabaseTestPage() {
     }
     runHealthChecks()
 
-    // Auto-fetch endpoint summary on mount
+    // Auto-fetch endpoint summary on mount (derived from /api/openapi.json)
     async function fetchEndpointSummary() {
       try {
-        const response = await fetch(route('health-endpoints'))
-        if (response.ok) {
-          const data = await response.json()
-          setEndpointsData(data)
-        }
+        const data = await fetchEndpointsFromSpec()
+        if (data) setEndpointsData(data)
       } catch {
         // Silently fail — the endpoints tab can still manually load
       }
@@ -310,8 +401,9 @@ export default function DatabaseTestPage() {
   const testApiEndpointSecurity = async (endpoint: string, method: string) => {
     updateSecurityResult(endpoint, method, { status: 'testing' })
 
-    // Skip routes that are intentionally public — sourced from the manifest
-    // via /api/health/endpoints (auto-fetched on mount). No hardcoded list.
+    // Skip routes that are intentionally public — sourced from the spec's
+    // x-ari-public extensions (transformed in specToEndpointsData, auto-fetched
+    // on mount). No hardcoded list.
     const knownPublic = endpointsData?.publicEndpoints?.some((e) => e.fullPath === endpoint)
     if (knownPublic) {
       updateSecurityResult(endpoint, method, {
@@ -402,12 +494,11 @@ export default function DatabaseTestPage() {
     setSecurityResults([])
 
     try {
-      // Reuse already-fetched data or fetch fresh
+      // Reuse already-fetched data or fetch fresh from /api/openapi.json
       let data = endpointsData
       if (!data) {
-        const response = await fetch(route('health-endpoints'))
-        if (!response.ok) throw new Error(`Failed to fetch endpoints: ${response.status}`)
-        data = await response.json()
+        data = await fetchEndpointsFromSpec()
+        if (!data) throw new Error('Failed to fetch /api/openapi.json')
         setEndpointsData(data)
       }
 
@@ -1190,14 +1281,11 @@ export default function DatabaseTestPage() {
   const runEndpointsTests = async () => {
     setIsRunningEndpointsTests(true)
     setEndpointsData(null)
-    console.log('🌐 Fetching endpoints data...')
+    console.log('🌐 Fetching endpoints data from /api/openapi.json...')
 
     try {
-      const response = await fetch(route('health-endpoints'))
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-      const data = await response.json()
+      const data = await fetchEndpointsFromSpec()
+      if (!data) throw new Error('Failed to fetch /api/openapi.json')
       setEndpointsData(data)
       console.log('✅ Endpoints data loaded:', data.summary)
     } catch (error: unknown) {
@@ -1215,12 +1303,11 @@ export default function DatabaseTestPage() {
     console.log('🔐 Starting public endpoint security tests...')
 
     try {
-      // Reuse already-fetched data or fetch fresh
+      // Reuse already-fetched data or fetch fresh from /api/openapi.json
       let data = endpointsData
       if (!data) {
-        const response = await fetch(route('health-endpoints'))
-        if (!response.ok) throw new Error(`Failed to fetch endpoints: ${response.status}`)
-        data = await response.json()
+        data = await fetchEndpointsFromSpec()
+        if (!data) throw new Error('Failed to fetch /api/openapi.json')
         setEndpointsData(data)
       }
       const publicEndpoints = data!.publicEndpoints || []

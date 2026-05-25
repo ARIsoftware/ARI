@@ -1,33 +1,83 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, validateQueryParams, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
-import { z } from 'zod'
+import {
+  createQuoteSchema,
+  updateQuoteSchema,
+  deleteQuoteQuerySchema as deleteQuerySchema,
+  listQuotesQuerySchema as listQuerySchema,
+  QuoteSchema,
+  QuoteListSchema,
+  DeleteSuccessSchema,
+} from '@/modules/quotes/lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 import { quotes } from '@/lib/db/schema'
 import { eq, desc, sql, and } from 'drizzle-orm'
 
-// Validation schemas
-const createQuoteSchema = z.object({
-  quote: z.object({
-    quote: z.string().min(1, 'Quote text is required').max(1000, 'Quote is too long'),
-    author: z.string().max(200, 'Author name is too long').optional().nullable()
-  })
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/quotes/quotes',
+  operationId: 'listQuotes',
+  summary: 'List quotes',
+  tags: ['quotes'],
+  security: DEFAULT_SECURITY,
+  request: { query: listQuerySchema },
+  responses: {
+    200: { description: "All of the user's quotes (created_at desc)", content: { 'application/json': { schema: QuoteListSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    500: InternalServerErrorResponse,
+  },
 })
 
-const updateQuoteSchema = z.object({
-  id: z.string().uuid('Invalid quote ID format'),
-  updates: z.object({
-    quote: z.string().min(1, 'Quote text is required').max(1000, 'Quote is too long').optional(),
-    author: z.string().max(200, 'Author name is too long').optional().nullable()
-  })
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/quotes/quotes',
+  operationId: 'createQuote',
+  summary: 'Create a quote',
+  tags: ['quotes'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: createQuoteSchema } } } },
+  responses: {
+    201: { description: 'Created quote', content: { 'application/json': { schema: QuoteSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    500: InternalServerErrorResponse,
+  },
 })
 
-const deleteQuerySchema = z.object({
-  id: z.string().uuid('Invalid quote ID format')
+registry.registerPath({
+  method: 'put',
+  path: '/api/modules/quotes/quotes',
+  operationId: 'updateQuote',
+  summary: 'Update a quote by id (id in body)',
+  tags: ['quotes'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: updateQuoteSchema } } } },
+  responses: {
+    200: { description: 'Updated quote', content: { 'application/json': { schema: QuoteSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    404: { description: 'Quote not found or unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
-const listQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(500).optional(),
-  offset: z.coerce.number().int().min(0).optional(),
+registry.registerPath({
+  method: 'delete',
+  path: '/api/modules/quotes/quotes',
+  operationId: 'deleteQuote',
+  summary: 'Delete a quote by id (passed as query parameter)',
+  tags: ['quotes'],
+  security: DEFAULT_SECURITY,
+  request: { query: deleteQuerySchema },
+  responses: {
+    200: { description: 'Deletion acknowledged', content: { 'application/json': { schema: DeleteSuccessSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    500: InternalServerErrorResponse,
+  },
 })
 
 export async function GET(request: NextRequest) {

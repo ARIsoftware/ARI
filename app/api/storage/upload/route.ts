@@ -10,6 +10,27 @@ import {
   isStorageUnavailable,
   readStorageConfig,
 } from '@/lib/storage'
+import { storageUploadFormSchema, StorageUploadResponseSchema } from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/storage/upload',
+  operationId: 'uploadToStorage',
+  summary: 'Upload a file to a bucket (multipart/form-data with bucket + file)',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'multipart/form-data': { schema: storageUploadFormSchema } } } },
+  responses: {
+    201: { description: 'Uploaded file metadata', content: { 'application/json': { schema: StorageUploadResponseSchema } } },
+    400: { description: 'Missing bucket/file or disallowed extension', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    413: { description: 'Request too large', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    503: { description: 'Storage backend unavailable', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
 
 export async function POST(request: NextRequest) {
   try {

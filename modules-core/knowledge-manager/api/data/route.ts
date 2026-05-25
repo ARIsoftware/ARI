@@ -10,28 +10,58 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { toSnakeCase } from '@/lib/api-helpers'
 import { z } from 'zod'
+import {
+  createArticleSchema,
+  listArticlesQuerySchema,
+  ArticleListResponseSchema,
+  ArticleSingleResponseSchema,
+} from '@/modules/knowledge-manager/lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { knowledgeArticles, knowledgeCollections } from '@/lib/db/schema'
 import { eq, desc, asc, ilike, or, and, sql, arrayContains } from 'drizzle-orm'
 import type { TagWithCount } from '../../types'
 
-/**
- * Validation Schema for POST requests
- */
-const CreateArticleSchema = z.object({
-  title: z.string()
-    .min(1, 'Title is required')
-    .max(255, 'Title must be less than 255 characters'),
-  content: z.string()
-    .default(''),
+// Apply normalization transform at runtime (kept separate from OpenAPI schema
+// so the spec describes the raw input shape, not the post-transform shape).
+const CreateArticleSchema = createArticleSchema.extend({
   tags: z.array(z.string().max(50))
     .default([])
     .transform(tags =>
       [...new Set(tags.map(tag => tag.toLowerCase().trim().replace(/^#/, '')))]
         .filter(tag => tag.length > 0)
     ),
-  collection_id: z.string().uuid().nullable().optional(),
-  status: z.enum(['draft', 'published']).default('draft'),
-  is_favorite: z.boolean().default(false)
+})
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/knowledge-manager/data',
+  operationId: 'listKnowledgeArticles',
+  summary: 'List knowledge articles with filters, search, and tag counts',
+  tags: ['knowledge-manager'],
+  security: DEFAULT_SECURITY,
+  request: { query: listArticlesQuerySchema },
+  responses: {
+    200: { description: 'Articles, total count, and tag histogram', content: { 'application/json': { schema: ArticleListResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/knowledge-manager/data',
+  operationId: 'createKnowledgeArticle',
+  summary: 'Create a knowledge article (tags get normalized: lowercased, deduped, stripped of leading #)',
+  tags: ['knowledge-manager'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: createArticleSchema } } } },
+  responses: {
+    201: { description: 'Created article (with joined collection ref)', content: { 'application/json': { schema: ArticleSingleResponseSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
 /**

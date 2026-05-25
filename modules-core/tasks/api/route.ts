@@ -1,11 +1,89 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, validateQueryParams, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
-import { createTaskSchema, updateTaskSchema, uuidParamSchema } from '@/modules/tasks/lib/validation'
+import {
+  createTaskSchema,
+  TaskSchema,
+  TaskListSchema,
+  UpdateTaskRequestSchema,
+  DeleteTaskQuerySchema,
+  DeleteSuccessSchema,
+} from '@/modules/tasks/lib/validation'
 import { calculatePriorityScore } from '@/modules/tasks/lib/priority-utils'
-import { z } from 'zod'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 import { tasks } from '@/lib/db/schema'
 import { desc, eq, asc, sql, and } from 'drizzle-orm'
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/tasks',
+  operationId: 'listTasks',
+  summary: 'List tasks',
+  tags: ['tasks'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: {
+      description: "All of the authenticated user's tasks, ordered by order_index",
+      content: { 'application/json': { schema: TaskListSchema } },
+    },
+    401: UnauthorizedResponse,
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/tasks',
+  operationId: 'createTask',
+  summary: 'Create a task',
+  tags: ['tasks'],
+  security: DEFAULT_SECURITY,
+  request: {
+    body: { content: { 'application/json': { schema: createTaskSchema } } },
+  },
+  responses: {
+    201: { description: 'Created task', content: { 'application/json': { schema: TaskSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'put',
+  path: '/api/modules/tasks',
+  operationId: 'updateTask',
+  summary: 'Update a task by id',
+  tags: ['tasks'],
+  security: DEFAULT_SECURITY,
+  request: {
+    body: { content: { 'application/json': { schema: UpdateTaskRequestSchema } } },
+  },
+  responses: {
+    200: { description: 'Updated task', content: { 'application/json': { schema: TaskSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    404: { description: 'Task not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'delete',
+  path: '/api/modules/tasks',
+  operationId: 'deleteTask',
+  summary: 'Delete a task by id (passed as query parameter)',
+  tags: ['tasks'],
+  security: DEFAULT_SECURITY,
+  request: { query: DeleteTaskQuerySchema },
+  responses: {
+    200: { description: 'Deletion acknowledged', content: { 'application/json': { schema: DeleteSuccessSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    500: InternalServerErrorResponse,
+  },
+})
 
 export async function GET(request: NextRequest) {
   try {
@@ -103,13 +181,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    // Validate request body
-    const updateRequestSchema = z.object({
-      id: z.string().uuid('Invalid task ID format'),
-      updates: updateTaskSchema.shape.task
-    })
-
-    const validation = await validateRequestBody(request, updateRequestSchema)
+    const validation = await validateRequestBody(request, UpdateTaskRequestSchema)
     if (!validation.success) {
       return validation.response
     }
@@ -206,12 +278,7 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
 
-    // Validate query parameters
-    const deleteQuerySchema = z.object({
-      id: z.string().uuid('Invalid task ID format')
-    })
-
-    const queryValidation = validateQueryParams(searchParams, deleteQuerySchema)
+    const queryValidation = validateQueryParams(searchParams, DeleteTaskQuerySchema)
     if (!queryValidation.success) {
       return queryValidation.response
     }

@@ -9,13 +9,45 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { toSnakeCase, validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
-import { z } from 'zod'
 import { documents, documentTags, documentTagAssignments } from '@/lib/db/schema'
 import { count, eq, and } from 'drizzle-orm'
+import {
+  createTagSchema as CreateTagSchema,
+  TagListResponseSchema,
+  TagSingleResponseSchema,
+} from '../../lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 
-const CreateTagSchema = z.object({
-  name: z.string().min(1).max(100),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Invalid hex color'),
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/documents/tags',
+  operationId: 'listDocumentTags',
+  summary: "List the user's document tags with usage counts",
+  tags: ['documents'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'Tags with usage counts', content: { 'application/json': { schema: TagListResponseSchema } } },
+    401: UnauthorizedResponse,
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/documents/tags',
+  operationId: 'createDocumentTag',
+  summary: 'Create a document tag (name must be unique per user)',
+  tags: ['documents'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: CreateTagSchema } } } },
+  responses: {
+    201: { description: 'Created tag', content: { 'application/json': { schema: TagSingleResponseSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    409: { description: 'Tag name already exists for this user', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
 /**

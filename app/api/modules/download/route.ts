@@ -11,7 +11,27 @@ import { inflateRawSync } from 'zlib'
 import { runSchemaSqlAtPath } from '@/lib/modules/schema-installer'
 import { installModuleNpmDeps, type NpmInstallEvent, type NpmInstallResult } from '@/lib/modules/npm-installer'
 import type { ModuleManifest } from '@/lib/modules/module-types'
+import { downloadModuleSchema } from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema } from '@/lib/openapi/common'
 import { TARGET_EXISTS_CODE, type ConflictType } from '@/lib/modules/install-types'
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/download',
+  operationId: 'downloadAndInstallModule',
+  summary: 'Stream-install a module: download zip, extract, install npm deps, sync to GitHub (Vercel), run schema.sql',
+  description: 'Streaming response — newline-delimited JSON (NDJSON) events for each install stage (extract → npm → github → schema → finalize). Content-Type: application/x-ndjson.',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: downloadModuleSchema } } } },
+  responses: {
+    200: { description: 'NDJSON stream of install events', content: { 'application/x-ndjson': { schema: { type: 'string' } } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    502: { description: 'Upstream module API returned an error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+  },
+})
 
 /**
  * Pure Node.js ZIP extractor using built-in zlib.

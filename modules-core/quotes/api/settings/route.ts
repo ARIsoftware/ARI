@@ -11,18 +11,43 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
-import { z } from 'zod'
+import {
+  QuoteSettingsSchema as SettingsSchema,
+  QuoteSettingsSaveResponseSchema,
+} from '@/modules/quotes/lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { moduleSettings } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 
-/**
- * Settings Schema
- * Validates the structure of settings being saved
- */
-const SettingsSchema = z.object({
-  showAuthor: z.boolean().optional(),
-  cardsPerRow: z.number().int().min(1).max(4).optional(),
-  defaultSortOrder: z.enum(['asc', 'desc']).optional()
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/quotes/settings',
+  operationId: 'getQuoteSettings',
+  summary: "Fetch the user's Quotes module settings (or empty object)",
+  tags: ['quotes'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'Settings object (all fields optional)', content: { 'application/json': { schema: SettingsSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'put',
+  path: '/api/modules/quotes/settings',
+  operationId: 'updateQuoteSettings',
+  summary: 'Save Quotes module settings (full replace)',
+  tags: ['quotes'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: SettingsSchema } } } },
+  responses: {
+    200: { description: 'Settings saved', content: { 'application/json': { schema: QuoteSettingsSaveResponseSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
 /**

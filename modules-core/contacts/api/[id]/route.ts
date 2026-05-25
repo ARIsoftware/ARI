@@ -1,9 +1,105 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, toSnakeCase } from '@/lib/api-helpers'
-import { updateContactSchema } from '@/modules/contacts/lib/validation'
+import {
+  updateContactSchema,
+  ContactSchema,
+  ContactIdParamSchema,
+  DeleteSuccessSchema,
+} from '@/modules/contacts/lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema } from '@/lib/openapi/common'
 import { contacts } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/contacts/{id}',
+  operationId: 'getContact',
+  summary: 'Get a contact by id',
+  tags: ['contacts'],
+  security: DEFAULT_SECURITY,
+  request: { params: ContactIdParamSchema },
+  responses: {
+    200: {
+      description: 'Contact',
+      content: { 'application/json': { schema: ContactSchema } },
+    },
+    401: {
+      description: 'Authentication required',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    404: {
+      description: 'Contact not found',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    500: {
+      description: 'Internal server error',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+  },
+})
+
+registry.registerPath({
+  method: 'patch',
+  path: '/api/modules/contacts/{id}',
+  operationId: 'updateContact',
+  summary: 'Update a contact',
+  tags: ['contacts'],
+  security: DEFAULT_SECURITY,
+  request: {
+    params: ContactIdParamSchema,
+    body: {
+      content: { 'application/json': { schema: updateContactSchema } },
+    },
+  },
+  responses: {
+    200: {
+      description: 'Updated contact',
+      content: { 'application/json': { schema: ContactSchema } },
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    401: {
+      description: 'Authentication required',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    404: {
+      description: 'Contact not found',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    500: {
+      description: 'Internal server error',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+  },
+})
+
+registry.registerPath({
+  method: 'delete',
+  path: '/api/modules/contacts/{id}',
+  operationId: 'deleteContact',
+  summary: 'Delete a contact',
+  tags: ['contacts'],
+  security: DEFAULT_SECURITY,
+  request: { params: ContactIdParamSchema },
+  responses: {
+    200: {
+      description: 'Deletion acknowledged',
+      content: { 'application/json': { schema: DeleteSuccessSchema } },
+    },
+    401: {
+      description: 'Authentication required',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    500: {
+      description: 'Internal server error',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+  },
+})
 
 // GET /api/contacts/[id] - Get a specific contact
 export async function GET(

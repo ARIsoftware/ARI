@@ -2,11 +2,28 @@ import { NextResponse } from "next/server"
 import { pool } from "@/lib/db/pool"
 import { getAuthenticatedUser } from "@/lib/auth-helpers"
 import { safeErrorResponse } from "@/lib/api-error"
+import { HealthCheckSchema } from "@/lib/openapi/app-schemas"
+import { registry } from "@/lib/openapi/registry"
+import { DEFAULT_SECURITY, ErrorResponseSchema, UnauthorizedResponse } from "@/lib/openapi/common"
 
 export const dynamic = "force-dynamic"
 // Identifier consumed by /health via the manifest — do not rename without
 // updating any callers that look this role up.
 export const debugRole = "health-database"
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/health',
+  operationId: 'healthCheck',
+  summary: 'Database connectivity health check',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'All checks passed', content: { 'application/json': { schema: HealthCheckSchema } } },
+    401: UnauthorizedResponse,
+    503: { description: 'One or more checks failed', content: { 'application/json': { schema: HealthCheckSchema } } },
+  },
+})
 
 export async function GET() {
   const { user } = await getAuthenticatedUser()

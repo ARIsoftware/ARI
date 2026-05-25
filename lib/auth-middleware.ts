@@ -4,7 +4,7 @@
  * Full session validation happens in API routes.
  */
 
-const BETTER_AUTH_COOKIE_NAME = "better-auth.session_token"
+export const BETTER_AUTH_COOKIE_NAME = "better-auth.session_token"
 const SECURE_COOKIE_NAME = `__Secure-${BETTER_AUTH_COOKIE_NAME}`
 const isProduction = process.env.NODE_ENV === 'production'
 
@@ -12,7 +12,7 @@ const isProduction = process.env.NODE_ENV === 'production'
 const MIN_TOKEN_LENGTH = 32
 
 // API key format: ari_k_ + 64 hex chars = 70 chars minimum
-const API_KEY_PREFIX = "ari_k_"
+export const API_KEY_PREFIX = "ari_k_"
 const MIN_API_KEY_LENGTH = 38
 
 /**

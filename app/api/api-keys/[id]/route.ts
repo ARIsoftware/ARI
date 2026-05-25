@@ -1,14 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
 import { eq } from 'drizzle-orm'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
 import { apiKeys } from '@/lib/db/schema/core-schema'
+import {
+  appIdParamSchema,
+  updateApiKeySchema,
+  ApiKeySchema,
+  SuccessSchema,
+} from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 
-const updateApiKeySchema = z.object({
-  label: z.string().min(1).max(255).optional(),
-  expiresAt: z.string().datetime().nullable().optional(),
-  allowedIps: z.array(z.string().max(45)).max(20).nullable().optional(),
+registry.registerPath({
+  method: 'patch',
+  path: '/api/api-keys/{id}',
+  operationId: 'updateApiKey',
+  summary: 'Update an API key (label, expiry, IP allowlist)',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  request: {
+    params: appIdParamSchema,
+    body: { content: { 'application/json': { schema: updateApiKeySchema } } },
+  },
+  responses: {
+    200: { description: 'Updated key', content: { 'application/json': { schema: ApiKeySchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    404: { description: 'API key not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'delete',
+  path: '/api/api-keys/{id}',
+  operationId: 'deleteApiKey',
+  summary: 'Revoke (delete) an API key',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  request: { params: appIdParamSchema },
+  responses: {
+    200: { description: 'Revocation acknowledged', content: { 'application/json': { schema: SuccessSchema } } },
+    401: UnauthorizedResponse,
+    404: { description: 'API key not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
 export async function PATCH(

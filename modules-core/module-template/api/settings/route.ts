@@ -13,29 +13,44 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
-import { safeText } from '@/lib/validation'
-import { z } from 'zod'
+import {
+  ModuleTemplateSettingsSchema as SettingsSchema,
+  SettingsSavedSchema,
+} from '@/modules/module-template/lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { moduleSettings } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 
-// All fields are `.optional()` to support partial updates. `.strict()` rejects
-// unknown keys so a typo or smuggled field can't land in the JSONB blob.
-const SettingsSchema = z.object({
-  onboardingCompleted: z.boolean().optional(),
-  sampleQuestion1: safeText(500).optional(),
-  sampleQuestion2: safeText(500).optional(),
-  sampleQuestion3: safeText(500).optional(),
-  enableNotifications: z.boolean().optional(),
-  showInDashboard: z.boolean().optional(),
-  defaultMessage: safeText(500).optional(),
-  userDisplayName: safeText(100).optional(),
-  theme: z.enum(['light', 'dark', 'auto'], {
-    errorMap: () => ({ message: 'Theme must be one of: light, dark, auto' }),
-  }).optional(),
-  refreshInterval: z.enum(['30', '60', '120'], {
-    errorMap: () => ({ message: 'Refresh interval must be one of: 30, 60, 120 (seconds)' }),
-  }).optional(),
-}).strict()
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/module-template/settings',
+  operationId: 'getModuleTemplateSettings',
+  summary: "Fetch the user's module-template settings (or empty object)",
+  tags: ['module-template'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'Settings object (all fields optional)', content: { 'application/json': { schema: SettingsSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'put',
+  path: '/api/modules/module-template/settings',
+  operationId: 'updateModuleTemplateSettings',
+  summary: 'JSONB-merge update of module-template settings',
+  tags: ['module-template'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: SettingsSchema } } } },
+  responses: {
+    200: { description: 'Settings saved', content: { 'application/json': { schema: SettingsSavedSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
 
 export async function GET(request: NextRequest) {
   try {

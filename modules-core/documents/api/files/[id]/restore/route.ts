@@ -11,6 +11,29 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { toSnakeCase, createErrorResponse } from '@/lib/api-helpers'
 import { documents } from '@/lib/db/schema'
 import { eq, and, isNotNull, sql } from 'drizzle-orm'
+import {
+  idParamSchema,
+  RestoreDocumentResponseSchema,
+} from '../../../../lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/documents/files/{id}/restore',
+  operationId: 'restoreDocumentFile',
+  summary: 'Restore a soft-deleted document from trash',
+  tags: ['documents'],
+  security: DEFAULT_SECURITY,
+  request: { params: idParamSchema },
+  responses: {
+    200: { description: 'Restored document', content: { 'application/json': { schema: RestoreDocumentResponseSchema } } },
+    400: { description: 'Invalid id format', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    404: { description: 'Document not found in trash', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
 
 /**
  * POST Handler - Restore file from trash

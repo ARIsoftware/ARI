@@ -1,7 +1,32 @@
 import { NextRequest } from 'next/server'
+import { z } from 'zod'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { createErrorResponse } from '@/lib/api-helpers'
 import { getStorageProvider, sanitizeBucketName, validateStoredFilename, readStorageConfig } from '@/lib/storage'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/storage/serve/{bucket}/{filename}',
+  operationId: 'serveStorageFile',
+  summary: 'Stream a binary file from a bucket (Content-Disposition: attachment, no inline render)',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  request: {
+    params: z.object({
+      bucket: z.string(),
+      filename: z.string(),
+    }),
+  },
+  responses: {
+    200: { description: 'Binary file stream', content: { '*/*': { schema: { type: 'string', format: 'binary' } } } },
+    400: { description: 'Invalid path / bucket / filename', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    404: { description: 'File not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
 
 export async function GET(
   _request: NextRequest,

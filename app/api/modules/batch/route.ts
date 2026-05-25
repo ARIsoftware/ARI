@@ -7,11 +7,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { setModuleEnabled } from '@/lib/modules/module-registry'
+import { batchModulesSchema, BatchModulesResponseSchema } from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 
 interface ModuleChange {
   moduleId: string
   enabled: boolean
 }
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/batch',
+  operationId: 'batchToggleModules',
+  summary: 'Enable/disable many modules in a single call',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: batchModulesSchema } } } },
+  responses: {
+    200: { description: 'All changes applied', content: { 'application/json': { schema: BatchModulesResponseSchema } } },
+    400: { description: 'Validation error or partial failure', content: { 'application/json': { schema: BatchModulesResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
 
 /**
  * POST /api/modules/batch

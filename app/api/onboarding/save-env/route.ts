@@ -5,10 +5,28 @@ import { checkRateLimit, getClientIp, isSameOriginRequest } from '@/lib/modules/
 import { requireAuthIfUsersExist } from '@/lib/auth-helpers'
 import { welcomeEnvSaveRequestSchema, flattenZodErrors } from '@/lib/validation'
 import { renderEnvFile } from '@/lib/env-file'
+import { SaveEnvSuccessSchema } from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 
 export const debugRole = "onboarding-save-env"
 // Public during setup — guarded below by user-count check
 export const isPublic = true
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/onboarding/save-env',
+  operationId: 'onboardingSaveEnv',
+  summary: 'Save .env.local from the onboarding flow (rate-limited, same-origin required)',
+  tags: ['app'],
+  responses: {
+    200: { description: 'Wrote .env.local successfully', content: { 'application/json': { schema: SaveEnvSuccessSchema } } },
+    400: { description: 'Invalid input', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    403: { description: 'Cross-origin rejected', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    429: { description: 'Rate limit exceeded', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
 
 export async function POST(request: NextRequest) {
   if (!checkRateLimit(`save-env:${getClientIp(request)}`, 3)) {

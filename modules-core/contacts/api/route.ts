@@ -1,12 +1,75 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
-import { createContactSchema } from '@/modules/contacts/lib/validation'
+import {
+  createContactSchema,
+  ContactSchema,
+  ContactListResponseSchema,
+  ContactQuerySchema,
+} from '@/modules/contacts/lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema } from '@/lib/openapi/common'
 import { contacts } from '@/lib/db/schema'
 import { asc, sql } from 'drizzle-orm'
 
 const MAX_LIMIT = 200
 const DEFAULT_LIMIT = 50
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/contacts',
+  operationId: 'listContacts',
+  summary: 'List contacts',
+  tags: ['contacts'],
+  security: DEFAULT_SECURITY,
+  request: { query: ContactQuerySchema },
+  responses: {
+    200: {
+      description: "Paginated list of the authenticated user's contacts",
+      content: { 'application/json': { schema: ContactListResponseSchema } },
+    },
+    401: {
+      description: 'Authentication required',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    500: {
+      description: 'Internal server error',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+  },
+})
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/contacts',
+  operationId: 'createContact',
+  summary: 'Create a contact',
+  tags: ['contacts'],
+  security: DEFAULT_SECURITY,
+  request: {
+    body: {
+      content: { 'application/json': { schema: createContactSchema } },
+    },
+  },
+  responses: {
+    201: {
+      description: 'Created contact',
+      content: { 'application/json': { schema: ContactSchema } },
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    401: {
+      description: 'Authentication required',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    500: {
+      description: 'Internal server error',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+  },
+})
 
 // GET /api/contacts - Fetch contacts with pagination
 export async function GET(request: NextRequest) {

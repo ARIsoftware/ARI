@@ -19,8 +19,25 @@ import { withUserContext } from '@/lib/db'
 import { moduleSettings } from '@/lib/db/schema'
 import { safeErrorResponse } from '@/lib/api-error'
 import { and, eq } from 'drizzle-orm'
+import { HealthRlsTestSchema } from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, UnauthorizedResponse } from '@/lib/openapi/common'
 
 export const debugRole = "health-rls-test"
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/health/rls-test',
+  operationId: 'runHealthRlsTest',
+  summary: 'End-to-end RLS isolation test using a sentinel module_settings row (positive + negative checks)',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'RLS test report', content: { 'application/json': { schema: HealthRlsTestSchema } } },
+    401: UnauthorizedResponse,
+    500: { description: 'Test failed', content: { 'application/json': { schema: ErrorResponseSchema } } },
+  },
+})
 
 // Sentinel module_id used exclusively by this diagnostic. Chosen to be
 // visually obvious and unlikely to collide with any real module id.

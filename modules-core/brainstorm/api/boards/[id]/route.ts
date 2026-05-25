@@ -4,27 +4,68 @@ import { z } from 'zod'
 import { toSnakeCase } from '@/lib/api-helpers'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import type { DrizzleDb } from '@/lib/db'
+import {
+  brainstormBoardIdParamSchema as ParamsSchema,
+  saveBrainstormBoardSchema as SaveBoardSchema,
+  BrainstormBoardDetailResponseSchema,
+  BrainstormBoardSaveResponseSchema,
+  BrainstormBoardDeleteResponseSchema,
+} from '@/modules/brainstorm/lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { brainstormBoards, brainstormEdges, brainstormNodes } from '@/lib/db/schema'
-import { BRAINSTORM_COLORS } from '@/modules/brainstorm/types'
 
-const ParamsSchema = z.object({
-  id: z.string().uuid('Board id must be a valid UUID'),
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/brainstorm/boards/{id}',
+  operationId: 'getBrainstormBoard',
+  summary: 'Load a brainstorm board with all nodes and edges',
+  tags: ['brainstorm'],
+  security: DEFAULT_SECURITY,
+  request: { params: ParamsSchema },
+  responses: {
+    200: { description: 'Board with graph', content: { 'application/json': { schema: BrainstormBoardDetailResponseSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    404: { description: 'Board not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
-const SaveBoardSchema = z.object({
-  name: z.string().min(1, 'Board name is required').max(200, 'Board name must be 200 characters or less'),
-  nodes: z.array(z.object({
-    id: z.string().uuid('Node id must be a valid UUID'),
-    text: z.string().max(500, 'Node text must be 500 characters or less'),
-    x: z.number().finite('x must be a finite number'),
-    y: z.number().finite('y must be a finite number'),
-    color: z.enum([...BRAINSTORM_COLORS] as [string, ...string[]], { message: 'Node color is invalid' }),
-  })),
-  edges: z.array(z.object({
-    id: z.string().uuid('Edge id must be a valid UUID'),
-    source_node_id: z.string().uuid('Source node id must be a valid UUID'),
-    target_node_id: z.string().uuid('Target node id must be a valid UUID'),
-  })),
+registry.registerPath({
+  method: 'put',
+  path: '/api/modules/brainstorm/boards/{id}',
+  operationId: 'saveBrainstormBoard',
+  summary: "Replace a board's full content (name, all nodes, all edges) in a single transaction",
+  tags: ['brainstorm'],
+  security: DEFAULT_SECURITY,
+  request: {
+    params: ParamsSchema,
+    body: { content: { 'application/json': { schema: SaveBoardSchema } } },
+  },
+  responses: {
+    200: { description: 'Saved board (loaded post-write)', content: { 'application/json': { schema: BrainstormBoardSaveResponseSchema } } },
+    400: { description: 'Validation error or invalid graph (self-loop / dangling edge / duplicate)', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    404: { description: 'Board not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'delete',
+  path: '/api/modules/brainstorm/boards/{id}',
+  operationId: 'deleteBrainstormBoard',
+  summary: 'Delete a brainstorm board (cascades to nodes and edges)',
+  tags: ['brainstorm'],
+  security: DEFAULT_SECURITY,
+  request: { params: ParamsSchema },
+  responses: {
+    200: { description: 'Deletion acknowledged', content: { 'application/json': { schema: BrainstormBoardDeleteResponseSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
 function validateGraph(nodes: z.infer<typeof SaveBoardSchema>['nodes'], edges: z.infer<typeof SaveBoardSchema>['edges']) {

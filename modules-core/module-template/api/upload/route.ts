@@ -17,10 +17,32 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { createErrorResponse } from '@/lib/api-helpers'
 import { getStorageProvider, sanitizeFilename, readStorageConfig } from '@/lib/storage'
+import {
+  UploadFormSchema,
+  UploadResponseSchema,
+} from '@/modules/module-template/lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 
 const BUCKET = 'module-template'
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/module-template/upload',
+  operationId: 'uploadModuleTemplateFile',
+  summary: 'Upload a single image file (jpeg/png/webp, max 5MB)',
+  tags: ['module-template'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'multipart/form-data': { schema: UploadFormSchema } } } },
+  responses: {
+    201: { description: 'Uploaded file metadata', content: { 'application/json': { schema: UploadResponseSchema } } },
+    400: { description: 'No file, file too large, or disallowed content type', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
 
 export async function POST(request: NextRequest) {
   try {

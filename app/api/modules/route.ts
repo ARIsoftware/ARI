@@ -9,6 +9,43 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { getEnabledModules, setModuleEnabled } from '@/lib/modules/module-registry'
+import {
+  toggleModuleSchema,
+  ToggleModuleResponseSchema,
+  ListEnabledModulesResponseSchema,
+} from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules',
+  operationId: 'listEnabledModules',
+  summary: "List the user's enabled modules",
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'Enabled modules + count', content: { 'application/json': { schema: ListEnabledModulesResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules',
+  operationId: 'toggleModule',
+  summary: 'Enable or disable a single module for the user',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: toggleModuleSchema } } } },
+  responses: {
+    200: { description: 'Module toggled', content: { 'application/json': { schema: ToggleModuleResponseSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
 
 /**
  * GET /api/modules

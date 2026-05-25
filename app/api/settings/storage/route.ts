@@ -2,6 +2,23 @@ import { NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { createErrorResponse } from '@/lib/api-helpers'
 import { readStorageConfig, PROVIDER_LABELS } from '@/lib/storage'
+import { SettingsStorageInfoSchema } from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/settings/storage',
+  operationId: 'getStorageSettings',
+  summary: 'Read-only storage provider info (provider, label, env var status)',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'Storage configuration', content: { 'application/json': { schema: SettingsStorageInfoSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
 
 const PROVIDER_ENV_VARS: Record<string, Array<{ name: string; required: boolean }>> = {
   filesystem: [],

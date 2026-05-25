@@ -42,17 +42,31 @@ import {
   Lock,
   Globe,
   AlertTriangle,
+  ExternalLink,
 } from "lucide-react"
 import type { ApiKey, ApiKeyUsageLog, ApiKeyCreateResponse } from "../types"
+import { HTTP_METHODS, NON_MODULE_TAGS, type OpenApiSpec } from "@/lib/openapi/types"
 
 interface EndpointData {
-  coreEndpoints: Array<{ path: string; fullPath: string; methods: string[] }>
-  moduleEndpoints: Array<{ path: string; fullPath: string; moduleId: string; methods: string[] }>
-  publicEndpoints: Array<{
-    path: string; fullPath: string; moduleId: string; methods: string[]
-    securityType?: string; hasRateLimit?: boolean; description?: string
-  }>
-  summary: { totalCore: number; totalModule: number; totalPublic: number }
+  coreEndpoints: Array<{ fullPath: string; methods: string[] }>
+  moduleEndpoints: Array<{ fullPath: string; methods: string[]; moduleId: string }>
+}
+
+function specToEndpoints(spec: OpenApiSpec): EndpointData {
+  const core: EndpointData['coreEndpoints'] = []
+  const module: EndpointData['moduleEndpoints'] = []
+  for (const [path, item] of Object.entries(spec.paths ?? {})) {
+    const firstMethodKey = HTTP_METHODS.find((m) => m in item)
+    if (!firstMethodKey) continue
+    const methods = HTTP_METHODS.filter((m) => m in item).map((m) => m.toUpperCase())
+    const tag = item[firstMethodKey]?.tags?.[0]
+    if (tag && !NON_MODULE_TAGS.has(tag)) {
+      module.push({ fullPath: path, methods, moduleId: tag })
+    } else {
+      core.push({ fullPath: path, methods })
+    }
+  }
+  return { coreEndpoints: core, moduleEndpoints: module }
 }
 
 export function ApiTab(): React.ReactElement {
@@ -87,9 +101,10 @@ export function ApiTab(): React.ReactElement {
   const fetchEndpoints = useCallback(async () => {
     setEndpointsLoading(true)
     try {
-      const res = await fetch("/api/health/endpoints")
+      const res = await fetch("/api/openapi.json")
       if (res.ok) {
-        setEndpointsData(await res.json())
+        const spec = (await res.json()) as OpenApiSpec
+        setEndpointsData(specToEndpoints(spec))
       }
     } catch (err) {
       console.error("Failed to fetch endpoints:", err)
@@ -135,9 +150,13 @@ export function ApiTab(): React.ReactElement {
 
     let expiresAt: string | null = null
     if (expiry !== "never") {
-      const days = parseInt(expiry, 10)
       const d = new Date()
-      d.setDate(d.getDate() + days)
+      if (expiry === "1h") {
+        d.setHours(d.getHours() + 1)
+      } else {
+        const days = parseInt(expiry, 10)
+        d.setDate(d.getDate() + days)
+      }
       expiresAt = d.toISOString()
     }
 
@@ -201,6 +220,20 @@ export function ApiTab(): React.ReactElement {
     return new Date(expiresAt) < new Date()
   }
 
+  function formatExpiry(dateStr: string): string {
+    const d = new Date(dateStr)
+    const msUntil = d.getTime() - Date.now()
+    if (msUntil < 24 * 60 * 60 * 1000) {
+      return d.toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    }
+    return formatDate(dateStr)
+  }
+
 
   return (
     <div className="space-y-6">
@@ -236,6 +269,7 @@ export function ApiTab(): React.ReactElement {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="1h">1 hour</SelectItem>
                   <SelectItem value="7">7 days</SelectItem>
                   <SelectItem value="30">30 days</SelectItem>
                   <SelectItem value="90">90 days</SelectItem>
@@ -278,7 +312,7 @@ export function ApiTab(): React.ReactElement {
                           <span>Last used {formatDate(key.last_used_at)}</span>
                           <span>{key.request_count} requests</span>
                           {key.expires_at && !isExpired(key.expires_at) && (
-                            <span>Expires {formatDate(key.expires_at)}</span>
+                            <span>Expires {formatExpiry(key.expires_at)}</span>
                           )}
                         </div>
                       </div>
@@ -380,13 +414,23 @@ export function ApiTab(): React.ReactElement {
       {/* Section 2: Available API Endpoints */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Globe className="h-5 w-5" />
-            Available API Endpoints
-          </CardTitle>
-          <CardDescription>
-            These are the endpoints you can call with your API key.
-          </CardDescription>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5" />
+                Available API Endpoints
+              </CardTitle>
+              <CardDescription className="mt-1">
+                These are the endpoints you can call with your API key.
+              </CardDescription>
+            </div>
+            <Button size="sm" asChild>
+              <a href="/api-docs">
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open interactive docs
+              </a>
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {endpointsLoading ? (

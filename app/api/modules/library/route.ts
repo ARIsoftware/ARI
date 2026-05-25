@@ -2,6 +2,23 @@ import { NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { MODULES_API_BASE, buildClientInfo } from '@/lib/license-helpers'
 import { getLicenseKey } from '@/lib/license-helpers-server'
+import { ModuleLibraryResponseSchema } from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/library',
+  operationId: 'getModuleLibrary',
+  summary: 'Proxy to the central ARI module library (lists installable modules)',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'Module library response from upstream', content: { 'application/json': { schema: ModuleLibraryResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
 
 export async function GET() {
   const { user } = await getAuthenticatedUser()

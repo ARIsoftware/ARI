@@ -15,6 +15,46 @@ import { eq, isNotNull, and, lte, inArray } from 'drizzle-orm'
 import { getStorageProvider } from '../../../lib/providers'
 import { TRASH_RETENTION_DAYS } from '../../../types'
 import type { StorageProvider } from '../../../types'
+import {
+  emptyTrashQuerySchema,
+  trashDeleteQuerySchema,
+  EmptyTrashResponseSchema,
+  TrashItemDeleteResponseSchema,
+} from '../../../lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/documents/trash/empty',
+  operationId: 'emptyDocumentsTrash',
+  summary: 'Permanently delete trashed items. Pass ?auto=true to limit to items older than the retention window.',
+  tags: ['documents'],
+  security: DEFAULT_SECURITY,
+  request: { query: emptyTrashQuerySchema },
+  responses: {
+    200: { description: 'Per-bucket delete counts plus any storage backend errors', content: { 'application/json': { schema: EmptyTrashResponseSchema } } },
+    401: UnauthorizedResponse,
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'delete',
+  path: '/api/modules/documents/trash/empty',
+  operationId: 'deleteTrashItem',
+  summary: 'Permanently delete a single trashed document or folder (id + type in query)',
+  tags: ['documents'],
+  security: DEFAULT_SECURITY,
+  request: { query: trashDeleteQuerySchema },
+  responses: {
+    200: { description: 'Deletion acknowledged', content: { 'application/json': { schema: TrashItemDeleteResponseSchema } } },
+    400: { description: 'Missing or invalid id, or invalid type parameter', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    404: { description: 'Document or folder not found in trash', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
 
 /**
  * POST Handler - Empty entire trash or auto-delete expired items

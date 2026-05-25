@@ -12,11 +12,50 @@ import { toSnakeCase, validateRequestBody, createErrorResponse } from '@/lib/api
 import { z } from 'zod'
 import { documents, documentFolders, documentTags, documentTagAssignments } from '@/lib/db/schema'
 import { eq, and, isNull, inArray, sql } from 'drizzle-orm'
+import {
+  updateDocumentSchema as UpdateDocumentSchema,
+  idParamSchema,
+  DocumentSingleResponseSchema,
+  DocumentSoftDeleteResponseSchema,
+} from '../../../lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 
-const UpdateDocumentSchema = z.object({
-  name: z.string().min(1).max(255).optional(),
-  folder_id: z.string().uuid().nullable().optional(),
-  tag_ids: z.array(z.string().uuid()).optional(),
+registry.registerPath({
+  method: 'patch',
+  path: '/api/modules/documents/files/{id}',
+  operationId: 'updateDocumentFile',
+  summary: 'Update document (rename, move, replace tag set)',
+  tags: ['documents'],
+  security: DEFAULT_SECURITY,
+  request: {
+    params: idParamSchema,
+    body: { content: { 'application/json': { schema: UpdateDocumentSchema } } },
+  },
+  responses: {
+    200: { description: 'Updated document', content: { 'application/json': { schema: DocumentSingleResponseSchema } } },
+    400: { description: 'Validation error or one of the supplied tag ids is invalid', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    404: { description: 'Document or target folder not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'delete',
+  path: '/api/modules/documents/files/{id}',
+  operationId: 'softDeleteDocumentFile',
+  summary: 'Soft-delete a document (move to trash)',
+  tags: ['documents'],
+  security: DEFAULT_SECURITY,
+  request: { params: idParamSchema },
+  responses: {
+    200: { description: 'Soft-delete acknowledged', content: { 'application/json': { schema: DocumentSoftDeleteResponseSchema } } },
+    400: { description: 'Invalid id format', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    404: { description: 'Document not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
 /**

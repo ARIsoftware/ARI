@@ -8,10 +8,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { getModules, bootstrapModuleSettings } from '@/lib/modules/module-registry'
+import { ListEnabledModulesResponseSchema } from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 
 export const debugRole = "modules-list-all"
 import { moduleSettings } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/all',
+  operationId: 'listAllModules',
+  summary: 'List ALL discovered modules with per-user enable state (used by Settings page)',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'All modules (enabled + disabled)', content: { 'application/json': { schema: ListEnabledModulesResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
 
 /**
  * GET /api/modules/all

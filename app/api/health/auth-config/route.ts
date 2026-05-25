@@ -1,7 +1,24 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { HealthAuthConfigSchema } from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 
 export const debugRole = "auth-config"
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/health/auth-config',
+  operationId: 'getHealthAuthConfig',
+  summary: 'Non-sensitive Better Auth configuration status (no secrets exposed)',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'Auth configuration status', content: { 'application/json': { schema: HealthAuthConfigSchema } } },
+    401: UnauthorizedResponse,
+    500: InternalServerErrorResponse,
+  },
+})
 
 /**
  * GET /api/health/auth-config

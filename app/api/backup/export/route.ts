@@ -4,6 +4,9 @@ import { isProductionSafeOperation } from '@/lib/admin-helpers'
 import { logger } from '@/lib/logger'
 import { safeErrorResponse } from '@/lib/api-error'
 import { queryRows, EXCLUDED_TABLES, calculateChecksum, stripNul } from '../utils'
+import { BackupExportRequestSchema, BackupExportResponseSchema } from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, UnauthorizedResponse } from '@/lib/openapi/common'
 
 type ColumnInfo = {
   column_name: string
@@ -15,6 +18,22 @@ type ColumnInfo = {
 }
 
 export const debugRole = "backup-export"
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/backup/export',
+  operationId: 'exportBackup',
+  summary: 'Auto-discover all user tables and export as an executable SQL backup file',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: BackupExportRequestSchema } } } },
+  responses: {
+    200: { description: 'Backup result (SQL content + metadata)', content: { 'application/json': { schema: BackupExportResponseSchema } } },
+    401: UnauthorizedResponse,
+    403: { description: 'Not allowed in production', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: { description: 'Export failed', content: { 'application/json': { schema: ErrorResponseSchema } } },
+  },
+})
 
 async function discoverTables(): Promise<{ tables: string[], method: string, warnings: string[] }> {
   const warnings: string[] = []

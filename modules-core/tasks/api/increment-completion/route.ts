@@ -1,13 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
-import { z } from 'zod'
+import {
+  incrementCompletionSchema,
+  IncrementCompletionResponseSchema,
+} from '@/modules/tasks/lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 import { tasks } from '@/lib/db/schema'
 import { and, eq } from 'drizzle-orm'
 
-const incrementCompletionSchema = z.object({
-  taskId: z.string().uuid('Invalid task ID format'),
-  increment: z.number().int().min(1, 'Increment must be at least 1').max(10, 'Increment too large').default(1)
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/tasks/increment-completion',
+  operationId: 'incrementTaskCompletion',
+  summary: 'Increment a task\'s completion_count by the given amount',
+  tags: ['tasks'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: incrementCompletionSchema } } } },
+  responses: {
+    200: {
+      description: 'Updated completion count',
+      content: { 'application/json': { schema: IncrementCompletionResponseSchema } },
+    },
+    400: { description: 'Validation error or completion count too high', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    404: { description: 'Task not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
 export async function POST(request: NextRequest) {

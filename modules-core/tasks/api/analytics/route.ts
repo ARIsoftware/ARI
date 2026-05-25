@@ -1,12 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateQueryParams, createErrorResponse } from '@/lib/api-helpers'
+import { analyticsQuerySchema, AnalyticsResponseSchema } from '@/modules/tasks/lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 import { tasks } from '@/lib/db/schema'
 import { eq, and, gte, lte } from 'drizzle-orm'
-import { z } from 'zod'
 
-const analyticsQuerySchema = z.object({
-  days: z.coerce.number().int().min(1).max(365).optional(),
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/tasks/analytics',
+  operationId: 'getTaskAnalytics',
+  summary: 'Get daily task creation/completion counts over a date range',
+  tags: ['tasks'],
+  security: DEFAULT_SECURITY,
+  request: { query: analyticsQuerySchema },
+  responses: {
+    200: {
+      description: 'Daily counts and summary statistics over the requested window',
+      content: { 'application/json': { schema: AnalyticsResponseSchema } },
+    },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    500: InternalServerErrorResponse,
+  },
 })
 
 export async function GET(request: NextRequest) {

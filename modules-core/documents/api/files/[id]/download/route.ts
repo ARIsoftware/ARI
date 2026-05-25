@@ -16,6 +16,29 @@ import { documents } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { getStorageProvider } from '../../../../lib/providers'
 import type { StorageProvider } from '../../../../types'
+import {
+  idParamSchema,
+  DownloadResponseSchema,
+} from '../../../../lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/documents/files/{id}/download',
+  operationId: 'getDocumentDownloadUrl',
+  summary: 'Generate a time-limited signed download URL (5 min) for a document',
+  tags: ['documents'],
+  security: DEFAULT_SECURITY,
+  request: { params: idParamSchema },
+  responses: {
+    200: { description: 'Signed URL plus filename + mime + size + expiry', content: { 'application/json': { schema: DownloadResponseSchema } } },
+    400: { description: 'Invalid id format', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    404: { description: 'Document not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
 
 /**
  * GET Handler - Generate signed download URL

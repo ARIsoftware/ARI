@@ -5,6 +5,42 @@ import { moduleSettings } from "@/lib/db/schema"
 import { eq, and } from "drizzle-orm"
 import { encrypt, decrypt, isEncrypted } from "@/lib/crypto"
 import { INTEGRATIONS_MODULE_ID } from "@/lib/constants"
+import {
+  settingsApiKeyBodySchema,
+  SettingsApiKeyStatusSchema,
+  SettingsApiKeySaveResponseSchema,
+} from "@/lib/openapi/app-schemas"
+import { registry } from "@/lib/openapi/registry"
+import { DEFAULT_SECURITY, ErrorResponseSchema } from "@/lib/openapi/common"
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/settings/api-keys',
+  operationId: 'getIntegrationKeysStatus',
+  summary: 'Get configured-and-masked status for each LLM provider API key + model name',
+  description: 'Use ?reveal=KEY_NAME to retrieve the decrypted value of a single secret key (model keys return plaintext masked field).',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'Per-key configured + masked status', content: { 'application/json': { schema: SettingsApiKeyStatusSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+  },
+})
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/settings/api-keys',
+  operationId: 'updateIntegrationKey',
+  summary: 'Save or delete a provider API key (encrypted at rest) or set a model name',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: settingsApiKeyBodySchema } } } },
+  responses: {
+    200: { description: 'Saved or deleted', content: { 'application/json': { schema: SettingsApiKeySaveResponseSchema } } },
+    400: { description: 'Invalid key or JSON body', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+  },
+})
 
 const SECRET_KEYS = new Set([
   "OPENROUTER_API_KEY",

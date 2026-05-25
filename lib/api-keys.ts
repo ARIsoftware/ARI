@@ -2,8 +2,7 @@ import crypto from 'crypto'
 import { eq, and, sql } from 'drizzle-orm'
 import { withAdminDb } from '@/lib/db'
 import { apiKeys, apiKeyUsageLogs } from '@/lib/db/schema/core-schema'
-
-const API_KEY_PREFIX = 'ari_k_'
+import { API_KEY_PREFIX } from '@/lib/auth-middleware'
 
 export function generateApiKey(): { rawKey: string; keyHash: string; keyPrefix: string } {
   const randomBytes = crypto.randomBytes(32).toString('hex')

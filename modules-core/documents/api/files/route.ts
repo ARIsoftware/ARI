@@ -18,6 +18,67 @@ import { getDocumentsSettings } from '../../lib/get-settings'
 import type { DocumentWithTags, StorageProvider } from '../../types'
 import { RISKY_MIME_TYPES } from '../../types'
 import { isPreviewableImage } from '../../lib/utils'
+import {
+  listFilesQuerySchema,
+  FileListResponseSchema,
+  UploadFileFormSchema,
+  DocumentSingleResponseSchema,
+  BulkFilesBodySchema,
+  BulkFilesResponseSchema,
+} from '../../lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/documents/files',
+  operationId: 'listDocumentFiles',
+  summary: 'List the user\'s document files with filtering, search, and pagination',
+  tags: ['documents'],
+  security: DEFAULT_SECURITY,
+  request: { query: listFilesQuerySchema },
+  responses: {
+    200: { description: 'Page of files (each augmented with tags and optional preview URL)', content: { 'application/json': { schema: FileListResponseSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/documents/files',
+  operationId: 'uploadDocumentFile',
+  summary: 'Upload a new file (multipart). folder_id and tag_ids are optional.',
+  tags: ['documents'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'multipart/form-data': { schema: UploadFileFormSchema } } } },
+  responses: {
+    201: { description: 'Created document row (no tags array)', content: { 'application/json': { schema: DocumentSingleResponseSchema } } },
+    400: { description: 'Validation error, missing file, disallowed type, or onboarding incomplete', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    404: { description: 'Folder not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    413: { description: 'File too large for configured max size', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'patch',
+  path: '/api/modules/documents/files',
+  operationId: 'bulkDocumentFiles',
+  summary: 'Bulk delete / move / tag multiple documents in one request',
+  tags: ['documents'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: BulkFilesBodySchema } } } },
+  responses: {
+    200: { description: 'Number of rows affected', content: { 'application/json': { schema: BulkFilesResponseSchema } } },
+    400: { description: 'Validation error or a referenced tag does not exist', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    404: { description: 'One or more documents (or target folder) do not exist', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
 
 // Tag-id arrays come in as comma-separated strings from GET query params and
 // the upload form. Cap at 100 to bound any later cross-product inserts

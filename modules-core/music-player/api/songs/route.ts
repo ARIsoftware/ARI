@@ -6,25 +6,84 @@ import {
   createErrorResponse,
   toSnakeCase,
 } from '@/lib/api-helpers'
-import { z } from 'zod'
+import {
+  createSongSchema as CreateSongSchema,
+  updateSongSchema as UpdateSongSchema,
+  songIdQuerySchema as IdQuerySchema,
+  SongListResponseSchema,
+  SongSingleResponseSchema,
+  SuccessResponseSchema,
+} from '@/modules/music-player/lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { musicPlaylist } from '@/lib/db/schema'
 import { and, eq, asc, sql } from 'drizzle-orm'
 
-const YOUTUBE_VIDEO_ID_REGEX = /^[A-Za-z0-9_-]{11}$/
-
-const CreateSongSchema = z.object({
-  youtube_video_id: z
-    .string()
-    .regex(YOUTUBE_VIDEO_ID_REGEX, 'Invalid YouTube video ID (must be 11 characters: A-Z, a-z, 0-9, _ or -)'),
-  title: z.string().min(1, 'Title is required').max(500, 'Title must be 500 characters or less'),
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/music-player/songs',
+  operationId: 'listSongs',
+  summary: 'List the user\'s playlist songs in playback order',
+  tags: ['music-player'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'Songs ordered by position', content: { 'application/json': { schema: SongListResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
-const UpdateSongSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(500, 'Title must be 500 characters or less'),
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/music-player/songs',
+  operationId: 'addSong',
+  summary: 'Append a new song to the end of the playlist',
+  tags: ['music-player'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: CreateSongSchema } } } },
+  responses: {
+    201: { description: 'Created song', content: { 'application/json': { schema: SongSingleResponseSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
-const IdQuerySchema = z.object({
-  id: z.string().uuid('Invalid song id format'),
+registry.registerPath({
+  method: 'delete',
+  path: '/api/modules/music-player/songs',
+  operationId: 'deleteSong',
+  summary: 'Delete a song by id (passed as query parameter)',
+  tags: ['music-player'],
+  security: DEFAULT_SECURITY,
+  request: { query: IdQuerySchema },
+  responses: {
+    200: { description: 'Deletion acknowledged', content: { 'application/json': { schema: SuccessResponseSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    404: { description: 'Song not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'put',
+  path: '/api/modules/music-player/songs',
+  operationId: 'updateSong',
+  summary: "Update a song's title (id in query, title in body)",
+  tags: ['music-player'],
+  security: DEFAULT_SECURITY,
+  request: {
+    query: IdQuerySchema,
+    body: { content: { 'application/json': { schema: UpdateSongSchema } } },
+  },
+  responses: {
+    200: { description: 'Updated song', content: { 'application/json': { schema: SongSingleResponseSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    404: { description: 'Song not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
 export async function GET(request: NextRequest) {

@@ -1,12 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { desc, inArray } from 'drizzle-orm'
-import { z } from 'zod'
 import { toSnakeCase } from '@/lib/api-helpers'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import {
+  createBrainstormBoardSchema as CreateBoardSchema,
+  BrainstormBoardListResponseSchema,
+  BrainstormBoardCreateResponseSchema,
+} from '@/modules/brainstorm/lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { brainstormBoards, brainstormNodes } from '@/lib/db/schema'
 
-const CreateBoardSchema = z.object({
-  name: z.string().min(1, 'Board name is required').max(200, 'Board name must be 200 characters or less'),
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/brainstorm/boards',
+  operationId: 'listBrainstormBoards',
+  summary: "List the user's brainstorm boards with node counts",
+  tags: ['brainstorm'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'Boards (most recently updated first)', content: { 'application/json': { schema: BrainstormBoardListResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/brainstorm/boards',
+  operationId: 'createBrainstormBoard',
+  summary: 'Create a new brainstorm board',
+  tags: ['brainstorm'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: CreateBoardSchema } } } },
+  responses: {
+    201: { description: 'Created board (with node_count: 0)', content: { 'application/json': { schema: BrainstormBoardCreateResponseSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
 export async function GET(_request: NextRequest) {

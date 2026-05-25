@@ -12,10 +12,51 @@ import { toSnakeCase, validateRequestBody, createErrorResponse } from '@/lib/api
 import { z } from 'zod'
 import { documentTags } from '@/lib/db/schema'
 import { eq, and, ne, sql } from 'drizzle-orm'
+import {
+  idParamSchema,
+  updateTagSchema as UpdateTagSchema,
+  TagSingleResponseSchema,
+  TagDeleteResponseSchema,
+} from '../../../lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 
-const UpdateTagSchema = z.object({
-  name: z.string().min(1).max(100).optional(),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Invalid hex color').optional(),
+registry.registerPath({
+  method: 'patch',
+  path: '/api/modules/documents/tags/{id}',
+  operationId: 'updateDocumentTag',
+  summary: 'Rename and/or recolor a document tag',
+  tags: ['documents'],
+  security: DEFAULT_SECURITY,
+  request: {
+    params: idParamSchema,
+    body: { content: { 'application/json': { schema: UpdateTagSchema } } },
+  },
+  responses: {
+    200: { description: 'Updated tag', content: { 'application/json': { schema: TagSingleResponseSchema } } },
+    400: { description: 'Validation error or no fields to update', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    404: { description: 'Tag not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    409: { description: 'Another tag with that name already exists', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'delete',
+  path: '/api/modules/documents/tags/{id}',
+  operationId: 'deleteDocumentTag',
+  summary: 'Delete a document tag (assignments cascade)',
+  tags: ['documents'],
+  security: DEFAULT_SECURITY,
+  request: { params: idParamSchema },
+  responses: {
+    200: { description: 'Deletion acknowledged', content: { 'application/json': { schema: TagDeleteResponseSchema } } },
+    400: { description: 'Invalid id format', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    404: { description: 'Tag not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
 /**

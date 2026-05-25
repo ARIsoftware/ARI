@@ -3,8 +3,25 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { logger } from '@/lib/logger'
 import { queryRows, EXCLUDED_TABLES } from '../utils'
 import type { RoleCheck } from '@/app/settings/types'
+import { BackupVerifyResponseSchema } from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, UnauthorizedResponse } from '@/lib/openapi/common'
 
 export const debugRole = "backup-verify"
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/backup/verify',
+  operationId: 'verifyBackupReadiness',
+  summary: 'Preview tables and row counts that would be included in a backup (probes connection role + RLS)',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'Backup readiness report', content: { 'application/json': { schema: BackupVerifyResponseSchema } } },
+    401: UnauthorizedResponse,
+    500: { description: 'Verification failed', content: { 'application/json': { schema: ErrorResponseSchema } } },
+  },
+})
 
 interface TableInfo {
   name: string

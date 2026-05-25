@@ -20,6 +20,43 @@ import { withAdminDb } from '@/lib/db'
 import { moduleSettings } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { z } from 'zod'
+import {
+  updateOrderSchema,
+  OrderResponseSchema,
+  SuccessSchema,
+} from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/order',
+  operationId: 'getModulesOrder',
+  summary: 'Get user-specific menu, icon, and dashboard ordering',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'Ordering maps', content: { 'application/json': { schema: OrderResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/order',
+  operationId: 'updateModulesOrder',
+  summary: 'Save user-specific menu, icon, and dashboard ordering',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: updateOrderSchema } } } },
+  responses: {
+    200: { description: 'Order saved', content: { 'application/json': { schema: SuccessSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
 
 const TOPBAR_ICONS_MODULE_ID = "__topbar_icons__"
 const DASHBOARD_STAT_CARDS_MODULE_ID = "__dashboard_stat_cards__"

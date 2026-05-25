@@ -15,8 +15,41 @@ import { z } from 'zod'
 import { DEFAULT_THEME_ID } from '@/lib/theme/presets'
 import { DEFAULT_FONT_ID } from '@/lib/theme/fonts'
 import type { ThemeSettings, CustomTheme, ThemeColors, SidebarView } from '@/lib/theme/types'
+import { ThemeSettingsSchema, updateThemeSchema } from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 
 const THEME_MODULE_ID = 'theme-system'
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/theme',
+  operationId: 'getTheme',
+  summary: "Get the user's theme settings (active theme, font, custom themes, sidebar view)",
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'Theme settings', content: { 'application/json': { schema: ThemeSettingsSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'put',
+  path: '/api/theme',
+  operationId: 'updateTheme',
+  summary: "Update the user's theme settings (merged with existing)",
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: updateThemeSchema } } } },
+  responses: {
+    200: { description: 'Updated theme settings', content: { 'application/json': { schema: ThemeSettingsSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
 
 // Schema for theme colors
 const ThemeColorsSchema = z.object({

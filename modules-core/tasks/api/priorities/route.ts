@@ -2,26 +2,66 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { toSnakeCase, validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
 import { calculatePriorityScore } from '@/modules/tasks/lib/priority-utils'
-import { z } from 'zod'
+import {
+  updatePrioritiesSchema,
+  batchPrioritiesSchema,
+  TaskSchema,
+  TaskListSchema,
+  BatchPrioritiesResponseSchema,
+} from '@/modules/tasks/lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 import { tasks } from '@/lib/db/schema'
 import { eq, desc, and, inArray } from 'drizzle-orm'
 
 // Force dynamic rendering - no caching
 export const dynamic = 'force-dynamic'
 
-const updatePrioritiesSchema = z.object({
-  taskId: z.string().uuid(),
-  axes: z.object({
-    impact: z.number().min(1).max(5),
-    severity: z.number().min(1).max(5),
-    timeliness: z.number().min(1).max(5),
-    effort: z.number().min(1).max(5),
-    strategic_fit: z.number().min(1).max(5)
-  })
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/tasks/priorities',
+  operationId: 'listTasksByPriority',
+  summary: 'List tasks sorted by computed priority score (descending)',
+  tags: ['tasks'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'Tasks ordered by priority_score desc', content: { 'application/json': { schema: TaskListSchema } } },
+    401: UnauthorizedResponse,
+    500: InternalServerErrorResponse,
+  },
 })
 
-const batchPrioritiesSchema = z.object({
-  taskIds: z.array(z.string().uuid()).min(1).max(500),
+registry.registerPath({
+  method: 'put',
+  path: '/api/modules/tasks/priorities',
+  operationId: 'updateTaskPriorities',
+  summary: 'Set priority axes for a task and recompute its priority score',
+  tags: ['tasks'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: updatePrioritiesSchema } } } },
+  responses: {
+    200: { description: 'Updated task with new priority_score', content: { 'application/json': { schema: TaskSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    404: { description: 'Task not found or update failed', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/tasks/priorities',
+  operationId: 'batchRecomputeTaskPriorities',
+  summary: 'Recompute priority scores for a batch of tasks (up to 500)',
+  tags: ['tasks'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: batchPrioritiesSchema } } } },
+  responses: {
+    200: { description: 'Per-task recomputed priority scores', content: { 'application/json': { schema: BatchPrioritiesResponseSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    500: InternalServerErrorResponse,
+  },
 })
 
 export async function GET(request: NextRequest) {

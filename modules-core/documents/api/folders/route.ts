@@ -9,18 +9,48 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { toSnakeCase, validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
-import { z } from 'zod'
 import { documentFolders, documents } from '@/lib/db/schema'
 import { eq, isNull, and, sql, count } from 'drizzle-orm'
 import type { FolderWithChildren } from '../../types'
-import { FOLDER_NAME_PATTERN, FOLDER_NAME_MAX_LENGTH } from '../../lib/utils'
+import {
+  listFoldersQuerySchema,
+  createFolderSchema as CreateFolderSchema,
+  FolderListResponseSchema,
+  FolderSingleResponseSchema,
+} from '../../lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 
-const FOLDER_NAME_VALIDATION_MESSAGE =
-  'Folder name may only contain letters, numbers, hyphens, and underscores'
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/documents/folders',
+  operationId: 'listDocumentFolders',
+  summary: 'List folders as either nested tree (default) or a flat list (?flat=true)',
+  tags: ['documents'],
+  security: DEFAULT_SECURITY,
+  request: { query: listFoldersQuerySchema },
+  responses: {
+    200: { description: 'Folders with per-folder document counts', content: { 'application/json': { schema: FolderListResponseSchema } } },
+    401: UnauthorizedResponse,
+    500: InternalServerErrorResponse,
+  },
+})
 
-const CreateFolderSchema = z.object({
-  name: z.string().min(1).max(FOLDER_NAME_MAX_LENGTH).regex(FOLDER_NAME_PATTERN, FOLDER_NAME_VALIDATION_MESSAGE),
-  parent_id: z.string().uuid().nullable().optional(),
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/documents/folders',
+  operationId: 'createDocumentFolder',
+  summary: 'Create a folder (optionally nested under parent_id)',
+  tags: ['documents'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: CreateFolderSchema } } } },
+  responses: {
+    201: { description: 'Created folder', content: { 'application/json': { schema: FolderSingleResponseSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    404: { description: 'Parent folder not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
 /**

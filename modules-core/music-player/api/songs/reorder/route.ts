@@ -1,12 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
-import { z } from 'zod'
+import {
+  reorderSongsSchema as ReorderSchema,
+  SuccessResponseSchema,
+} from '@/modules/music-player/lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { musicPlaylist } from '@/lib/db/schema'
 import { and, eq, sql } from 'drizzle-orm'
 
-const ReorderSchema = z.object({
-  orderedIds: z.array(z.string().uuid('Invalid song id format')).min(1).max(500),
+registry.registerPath({
+  method: 'put',
+  path: '/api/modules/music-player/songs/reorder',
+  operationId: 'reorderSongs',
+  summary: 'Reorder playlist songs by submitting the new ordered list of song ids',
+  tags: ['music-player'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: ReorderSchema } } } },
+  responses: {
+    200: { description: 'Reorder applied', content: { 'application/json': { schema: SuccessResponseSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
 export async function PUT(request: NextRequest) {

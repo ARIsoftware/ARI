@@ -5,6 +5,37 @@ import { moduleSettings } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { LICENSE_MODULE_ID } from '@/lib/license-helpers'
 import { z } from 'zod'
+import { LicenseStatusSchema, SuccessSchema } from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/license/status',
+  operationId: 'getLicenseStatus',
+  summary: "Get the user's license status (masked key, expiry, customer info)",
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'License status', content: { 'application/json': { schema: LicenseStatusSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'delete',
+  path: '/api/license/status',
+  operationId: 'deactivateLicense',
+  summary: 'Deactivate the stored license (removes module_settings row)',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'Deactivation acknowledged', content: { 'application/json': { schema: SuccessSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
 
 const licenseSettingsSchema = z.object({
   key: z.string(),

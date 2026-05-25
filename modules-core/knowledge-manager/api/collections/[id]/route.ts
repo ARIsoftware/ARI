@@ -9,28 +9,54 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { toSnakeCase } from '@/lib/api-helpers'
-import { z } from 'zod'
+import {
+  updateCollectionSchema as UpdateCollectionSchema,
+  collectionIdParamSchema,
+  CollectionSingleResponseSchema,
+  CollectionDeleteResponseSchema,
+} from '@/modules/knowledge-manager/lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { knowledgeCollections } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 
-/**
- * Validation Schema for PATCH requests
- */
-const UpdateCollectionSchema = z.object({
-  name: z.string()
-    .min(1, 'Name is required')
-    .max(100, 'Name must be less than 100 characters')
-    .optional(),
-  color: z.string()
-    .regex(/^#[0-9A-Fa-f]{6}$/, 'Color must be a valid hex color')
-    .optional(),
-  icon: z.string()
-    .max(50)
-    .optional(),
-  sort_order: z.number().int().min(0).optional()
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+registry.registerPath({
+  method: 'patch',
+  path: '/api/modules/knowledge-manager/collections/{id}',
+  operationId: 'updateKnowledgeCollection',
+  summary: 'Update a collection',
+  tags: ['knowledge-manager'],
+  security: DEFAULT_SECURITY,
+  request: {
+    params: collectionIdParamSchema,
+    body: { content: { 'application/json': { schema: UpdateCollectionSchema } } },
+  },
+  responses: {
+    200: { description: 'Updated collection', content: { 'application/json': { schema: CollectionSingleResponseSchema } } },
+    400: { description: 'Validation error or no fields to update', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    404: { description: 'Collection not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+registry.registerPath({
+  method: 'delete',
+  path: '/api/modules/knowledge-manager/collections/{id}',
+  operationId: 'deleteKnowledgeCollection',
+  summary: 'Delete a collection (articles inside have collection_id set to NULL)',
+  tags: ['knowledge-manager'],
+  security: DEFAULT_SECURITY,
+  request: { params: collectionIdParamSchema },
+  responses: {
+    200: { description: 'Deletion acknowledged', content: { 'application/json': { schema: CollectionDeleteResponseSchema } } },
+    400: { description: 'Invalid id format', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
 
 /**
  * PATCH Handler - Update a collection

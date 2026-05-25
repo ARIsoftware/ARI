@@ -59,6 +59,7 @@ const protectedRoutes = [
   "/profile",
   "/logs",
   "/health",
+  "/api-docs",
   "/api" // All API routes require authentication (defense-in-depth)
 ]
 
@@ -156,8 +157,11 @@ export async function middleware(req: NextRequest) {
     const hasSession = hasSessionCookie(req.cookies)
 
     if (!hasSession) {
-      // For API routes, check for API key header as alternative auth
-      if (pathname.startsWith('/api')) {
+      // For API routes, check for API key header as alternative auth.
+      // Match `/api/` (with trailing slash) so other top-level pages whose
+      // name happens to start with "api" (e.g. /api-docs) are treated as
+      // page routes and redirected to /sign-in instead of getting JSON 401.
+      if (pathname.startsWith('/api/')) {
         if (hasApiKeyHeader(req.headers)) {
           // Format looks valid — let request through for full validation
           // in getAuthenticatedUser()

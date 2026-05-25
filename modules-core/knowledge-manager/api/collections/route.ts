@@ -9,23 +9,44 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { toSnakeCase } from '@/lib/api-helpers'
-import { z } from 'zod'
+import {
+  createCollectionSchema as CreateCollectionSchema,
+  CollectionListResponseSchema,
+  CollectionSingleResponseSchema,
+} from '@/modules/knowledge-manager/lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { knowledgeCollections, knowledgeArticles } from '@/lib/db/schema'
 import { eq, asc, desc } from 'drizzle-orm'
 
-/**
- * Validation Schema for POST requests
- */
-const CreateCollectionSchema = z.object({
-  name: z.string()
-    .min(1, 'Name is required')
-    .max(100, 'Name must be less than 100 characters'),
-  color: z.string()
-    .regex(/^#[0-9A-Fa-f]{6}$/, 'Color must be a valid hex color')
-    .default('#6b7280'),
-  icon: z.string()
-    .max(50)
-    .default('Folder')
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/knowledge-manager/collections',
+  operationId: 'listKnowledgeCollections',
+  summary: 'List collections with article counts',
+  tags: ['knowledge-manager'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'Collections (sorted by sort_order then name)', content: { 'application/json': { schema: CollectionListResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/knowledge-manager/collections',
+  operationId: 'createKnowledgeCollection',
+  summary: 'Create a new collection',
+  tags: ['knowledge-manager'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: CreateCollectionSchema } } } },
+  responses: {
+    201: { description: 'Created collection (article_count = 0)', content: { 'application/json': { schema: CollectionSingleResponseSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
 /**

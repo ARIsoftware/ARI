@@ -1,12 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
 import { getStorageProvider, sanitizeBucketName, validateStoredFilename, readStorageConfig } from '@/lib/storage'
+import { storageDeleteSchema as deleteSchema, SuccessSchema } from '@/lib/openapi/app-schemas'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 
-const deleteSchema = z.object({
-  bucket: z.string(),
-  filename: z.string(),
+registry.registerPath({
+  method: 'delete',
+  path: '/api/storage/delete',
+  operationId: 'deleteFromStorage',
+  summary: 'Delete a file from a bucket',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: deleteSchema } } } },
+  responses: {
+    200: { description: 'Deletion acknowledged', content: { 'application/json': { schema: SuccessSchema } } },
+    400: { description: 'Invalid bucket or filename', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
 export async function DELETE(request: NextRequest) {

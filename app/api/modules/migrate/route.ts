@@ -1,4 +1,19 @@
 import { NextResponse } from 'next/server'
+import { registry } from '@/lib/openapi/registry'
+import { ErrorResponseSchema } from '@/lib/openapi/common'
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/migrate',
+  operationId: 'modulesMigrate_DEPRECATED',
+  summary: 'DEPRECATED — always returns 410 Gone',
+  description: 'Removed for security. Module schema install is now handled server-side by /api/modules/download.',
+  tags: ['app'],
+  deprecated: true,
+  responses: {
+    410: { description: 'Gone — endpoint removed', content: { 'application/json': { schema: ErrorResponseSchema } } },
+  },
+})
 
 /**
  * This route was deprecated and removed for security reasons.

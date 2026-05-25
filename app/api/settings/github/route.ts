@@ -3,6 +3,41 @@ import { readFile, writeFile, copyFile, access } from "fs/promises"
 import path from "path"
 import { getAuthenticatedUser } from "@/lib/auth-helpers"
 import { upsertEnvVars } from "@/lib/env-file"
+import {
+  SettingsGithubStatusSchema,
+  settingsGithubBodySchema,
+  SuccessSchema,
+} from "@/lib/openapi/app-schemas"
+import { registry } from "@/lib/openapi/registry"
+import { DEFAULT_SECURITY, ErrorResponseSchema } from "@/lib/openapi/common"
+
+registry.registerPath({
+  method: 'get',
+  path: '/api/settings/github',
+  operationId: 'getGithubSettings',
+  summary: 'Current GitHub Sync configuration (token presence only, not the value)',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'GitHub settings', content: { 'application/json': { schema: SettingsGithubStatusSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+  },
+})
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/settings/github',
+  operationId: 'updateGithubSettings',
+  summary: 'Update GitHub Sync configuration in .env.local (token + owner + repo)',
+  tags: ['app'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: settingsGithubBodySchema } } } },
+  responses: {
+    200: { description: 'Settings saved', content: { 'application/json': { schema: SuccessSchema } } },
+    400: { description: 'Invalid JSON body', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+  },
+})
 
 /**
  * GET: Return current GitHub Sync configuration (owner + repo name + whether a token is set).

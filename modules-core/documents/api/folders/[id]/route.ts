@@ -12,14 +12,50 @@ import { toSnakeCase, validateRequestBody, createErrorResponse } from '@/lib/api
 import { z } from 'zod'
 import { documentFolders, documents } from '@/lib/db/schema'
 import { eq, and, isNull, inArray, sql } from 'drizzle-orm'
-import { FOLDER_NAME_PATTERN, FOLDER_NAME_MAX_LENGTH } from '../../../lib/utils'
+import {
+  idParamSchema,
+  updateFolderSchema as UpdateFolderSchema,
+  FolderSingleResponseSchema,
+  FolderDeleteResponseSchema,
+} from '../../../lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 
-const UpdateFolderSchema = z.object({
-  name: z.string().min(1).max(FOLDER_NAME_MAX_LENGTH).regex(
-    FOLDER_NAME_PATTERN,
-    'Folder name may only contain letters, numbers, hyphens, and underscores'
-  ).optional(),
-  parent_id: z.string().uuid().nullable().optional(),
+registry.registerPath({
+  method: 'patch',
+  path: '/api/modules/documents/folders/{id}',
+  operationId: 'updateDocumentFolder',
+  summary: 'Rename or re-parent a folder (rejects cycles)',
+  tags: ['documents'],
+  security: DEFAULT_SECURITY,
+  request: {
+    params: idParamSchema,
+    body: { content: { 'application/json': { schema: UpdateFolderSchema } } },
+  },
+  responses: {
+    200: { description: 'Updated folder', content: { 'application/json': { schema: FolderSingleResponseSchema } } },
+    400: { description: 'Validation error, invalid id, or cycle attempt', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    404: { description: 'Folder or parent folder not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'delete',
+  path: '/api/modules/documents/folders/{id}',
+  operationId: 'softDeleteDocumentFolder',
+  summary: 'Soft-delete a folder and all of its descendants (and contained documents)',
+  tags: ['documents'],
+  security: DEFAULT_SECURITY,
+  request: { params: idParamSchema },
+  responses: {
+    200: { description: 'Soft-delete acknowledged with folders_affected count', content: { 'application/json': { schema: FolderDeleteResponseSchema } } },
+    400: { description: 'Invalid id format', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: UnauthorizedResponse,
+    404: { description: 'Folder not found', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
 /**

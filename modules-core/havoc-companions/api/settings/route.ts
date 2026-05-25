@@ -9,49 +9,47 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
 import { eq, sql } from 'drizzle-orm'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
 import { moduleSettings } from '@/lib/db/schema'
-import { ALL_SPECIES } from '@/modules/havoc-companions/lib/animals'
+import {
+  HavocSettingsSchema as SettingsSchema,
+  SaveSuccessSchema,
+} from '@/modules/havoc-companions/lib/validation'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 
 const MODULE_ID = 'havoc-companions'
 
-const SPECIES = z.enum(ALL_SPECIES, {
-  errorMap: () => ({ message: 'Unknown species' }),
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/havoc-companions/settings',
+  operationId: 'getHavocSettings',
+  summary: "Fetch the authenticated user's Havoc Companions settings (or empty object)",
+  tags: ['havoc-companions'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'Settings object (all fields optional)', content: { 'application/json': { schema: SettingsSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
-const AnimalSchema = z.object({
-  id: z
-    .string()
-    .min(1, 'Animal id is required')
-    .max(64, 'Animal id must be 64 characters or fewer'),
-  species: SPECIES,
-  name: z
-    .string()
-    .min(1, 'Name is required')
-    .max(40, 'Name must be 40 characters or fewer'),
-})
-
-const SettingsSchema = z.object({
-  initialized: z.boolean().optional(),
-  animals: z
-    .array(AnimalSchema)
-    .length(3, 'There must be exactly 3 companions')
-    .optional(),
-  intensity: z
-    .number()
-    .int('Intensity must be a whole number')
-    .min(1, 'Intensity must be between 1 and 10')
-    .max(10, 'Intensity must be between 1 and 10')
-    .optional(),
-  speed: z
-    .number()
-    .int('Speed must be a whole number')
-    .min(1, 'Speed must be between 1 and 10')
-    .max(10, 'Speed must be between 1 and 10')
-    .optional(),
+registry.registerPath({
+  method: 'put',
+  path: '/api/modules/havoc-companions/settings',
+  operationId: 'updateHavocSettings',
+  summary: 'Partial-merge update of Havoc Companions settings',
+  tags: ['havoc-companions'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: SettingsSchema } } } },
+  responses: {
+    200: { description: 'Settings saved', content: { 'application/json': { schema: SaveSuccessSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
 export async function GET() {
