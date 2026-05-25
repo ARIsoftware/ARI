@@ -1,4 +1,5 @@
 import fs from 'fs'
+import os from 'os'
 import path from 'path'
 
 export function getGitHubConfig() {
@@ -36,14 +37,46 @@ async function githubApi(endpoint: string, config: GitHubConfig, options: Reques
 
 const BINARY_EXTENSIONS = /\.(png|jpg|jpeg|gif|ico|webp|bmp|avif|woff|woff2|ttf|otf|eot|pdf|zip|tar|gz|mp3|mp4|wav)$/i
 
+// Allowlist of roots collectFiles is permitted to read from. Enforced
+// in-function as defense-in-depth so a caller that forgets to validate
+// can't trigger path traversal via a tainted directory argument.
+function getAllowedRoots(): string[] {
+  const candidates = [
+    path.resolve(process.cwd(), 'modules-core'),
+    path.resolve(process.cwd(), 'modules-custom'),
+    path.resolve(os.tmpdir(), 'ari-modules'),
+  ]
+  return candidates.map((p) => {
+    try {
+      return fs.realpathSync(p)
+    } catch {
+      return p
+    }
+  })
+}
+
+function isInsideAllowedRoot(resolvedDir: string, roots: string[]): boolean {
+  return roots.some(
+    (root) => resolvedDir === root || resolvedDir.startsWith(root + path.sep)
+  )
+}
+
 function collectFiles(dir: string, basePath: string = ''): { path: string; content: string; encoding: 'utf-8' | 'base64' }[] {
   const files: { path: string; content: string; encoding: 'utf-8' | 'base64' }[] = []
-  if (!fs.existsSync(dir)) return files
-  // realpathSync resolves symlinks once at the root so the iteration anchor
-  // is a real on-disk directory; combined with the per-entry symlink skip
-  // below this prevents a symlink inside a module from exfiltrating files
-  // outside the module tree when the result is committed to GitHub.
-  const resolvedDir = fs.realpathSync(path.resolve(dir))
+  // realpathSync resolves symlinks and also throws if the directory does
+  // not exist — replaces the previous separate existsSync check.
+  let resolvedDir: string
+  try {
+    resolvedDir = fs.realpathSync(path.resolve(dir))
+  } catch {
+    return files
+  }
+
+  // Allowlist check on the real path. Must be under a known module root;
+  // this is what makes the subsequent fs reads safe regardless of caller.
+  if (!isInsideAllowedRoot(resolvedDir, getAllowedRoots())) {
+    throw new Error(`Refusing to read directory outside allowed module roots: ${resolvedDir}`)
+  }
 
   for (const entry of fs.readdirSync(resolvedDir, { withFileTypes: true })) {
     if (entry.isSymbolicLink()) continue
