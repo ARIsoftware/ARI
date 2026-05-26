@@ -24,6 +24,8 @@
 5. [Checklist: Migrating Existing Feature](#5-checklist-migrating-existing-feature)
 6. [Database Integration](#6-database-integration)
 7. [API Routes](#7-api-routes)
+    - [7.5 Public Routes](#75-public-routes)
+    - [7.6 OpenAPI Spec & API Keys](#76-openapi-spec--api-keys)
 8. [Components](#8-components)
 9. [Data Fetching with TanStack Query](#9-data-fetching-with-tanstack-query)
 10. [Module Utility Functions](#10-module-utility-functions)
@@ -1168,6 +1170,42 @@ ARI uses **Drizzle ORM** with the `withRLS()` helper for database operations, NO
 - SELECT operations are automatically filtered by user_id via `withRLS()`
 - INSERT operations require explicit `userId: user.id`
 
+### OpenAPI annotations are required
+
+Every route in ARI is documented via the shared OpenAPI 3.1 registry (`scripts/generate-openapi.ts`, run on `predev`/`prebuild`). Annotated routes appear in `/api/openapi.json`, render in the Scalar viewer at `/api-docs`, list in `/settings?tab=api`, and surface in the `/health` Endpoints panel. See [section 7.6](#76-openapi-spec--api-keys) for the full pipeline.
+
+For each module:
+
+1. **Put all Zod schemas in `modules-{core,custom}/<id>/lib/validation.ts`** (not inline in `route.ts`) and tag each with `.openapi('SchemaName')`. `operationId`s and schema names must be globally unique — prefix with the module slug.
+2. **In `route.ts`, call `registry.registerPath({ ... })`** once per HTTP verb above the handler. Use `tags: ['<module-id>']`, `security: DEFAULT_SECURITY`, and the shared `ErrorResponseSchema` / `InternalServerErrorResponse` from `@/lib/openapi/common`.
+
+```typescript
+// modules/my-module/lib/validation.ts
+import { z } from 'zod'
+import '@/lib/openapi/registry'  // side-effect: extends zod with .openapi()
+
+export const createDataSchema = z.object({
+  title: z.string().min(1, 'Title is required').max(255, 'Title must be 255 characters or fewer'),
+  content: z.string().optional(),
+}).openapi('MyModuleCreateData')
+
+export const MyModuleDataSchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string(),
+  title: z.string(),
+  content: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+}).openapi('MyModuleData')
+
+export const MyModuleDataListResponseSchema = z.object({
+  data: z.array(MyModuleDataSchema),
+  count: z.number().int().nonnegative(),
+}).openapi('MyModuleDataListResponse')
+```
+
+The reference implementation lives at `modules-core/module-template/lib/validation.ts` + `modules-core/module-template/api/data/route.ts`.
+
 ### Basic API Route Template
 
 ```typescript
@@ -1175,14 +1213,44 @@ ARI uses **Drizzle ORM** with the `withRLS()` helper for database operations, NO
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { toSnakeCase } from '@/lib/api-helpers'
-import { z } from 'zod'
 import { myModuleData } from '@/lib/db/schema'  // Import your Drizzle table
 import { eq, desc } from 'drizzle-orm'
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+import {
+  createDataSchema as CreateDataSchema,
+  MyModuleDataSchema,
+  MyModuleDataListResponseSchema,
+} from '@/modules/my-module/lib/validation'
 
-// Validation schema
-const CreateDataSchema = z.object({
-  title: z.string().min(1).max(255),
-  content: z.string().optional()
+registry.registerPath({
+  method: 'get',
+  path: '/api/modules/my-module/data',
+  operationId: 'listMyModuleData',
+  summary: "List the authenticated user's entries",
+  tags: ['my-module'],
+  security: DEFAULT_SECURITY,
+  responses: {
+    200: { description: 'Page of entries', content: { 'application/json': { schema: MyModuleDataListResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/my-module/data',
+  operationId: 'createMyModuleData',
+  summary: 'Create a new entry',
+  tags: ['my-module'],
+  security: DEFAULT_SECURITY,
+  request: { body: { content: { 'application/json': { schema: CreateDataSchema } } } },
+  responses: {
+    201: { description: 'Created entry', content: { 'application/json': { schema: MyModuleDataSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
 })
 
 /**
@@ -1415,6 +1483,17 @@ export async function PATCH(
 - [ ] Log errors with descriptive context
 - [ ] Never expose internal error details to client
 
+### OpenAPI Annotation Checklist
+
+- [ ] All Zod schemas live in `[module]/lib/validation.ts` (not inline in `route.ts`)
+- [ ] Every schema is tagged with `.openapi('SchemaName')` and the name is prefixed with the module slug for uniqueness
+- [ ] Every route handler is preceded by a `registry.registerPath({ ... })` call (one per HTTP verb)
+- [ ] `tags` is set to `['<module-id>']` (anything not in `NON_MODULE_TAGS` is treated as a module id)
+- [ ] `security: DEFAULT_SECURITY` is set on authenticated routes (omit/set `[]` only for `publicRoutes`)
+- [ ] Error responses reference the shared `ErrorResponseSchema` / `InternalServerErrorResponse` from `@/lib/openapi/common`
+- [ ] `operationId` is globally unique across the spec (prefix with the module slug)
+- [ ] After `pnpm dev` restarts, the route appears in `/api-docs` and `/health` → Endpoints
+
 ### Reference Implementation
 
 See `/modules-core/module-template/api/data/route.ts` for a complete working example with GET, POST, and DELETE handlers.
@@ -1551,6 +1630,48 @@ After configuring public routes:
 - [ ] Route appears in `/health` → Endpoints tab
 - [ ] Tested without authentication (should fail without proper security headers)
 - [ ] Tested with valid security headers (should succeed)
+
+---
+
+## 7.6 OpenAPI Spec & API Keys
+
+ARI publishes a unified OpenAPI 3.1 specification covering every authenticated and public route across the core app and all installed modules. The spec is the single source of truth for `/api-docs`, the Settings → API tab, and the `/health` Endpoints diagnostic.
+
+### Pipeline
+
+| Stage | What happens | Where |
+|---|---|---|
+| Build | `scripts/generate-openapi.ts` walks `app/api/` and `modules-{core,custom}/*/api/` collecting `registry.registerPath` calls, then writes the spec to `lib/generated/openapi.json` | Runs on `predev` and `prebuild` |
+| Serve | `/api/openapi.json` reads the generated file, overrides `servers[0].url` with the current origin, and returns it (auth-gated, in-memory cached) | `app/api/openapi.json/route.ts` |
+| Render | The Scalar viewer fetches the spec and renders an interactive Try-It-Out UI | `/api-docs` (`app/api-docs/page.tsx`) |
+| Inspect | Settings → API and the `/health` Endpoints panel both consume the same spec, classifying routes by tag (`app`/`auth` = core, anything else = module id) | `/settings?tab=api`, `/health` |
+
+A module's routes will only appear in `/api-docs`, `/settings?tab=api`, and `/health` if `registry.registerPath` is called. Missing the call doesn't break the route, but it makes the route invisible to every diagnostic in ARI.
+
+### Shared building blocks
+
+Import from `@/lib/openapi/`:
+
+| Import | Source | Purpose |
+|---|---|---|
+| `registry` | `@/lib/openapi/registry` | The singleton `OpenAPIRegistry`. Also extends Zod with `.openapi()` as a side effect. |
+| `DEFAULT_SECURITY` | `@/lib/openapi/common` | `[{ apiKey: [] }, { sessionCookie: [] }]` — accepts either auth type. |
+| `ErrorResponseSchema` | `@/lib/openapi/common` | The canonical `{ error, details? }` shape. |
+| `UnauthorizedResponse`, `InternalServerErrorResponse` | `@/lib/openapi/common` | Pre-built 401 / 500 response objects. |
+| `X_ARI`, `NON_MODULE_TAGS`, `HTTP_METHODS` | `@/lib/openapi/types` | Constants used by writers and readers. Side-effect-free, safe in client bundles. |
+
+### API Keys (`x-api-key`)
+
+Every authenticated route that declares `security: DEFAULT_SECURITY` accepts **two** credentials:
+
+1. **Better Auth session cookie** — set automatically after sign-in (the normal browser path).
+2. **`x-api-key: <key>` header** — long-lived programmatic credentials minted by the user in **Settings → API**. The key prefix is defined by `API_KEY_PREFIX` in `lib/auth-middleware.ts`.
+
+There is nothing for a module to wire up — `getAuthenticatedUser()` resolves the request to a user regardless of which mechanism was used, and `withRLS()` scopes queries to that user identically in both cases. The same API key works against the Scalar Try-It-Out UI at `/api-docs`, against direct `curl` calls, and against any HTTP client.
+
+### Public routes and the spec
+
+Routes declared in `module.json` `publicRoutes` are merged into the spec with `x-ari-public`, `x-ari-security-type`, `x-ari-rate-limit`, and related extensions (`X_ARI.*` constants). They still need a `registry.registerPath` call to appear in `/api-docs` — just omit `security` (or set it to `[]`) since they don't require user auth. See [section 7.5](#75-public-routes) for security type details.
 
 ---
 

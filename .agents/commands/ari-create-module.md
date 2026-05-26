@@ -171,7 +171,9 @@ When approved, create the module following this order:
    - Use `toSnakeCase()` from `@/lib/api-helpers` for responses
    - **Drizzle `numeric()` columns return STRINGS** - convert to `Number()` in GET responses before sending to client (see "Drizzle Numeric Column Handling" section below)
    - **Zod schemas MUST have human-readable error messages** on every constraint (see "Zod Validation Rules" section below)
-   - See `modules-core/module-template/api/data/route.ts` as the reference
+   - **Zod schemas MUST live in `[module]/lib/validation.ts`** (not inline in `route.ts`) and be tagged with `.openapi('SchemaName')` so they appear as named components in `/api/openapi.json` and `/api-docs`. See "OpenAPI Annotations" section below.
+   - **Every route handler MUST be preceded by a `registry.registerPath({...})` call** documenting the method, path, tags (use the module id), `security: DEFAULT_SECURITY`, request schema, and response schemas. This is what surfaces the route in the OpenAPI spec, `/api-docs`, `/settings?tab=api`, and the `/health` Endpoints panel.
+   - See `modules-core/module-template/api/data/route.ts` and `modules-core/module-template/lib/validation.ts` as the reference
    - **If v0 code was provided:** Use the derived data model from the "v0 Code Integration" analysis to inform API route data shapes. Build routes that serve data in the same shape the v0 components already expect (matching the mock data structure).
 5. **Register API routes in MODULE_API_ROUTES** (REQUIRED if module has API routes):
    - Edit `/app/api/modules/[module]/[[...path]]/route.ts`
@@ -612,6 +614,79 @@ mutationFn: async (data: CreateRequest): Promise<Item> => {
 },
 ```
 
+## OpenAPI Annotations
+
+Every API route in ARI is documented via the shared OpenAPI 3.1 registry. The spec is generated at `predev`/`prebuild` (`scripts/generate-openapi.ts`), served at `/api/openapi.json` (auth-gated), and rendered interactively at `/api-docs` via Scalar. Routes also appear in `/settings?tab=api` and the `/health` Endpoints panel, both of which consume the same spec.
+
+**This is not optional.** A module's routes that skip the registry call still work, but they will be invisible to `/api-docs`, `/settings?tab=api`, and `/health`, and they will fail the Module Audit.
+
+### Where schemas live
+
+All request bodies, query params, and response bodies belong in `modules-{core,custom}/<id>/lib/validation.ts` and must be tagged with `.openapi('SchemaName')`:
+
+```typescript
+// modules-custom/my-module/lib/validation.ts
+import { z } from 'zod'
+import '@/lib/openapi/registry'  // side-effect import extends zod with .openapi()
+
+export const createEntrySchema = z.object({
+  title: z.string().min(1, 'Title is required').max(200, 'Title must be 200 characters or fewer'),
+}).openapi('MyModuleCreateEntryBody')
+
+export const EntrySchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string(),
+  title: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+}).openapi('MyModuleEntry')
+
+export const EntryListResponseSchema = z.object({
+  entries: z.array(EntrySchema),
+  count: z.number().int().nonnegative(),
+}).openapi('MyModuleEntryListResponse')
+```
+
+### Registering the route
+
+Inside each `route.ts`, import the registry and shared helpers, then register one block per HTTP verb above the handler:
+
+```typescript
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+import { createEntrySchema, EntryListResponseSchema } from '@/modules/my-module/lib/validation'
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/my-module/data',
+  operationId: 'createMyModuleEntry',
+  summary: 'Create a new entry',
+  tags: ['my-module'],            // tag MUST be the module id (anything not in NON_MODULE_TAGS = module)
+  security: DEFAULT_SECURITY,     // accepts either Better Auth session cookie OR x-api-key header
+  request: { body: { content: { 'application/json': { schema: createEntrySchema } } } },
+  responses: {
+    201: { description: 'Created entry', content: { 'application/json': { schema: EntryListResponseSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+export async function POST(request: NextRequest) { /* ... */ }
+```
+
+### Rules
+
+- **Tags = module id.** The build script classifies any tag not in `NON_MODULE_TAGS` (`'app'`, `'auth'`) as a module id. Always tag your routes with the module's slug (e.g. `tags: ['my-module']`).
+- **Use `DEFAULT_SECURITY`** for any route gated by `getAuthenticatedUser()`. It declares both `apiKey` (x-api-key header) and `sessionCookie` — Better Auth session OR API key both work. Don't define your own security schemes.
+- **Use the shared error response.** Import `ErrorResponseSchema`, `UnauthorizedResponse`, and `InternalServerErrorResponse` from `@/lib/openapi/common` instead of redefining the same `{ error, details }` shape per route.
+- **`operationId` must be unique** across the whole spec — prefix with the module slug (e.g. `createMyModuleEntry`, `listMyModuleEntries`).
+- **Multipart uploads:** declare the file field as `z.any().openapi({ type: 'string', format: 'binary' })` — see `modules-core/module-template/lib/validation.ts` `UploadFormSchema` and `modules-core/module-template/api/upload/route.ts`.
+- **Public/webhook routes** (declared in `publicRoutes`) inherit `x-ari-public`, `x-ari-security-type`, and related extensions automatically from `module.json`. You still need a `registry.registerPath` call to make them visible in `/api-docs` — just omit `security` (or set it to `[]`) since they don't require user auth.
+- **Settings → API tab** lets users mint API keys (prefix from `lib/auth-middleware.ts` `API_KEY_PREFIX`). Routes that use `DEFAULT_SECURITY` accept these automatically — there's nothing for the module to wire up.
+
+After adding annotations, the route should appear in `/api-docs` and `/health` → Endpoints on the next dev-server restart (the spec is regenerated by the `predev` hook).
+
 ## Dialog & Form Validation Pattern
 
 **All create/edit dialogs MUST implement inline validation with red outlines.** Never rely only on toast messages for validation errors.
@@ -771,6 +846,10 @@ Before marking complete, verify:
 - [ ] **If tables use `numeric()` columns**: API GET routes convert them to `Number()` before responding
 - [ ] **All Zod constraints have human-readable error messages** (no bare `.min()` / `.max()`)
 - [ ] **Mutation hooks surface API error details** (parse `err.details` from Zod validation responses)
+- [ ] **All Zod schemas live in `[module]/lib/validation.ts`** (not inline in route files) and are tagged with `.openapi('SchemaName')`
+- [ ] **Every API route handler is preceded by a `registry.registerPath({...})` block** that sets `tags: ['<module-id>']`, `security: DEFAULT_SECURITY`, and uses the shared `ErrorResponseSchema`/`InternalServerErrorResponse` for error responses
+- [ ] **`operationId`s are unique** across the module (prefix with the module slug)
+- [ ] **Routes appear in `/api-docs`** after `pnpm dev` restarts (the spec is regenerated by the `predev` hook)
 - [ ] **All create/edit dialogs have inline validation** (red outlines + error text below fields)
 - [ ] **Dialogs only close on `onSuccess`** (never before API confirms - user must not lose form data on error)
 - [ ] **Every `DialogContent`/`DrawerContent` includes a `DialogTitle`/`DrawerTitle`** (use `VisuallyHidden` if the design has no visible title)
