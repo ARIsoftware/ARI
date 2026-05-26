@@ -79,6 +79,8 @@ export function MusicPlayerContextProvider({ children, isAuthenticated = false }
     setMounted(true)
   }, [])
 
+  const pendingVideoRef = useRef<string | null>(null)
+
   const loadVideo = useCallback((videoId: string) => {
     if (!window.youtubePlayer || !isReady) return
     window.youtubePlayer.loadVideoById(videoId)
@@ -106,6 +108,10 @@ export function MusicPlayerContextProvider({ children, isAuthenticated = false }
       events: {
         onReady: () => {
           setIsReady(true)
+          if (pendingVideoRef.current) {
+            window.youtubePlayer?.loadVideoById(pendingVideoRef.current)
+            pendingVideoRef.current = null
+          }
         },
         onStateChange: (event: any) => {
           const YTState = window.YT?.PlayerState
@@ -133,28 +139,30 @@ export function MusicPlayerContextProvider({ children, isAuthenticated = false }
     })
   }, [])
 
-  useEffect(() => {
-    if (!mounted || !isAuthenticated || typeof window === "undefined") return
+  const ensureYouTubeAPI = useCallback((videoId?: string) => {
+    if (typeof window === "undefined") return
+    if (videoId) pendingVideoRef.current = videoId
 
-    if (!window.YT && !document.querySelector('script[src*="youtube.com/iframe_api"]')) {
-      const tag = document.createElement("script")
-      tag.src = "https://www.youtube.com/iframe_api"
-      document.head.appendChild(tag)
+    if (window.YT && window.isYouTubeAPIReady) {
+      initializePlayer()
+      return
     }
 
-    const onReady = () => {
+    window.onYouTubeIframeAPIReady = () => {
       window.isYouTubeAPIReady = true
       initializePlayer()
     }
 
-    window.onYouTubeIframeAPIReady = onReady
-
-    if (window.YT && window.isYouTubeAPIReady) {
-      initializePlayer()
+    if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+      const tag = document.createElement("script")
+      tag.src = "https://www.youtube.com/iframe_api"
+      document.head.appendChild(tag)
     }
+  }, [initializePlayer])
 
+  useEffect(() => {
     return () => {
-      if (window.onYouTubeIframeAPIReady === onReady) {
+      if (window.onYouTubeIframeAPIReady) {
         window.onYouTubeIframeAPIReady = undefined
       }
       if (window.youtubePlayer && typeof window.youtubePlayer.destroy === "function") {
@@ -164,7 +172,7 @@ export function MusicPlayerContextProvider({ children, isAuthenticated = false }
       setIsReady(false)
       setIsPlaying(false)
     }
-  }, [mounted, isAuthenticated, initializePlayer])
+  }, [])
 
   const setPlaylist = useCallback((songs: MusicPlaylistEntry[]) => {
     setPlaylistState(songs)
@@ -182,8 +190,12 @@ export function MusicPlayerContextProvider({ children, isAuthenticated = false }
     setCurrentSongId(song.id)
     currentSongIdRef.current = song.id
     setIsActive(true)
-    loadVideo(song.youtube_video_id)
-  }, [loadVideo])
+    if (isReady) {
+      loadVideo(song.youtube_video_id)
+    } else {
+      ensureYouTubeAPI(song.youtube_video_id)
+    }
+  }, [isReady, loadVideo, ensureYouTubeAPI])
 
   const playNext = useCallback(() => {
     const pl = playlistRef.current
@@ -193,20 +205,20 @@ export function MusicPlayerContextProvider({ children, isAuthenticated = false }
     const curId = currentSongIdRef.current
     const curIdx = curId ? pl.findIndex(s => s.id === curId) : -1
 
+    let targetSong: MusicPlaylistEntry
     if (curIdx < 0) {
-      // Nothing playing, start from beginning
-      const first = pl[0]
-      setCurrentSongId(first.id)
-      currentSongIdRef.current = first.id
-      loadVideo(first.youtube_video_id)
+      targetSong = pl[0]
     } else {
-      const nextIdx = (curIdx + 1) % pl.length
-      const next = pl[nextIdx]
-      setCurrentSongId(next.id)
-      currentSongIdRef.current = next.id
-      loadVideo(next.youtube_video_id)
+      targetSong = pl[(curIdx + 1) % pl.length]
     }
-  }, [loadVideo])
+    setCurrentSongId(targetSong.id)
+    currentSongIdRef.current = targetSong.id
+    if (isReady) {
+      loadVideo(targetSong.youtube_video_id)
+    } else {
+      ensureYouTubeAPI(targetSong.youtube_video_id)
+    }
+  }, [isReady, loadVideo, ensureYouTubeAPI])
 
   const pause = useCallback(() => {
     if (window.youtubePlayer) {
