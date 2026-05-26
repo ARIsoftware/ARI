@@ -110,8 +110,13 @@ CREATE TABLE IF NOT EXISTS "twoFactor" (
   "secret" TEXT NOT NULL,
   "backupCodes" TEXT NOT NULL,
   "userId" TEXT NOT NULL,
+  "verified" BOOLEAN DEFAULT TRUE,
   PRIMARY KEY ("id")
 );
+-- Better Auth 1.6 added \`verified\` to its twoFactor schema. Existing installs
+-- need this column or both \`/two-factor/enable\` (INSERT) and \`/two-factor/verify-totp\`
+-- (post-verify UPDATE) error with 500.
+ALTER TABLE "twoFactor" ADD COLUMN IF NOT EXISTS "verified" BOOLEAN DEFAULT TRUE;
 ALTER TABLE "twoFactor" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "twoFactor_rls_deny" ON "twoFactor";
 CREATE POLICY "twoFactor_rls_deny" ON "twoFactor" FOR ALL TO public USING (false);
