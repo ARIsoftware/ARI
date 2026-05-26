@@ -37,6 +37,7 @@ export function getStorageProviderLabel(provider: StorageProvider): string {
     case 'supabase': return 'Supabase Storage'
     case 'r2': return 'Cloudflare R2'
     case 's3': return 'AWS S3'
+    case 'local': return 'Local Filesystem'
   }
 }
 
