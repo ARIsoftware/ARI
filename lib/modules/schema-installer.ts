@@ -18,9 +18,8 @@
  */
 
 import { readFile } from 'fs/promises'
-import { join } from 'path'
-import { getModuleById } from './module-loader'
 import { getPoolClient } from '@/lib/db'
+import { MODULE_SCHEMAS } from '@/lib/generated/module-schemas'
 
 export type SchemaInstallResult =
   | { ok: true; alreadyExisted?: false }
@@ -54,32 +53,14 @@ function stripSqlComments(sql: string): string {
 }
 
 /**
- * Run a schema.sql file at the given path against the database. Idempotent
- * and safe to call repeatedly. Used by both `runModuleSchemaInstall` (which
- * resolves the path via the manifest) and the download flow (which has the
- * path directly because the manifest cache hasn't seen the new module yet).
+ * Run a SQL string against the database inside a single transaction.
+ * Applies the same safety scan and "already exists is harmless" semantics
+ * regardless of where the SQL came from (filesystem or bundled map).
  */
-export async function runSchemaSqlAtPath(
+async function executeSchemaSql(
   moduleId: string,
-  schemaPath: string
+  sqlText: string
 ): Promise<SchemaInstallResult> {
-  let sqlText: string
-  try {
-    sqlText = await readFile(schemaPath, 'utf-8')
-  } catch (err: unknown) {
-    const code = (err as NodeJS.ErrnoException)?.code
-    if (code === 'ENOENT') {
-      // No schema.sql is fine — module owns no DB tables.
-      return { ok: true }
-    }
-    return {
-      ok: false,
-      alreadyExisted: false,
-      error: `Failed to read ${schemaPath}: ${(err as Error).message}`,
-    }
-  }
-
-  // Safety guard: scan stripped SQL for forbidden destructive statements.
   const scanText = stripSqlComments(sqlText)
   for (const { name, regex } of FORBIDDEN_PATTERNS) {
     if (regex.test(scanText)) {
@@ -89,7 +70,6 @@ export async function runSchemaSqlAtPath(
     }
   }
 
-  // Execute inside a single transaction.
   let client
   try {
     client = await getPoolClient()
@@ -114,8 +94,6 @@ export async function runSchemaSqlAtPath(
       // ignore rollback errors
     }
     const msg = (err as Error).message
-    // "already exists" is harmless — tables/policies/indexes are already in place.
-    // Caller can treat this the same as a successful install.
     const alreadyExisted = msg.includes('already exists')
     console.error(`[module-installer] ${moduleId} schema.sql failed: ${msg}`)
     return { ok: false, alreadyExisted, error: msg }
@@ -129,17 +107,51 @@ export async function runSchemaSqlAtPath(
 }
 
 /**
- * Run a module's schema.sql against the database. Idempotent and safe to
- * call on every module enable.
+ * Run a schema.sql file at the given path against the database. Used by
+ * the download flow, which has the path directly because the manifest cache
+ * hasn't seen the new module yet. Manifest-known modules should use
+ * `runModuleSchemaInstall` instead — it reads from the bundled SQL map and
+ * therefore works on serverless deployments where untraced .sql files
+ * aren't in the function bundle.
+ */
+export async function runSchemaSqlAtPath(
+  moduleId: string,
+  schemaPath: string
+): Promise<SchemaInstallResult> {
+  let sqlText: string
+  try {
+    sqlText = await readFile(schemaPath, 'utf-8')
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException)?.code
+    if (code === 'ENOENT') {
+      // No schema.sql is fine — module owns no DB tables.
+      return { ok: true }
+    }
+    return {
+      ok: false,
+      alreadyExisted: false,
+      error: `Failed to read ${schemaPath}: ${(err as Error).message}`,
+    }
+  }
+  return executeSchemaSql(moduleId, sqlText)
+}
+
+/**
+ * Run a module's schema.sql against the database. Reads the SQL from
+ * `lib/generated/module-schemas.ts` (an auto-generated map of every
+ * known module's schema.sql), so this works on Vercel/serverless where
+ * the raw .sql files aren't bundled into the function. Idempotent and
+ * safe to call on every module enable.
  *
  * @param moduleId - kebab-case module id (e.g. "module-template")
  */
 export async function runModuleSchemaInstall(
   moduleId: string
 ): Promise<SchemaInstallResult> {
-  const mod = await getModuleById(moduleId)
-  if (!mod) {
-    return { ok: false, alreadyExisted: false, error: `Module '${moduleId}' not found in manifest` }
+  const sqlText = MODULE_SCHEMAS[moduleId]
+  if (sqlText === undefined) {
+    // Module owns no DB tables — same semantics as a missing file used to.
+    return { ok: true }
   }
-  return runSchemaSqlAtPath(moduleId, join(mod.path, 'database', 'schema.sql'))
+  return executeSchemaSql(moduleId, sqlText)
 }
