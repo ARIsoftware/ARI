@@ -19,6 +19,7 @@ import {
   Plus,
   Loader2,
   Activity,
+  FileCode,
 } from "lucide-react"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
 import { useModules } from "@/lib/modules/module-hooks"
@@ -117,6 +118,10 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
           <CommandItem onSelect={() => runCommand(() => router.push("/health"))}>
             <Activity className="mr-2 h-4 w-4" />
             <span>Health Check</span>
+          </CommandItem>
+          <CommandItem onSelect={() => runCommand(() => router.push("/api-docs"))}>
+            <FileCode className="mr-2 h-4 w-4" />
+            <span>API Docs</span>
           </CommandItem>
         </CommandGroup>
 
