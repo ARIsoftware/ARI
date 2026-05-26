@@ -3,8 +3,25 @@
 // Run `pnpm run generate-module-registry` to regenerate.
 export const setupSql = `-- ================================================================
 -- ARI Database Setup
--- Creates all required tables with Row Level Security (RLS)
--- Run this in your SQL client (Supabase Studio, pgweb, or psql) before first use
+--
+-- This file is the canonical source of truth for ARI's local schema.
+-- It is applied automatically on every Next.js boot (see
+-- \`lib/db/ensure-schema.ts\`), so any change you make here will roll
+-- out to existing installs on their next start — no manual migration.
+--
+-- CONTRACT: every statement in this file MUST be safe to run repeatedly.
+--   • Use \`CREATE TABLE IF NOT EXISTS\`, never bare \`CREATE TABLE\`.
+--   • Use \`ALTER TABLE ... ADD COLUMN IF NOT EXISTS\`, never bare ADD COLUMN.
+--   • Use \`CREATE INDEX IF NOT EXISTS\`, never bare \`CREATE INDEX\`.
+--   • Use \`CREATE OR REPLACE FUNCTION\`, never bare \`CREATE FUNCTION\`.
+--   • For policies, always pair \`DROP POLICY IF EXISTS ... ON ...;\` with
+--     \`CREATE POLICY ...;\` (Postgres < 16 has no \`CREATE POLICY IF NOT EXISTS\`).
+--   • For seed rows, use \`INSERT ... SELECT ... WHERE NOT EXISTS (...)\`.
+--
+-- After editing this file, regenerate the TS export:
+--   node scripts/generate-setup-sql.js
+-- Commit both files together.
+--
 -- NOTE: Keep in sync with lib/db/setup-sql.ts (TS export for /welcome)
 -- ================================================================
 
@@ -42,6 +59,7 @@ CREATE TABLE IF NOT EXISTS "user" (
   CONSTRAINT "user_email_key" UNIQUE ("email")
 );
 ALTER TABLE "user" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "user_rls_deny" ON "user";
 CREATE POLICY "user_rls_deny" ON "user" FOR ALL TO public USING (false);
 
 -- Table: session
@@ -58,6 +76,7 @@ CREATE TABLE IF NOT EXISTS "session" (
   CONSTRAINT "session_token_key" UNIQUE ("token")
 );
 ALTER TABLE "session" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "session_rls_deny" ON "session";
 CREATE POLICY "session_rls_deny" ON "session" FOR ALL TO public USING (false);
 
 -- Table: account
@@ -78,6 +97,7 @@ CREATE TABLE IF NOT EXISTS "account" (
   PRIMARY KEY ("id")
 );
 ALTER TABLE "account" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "account_rls_deny" ON "account";
 CREATE POLICY "account_rls_deny" ON "account" FOR ALL TO public USING (false);
 
 -- Table: twoFactor
@@ -89,6 +109,7 @@ CREATE TABLE IF NOT EXISTS "twoFactor" (
   PRIMARY KEY ("id")
 );
 ALTER TABLE "twoFactor" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "twoFactor_rls_deny" ON "twoFactor";
 CREATE POLICY "twoFactor_rls_deny" ON "twoFactor" FOR ALL TO public USING (false);
 
 -- Table: verification
@@ -102,6 +123,7 @@ CREATE TABLE IF NOT EXISTS "verification" (
   PRIMARY KEY ("id")
 );
 ALTER TABLE "verification" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "verification_rls_deny" ON "verification";
 CREATE POLICY "verification_rls_deny" ON "verification" FOR ALL TO public USING (false);
 
 -- ================================================================
@@ -127,12 +149,16 @@ CREATE TABLE IF NOT EXISTS "user_preferences" (
 );
 
 ALTER TABLE "user_preferences" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "user_preferences_rls_select" ON "user_preferences";
 CREATE POLICY "user_preferences_rls_select" ON "user_preferences" FOR SELECT TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "user_preferences_rls_insert" ON "user_preferences";
 CREATE POLICY "user_preferences_rls_insert" ON "user_preferences" FOR INSERT TO public
   WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "user_preferences_rls_update" ON "user_preferences";
 CREATE POLICY "user_preferences_rls_update" ON "user_preferences" FOR UPDATE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "user_preferences_rls_delete" ON "user_preferences";
 CREATE POLICY "user_preferences_rls_delete" ON "user_preferences" FOR DELETE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
@@ -149,12 +175,16 @@ CREATE TABLE IF NOT EXISTS "module_settings" (
   CONSTRAINT "module_settings_user_id_module_id_key" UNIQUE ("user_id", "module_id")
 );
 ALTER TABLE "module_settings" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "module_settings_rls_select" ON "module_settings";
 CREATE POLICY "module_settings_rls_select" ON "module_settings" FOR SELECT TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "module_settings_rls_insert" ON "module_settings";
 CREATE POLICY "module_settings_rls_insert" ON "module_settings" FOR INSERT TO public
   WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "module_settings_rls_update" ON "module_settings";
 CREATE POLICY "module_settings_rls_update" ON "module_settings" FOR UPDATE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "module_settings_rls_delete" ON "module_settings";
 CREATE POLICY "module_settings_rls_delete" ON "module_settings" FOR DELETE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
@@ -169,6 +199,7 @@ CREATE TABLE IF NOT EXISTS "module_migrations" (
   CONSTRAINT "module_migrations_module_id_migration_name_key" UNIQUE ("module_id", "migration_name")
 );
 ALTER TABLE "module_migrations" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "module_migrations_rls_deny" ON "module_migrations";
 CREATE POLICY "module_migrations_rls_deny" ON "module_migrations" FOR ALL TO public USING (false);
 
 -- ================================================================
@@ -192,12 +223,16 @@ CREATE TABLE IF NOT EXISTS "api_keys" (
   PRIMARY KEY ("id")
 );
 ALTER TABLE "api_keys" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "api_keys_rls_select" ON "api_keys";
 CREATE POLICY "api_keys_rls_select" ON "api_keys" FOR SELECT TO public
   USING (user_id = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "api_keys_rls_insert" ON "api_keys";
 CREATE POLICY "api_keys_rls_insert" ON "api_keys" FOR INSERT TO public
   WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "api_keys_rls_update" ON "api_keys";
 CREATE POLICY "api_keys_rls_update" ON "api_keys" FOR UPDATE TO public
   USING (user_id = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "api_keys_rls_delete" ON "api_keys";
 CREATE POLICY "api_keys_rls_delete" ON "api_keys" FOR DELETE TO public
   USING (user_id = (SELECT current_setting('app.current_user_id')));
 
@@ -215,12 +250,16 @@ CREATE TABLE IF NOT EXISTS "api_key_usage_logs" (
   PRIMARY KEY ("id")
 );
 ALTER TABLE "api_key_usage_logs" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "api_key_usage_logs_rls_select" ON "api_key_usage_logs";
 CREATE POLICY "api_key_usage_logs_rls_select" ON "api_key_usage_logs" FOR SELECT TO public
   USING (user_id = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "api_key_usage_logs_rls_insert" ON "api_key_usage_logs";
 CREATE POLICY "api_key_usage_logs_rls_insert" ON "api_key_usage_logs" FOR INSERT TO public
   WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "api_key_usage_logs_rls_update" ON "api_key_usage_logs";
 CREATE POLICY "api_key_usage_logs_rls_update" ON "api_key_usage_logs" FOR UPDATE TO public
   USING (user_id = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "api_key_usage_logs_rls_delete" ON "api_key_usage_logs";
 CREATE POLICY "api_key_usage_logs_rls_delete" ON "api_key_usage_logs" FOR DELETE TO public
   USING (user_id = (SELECT current_setting('app.current_user_id')));
 
@@ -258,12 +297,16 @@ CREATE TABLE IF NOT EXISTS "tasks" (
   PRIMARY KEY ("id")
 );
 ALTER TABLE "tasks" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "tasks_rls_select" ON "tasks";
 CREATE POLICY "tasks_rls_select" ON "tasks" FOR SELECT TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "tasks_rls_insert" ON "tasks";
 CREATE POLICY "tasks_rls_insert" ON "tasks" FOR INSERT TO public
   WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "tasks_rls_update" ON "tasks";
 CREATE POLICY "tasks_rls_update" ON "tasks" FOR UPDATE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "tasks_rls_delete" ON "tasks";
 CREATE POLICY "tasks_rls_delete" ON "tasks" FOR DELETE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
@@ -278,12 +321,16 @@ CREATE TABLE IF NOT EXISTS "quotes" (
   PRIMARY KEY ("id")
 );
 ALTER TABLE "quotes" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "quotes_rls_select" ON "quotes";
 CREATE POLICY "quotes_rls_select" ON "quotes" FOR SELECT TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "quotes_rls_insert" ON "quotes";
 CREATE POLICY "quotes_rls_insert" ON "quotes" FOR INSERT TO public
   WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "quotes_rls_update" ON "quotes";
 CREATE POLICY "quotes_rls_update" ON "quotes" FOR UPDATE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "quotes_rls_delete" ON "quotes";
 CREATE POLICY "quotes_rls_delete" ON "quotes" FOR DELETE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
@@ -299,12 +346,16 @@ CREATE TABLE IF NOT EXISTS "music_playlist" (
   PRIMARY KEY ("id")
 );
 ALTER TABLE "music_playlist" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "music_playlist_rls_select" ON "music_playlist";
 CREATE POLICY "music_playlist_rls_select" ON "music_playlist" FOR SELECT TO public
   USING (user_id = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "music_playlist_rls_insert" ON "music_playlist";
 CREATE POLICY "music_playlist_rls_insert" ON "music_playlist" FOR INSERT TO public
   WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "music_playlist_rls_update" ON "music_playlist";
 CREATE POLICY "music_playlist_rls_update" ON "music_playlist" FOR UPDATE TO public
   USING (user_id = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "music_playlist_rls_delete" ON "music_playlist";
 CREATE POLICY "music_playlist_rls_delete" ON "music_playlist" FOR DELETE TO public
   USING (user_id = (SELECT current_setting('app.current_user_id')));
 
@@ -319,12 +370,16 @@ CREATE TABLE IF NOT EXISTS "notepad" (
   CONSTRAINT "notepad_user_id_key" UNIQUE ("user_id")
 );
 ALTER TABLE "notepad" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "notepad_rls_select" ON "notepad";
 CREATE POLICY "notepad_rls_select" ON "notepad" FOR SELECT TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "notepad_rls_insert" ON "notepad";
 CREATE POLICY "notepad_rls_insert" ON "notepad" FOR INSERT TO public
   WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "notepad_rls_update" ON "notepad";
 CREATE POLICY "notepad_rls_update" ON "notepad" FOR UPDATE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "notepad_rls_delete" ON "notepad";
 CREATE POLICY "notepad_rls_delete" ON "notepad" FOR DELETE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
@@ -338,12 +393,16 @@ CREATE TABLE IF NOT EXISTS "notepad_revisions" (
   PRIMARY KEY ("id")
 );
 ALTER TABLE "notepad_revisions" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "notepad_revisions_rls_select" ON "notepad_revisions";
 CREATE POLICY "notepad_revisions_rls_select" ON "notepad_revisions" FOR SELECT TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "notepad_revisions_rls_insert" ON "notepad_revisions";
 CREATE POLICY "notepad_revisions_rls_insert" ON "notepad_revisions" FOR INSERT TO public
   WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "notepad_revisions_rls_update" ON "notepad_revisions";
 CREATE POLICY "notepad_revisions_rls_update" ON "notepad_revisions" FOR UPDATE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "notepad_revisions_rls_delete" ON "notepad_revisions";
 CREATE POLICY "notepad_revisions_rls_delete" ON "notepad_revisions" FOR DELETE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
@@ -357,12 +416,16 @@ CREATE TABLE IF NOT EXISTS "brainstorm_boards" (
   PRIMARY KEY ("id")
 );
 ALTER TABLE "brainstorm_boards" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "brainstorm_boards_rls_select" ON "brainstorm_boards";
 CREATE POLICY "brainstorm_boards_rls_select" ON "brainstorm_boards" FOR SELECT TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "brainstorm_boards_rls_insert" ON "brainstorm_boards";
 CREATE POLICY "brainstorm_boards_rls_insert" ON "brainstorm_boards" FOR INSERT TO public
   WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "brainstorm_boards_rls_update" ON "brainstorm_boards";
 CREATE POLICY "brainstorm_boards_rls_update" ON "brainstorm_boards" FOR UPDATE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "brainstorm_boards_rls_delete" ON "brainstorm_boards";
 CREATE POLICY "brainstorm_boards_rls_delete" ON "brainstorm_boards" FOR DELETE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
@@ -380,12 +443,16 @@ CREATE TABLE IF NOT EXISTS "brainstorm_nodes" (
   PRIMARY KEY ("id")
 );
 ALTER TABLE "brainstorm_nodes" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "brainstorm_nodes_rls_select" ON "brainstorm_nodes";
 CREATE POLICY "brainstorm_nodes_rls_select" ON "brainstorm_nodes" FOR SELECT TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "brainstorm_nodes_rls_insert" ON "brainstorm_nodes";
 CREATE POLICY "brainstorm_nodes_rls_insert" ON "brainstorm_nodes" FOR INSERT TO public
   WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "brainstorm_nodes_rls_update" ON "brainstorm_nodes";
 CREATE POLICY "brainstorm_nodes_rls_update" ON "brainstorm_nodes" FOR UPDATE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "brainstorm_nodes_rls_delete" ON "brainstorm_nodes";
 CREATE POLICY "brainstorm_nodes_rls_delete" ON "brainstorm_nodes" FOR DELETE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
@@ -402,12 +469,16 @@ CREATE TABLE IF NOT EXISTS "brainstorm_edges" (
   CONSTRAINT "brainstorm_edges_unique_pair" UNIQUE (board_id, source_node_id, target_node_id)
 );
 ALTER TABLE "brainstorm_edges" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "brainstorm_edges_rls_select" ON "brainstorm_edges";
 CREATE POLICY "brainstorm_edges_rls_select" ON "brainstorm_edges" FOR SELECT TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "brainstorm_edges_rls_insert" ON "brainstorm_edges";
 CREATE POLICY "brainstorm_edges_rls_insert" ON "brainstorm_edges" FOR INSERT TO public
   WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "brainstorm_edges_rls_update" ON "brainstorm_edges";
 CREATE POLICY "brainstorm_edges_rls_update" ON "brainstorm_edges" FOR UPDATE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "brainstorm_edges_rls_delete" ON "brainstorm_edges";
 CREATE POLICY "brainstorm_edges_rls_delete" ON "brainstorm_edges" FOR DELETE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
@@ -418,15 +489,19 @@ CREATE POLICY "brainstorm_edges_rls_delete" ON "brainstorm_edges" FOR DELETE TO 
 CREATE TABLE IF NOT EXISTS "ari_instance" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "telemetry_enabled" BOOLEAN NOT NULL DEFAULT TRUE,
+  "first_signin_pinged" BOOLEAN NOT NULL DEFAULT FALSE,
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY ("id")
 );
+
+ALTER TABLE "ari_instance" ADD COLUMN IF NOT EXISTS "first_signin_pinged" BOOLEAN NOT NULL DEFAULT FALSE;
 
 INSERT INTO "ari_instance" ("telemetry_enabled")
 SELECT TRUE
 WHERE NOT EXISTS (SELECT 1 FROM "ari_instance");
 
 ALTER TABLE "ari_instance" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "ari_instance_rls_deny" ON "ari_instance";
 CREATE POLICY "ari_instance_rls_deny" ON "ari_instance" FOR ALL TO public USING (false);
 
 -- ================================================================

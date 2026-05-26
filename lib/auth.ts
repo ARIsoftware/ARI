@@ -3,6 +3,13 @@ import { nextCookies } from "better-auth/next-js"
 import { twoFactor } from "better-auth/plugins/two-factor"
 import { hash as argon2Hash, verify as argon2Verify } from "@node-rs/argon2"
 import { pool } from "@/lib/db/pool"
+import { getAriInstance, tryClaimFirstSigninPing } from "@/lib/telemetry/instance"
+import { sendTvConnect } from "@/lib/telemetry/send-tv-connect"
+
+// Short-circuits the session-create hook after we've confirmed (or sent) the
+// one-shot first-login ping. Keeps subsequent sign-ins from hitting the DB
+// for a flag that can never flip back.
+let firstSigninPingResolved = false
 
 // Build trusted origins
 const trustedOrigins: string[] = []
@@ -87,6 +94,51 @@ export const auth = betterAuth({
       "/get-session": {
         window: 60,
         max: 500, // Session checks are read-only and cookie-cached, safe to allow many
+      },
+    },
+  },
+  databaseHooks: {
+    session: {
+      create: {
+        after: async (session) => {
+          if (firstSigninPingResolved) return
+          void (async () => {
+            try {
+              const instance = await getAriInstance()
+              if (!instance || !instance.telemetryEnabled) return
+              if (instance.firstSigninPinged) {
+                firstSigninPingResolved = true
+                return
+              }
+              if (!pool) return
+
+              // Claim the once-per-install slot BEFORE sending. If another
+              // concurrent sign-in already claimed it, bail. If we claim it
+              // and the send later fails, we lose this one ping — but we'll
+              // never double-fire, which the upstream telemetry prefers.
+              const claimed = await tryClaimFirstSigninPing()
+              if (!claimed) {
+                firstSigninPingResolved = true
+                return
+              }
+
+              const { rows } = await pool.query<{ email: string }>(
+                'SELECT email FROM "user" WHERE id = $1 LIMIT 1',
+                [session.userId]
+              )
+              const email = rows[0]?.email
+              if (!email) {
+                firstSigninPingResolved = true
+                return
+              }
+
+              await sendTvConnect({ event: "first_login", username: email })
+              firstSigninPingResolved = true
+            } catch {
+              // never break auth on telemetry failure
+            }
+          })()
+        },
       },
     },
   },

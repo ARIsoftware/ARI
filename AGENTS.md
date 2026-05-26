@@ -185,6 +185,33 @@ END $$;
 - `RETURNING id INTO variable` captures auto-generated UUIDs
 - Query `public."user"` (Better Auth table) to get user IDs for sample data
 
+### Database Schema Changes
+
+The local ARI schema lives in `lib/db/setup.sql`. This file:
+
+- Is the **single source of truth** for ARI's database schema.
+- Is **auto-applied on every Next.js boot** via `instrumentation.ts` → `lib/db/ensure-schema.ts`.
+- Therefore: any schema change you add here rolls out to existing installs on their next start. No manual migration step required.
+
+**Rules when editing `setup.sql`** — every statement must be safe to run repeatedly:
+
+- `CREATE TABLE IF NOT EXISTS` (not bare `CREATE TABLE`)
+- `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` (not bare `ADD COLUMN`)
+- `CREATE INDEX IF NOT EXISTS` (not bare `CREATE INDEX`)
+- `CREATE OR REPLACE FUNCTION` (not bare `CREATE FUNCTION`)
+- For policies: `DROP POLICY IF EXISTS "name" ON "table"; CREATE POLICY ...;` (Postgres < 16 has no `CREATE POLICY IF NOT EXISTS`)
+- For seed rows: `INSERT ... SELECT ... WHERE NOT EXISTS (...)`
+
+Never write destructive changes (`DROP TABLE`, `DROP COLUMN`, etc.) directly. If a column must go, soft-deprecate first, then remove in a later release after confirming no readers remain.
+
+After editing `setup.sql`, regenerate the TS export and commit both files together:
+
+```bash
+node scripts/generate-setup-sql.js
+```
+
+Module-specific schemas live in `modules-{core,custom}/<id>/database/schema.sql` and follow the same idempotency rule — they auto-apply when the module is enabled.
+
 ## Application Features
 
 ### Core Features

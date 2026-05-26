@@ -34,6 +34,19 @@ export async function register() {
       }
     }
 
+    // Apply lib/db/setup.sql on every boot. Idempotent. Skipped during the
+    // Vercel build phase (no DB available). Awaited so the auth hook on first
+    // sign-in always finds the latest schema.
+    if (process.env.NEXT_PHASE !== 'phase-production-build') {
+      try {
+        const { ensureSchema } = await import('./lib/db/ensure-schema')
+        await ensureSchema()
+      } catch {
+        // ensureSchema swallows its own DB errors; this outer catch is for
+        // the dynamic import itself.
+      }
+    }
+
     // Fire-and-forget anonymous install ping. Never blocks startup.
     void import('./lib/telemetry/send-tv-connect').then(({ sendTvConnect }) => {
       sendTvConnect().catch(() => {})
