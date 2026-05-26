@@ -23,6 +23,11 @@ import { cookies } from 'next/headers'
 import moduleManifest from '@/lib/generated/module-manifest.json'
 import { MODULE_API_ROUTES } from '@/lib/generated/module-api-registry'
 import { recordApiKeyUsage, hashApiKey, lookupApiKey } from '@/lib/api-keys'
+import { getEnabledModule } from '@/lib/modules/module-registry'
+
+// Skip the schema gate after its first successful pass per process.
+// The migration it triggers is table-level, so one pass heals all users.
+const schemaHealedModules = new Set<string>()
 
 /**
  * Public routes from module manifest
@@ -137,6 +142,18 @@ async function handleRequest(
       )
     }
 
+    // Module-page server renders run the schema gate via getEnabledModule().
+    // API-only clients bypass that path, so fire it here once per process so
+    // additive schema.sql changes auto-apply on the first valid API call.
+    if (!schemaHealedModules.has(module)) {
+      try {
+        await getEnabledModule(module)
+        schemaHealedModules.add(module)
+      } catch (err) {
+        console.error(`[Module API] Schema gate failed for module '${module}':`, err)
+      }
+    }
+
     // Load the route handler using the static import
     const handler = await routeLoader()
 
@@ -180,11 +197,16 @@ async function handleRequest(
     // Log error for debugging
     console.error(`[Module API ${module}/${apiPath}] Error:`, error)
 
-    // Generic error response
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    // In development, surface the real error message in the response so
+    // /health and the browser network panel show what actually broke. In
+    // production, keep the generic message — error details may leak schema
+    // names, constraint names, or row contents.
+    const isDev = process.env.NODE_ENV !== 'production'
+    const body: Record<string, unknown> = { error: 'Internal server error' }
+    if (isDev && error instanceof Error) {
+      body.message = error.message
+    }
+    return NextResponse.json(body, { status: 500 })
   }
 }
 

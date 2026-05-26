@@ -128,12 +128,12 @@ async function installAndMark(
   expectedHash: string,
 ): Promise<void> {
   const result = await runModuleSchemaInstall(moduleId)
-  if (!result.ok && !result.alreadyExisted) {
+  if (!result.ok) {
+    // schema.sql runs in one transaction — any failure (including
+    // "already exists") rolls back every additive ALTER in the file, so
+    // a non-ok result must not advance the install hash.
     console.error(`[Modules] Schema install failed for ${moduleId}: ${result.error}`)
     return
-  }
-  if (result.alreadyExisted) {
-    console.warn(`[Modules] Schema install warning for ${moduleId}: ${result.error}`)
   }
   await persistSchemaInstalled(userId, moduleId, expectedHash)
 }

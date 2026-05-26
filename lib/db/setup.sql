@@ -31,6 +31,9 @@ SET session_replication_role = 'replica';
 -- ================================================================
 
 CREATE SCHEMA IF NOT EXISTS app;
+-- DROP-before-CREATE so a return-type change doesn't break setup.sql.
+-- RESTRICT (default) fails loudly if any dependent object is introduced.
+DROP FUNCTION IF EXISTS app.current_user_id();
 CREATE OR REPLACE FUNCTION app.current_user_id()
 RETURNS TEXT AS $$
   SELECT current_setting('app.current_user_id', true);
@@ -291,8 +294,11 @@ CREATE TABLE IF NOT EXISTS "tasks" (
   "project_id" UUID,
   "monster_type" TEXT,
   "monster_colors" JSONB,
+  "assigned_agent_id" TEXT,
   PRIMARY KEY ("id")
 );
+-- Additive upgrade for installs that predate this column.
+ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "assigned_agent_id" TEXT;
 ALTER TABLE "tasks" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "tasks_rls_select" ON "tasks";
 CREATE POLICY "tasks_rls_select" ON "tasks" FOR SELECT TO public
@@ -502,6 +508,48 @@ DROP POLICY IF EXISTS "ari_instance_rls_deny" ON "ari_instance";
 CREATE POLICY "ari_instance_rls_deny" ON "ari_instance" FOR ALL TO public USING (false);
 
 -- ================================================================
+-- ONE-SHOT SCHEMA FIXUPS
+-- ================================================================
+-- ari_instance.schema_fixups tracks which one-time data fixups have run on
+-- this install. Each fixup gates on a key (e.g. "hash_cleanup_v1"). After
+-- it runs, the key is set, and subsequent boots skip the block. Add new
+-- fixups with new keys (hash_cleanup_v2, etc.) — never re-use a key.
+
+ALTER TABLE "ari_instance"
+  ADD COLUMN IF NOT EXISTS "schema_fixups" JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+-- hash_cleanup_v1: a previous bug in installAndMark persisted the schema
+-- install hash even when the install transaction rolled back, leaving rows
+-- with a "success" marker but missing columns (e.g. documents.storage_bucket).
+-- Clear all stored hashes so the schema-gate re-fires on next module access;
+-- schema.sql files are idempotent, so re-running them is safe and cheap.
+DO $$
+DECLARE
+  inst_id UUID;
+BEGIN
+  SELECT id INTO inst_id FROM "ari_instance"
+    ORDER BY created_at ASC LIMIT 1;
+  IF inst_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  IF NOT (
+    SELECT COALESCE(schema_fixups, '{}'::jsonb) ? 'hash_cleanup_v1'
+    FROM "ari_instance" WHERE id = inst_id
+  ) THEN
+    UPDATE "module_settings"
+       SET settings = COALESCE(settings, '{}'::jsonb) - '__schema_installed_hash'
+     WHERE settings ? '__schema_installed_hash';
+
+    UPDATE "ari_instance"
+       SET schema_fixups =
+             COALESCE(schema_fixups, '{}'::jsonb)
+             || jsonb_build_object('hash_cleanup_v1', to_jsonb(NOW()))
+     WHERE id = inst_id;
+  END IF;
+END $$;
+
+-- ================================================================
 -- INDEXES
 -- ================================================================
 
@@ -552,6 +600,7 @@ COMMIT;
 -- ================================================================
 
 -- Returns all user (public-schema) tables, excluding system/internal ones.
+DROP FUNCTION IF EXISTS public.get_all_user_tables();
 CREATE OR REPLACE FUNCTION public.get_all_user_tables()
 RETURNS TABLE(table_name text)
 LANGUAGE sql
@@ -573,6 +622,7 @@ AS $$
 $$;
 
 -- Returns column metadata for every public-schema table in one call.
+DROP FUNCTION IF EXISTS public.get_all_table_columns();
 CREATE OR REPLACE FUNCTION public.get_all_table_columns()
 RETURNS TABLE(
   table_name text,
@@ -605,6 +655,7 @@ AS $$
 $$;
 
 -- Returns approximate row counts for every public-schema table.
+DROP FUNCTION IF EXISTS public.get_table_row_counts();
 CREATE OR REPLACE FUNCTION public.get_table_row_counts()
 RETURNS TABLE(table_name text, row_count bigint)
 LANGUAGE plpgsql
@@ -633,6 +684,7 @@ $$;
 -- Used as a fallback by the backup discovery code. SECURITY DEFINER is safe
 -- here because the function is only callable by the service role (Supabase
 -- does not expose it to anon/authenticated by default).
+DROP FUNCTION IF EXISTS public.exec_sql(text);
 CREATE OR REPLACE FUNCTION public.exec_sql(query text)
 RETURNS jsonb
 LANGUAGE plpgsql
