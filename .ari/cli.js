@@ -102,13 +102,17 @@ function ask(question) {
 }
 
 function getDatabaseUrl() {
-  const envPath = path.join(ROOT, '.env.local');
-  if (fs.existsSync(envPath)) {
-    const content = fs.readFileSync(envPath, 'utf8');
+  // Match next.config.mjs dotenv layering: .env.local first, then .env.supabase.local
+  // overrides on top (override: true). Iterate in that order so the later file wins.
+  const candidates = [path.join(ROOT, '.env.local'), ENV_FILE];
+  let result = null;
+  for (const p of candidates) {
+    if (!fs.existsSync(p)) continue;
+    const content = fs.readFileSync(p, 'utf8');
     const match = content.match(/^DATABASE_URL=["']?([^"'\s]+)["']?$/m);
-    if (match) return match[1];
+    if (match) result = match[1];
   }
-  return null;
+  return result;
 }
 
 function isPgwebRunning() {
@@ -747,12 +751,25 @@ async function doctor() {
     fail('.env.local', 'missing — run the installer or /welcome wizard');
   } else {
     ok('.env.local', envPath);
+    if (fs.existsSync(ENV_FILE)) ok('.env.supabase.local', ENV_FILE);
+
     const content = fs.readFileSync(envPath, 'utf8');
-    for (const key of ['ARI_DB_MODE', 'DATABASE_URL', 'BETTER_AUTH_SECRET', 'BETTER_AUTH_URL', 'NEXT_PUBLIC_APP_URL']) {
-      const m = content.match(new RegExp('^' + key + '=(.*)$', 'm'));
-      const val = m ? m[1].trim() : '';
+    const readKey = (text, key) => {
+      const m = text.match(new RegExp('^' + key + '=(.*)$', 'm'));
+      return m ? m[1].trim() : '';
+    };
+
+    // ARI_DB_MODE — fall back to getDbMode() inference for installs that predate this var.
+    const mode = readKey(content, 'ARI_DB_MODE') || getDbMode();
+    mode ? ok('  ARI_DB_MODE', mode) : fail('  ARI_DB_MODE', 'missing or empty');
+
+    // DATABASE_URL — getDatabaseUrl() layers .env.local + .env.supabase.local like next.config.mjs.
+    const dbVal = getDatabaseUrl();
+    dbVal ? ok('  DATABASE_URL', redactDbUrl(dbVal)) : fail('  DATABASE_URL', 'missing or empty');
+
+    for (const key of ['BETTER_AUTH_SECRET', 'BETTER_AUTH_URL', 'NEXT_PUBLIC_APP_URL']) {
+      const val = readKey(content, key);
       if (!val) fail('  ' + key, 'missing or empty');
-      else if (key === 'DATABASE_URL') ok('  ' + key, redactDbUrl(val));
       else if (key === 'BETTER_AUTH_SECRET') ok('  ' + key, '(set, ' + val.length + ' chars)');
       else ok('  ' + key, val);
     }
