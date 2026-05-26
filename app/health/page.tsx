@@ -347,17 +347,8 @@ export default function DatabaseTestPage() {
       }))
     }
     runHealthChecks()
-
-    // Auto-fetch endpoint summary on mount (derived from /api/openapi.json)
-    async function fetchEndpointSummary() {
-      try {
-        const data = await fetchEndpointsFromSpec()
-        if (data) setEndpointsData(data)
-      } catch {
-        // Silently fail — the endpoints tab can still manually load
-      }
-    }
-    fetchEndpointSummary()
+    // Endpoints tab data loads on demand via the "Load Endpoints Data" button.
+    // runSecurityTests / runPublicSecurityTests also lazy-fetch when needed.
   }, [])
 
   const [isRunning, setIsRunning] = useState(false)
