@@ -85,10 +85,12 @@ export async function PUT(request: NextRequest) {
     )
 
     if (existing.length > 0) {
-      const merged = SettingsSchema.parse({
+      // Preserve unknown keys from older versions so we don't 500 on legacy data.
+      // The incoming payload was already strict-validated by validateRequestBody.
+      const merged = {
         ...(existing[0].settings as Record<string, unknown> || {}),
         ...validation.data,
-      })
+      }
       await withRLS((db) =>
         db.update(moduleSettings)
           .set({
@@ -111,6 +113,11 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('PUT /api/modules/music-player/settings error:', error instanceof Error ? error.message : error)
-    return createErrorResponse('Internal server error', 500)
+    const isDev = process.env.NODE_ENV !== 'production'
+    return createErrorResponse(
+      'Internal server error',
+      500,
+      isDev && error instanceof Error ? { message: error.message } : undefined,
+    )
   }
 }
