@@ -112,7 +112,7 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
           </CommandItem>
           <CommandItem onSelect={() => runCommand(() => router.push("/modules"))}>
             <Package className="mr-2 h-4 w-4" />
-            <span>Modules</span>
+            <span>Modules Library</span>
           </CommandItem>
           <CommandItem onSelect={() => runCommand(() => router.push("/health"))}>
             <Activity className="mr-2 h-4 w-4" />
