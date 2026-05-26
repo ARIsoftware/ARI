@@ -34,9 +34,10 @@ SET session_replication_role = 'replica';
 -- ================================================================
 
 CREATE SCHEMA IF NOT EXISTS app;
--- DROP-before-CREATE so a return-type change doesn't break setup.sql.
--- RESTRICT (default) fails loudly if any dependent object is introduced.
-DROP FUNCTION IF EXISTS app.current_user_id();
+-- No DROP FUNCTION here: older RLS policies on production DBs reference
+-- this function directly (instead of inlining current_setting()), so the
+-- drop would fail with "other objects depend on it" and abort setup.sql.
+-- The function's return type has been stable, so CREATE OR REPLACE is safe.
 CREATE OR REPLACE FUNCTION app.current_user_id()
 RETURNS TEXT AS $$
   SELECT current_setting('app.current_user_id', true);
