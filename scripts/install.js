@@ -728,8 +728,22 @@ const TOOLS = [
     installCmds: {
       darwin: 'brew install gh',
       linux: {
-        apt: 'sudo apt-get install -y gh',
-        dnf: 'sudo dnf install -y gh',
+        // gh is not in the default Debian/older-Ubuntu repos — add GitHub's
+        // signed apt source first, then install. Idempotent: re-running
+        // overwrites the keyring and sources.list.d entry safely.
+        apt:
+          'sudo mkdir -p -m 755 /etc/apt/keyrings && ' +
+          'curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | ' +
+          'sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null && ' +
+          'sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && ' +
+          'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | ' +
+          'sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null && ' +
+          'sudo apt-get update && sudo apt-get install -y gh',
+        // Older RHEL/CentOS don't ship gh either; add GitHub's rpm repo first.
+        dnf:
+          "sudo dnf install -y 'dnf-command(config-manager)' && " +
+          'sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo && ' +
+          'sudo dnf install -y gh',
         pacman: 'sudo pacman -S --noconfirm github-cli',
       },
       win32: 'winget install -e --id GitHub.cli --source winget --accept-source-agreements --accept-package-agreements',
@@ -920,10 +934,19 @@ async function installTools() {
     }
 
     const spinner = new Spinner();
-    const streamMode = !!tool.streamOutput && !isWinGithubBinary;
+    // sudo writes its password prompt to /dev/tty, which the spinner would
+    // overwrite with \r — leaving the user staring at an apparently-frozen
+    // "Installing…" line. Stream output so the prompt is visible and they can
+    // type their password.
+    const needsSudo = PLATFORM === 'linux' && typeof cmd === 'string' && /(^|[\s;&|])sudo(\s|$)/.test(cmd);
+    const streamMode = (!!tool.streamOutput || needsSudo) && !isWinGithubBinary;
     if (streamMode) {
       console.log(`  ${dim('Installing ' + tool.name + '…')}`);
-      console.log(`  ${dim('Note: The windows PostgreSQL installer can be silent for 1–5 minutes while the installer unpacks. This is normal.')}`);
+      if (needsSudo) {
+        console.log(`  ${dim('Note: sudo may prompt for your password.')}`);
+      } else {
+        console.log(`  ${dim('Note: The windows PostgreSQL installer can be silent for 1–5 minutes while the installer unpacks. This is normal.')}`);
+      }
       console.log('');
     } else {
       spinner.start(`Installing ${tool.name}…`);
