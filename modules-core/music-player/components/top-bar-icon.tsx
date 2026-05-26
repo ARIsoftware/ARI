@@ -56,7 +56,6 @@ export default function MusicPlayerTopBarIcon({ isDragMode = false }: { isDragMo
             size="icon"
             className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 hover:text-topbar-foreground ${dragItemClass}`}
             onClick={handleMainClick}
-            disabled={!isReady && !isDragMode}
           >
             {isActive ? (
               <Square className="h-3.5 w-3.5 fill-current" />
