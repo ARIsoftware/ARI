@@ -379,21 +379,33 @@ function start(opts = {}) {
   } else if (mode === 'postgres') {
     ensurePostgresPath();
     let pgReady = run(PG_IS_READY) !== null;
-    if (!pgReady && IS_WIN) {
-      run('powershell -NoProfile -Command "Get-Service postgresql-x64-* | Start-Service"');
-      pgReady = run(PG_IS_READY) !== null;
+    if (!pgReady) {
+      log('  ' + DIM + 'Starting PostgreSQL...' + RESET);
+      if (process.platform === 'darwin') {
+        run('brew services start postgresql@17');
+      } else if (IS_WIN) {
+        run('powershell -NoProfile -Command "Get-Service postgresql-x64-* | Start-Service"');
+      } else {
+        run('sudo systemctl start postgresql');
+      }
+      const sleepBuf = new Int32Array(new SharedArrayBuffer(4));
+      const deadline = Date.now() + 5000;
+      while (!pgReady && Date.now() < deadline) {
+        Atomics.wait(sleepBuf, 0, 0, 250);
+        pgReady = run(PG_IS_READY) !== null;
+      }
     }
     if (pgReady) {
       log('  ' + GREEN + '✔' + RESET + ' PostgreSQL is running');
       pgwebRunning = startPgweb(log);
     } else {
-      log('  ' + YELLOW + '⚠' + RESET + ' PostgreSQL is not running.');
+      log('  ' + YELLOW + '⚠' + RESET + ' PostgreSQL could not be started.');
       if (process.platform === 'darwin') {
-        log('  ' + DIM + 'Start it with: brew services start postgresql@17' + RESET);
+        log('  ' + DIM + 'Try manually: brew services start postgresql@17' + RESET);
       } else if (IS_WIN) {
-        log('  ' + DIM + 'Start it with: net start postgresql-x64-17  (or open Services.msc)' + RESET);
+        log('  ' + DIM + 'Try manually: net start postgresql-x64-17  (or open Services.msc)' + RESET);
       } else {
-        log('  ' + DIM + 'Start it with: sudo systemctl start postgresql' + RESET);
+        log('  ' + DIM + 'Try manually: sudo systemctl start postgresql' + RESET);
       }
     }
   } else {
