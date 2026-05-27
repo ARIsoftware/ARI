@@ -1400,6 +1400,19 @@ async function setupLocalPostgres(targetDir) {
     } catch (e) {
       spinner.error('Failed to create database "ari"');
       console.log(`  ${dim(e.message.split('\n').slice(0, 3).map(l => l.trim()).filter(Boolean).join('\n  '))}`);
+      // Homebrew's postgresql@17 data dir is shared across all macOS user accounts,
+      // but only the OS user that first ran `brew install` exists as a PG role.
+      // A second macOS account hits "role <username> does not exist" here.
+      if (PLATFORM === 'darwin' && /role .* does not exist/i.test(e.message)) {
+        const me = process.env.USER || '<your-username>';
+        console.log('');
+        console.log(`  ${yellow('Your macOS account has no PostgreSQL role.')}`);
+        console.log(`  ${dim('The Homebrew Postgres cluster was initialized by a different macOS user,')}`);
+        console.log(`  ${dim('so role "' + me + '" does not exist in it.')}`);
+        console.log('');
+        console.log(`  ${dim('Easiest fix: re-run this installer and pick "Local Supabase" or "Supabase Cloud" instead.')}`);
+        console.log(`  ${dim('Or, from the original macOS account that installed Postgres, run:  createuser -s ' + me)}`);
+      }
       console.log(`  ${dim('Try manually: ' + createCmd)}`);
       if (isWin) writeIncompleteEnv();
       return result;
