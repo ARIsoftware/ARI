@@ -17,7 +17,7 @@
   "routes": [
     {
       "path": "/contacts",
-      "label": "All Contacts",
+      "label": "Contacts",
       "icon": "Users",
       "sidebarPosition": "main"
     }

@@ -17,7 +17,7 @@
   "routes": [
     {
       "path": "/tasks",
-      "label": "All Tasks",
+      "label": "Tasks",
       "icon": "CheckSquare",
       "sidebarPosition": "main"
     },
