@@ -50,8 +50,9 @@ export const auth = betterAuth({
   rateLimit: {
     enabled: true, window: 60, max: 30,
     customRules: {
-      "/sign-in/*": { window: 60, max: 5 },
+      "/sign-in/*": { window: 300, max: 5 },
       "/sign-up/*": { window: 300, max: 3 },
+      "/two-factor/verify-totp": { window: 60, max: 5 },
       "/get-session": { window: 60, max: 500 },
     }
   },
