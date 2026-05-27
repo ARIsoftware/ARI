@@ -9,6 +9,8 @@ import { getGitHubConfig, commitModuleToGitHub, type ExtraCommitFile } from '@/l
 import { tmpdir } from 'os'
 import { inflateRawSync } from 'zlib'
 import { runSchemaSqlAtPath } from '@/lib/modules/schema-installer'
+import { withAdminDb } from '@/lib/db'
+import { moduleSettings as moduleSettingsTable } from '@/lib/db/schema'
 import { installModuleNpmDeps, type NpmInstallEvent, type NpmInstallResult } from '@/lib/modules/npm-installer'
 import type { ModuleManifest } from '@/lib/modules/module-types'
 import { downloadModuleSchema } from '@/lib/openapi/app-schemas'
@@ -471,6 +473,36 @@ export async function POST(request: NextRequest) {
         // Schema failure is non-fatal: module files are installed and the
         // user can re-run via Settings → Backup or by re-enabling the module.
         emit({ stage: 'schema', status: 'error', error: schemaInstall.error })
+      }
+
+      // Enable the freshly-installed module for this user. Without this, the
+      // catch-all route's getEnabledModule() falls back to the custom-module
+      // default of `enabled: false` and serves a 404 when the success dialog
+      // routes the user to the module's first route.
+      //
+      // Done as a direct upsert (not via setModuleEnabled) because the helper
+      // validates against the cached module manifest, which isn't refreshed
+      // until the client fires /api/modules/refresh after `finalize`. The
+      // schema was already installed above via runSchemaSqlAtPath.
+      try {
+        await withAdminDb(async (db) => {
+          await db.insert(moduleSettingsTable)
+            .values({
+              userId: user.id,
+              moduleId: moduleName,
+              enabled: true,
+              settings: {},
+            })
+            .onConflictDoUpdate({
+              target: [moduleSettingsTable.userId, moduleSettingsTable.moduleId],
+              set: {
+                enabled: true,
+                updatedAt: new Date().toISOString(),
+              },
+            })
+        })
+      } catch (err) {
+        console.error(`[API /modules/download] Failed to enable ${moduleName} for user ${user.id}:`, err)
       }
 
       // ── 5. Finalize ──────────────────────────────────────────────
