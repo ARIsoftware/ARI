@@ -43,9 +43,11 @@ When the agent runtime supports delegation, split the audit across **4 subagents
 Scope: the entire module directory (`modules-core/[id]/**` or `modules-custom/[id]/**`) including `api/`, `components/`, `lib/`, `app/`, `hooks/`, `database/`, `module.json`, fixtures, and any docs. The hardcoded-credential scan in category 11 must cover **all file types**, not just TypeScript.
 Runs Part A (Security Audit — 16 categories below). Returns findings as `{severity, file, line, category, issue, risk, recommendation}`.
 
+> Context for Subagent 1: `getAuthenticatedUser()` now accepts **two** credentials — the Better Auth session cookie AND an `x-api-key` header (see `lib/auth-helpers.ts`, `lib/api-keys.ts`, `lib/auth-middleware.ts` `API_KEY_PREFIX`). The module dispatcher at `app/api/modules/[module]/[[...path]]/route.ts` already does a coarse "cookie or API key present" gate before invoking the handler, so the *only* check that matters in the module handler is `getAuthenticatedUser()` — do not separately flag a missing cookie check. Routes listed in `module.json` `publicRoutes` bypass the dispatcher gate entirely and must implement their own security per the rules below.
+
 ### Subagent 2 — Production-Readiness
 Scope: the entire module folder plus the registration touchpoints listed in Part B.
-Runs Part B (manifest, self-containment, install SQL, API patterns, registration, page hygiene, type safety).
+Runs Part B (manifest, self-containment, install SQL, API patterns, OpenAPI annotations, public routes, registration, page hygiene, type safety).
 
 ### Subagent 3 — Database / Supabase / Postgres
 Scope: `[module]/database/**`, any `[module]/database/migrations/**`, plus any Supabase usage in `[module]/api/**`.
@@ -66,13 +68,14 @@ For every file under `[module]/api/**/*.ts`, `[module]/components/**`, and any s
 
 ### 1. Authentication & Authorization
 - [ ] Missing `getAuthenticatedUser()` call at start of route handler — **High**
-- [ ] Missing 401 response when user is not authenticated — **High**
-- [ ] User ID taken from request body or query string instead of session — **High** (user impersonation)
-- [ ] Missing `user_id` filter in DB queries where required (relying solely on RLS) — **Medium**
+- [ ] Missing 401 response when both `user` AND `withRLS` are not returned — **High**
+- [ ] User ID taken from request body or query string instead of session/key — **High** (user impersonation)
+- [ ] Missing `user_id` filter on SELECT/UPDATE/DELETE — relying solely on RLS — **High**. Per `docs/SECURITY.md`: the default Postgres role has `BYPASSRLS`, so explicit `where(eq(table.userId, user.id))` is **required**, not defense-in-depth.
 - [ ] Routes that should be admin-only but accessible to all authenticated users — **High**
 - [ ] Role/permission checks on the client only — **High**
 - [ ] Hardcoded user IDs, roles, or tenant IDs — **Medium**
 - [ ] Use of `supabase` client without a clear tenant/user boundary — **Medium**
+- [ ] Handler logs or returns the `apiKey` metadata field returned by `getAuthenticatedUser()` (key id, IP) to the client — **Medium**. That field is meant for server-side audit logging only.
 
 **Bad pattern:**
 ```typescript
@@ -142,6 +145,14 @@ await supabase.from("table").insert({ user_id, ...data })
 - [ ] User uploads served from same domain without strict content-type controls — **Medium**
 - [ ] No malware scanning for risky file types — **Low**
 
+**ARI storage system patterns (when the module accepts uploads):**
+- [ ] Uses `getStorageProvider(readStorageConfig())` from `@/lib/storage` — never writes to disk directly or constructs paths from user input — **High** if bypassed
+- [ ] Uses `sanitizeFilename()` from `@/lib/storage` on the user-supplied filename before passing to the provider — **High** if absent
+- [ ] Uses `validateStoredFilename()` when reading a stored filename back from a request (download/delete endpoints) — **High** if absent (path-traversal vector)
+- [ ] Declares a stable `BUCKET` constant per module and validates `ALLOWED_TYPES` + `MAX_FILE_SIZE` server-side before writing — **High** if absent
+- [ ] Does NOT read or trust `ARI_STORAGE_PROVIDER` to decide whether to skip validation — validation must run for every provider — **Medium**
+- [ ] Reads provider-agnostic config via `readStorageConfig()` rather than env vars directly — **Low**
+
 ### 9. Rate Limiting & DoS
 - [ ] No rate limiting on auth endpoints — **High**
 - [ ] No rate limiting on expensive operations (reports, exports, complex queries) — **Medium**
@@ -188,11 +199,24 @@ Every confirmed hardcoded secret must appear in the report with file + line and 
 - [ ] Encryption keys reused across unrelated purposes — **Medium**
 - [ ] Tokens generated with predictable values instead of secure random — **High**
 
-### 13. URL Handling, Redirects & SSRF
+### 13. URL Handling, Redirects, SSRF & Public Routes
 - [ ] Open redirects via user-controlled `redirect`/`next` params — **High**
 - [ ] Server-side HTTP calls to user-supplied URLs without allowlists (SSRF) — **High**
 - [ ] Webhook endpoints accepting unauthenticated POSTs without signature verification — **High**
 - [ ] External integrations trusting incoming requests without verification — **High**
+
+**Public routes (`module.json` `publicRoutes[]`):** these bypass the dispatcher's auth gate and must declare and enforce their own security.
+
+- [ ] Every API path that exists under `[module]/api/**/route.ts` but skips `getAuthenticatedUser()` MUST be listed in `module.json` `publicRoutes[]` with a matching `path` + `methods` — **High** if missing (silent unauthenticated endpoint)
+- [ ] Every `publicRoutes[]` entry has a `security` object with a recognized `type` — `webhook_signature` | `api_key` | `rate_limit_only` | `ip_allowlist` | `custom` — **High** if absent or unknown
+- [ ] `webhook_signature` entries set `secretEnvVar` and the env var is read via `process.env.<NAME>` (not hardcoded) — **High**
+- [ ] `api_key` entries set `apiKeyEnvVar` (and optionally `apiKeyHeader`); comparison is constant-time — **High**
+- [ ] `ip_allowlist` entries list explicit IPs/CIDRs; the handler resolves the real client IP via `getClientIp()` from `@/lib/modules/public-route-security` (don't trust raw `request.ip`) — **High**
+- [ ] `rate_limit_only` is justified in `customDescription` or `description` (it's the weakest type) — **Medium**
+- [ ] `custom` entries include a `customDescription` documenting the validation approach — **Medium**
+- [ ] Every public entry sets a sensible `rateLimit` (req/min). Missing or absurdly high (>1000) — **Medium**
+- [ ] Signature validators use constant-time compare (`crypto.timingSafeEqual`) and reject stale timestamps (>5 min) for Stripe/Svix-style payloads — **High** if rolling your own without these
+- [ ] Public route handlers still validate input with Zod before processing payload — **Medium**
 
 ### 14. Multi-tenancy & Data Segregation
 - [ ] Queries that don't filter by tenant/user where they should — **High**
@@ -222,7 +246,14 @@ Every confirmed hardcoded secret must appear in the report with file + line and 
 - [ ] File exists and parses as valid JSON — **High** if missing
 - [ ] `id` matches the folder name and is kebab-case — **High** if mismatched
 - [ ] Required fields present: `id`, `name`, `description`, `version`, `icon`, `enabled`, `routes` — **Medium**
-- [ ] Optional fields like `author`, `group` populated — **Low**
+- [ ] Optional fields like `author`, `group`, `menuPriority`, `fullscreen` populated — **Low**
+- [ ] `description` ≤ 200 chars — **Low**
+- [ ] `database.tables[]` matches the tables actually created in `database/schema.sql` — **Medium**. `lib/modules/module-registry.ts` warns when `tables[]` is declared but `schema.sql` is missing; missing tables won't be auto-provisioned.
+- [ ] If `database/schema.sql` exists, `schemaSha256` is present (auto-populated by `scripts/generate-module-registry.js`; missing usually means the generator was never re-run after editing schema.sql) — **Low**
+- [ ] `npmDependencies` (if present) is a flat `{ name: version }` map with ≤ 25 entries — **Medium**
+- [ ] No npm spec contains `git:`, `http:`, `https:`, `file:`, `link:`, `workspace:`, `npm:`, or `..` (installer rejects these at install time per `lib/modules/npm-installer.ts`) — **High**
+- [ ] No npm package would conflict with the host's root `package.json` at an incompatible range (framework deps like `react`, `next`, `drizzle-orm`, `better-auth` are the common conflict points) — **High**
+- [ ] `topBarIcon` / `submenu` / `dashboard` / `settings` paths point to files that actually exist — **Medium**
 
 ### B2. Self-containment (user-emphasized)
 - [ ] All source files for the module live under `modules-core/[id]/` or `modules-custom/[id]/`. Search for the module id in `lib/hooks/`, `lib/utils/`, `components/`, `app/` (excluding the auto-generated registries in `lib/generated/` and the API proxy at `app/api/modules/[module]/[[...path]]/route.ts`). Any hit is **High**.
@@ -243,10 +274,10 @@ Every confirmed hardcoded secret must appear in the report with file + line and 
 - [ ] Every `CREATE INDEX` uses `IF NOT EXISTS`. **Medium** if missing.
 - [ ] Every `CREATE POLICY` is wrapped in `DROP POLICY IF EXISTS ...; CREATE POLICY ...` (or equivalent) so re-runs don't fail on duplicate policies. **Medium** if missing.
 
-**Install SQL must never be destructive.** The install script (`schema.sql`) and any other `.sql` file the module loader executes must NOT contain anything that can destroy user data:
-- [ ] **No `DROP TABLE`, `DROP SCHEMA`, `DROP DATABASE`, `DROP INDEX`, or `TRUNCATE`** anywhere in `schema.sql` or any auto-loaded SQL file. **High** — re-enabling the module would wipe user data.
-- [ ] **No `DELETE FROM ...` without a `WHERE` clause** in any auto-loaded SQL file. **High**.
-- [ ] **No `ALTER TABLE ... DROP COLUMN`** in `schema.sql`. **High** — would silently lose user data on every enable.
+**Install SQL must never be destructive.** The install script (`schema.sql`) and any other `.sql` file the module loader executes must NOT contain anything that can destroy user data. The runtime installer at `lib/modules/schema-installer.ts` will *refuse* to execute the file if it sees any of these (the regex scan strips SQL comments first, so wrapping a forbidden statement in `--` won't sneak it past — and won't help an audit either):
+- [ ] **No `DROP TABLE`, `DROP SCHEMA`, `DROP DATABASE`, or `TRUNCATE`** anywhere in `schema.sql` or any auto-loaded SQL file. **High** — installer rejects and the module fails to enable. (`DROP INDEX`, `DROP POLICY`, `DROP TRIGGER` are allowed; they're needed for re-runnable schema.)
+- [ ] **No `DELETE FROM ...` without a `WHERE` clause** in any auto-loaded SQL file. **High** — installer rejects.
+- [ ] **No `ALTER TABLE ... DROP COLUMN`** in `schema.sql`. **High** — installer rejects.
 
 **`uninstall.sql` is manual-only.** This file is allowed (and expected) to contain `DROP TABLE` statements, but it must never be wired into the module loader, an enable hook, a disable hook, or any API route:
 - [ ] Confirm `uninstall.sql` is NOT referenced from `lib/modules/module-loader.ts`, `module.json`, or any code path that runs on enable/disable. **High** if it is auto-executed anywhere.
@@ -261,34 +292,53 @@ Every confirmed hardcoded secret must appear in the report with file + line and 
 - [ ] Indexes exist on `user_id` and frequently filtered columns — **Medium**
 
 ### B4. API security & patterns
-For every `[module]/api/**/route.ts`:
+For every `[module]/api/**/route.ts` (skip routes listed in `module.json` `publicRoutes[]` — those are governed by Part A §13):
 - [ ] Imports `getAuthenticatedUser` from `@/lib/auth-helpers` — **High**
-- [ ] Every exported handler (`GET`/`POST`/`PUT`/`DELETE`/`PATCH`) calls `getAuthenticatedUser()` and returns 401 when `user`/`withRLS` are missing **before any DB access** — **High**
+- [ ] Every exported handler (`GET`/`POST`/`PUT`/`DELETE`/`PATCH`) calls `getAuthenticatedUser()` and returns 401 when `user` OR `withRLS` is missing **before any DB access** — **High**
+- [ ] Handler does not read `session.*` fields directly — use `user.*` instead. When the caller authenticated via `x-api-key`, `session` is `null` (see `lib/auth-helpers.ts`), so any `session.user.email` / `session.access_token` dereference crashes the route for API-key callers — **Medium**
 - [ ] All DB operations use `withRLS((db) => ...)`. Any direct use of the legacy `supabase` client is **Medium**
-- [ ] Inserts explicitly set `user_id: user.id` — **High**
-- [ ] Request bodies validated via `validateRequestBody` from `lib/api-helpers.ts` — **Medium**
-- [ ] Error responses use `createErrorResponse` and don't leak stack traces, raw SQL errors, or PII — **Medium**
-- [ ] No `process.env.SUPABASE_SERVICE_ROLE_KEY` usage in module code — **High**
-- [ ] Public/webhook routes (if any) require a secret check — **High**
+- [ ] SELECT/UPDATE/DELETE queries include `.where(eq(table.userId, user.id))` (or `and(...)` with the resource id) — **High**. Per `docs/SECURITY.md`: the default Postgres role has `BYPASSRLS`, so explicit filters are **mandatory**, not defense-in-depth.
+- [ ] Inserts explicitly set `userId: user.id` (Drizzle camelCase) — **High**
+- [ ] Request bodies validated via `validateRequestBody` from `lib/api-helpers.ts` **OR** `Schema.safeParse()` — **Medium**
+- [ ] Path/query params validated via `validatePathParams` / `validateQueryParams` — **Medium**
+- [ ] User-rendered text fields validated with `safeText(max)` from `@/lib/validation` (rejects `<`, `>`, control chars) — **Medium** for fields that round-trip to HTML/UI
+- [ ] Error responses use `createErrorResponse()` from `@/lib/api-helpers` OR wrap the catch-block message with `safeErrorResponse()` from `@/lib/api-error` (production-safe) — **Medium**
+- [ ] No `console.log` / response body leaks stack traces, raw SQL errors, secrets, or PII — **Medium**
+- [ ] No `process.env.SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_SECRET_KEY` usage in module code — **High**
 - [ ] API responses wrap Drizzle output with `toSnakeCase()` from `@/lib/api-helpers` (Drizzle returns camelCase; frontend expects snake_case) — **Medium**
 - [ ] No manual field mapping where `toSnakeCase()` would suffice (e.g. `{ content: data[0].content, updated_at: data[0].updatedAt }`) — **Low**
 - [ ] POST handlers return `{ status: 201 }` for resource creation, not 200 — **Low**
-- [ ] Error responses use `createErrorResponse()` helper for consistent error shapes — **Low**
 - [ ] Specific-resource endpoints return 404 when the resource is not found (not an empty array or silent 200) — **Low**
 
-### B5. Registration completeness
-- [ ] Module id appears in `lib/generated/module-pages-registry.ts` (`REGISTERED_MODULE_IDS`) — **Medium**
-- [ ] If the module has `api/`: a corresponding entry exists in `app/api/modules/[module]/[[...path]]/route.ts` `MODULE_API_ROUTES` — **High**
-- [ ] If the module has `database/schema.ts`: re-exported in `lib/db/schema/schema.ts` (auto-generated barrel) — **Medium**
-- [ ] If the module declares dashboard widgets / submenus / topBarIcon: corresponding registry entries exist — **Medium**
+### B5. OpenAPI annotations (required for every route)
+Every authenticated **and** public route must register with the shared OpenAPI registry so it surfaces in `/api-docs`, `/settings?tab=api`, and `/health` → Endpoints. Missing annotations don't break the route, but they make it invisible to every diagnostic in ARI. See `docs/MODULES.md` §7.6 and `modules-core/module-template/api/data/route.ts` for the canonical pattern.
 
-### B6. Page component hygiene
+- [ ] All Zod schemas live in `[module]/lib/validation.ts`, NOT inline in `route.ts` — **Low**
+- [ ] `[module]/lib/validation.ts` imports `'@/lib/openapi/registry'` as a side-effect (extends Zod with `.openapi()`) — **Medium** if missing (every schema name silently disappears from the spec)
+- [ ] Every schema is tagged `.openapi('SchemaName')` and the name is prefixed with the module slug for uniqueness — **Medium**
+- [ ] Every handler verb (`GET`/`POST`/`PUT`/`DELETE`/`PATCH`) has a preceding `registry.registerPath({ ... })` call — **Medium** if missing
+- [ ] `tags: ['<module-id>']` matches the module's folder slug (anything not in `NON_MODULE_TAGS` is treated as a module id by the spec consumers) — **Low**
+- [ ] `security: DEFAULT_SECURITY` is set on authenticated routes; omitted or `[]` only on `publicRoutes` — **Medium**
+- [ ] Error responses reference shared `ErrorResponseSchema` / `InternalServerErrorResponse` from `@/lib/openapi/common` (not redeclared per module) — **Low**
+- [ ] `operationId` is globally unique across the spec — prefix with module slug (e.g. `listMyModuleEntries`) — **Medium**
+- [ ] Spec rebuilds clean: `pnpm dev` or `pnpm build` ran the `predev` / `prebuild` `scripts/generate-openapi.ts` without logging failures for this module — **Low**
+
+### B6. Registration completeness
+- [ ] Module id appears in `lib/generated/module-pages-registry.ts` (`REGISTERED_MODULE_IDS`) — **Medium**
+- [ ] If the module has `api/`: a corresponding entry exists in the auto-generated `lib/generated/module-api-registry.ts` `MODULE_API_ROUTES` — **High**
+- [ ] If the module has `database/schema.ts`: re-exported by the auto-generated barrel `lib/db/schema/schema.ts` — **Medium**
+- [ ] If `database/relations.ts` exists, it references only this module's tables (cross-module relations cause the generator to skip the file with a warning when the other module isn't installed — the relations end up unavailable at runtime even though the build succeeds) — **Medium**
+- [ ] If the module has `database/schema.sql`: registered in `lib/generated/module-schemas.ts` (bundled SQL map used at install time on Vercel) — **Medium**
+- [ ] If the module declares dashboard widgets / submenus / topBarIcon: corresponding registry entries exist — **Medium**
+- [ ] If the module has `publicRoutes`: each entry is reflected in `lib/generated/module-manifest.json` `publicRoutes` (the dispatcher reads from this file, not `module.json` directly) — **High** if drifted (route silently requires auth at runtime)
+
+### B7. Page component hygiene
 - [ ] `app/page.tsx` exists for any route with a non-`hidden` sidebar position — **Medium**
 - [ ] Has `'use client'` directive where appropriate — **Low**
-- [ ] Does NOT render `SidebarProvider`, `AppSidebar`, or `SidebarInset` (provided by router) — **Medium**
+- [ ] Does NOT render `SidebarProvider`, `AppSidebar`, `SidebarInset`, `DarkModeProvider`, or `TaskAnnouncement` (all provided by router wrapper) — **Medium**
 - [ ] Uses TanStack Query hooks (not raw `useState` + `fetch`) — **Low**
 
-### B7. Type safety
+### B8. Type safety
 - [ ] `types/index.ts` exists if the module has shared types — **Low**
 - [ ] No `any` types in API route handlers — **Low**
 
@@ -354,7 +404,7 @@ This part is run by Subagent 4. Before auditing, read `modules-core/module-templ
 
 Output a single Markdown report for the audited module. Group findings by severity (High → Medium → Low). Each finding cites file + line, category, issue, and recommendation.
 
-Category tags: `[Security]` (Part A), `[Readiness]` (Part B), `[Database]` (Part C), `[Performance]` (Part D1), `[Data Fetching]` (Part D2), `[UX]` (Part D3), `[Accessibility]` (Part D4).
+Category tags: `[Security]` (Part A), `[Readiness]` (Part B), `[OpenAPI]` (Part B5), `[Database]` (Part C), `[Performance]` (Part D1), `[Data Fetching]` (Part D2), `[UX]` (Part D3), `[Accessibility]` (Part D4).
 
 ```md
 # Module Audit Report — <module-name> (`modules-core/<module-id>`)
@@ -420,14 +470,33 @@ If a subagent's checks were skipped (e.g. a skill was unavailable), list them un
 ## Critical files to read
 
 When auditing, the subagents should be aware of these reference files:
-- `.claude/commands/ari-create-module.md` — source of truth for module rules
-- `lib/auth-helpers.ts` — `getAuthenticatedUser`, `withRLS` helper
-- `lib/api-helpers.ts` — `validateRequestBody`, `createErrorResponse`, `toSnakeCase`
-- `lib/modules/module-loader.ts` — install-time SQL behavior
+- `.claude/commands/ari-create-module.md` — source of truth for module creation rules
+- `docs/MODULES.md` — full module system reference (§7.5 public routes, §7.6 OpenAPI + API keys)
+- `docs/SECURITY.md` — layered security model; explains why `BYPASSRLS` makes explicit `user_id` filters mandatory
+- `lib/auth-helpers.ts` — `getAuthenticatedUser` (resolves session cookie OR `x-api-key`), `withRLS` helper, `requireAuthIfUsersExist`
+- `lib/auth-middleware.ts` — `BETTER_AUTH_COOKIE_NAME`, `API_KEY_PREFIX`, `hasSessionCookie`, `hasApiKeyHeader`
+- `lib/api-keys.ts` — `hashApiKey`, `lookupApiKey`, `checkIpAllowed`, `recordApiKeyUsage`
+- `lib/api-helpers.ts` — `validateRequestBody`, `validatePathParams`, `validateQueryParams`, `createErrorResponse`, `toSnakeCase`
+- `lib/api-error.ts` — `safeErrorResponse` (production-safe error message helper)
+- `lib/validation.ts` — `safeText(max)` XSS-safe text validator; shared welcome/profile schemas
+- `lib/modules/schema-installer.ts` — refuses `DROP TABLE` / `TRUNCATE` / `DELETE without WHERE` / `ALTER TABLE … DROP COLUMN` in schema.sql at install time
+- `lib/modules/public-route-security.ts` — `checkRateLimit`, `isSameOriginRequest`, `getClientIp`, Svix/Stripe/GitHub signature validators
+- `lib/modules/npm-installer.ts` — npm dependency installer; rejects forbidden version specifiers
+- `lib/modules/module-types.ts` — `ModuleManifest`, `PublicRouteConfig`, `PublicRouteSecurity` type definitions
+- `lib/openapi/registry.ts` — singleton `OpenAPIRegistry`; extends Zod with `.openapi()` as a side effect
+- `lib/openapi/common.ts` — `DEFAULT_SECURITY`, `ErrorResponseSchema`, `UnauthorizedResponse`, `InternalServerErrorResponse`
+- `lib/openapi/types.ts` — `NON_MODULE_TAGS`, `X_ARI` extension keys
+- `lib/storage/index.ts` + `lib/storage/sanitize.ts` — `getStorageProvider`, `readStorageConfig`, `sanitizeFilename`, `validateStoredFilename`
 - `lib/generated/module-pages-registry.ts` — page registration
-- `app/api/modules/[module]/[[...path]]/route.ts` — API registration
+- `lib/generated/module-api-registry.ts` — API route registration (auto-generated; reflects what the dispatcher can dispatch)
+- `lib/generated/module-manifest.json` — bundled manifest read by the dispatcher to identify `publicRoutes`
+- `lib/generated/module-schemas.ts` — bundled schema.sql map used at install time on Vercel
+- `app/api/modules/[module]/[[...path]]/route.ts` — dispatcher; does the coarse auth gate + API-key usage logging
 - `lib/db/schema/schema.ts` — Drizzle schema barrel
 - `lib/db/schema/core-schema.ts` — Better Auth tables and system tables; source of truth that `user.id` is `text`, so all module `user_id` columns must also be `text`, not `uuid`
+- `modules-core/module-template/api/data/route.ts` — gold-standard route: OpenAPI annotations, validation, RLS, `toSnakeCase`
+- `modules-core/module-template/api/upload/route.ts` — gold-standard upload route using ARI storage system
+- `modules-core/module-template/lib/validation.ts` — gold-standard Zod schemas tagged with `.openapi()`
 - `modules-core/module-template/hooks/use-module-template.ts` — gold-standard TanStack Query patterns (query key constants, optimistic updates, rollback, cache invalidation)
 - `modules-core/module-template/components/settings-panel.tsx` — gold-standard UX patterns (loading states, `isPending` guards, toast usage)
 - A reference module like `modules-core/tasks/` for the gold-standard structure
