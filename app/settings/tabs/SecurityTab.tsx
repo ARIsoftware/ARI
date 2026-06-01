@@ -204,7 +204,7 @@ export function SecurityTab({
               <div className="pr-4">
                 <p className="text-sm font-medium">Share anonymous usage statistics</p>
                 <p className="text-sm text-muted-foreground">
-                  Sends a single ping on server startup containing an opaque install ID, ARI version, platform, and the configured account email address (used only for basic instance identification). No user content is ever transmitted.
+                  Sends a single ping on server startup containing a data/time, ARI version, platform, truncated IP addresses (e.g., 70.5.5.x), and the configured account email address (used only for basic instance identification).
                 </p>
               </div>
               <Switch
