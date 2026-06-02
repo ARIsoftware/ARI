@@ -19,6 +19,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { TopBar } from "@/components/top-bar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import {
   AlertCircle,
@@ -213,6 +214,20 @@ export default function ModulesPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [viewMode, setViewMode] = useState<"card" | "list">("list")
 
+  // Welcome popup state — shows every visit until user explicitly dismisses it
+  const [welcomeOpen, setWelcomeOpen] = useState(false)
+  const [welcomeStep, setWelcomeStep] = useState<1 | 2>(1)
+
+  const dismissWelcomeForever = () => {
+    try {
+      localStorage.setItem('ari:modules:welcomeDismissed', '1')
+    } catch {
+      /* ignore storage errors */
+    }
+    setWelcomeOpen(false)
+    setWelcomeStep(1)
+  }
+
   // Download state
   const [downloading, setDownloading] = useState<string | null>(null)
   const [downloadResult, setDownloadResult] = useState<{ module: string, type: 'success' | 'error', message: string } | null>(null)
@@ -305,6 +320,21 @@ export default function ModulesPage() {
       }
     }
     loadLicenseStatus()
+  }, [])
+
+  // Show welcome popup on every visit unless the user explicitly dismissed it
+  useEffect(() => {
+    try {
+      const dismissed = localStorage.getItem('ari:modules:welcomeDismissed')
+      if (!dismissed) {
+        setWelcomeStep(1)
+        setWelcomeOpen(true)
+      }
+    } catch {
+      /* localStorage disabled — default to showing it */
+      setWelcomeStep(1)
+      setWelcomeOpen(true)
+    }
   }, [])
 
   const activateLicense = async () => {
@@ -1814,6 +1844,106 @@ export default function ModulesPage() {
           )}
         </SidebarInset>
       </SidebarProvider>
+
+      <Dialog
+        open={welcomeOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setWelcomeOpen(false)
+            setWelcomeStep(1)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[36.4rem]">
+          {welcomeStep === 1 ? (
+            <>
+              <div className="-mx-6 -mt-6 mb-2 overflow-hidden rounded-t-lg bg-[#212121]">
+                <img
+                  src="/ari-create-module-terminal.svg"
+                  alt="Terminal showing the /ari-create-module command"
+                  className="block h-auto w-full"
+                />
+              </div>
+              <DialogHeader>
+                <DialogTitle className="text-xl">Welcome to the Module Library</DialogTitle>
+                <DialogDescription className="pt-2 text-base">
+                  This is where you discover, install, and manage modules that extend ARI.
+                  Free modules install instantly. Premium modules require a license key,
+                  which you can activate at the top of the page.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex items-center justify-between pt-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-1.5 w-6 rounded-full bg-[#148962]" />
+                  <span className="h-1.5 w-6 rounded-full bg-muted" />
+                </div>
+                <Button onClick={() => setWelcomeStep(2)}>
+                  Next
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+              <button
+                type="button"
+                onClick={dismissWelcomeForever}
+                className="mx-auto -mb-2 mt-1 block text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                Don't show this again
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="-mx-6 -mt-6 mb-2 overflow-hidden rounded-t-lg bg-[#212121]">
+                <img
+                  src="/ari-create-module-terminal.svg"
+                  alt="Terminal showing the /ari-create-module command"
+                  className="block h-auto w-full"
+                />
+              </div>
+              <DialogHeader>
+                <DialogTitle className="text-xl">Build your own modules</DialogTitle>
+                <DialogDescription className="pt-2 text-base">
+                  You're not limited to what's in the library — ARI lets you easily
+                  create/fork/modify/share modules and build your very own modules!{' '}
+                  <a
+                    href="https://ari.software/docs/creating-modules"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-[#148962] underline-offset-4 hover:underline"
+                  >
+                    Learn more.
+                  </a>
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:items-center sm:justify-between sm:space-x-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-1.5 w-6 rounded-full bg-muted" />
+                  <span className="h-1.5 w-6 rounded-full bg-[#148962]" />
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setWelcomeStep(1)}>
+                    Back
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setWelcomeOpen(false)
+                      setWelcomeStep(1)
+                    }}
+                  >
+                    Done
+                  </Button>
+                </div>
+              </DialogFooter>
+              <button
+                type="button"
+                onClick={dismissWelcomeForever}
+                className="mx-auto -mb-2 mt-1 block text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                Don't show this again
+              </button>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
