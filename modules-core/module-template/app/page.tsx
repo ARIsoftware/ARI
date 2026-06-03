@@ -274,7 +274,7 @@ export default function ModuleTemplatePage() {
                     className={cn(error && 'border-red-500 focus-visible:ring-red-500')}
                   />
                   {error && (
-                    <p id={errorId} className="text-xs text-red-500">{error}</p>
+                    <p id={errorId} className="text-xs text-destructive">{error}</p>
                   )}
                 </div>
               )
@@ -332,7 +332,7 @@ export default function ModuleTemplatePage() {
         <div>
           <h1 className="text-4xl font-medium">Module Template</h1>
           {quotesEnabled && randomQuote && (
-            <p className="text-sm text-[#aa2020] mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               {randomQuote.quote}
             </p>
           )}
@@ -442,7 +442,7 @@ export default function ModuleTemplatePage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => handleDeleteEntry(entry.id)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
@@ -454,11 +454,11 @@ export default function ModuleTemplatePage() {
       </Card>
 
       {/* Module Info */}
-      <Card className="bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800">
+      <Card className="bg-muted/50 border-border">
         <CardHeader>
-          <CardTitle className="text-blue-900 dark:text-blue-100">Developer Notes</CardTitle>
+          <CardTitle>Developer Notes</CardTitle>
         </CardHeader>
-        <CardContent className="text-sm text-blue-800 dark:text-blue-200 space-y-2">
+        <CardContent className="text-sm text-muted-foreground space-y-2">
           <p>
             <strong>This is a template module.</strong> Use it as a reference when building your own modules.
           </p>

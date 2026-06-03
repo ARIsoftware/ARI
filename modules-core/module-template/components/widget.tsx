@@ -59,13 +59,13 @@ export function ModuleTemplateWidget() {
   // Error state
   if (isError) {
     return (
-      <Card className="border-red-200">
+      <Card className="border-destructive/50">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Module Template</CardTitle>
-          <AlertCircle className="h-4 w-4 text-red-600" />
+          <AlertCircle className="h-4 w-4 text-destructive" />
         </CardHeader>
         <CardContent>
-          <div className="text-xs text-red-600">
+          <div className="text-xs text-destructive">
             Failed to load data
           </div>
           <Button

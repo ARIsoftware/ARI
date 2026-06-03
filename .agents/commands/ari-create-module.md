@@ -4,7 +4,7 @@ The user would like to create a custom module in the modules-custom directory. E
 
 Before doing anything:
 1. Read `/docs/SECURITY.md` - understand the layered security model (middleware, withRLS, database RLS)
-2. Read `/CLAUDE.md` for project conventions (authentication, RLS, theming)
+2. Read `/CLAUDE.md` for project conventions (authentication, RLS). For theme-aware UI, see the **Theming** section later in this prompt.
 3. Confirm `modules-core/module-template` exists. **If it does not exist, STOP immediately. Tell the user: "The Module Template at `modules-core/module-template` is missing — this is required as the starting template for new modules. How would you like to proceed?" Wait for the user's instructions before doing anything else.**
 4. Confirm we are at the repo root and that `modules-custom` exists. If not, create it.
 
@@ -158,7 +158,7 @@ When approved, create the module following this order:
      5. Display below the `<h1>` title:
         ```tsx
         {quotesEnabled && randomQuote && (
-          <p className="text-sm text-[#aa2020] mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             {randomQuote.quote}
           </p>
         )}
@@ -764,6 +764,41 @@ const openCreate = () => {
 
 Every `DialogContent`/`DrawerContent` must include a `DialogTitle`/`DrawerTitle` (Radix logs a console error otherwise). When the design has no visible title, wrap the title in `VisuallyHidden` from `@radix-ui/react-visually-hidden` rather than omitting it.
 
+## Theming
+
+ARI ships multiple themes — default light, `.dark`, `.light`, `.blueprint`, `[data-theme="terminal"]`, and `[data-theme="grayscale"]` — all defined in `app/globals.css` as HSL CSS variables. A module that only styles for light + dark will visually degrade in the other themes (washed-out cards, low-contrast text, off-brand chrome).
+
+### Recommended approach
+
+Use Tailwind classes that map to semantic tokens. They re-color automatically across every theme:
+
+| Purpose | Class |
+|---------|-------|
+| Page/section background | `bg-background` |
+| Body text | `text-foreground` |
+| Card / panel surface | `bg-card`, `text-card-foreground` |
+| Secondary / muted surface | `bg-secondary`, `bg-muted` |
+| De-emphasized text | `text-muted-foreground` |
+| Borders & dividers | `border-border` |
+| Form input chrome | `bg-input`, `ring-ring` |
+| Primary action | `bg-primary`, `text-primary-foreground` |
+| Accent / highlight | `bg-accent`, `text-accent-foreground` |
+| Destructive action | `bg-destructive`, `text-destructive-foreground` |
+| Sidebar surfaces | `bg-sidebar`, `text-sidebar-foreground`, `bg-sidebar-accent`, etc. |
+
+For chart colors, prefer `hsl(var(--chart-1))` through `hsl(var(--chart-5))` so visualizations recolor with the theme.
+
+### Patterns it is recommended to avoid
+
+These work, but they tend to look broken or off-brand outside of light/dark mode. Prefer the semantic tokens above unless you have a deliberate reason:
+
+- **Hardcoded hex values** (e.g. `text-[#aa2020]`, `bg-[#091a32]`) — locked to one color across every theme. Acceptable for intentional brand accents (ARI's signature red quote line is an example); generally avoid for primary surfaces, body text, and borders.
+- **Raw palette classes** (e.g. `bg-blue-50`, `text-gray-700`, `border-zinc-200`) — same issue; the color won't shift between themes.
+- **Manually-paired light/dark variants** (e.g. `bg-blue-50 dark:bg-blue-950`) — covers two themes but still misses `.blueprint`, `[data-theme="terminal"]`, and `[data-theme="grayscale"]`.
+- **Inline `style={{ color: '#...' }}`** for theme-relevant surfaces.
+
+When a custom color is the right call (brand red, status pill, illustrative accent), scope it tightly to that element rather than using it for the surrounding chrome.
+
 ## Input Validation & Sanitization
 
 **All input fields MUST have appropriate validation and sanitization by default.** Every field should enforce constraints that match its purpose, with clear and friendly error messages. Validation must happen on both client (for immediate feedback) and server (for security).
@@ -856,7 +891,7 @@ Before marking complete, verify:
 - [ ] **Random quote displayed under page title** when Quotes module is enabled (follows Module Template pattern)
 - [ ] Page does NOT block on session check (no "Authenticating..." spinner)
 - [ ] **Page does NOT include layout wrappers** (no SidebarProvider, AppSidebar, DarkModeProvider, SidebarInset, or header with breadcrumbs - these are already provided by the module routing system)
-- [ ] Component uses proper theming (Tailwind classes, not hardcoded colors)
+- [ ] Component prefers semantic Tailwind tokens (`bg-background`, `text-foreground`, `bg-card`, `text-muted-foreground`, `border-border`, etc.) over raw palette classes for primary surfaces, text, and borders — see the Theming section
 - [ ] No TypeScript errors (`npx tsc --noEmit`)
 - [ ] Module appears in sidebar after registry generation
 - [ ] Page loads without errors in dev server (no duplicate toolbars)
