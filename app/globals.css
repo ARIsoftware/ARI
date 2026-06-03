@@ -290,9 +290,19 @@
 }
 
 /* Grayscale theme - strip color from every element, including hardcoded inline colors
- * (e.g. dashboard widgets using text-red-500, bg-emerald-500 directly). The theme
- * promise is "no colours anywhere", so we desaturate the entire UI at the body level. */
-[data-theme="grayscale"] body {
+ * (e.g. dashboard widgets using text-red-500, bg-emerald-500 directly).
+ *
+ * Filter is applied to the .ari-app-content wrapper, NOT body. CSS `filter`
+ * creates a containing block for fixed-positioned descendants — if it lived
+ * on body, Radix Dialog/Command portals (which mount on document.body) would
+ * resolve `top: 50%` against the full body height instead of the viewport,
+ * landing the dialog at ~50% of scroll height on long pages.
+ *
+ * Trade-off: Radix portals are siblings of .ari-app-content, so dialogs are
+ * outside the filter and render in full color while grayscale is active.
+ * Acceptable — modals are short-lived and "no colours" still holds for the
+ * persistent chrome (sidebar, topbar, main content). */
+[data-theme="grayscale"] .ari-app-content {
   filter: grayscale(1);
 }
 

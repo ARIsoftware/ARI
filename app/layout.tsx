@@ -68,13 +68,23 @@ export default async function RootLayout({
         <script src="/theme-init.js" />
       </head>
       <body>
-        <QueryProvider>
-          {duplicateErrors.length > 0 ? (
-            <ModuleErrorOverlay errors={duplicateErrors} />
-          ) : (
-            <Providers modules={installedModules} enabledModules={enabledModules}>{children}</Providers>
-          )}
-        </QueryProvider>
+        {/*
+          App content wrapper. Themes that desaturate the UI (e.g. grayscale)
+          target this wrapper rather than `body` because a CSS `filter` on body
+          creates a new containing block for fixed-positioned descendants —
+          including Radix Dialog/Command portals that mount on `document.body`.
+          Keeping the filter off body restores the viewport as the containing
+          block so modals center correctly on long pages.
+        */}
+        <div className="ari-app-content">
+          <QueryProvider>
+            {duplicateErrors.length > 0 ? (
+              <ModuleErrorOverlay errors={duplicateErrors} />
+            ) : (
+              <Providers modules={installedModules} enabledModules={enabledModules}>{children}</Providers>
+            )}
+          </QueryProvider>
+        </div>
       </body>
     </html>
   )
