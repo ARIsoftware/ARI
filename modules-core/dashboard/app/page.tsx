@@ -1,44 +1,23 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
-import {
-  Plus,
-  BarChart3,
-  Activity,
-  Loader2,
-} from 'lucide-react'
+import { Plus, BarChart3, Activity } from 'lucide-react'
 import { useDashboardData } from '@/modules/dashboard/hooks/use-dashboard'
 import { useDragDropMode } from '@/components/drag-drop-mode-context'
 import { RecentActivityFeed } from '../components/recent-activity-feed'
 import { DashboardStatCards, DashboardWidgetArea } from '../components/dashboard-widgets'
 
 export default function DashboardPage() {
-  const {
-    tasksEnabled,
-    quote,
-    recentActivity,
-    isLoading,
-    isDataLoading,
-  } = useDashboardData()
+  const { tasksEnabled, quote, recentActivity } = useDashboardData()
   const { isDragMode } = useDragDropMode()
 
-  // Show loading overlay while checking modules
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
+  // No loading gates — render the shell unconditionally. Modules-list and
+  // recent-activity queries are TanStack-cached with long staleTime, so they
+  // resolve from memory on every navigation after the first. The brief cold
+  // load shows the page chrome and empty cards rather than a spinner soup.
 
   return (
     <>
-      {isDataLoading && (
-        <div className="absolute inset-0 bg-background/50 z-10 flex items-center justify-center">
-          <Loader2 className="w-6 h-6 animate-spin" />
-        </div>
-      )}
-
       <div className="flex flex-1 relative">
         {/* Main Content */}
         <div className="flex-1 flex flex-col gap-6 p-6 pr-3">
@@ -96,7 +75,7 @@ export default function DashboardPage() {
 
         {/* Right Sidebar - Recent Activity */}
         <div className="w-80 bg-background p-6 pl-3">
-          <RecentActivityFeed activities={recentActivity} isLoading={isDataLoading} />
+          <RecentActivityFeed activities={recentActivity} />
         </div>
       </div>
     </>

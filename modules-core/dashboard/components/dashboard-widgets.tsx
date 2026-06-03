@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useMemo, ComponentType } from 'react'
-import { Loader2 } from 'lucide-react'
 import {
   DndContext,
   PointerSensor,
@@ -29,14 +28,6 @@ import {
 // Dynamic ESM imports have an unknown module shape; resolveComponent probes for `default` or any exported function.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type DynamicModule = any
-
-function WidgetSkeleton() {
-  return (
-    <div className="flex items-center justify-center h-[120px]">
-      <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-    </div>
-  )
-}
 
 function useEnabledDashboardModuleIds(): Set<string> {
   const { modules } = useModules()
@@ -85,7 +76,9 @@ function DynamicWidget({ loader }: { loader: () => Promise<DynamicModule> }) {
   }, [loader])
 
   if (failed) return null
-  if (!Component) return <WidgetSkeleton />
+  // Render nothing while the chunk loads — widget pops in when ready.
+  // Chunks are cached after first load, so this is invisible on warm navigations.
+  if (!Component) return null
   return <div className="h-full [&>*]:h-full"><Component /></div>
 }
 

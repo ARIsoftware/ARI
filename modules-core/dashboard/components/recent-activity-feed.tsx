@@ -12,13 +12,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { Loader2, Activity, CheckCircle, Clock, Plus, User } from 'lucide-react'
+import { Activity, CheckCircle, Clock, Plus, User } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import type { ActivityItem } from '../types'
 
 interface RecentActivityFeedProps {
   activities: ActivityItem[]
-  isLoading?: boolean
 }
 
 function safeFormatDistanceToNow(timestamp: string | null | undefined): string {
@@ -58,28 +57,7 @@ function getActivityColor(type: ActivityItem['type']) {
   }
 }
 
-export function RecentActivityFeed({ activities, isLoading = false }: RecentActivityFeedProps) {
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="w-5 h-5 text-blue-600" />
-            Activity
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center h-[300px]">
-            <div className="flex items-center gap-2">
-              <Loader2 className="w-6 h-6 animate-spin" />
-              <span>Loading recent activity...</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
+export function RecentActivityFeed({ activities }: RecentActivityFeedProps) {
   if (activities.length === 0) {
     return (
       <Card>
