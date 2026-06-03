@@ -60,6 +60,7 @@ CREATE INDEX IF NOT EXISTS idx_ari_database_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_priority_score ON tasks(priority_score);
 CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_monster_type ON tasks(monster_type);
+CREATE INDEX IF NOT EXISTS idx_tasks_user_id_updated_at ON tasks(user_id, updated_at DESC);
 
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 

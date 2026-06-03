@@ -7,20 +7,6 @@ interface Quote {
   author?: string | null
 }
 
-interface Task {
-  id: string
-  title: string
-  completed: boolean
-  created_at: string
-  updated_at: string
-}
-
-interface Contact {
-  id: string
-  name: string
-  created_at: string
-}
-
 /**
  * Hook to fetch enabled modules
  */
@@ -52,22 +38,16 @@ export function useTasksModuleEnabled() {
 }
 
 /**
- * Hook to fetch a random quote (fetches all and picks one)
+ * Hook to fetch a random quote. Server picks the row via ORDER BY random() LIMIT 1
+ * so the client only receives one quote instead of the whole table.
  */
 export function useDashboardQuote(enabled: boolean) {
   return useQuery({
     queryKey: ['dashboard-quote'],
     queryFn: async (): Promise<Quote | null> => {
-      const res = await fetch('/api/modules/quotes/quotes')
-      if (!res.ok) {
-        return null
-      }
-      const quotes: Quote[] = await res.json()
-      if (!Array.isArray(quotes) || quotes.length === 0) {
-        return null
-      }
-      // Pick a random quote
-      return quotes[Math.floor(Math.random() * quotes.length)]
+      const res = await fetch('/api/modules/quotes/quotes/random')
+      if (!res.ok) return null
+      return res.json()
     },
     enabled,
     staleTime: 60 * 60 * 1000, // Quote stays fresh for 1 hour
@@ -75,85 +55,21 @@ export function useDashboardQuote(enabled: boolean) {
 }
 
 /**
- * Hook to fetch recent activity for the feed
+ * Hook to fetch recent activity for the feed. Server returns at most 15
+ * ActivityItems pre-sorted by timestamp DESC; the client passes the array
+ * straight to the widget.
  */
 export function useDashboardRecentActivity(tasksEnabled: boolean, contactsEnabled: boolean) {
   return useQuery({
     queryKey: ['dashboard-recent-activity', tasksEnabled, contactsEnabled],
     queryFn: async (): Promise<ActivityItem[]> => {
-      const allActivities: ActivityItem[] = []
-
-      // Fetch tasks if enabled
-      if (tasksEnabled) {
-        try {
-          const tasksRes = await fetch('/api/modules/tasks')
-          if (tasksRes.ok) {
-            const tasks: Task[] = await tasksRes.json()
-            const recentTasks = tasks
-              .filter((t) => t.created_at || t.updated_at)
-              .sort((a, b) => {
-                const dateA = new Date(b.updated_at || b.created_at).getTime()
-                const dateB = new Date(a.updated_at || a.created_at).getTime()
-                return dateA - dateB
-              })
-              .slice(0, 10)
-
-            recentTasks.forEach((task) => {
-              if (task.completed && task.updated_at !== task.created_at) {
-                allActivities.push({
-                  id: `task_completed_${task.id}`,
-                  type: 'task_completed',
-                  title: 'Task Completed',
-                  description: task.title,
-                  timestamp: task.updated_at,
-                })
-              }
-              allActivities.push({
-                id: `task_created_${task.id}`,
-                type: 'task_created',
-                title: 'Task Created',
-                description: task.title,
-                timestamp: task.created_at,
-              })
-            })
-          }
-        } catch (err) {
-          console.warn('Dashboard recent activity: failed to fetch tasks', err)
-        }
+      if (!tasksEnabled && !contactsEnabled) return []
+      const res = await fetch('/api/modules/dashboard/recent-activity')
+      if (!res.ok) {
+        console.warn('Dashboard recent activity: fetch failed', res.status)
+        return []
       }
-
-      // Fetch contacts if enabled
-      if (contactsEnabled) {
-        try {
-          const contactsRes = await fetch('/api/modules/contacts')
-          if (contactsRes.ok) {
-            const contactsData = await contactsRes.json()
-            const contacts: Contact[] = contactsData.data || contactsData
-            const recentContacts = contacts
-              .filter((c) => c.created_at)
-              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-              .slice(0, 5)
-
-            recentContacts.forEach((contact) => {
-              allActivities.push({
-                id: `contact_added_${contact.id}`,
-                type: 'contact_added',
-                title: 'Contact Added',
-                description: contact.name,
-                timestamp: contact.created_at,
-              })
-            })
-          }
-        } catch (err) {
-          console.warn('Dashboard recent activity: failed to fetch contacts', err)
-        }
-      }
-
-      // Sort by timestamp and return most recent 15
-      return allActivities
-        .filter((a) => a.timestamp)
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-        .slice(0, 15)
+      return res.json()
     },
     enabled: tasksEnabled || contactsEnabled,
   })

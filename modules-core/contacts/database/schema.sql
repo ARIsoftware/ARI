@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS contacts (
 CREATE INDEX IF NOT EXISTS idx_contacts_category ON contacts(category);
 CREATE INDEX IF NOT EXISTS idx_contacts_name ON contacts(name);
 CREATE INDEX IF NOT EXISTS idx_contacts_user_id ON contacts(user_id);
+CREATE INDEX IF NOT EXISTS idx_contacts_user_id_created_at ON contacts(user_id, created_at DESC);
 
 ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
 
