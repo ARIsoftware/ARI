@@ -1054,12 +1054,16 @@ export default function DatabaseTestPage() {
     // Test 1: Storage Provider Config
     updateStorageResult('Storage Provider', { status: 'testing' })
     let envVars: Array<{ name: string; set: boolean; required: boolean }> = []
+    let activeProvider: string | null = null
+    let activeProviderLabel: string | null = null
     try {
       const res = await fetch('/api/settings/storage')
       if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
       const data = await res.json()
       const label = data.providerLabel ?? data.provider ?? 'unknown'
       envVars = Array.isArray(data.envVars) ? data.envVars : []
+      activeProvider = data.provider ?? null
+      activeProviderLabel = data.providerLabel ?? data.provider ?? null
       updateStorageResult('Storage Provider', {
         status: 'success',
         message: `Active: ${label} (source: ${data.source})`,
@@ -1085,6 +1089,45 @@ export default function DatabaseTestPage() {
         message = 'Not set (optional)'
       }
       updateStorageResult(testName, { status, message })
+    }
+
+    // Pre-flight check only for the local filesystem provider — surfaces the
+    // absolute path and an explicit writability signal before the upload test.
+    // Bypass the network round-trip when a remote provider is active.
+    const fsTestName = 'Local storage folder (filesystem provider)'
+    if (activeProvider && activeProvider !== 'filesystem') {
+      updateStorageResult(fsTestName, {
+        status: 'success',
+        message: `Not applicable — using ${activeProviderLabel ?? activeProvider}`,
+      })
+    } else {
+      updateStorageResult(fsTestName, { status: 'testing' })
+      try {
+        const res = await fetch('/api/health/storage-filesystem')
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error || `HTTP ${res.status}`)
+        }
+        const data = await res.json()
+        if (data.exists && data.writable) {
+          updateStorageResult(fsTestName, {
+            status: data.isEphemeral ? 'warning' : 'success',
+            message: data.isEphemeral
+              ? `${data.basePath} — exists & writable, but Vercel filesystem is ephemeral and won't persist between requests`
+              : `${data.basePath} — exists & writable`,
+            data,
+          })
+        } else {
+          updateStorageResult(fsTestName, {
+            status: 'error',
+            message: `${data.basePath} — exists=${data.exists}, writable=${data.writable}`,
+            error: data.error,
+            data,
+          })
+        }
+      } catch (error: unknown) {
+        updateStorageResult(fsTestName, { status: 'error', error: errMsg(error) })
+      }
     }
 
     // Test 2: Upload (text)

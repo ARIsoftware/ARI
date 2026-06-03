@@ -116,6 +116,16 @@ export const HealthModuleStatusSchema = z.object({
   error: z.string().optional(),
 }).openapi('HealthModuleStatus')
 
+export const HealthStorageFilesystemSchema = z.object({
+  provider: z.string(),
+  applicable: z.boolean(),
+  basePath: z.string().optional(),
+  exists: z.boolean().optional(),
+  writable: z.boolean().optional(),
+  isEphemeral: z.boolean().optional(),
+  error: z.string().optional(),
+}).openapi('HealthStorageFilesystem')
+
 export const HealthRlsTestSchema = z.object({
   authenticated: z.boolean(),
   userId: z.string().optional(),

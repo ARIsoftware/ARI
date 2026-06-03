@@ -7,7 +7,7 @@ import type { StorageConfig } from './config'
 
 export * from './types'
 export { sanitizeFilename, sanitizeBucketName, validateStoredFilename } from './sanitize'
-export { getMimeTypeForExtension } from './local'
+export { getMimeTypeForExtension, getDefaultLocalStorageBasePath } from './local'
 export { readStorageConfig, ENV_MAP, PROVIDER_LABELS } from './config'
 export type { StorageConfig } from './config'
 

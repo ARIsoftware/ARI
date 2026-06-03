@@ -37,12 +37,16 @@ export function getMimeTypeForExtension(filename: string): string {
   return getMimeType(filename)
 }
 
+export function getDefaultLocalStorageBasePath(): string {
+  return path.join(process.cwd(), 'data', 'storage')
+}
+
 export class LocalFilesystemProvider implements StorageProvider {
   private basePath: string
   private realBasePathPromise: Promise<string> | null = null
 
   constructor(basePath?: string) {
-    this.basePath = basePath ?? path.join(process.cwd(), 'data', 'storage')
+    this.basePath = basePath ?? getDefaultLocalStorageBasePath()
   }
 
   private getUserBucketDir(userId: string, bucket: string): string {
