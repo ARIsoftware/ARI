@@ -21,6 +21,8 @@ export default function ApiDocsPage() {
           // Suppress Scalar's "Ask AI" search-bar button. It auto-enables on
           // localhost; we don't ship an AI agent so the button would dead-end.
           agent: { disabled: true },
+          // Opt out of Scalar's PostHog telemetry.
+          telemetry: false,
         }}
       />
     </div>
