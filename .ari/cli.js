@@ -734,6 +734,14 @@ async function doctor() {
 
   lines.push('  ' + DIM + 'Platform: ' + process.platform + ' ' + os.release() + RESET);
 
+  let ariVersion = '';
+  try {
+    ariVersion = require(path.join(ROOT, 'package.json')).version || '';
+  } catch {}
+  const ariCommit = run('git rev-parse --short HEAD') || '';
+  const ariVersionStr = ariVersion + (ariCommit ? '+' + ariCommit : '');
+  ariVersionStr ? ok('ARI version', ariVersionStr) : warn('ARI version', 'unknown');
+
   const nodeV = run('node --version');
   if (nodeV) {
     const major = Number(nodeV.replace(/^v/, '').split('.')[0]);
