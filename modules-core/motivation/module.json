@@ -1,0 +1,41 @@
+{
+  "id": "motivation",
+  "group": "Mindset",
+  "name": "Motivation",
+  "description": "Save motivational YouTube videos and play them back-to-back in a focused player.",
+  "version": "1.0.0",
+  "author": "ARI",
+  "icon": "Flame",
+  "enabled": false,
+  "fullscreen": false,
+  "menuPriority": 50,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": false
+  },
+  "routes": [
+    {
+      "path": "/motivation",
+      "label": "Motivation",
+      "icon": "Flame",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": ["motivation_videos"]
+  },
+  "npmDependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@radix-ui/react-visually-hidden": "^1.2.4"
+  },
+  "submenu": {
+    "component": "./components/sidebar-submenu.tsx"
+  }
+}
