@@ -31,6 +31,35 @@ Before doing anything:
 - Always use parameterized queries (Drizzle handles this) — never interpolate user input into SQL.
 - If a module accepts file uploads, validate file types and sizes server-side.
 
+## Files You Must Never Edit
+
+**A module is created by adding ONE folder under `modules-custom/<id>/`. Nothing else.** Editing any file outside that folder (other than the three registration touchpoints listed below) will cause real damage: those files are upstream-managed, and the user will lose your edits — and get a merge conflict that blocks future updates — the next time they run `ari-update`. This is not a stylistic preference; it is a hard correctness rule.
+
+### Forbidden — never edit these during module creation
+
+- `app/globals.css` — themes, CSS variables, global styles all live here. **Never add a rule, variable, animation, or import to this file for a module.**
+- `app/layout.tsx`, `app/page.tsx`, any other file under `app/` that isn't a module-owned route
+- `tailwind.config.*` and `postcss.config.*`
+- `next.config.mjs`, `middleware.ts`, `instrumentation.ts`
+- `components/` (the shared shadcn/ui directory) — do not add module components here
+- `lib/` (other than the one allowed schema file below) — do not add module hooks, types, utilities, or constants here
+- `package.json` directly — module npm deps go in `module.json` under `npmDependencies`; the installer handles the rest
+- Any file inside `modules-core/` (these are upstream-managed; the only correct response is to duplicate the module into `modules-custom/` first — see the project-level rule in `CLAUDE.md`)
+
+### The ONLY three files outside the module folder that may be edited
+
+These are the unavoidable registration touchpoints described later in this prompt:
+
+1. `/lib/db/schema/schema.ts` — add the Drizzle table definitions for tables the module owns
+2. `/app/api/modules/[module]/[[...path]]/route.ts` — add the module to `MODULE_API_ROUTES`
+3. `/components/sidebar-submenu-renderer.tsx` — register the submenu component (only if the module has a submenu)
+
+If you find yourself wanting to edit any file not on this short list, **stop and reconsider.** The correct fix is almost always to put the code inside `modules-custom/<id>/` instead. If you genuinely believe an exception is needed, ask the user before editing.
+
+### Module-scoped styles
+
+If a module needs custom CSS (animations, keyframes, one-off rules that can't be expressed with Tailwind utility classes), put the CSS file inside the module folder — for example `modules-custom/<id>/styles.css` — and import it from the module's `app/page.tsx`. **Do not add the CSS to `app/globals.css`.** Theme-aware colors should still use semantic Tailwind tokens (`bg-background`, `text-foreground`, etc.) — see the Theming section below.
+
 ## Postgres & Supabase Skills
 
 This project includes Supabase guidance for Claude in `.claude/skills/`. When creating database schemas, use the `supabase-postgres-best-practices` skill to look up PostgreSQL best practices for data types, indexes, constraints, and table design. For Codex, rely on the documented schema conventions in this prompt and the repo docs instead. These references help ensure database tables follow PostgreSQL conventions and best practices.
@@ -768,6 +797,8 @@ Every `DialogContent`/`DrawerContent` must include a `DialogTitle`/`DrawerTitle`
 
 ARI ships multiple themes — default light, `.dark`, `.light`, `.blueprint`, `[data-theme="terminal"]`, and `[data-theme="grayscale"]` — all defined in `app/globals.css` as HSL CSS variables. A module that only styles for light + dark will visually degrade in the other themes (washed-out cards, low-contrast text, off-brand chrome).
 
+**`app/globals.css` is read-only for module creation.** Do not add new CSS variables, theme rules, animations, or imports to it. If your module needs custom CSS, follow the "Module-scoped styles" guidance in the "Files You Must Never Edit" section above. For colors, always use the semantic Tailwind tokens listed below — they re-color correctly across every theme without needing any change to `globals.css`.
+
 ### Recommended approach
 
 Use Tailwind classes that map to semantic tokens. They re-color automatically across every theme:
@@ -867,6 +898,8 @@ Before marking complete, verify:
 - [ ] **SECURITY: All user input validated with Zod before use**
 - [ ] **SECURITY: Database tables have RLS enabled** (verify in schema.sql: `ALTER TABLE ... ENABLE ROW LEVEL SECURITY`)
 - [ ] **SECURITY: No secrets, credentials, or sensitive data hardcoded or logged**
+- [ ] **No edits to forbidden core files** — `app/globals.css`, `tailwind.config.*`, `next.config.mjs`, `middleware.ts`, root `app/` files, shared `lib/` or `components/` were NOT modified. The only files touched outside `modules-custom/<id>/` are the three allowed registration touchpoints (`/lib/db/schema/schema.ts`, `MODULE_API_ROUTES`, and `sidebar-submenu-renderer.tsx` if a submenu was added)
+- [ ] **Module-specific CSS, if any, lives inside the module folder** (e.g. `modules-custom/<id>/styles.css`) — never added to `app/globals.css`
 - [ ] module.json is valid and complete
 - [ ] All API routes use `withRLS()` helper (NOT Supabase client) - see `modules-core/module-template/api/data/route.ts`
 - [ ] **If module has API routes**: Routes registered in `MODULE_API_ROUTES` in `/app/api/modules/[module]/[[...path]]/route.ts`
@@ -920,7 +953,7 @@ Before marking complete, verify:
 ## Critical Rules
 
 1. **Security is paramount.** Every module must be secure by default — no exceptions. All API routes must authenticate, all DB operations must use `withRLS()`, all input must be Zod-validated, all tables must have RLS enabled. See the Security Requirements section above for full details.
-2. **ALL module code MUST be self-contained within the module directory.** Hooks, components, types, utilities — everything lives inside `modules-core/<id>/` or `modules-custom/<id>/`. NEVER place module-specific code in shared directories like `lib/hooks/`, `lib/`, or `components/`. A module must be installable by adding its single folder. A module must be deletable by removing its single folder. The ONLY exceptions are the required registration touchpoints: Drizzle schema in `/lib/db/schema/schema.ts`, API routes in `MODULE_API_ROUTES`, and submenu registration in `sidebar-submenu-renderer.tsx`.
+2. **ALL module code MUST be self-contained within the module directory.** Hooks, components, types, utilities, styles — everything lives inside `modules-core/<id>/` or `modules-custom/<id>/`. NEVER place module-specific code in shared directories like `lib/hooks/`, `lib/`, or `components/`. NEVER edit `app/globals.css`, `tailwind.config.*`, `next.config.mjs`, `middleware.ts`, or other root configuration/style files — they are upstream-managed and your edits will be wiped (and block updates) the next time the user runs `ari-update`. A module must be installable by adding its single folder, and deletable by removing its single folder. The ONLY exceptions are the three required registration touchpoints: Drizzle schema in `/lib/db/schema/schema.ts`, API routes in `MODULE_API_ROUTES`, and submenu registration in `sidebar-submenu-renderer.tsx`. See the "Files You Must Never Edit" section above for the full list.
 3. **NEVER start the dev server** — the user will do this.
 4. **Never run a .sql statement without explicit approval.**
 5. **Follow existing code patterns exactly** — use `modules-core/module-template` as the template.

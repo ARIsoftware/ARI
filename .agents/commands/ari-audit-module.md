@@ -261,6 +261,44 @@ Every confirmed hardcoded secret must appear in the report with file + line and 
 - [ ] Internal imports use the `@/modules/...` alias rather than relative paths into other modules — **Medium**
 - [ ] No imports reaching into a sibling module's internals — **High**
 
+### B2.1. Shared-file pollution (forbidden edits outside the module folder)
+
+**Context:** `/ari-create-module` defines a hard rule that a module is created by adding ONE folder under `modules-custom/<id>/` and editing only three registration touchpoints (`/lib/db/schema/schema.ts`, `MODULE_API_ROUTES`, `sidebar-submenu-renderer.tsx`). Anything else outside the module folder is forbidden because those files are upstream-managed and edits will be wiped — and will block `ari-update` — the next time the user updates. This audit must look for evidence that the rule was violated.
+
+**Files to scan** (each one is forbidden territory for module-specific content):
+
+- `app/globals.css`
+- `app/layout.tsx`
+- `tailwind.config.*` (`.ts`, `.js`, `.mjs`, `.cjs`)
+- `postcss.config.*`
+- `next.config.mjs`
+- `middleware.ts`
+- `instrumentation.ts`
+- `components/` (the shared shadcn/ui directory — module components belong inside the module folder)
+- `lib/` other than the one allowed `/lib/db/schema/schema.ts` re-export
+
+**How to scan:** For each file/directory above, look for any content that ties back to the module being audited. Strong signals of pollution:
+
+- A literal string match on the module id (e.g. `bible-study`, `my-module`) — comments, class names, CSS variables, route strings, conditionals — anywhere in the file
+- CSS rules, custom properties (`--bible-study-bg`), `@keyframes` names, or selectors that are obviously named after the module
+- `import` statements pointing into `@/modules/...`, `modules-custom/...`, or `modules-core/...` from any of the forbidden files
+- Conditionals or registrations that reference the module by id in `middleware.ts`, `next.config.mjs`, `instrumentation.ts`, or `app/layout.tsx`
+- Theme variables added to `app/globals.css` that only the module uses
+
+Findings:
+
+- [ ] Any reference to the module's id, name, slug, or obviously module-scoped CSS variable/class found inside one of the forbidden files above — **High**. The module is not self-contained and the host install is now blocked from updating cleanly. Recommend moving the content into the module folder (CSS → `modules-custom/<id>/styles.css` imported from the module page; helpers → `modules-custom/<id>/lib/`; components → `modules-custom/<id>/components/`).
+- [ ] Module's `app/page.tsx` or components reference CSS classes/variables that are NOT defined in core ARI (no match in `app/globals.css`'s base/theme blocks, no Tailwind utility) and are NOT defined in a module-scoped CSS file — **Medium**. This is a strong signal that the styles were added to a shared file that has since been reverted/overwritten, or that they will fail to render. Recommend creating `modules-custom/<id>/styles.css` and defining the classes there.
+- [ ] Module folder contains no CSS file but the module's components include hardcoded color hex values, custom `@keyframes` names, or `style={{ ... }}` attributes that imply theme work was done somewhere else — **Low**. Worth flagging so the user can confirm globals.css wasn't touched.
+- [ ] `package.json` at the repo root has dependencies that look like they were added for this module (match against `module.json` `npmDependencies`) but `module.json` `npmDependencies` is empty or missing — **Medium**. Module deps must be declared in `module.json` so the installer manages them; hand-edits to root `package.json` will be lost on update.
+
+**False-positive guardrails (do NOT flag these):**
+
+- The module id appearing inside `lib/generated/*` files (auto-generated registries are expected to reference every module id)
+- The module id appearing inside `app/api/modules/[module]/[[...path]]/route.ts` only as part of the `MODULE_API_ROUTES` registration — that file IS one of the three allowed touchpoints
+- The module id appearing inside `/components/sidebar-submenu-renderer.tsx` as part of the `SUBMENU_COMPONENTS` registry — also an allowed touchpoint
+- The module id appearing inside `/lib/db/schema/schema.ts` as a re-export — also allowed
+
 ### B3. Install-time SQL (user-emphasized)
 
 **Required database files.** Every module that owns tables must ship all three of these files inside `[module]/database/`:
