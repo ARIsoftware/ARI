@@ -10,6 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const os = require('os');
+const { reconcileCustomModuleDeps } = require('../scripts/reconcile-module-deps.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const ENV_FILE = path.join(ROOT, '.env.supabase.local');
@@ -99,6 +100,25 @@ function ask(question) {
       resolve(answer);
     });
   });
+}
+
+function logReconcileResult(result, log) {
+  if (!result.ok) {
+    log('  ' + YELLOW + '⚠' + RESET + ' Module dep reconcile error: ' + result.error);
+    return;
+  }
+  if (result.skipped) return;
+  if (result.changed) {
+    const names = result.added.map((a) => a.name).join(', ');
+    log('  ' + GREEN + '✔' + RESET + ` Synced ${result.added.length} custom-module dep(s): ${names}`);
+  }
+  for (const c of result.conflicts) {
+    log('  ' + YELLOW + '⚠' + RESET + ` ${c.name}: module wants ${c.declared}, package.json has ${c.existing}`);
+    log('  ' + DIM + '  Source(s): ' + c.sources.join(', ') + RESET);
+  }
+  for (const inv of result.invalid) {
+    log('  ' + YELLOW + '⚠' + RESET + ` ${inv.module}: skipped invalid dep "${inv.name}" (${inv.reason})`);
+  }
 }
 
 function getDatabaseUrl() {
@@ -695,6 +715,12 @@ async function update() {
   }
   console.log('  ' + GREEN + '✔' + RESET + ' Code updated');
 
+  // Reconcile custom-module npm deps before pnpm install so the lockfile and
+  // node_modules pick up anything the merge dropped. Safe-fail: any
+  // reconciler error is surfaced but does not abort the update.
+  console.log('  Reconciling custom module dependencies...');
+  logReconcileResult(reconcileCustomModuleDeps(ROOT), (msg) => console.log(msg));
+
   // Install dependencies
   console.log('  Installing dependencies...');
   try {
@@ -707,6 +733,36 @@ async function update() {
 
   console.log('');
   console.log('  ' + GREEN + 'Update complete!' + RESET + ' Run ' + DIM + './ari start' + RESET + ' to launch.');
+  console.log('');
+}
+
+// ── Fix-deps ───────────────────────────────────────────────────────────────
+
+function fixDeps() {
+  console.log('');
+  console.log('  ' + YELLOW + 'Reconciling custom module dependencies...' + RESET);
+  console.log('');
+
+  const result = reconcileCustomModuleDeps(ROOT);
+  logReconcileResult(result, (msg) => console.log(msg));
+
+  if (!result.ok) {
+    process.exit(1);
+  }
+  if (result.changed) {
+    console.log('  Installing dependencies...');
+    try {
+      execSync('pnpm install', { stdio: 'inherit', cwd: ROOT });
+      console.log('  ' + GREEN + '✔' + RESET + ' Dependencies installed');
+    } catch {
+      console.log('  ' + RED + '✘' + RESET + ' pnpm install failed');
+      process.exit(1);
+    }
+  } else if (result.conflicts.length === 0 && result.invalid.length === 0) {
+    console.log('  ' + GREEN + '✔' + RESET + ' Already in sync. Nothing to do.');
+  }
+  // else: conflicts/invalid were logged by logReconcileResult; nothing to install.
+
   console.log('');
 }
 
@@ -833,7 +889,7 @@ async function doctor() {
 // ── Main ───────────────────────────────────────────────────────────────────
 
 const cmd = process.argv[2];
-const commands = { start: startDefault, startquiet: startDefault, stop, status, update, doctor };
+const commands = { start: startDefault, startquiet: startDefault, stop, status, update, 'fix-deps': fixDeps, doctor };
 
 if (!cmd || !commands[cmd]) {
   console.log('');
@@ -847,6 +903,7 @@ if (!cmd || !commands[cmd]) {
   console.log('    stop               Stop database services');
   console.log('    status             Show database status');
   console.log('    update             Pull latest ARI updates + install dependencies');
+  console.log('    fix-deps           Re-sync custom-module npm deps into package.json');
   console.log('    doctor             Print diagnostic report (paste this when asking for help)');
   console.log('');
   process.exit(cmd ? 1 : 0);
