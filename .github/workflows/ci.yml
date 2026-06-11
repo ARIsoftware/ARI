@@ -15,6 +15,10 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Generate lib/generated/* and the schema barrel (same as predev) —
+      # typecheck and tests need them, and a fresh checkout doesn't have them.
+      - run: pnpm generate-module-registry
+      - run: pnpm generate-openapi
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
