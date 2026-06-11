@@ -12,7 +12,10 @@
     "predev": "node scripts/generate-module-registry.js && tsx scripts/generate-openapi.ts",
     "dev": "next dev",
     "start": "next start",
-    "setup": "node scripts/install.js"
+    "setup": "node scripts/install.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.0",

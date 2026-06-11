@@ -30,9 +30,6 @@ const nextConfig = {
     NEXT_PUBLIC_ARI_COMMIT: commitSha,
     NEXT_PUBLIC_IS_VERCEL: process.env.VERCEL ? '1' : '',
   },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   images: {
     unoptimized: true,
   },
