@@ -379,6 +379,7 @@ Every authenticated **and** public route must register with the shared OpenAPI r
 ### B8. Type safety
 - [ ] `types/index.ts` exists if the module has shared types — **Low**
 - [ ] No `any` types in API route handlers — **Low**
+- [ ] `pnpm typecheck` exits 0 with the module present (run it; a failure naming a file inside this module is **High**, a pre-existing failure elsewhere is out of audit scope — note it under "Skipped checks") — **High**
 
 ---
 
