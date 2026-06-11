@@ -91,7 +91,7 @@ export async function PATCH(
       // Verify parent exists AND that `id` isn't anywhere in its ancestor chain
       // (would create a cycle). One recursive CTE walks the chain in a single
       // round-trip; bails as soon as it finds `id`.
-      const ancestors = await withRLS((db: any) =>
+      const ancestors = await withRLS((db) =>
         db.execute(sql`
           WITH RECURSIVE ancestors(id, parent_id, depth) AS (
             SELECT id, parent_id, 0
@@ -127,7 +127,7 @@ export async function PATCH(
     if (name !== undefined) updateData.name = name
     if (parent_id !== undefined) updateData.parentId = parent_id
 
-    const updated = await withRLS((db: any) =>
+    const updated = await withRLS((db) =>
       db.update(documentFolders)
         .set(updateData)
         .where(and(
@@ -173,7 +173,7 @@ export async function DELETE(
     }
 
     // Verify folder exists and belongs to user
-    const existing = await withRLS((db: any) =>
+    const existing = await withRLS((db) =>
       db.select()
         .from(documentFolders)
         .where(and(
@@ -192,7 +192,7 @@ export async function DELETE(
     // Collect the target folder + every descendant via a single recursive CTE,
     // replacing the previous one-query-per-folder traversal. RLS still applies
     // because withRLS sets app.current_user_id for the whole transaction.
-    const descendantRows = await withRLS((db: any) =>
+    const descendantRows = await withRLS((db) =>
       db.execute(sql`
         WITH RECURSIVE descendants(id) AS (
           SELECT ${id}::uuid
@@ -215,7 +215,7 @@ export async function DELETE(
 
     if (allFolderIds.length > 0) {
       // Single batched soft-delete of every document inside these folders.
-      await withRLS((db: any) =>
+      await withRLS((db) =>
         db.update(documents)
           .set({ deletedAt, updatedAt: deletedAt })
           .where(and(
@@ -225,7 +225,7 @@ export async function DELETE(
       )
 
       // Single batched soft-delete of the folders themselves.
-      await withRLS((db: any) =>
+      await withRLS((db) =>
         db.update(documentFolders)
           .set({ deletedAt, updatedAt: deletedAt })
           .where(and(

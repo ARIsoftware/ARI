@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch all folders
-    const folders = await withRLS((db: any) =>
+    const folders = await withRLS((db) =>
       db.select()
         .from(documentFolders)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
     )
 
     // Get document counts per folder
-    const documentCountsResult = await withRLS((db: any) =>
+    const documentCountsResult = await withRLS((db) =>
       db.select({
         folderId: documents.folderId,
         count: count(documents.id),
@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
 
     // Verify parent folder exists if specified
     if (parent_id) {
-      const parent = await withRLS((db: any) =>
+      const parent = await withRLS((db) =>
         db.select()
           .from(documentFolders)
           .where(and(
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create folder
-    const newFolder = await withRLS((db: any) =>
+    const newFolder = await withRLS((db) =>
       db.insert(documentFolders)
         .values({
           userId: user.id,

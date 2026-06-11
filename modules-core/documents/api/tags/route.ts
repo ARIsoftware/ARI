@@ -62,7 +62,7 @@ export async function GET(_request: NextRequest) {
     }
 
     // Fetch user's tags
-    const tags = await withRLS((db: any) =>
+    const tags = await withRLS((db) =>
       db.select()
         .from(documentTags)
         .where(eq(documentTags.userId, user.id))
@@ -70,7 +70,7 @@ export async function GET(_request: NextRequest) {
     )
 
     // Get usage count per tag (only assignments on documents owned by the user)
-    const usageCounts = await withRLS((db: any) =>
+    const usageCounts = await withRLS((db) =>
       db.select({
         tagId: documentTagAssignments.tagId,
         count: count(documentTagAssignments.id),
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
     const { name, color } = validation.data
 
     // Check if user already has a tag with this name
-    const existing = await withRLS((db: any) =>
+    const existing = await withRLS((db) =>
       db.select()
         .from(documentTags)
         .where(and(
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create tag
-    const newTag = await withRLS((db: any) =>
+    const newTag = await withRLS((db) =>
       db.insert(documentTags)
         .values({
           userId: user.id,

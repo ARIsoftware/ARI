@@ -30,7 +30,7 @@ export class S3CompatibleProvider implements StorageProviderInterface {
     contentType: string
   ): Promise<{ path: string; size: number }> {
     const path = `${userId}/${filename}`
-    const body = content instanceof Buffer ? content : Buffer.from(await content.arrayBuffer())
+    const body = Buffer.isBuffer(content) ? content : Buffer.from(await content.arrayBuffer())
     const size = body.length
 
     await withProviderRedaction(this.label, 'upload', () =>

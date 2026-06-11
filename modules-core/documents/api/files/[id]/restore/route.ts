@@ -55,7 +55,7 @@ export async function POST(
       return createErrorResponse('Invalid ID format', 400)
     }
 
-    const restored = await withRLS((db: any) =>
+    const restored = await withRLS((db) =>
       db.update(documents)
         .set({
           deletedAt: null,

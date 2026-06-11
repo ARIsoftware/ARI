@@ -62,7 +62,7 @@ export async function GET(
 
     // Get document — RLS plus an explicit user_id filter (defense-in-depth).
     // Allow downloading from trash (don't filter by deletedAt).
-    const doc = await withRLS((db: any) =>
+    const doc = await withRLS((db) =>
       db.select()
         .from(documents)
         .where(and(eq(documents.id, id), eq(documents.userId, user.id)))

@@ -4,10 +4,11 @@
 
 import { moduleSettings } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
+import type { DrizzleDb } from '@/lib/db'
 import { DEFAULT_DOCUMENTS_SETTINGS, MODULE_ID } from '../types'
 import type { DocumentsSettings } from '../types'
 
-type WithRLS = <T>(op: (db: any) => Promise<T>) => Promise<T>
+type WithRLS = <T>(op: (db: DrizzleDb) => Promise<T>) => Promise<T>
 
 export async function getDocumentsSettings(
   withRLS: WithRLS,

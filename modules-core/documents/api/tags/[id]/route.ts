@@ -85,7 +85,7 @@ export async function PATCH(
     const { name, color } = validation.data
 
     // Verify tag exists and belongs to user
-    const existing = await withRLS((db: any) =>
+    const existing = await withRLS((db) =>
       db.select()
         .from(documentTags)
         .where(and(
@@ -101,7 +101,7 @@ export async function PATCH(
 
     // If renaming, check that new name doesn't conflict among this user's tags
     if (name && name !== existing[0].name) {
-      const nameConflict = await withRLS((db: any) =>
+      const nameConflict = await withRLS((db) =>
         db.select()
           .from(documentTags)
           .where(and(
@@ -125,7 +125,7 @@ export async function PATCH(
     }
 
     // Update tag
-    const updated = await withRLS((db: any) =>
+    const updated = await withRLS((db) =>
       db.update(documentTags)
         .set(updateData)
         .where(and(eq(documentTags.id, id), eq(documentTags.userId, user.id)))
@@ -163,7 +163,7 @@ export async function DELETE(
     }
 
     // Cascade will remove assignments. Returning gives us the rowcount for 404.
-    const deleted = await withRLS((db: any) =>
+    const deleted = await withRLS((db) =>
       db.delete(documentTags)
         .where(and(eq(documentTags.id, id), eq(documentTags.userId, user.id)))
         .returning({ id: documentTags.id })

@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       cutoffDate.setDate(cutoffDate.getDate() - TRASH_RETENTION_DAYS)
       const cutoffStr = cutoffDate.toISOString()
 
-      docsToDelete = await withRLS((db: any) =>
+      docsToDelete = await withRLS((db) =>
         db.select()
           .from(documents)
           .where(and(
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
           ))
       )
 
-      foldersToDelete = await withRLS((db: any) =>
+      foldersToDelete = await withRLS((db) =>
         db.select()
           .from(documentFolders)
           .where(and(
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       )
     } else {
       // Manual empty: delete all items in this user's trash
-      docsToDelete = await withRLS((db: any) =>
+      docsToDelete = await withRLS((db) =>
         db.select()
           .from(documents)
           .where(and(
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
           ))
       )
 
-      foldersToDelete = await withRLS((db: any) =>
+      foldersToDelete = await withRLS((db) =>
         db.select()
           .from(documentFolders)
           .where(and(
@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
     // Batch-delete document records (single statement)
     if (docsToDelete.length > 0) {
       const docIds = docsToDelete.map((d: any) => d.id)
-      await withRLS((db: any) =>
+      await withRLS((db) =>
         db.delete(documents)
           .where(and(
             eq(documents.userId, user.id),
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
     // Batch-delete folder records (single statement)
     if (foldersToDelete.length > 0) {
       const folderIds = foldersToDelete.map((f: any) => f.id)
-      await withRLS((db: any) =>
+      await withRLS((db) =>
         db.delete(documentFolders)
           .where(and(
             eq(documentFolders.userId, user.id),
@@ -202,7 +202,7 @@ export async function DELETE(request: NextRequest) {
 
     if (type === 'document') {
       // Get document — scoped to user
-      const doc = await withRLS((db: any) =>
+      const doc = await withRLS((db) =>
         db.select()
           .from(documents)
           .where(and(
@@ -229,7 +229,7 @@ export async function DELETE(request: NextRequest) {
       }
 
       // Delete record
-      await withRLS((db: any) =>
+      await withRLS((db) =>
         db.delete(documents)
           .where(and(eq(documents.id, id), eq(documents.userId, user.id)))
       )
@@ -240,7 +240,7 @@ export async function DELETE(request: NextRequest) {
       })
     } else if (type === 'folder') {
       // Get folder — scoped to user
-      const folder = await withRLS((db: any) =>
+      const folder = await withRLS((db) =>
         db.select()
           .from(documentFolders)
           .where(and(
@@ -256,7 +256,7 @@ export async function DELETE(request: NextRequest) {
       }
 
       // Delete record (documents should already be soft-deleted)
-      await withRLS((db: any) =>
+      await withRLS((db) =>
         db.delete(documentFolders)
           .where(and(eq(documentFolders.id, id), eq(documentFolders.userId, user.id)))
       )

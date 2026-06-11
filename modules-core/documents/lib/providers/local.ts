@@ -47,7 +47,7 @@ export class LocalFilesystemProvider implements StorageProviderInterface {
     content: Buffer | Blob,
     contentType: string
   ): Promise<{ path: string; size: number }> {
-    const body = content instanceof Buffer ? content : Buffer.from(await content.arrayBuffer())
+    const body = Buffer.isBuffer(content) ? content : Buffer.from(await content.arrayBuffer())
     const result = await this.ari.upload(userId, this.bucket, filename, body, contentType)
     return { path: `${userId}/${result.name}`, size: body.length }
   }
