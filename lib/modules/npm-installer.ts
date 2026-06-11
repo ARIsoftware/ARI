@@ -68,6 +68,27 @@ type InstallOpts = {
 let installQueue: Promise<unknown> = Promise.resolve()
 let queueActive = false
 
+/** Returns an error message for the first invalid dependency entry, or null if all are valid. */
+export function validateNpmDeps(moduleId: string, entries: Array<[string, unknown]>): string | null {
+  if (entries.length > MAX_DEPS_PER_MODULE) {
+    return `Module ${moduleId} declares ${entries.length} npm dependencies; limit is ${MAX_DEPS_PER_MODULE}.`
+  }
+  for (const [name, spec] of entries) {
+    if (!NPM_NAME_RE.test(name)) {
+      return `Invalid npm package name: "${name}"`
+    }
+    if (typeof spec !== 'string' || spec.length === 0 || spec.length > 100) {
+      return `Invalid version spec for "${name}": "${spec}"`
+    }
+    for (const token of FORBIDDEN_SPEC_TOKENS) {
+      if (spec.includes(token)) {
+        return `Forbidden version spec for "${name}": "${spec}" (contains ${token})`
+      }
+    }
+  }
+  return null
+}
+
 export async function installModuleNpmDeps(
   moduleId: string,
   deps: Record<string, string> | undefined,
@@ -81,28 +102,9 @@ export async function installModuleNpmDeps(
     return { ok: true, installed: [], alreadySatisfied: [], skipped: 'empty' }
   }
 
-  if (entries.length > MAX_DEPS_PER_MODULE) {
-    return {
-      ok: false,
-      error: `Module ${moduleId} declares ${entries.length} npm dependencies; limit is ${MAX_DEPS_PER_MODULE}.`,
-    }
-  }
-
-  for (const [name, spec] of entries) {
-    if (!NPM_NAME_RE.test(name)) {
-      return { ok: false, error: `Invalid npm package name: "${name}"` }
-    }
-    if (typeof spec !== 'string' || spec.length === 0 || spec.length > 100) {
-      return { ok: false, error: `Invalid version spec for "${name}": "${spec}"` }
-    }
-    for (const token of FORBIDDEN_SPEC_TOKENS) {
-      if (spec.includes(token)) {
-        return {
-          ok: false,
-          error: `Forbidden version spec for "${name}": "${spec}" (contains ${token})`,
-        }
-      }
-    }
+  const validationError = validateNpmDeps(moduleId, entries)
+  if (validationError !== null) {
+    return { ok: false, error: validationError }
   }
 
   if (opts.isVercel && opts.githubConfigured === false) {

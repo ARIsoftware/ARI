@@ -52,6 +52,15 @@ function stripSqlComments(sql: string): string {
     .replace(/--[^\n]*/g, '')
 }
 
+/** Returns the name of the first forbidden pattern found, or null if the SQL is safe. */
+export function scanForForbiddenSql(sqlText: string): string | null {
+  const scanText = stripSqlComments(sqlText)
+  for (const { name, regex } of FORBIDDEN_PATTERNS) {
+    if (regex.test(scanText)) return name
+  }
+  return null
+}
+
 /**
  * Run a SQL string against the database inside a single transaction.
  * Applies the same safety scan and "already exists is harmless" semantics
@@ -61,13 +70,11 @@ async function executeSchemaSql(
   moduleId: string,
   sqlText: string
 ): Promise<SchemaInstallResult> {
-  const scanText = stripSqlComments(sqlText)
-  for (const { name, regex } of FORBIDDEN_PATTERNS) {
-    if (regex.test(scanText)) {
-      const msg = `refused — forbidden destructive statement detected (${name})`
-      console.error(`[module-installer] ${moduleId}: ${msg}`)
-      return { ok: false, alreadyExisted: false, error: msg }
-    }
+  const forbiddenName = scanForForbiddenSql(sqlText)
+  if (forbiddenName !== null) {
+    const msg = `refused — forbidden destructive statement detected (${forbiddenName})`
+    console.error(`[module-installer] ${moduleId}: ${msg}`)
+    return { ok: false, alreadyExisted: false, error: msg }
   }
 
   let client
