@@ -5,7 +5,7 @@
  * Usage: ./ari start | stop | status | update
  */
 
-const { execSync, spawn } = require('child_process');
+const { execSync, spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
@@ -776,6 +776,8 @@ function redactDbUrl(url) {
 
 // Parse `tsc --noEmit` output into { core: N, modules: { fitness: N, ... } }.
 // Lines look like: modules-custom/fitness/app/chat/page.tsx(267,41): error TS2554: ...
+// The modules-(core|custom) directory names mirror MODULE_DIRECTORIES in
+// lib/modules/scanner.ts and scripts/generate-module-registry.js — keep in sync.
 function parseTscErrors(output) {
   const counts = { core: 0, modules: {} };
   for (const line of String(output || '').split('\n')) {
@@ -896,34 +898,33 @@ async function doctor() {
 
   // TypeScript — type errors don't affect `ari start`, but they block
   // production builds/deploys since the typecheck gate landed.
-  process.stdout.write('  ' + DIM + 'Running TypeScript check (can take ~a minute)...' + RESET + '\r');
   const tscBin = path.join(ROOT, 'node_modules', '.bin', IS_WIN ? 'tsc.cmd' : 'tsc');
   if (!fs.existsSync(tscBin)) {
     warn('TypeScript', 'skipped — run pnpm install first');
   } else {
+    process.stdout.write('  ' + DIM + 'Running TypeScript check (can take ~a minute)...' + RESET + '\r');
     // Regenerate the module registry first (same as predev / instrumentation.ts),
     // so a fresh clone that never ran `pnpm dev` doesn't report false errors
     // about missing generated files (lib/generated/*, schema barrel).
-    const regen = require('child_process').spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'generate-module-registry.js')], { cwd: ROOT, encoding: 'utf8', timeout: 60000 });
-    if (regen.status !== 0) {
-      process.stdout.write(' '.repeat(60) + '\r'); // clear the progress line
+    const regen = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'generate-module-registry.js')], { cwd: ROOT, encoding: 'utf8', timeout: 60000 });
+    const tsc = regen.status === 0
+      ? spawnSync(tscBin, ['--noEmit'], { cwd: ROOT, encoding: 'utf8', timeout: 300000 })
+      : null;
+    process.stdout.write(' '.repeat(60) + '\r'); // clear the progress line
+    if (!tsc) {
       warn('TypeScript', 'skipped — module registry generation failed');
+    } else if (tsc.status === 0) {
+      ok('TypeScript', 'no type errors');
     } else {
-      const tsc = require('child_process').spawnSync(tscBin, ['--noEmit'], { cwd: ROOT, encoding: 'utf8', timeout: 300000 });
-      process.stdout.write(' '.repeat(60) + '\r'); // clear the progress line
-      if (tsc.status === 0) {
-        ok('TypeScript', 'no type errors');
-      } else {
-        const counts = parseTscErrors((tsc.stdout || '') + (tsc.stderr || ''));
-        for (const [id, n] of Object.entries(counts.modules)) {
-          fail('Module "' + id + '"', n + ' type error' + (n === 1 ? '' : 's') + ' — will block deploys (run: pnpm typecheck)');
-        }
-        if (counts.core > 0) {
-          fail('TypeScript (core)', counts.core + ' error' + (counts.core === 1 ? '' : 's') + ' — run pnpm typecheck for details');
-        }
-        if (counts.core === 0 && Object.keys(counts.modules).length === 0) {
-          warn('TypeScript', 'tsc failed but no errors parsed — run pnpm typecheck manually');
-        }
+      const counts = parseTscErrors((tsc.stdout || '') + (tsc.stderr || ''));
+      for (const [id, n] of Object.entries(counts.modules)) {
+        fail('Module "' + id + '"', n + ' type error' + (n === 1 ? '' : 's') + ' — will block deploys (run: pnpm typecheck)');
+      }
+      if (counts.core > 0) {
+        fail('TypeScript (core)', counts.core + ' error' + (counts.core === 1 ? '' : 's') + ' — run pnpm typecheck for details');
+      }
+      if (counts.core === 0 && Object.keys(counts.modules).length === 0) {
+        warn('TypeScript', 'tsc failed but no errors parsed — run pnpm typecheck manually');
       }
     }
   }
