@@ -34,6 +34,9 @@ Desktop.ini
 FIX_PLAN.md
 .code-review/
 !.agents/commands/*.md
+
+# Local planning scratch dir
+plans/
 !.claude/commands/*.md
 !.codex/prompts/*.md
 
