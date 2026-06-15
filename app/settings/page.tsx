@@ -25,6 +25,7 @@ import {
   NotificationsTab,
   SecurityTab,
   IntegrationsTab,
+  EmailTab,
   StorageTab,
   ApiTab,
   GitTab,
@@ -48,6 +49,7 @@ const SETTINGS_TABS = [
   "keybindings",
   "notifications",
   "integrations",
+  "email",
   "security",
   "storage",
   "api",
@@ -470,7 +472,8 @@ function SettingsPageContent(): React.ReactElement {
                     <TabsTrigger value="themes">Themes</TabsTrigger>
                     <TabsTrigger value="keybindings">Shortcuts</TabsTrigger>
                     {/* <TabsTrigger value="notifications">Notifications</TabsTrigger> */}
-                    <TabsTrigger value="integrations">Integrations</TabsTrigger>
+                    <TabsTrigger value="integrations">AI Providers</TabsTrigger>
+                    <TabsTrigger value="email">Email</TabsTrigger>
                     <TabsTrigger value="security">Security</TabsTrigger>
                     <TabsTrigger value="storage">Storage</TabsTrigger>
                     <TabsTrigger value="api">API</TabsTrigger>
@@ -536,6 +539,10 @@ function SettingsPageContent(): React.ReactElement {
 
                 <TabsContent value="integrations">
                   <IntegrationsTab />
+                </TabsContent>
+
+                <TabsContent value="email">
+                  <EmailTab />
                 </TabsContent>
 
                 <TabsContent value="api">

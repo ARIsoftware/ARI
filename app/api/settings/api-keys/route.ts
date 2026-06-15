@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from "@/lib/auth-helpers"
 import { withAdminDb } from "@/lib/db"
 import { moduleSettings } from "@/lib/db/schema"
-import { eq, and } from "drizzle-orm"
+import { eq, and, sql } from "drizzle-orm"
 import { encrypt, decrypt, isEncrypted } from "@/lib/crypto"
 import { INTEGRATIONS_MODULE_ID } from "@/lib/constants"
+import {
+  AI_PROVIDER_SECRET_ENV_KEYS,
+  AI_PROVIDER_PLAINTEXT_ENV_KEYS,
+} from "@/lib/ai-providers"
 import {
   settingsApiKeyBodySchema,
   SettingsApiKeyStatusSchema,
@@ -18,7 +22,7 @@ registry.registerPath({
   path: '/api/settings/api-keys',
   operationId: 'getIntegrationKeysStatus',
   summary: 'Get configured-and-masked status for each LLM provider API key + model name',
-  description: 'Use ?reveal=KEY_NAME to retrieve the decrypted value of a single secret key (model keys return plaintext masked field).',
+  description: 'Returns per-key { configured, masked } status only. Secret values are never returned in full — model/plaintext keys return their value in the masked field.',
   tags: ['app'],
   security: DEFAULT_SECURITY,
   responses: {
@@ -43,20 +47,15 @@ registry.registerPath({
 })
 
 const SECRET_KEYS = new Set([
-  "OPENROUTER_API_KEY",
-  "ANTHROPIC_API_KEY",
-  "OPENAI_API_KEY",
-  "GOOGLE_GEMINI_API_KEY",
+  ...AI_PROVIDER_SECRET_ENV_KEYS,
   "RESEND_API_KEY",
   "RESEND_WEBHOOK_SECRET",
 ])
 
-const MODEL_KEYS = new Set([
-  "OPENROUTER_MODEL",
-  "ANTHROPIC_MODEL",
-  "OPENAI_MODEL",
-  "GOOGLE_GEMINI_MODEL",
-])
+// Plaintext config values — stored unencrypted, returned in `masked` verbatim,
+// rendered with a plain text input. Model names and the Ollama base URL all
+// fall in this bucket (neither is a secret).
+const MODEL_KEYS = new Set(AI_PROVIDER_PLAINTEXT_ENV_KEYS)
 
 const ALLOWED_KEYS = new Set([...SECRET_KEYS, ...MODEL_KEYS])
 
@@ -84,52 +83,67 @@ async function readSettings(userId: string): Promise<Record<string, unknown>> {
   return (rows[0]?.settings ?? {}) as Record<string, unknown>
 }
 
-async function writeSettings(userId: string, settings: Record<string, unknown>) {
+/**
+ * Atomically merge a single key into the integrations settings blob.
+ *
+ * Uses a SQL-level JSONB merge (`existing || patch`) inside the upsert rather
+ * than a read-modify-write in JS. This is what makes concurrent saves safe: the
+ * IntegrationsTab fires one POST per dirty field in parallel (e.g. an API key
+ * and its model name from a single Save click), and a JS merge would let the
+ * last writer overwrite the whole blob and drop the others' keys. The `||`
+ * merge lets each write land independently.
+ */
+async function upsertKey(userId: string, key: string, storedValue: string) {
+  const patch = JSON.stringify({ [key]: storedValue })
   await withAdminDb(async (db) =>
     db.insert(moduleSettings)
       .values({
         userId,
         moduleId: INTEGRATIONS_MODULE_ID,
         enabled: true,
-        settings,
+        settings: { [key]: storedValue },
       })
       .onConflictDoUpdate({
         target: [moduleSettings.userId, moduleSettings.moduleId],
         set: {
-          settings,
+          settings: sql`COALESCE(${moduleSettings.settings}, '{}'::jsonb) || ${patch}::jsonb`,
           updatedAt: new Date().toISOString(),
         },
       })
   )
 }
 
-export async function GET(request: NextRequest) {
+/**
+ * Atomically remove a single key (JSONB `-`). Same race-safety rationale as
+ * upsertKey. A missing row is a no-op — there is nothing to delete.
+ */
+async function deleteKey(userId: string, key: string) {
+  await withAdminDb(async (db) =>
+    db.update(moduleSettings)
+      .set({
+        settings: sql`COALESCE(${moduleSettings.settings}, '{}'::jsonb) - ${key}::text`,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(moduleSettings.userId, userId),
+          eq(moduleSettings.moduleId, INTEGRATIONS_MODULE_ID)
+        )
+      )
+  )
+}
+
+export async function GET() {
   const { user } = await getAuthenticatedUser()
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const { searchParams } = new URL(request.url)
-  const reveal = searchParams.get("reveal")
-
   const saved = await readSettings(user.id)
 
-  // Reveal a specific secret key's decrypted value (model keys aren't secret —
-  // their plaintext value is already in the masked field of the status response).
-  if (reveal && SECRET_KEYS.has(reveal)) {
-    const headers = { "Cache-Control": "no-store", "Pragma": "no-cache" }
-    const raw = saved[reveal]
-    if (typeof raw === "string") {
-      return NextResponse.json({ key: reveal, value: decryptValue(raw) }, { headers })
-    }
-    const envVal = process.env[reveal]
-    if (envVal) {
-      return NextResponse.json({ key: reveal, value: envVal }, { headers })
-    }
-    return NextResponse.json({ key: reveal, value: null }, { headers })
-  }
-
-  // Return status for all keys.
+  // Status only — secret values are never returned in full. (There is
+  // deliberately no reveal endpoint: the UI shows the masked value and nothing
+  // more, so a stored or env-configured secret can't be read back out.)
   // Secret keys: { configured, masked: "abcd••••wxyz" }
   // Model keys:  { configured, masked: "claude-sonnet-4-5" } — plaintext, not a secret.
   const result: Record<string, { configured: boolean; masked: string | null }> = {}
@@ -169,9 +183,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
   }
 
-  const existing = await readSettings(user.id)
-
-  // Handle API key save
   const key = typeof body.key === "string" ? body.key.trim() : ""
   const value = typeof body.value === "string" ? body.value.trim() : ""
 
@@ -179,18 +190,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid key" }, { status: 400 })
   }
 
-  // Empty value = delete the key
+  // Empty value = delete the key (atomic JSONB minus).
   if (!value) {
-    const { [key]: _, ...rest } = existing
-    await writeSettings(user.id, rest as Record<string, unknown>)
+    await deleteKey(user.id, key)
     return NextResponse.json({ success: true, deleted: true })
   }
 
-  // Model values are not secrets — store plaintext so the UI can show them.
-  // API keys are encrypted at rest.
+  // Model/plaintext values are stored verbatim so the UI can echo them back;
+  // secrets are encrypted at rest. The write is an atomic JSONB merge, so two
+  // parallel POSTs (e.g. key + model) from one Save can't drop each other.
   const stored = MODEL_KEYS.has(key) ? value : encrypt(value)
-  const merged = { ...existing, [key]: stored }
-  await writeSettings(user.id, merged)
+  await upsertKey(user.id, key, stored)
 
   return NextResponse.json({
     success: true,

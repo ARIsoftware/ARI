@@ -56,6 +56,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { API_INTEGRATIONS_DOCS_URL } from '@/lib/constants'
 import { AI_PROVIDERS, type AiProviderId } from '@/lib/ai-providers'
 import { useApiKeysStatus } from '@/hooks/use-api-keys-status'
 
@@ -131,7 +132,7 @@ export function AiProviderCard({
             </Button>
             <Button asChild size="sm" variant="secondary">
               <a
-                href="https://ari.software/docs/api-integrations"
+                href={API_INTEGRATIONS_DOCS_URL}
                 target="_blank"
                 rel="noopener noreferrer"
               >
