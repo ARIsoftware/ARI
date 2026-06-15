@@ -1888,6 +1888,35 @@ export default MyModuleSettings
 
 **Required exports**: Both named and default exports.
 
+### AI Providers Card (shared component)
+
+If your module calls an LLM, let the user pick which provider it should use with the **shared** `AiProviderCard` — do **not** rebuild the provider grid in each module. It lives once in the core app at `components/ai-provider-card.tsx` and every module imports the same component, so any future change (new providers, restyling, copy tweaks) rolls out everywhere at once.
+
+```tsx
+import { AiProviderCard } from '@/components/ai-provider-card'
+import type { AiProviderId } from '@/lib/ai-providers'
+
+// In your settings panel, with `settings.selectedAiProvider: AiProviderId | null`:
+<AiProviderCard
+  value={settings.selectedAiProvider}
+  onChange={(id) => updateSetting('selectedAiProvider', id)}
+  // Optional — renders an embedded Save button inside the card. Omit it when
+  // your settings page already has its own page-level Save.
+  onSave={handleSave}
+  isSaving={updateSettings.isPending}
+  justSaved={saved}
+/>
+```
+
+**How it works:**
+
+- **Controlled component.** The host module owns the value. Store it as a `selectedAiProvider: AiProviderId | null` field on your `module_settings` JSON (the same place all your other settings live) and persist it however you already save settings.
+- **Only configured providers are offered.** The card reads `useApiKeysStatus()` and lists only providers that have an API key set under **Settings → Integrations**. If none are configured it shows an empty state linking the user there — you don't handle that case yourself.
+- **Auto-selects a lone provider.** When exactly one provider is configured and `value` is still `null`, the card fires `onChange` with that provider so the module defaults to the only available choice. It surfaces in your local state immediately and persists on your next save.
+- **`AiProviderId`** is the canonical provider-id union from `@/lib/ai-providers` (the single source of truth for the provider list). Use it for the settings field type and for any server-side handling.
+
+`AiProviderCard` only records *which* provider the module should use. Resolving the matching API key/model env vars and actually calling the provider at runtime is the module's own responsibility.
+
 ### Using Core App Features
 
 ```typescript

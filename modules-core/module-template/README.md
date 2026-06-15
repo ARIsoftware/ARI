@@ -44,6 +44,20 @@ This is a fully-featured example module demonstrating all capabilities of the AR
 - Text input settings
 - Proper state management
 - Save/load functionality
+- **AI Provider picker** via the shared `AiProviderCard` (see below)
+
+### 5a. **AI Provider Selection (shared `AiProviderCard`)**
+- The settings panel renders `AiProviderCard` from `@/components/ai-provider-card`
+  so the user can choose which AI provider this module should use.
+- **Shared, not duplicated:** the card lives once in the core app at
+  `components/ai-provider-card.tsx`. Every module imports the same component, so
+  updates (new providers, restyling) apply everywhere at once. Do not copy the
+  provider grid into a module.
+- It is a controlled component — the module stores the choice in its own
+  settings as `selectedAiProvider: AiProviderId | null` (see `types/index.ts`).
+- It lists only providers configured under Settings → Integrations, and
+  auto-selects the provider when exactly one is configured.
+- See `docs/MODULES.md` → "AI Providers Card (shared component)" for full usage.
 
 ### 6. **File Storage (ARI File Storage System)**
 - Example upload endpoint in `api/upload/route.ts`

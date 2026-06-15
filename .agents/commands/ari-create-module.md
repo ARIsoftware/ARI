@@ -76,6 +76,7 @@ Ask the user the following questions ONE AT A TIME, waiting for each answer befo
 6. **Onboarding**: Does this module need an onboarding/setup screen to collect initial configuration from the user? (e.g., asking for birthdate, preferences, API keys, etc.)
 7. **Dashboard Widget**: Should this module add a card or widget to the main Dashboard? If yes, describe what it should display (e.g., summary stat, chart, recent items list). There are two types: **stat cards** (small cards in the Quick Overview grid) and **widgets** (larger components in the content area below).
 8. **File Storage**: Does this module need to store files (images, documents, audio, etc.)? If yes, what types of files and are there any size limits? (Files are stored via the ARI File Storage System — works in all database modes with no extra configuration.)
+9. **AI Provider**: Should we add an AI Provider configuration screen where users can select the provider they want this module to use (e.g., Claude, Gemini, OpenAI)? (If yes, the settings panel includes the shared `AiProviderCard` — see "AI Provider Selection" below. Only ask/build this when the module actually calls an LLM.)
 
 If the user provides v0 code:
 - Read and analyze all provided v0 code files
@@ -576,6 +577,54 @@ If the module requires an onboarding/setup screen, follow the **Module Template 
 - **Settings API**: `modules-core/module-template/api/settings/route.ts`
 - **Hooks**: `modules-core/module-template/hooks/use-module-template.ts` (useModuleTemplateSettings, useUpdateModuleTemplateSettings)
 - **Types**: `modules-core/module-template/types/index.ts`
+
+## AI Provider Selection
+
+Only build this when the user answered **yes** to the AI Provider question (Q9) — i.e. the module actually calls an LLM. Do NOT add it to modules that never talk to a provider.
+
+**Never rebuild the provider grid inside a module.** ARI ships a single shared component, `components/ai-provider-card.tsx`, that every module imports. Building it once means a future change (new providers, restyle, copy) rolls out to all modules at once. Duplicating it defeats the entire purpose.
+
+### How to add it
+
+1. **Add the settings field.** In `types/index.ts`, add `selectedAiProvider: AiProviderId | null` to the module's settings interface and import the type:
+
+   ```typescript
+   import type { AiProviderId } from '@/lib/ai-providers'
+   // ...
+   selectedAiProvider: AiProviderId | null
+   ```
+
+   Add `selectedAiProvider: null` to the `DEFAULT_SETTINGS` constant in the settings panel.
+
+2. **Render the shared card** at the top of the module's settings panel (`components/settings-panel.tsx`):
+
+   ```tsx
+   import { AiProviderCard } from '@/components/ai-provider-card'
+
+   <AiProviderCard
+     value={settings.selectedAiProvider}
+     onChange={(id) => updateSetting('selectedAiProvider', id)}
+     onSave={handleSave}            // optional embedded Save button
+     isSaving={updateSettings.isPending}
+     justSaved={saved}
+   />
+   ```
+
+   Omit `onSave`/`isSaving`/`justSaved` if the settings page already has its own page-level Save that persists the whole settings object.
+
+### What the card does for you (don't re-implement)
+
+- **Controlled component.** The host module owns `selectedAiProvider` and persists it like any other setting — no new API route or table.
+- **Lists only configured providers.** It reads `useApiKeysStatus()` and shows only providers with an API key set under Settings → Integrations. If none are configured, it renders an empty state linking the user there.
+- **Auto-selects a lone provider.** When exactly one provider is configured and nothing is selected yet, the card calls `onChange` with that provider so the module defaults to the only available choice (persisted on the next save).
+- **Provider ids** come from `@/lib/ai-providers` (`AiProviderId`, `AI_PROVIDERS`) — the single source of truth. Never hard-code a provider list.
+
+The card only records *which* provider to use. Resolving that provider's API key/model env vars and actually calling the LLM at runtime is the module's own responsibility.
+
+### Reference
+- **Shared component**: `components/ai-provider-card.tsx`
+- **Live example**: `modules-core/module-template/components/settings-panel.tsx` (renders `AiProviderCard`)
+- **Provider list / types**: `lib/ai-providers.ts`
 
 ## Drizzle Numeric Column Handling
 
