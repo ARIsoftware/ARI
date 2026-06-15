@@ -14,6 +14,9 @@
  * - Component props (components)
  */
 
+import type { AiProviderId } from '@/lib/ai-providers'
+export type { AiProviderId }
+
 /**
  * ModuleTemplateEntry
  *
@@ -91,6 +94,8 @@ export interface ModuleTemplateSettings {
   // Dropdown settings
   theme: 'light' | 'dark' | 'auto'
   refreshInterval: '30' | '60' | '120'
+
+  selectedAiProvider: AiProviderId | null
 }
 
 /**

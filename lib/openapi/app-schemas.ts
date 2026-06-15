@@ -107,6 +107,17 @@ export const HealthAuthConfigSchema = z.object({
   }),
 }).openapi('HealthAuthConfig')
 
+export const HealthAiProvidersSchema = z.object({
+  status: z.enum(['ok', 'none']),
+  configuredCount: z.number().int().nonnegative(),
+  providers: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    configured: z.boolean(),
+    source: z.enum(['env', 'db']).nullable(),
+  })),
+}).openapi('HealthAiProviders')
+
 export const HealthModuleStatusSchema = z.object({
   authenticated: z.boolean(),
   userId: z.string().optional(),

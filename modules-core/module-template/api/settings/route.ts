@@ -67,7 +67,17 @@ export async function GET(request: NextRequest) {
         .limit(1)
     )
 
-    return NextResponse.json(data[0]?.settings ?? {})
+    // Strip system-managed bookkeeping keys (e.g. __schema_installed_hash) so
+    // they never reach config UIs. Settings panels merge whatever GET returns
+    // into form state and POST it back through a `.strict()` schema, which
+    // would reject these `__`-prefixed keys. They stay in the DB regardless —
+    // the PUT does a JSONB merge that preserves keys not present in the patch.
+    const raw = (data[0]?.settings ?? {}) as Record<string, unknown>
+    const settings = Object.fromEntries(
+      Object.entries(raw).filter(([key]) => !key.startsWith('__'))
+    )
+
+    return NextResponse.json(settings)
 
   } catch (error) {
     console.error('GET /api/modules/module-template/settings error:', error instanceof Error ? error.message : error)

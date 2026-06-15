@@ -865,6 +865,24 @@ async function doctor() {
       else if (key === 'BETTER_AUTH_SECRET') ok('  ' + key, '(set, ' + val.length + ' chars)');
       else ok('  ' + key, val);
     }
+
+    // AI Providers — informational only. Keys may instead be saved per-user in
+    // the DB (module_settings 'integrations'), which this offline check can't
+    // read, so the count reflects .env.local alone. Source of truth for the
+    // key list: lib/ai-providers.ts (keep in sync if providers are added).
+    const aiKeyEnv = [
+      'OPENROUTER_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_GEMINI_API_KEY',
+      'XAI_API_KEY', 'MISTRAL_API_KEY', 'DEEPSEEK_API_KEY', 'GROQ_API_KEY', 'PERPLEXITY_API_KEY',
+    ];
+    const aiSet = aiKeyEnv.filter((k) => readKey(content, k));
+    const ollamaUrl = readKey(content, 'OLLAMA_BASE_URL');
+    if (aiSet.length === 0 && !ollamaUrl) {
+      warn('AI Providers', 'none in .env.local (may be set in app settings)');
+    } else {
+      ok('AI Providers', aiSet.length + ' key' + (aiSet.length === 1 ? '' : 's') + ' in .env.local' + (ollamaUrl ? ' + Ollama URL' : ''));
+      for (const k of aiSet) ok('  ' + k, '(set)');
+      if (ollamaUrl) ok('  OLLAMA_BASE_URL', ollamaUrl);
+    }
   }
 
   // Live DB connectivity

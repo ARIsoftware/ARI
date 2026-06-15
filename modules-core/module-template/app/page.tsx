@@ -81,6 +81,11 @@ export default function ModuleTemplatePage() {
   const [newMessage, setNewMessage] = useState('')
   const [randomQuote, setRandomQuote] = useState<{ quote: string; author?: string } | null>(null)
 
+  // AI generation demo state — exercises the user's selected AI provider.
+  const [prompt, setPrompt] = useState('')
+  const [generating, setGenerating] = useState(false)
+  const [reply, setReply] = useState<{ text: string; provider: string; model: string } | null>(null)
+
   const [answers, setAnswers] = useState<Record<QuestionField, string>>(EMPTY_ANSWERS)
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<QuestionField, string>>>({})
   const [justSaved, setJustSaved] = useState(false)
@@ -204,6 +209,44 @@ export default function ModuleTemplatePage() {
         })
       },
     })
+  }
+
+  /**
+   * Generate a response using the user's selected AI provider.
+   * Hits the module's /generate route, which resolves the provider + key
+   * server-side. Surfaces the "no provider / no key" cases as toasts.
+   */
+  const handleGenerate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!prompt.trim() || generating) return
+
+    setGenerating(true)
+    setReply(null)
+    try {
+      const res = await fetch('/api/modules/module-template/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: prompt.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast({
+          variant: 'destructive',
+          title: 'Generation failed',
+          description: data?.error ?? 'Please try again.',
+        })
+        return
+      }
+      setReply(data)
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: 'Generation failed',
+        description: 'Check your connection and try again.',
+      })
+    } finally {
+      setGenerating(false)
+    }
   }
 
   /**
@@ -408,6 +451,52 @@ export default function ModuleTemplatePage() {
               )}
             </Button>
           </form>
+        </CardContent>
+      </Card>
+
+      {/* AI Generation Demo — exercises the selected AI provider end-to-end */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-primary" />
+            AI Generation
+          </CardTitle>
+          <CardDescription>
+            Generate a response using the AI provider selected in this module&apos;s settings.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <form onSubmit={handleGenerate} className="flex gap-2">
+            <Input
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Ask the model something..."
+              disabled={generating}
+              maxLength={2000}
+              className="flex-1"
+            />
+            <Button type="submit" disabled={generating || !prompt.trim()}>
+              {generating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Generate
+                </>
+              )}
+            </Button>
+          </form>
+          {reply && (
+            <div className="rounded-lg border bg-muted/40 p-4">
+              <p className="whitespace-pre-wrap text-sm">{reply.text}</p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                via {reply.provider} · {reply.model}
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

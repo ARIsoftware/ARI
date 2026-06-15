@@ -289,6 +289,14 @@ async function fetchEndpointsFromSpec(): Promise<EndpointsData | null> {
   return pendingFetch
 }
 
+// Dot + text colors for the AI Providers status chip, keyed by status.
+const AI_PROVIDERS_STATUS_STYLES = {
+  loading: { dot: 'bg-gray-300 animate-pulse', text: 'text-gray-400' },
+  ok: { dot: 'bg-green-500', text: 'text-green-600' },
+  none: { dot: 'bg-gray-400', text: 'text-gray-400' },
+  error: { dot: 'bg-red-500', text: 'text-red-600' },
+} as const
+
 export default function DatabaseTestPage() {
   // Use the global Supabase client from context (already authenticated)
   const { user, session } = useAuth()
@@ -323,6 +331,13 @@ export default function DatabaseTestPage() {
     resend: 'loading' | 'ok' | 'error' | 'not_set'
   }>({ database: 'loading', domain: { status: 'loading', hostname: '' }, resend: 'loading' })
 
+  // AI Providers status — how many provider keys are configured (env or saved).
+  const [aiProviders, setAiProviders] = useState<
+    | { status: 'loading' }
+    | { status: 'error' }
+    | { status: 'ok' | 'none'; configuredCount: number; providers: Array<{ id: string; name: string; configured: boolean; source: 'env' | 'db' | null }> }
+  >({ status: 'loading' })
+
   // Auto-run health checks on mount (all in parallel)
   useEffect(() => {
     // Domain is just the current origin — no API call needed
@@ -345,6 +360,17 @@ export default function DatabaseTestPage() {
         database: dbResult.status === 'fulfilled' && dbResult.value.checks?.database?.status === 'ok' ? 'ok' : 'error',
         resend: resendResult.status === 'fulfilled' ? resendResult.value.status : 'error',
       }))
+
+      try {
+        const ai = await fetch(route('health-ai-providers')).then(r => r.json())
+        setAiProviders(
+          typeof ai?.configuredCount === 'number'
+            ? { status: ai.status, configuredCount: ai.configuredCount, providers: ai.providers ?? [] }
+            : { status: 'error' }
+        )
+      } catch {
+        setAiProviders({ status: 'error' })
+      }
     }
     runHealthChecks()
     // Endpoints tab data loads on demand via the "Load Endpoints Data" button.
@@ -2353,6 +2379,26 @@ export default function DatabaseTestPage() {
              healthChecks.resend === 'not_set' ? 'Not configured' : 'Error'}
           </span>
         </div>
+
+        {/* AI Providers */}
+        {(() => {
+          const style = AI_PROVIDERS_STATUS_STYLES[aiProviders.status]
+          const label =
+            aiProviders.status === 'loading' ? 'Checking...' :
+            aiProviders.status === 'ok' ? `${aiProviders.configuredCount} configured` :
+            aiProviders.status === 'none' ? 'None configured' : 'Error'
+          const title =
+            aiProviders.status === 'ok' || aiProviders.status === 'none'
+              ? aiProviders.providers.filter(p => p.configured).map(p => `${p.name} (${p.source})`).join(', ') || 'None configured'
+              : undefined
+          return (
+            <div className="flex items-center gap-2.5 rounded-lg border px-4 py-2.5" title={title}>
+              <div className={`w-2.5 h-2.5 rounded-full ${style.dot}`} />
+              <span className="text-sm font-medium">AI Providers</span>
+              <span className={`text-xs ${style.text}`}>{label}</span>
+            </div>
+          )
+        })()}
       </div>
 
       {/* Tabs */}

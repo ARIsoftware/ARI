@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import '@/lib/openapi/registry'
 import { safeText } from '@/lib/validation'
+import { AI_PROVIDER_IDS } from '@/lib/ai-providers'
 
 const uuidSchema = z.string().uuid('Invalid entry id format')
 
@@ -55,11 +56,22 @@ export const ModuleTemplateSettingsSchema = z.object({
   userDisplayName: safeText(100).optional(),
   theme: z.enum(['light', 'dark', 'auto']).optional(),
   refreshInterval: z.enum(['30', '60', '120']).optional(),
+  selectedAiProvider: z.enum(AI_PROVIDER_IDS).nullable().optional(),
 }).strict().openapi('ModuleTemplateSettings')
 
 export const SettingsSavedSchema = z.object({
   success: z.literal(true),
 }).openapi('ModuleTemplateSettingsSaved')
+
+export const GenerateRequestSchema = z.object({
+  prompt: z.string().min(1, 'Prompt is required').max(2000, 'Prompt must be 2000 characters or fewer'),
+}).openapi('ModuleTemplateGenerateRequest')
+
+export const GenerateResponseSchema = z.object({
+  text: z.string(),
+  provider: z.enum(AI_PROVIDER_IDS),
+  model: z.string(),
+}).openapi('ModuleTemplateGenerateResponse')
 
 // Multipart file upload — represented as binary string per OpenAPI conventions.
 export const UploadFormSchema = z.object({

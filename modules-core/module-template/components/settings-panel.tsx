@@ -17,7 +17,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -29,12 +37,46 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
-import { Loader2, Save, CheckCircle2 } from 'lucide-react'
+import {
+  Loader2,
+  Save,
+  CheckCircle2,
+  Check,
+  Sparkles,
+  Bot,
+  Layers,
+  Network,
+  Atom,
+  Wind,
+  Search,
+  Zap,
+  Compass,
+  Server,
+  ExternalLink,
+  Plug,
+  type LucideIcon,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { AI_PROVIDERS, type AiProviderId } from '@/lib/ai-providers'
+import { useApiKeysStatus } from '@/hooks/use-api-keys-status'
 import {
   useModuleTemplateSettings,
   useUpdateModuleTemplateSettings,
 } from '../hooks/use-module-template'
 import type { ModuleTemplateSettings } from '../types'
+
+const PROVIDER_ICONS: Record<AiProviderId, LucideIcon> = {
+  openrouter: Network,
+  claude: Sparkles,
+  openai: Bot,
+  gemini: Layers,
+  xai: Atom,
+  mistral: Wind,
+  deepseek: Search,
+  groq: Zap,
+  perplexity: Compass,
+  ollama: Server,
+}
 
 /**
  * Default settings values
@@ -52,7 +94,8 @@ const DEFAULT_SETTINGS: ModuleTemplateSettings = {
   defaultMessage: 'Hello, World!',
   userDisplayName: '',
   theme: 'auto',
-  refreshInterval: '60'
+  refreshInterval: '60',
+  selectedAiProvider: null,
 }
 
 /**
@@ -68,16 +111,22 @@ export function ModuleTemplateSettingsPanel() {
   const { data: savedSettings, isLoading } = useModuleTemplateSettings()
   const updateSettings = useUpdateModuleTemplateSettings()
 
-  // Local state for form (merged with defaults)
   const [settings, setSettings] = useState<ModuleTemplateSettings>(DEFAULT_SETTINGS)
   const [saved, setSaved] = useState(false)
 
-  // Update local state when saved settings load
+  const { data: providerKeys = {} } = useApiKeysStatus()
+
   useEffect(() => {
     if (savedSettings) {
       setSettings({ ...DEFAULT_SETTINGS, ...savedSettings })
     }
   }, [savedSettings])
+
+  // Only providers with an API key configured are offered for selection;
+  // unconfigured ones are set up via Settings → Integrations first.
+  const configuredProviders = AI_PROVIDERS.filter(
+    p => providerKeys[p.primaryEnvKey]?.configured ?? false,
+  )
 
   /**
    * Save settings
@@ -125,19 +174,149 @@ export function ModuleTemplateSettingsPanel() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h3 className="text-lg font-medium">Module Template Settings</h3>
-        <p className="text-sm text-muted-foreground">
-          Configure your Module Template module preferences
-        </p>
-      </div>
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-1.5">
+              <CardTitle>AI Providers</CardTitle>
+              <CardDescription>
+                Configure the AI Providers to use with this module.
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
+              <Button asChild size="sm">
+                <Link href="/settings?tab=integrations">Manage Providers</Link>
+              </Button>
+              <Button asChild size="sm" variant="secondary">
+                <a
+                  href="https://ari.software/docs/api-integrations"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  View Documentation
+                  <ExternalLink className="ml-1 h-3.5 w-3.5" />
+                </a>
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {configuredProviders.length === 0 ? (
+            // Empty state: no API keys configured anywhere in ARI yet.
+            // Replaces the whole card body with a single clear call to action.
+            <div className="flex flex-col items-center rounded-xl border border-dashed px-6 py-12 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                <Plug className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <p className="mt-4 text-sm font-medium">
+                You have not setup any AI Providers yet.
+              </p>
+              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                Add an API key for a provider and it will appear here, ready to
+                use with this module.
+              </p>
+              <Button asChild className="mt-5">
+                <Link href="/settings?tab=integrations">Set up AI Providers</Link>
+              </Button>
+            </div>
+          ) : (
+            <>
+          <div className="rounded-xl border bg-muted/30 p-5">
+            <p className="text-sm font-medium text-foreground">
+              Choose the AI Provider that this module should use. You can add or manage additional AI Providers in{' '}
+              <Link
+                href="/settings?tab=integrations"
+                className="underline underline-offset-4 hover:text-foreground/80"
+              >
+                ARI settings
+              </Link>
+              .
+            </p>
+          </div>
 
-      {/* Settings Form */}
-      <div className="space-y-6">
-        {/* Section 1: Feature Toggles */}
-        <div className="space-y-4">
-          <h4 className="text-sm font-medium text-muted-foreground">Features</h4>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {configuredProviders.map(({ id, name, description }) => {
+                const Icon = PROVIDER_ICONS[id]
+                const selected = settings.selectedAiProvider === id
+                // Selected: filled check. Otherwise an empty radio circle that
+                // highlights on hover — signals "click to select".
+                const badge = selected ? (
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-600 text-white">
+                    <Check className="h-3.5 w-3.5" />
+                  </span>
+                ) : (
+                  <span className="h-5 w-5 rounded-full border-2 border-muted-foreground/40 transition-colors group-hover:border-green-600" />
+                )
+
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() =>
+                      updateSetting('selectedAiProvider', selected ? null : id)
+                    }
+                    className={cn(
+                      'group relative flex flex-col gap-3 rounded-xl border p-4 text-left transition',
+                      selected
+                        ? // Same green as enabled provider cards on /settings?tab=integrations
+                          'border-green-600/40 bg-green-600/40'
+                        : 'cursor-pointer border-border bg-card shadow-sm hover:border-green-600/50 hover:shadow-md',
+                    )}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                        <Icon className="h-5 w-5 text-foreground/80" />
+                      </div>
+                      {badge}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{name}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {description}
+                      </p>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="flex items-center gap-2 border-t pt-4">
+              <Button onClick={handleSave} disabled={updateSettings.isPending}>
+                {updateSettings.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : saved ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 mr-2 text-green-600" />
+                    Saved!
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save
+                  </>
+                )}
+              </Button>
+            </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Module Settings</CardTitle>
+          <CardDescription>
+            Customize how the Module Template module works for you
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium text-muted-foreground">Features</h4>
 
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
@@ -249,51 +428,50 @@ export function ModuleTemplateSettingsPanel() {
             </p>
           </div>
         </div>
-      </div>
 
-      {/* Save Button */}
-      <div className="flex items-center gap-2 pt-4 border-t">
-        <Button onClick={handleSave} disabled={updateSettings.isPending}>
-          {updateSettings.isPending ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Saving...
-            </>
-          ) : saved ? (
-            <>
-              <CheckCircle2 className="w-4 h-4 mr-2 text-green-600" />
-              Saved!
-            </>
-          ) : (
-            <>
-              <Save className="w-4 h-4 mr-2" />
-              Save Settings
-            </>
-          )}
-        </Button>
+          <div className="flex items-center gap-2 pt-4 border-t">
+            <Button onClick={handleSave} disabled={updateSettings.isPending}>
+              {updateSettings.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : saved ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 mr-2 text-green-600" />
+                  Saved!
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Settings
+                </>
+              )}
+            </Button>
 
-        {saved && (
-          <span className="text-sm text-green-600">
-            Settings saved successfully
-          </span>
-        )}
-      </div>
-
-      {/* Developer Info */}
-      <div className="pt-4 border-t">
-        <details className="text-sm">
-          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-            Developer Information
-          </summary>
-          <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-            <p>• Settings stored in: <code>module_settings.settings</code> (JSONB)</p>
-            <p>• API endpoint: <code>/api/modules/module-template/settings</code></p>
-            <p>• User-specific: Each user has their own settings</p>
-            <p>• Default values: Defined in DEFAULT_SETTINGS constant</p>
-            <p>• Auth: Better Auth cookies (no Authorization header needed)</p>
+            {saved && (
+              <span className="text-sm text-green-600">
+                Settings saved successfully
+              </span>
+            )}
           </div>
-        </details>
-      </div>
+
+          <div className="pt-4 border-t">
+            <details className="text-sm">
+              <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                Developer Information
+              </summary>
+              <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                <p>• Settings stored in: <code>module_settings.settings</code> (JSONB)</p>
+                <p>• API endpoint: <code>/api/modules/module-template/settings</code></p>
+                <p>• User-specific: Each user has their own settings</p>
+                <p>• Default values: Defined in DEFAULT_SETTINGS constant</p>
+                <p>• Auth: Better Auth cookies (no Authorization header needed)</p>
+              </div>
+            </details>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
