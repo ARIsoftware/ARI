@@ -8,7 +8,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { toSnakeCase } from '@/lib/api-helpers'
+import { toSnakeCase, createErrorResponse } from '@/lib/api-helpers'
+import { safeErrorResponse } from '@/lib/api-error'
 import {
   createCollectionSchema as CreateCollectionSchema,
   CollectionListResponseSchema,
@@ -17,7 +18,7 @@ import {
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { knowledgeCollections, knowledgeArticles } from '@/lib/db/schema'
-import { eq, asc, desc } from 'drizzle-orm'
+import { eq, and, asc, desc, sql } from 'drizzle-orm'
 
 registry.registerPath({
   method: 'get',
@@ -63,25 +64,33 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get collections (RLS filters automatically)
+    // Explicit user_id filter is mandatory (BYPASSRLS — see docs/SECURITY.md)
     const collections = await withRLS((db) =>
       db.select()
         .from(knowledgeCollections)
+        .where(eq(knowledgeCollections.userId, user.id))
         .orderBy(asc(knowledgeCollections.sortOrder), asc(knowledgeCollections.name))
     )
 
-    // Get article counts for each collection (RLS filters automatically)
-    const articles = await withRLS((db) =>
-      db.select({ collectionId: knowledgeArticles.collectionId })
+    // Article counts per collection, aggregated in the DB (GROUP BY) rather than
+    // by pulling every article row into the app.
+    const counts = await withRLS((db) =>
+      db.select({
+        collectionId: knowledgeArticles.collectionId,
+        count: sql<number>`count(*)::int`,
+      })
         .from(knowledgeArticles)
-        .where(eq(knowledgeArticles.isDeleted, false))
+        .where(and(
+          eq(knowledgeArticles.userId, user.id),
+          eq(knowledgeArticles.isDeleted, false)
+        ))
+        .groupBy(knowledgeArticles.collectionId)
     )
 
-    // Calculate counts
     const countMap = new Map<string, number>()
-    for (const article of articles || []) {
-      if (article.collectionId) {
-        countMap.set(article.collectionId, (countMap.get(article.collectionId) || 0) + 1)
+    for (const row of counts) {
+      if (row.collectionId) {
+        countMap.set(row.collectionId, row.count)
       }
     }
 
@@ -96,11 +105,8 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('GET /api/modules/knowledge-manager/collections error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    console.error('GET /api/modules/knowledge-manager/collections error:', safeErrorResponse(error))
+    return createErrorResponse('Internal server error', 500)
   }
 }
 
@@ -133,10 +139,11 @@ export async function POST(request: NextRequest) {
 
     const { name, color, icon } = parseResult.data
 
-    // Get max sort_order (RLS filters automatically)
+    // Get max sort_order (explicit user_id filter — BYPASSRLS)
     const existing = await withRLS((db) =>
       db.select({ sortOrder: knowledgeCollections.sortOrder })
         .from(knowledgeCollections)
+        .where(eq(knowledgeCollections.userId, user.id))
         .orderBy(desc(knowledgeCollections.sortOrder))
         .limit(1)
     )
@@ -162,10 +169,7 @@ export async function POST(request: NextRequest) {
     )
 
   } catch (error) {
-    console.error('POST /api/modules/knowledge-manager/collections error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    console.error('POST /api/modules/knowledge-manager/collections error:', safeErrorResponse(error))
+    return createErrorResponse('Internal server error', 500)
   }
 }

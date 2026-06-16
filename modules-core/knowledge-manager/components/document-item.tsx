@@ -54,6 +54,7 @@ export function DocumentItem({
       <div className="flex items-start gap-2">
         <button
           onClick={onToggleFavorite}
+          aria-label={article.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
           className={`
             mt-0.5 shrink-0 transition-colors
             ${article.is_favorite

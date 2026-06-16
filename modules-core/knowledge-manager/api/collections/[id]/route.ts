@@ -8,7 +8,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { toSnakeCase } from '@/lib/api-helpers'
+import { toSnakeCase, createErrorResponse } from '@/lib/api-helpers'
+import { safeErrorResponse } from '@/lib/api-error'
 import {
   updateCollectionSchema as UpdateCollectionSchema,
   collectionIdParamSchema,
@@ -18,7 +19,7 @@ import {
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { knowledgeCollections } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -120,11 +121,14 @@ export async function PATCH(
       )
     }
 
-    // RLS automatically ensures user can only update their own collections
+    // Explicit user_id filter is mandatory (BYPASSRLS — see docs/SECURITY.md)
     const collection = await withRLS((db) =>
       db.update(knowledgeCollections)
         .set(updateData)
-        .where(eq(knowledgeCollections.id, id))
+        .where(and(
+          eq(knowledgeCollections.id, id),
+          eq(knowledgeCollections.userId, user.id)
+        ))
         .returning()
     )
 
@@ -138,11 +142,8 @@ export async function PATCH(
     return NextResponse.json({ collection: toSnakeCase(collection[0]) })
 
   } catch (error) {
-    console.error('PATCH /api/modules/knowledge-manager/collections/[id] error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    console.error('PATCH /api/modules/knowledge-manager/collections/[id] error:', safeErrorResponse(error))
+    return createErrorResponse('Internal server error', 500)
   }
 }
 
@@ -174,10 +175,13 @@ export async function DELETE(
       )
     }
 
-    // RLS automatically ensures user can only delete their own collections
+    // Explicit user_id filter is mandatory (BYPASSRLS — see docs/SECURITY.md)
     await withRLS((db) =>
       db.delete(knowledgeCollections)
-        .where(eq(knowledgeCollections.id, id))
+        .where(and(
+          eq(knowledgeCollections.id, id),
+          eq(knowledgeCollections.userId, user.id)
+        ))
     )
 
     return NextResponse.json({
@@ -186,10 +190,7 @@ export async function DELETE(
     })
 
   } catch (error) {
-    console.error('DELETE /api/modules/knowledge-manager/collections/[id] error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    console.error('DELETE /api/modules/knowledge-manager/collections/[id] error:', safeErrorResponse(error))
+    return createErrorResponse('Internal server error', 500)
   }
 }

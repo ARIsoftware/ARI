@@ -12,10 +12,10 @@ export const knowledgeCollections = pgTable("knowledge_collections", {
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [
 	index("idx_knowledge_collections_user_id").using("btree", table.userId.asc().nullsLast().op("text_ops")),
-	pgPolicy("knowledge_collections_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
-	pgPolicy("knowledge_collections_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
-	pgPolicy("knowledge_collections_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
-	pgPolicy("knowledge_collections_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("knowledge_collections_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("knowledge_collections_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("knowledge_collections_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("knowledge_collections_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
 ]);
 
 export const knowledgeArticles = pgTable("knowledge_articles", {
@@ -23,7 +23,7 @@ export const knowledgeArticles = pgTable("knowledge_articles", {
 	userId: text("user_id").notNull(),
 	title: varchar({ length: 255 }).notNull(),
 	content: text().default('').notNull(),
-	tags: text().array().default([""]).notNull(),
+	tags: text().array().default([]).notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	collectionId: uuid("collection_id"),
@@ -39,14 +39,15 @@ export const knowledgeArticles = pgTable("knowledge_articles", {
 	index("idx_knowledge_articles_status").using("btree", table.status.asc().nullsLast().op("text_ops")),
 	index("idx_knowledge_articles_tags").using("gin", table.tags.asc().nullsLast().op("array_ops")),
 	index("idx_knowledge_articles_user_id").using("btree", table.userId.asc().nullsLast().op("text_ops")),
+	index("idx_knowledge_articles_user_active_updated").using("btree", table.userId.asc().nullsLast().op("text_ops"), table.isDeleted.asc().nullsLast().op("bool_ops"), table.updatedAt.desc().nullsFirst().op("timestamptz_ops")),
 	foreignKey({
 			columns: [table.collectionId],
 			foreignColumns: [knowledgeCollections.id],
 			name: "knowledge_articles_collection_id_fkey"
 		}).onDelete("set null"),
-	pgPolicy("knowledge_articles_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
-	pgPolicy("knowledge_articles_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
-	pgPolicy("knowledge_articles_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
-	pgPolicy("knowledge_articles_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id::text = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("knowledge_articles_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("knowledge_articles_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("knowledge_articles_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("knowledge_articles_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
 	check("knowledge_articles_status_check", sql`(status)::text = ANY ((ARRAY['draft'::character varying, 'published'::character varying])::text[])`),
 ]);

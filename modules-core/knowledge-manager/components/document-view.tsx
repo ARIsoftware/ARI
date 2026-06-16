@@ -35,6 +35,7 @@ interface DocumentViewProps {
   collections: KnowledgeCollection[]
   allTags: string[]
   isEditing: boolean
+  isSaving?: boolean
   onToggleEdit: () => void
   onSave: (updates: Partial<KnowledgeArticle>) => void
   onToggleFavorite: () => void
@@ -48,6 +49,7 @@ export function DocumentView({
   collections,
   allTags,
   isEditing,
+  isSaving = false,
   onToggleEdit,
   onSave,
   onToggleFavorite,
@@ -144,27 +146,28 @@ export function DocumentView({
             variant="ghost"
             size="icon"
             onClick={onToggleFavorite}
+            aria-label={article.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
             className={article.is_favorite ? 'text-amber-500' : ''}
           >
             <Star className="h-4 w-4" fill={article.is_favorite ? 'currentColor' : 'none'} />
           </Button>
           {!article.is_deleted && (
-            <Button variant="ghost" size="icon" onClick={isEditing ? handleCancel : startEditing}>
+            <Button variant="ghost" size="icon" onClick={isEditing ? handleCancel : startEditing} aria-label={isEditing ? 'Cancel editing' : 'Edit document'}>
               <Edit2 className="h-4 w-4" />
             </Button>
           )}
           {article.is_deleted && onRestore ? (
-            <Button variant="ghost" size="icon" onClick={onRestore}>
+            <Button variant="ghost" size="icon" onClick={onRestore} aria-label="Restore document">
               <RotateCcw className="h-4 w-4" />
             </Button>
           ) : null}
-          <Button variant="ghost" size="icon" onClick={onDelete}>
+          <Button variant="ghost" size="icon" onClick={onDelete} aria-label={article.is_deleted ? 'Delete permanently' : 'Move to trash'}>
             <Trash2 className="h-4 w-4" />
           </Button>
           {isEditing && (
             <>
-              <Button size="sm" onClick={handleSave}>Save</Button>
-              <Button size="sm" variant="outline" onClick={handleCancel}>Cancel</Button>
+              <Button size="sm" onClick={handleSave} disabled={isSaving}>{isSaving ? 'Saving…' : 'Save'}</Button>
+              <Button size="sm" variant="outline" onClick={handleCancel} disabled={isSaving}>Cancel</Button>
             </>
           )}
           {onCreateNew && (

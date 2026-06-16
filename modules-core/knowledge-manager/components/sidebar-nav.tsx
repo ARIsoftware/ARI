@@ -126,6 +126,7 @@ export function SidebarNav({
               size="icon"
               className="h-6 w-6"
               onClick={onCreateCollection}
+              aria-label="New collection"
             >
               <Plus className="h-3 w-3" />
             </Button>
@@ -153,6 +154,8 @@ export function SidebarNav({
                     <div
                       className="w-3 h-3 rounded-sm"
                       style={{ backgroundColor: collection.color }}
+                      title={`${collection.name} color`}
+                      aria-hidden="true"
                     />
                     <span className="truncate">{collection.name}</span>
                   </div>
@@ -167,6 +170,7 @@ export function SidebarNav({
                           size="icon"
                           className="h-6 w-6 opacity-0 group-hover:opacity-100"
                           onClick={(e) => e.stopPropagation()}
+                          aria-label={`Collection options for ${collection.name}`}
                         >
                           <MoreHorizontal className="h-3 w-3" />
                         </Button>

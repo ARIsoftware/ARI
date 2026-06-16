@@ -9,7 +9,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { toSnakeCase } from '@/lib/api-helpers'
+import { toSnakeCase, createErrorResponse } from '@/lib/api-helpers'
+import { safeErrorResponse } from '@/lib/api-error'
 import { z } from 'zod'
 import {
   updateArticleSchema,
@@ -21,7 +22,7 @@ import {
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { knowledgeArticles, knowledgeCollections } from '@/lib/db/schema'
-import { eq, sql } from 'drizzle-orm'
+import { eq, and, sql } from 'drizzle-orm'
 
 // Runtime schema adds tag normalization transform that the OpenAPI schema omits
 // so the spec describes the raw input shape.
@@ -118,7 +119,7 @@ export async function GET(
       )
     }
 
-    // RLS filters automatically
+    // Explicit user_id filter is mandatory (BYPASSRLS — see docs/SECURITY.md)
     const article = await withRLS((db) =>
       db.select({
         id: knowledgeArticles.id,
@@ -142,7 +143,10 @@ export async function GET(
       })
       .from(knowledgeArticles)
       .leftJoin(knowledgeCollections, eq(knowledgeArticles.collectionId, knowledgeCollections.id))
-      .where(eq(knowledgeArticles.id, id))
+      .where(and(
+        eq(knowledgeArticles.id, id),
+        eq(knowledgeArticles.userId, user.id)
+      ))
       .limit(1)
     )
 
@@ -156,11 +160,8 @@ export async function GET(
     return NextResponse.json({ article: toSnakeCase(article[0]) })
 
   } catch (error) {
-    console.error('GET /api/modules/knowledge-manager/data/[id] error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    console.error('GET /api/modules/knowledge-manager/data/[id] error:', safeErrorResponse(error))
+    return createErrorResponse('Internal server error', 500)
   }
 }
 
@@ -241,11 +242,14 @@ export async function PATCH(
       )
     }
 
-    // RLS automatically ensures user can only update their own articles
+    // Explicit user_id filter is mandatory (BYPASSRLS — see docs/SECURITY.md)
     await withRLS((db) =>
       db.update(knowledgeArticles)
         .set(updateData)
-        .where(eq(knowledgeArticles.id, id))
+        .where(and(
+          eq(knowledgeArticles.id, id),
+          eq(knowledgeArticles.userId, user.id)
+        ))
     )
 
     // Fetch updated article with collection
@@ -272,7 +276,10 @@ export async function PATCH(
       })
       .from(knowledgeArticles)
       .leftJoin(knowledgeCollections, eq(knowledgeArticles.collectionId, knowledgeCollections.id))
-      .where(eq(knowledgeArticles.id, id))
+      .where(and(
+        eq(knowledgeArticles.id, id),
+        eq(knowledgeArticles.userId, user.id)
+      ))
       .limit(1)
     )
 
@@ -286,11 +293,8 @@ export async function PATCH(
     return NextResponse.json({ article: toSnakeCase(article[0]) })
 
   } catch (error) {
-    console.error('PATCH /api/modules/knowledge-manager/data/[id] error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    console.error('PATCH /api/modules/knowledge-manager/data/[id] error:', safeErrorResponse(error))
+    return createErrorResponse('Internal server error', 500)
   }
 }
 
@@ -326,11 +330,15 @@ export async function DELETE(
     const { searchParams } = new URL(request.url)
     const permanent = searchParams.get('permanent') === 'true'
 
+    // Explicit user_id filter is mandatory (BYPASSRLS — see docs/SECURITY.md)
     if (permanent) {
-      // Hard delete - RLS automatically ensures user can only delete their own
+      // Hard delete
       await withRLS((db) =>
         db.delete(knowledgeArticles)
-          .where(eq(knowledgeArticles.id, id))
+          .where(and(
+            eq(knowledgeArticles.id, id),
+            eq(knowledgeArticles.userId, user.id)
+          ))
       )
 
       return NextResponse.json({
@@ -345,7 +353,10 @@ export async function DELETE(
             isDeleted: true,
             deletedAt: sql`timezone('utc'::text, now())`
           })
-          .where(eq(knowledgeArticles.id, id))
+          .where(and(
+            eq(knowledgeArticles.id, id),
+            eq(knowledgeArticles.userId, user.id)
+          ))
       )
 
       return NextResponse.json({
@@ -355,10 +366,7 @@ export async function DELETE(
     }
 
   } catch (error) {
-    console.error('DELETE /api/modules/knowledge-manager/data/[id] error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    console.error('DELETE /api/modules/knowledge-manager/data/[id] error:', safeErrorResponse(error))
+    return createErrorResponse('Internal server error', 500)
   }
 }

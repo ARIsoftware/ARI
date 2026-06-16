@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { Loader2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { AlertCircle } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -25,24 +25,29 @@ import { Label } from '@/components/ui/label'
 import { DocumentList } from '../components/document-list'
 import { DocumentView } from '../components/document-view'
 import { SidebarNav } from '../components/sidebar-nav'
+import {
+  useArticles,
+  useCollections,
+  useCounts,
+  useCreateArticle,
+  useUpdateArticle,
+  useDeleteArticle,
+  useCreateCollection,
+  useUpdateCollection,
+  useDeleteCollection,
+} from '../hooks/use-knowledge-manager'
 import type {
   KnowledgeArticle,
   KnowledgeCollection,
   ArticleView,
   ArticleSortField,
   SortDirection,
-  TagWithCount,
-  NavigationCounts
+  NavigationCounts,
 } from '../types'
 
-export default function KnowledgeManagerPage() {
-  // Data state
-  const [articles, setArticles] = useState<KnowledgeArticle[]>([])
-  const [collections, setCollections] = useState<KnowledgeCollection[]>([])
-  const [allTags, setAllTags] = useState<TagWithCount[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+const EMPTY_COUNTS: NavigationCounts = { all: 0, favorites: 0, trash: 0, recent: 0 }
 
+export default function KnowledgeManagerPage() {
   // View state
   const [activeView, setActiveView] = useState<ArticleView>('all')
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null)
@@ -50,8 +55,10 @@ export default function KnowledgeManagerPage() {
   const [selectedArticle, setSelectedArticle] = useState<KnowledgeArticle | null>(null)
   const [isEditing, setIsEditing] = useState(false)
 
-  // Filter/sort state
+  // Filter/sort state. `searchQuery` drives the input; `debouncedSearch` feeds
+  // the query so we don't fire a request on every keystroke.
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [sortBy, setSortBy] = useState<ArticleSortField>('updated_at')
   const [sortDir, setSortDir] = useState<SortDirection>('desc')
 
@@ -68,101 +75,44 @@ export default function KnowledgeManagerPage() {
   const [collectionName, setCollectionName] = useState('')
   const [collectionColor, setCollectionColor] = useState('#6b7280')
 
-  // Counts for navigation
-  const [counts, setCounts] = useState<NavigationCounts>({
-    all: 0,
-    favorites: 0,
-    trash: 0,
-    recent: 0
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), 300)
+    return () => clearTimeout(t)
+  }, [searchQuery])
+
+  // ─── Data ────────────────────────────────────────────────────────────
+  const articlesQuery = useArticles({
+    search: debouncedSearch,
+    tag: activeTag,
+    collectionId: activeCollectionId,
+    view: activeView,
+    sortBy,
+    sortDir,
   })
+  const collectionsQuery = useCollections()
+  const countsQuery = useCounts()
 
-  // Load data. Better Auth uses HTTP-only cookies — sent automatically with
-  // same-origin fetch. No Authorization header needed; the page is gated by
-  // middleware so we know the user is signed in.
-  const loadArticles = useCallback(async () => {
-    try {
-      setLoading(true)
-      const params = new URLSearchParams()
+  const articles = articlesQuery.data?.articles ?? []
+  const allTags = articlesQuery.data?.allTags ?? []
+  const collections = collectionsQuery.data ?? []
+  const counts = countsQuery.data ?? EMPTY_COUNTS
 
-      if (searchQuery) params.set('search', searchQuery)
-      if (activeTag) params.set('tag', activeTag)
-      if (activeCollectionId) params.set('collection_id', activeCollectionId)
-      if (activeView === 'favorites') params.set('is_favorite', 'true')
-      if (activeView === 'trash') params.set('is_deleted', 'true')
-      params.set('sort_by', sortBy)
-      params.set('sort_dir', sortDir)
+  // Mutations
+  const createArticle = useCreateArticle()
+  const updateArticle = useUpdateArticle()
+  const deleteArticle = useDeleteArticle()
+  const createCollection = useCreateCollection()
+  const updateCollection = useUpdateCollection()
+  const deleteCollection = useDeleteCollection()
 
-      const response = await fetch(`/api/modules/knowledge-manager/data?${params}`)
-      if (!response.ok) throw new Error('Failed to load articles')
-
-      const data = await response.json()
-      setArticles(data.articles || [])
-      setAllTags(data.allTags || [])
-
-      if (selectedArticle) {
-        const updated = data.articles?.find((a: KnowledgeArticle) => a.id === selectedArticle.id)
-        if (updated) setSelectedArticle(updated)
-      }
-    } catch (err) {
-      console.error('Error loading articles:', err)
-      setError('Failed to load articles')
-    } finally {
-      setLoading(false)
-    }
-  }, [searchQuery, activeTag, activeCollectionId, activeView, sortBy, sortDir, selectedArticle])
-
-  const loadCollections = useCallback(async () => {
-    try {
-      const response = await fetch('/api/modules/knowledge-manager/collections')
-      if (!response.ok) throw new Error('Failed to load collections')
-      const data = await response.json()
-      setCollections(data.collections || [])
-    } catch (err) {
-      console.error('Error loading collections:', err)
-    }
-  }, [])
-
-  const loadCounts = useCallback(async () => {
-    try {
-      const [allRes, favRes, trashRes] = await Promise.all([
-        fetch('/api/modules/knowledge-manager/data'),
-        fetch('/api/modules/knowledge-manager/data?is_favorite=true'),
-        fetch('/api/modules/knowledge-manager/data?is_deleted=true'),
-      ])
-
-      const [allData, favData, trashData] = await Promise.all([
-        allRes.json(),
-        favRes.json(),
-        trashRes.json()
-      ])
-
-      setCounts({
-        all: allData.count || 0,
-        favorites: favData.count || 0,
-        trash: trashData.count || 0,
-        recent: Math.min(allData.count || 0, 10) // Recent is just last 10
-      })
-    } catch (err) {
-      console.error('Error loading counts:', err)
-    }
-  }, [])
-
+  // Keep the open article in sync with fresh list data (after edits/refetch).
   useEffect(() => {
-    loadArticles()
-    loadCollections()
-    loadCounts()
-    // Run once on mount; subsequent loads are triggered by the search/filter
-    // effect below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (!selectedArticle) return
+    const fresh = articles.find((a) => a.id === selectedArticle.id)
+    if (fresh && fresh !== selectedArticle) setSelectedArticle(fresh)
+  }, [articles]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    const debounce = setTimeout(loadArticles, 300)
-    return () => clearTimeout(debounce)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, activeTag, activeCollectionId, activeView, sortBy, sortDir])
-
-  // Handlers
+  // ─── Handlers ────────────────────────────────────────────────────────
   const handleViewChange = (view: ArticleView, collectionId?: string | null, tag?: string | null) => {
     setActiveView(view)
     setActiveCollectionId(collectionId ?? null)
@@ -176,182 +126,96 @@ export default function KnowledgeManagerPage() {
     setIsEditing(false)
   }
 
-  const handleToggleFavorite = async (article: KnowledgeArticle) => {
-    try {
-      const response = await fetch(`/api/modules/knowledge-manager/data/${article.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_favorite: !article.is_favorite })
-      })
-
-      if (!response.ok) throw new Error('Failed to update favorite')
-
-      await loadArticles()
-      await loadCounts()
-    } catch (err) {
-      console.error('Error toggling favorite:', err)
-    }
+  const handleToggleFavorite = (article: KnowledgeArticle) => {
+    updateArticle.mutate({ id: article.id, updates: { is_favorite: !article.is_favorite } })
   }
 
-  const handleSaveArticle = async (updates: Partial<KnowledgeArticle>) => {
+  const handleSaveArticle = (updates: Partial<KnowledgeArticle>) => {
     if (!selectedArticle) return
-
-    try {
-      const response = await fetch(`/api/modules/knowledge-manager/data/${selectedArticle.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates)
-      })
-
-      if (!response.ok) throw new Error('Failed to save article')
-
-      setIsEditing(false)
-      await loadArticles()
-    } catch (err) {
-      console.error('Error saving article:', err)
-    }
+    updateArticle.mutate(
+      { id: selectedArticle.id, updates },
+      { onSuccess: () => setIsEditing(false) }
+    )
   }
 
-  const handleCreateArticle = async () => {
-    if (!newArticleTitle.trim()) return
-
-    try {
-      const response = await fetch('/api/modules/knowledge-manager/data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: newArticleTitle,
-          collection_id: activeCollectionId
-        })
-      })
-
-      if (!response.ok) throw new Error('Failed to create article')
-
-      const data = await response.json()
-      setShowNewArticle(false)
-      setNewArticleTitle('')
-      await loadArticles()
-      await loadCounts()
-      setSelectedArticle(data.article)
-      setIsEditing(true)
-    } catch (err) {
-      console.error('Error creating article:', err)
-    }
+  const handleCreateArticle = () => {
+    if (!newArticleTitle.trim() || createArticle.isPending) return
+    createArticle.mutate(
+      { title: newArticleTitle, collection_id: activeCollectionId },
+      {
+        onSuccess: (article) => {
+          setShowNewArticle(false)
+          setNewArticleTitle('')
+          setSelectedArticle(article)
+          setIsEditing(true)
+        },
+      }
+    )
   }
 
-  const handleDeleteArticle = async () => {
+  const handleDeleteArticle = () => {
     if (!deleteArticleId) return
-
-    try {
-      const url = isPermanentDelete
-        ? `/api/modules/knowledge-manager/data/${deleteArticleId}?permanent=true`
-        : `/api/modules/knowledge-manager/data/${deleteArticleId}`
-
-      const response = await fetch(url, { method: 'DELETE' })
-
-      if (!response.ok) throw new Error('Failed to delete article')
-
-      if (selectedArticle?.id === deleteArticleId) {
-        setSelectedArticle(null)
+    const id = deleteArticleId
+    deleteArticle.mutate(
+      { id, permanent: isPermanentDelete },
+      {
+        onSuccess: () => {
+          if (selectedArticle?.id === id) setSelectedArticle(null)
+          setDeleteArticleId(null)
+          setIsPermanentDelete(false)
+        },
       }
-      setDeleteArticleId(null)
-      setIsPermanentDelete(false)
-      await loadArticles()
-      await loadCounts()
-    } catch (err) {
-      console.error('Error deleting article:', err)
-    }
+    )
   }
 
-  const handleRestoreArticle = async () => {
+  const handleRestoreArticle = () => {
     if (!selectedArticle) return
-
-    try {
-      const response = await fetch(`/api/modules/knowledge-manager/data/${selectedArticle.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_deleted: false })
-      })
-
-      if (!response.ok) throw new Error('Failed to restore article')
-
-      setSelectedArticle(null)
-      await loadArticles()
-      await loadCounts()
-    } catch (err) {
-      console.error('Error restoring article:', err)
-    }
+    updateArticle.mutate(
+      { id: selectedArticle.id, updates: { is_deleted: false } },
+      { onSuccess: () => setSelectedArticle(null) }
+    )
   }
 
-  const handleCreateCollection = async () => {
-    if (!collectionName.trim()) return
-
-    try {
-      const response = await fetch('/api/modules/knowledge-manager/collections', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: collectionName,
-          color: collectionColor
-        })
-      })
-
-      if (!response.ok) throw new Error('Failed to create collection')
-
-      setShowNewCollection(false)
-      setCollectionName('')
-      setCollectionColor('#6b7280')
-      await loadCollections()
-    } catch (err) {
-      console.error('Error creating collection:', err)
-    }
-  }
-
-  const handleUpdateCollection = async () => {
-    if (!editingCollection) return
-
-    try {
-      const response = await fetch(`/api/modules/knowledge-manager/collections/${editingCollection.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: collectionName,
-          color: collectionColor
-        })
-      })
-
-      if (!response.ok) throw new Error('Failed to update collection')
-
-      setEditingCollection(null)
-      setCollectionName('')
-      setCollectionColor('#6b7280')
-      await loadCollections()
-      await loadArticles()
-    } catch (err) {
-      console.error('Error updating collection:', err)
-    }
-  }
-
-  const handleDeleteCollection = async () => {
-    if (!deleteCollectionId) return
-
-    try {
-      const response = await fetch(`/api/modules/knowledge-manager/collections/${deleteCollectionId}`, {
-        method: 'DELETE',
-      })
-
-      if (!response.ok) throw new Error('Failed to delete collection')
-
-      if (activeCollectionId === deleteCollectionId) {
-        setActiveCollectionId(null)
-        setActiveView('all')
+  const handleCreateCollection = () => {
+    if (!collectionName.trim() || createCollection.isPending) return
+    createCollection.mutate(
+      { name: collectionName, color: collectionColor },
+      {
+        onSuccess: () => {
+          setShowNewCollection(false)
+          setCollectionName('')
+          setCollectionColor('#6b7280')
+        },
       }
-      setDeleteCollectionId(null)
-      await loadCollections()
-      await loadArticles()
-    } catch (err) {
-      console.error('Error deleting collection:', err)
-    }
+    )
+  }
+
+  const handleUpdateCollection = () => {
+    if (!editingCollection || updateCollection.isPending) return
+    updateCollection.mutate(
+      { id: editingCollection.id, updates: { name: collectionName, color: collectionColor } },
+      {
+        onSuccess: () => {
+          setEditingCollection(null)
+          setCollectionName('')
+          setCollectionColor('#6b7280')
+        },
+      }
+    )
+  }
+
+  const handleDeleteCollection = () => {
+    if (!deleteCollectionId) return
+    const id = deleteCollectionId
+    deleteCollection.mutate(id, {
+      onSuccess: () => {
+        if (activeCollectionId === id) {
+          setActiveCollectionId(null)
+          setActiveView('all')
+        }
+        setDeleteCollectionId(null)
+      },
+    })
   }
 
   const openEditCollection = (collection: KnowledgeCollection) => {
@@ -360,57 +224,78 @@ export default function KnowledgeManagerPage() {
     setCollectionColor(collection.color)
   }
 
+  const savingCollection = createCollection.isPending || updateCollection.isPending
+
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
-      {/* Left Panel - Document List */}
-      <div className="w-80 shrink-0">
-        <DocumentList
-          articles={articles}
-          selectedId={selectedArticle?.id || null}
-          searchQuery={searchQuery}
-          sortBy={sortBy}
-          sortDir={sortDir}
-          onSelect={handleSelectArticle}
-          onSearch={setSearchQuery}
-          onSort={(field, dir) => { setSortBy(field); setSortDir(dir) }}
-          onToggleFavorite={handleToggleFavorite}
+    <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
+      {articlesQuery.isError && (
+        <div className="flex items-center justify-between gap-3 border-b border-destructive/20 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+          <span className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            Failed to load documents. Check your connection and try again.
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-destructive hover:text-destructive"
+            onClick={() => articlesQuery.refetch()}
+          >
+            Retry
+          </Button>
+        </div>
+      )}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Panel - Document List */}
+        <div className="w-80 shrink-0">
+          <DocumentList
+            articles={articles}
+            selectedId={selectedArticle?.id || null}
+            searchQuery={searchQuery}
+            sortBy={sortBy}
+            sortDir={sortDir}
+            onSelect={handleSelectArticle}
+            onSearch={setSearchQuery}
+            onSort={(field, dir) => { setSortBy(field); setSortDir(dir) }}
+            onToggleFavorite={handleToggleFavorite}
+            onCreateNew={() => setShowNewArticle(true)}
+            loading={articlesQuery.isLoading}
+          />
+        </div>
+
+        {/* Center Panel - Document View */}
+        <DocumentView
+          article={selectedArticle}
+          collections={collections}
+          allTags={allTags.map(t => t.name)}
+          isEditing={isEditing}
+          isSaving={updateArticle.isPending}
+          onToggleEdit={() => setIsEditing(!isEditing)}
+          onSave={handleSaveArticle}
+          onToggleFavorite={() => selectedArticle && handleToggleFavorite(selectedArticle)}
+          onDelete={() => {
+            if (selectedArticle) {
+              setDeleteArticleId(selectedArticle.id)
+              setIsPermanentDelete(selectedArticle.is_deleted)
+            }
+          }}
+          onRestore={handleRestoreArticle}
           onCreateNew={() => setShowNewArticle(true)}
-          loading={loading}
+        />
+
+        {/* Right Panel - Sidebar Navigation */}
+        <SidebarNav
+          activeView={activeView}
+          activeCollectionId={activeCollectionId}
+          activeTag={activeTag}
+          collections={collections}
+          tags={allTags}
+          counts={counts}
+          onViewChange={handleViewChange}
+          onCreateCollection={() => setShowNewCollection(true)}
+          onEditCollection={openEditCollection}
+          onDeleteCollection={(id) => setDeleteCollectionId(id)}
         />
       </div>
-
-      {/* Center Panel - Document View */}
-      <DocumentView
-        article={selectedArticle}
-        collections={collections}
-        allTags={allTags.map(t => t.name)}
-        isEditing={isEditing}
-        onToggleEdit={() => setIsEditing(!isEditing)}
-        onSave={handleSaveArticle}
-        onToggleFavorite={() => selectedArticle && handleToggleFavorite(selectedArticle)}
-        onDelete={() => {
-          if (selectedArticle) {
-            setDeleteArticleId(selectedArticle.id)
-            setIsPermanentDelete(selectedArticle.is_deleted)
-          }
-        }}
-        onRestore={handleRestoreArticle}
-        onCreateNew={() => setShowNewArticle(true)}
-      />
-
-      {/* Right Panel - Sidebar Navigation */}
-      <SidebarNav
-        activeView={activeView}
-        activeCollectionId={activeCollectionId}
-        activeTag={activeTag}
-        collections={collections}
-        tags={allTags}
-        counts={counts}
-        onViewChange={handleViewChange}
-        onCreateCollection={() => setShowNewCollection(true)}
-        onEditCollection={openEditCollection}
-        onDeleteCollection={(id) => setDeleteCollectionId(id)}
-      />
 
       {/* New Article Dialog */}
       <Dialog open={showNewArticle} onOpenChange={setShowNewArticle}>
@@ -420,8 +305,9 @@ export default function KnowledgeManagerPage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Title</Label>
+              <Label htmlFor="km-new-article-title">Title</Label>
               <Input
+                id="km-new-article-title"
                 value={newArticleTitle}
                 onChange={(e) => setNewArticleTitle(e.target.value)}
                 placeholder="Document title..."
@@ -431,7 +317,9 @@ export default function KnowledgeManagerPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNewArticle(false)}>Cancel</Button>
-            <Button onClick={handleCreateArticle} disabled={!newArticleTitle.trim()}>Create</Button>
+            <Button onClick={handleCreateArticle} disabled={!newArticleTitle.trim() || createArticle.isPending}>
+              {createArticle.isPending ? 'Creating…' : 'Create'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -454,18 +342,21 @@ export default function KnowledgeManagerPage() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Name</Label>
+              <Label htmlFor="km-collection-name">Name</Label>
               <Input
+                id="km-collection-name"
                 value={collectionName}
                 onChange={(e) => setCollectionName(e.target.value)}
                 placeholder="Collection name..."
               />
             </div>
             <div className="space-y-2">
-              <Label>Color</Label>
+              <Label htmlFor="km-collection-color">Color</Label>
               <div className="flex items-center gap-3">
                 <input
                   type="color"
+                  id="km-collection-color"
+                  aria-label="Collection color"
                   value={collectionColor}
                   onChange={(e) => setCollectionColor(e.target.value)}
                   className="w-10 h-10 rounded border cursor-pointer"
@@ -475,6 +366,7 @@ export default function KnowledgeManagerPage() {
                   onChange={(e) => setCollectionColor(e.target.value)}
                   placeholder="#6b7280"
                   className="w-28"
+                  aria-label="Collection color hex value"
                 />
               </div>
             </div>
@@ -486,9 +378,9 @@ export default function KnowledgeManagerPage() {
             }}>Cancel</Button>
             <Button
               onClick={editingCollection ? handleUpdateCollection : handleCreateCollection}
-              disabled={!collectionName.trim()}
+              disabled={!collectionName.trim() || savingCollection}
             >
-              {editingCollection ? 'Save' : 'Create'}
+              {savingCollection ? 'Saving…' : editingCollection ? 'Save' : 'Create'}
             </Button>
           </DialogFooter>
         </DialogContent>

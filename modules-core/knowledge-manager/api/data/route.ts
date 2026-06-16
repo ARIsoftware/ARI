@@ -8,7 +8,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { toSnakeCase } from '@/lib/api-helpers'
+import { toSnakeCase, validateQueryParams, createErrorResponse } from '@/lib/api-helpers'
+import { safeErrorResponse } from '@/lib/api-error'
 import { z } from 'zod'
 import {
   createArticleSchema,
@@ -79,44 +80,62 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const search = searchParams.get('search')
-    const tag = searchParams.get('tag')
-    const collectionId = searchParams.get('collection_id')
-    const status = searchParams.get('status')
-    const isFavorite = searchParams.get('is_favorite')
-    const isDeleted = searchParams.get('is_deleted')
-    const sortBy = searchParams.get('sort_by') || 'updated_at'
-    const sortDir = searchParams.get('sort_dir') || 'desc'
-    const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '200', 10) || 200, 1), 500)
-    const offset = Math.max(parseInt(searchParams.get('offset') || '0', 10) || 0, 0)
+    const validation = validateQueryParams(searchParams, listArticlesQuerySchema)
+    if (!validation.success) {
+      return validation.response
+    }
+    const query = validation.data
 
-    // Build SQL WHERE conditions
+    const sortBy = query.sort_by || 'updated_at'
+    const sortDir = query.sort_dir || 'desc'
+    const limit = query.limit ?? 200
+    const offset = query.offset ?? 0
+
+    // Build SQL WHERE conditions. The explicit user_id predicate is mandatory:
+    // the default Postgres role has BYPASSRLS, so RLS policies are NOT a
+    // sufficient tenant boundary on their own (see docs/SECURITY.md).
     const conditions = [
-      isDeleted === 'true'
+      eq(knowledgeArticles.userId, user.id),
+      query.is_deleted === 'true'
         ? eq(knowledgeArticles.isDeleted, true)
         : eq(knowledgeArticles.isDeleted, false)
     ]
 
-    if (collectionId) {
-      conditions.push(eq(knowledgeArticles.collectionId, collectionId))
+    if (query.collection_id) {
+      conditions.push(eq(knowledgeArticles.collectionId, query.collection_id))
     }
-    if (status === 'draft' || status === 'published') {
-      conditions.push(eq(knowledgeArticles.status, status))
+    if (query.status === 'draft' || query.status === 'published') {
+      conditions.push(eq(knowledgeArticles.status, query.status))
     }
-    if (isFavorite === 'true') {
+    if (query.is_favorite === 'true') {
       conditions.push(eq(knowledgeArticles.isFavorite, true))
     }
-    if (tag) {
-      const normalizedTag = tag.toLowerCase().trim().replace(/^#/, '')
+    if (query.tag) {
+      const normalizedTag = query.tag.toLowerCase().trim().replace(/^#/, '')
       conditions.push(arrayContains(knowledgeArticles.tags, [normalizedTag]))
     }
-    if (search) {
+    if (query.search) {
       conditions.push(
         or(
-          ilike(knowledgeArticles.title, `%${search}%`),
-          ilike(knowledgeArticles.content, `%${search}%`)
+          ilike(knowledgeArticles.title, `%${query.search}%`),
+          ilike(knowledgeArticles.content, `%${query.search}%`)
         )!
       )
+    }
+
+    // True total count for the current filter set (ignores limit/offset so the
+    // sidebar badges reflect the real number, not the capped page length).
+    const [{ total }] = await withRLS(async (db) =>
+      db
+        .select({ total: sql<number>`count(*)::int` })
+        .from(knowledgeArticles)
+        .where(and(...conditions))
+    )
+
+    // Lightweight path: the nav counts only need the total, so skip the row
+    // fetch + join + tag aggregation entirely.
+    if (query.count_only === 'true') {
+      return NextResponse.json({ articles: [], count: total, allTags: [] })
     }
 
     // Determine sort column and direction
@@ -127,7 +146,7 @@ export async function GET(request: NextRequest) {
         : knowledgeArticles.updatedAt
     const orderBy = sortDir === 'asc' ? asc(sortColumn) : desc(sortColumn)
 
-    // Fetch articles with collection join (RLS filters automatically)
+    // Fetch articles with collection join
     const articles = await withRLS(async (db) =>
       db
         .select({
@@ -158,37 +177,30 @@ export async function GET(request: NextRequest) {
         .offset(offset)
     )
 
-    // Extract all unique tags with counts (from non-deleted articles, separate efficient query)
-    const allArticleTags = await withRLS(async (db) =>
-      db
-        .select({ tags: knowledgeArticles.tags })
-        .from(knowledgeArticles)
-        .where(eq(knowledgeArticles.isDeleted, false))
+    // Tag histogram over the user's non-deleted articles, aggregated in the DB
+    // (unnest + GROUP BY) so we don't pull every row into memory.
+    const tagRows = await withRLS(async (db) =>
+      db.execute(sql`
+        SELECT t AS name, count(*)::int AS count
+          FROM ${knowledgeArticles}, unnest(${knowledgeArticles.tags}) AS t
+         WHERE ${knowledgeArticles.userId} = ${user.id}
+           AND ${knowledgeArticles.isDeleted} = false
+         GROUP BY t
+         ORDER BY count DESC, name ASC
+      `)
     )
-
-    const tagCounts = new Map<string, number>()
-    for (const article of allArticleTags) {
-      for (const t of article.tags || []) {
-        tagCounts.set(t, (tagCounts.get(t) || 0) + 1)
-      }
-    }
-
-    const allTags: TagWithCount[] = Array.from(tagCounts.entries())
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
+    const allTags: TagWithCount[] = (Array.isArray(tagRows) ? tagRows : ((tagRows as { rows?: unknown[] }).rows ?? []))
+      .map((r) => r as { name: string; count: number })
 
     return NextResponse.json({
       articles: toSnakeCase(articles) || [],
-      count: articles?.length || 0,
+      count: total,
       allTags
     })
 
   } catch (error) {
-    console.error('GET /api/modules/knowledge-manager/data error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    console.error('GET /api/modules/knowledge-manager/data error:', safeErrorResponse(error))
+    return createErrorResponse('Internal server error', 500)
   }
 }
 
@@ -261,7 +273,10 @@ export async function POST(request: NextRequest) {
       })
       .from(knowledgeArticles)
       .leftJoin(knowledgeCollections, eq(knowledgeArticles.collectionId, knowledgeCollections.id))
-      .where(eq(knowledgeArticles.id, articleData[0].id))
+      .where(and(
+        eq(knowledgeArticles.id, articleData[0].id),
+        eq(knowledgeArticles.userId, user.id)
+      ))
       .limit(1)
     )
 
@@ -271,10 +286,7 @@ export async function POST(request: NextRequest) {
     )
 
   } catch (error) {
-    console.error('POST /api/modules/knowledge-manager/data error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    console.error('POST /api/modules/knowledge-manager/data error:', safeErrorResponse(error))
+    return createErrorResponse('Internal server error', 500)
   }
 }

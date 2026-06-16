@@ -101,6 +101,11 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_knowledge_articles_user_id
   ON knowledge_articles(user_id);
 
+-- Composite index for the dominant list path: filter by user + is_deleted,
+-- sort by updated_at (the default sort). Covers active + trash views.
+CREATE INDEX IF NOT EXISTS idx_knowledge_articles_user_active_updated
+  ON knowledge_articles(user_id, is_deleted, updated_at DESC);
+
 CREATE INDEX IF NOT EXISTS idx_knowledge_articles_created_at
   ON knowledge_articles(created_at DESC);
 

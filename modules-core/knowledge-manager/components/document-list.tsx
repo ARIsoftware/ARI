@@ -1,7 +1,6 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, Search, Filter, ArrowUpDown, LayoutList, LayoutGrid } from 'lucide-react'
+import { Search, ArrowUpDown } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -40,8 +39,6 @@ export function DocumentList({
   onCreateNew,
   loading = false
 }: DocumentListProps) {
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
-
   const getSortLabel = () => {
     const labels: Record<ArticleSortField, string> = {
       updated_at: 'Last Updated',
@@ -71,65 +68,30 @@ export function DocumentList({
         </div>
       </div>
 
-      {/* Filter & Sort Controls */}
+      {/* Sort Controls */}
       <div className="flex items-center justify-between px-3 py-2 border-b">
-        <div className="flex items-center gap-1">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 text-xs">
-                <Filter className="h-3 w-3 mr-1" />
-                Filter
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem>All Documents</DropdownMenuItem>
-              <DropdownMenuItem>Published</DropdownMenuItem>
-              <DropdownMenuItem>Drafts</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 text-xs">
-                <ArrowUpDown className="h-3 w-3 mr-1" />
-                {getSortLabel()}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem onClick={() => onSort('updated_at', 'desc')}>
-                Last Updated
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onSort('created_at', 'desc')}>
-                Date Created
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onSort('title', 'asc')}>
-                Title A-Z
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onSort('title', 'desc')}>
-                Title Z-A
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        <div className="flex items-center gap-1">
-          <Button
-            variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setViewMode('list')}
-          >
-            <LayoutList className="h-4 w-4" />
-          </Button>
-          <Button
-            variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setViewMode('grid')}
-          >
-            <LayoutGrid className="h-4 w-4" />
-          </Button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 text-xs">
+              <ArrowUpDown className="h-3 w-3 mr-1" />
+              {getSortLabel()}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem onClick={() => onSort('updated_at', 'desc')}>
+              Last Updated
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSort('created_at', 'desc')}>
+              Date Created
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSort('title', 'asc')}>
+              Title A-Z
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onSort('title', 'desc')}>
+              Title Z-A
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Document List */}
@@ -164,7 +126,6 @@ export function DocumentList({
       {/* Footer */}
       <div className="flex items-center justify-between px-4 py-2 border-t text-xs text-muted-foreground">
         <span>{articles.length} document{articles.length !== 1 ? 's' : ''}</span>
-        <span>Last sync: just now</span>
       </div>
     </div>
   )
