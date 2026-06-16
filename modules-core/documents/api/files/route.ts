@@ -115,6 +115,49 @@ const BulkSchema = z.discriminatedUnion('action', [
   }),
 ])
 
+// MIME types whose legitimate payload IS script-capable markup. When the
+// operator has explicitly allowlisted one of these, content that sniffs as
+// markup is expected and allowed; otherwise markup content is a type mismatch.
+const ACTIVE_MARKUP_MIME_TYPES = new Set([
+  'text/html',
+  'application/xhtml+xml',
+  'image/svg+xml',
+  'application/xml',
+  'text/xml',
+])
+
+/**
+ * Sniff the leading bytes of an uploaded file for script-capable markup
+ * (HTML / SVG / XML-with-script / PHP). The declared MIME type (`file.type`) is
+ * attacker-controlled, so it can't be trusted alone: a file can claim
+ * `image/png` while carrying `<script>…</script>`. We scan the first 1 KB
+ * (case-insensitively, after skipping a BOM and leading whitespace) for the
+ * signatures that matter for stored-XSS.
+ */
+function sniffsAsActiveMarkup(buffer: Buffer): boolean {
+  const head = buffer
+    .subarray(0, 1024)
+    .toString('latin1')
+    .replace(/^(\xEF\xBB\xBF|\xFF\xFE|\xFE\xFF)/, '') // UTF-8 / UTF-16 BOMs
+    .replace(/^\s+/, '')
+    .toLowerCase()
+
+  if (
+    head.startsWith('<!doctype html') ||
+    head.startsWith('<html') ||
+    head.startsWith('<script') ||
+    head.startsWith('<svg') ||
+    head.startsWith('<?php')
+  ) {
+    return true
+  }
+  // SVG/HTML that opens with an <?xml …?> prolog.
+  if (head.startsWith('<?xml') && /<\s*(svg|script)\b/.test(head)) {
+    return true
+  }
+  return false
+}
+
 /**
  * GET Handler - List files with optional filtering
  */
@@ -330,6 +373,17 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('No file provided', 400)
     }
 
+    // The display name is derived from the untrusted, unbounded filename. Trim
+    // it, reject an empty name, and cap at 255 to match the rename path
+    // (updateDocumentSchema). The `name` column is unbounded TEXT, so an
+    // oversized filename would bloat list responses and the search index. The
+    // storage *key* is a server-generated UUID, so this only governs the
+    // human-readable name.
+    const displayName = (file.name ?? '').trim().slice(0, 255)
+    if (!displayName) {
+      return createErrorResponse('File must have a non-empty name', 400)
+    }
+
     // Validate any supplied tag ids up front — same shape as the bulk PATCH
     // endpoint so the row insert can't land non-UUID values that the FK will
     // reject opaquely.
@@ -350,20 +404,37 @@ export async function POST(request: NextRequest) {
       return createErrorResponse(`File size exceeds maximum of ${settings.maxFileSizeMb}MB`, 413)
     }
 
+    // Buffer the upload once, up front: we need the raw bytes both for the
+    // content-type sniff below and for the storage write further down.
+    const fileBuffer = Buffer.from(await file.arrayBuffer())
+
     // Validate file type. If an allowlist is configured, it's authoritative.
     // Otherwise, reject types that can host script content (HTML, SVG, generic
     // application/x-* archives/executables). This neutralizes stored-XSS via
     // signed-URL fetches even though signed URLs now force Content-Disposition:
     // attachment — defense-in-depth in case a future change relaxes that.
+    //
+    // The declared MIME (file.type) is attacker-controlled, so we ALSO sniff the
+    // leading bytes: content that is script-capable markup is rejected even when
+    // it claims to be something benign (e.g. text/html bytes declared image/png).
+    // This closes the bypass where a forged MIME slips past the denylist.
     const clientMime = (file.type || '').toLowerCase()
+    const looksLikeActiveMarkup = sniffsAsActiveMarkup(fileBuffer)
+
     if (settings.allowedFileTypes.length > 0) {
       if (!settings.allowedFileTypes.includes(file.type)) {
         return createErrorResponse('File type not allowed', 400)
       }
+      // An allowlisted markup type (e.g. image/svg+xml) may legitimately contain
+      // markup; markup content wearing a non-markup allowlisted type may not.
+      if (looksLikeActiveMarkup && !ACTIVE_MARKUP_MIME_TYPES.has(clientMime)) {
+        return createErrorResponse('File content does not match its declared type', 400)
+      }
     } else {
       const isRisky =
         RISKY_MIME_TYPES.includes(clientMime) ||
-        clientMime.startsWith('application/x-')
+        clientMime.startsWith('application/x-') ||
+        looksLikeActiveMarkup
       if (isRisky) {
         return createErrorResponse('File type not allowed', 400)
       }
@@ -401,7 +472,6 @@ export async function POST(request: NextRequest) {
     const activeProvider = getActiveProvider()
     const storageBucket = getCurrentBucket(activeProvider)
     const storageProvider = getStorageProvider(activeProvider, storageBucket)
-    const fileBuffer = Buffer.from(await file.arrayBuffer())
     const { path: storagePath, size } = await storageProvider.upload(
       user.id,
       storedFilename,
@@ -417,8 +487,8 @@ export async function POST(request: NextRequest) {
         db.insert(documents)
           .values({
             userId: user.id,
-            name: file.name,
-            originalName: file.name,
+            name: displayName,
+            originalName: displayName,
             storageProvider: activeProvider,
             storagePath,
             storageBucket: storageBucket || null,

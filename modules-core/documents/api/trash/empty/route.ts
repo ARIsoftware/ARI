@@ -7,9 +7,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { createErrorResponse } from '@/lib/api-helpers'
+import { createErrorResponse, validateQueryParams } from '@/lib/api-helpers'
 import { documents, documentFolders } from '@/lib/db/schema'
 import { eq, isNotNull, and, lte, inArray } from 'drizzle-orm'
 import { getStorageProvider } from '../../../lib/providers'
@@ -189,16 +188,14 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const id = searchParams.get('id')
-    const type = searchParams.get('type') || 'document' // 'document' or 'folder'
+    // Validate id (required UUID) + type (optional 'document' | 'folder') against
+    // the schema declared in the route's OpenAPI registration, rather than ad-hoc
+    // searchParams.get() — keeps the contract and implementation in lockstep.
+    const validation = validateQueryParams(searchParams, trashDeleteQuerySchema)
+    if (!validation.success) return validation.response
 
-    if (!id) {
-      return createErrorResponse('Missing id parameter', 400)
-    }
-
-    if (!z.string().uuid().safeParse(id).success) {
-      return createErrorResponse('Invalid ID format', 400)
-    }
+    const { id } = validation.data
+    const type = validation.data.type ?? 'document' // 'document' or 'folder'
 
     if (type === 'document') {
       // Get document — scoped to user

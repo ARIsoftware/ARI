@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -136,12 +136,21 @@ export default function DocumentsPage() {
     isLoading: docsLoading,
     error: docsError,
     refetch: refetchDocs,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
   } = useDocuments({
     folder_id: currentFolderId,
     search: debouncedSearch || undefined,
     with_previews: viewMode === 'cards',
     ...filters,
   })
+
+  // Flatten the paged results into a single list for rendering and selection.
+  const documentFiles = useMemo(
+    () => documentsData?.pages.flatMap((p) => p.files) ?? [],
+    [documentsData],
+  )
   const { data: foldersData } = useFolders(true)
   const { data: tagsData } = useTags()
 
@@ -246,8 +255,8 @@ export default function DocumentsPage() {
   }
 
   const handleSelectAll = (selected: boolean) => {
-    if (selected && documentsData?.files) {
-      setSelectedIds(new Set(documentsData.files.map((f) => f.id)))
+    if (selected && documentFiles.length > 0) {
+      setSelectedIds(new Set(documentFiles.map((f) => f.id)))
     } else {
       setSelectedIds(new Set())
     }
@@ -284,7 +293,7 @@ export default function DocumentsPage() {
 
   // Delete handler — opens confirmation dialog instead of immediately deleting.
   const handleDelete = (id: string) => {
-    const doc = documentsData?.files.find((f) => f.id === id) ?? null
+    const doc = documentFiles.find((f) => f.id === id) ?? null
     setConfirmDelete(doc)
   }
 
@@ -714,7 +723,7 @@ export default function DocumentsPage() {
         </div>
       ) : viewMode === 'cards' ? (
         <div className="flex flex-wrap gap-4">
-          {documentsData?.files.map((doc) => (
+          {documentFiles.map((doc) => (
             <FileCard
               key={doc.id}
               document={doc}
@@ -739,7 +748,7 @@ export default function DocumentsPage() {
         </div>
       ) : (
         <FileTable
-          documents={documentsData?.files || []}
+          documents={documentFiles}
           selectedIds={selectedIds}
           onSelectAll={handleSelectAll}
           onSelect={handleSelect}
@@ -758,8 +767,28 @@ export default function DocumentsPage() {
         />
       )}
 
+      {/* Load more */}
+      {!docsLoading && !docsError && documentFiles.length > 0 && hasNextPage && (
+        <div className="flex justify-center pt-4">
+          <Button
+            variant="outline"
+            onClick={() => fetchNextPage()}
+            disabled={isFetchingNextPage}
+          >
+            {isFetchingNextPage ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Loading…
+              </>
+            ) : (
+              'Load more'
+            )}
+          </Button>
+        </div>
+      )}
+
       {/* Empty state */}
-      {!docsLoading && (!documentsData?.files || documentsData.files.length === 0) && (
+      {!docsLoading && !docsError && documentFiles.length === 0 && (
         <div className="text-center py-12 text-muted-foreground">
           <FileBox className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <p className="text-lg font-medium">No documents yet</p>

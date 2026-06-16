@@ -8,7 +8,8 @@
  * - Error handling
  */
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import type { InfiniteData } from '@tanstack/react-query'
 import type {
   Document,
   DocumentWithTags,
@@ -97,6 +98,20 @@ export function useUpdateDocumentsSettings() {
 
 // Documents Hooks
 
+// One page of the files list, as returned by GET /files (limit/offset + has_more).
+const DOCUMENTS_PAGE_SIZE = 50
+
+export type DocumentsPage = {
+  files: DocumentWithTags[]
+  count: number
+  limit: number
+  offset: number
+  has_more: boolean
+}
+
+// Paginated documents list. Pages are fetched 50-at-a-time via the files API's
+// limit/offset; `has_more` drives `hasNextPage` so the UI can offer "Load more"
+// instead of silently capping the list at the first page.
 export function useDocuments(filters?: DocumentFilters & { with_previews?: boolean }) {
   const params = new URLSearchParams()
   if (filters?.folder_id !== undefined) {
@@ -108,20 +123,47 @@ export function useDocuments(filters?: DocumentFilters & { with_previews?: boole
   if (filters?.date_from) params.set('date_from', filters.date_from)
   if (filters?.date_to) params.set('date_to', filters.date_to)
   if (filters?.with_previews === false) params.set('with_previews', 'false')
+  params.set('limit', String(DOCUMENTS_PAGE_SIZE))
 
   const queryString = params.toString()
 
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: [...DOCUMENTS_KEY, queryString],
-    queryFn: async (): Promise<{ files: DocumentWithTags[]; count: number }> => {
-      const res = await fetch(`/api/modules/documents/files?${queryString}`)
+    queryFn: async ({ pageParam }): Promise<DocumentsPage> => {
+      const res = await fetch(`/api/modules/documents/files?${queryString}&offset=${pageParam}`)
       if (!res.ok) {
-        const error = await res.json()
+        const error = await res.json().catch(() => ({}))
         throw new Error(error.error || 'Failed to fetch documents')
       }
       return await res.json()
     },
+    initialPageParam: 0,
+    // Advance by one page until the API reports no more rows. The API clamps
+    // offset at 10_000, so stop there too — requesting beyond it would just
+    // re-fetch the clamped final page indefinitely.
+    getNextPageParam: (lastPage) => {
+      if (!lastPage.has_more) return undefined
+      const next = lastPage.offset + lastPage.limit
+      return next <= 10_000 ? next : undefined
+    },
   })
+}
+
+// Apply a transform to the files of every page in the infinite documents cache,
+// recomputing each page's count. Used by the optimistic mutations below so they
+// stay correct against the paged ({ pages: [...] }) cache shape.
+function mapDocumentsPages(
+  old: InfiniteData<DocumentsPage> | undefined,
+  transform: (files: DocumentWithTags[]) => DocumentWithTags[],
+): InfiniteData<DocumentsPage> | undefined {
+  if (!old) return old
+  return {
+    ...old,
+    pages: old.pages.map((page) => {
+      const files = transform(page.files)
+      return { ...page, files, count: files.length }
+    }),
+  }
 }
 
 export function useTrashDocuments() {
@@ -221,18 +263,12 @@ export function useDeleteDocument() {
     },
     onMutate: async (deletedId) => {
       await queryClient.cancelQueries({ queryKey: DOCUMENTS_KEY })
-      const previous = queryClient.getQueriesData<{ files: DocumentWithTags[]; count: number }>({
+      const previous = queryClient.getQueriesData<InfiniteData<DocumentsPage>>({
         queryKey: DOCUMENTS_KEY,
       })
-      queryClient.setQueriesData<{ files: DocumentWithTags[]; count: number }>(
+      queryClient.setQueriesData<InfiniteData<DocumentsPage>>(
         { queryKey: DOCUMENTS_KEY },
-        (old) => {
-          if (!old) return old
-          return {
-            files: old.files.filter((f) => f.id !== deletedId),
-            count: old.count - 1,
-          }
-        }
+        (old) => mapDocumentsPages(old, (files) => files.filter((f) => f.id !== deletedId)),
       )
       return { previous }
     },
@@ -308,17 +344,13 @@ export function useBulkDeleteDocuments() {
     mutationFn: (ids: string[]) => bulkFiles({ action: 'delete', ids }),
     onMutate: async (ids) => {
       await queryClient.cancelQueries({ queryKey: DOCUMENTS_KEY })
-      const previous = queryClient.getQueriesData<{ files: DocumentWithTags[]; count: number }>({
+      const previous = queryClient.getQueriesData<InfiniteData<DocumentsPage>>({
         queryKey: DOCUMENTS_KEY,
       })
       const toRemove = new Set(ids)
-      queryClient.setQueriesData<{ files: DocumentWithTags[]; count: number }>(
+      queryClient.setQueriesData<InfiniteData<DocumentsPage>>(
         { queryKey: DOCUMENTS_KEY },
-        (old) => {
-          if (!old) return old
-          const next = old.files.filter((f) => !toRemove.has(f.id))
-          return { files: next, count: next.length }
-        }
+        (old) => mapDocumentsPages(old, (files) => files.filter((f) => !toRemove.has(f.id))),
       )
       return { previous }
     },
@@ -345,21 +377,17 @@ export function useBulkMoveDocuments() {
       bulkFiles({ action: 'move', ids, folder_id: folderId }),
     onMutate: async ({ ids, folderId }) => {
       await queryClient.cancelQueries({ queryKey: DOCUMENTS_KEY })
-      const previous = queryClient.getQueriesData<{ files: DocumentWithTags[]; count: number }>({
+      const previous = queryClient.getQueriesData<InfiniteData<DocumentsPage>>({
         queryKey: DOCUMENTS_KEY,
       })
       const moving = new Set(ids)
-      queryClient.setQueriesData<{ files: DocumentWithTags[]; count: number }>(
+      queryClient.setQueriesData<InfiniteData<DocumentsPage>>(
         { queryKey: DOCUMENTS_KEY },
-        (old) => {
-          if (!old) return old
-          return {
-            files: old.files.map((f) =>
-              moving.has(f.id) ? { ...f, folder_id: folderId } as DocumentWithTags : f
-            ),
-            count: old.count,
-          }
-        }
+        (old) => mapDocumentsPages(old, (files) =>
+          files.map((f) =>
+            moving.has(f.id) ? ({ ...f, folder_id: folderId } as DocumentWithTags) : f
+          ),
+        ),
       )
       return { previous }
     },
