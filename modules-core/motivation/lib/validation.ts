@@ -6,6 +6,18 @@ export const uuidSchema = z.string().uuid('Invalid video id format')
 export const URL_MAX = 2048
 const REORDER_MAX = 500
 
+// Pagination for GET /videos. The default page size is mirrored on the client
+// in hooks/use-motivation.ts (MOTIVATION_PAGE_SIZE) — keep them in sync.
+export const LIST_LIMIT_DEFAULT = 60
+export const LIST_LIMIT_MAX = 200
+
+export const listVideosQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(LIST_LIMIT_MAX).default(LIST_LIMIT_DEFAULT),
+    offset: z.coerce.number().int().min(0).default(0),
+  })
+  .openapi('MotivationListVideosQuery')
+
 // YouTube IDs are exactly 11 chars from [a-zA-Z0-9_-]. Use this everywhere we
 // read or write the youtube_id field.
 export const youtubeIdSchema = z
@@ -50,7 +62,10 @@ export const MotivationVideoSchema = z
 export const VideoListResponseSchema = z
   .object({
     videos: z.array(MotivationVideoSchema),
-    count: z.number().int().nonnegative(),
+    count: z.number().int().nonnegative(), // number of videos in THIS page
+    total: z.number().int().nonnegative(), // total videos the user owns (across all pages)
+    limit: z.number().int().positive(),
+    offset: z.number().int().nonnegative(),
   })
   .openapi('MotivationVideoListResponse')
 

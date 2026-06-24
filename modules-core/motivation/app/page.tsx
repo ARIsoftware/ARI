@@ -33,10 +33,14 @@ export default function MotivationPage() {
   const { toast } = useToast()
   const { data: settings, isLoading: settingsLoading } = useMotivationSettings()
   const {
-    data: videos = [],
+    videos,
+    total,
     isLoading: videosLoading,
     isError: videosError,
     refetch: refetchVideos,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage,
   } = useMotivationVideos()
   const deleteVideo = useDeleteMotivationVideo()
   const reorderVideos = useReorderMotivationVideos()
@@ -181,14 +185,37 @@ export default function MotivationPage() {
           </CardContent>
         </Card>
       ) : (
-        <VideoGrid
-          videos={videos}
-          density={density}
-          reorderEnabled={reorderEnabled}
-          onPlay={openPlayerAt}
-          onDelete={requestDelete}
-          onReorder={handleReorder}
-        />
+        <>
+          <VideoGrid
+            videos={videos}
+            density={density}
+            reorderEnabled={reorderEnabled}
+            onPlay={openPlayerAt}
+            onDelete={requestDelete}
+            onReorder={handleReorder}
+          />
+          {hasNextPage && (
+            <div className="flex flex-col items-center gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+              >
+                {isFetchingNextPage ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  'Load more'
+                )}
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Showing {videos.length} of {total}
+              </p>
+            </div>
+          )}
+        </>
       )}
 
       <AddVideoDialog open={addOpen} onOpenChange={setAddOpen} />

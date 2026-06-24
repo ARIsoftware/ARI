@@ -9,6 +9,7 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
 import {
   addVideoSchema,
+  listVideosQuerySchema,
   VideoListResponseSchema,
   VideoSingleResponseSchema,
 } from '@/modules/motivation/lib/validation'
@@ -31,11 +32,13 @@ registry.registerPath({
   method: 'get',
   path: '/api/modules/motivation/videos',
   operationId: 'listMotivationVideos',
-  summary: "List the user's motivation videos in their preferred sort order",
+  summary: "List the user's motivation videos in their preferred sort order (paginated)",
   tags: ['motivation'],
   security: DEFAULT_SECURITY,
+  request: { query: listVideosQuerySchema },
   responses: {
     200: { description: 'Videos', content: { 'application/json': { schema: VideoListResponseSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
     401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
     500: InternalServerErrorResponse,
   },
@@ -58,17 +61,30 @@ registry.registerPath({
   },
 })
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const { user, withRLS } = await getAuthenticatedUser()
     if (!user || !withRLS) {
       return createErrorResponse('Unauthorized - Valid authentication required', 401)
     }
 
-    // Settings probe and videos query share a single transaction so we
-    // make one round-trip pair and the user_id filter is mandatory (the
-    // default Postgres role bypasses RLS — see docs/SECURITY.md).
-    const { videos } = await withRLS(async (db) => {
+    // Pagination: `limit`/`offset` are validated + clamped (default 60, max 200)
+    // so a list can never return an unbounded result set. Offset paging is used
+    // (rather than keyset) because it serves all three sort modes uniformly and
+    // the (user_id, position) / (user_id, created_at) composites cover it.
+    const parsedQuery = listVideosQuerySchema.safeParse({
+      limit: request.nextUrl.searchParams.get('limit') ?? undefined,
+      offset: request.nextUrl.searchParams.get('offset') ?? undefined,
+    })
+    if (!parsedQuery.success) {
+      return createErrorResponse('Invalid pagination parameters', 400)
+    }
+    const { limit, offset } = parsedQuery.data
+
+    // Settings probe, total count, and the page query share a single
+    // transaction. The user_id filter is mandatory on every read (the default
+    // Postgres role bypasses RLS — see docs/SECURITY.md).
+    const { videos, total } = await withRLS(async (db) => {
       const settingsRow = await db
         .select({ settings: moduleSettings.settings })
         .from(moduleSettings)
@@ -78,19 +94,31 @@ export async function GET(_request: NextRequest) {
         ? settings.defaultSort
         : 'custom'
 
+      const totalRow = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(motivationVideos)
+        .where(eq(motivationVideos.userId, user.id))
+      const total = totalRow[0]?.count ?? 0
+
       const base = db.select().from(motivationVideos).where(eq(motivationVideos.userId, user.id))
-      const videos = await (
+      const ordered =
         sort === 'newest'
           ? base.orderBy(desc(motivationVideos.createdAt))
           : sort === 'oldest'
             ? base.orderBy(asc(motivationVideos.createdAt))
             // custom: position ASC, then createdAt DESC as a tiebreaker
             : base.orderBy(asc(motivationVideos.position), desc(motivationVideos.createdAt))
-      )
-      return { videos }
+      const videos = await ordered.limit(limit).offset(offset)
+      return { videos, total }
     })
 
-    return NextResponse.json({ videos: toSnakeCase(videos), count: videos.length })
+    return NextResponse.json({
+      videos: toSnakeCase(videos),
+      count: videos.length,
+      total,
+      limit,
+      offset,
+    })
   } catch (error) {
     console.error('GET /api/modules/motivation/videos error:', error instanceof Error ? error.message : error)
     return createErrorResponse('Internal server error', 500)

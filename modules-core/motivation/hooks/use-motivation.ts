@@ -6,12 +6,71 @@
  * watch — never close on the click event.
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+} from '@tanstack/react-query'
 import type { MotivationSettings, MotivationVideo } from '../types'
 
 const VIDEOS_KEY = ['motivation', 'videos']
 const SETTINGS_KEY = ['motivation', 'settings']
 const QUOTES_KEY = ['motivation', 'quotes-pool']
+
+// Page size for the videos grid. Mirrors LIST_LIMIT_DEFAULT in lib/validation.ts
+// (the server clamps to its own max regardless) — keep them in sync.
+export const MOTIVATION_PAGE_SIZE = 60
+
+interface VideosPage {
+  videos: MotivationVideo[]
+  total: number
+  limit: number
+  offset: number
+}
+
+// Map the deleted id out of every cached page and decrement the (duplicated)
+// total. onSettled re-fetches the canonical total, so this is transient.
+function removeFromPages(
+  old: InfiniteData<VideosPage> | undefined,
+  deletedId: string,
+): InfiniteData<VideosPage> | undefined {
+  if (!old) return old
+  return {
+    ...old,
+    pages: old.pages.map((p) => ({
+      ...p,
+      total: Math.max(0, p.total - 1),
+      videos: p.videos.filter((v) => v.id !== deletedId),
+    })),
+  }
+}
+
+// Apply a new id ordering to the flattened pages, then re-chunk preserving each
+// page's original size. `ids` always covers exactly the loaded videos, so the
+// reordered list and the flattened list have the same length.
+function reorderPages(
+  old: InfiniteData<VideosPage> | undefined,
+  ids: string[],
+): InfiniteData<VideosPage> | undefined {
+  if (!old) return old
+  const flat = old.pages.flatMap((p) => p.videos)
+  const byId = new Map(flat.map((v) => [v.id, v]))
+  const reordered = ids
+    .map((id, index) => {
+      const v = byId.get(id)
+      return v ? { ...v, position: index + 1 } : null
+    })
+    .filter((v): v is MotivationVideo => v !== null)
+  let cursor = 0
+  const pages = old.pages.map((p) => {
+    const slice = reordered.slice(cursor, cursor + p.videos.length)
+    cursor += p.videos.length
+    return { ...p, videos: slice }
+  })
+  return { ...old, pages }
+}
 
 export interface MotivationQuote {
   quote: string
@@ -52,16 +111,48 @@ export function useQuotesPool(enabled: boolean) {
   })
 }
 
+/**
+ * Paginated videos query. Returns a flattened `videos` array plus "load more"
+ * controls. Pages are fetched with offset paging (limit = MOTIVATION_PAGE_SIZE).
+ */
 export function useMotivationVideos() {
-  return useQuery({
+  const query = useInfiniteQuery({
     queryKey: VIDEOS_KEY,
-    queryFn: async (): Promise<MotivationVideo[]> => {
-      const res = await fetch('/api/modules/motivation/videos')
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }): Promise<VideosPage> => {
+      const params = new URLSearchParams({
+        limit: String(MOTIVATION_PAGE_SIZE),
+        offset: String(pageParam),
+      })
+      const res = await fetch(`/api/modules/motivation/videos?${params.toString()}`)
       if (!res.ok) throw new Error(await extractErrorMessage(res, 'Failed to load videos'))
       const data = await res.json()
-      return data.videos ?? []
+      return {
+        videos: data.videos ?? [],
+        total: data.total ?? (data.videos?.length ?? 0),
+        limit: data.limit ?? MOTIVATION_PAGE_SIZE,
+        offset: data.offset ?? Number(pageParam),
+      }
+    },
+    getNextPageParam: (lastPage) => {
+      const loaded = lastPage.offset + lastPage.videos.length
+      return loaded < lastPage.total ? loaded : undefined
     },
   })
+
+  const videos = query.data?.pages.flatMap((p) => p.videos) ?? []
+  const total = query.data?.pages[0]?.total ?? 0
+
+  return {
+    videos,
+    total,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    refetch: query.refetch,
+    hasNextPage: query.hasNextPage,
+    fetchNextPage: query.fetchNextPage,
+    isFetchingNextPage: query.isFetchingNextPage,
+  }
 }
 
 export function useAddMotivationVideo() {
@@ -94,9 +185,9 @@ export function useDeleteMotivationVideo() {
     },
     onMutate: async (deletedId) => {
       await queryClient.cancelQueries({ queryKey: VIDEOS_KEY })
-      const previous = queryClient.getQueryData<MotivationVideo[]>(VIDEOS_KEY)
-      queryClient.setQueryData<MotivationVideo[]>(VIDEOS_KEY, (old = []) =>
-        old.filter((v) => v.id !== deletedId),
+      const previous = queryClient.getQueryData<InfiniteData<VideosPage>>(VIDEOS_KEY)
+      queryClient.setQueryData<InfiniteData<VideosPage>>(VIDEOS_KEY, (old) =>
+        removeFromPages(old, deletedId),
       )
       return { previous }
     },
@@ -124,15 +215,10 @@ export function useReorderMotivationVideos() {
     },
     onMutate: async (ids) => {
       await queryClient.cancelQueries({ queryKey: VIDEOS_KEY })
-      const previous = queryClient.getQueryData<MotivationVideo[]>(VIDEOS_KEY)
-      if (previous) {
-        const byId = new Map(previous.map((v) => [v.id, v]))
-        const next = ids.map((id, index) => {
-          const v = byId.get(id)
-          return v ? { ...v, position: index + 1 } : null
-        }).filter((v): v is MotivationVideo => v !== null)
-        queryClient.setQueryData<MotivationVideo[]>(VIDEOS_KEY, next)
-      }
+      const previous = queryClient.getQueryData<InfiniteData<VideosPage>>(VIDEOS_KEY)
+      queryClient.setQueryData<InfiniteData<VideosPage>>(VIDEOS_KEY, (old) =>
+        reorderPages(old, ids),
+      )
       return { previous }
     },
     onError: (_err, _ids, context) => {
