@@ -87,8 +87,6 @@ export interface AiProviderCardProps {
   isSaving?: boolean
   /** Briefly flip the embedded Save button to a "Saved!" confirmation. */
   justSaved?: boolean
-  /** Override the card description line. */
-  description?: string
 }
 
 export function AiProviderCard({
@@ -97,7 +95,6 @@ export function AiProviderCard({
   onSave,
   isSaving = false,
   justSaved = false,
-  description = 'Configure the AI Providers to use with this module.',
 }: AiProviderCardProps) {
   const { data: providerKeys = {} } = useApiKeysStatus()
 
@@ -124,7 +121,17 @@ export function AiProviderCard({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1.5">
             <CardTitle>AI Providers</CardTitle>
-            <CardDescription>{description}</CardDescription>
+            <CardDescription>
+              Choose the AI Provider that this module should use. You can add
+              or manage additional AI Providers in{' '}
+              <Link
+                href="/settings?tab=integrations"
+                className="underline underline-offset-4 hover:text-foreground/80"
+              >
+                ARI settings
+              </Link>
+              .
+            </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2 sm:flex-shrink-0">
             <Button asChild size="sm">
@@ -147,7 +154,7 @@ export function AiProviderCard({
         {configuredProviders.length === 0 ? (
           // Empty state: no API keys configured anywhere in ARI yet.
           // Replaces the whole card body with a single clear call to action.
-          <div className="flex flex-col items-center rounded-xl border border-dashed px-6 py-12 text-center">
+          <div className="flex flex-col items-center rounded-lg border border-dashed px-6 py-12 text-center">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
               <Plug className="h-6 w-6 text-muted-foreground" />
             </div>
@@ -164,19 +171,6 @@ export function AiProviderCard({
           </div>
         ) : (
           <>
-            <div className="rounded-xl border bg-muted/30 p-5">
-              <p className="text-sm font-medium text-foreground">
-                Choose the AI Provider that this module should use. You can add or manage additional AI Providers in{' '}
-                <Link
-                  href="/settings?tab=integrations"
-                  className="underline underline-offset-4 hover:text-foreground/80"
-                >
-                  ARI settings
-                </Link>
-                .
-              </p>
-            </div>
-
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {configuredProviders.map(({ id, name, description }) => {
                 const Icon = PROVIDER_ICONS[id]
@@ -199,7 +193,7 @@ export function AiProviderCard({
                     aria-checked={selected}
                     onClick={() => onChange(selected ? null : id)}
                     className={cn(
-                      'group relative flex flex-col gap-3 rounded-xl border p-4 text-left transition',
+                      'group relative flex flex-col gap-3 rounded-lg border p-4 text-left transition',
                       selected
                         ? // Same green as enabled provider cards on /settings?tab=integrations
                           'border-green-600/40 bg-green-600/40'
