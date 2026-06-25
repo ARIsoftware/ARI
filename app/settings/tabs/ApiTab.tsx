@@ -425,7 +425,7 @@ export function ApiTab(): React.ReactElement {
               </CardDescription>
             </div>
             <Button size="sm" asChild>
-              <a href="/api-docs">
+              <a href="/api-docs" target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Open interactive docs
               </a>
