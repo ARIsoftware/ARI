@@ -20,6 +20,7 @@ export const AI_PROVIDER_IDS = [
   'deepseek',
   'groq',
   'perplexity',
+  'elevenlabs',
   'ollama',
 ] as const
 
@@ -119,6 +120,15 @@ export const AI_PROVIDERS: readonly AiProvider[] = [
     primaryPlaceholder: '',
     modelEnvKey: 'PERPLEXITY_MODEL',
     modelPlaceholder: 'sonar',
+  },
+  {
+    id: 'elevenlabs',
+    name: 'ElevenLabs',
+    description: 'Realistic AI voice synthesis and text-to-speech.',
+    primaryEnvKey: 'ELEVENLABS_API_KEY',
+    primaryPlaceholder: '',
+    modelEnvKey: 'ELEVENLABS_MODEL',
+    modelPlaceholder: 'eleven_multilingual_v2',
   },
   {
     id: 'ollama',

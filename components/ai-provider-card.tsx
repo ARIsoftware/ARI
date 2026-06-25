@@ -51,6 +51,7 @@ import {
   Zap,
   Compass,
   Server,
+  AudioLines,
   ExternalLink,
   Plug,
   type LucideIcon,
@@ -70,6 +71,7 @@ const PROVIDER_ICONS: Record<AiProviderId, LucideIcon> = {
   deepseek: Search,
   groq: Zap,
   perplexity: Compass,
+  elevenlabs: AudioLines,
   ollama: Server,
 }
 
