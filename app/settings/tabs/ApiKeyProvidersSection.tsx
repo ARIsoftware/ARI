@@ -281,7 +281,7 @@ export function ApiKeyProvidersSection({
                       </p>
                       {renderModelField(provider.modelField.envKey, provider.modelField.placeholder)}
                       <p className="text-[10px] text-muted-foreground mt-1">
-                        Leave blank to use the default ({provider.modelField.placeholder}).
+                        Leave blank to use the default model.
                       </p>
                     </div>
                   )}
