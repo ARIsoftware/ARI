@@ -161,6 +161,9 @@ importers:
       framer-motion:
         specifier: ^12.40.0
         version: 12.40.0(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      ical-expander:
+        specifier: ^3.2.0
+        version: 3.2.0
       input-otp:
         specifier: ^1.4.2
         version: 1.4.2(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -4106,6 +4109,13 @@ packages:
   https-proxy-agent@7.0.6:
     resolution: {integrity: sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==}
     engines: {node: '>= 14'}
+
+  ical-expander@3.2.0:
+    resolution: {integrity: sha512-QhU7l1X7rcbVVekpIHy7Vm7dvFcMl+PoNPhn13oB3RK3YjdZo3+uT/yx9OJopo0anX5cEGUyzsWRvagZk8gOSw==}
+    engines: {node: '>=4'}
+
+  ical.js@1.5.0:
+    resolution: {integrity: sha512-7ZxMkogUkkaCx810yp0ZGKvq1ZpRgJeornPttpoxe6nYZ3NLesZe1wWMXDdwTkj/b5NtXT+Y16Aakph/ao98ZQ==}
 
   iceberg-js@0.8.1:
     resolution: {integrity: sha512-1dhVQZXhcHje7798IVM+xoo/1ZdVfzOMIc8/rgVSijRK38EDqOJoGula9N/8ZI5RD8QTxNQtK/Gozpr+qUqRRA==}
@@ -10131,6 +10141,12 @@ snapshots:
       debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
+
+  ical-expander@3.2.0:
+    dependencies:
+      ical.js: 1.5.0
+
+  ical.js@1.5.0: {}
 
   iceberg-js@0.8.1: {}
 
