@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { toSnakeCase, validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
+import { toSnakeCase, validateRequestBody, validateQueryParams, createErrorResponse } from '@/lib/api-helpers'
 import { calculatePriorityScore } from '@/modules/tasks/lib/priority-utils'
 import {
   updatePrioritiesSchema,
   batchPrioritiesSchema,
+  prioritiesQuerySchema,
   TaskSchema,
   TaskListSchema,
   BatchPrioritiesResponseSchema,
@@ -24,8 +25,10 @@ registry.registerPath({
   summary: 'List tasks sorted by computed priority score (descending)',
   tags: ['tasks'],
   security: DEFAULT_SECURITY,
+  request: { query: prioritiesQuerySchema },
   responses: {
     200: { description: 'Tasks ordered by priority_score desc', content: { 'application/json': { schema: TaskListSchema } } },
+    400: { description: 'Invalid query parameters', content: { 'application/json': { schema: ErrorResponseSchema } } },
     401: UnauthorizedResponse,
     500: InternalServerErrorResponse,
   },
@@ -72,9 +75,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    const data = await withRLS((db) =>
-      db.select().from(tasks).where(eq(tasks.userId, user.id)).orderBy(desc(tasks.priorityScore))
-    )
+    const { searchParams } = new URL(request.url)
+    const parsed = validateQueryParams(searchParams, prioritiesQuerySchema)
+    if (!parsed.success) {
+      return parsed.response
+    }
+    const { limit, offset } = parsed.data
+    // and() drops undefined args, so this conditionally filters by completion.
+    const completedFilter = parsed.data.completed
+      ? eq(tasks.completed, parsed.data.completed === 'true')
+      : undefined
+
+    const data = await withRLS((db) => {
+      let q = db
+        .select()
+        .from(tasks)
+        .where(and(eq(tasks.userId, user.id), completedFilter))
+        .orderBy(desc(tasks.priorityScore))
+        .$dynamic()
+      if (limit !== undefined) q = q.limit(limit)
+      if (offset !== undefined) q = q.offset(offset)
+      return q
+    })
 
     return NextResponse.json(toSnakeCase(data))
   } catch (err) {

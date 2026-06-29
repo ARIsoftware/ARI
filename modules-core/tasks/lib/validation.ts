@@ -140,6 +140,14 @@ export const PrioritiesAxesSchema = z.object({
   strategic_fit: z.number().min(1).max(5),
 })
 
+// Optional filters/pagination for GET /priorities. All optional → default
+// behavior (every task, all statuses, sorted by priority) is unchanged.
+export const prioritiesQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1, 'limit must be at least 1').max(500, 'limit must be 500 or fewer').optional(),
+  offset: z.coerce.number().int().min(0, 'offset must be 0 or more').optional(),
+  completed: z.enum(['true', 'false']).optional(),
+})
+
 export const updatePrioritiesSchema = z.object({
   taskId: uuidSchema,
   axes: PrioritiesAxesSchema,
