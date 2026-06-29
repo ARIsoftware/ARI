@@ -22,7 +22,9 @@ const cspHeader = [
   "form-action 'self'",
   "base-uri 'self'",
   "object-src 'none'",
-  "media-src 'self'"
+  // blob: for synthesized TTS audio (e.g. Morning Brief read-aloud); the Google
+  // Storage host serves ElevenLabs' premade voice preview clips.
+  "media-src 'self' blob: https://storage.googleapis.com"
 ].join("; ")
 
 /** Apply all security headers to any response (redirects, errors, etc.) */

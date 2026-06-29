@@ -29,6 +29,11 @@ export type AiProviderId = (typeof AI_PROVIDER_IDS)[number]
 export interface AiProvider {
   id: AiProviderId
   name: string
+  // What the provider does. 'chat' = a text/LLM "brain" (the default); 'voice' =
+  // text-to-speech / audio. These are different jobs, not interchangeable: the
+  // per-module AiProviderCard only offers 'chat' providers (single-select brain),
+  // while voice providers are configured by the feature that needs them.
+  kind?: 'chat' | 'voice'
   description: string
   primaryEnvKey: string
   primaryPlaceholder: string
@@ -124,6 +129,7 @@ export const AI_PROVIDERS: readonly AiProvider[] = [
   {
     id: 'elevenlabs',
     name: 'ElevenLabs',
+    kind: 'voice',
     description: 'Realistic AI voice synthesis and text-to-speech.',
     primaryEnvKey: 'ELEVENLABS_API_KEY',
     primaryPlaceholder: '',
@@ -141,6 +147,13 @@ export const AI_PROVIDERS: readonly AiProvider[] = [
     modelPlaceholder: 'llama3.3',
   },
 ]
+
+/** Providers that act as a module's text/LLM brain. The per-module provider
+ *  picker only offers these — voice/audio providers are chosen elsewhere. */
+export const AI_CHAT_PROVIDERS = AI_PROVIDERS.filter((p) => (p.kind ?? 'chat') === 'chat')
+
+/** Voice / text-to-speech providers (e.g. ElevenLabs), configured per feature. */
+export const AI_VOICE_PROVIDERS = AI_PROVIDERS.filter((p) => p.kind === 'voice')
 
 export const AI_PROVIDER_SECRET_ENV_KEYS = AI_PROVIDERS
   .filter((p) => !p.keyIsPlaintext)
