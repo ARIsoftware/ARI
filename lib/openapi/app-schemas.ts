@@ -299,6 +299,21 @@ export const SettingsApiKeySaveResponseSchema = z.object({
   masked: z.string().optional(),
 }).openapi('SettingsApiKeySaveResponse')
 
+export const settingsProviderModelsQuerySchema = z.object({
+  provider: z.string(),
+}).openapi('SettingsProviderModelsQuery')
+
+export const SettingsProviderModelsSchema = z.object({
+  provider: z.string(),
+  // 'live' = fetched/cached from the provider; 'unavailable' = no list endpoint
+  // or the fetch failed (UI falls back to a free-text model field).
+  source: z.enum(['live', 'unavailable']),
+  models: z.array(z.object({
+    id: z.string(),
+    label: z.string().optional(),
+  })),
+}).openapi('SettingsProviderModels')
+
 export const SettingsGithubStatusSchema = z.object({
   hasToken: z.boolean(),
   repoOwner: z.string(),
