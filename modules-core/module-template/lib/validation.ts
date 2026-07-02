@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import '@/lib/openapi/registry'
 import { safeText } from '@/lib/validation'
-import { AI_PROVIDER_IDS } from '@/lib/ai-providers'
+import { AI_PROVIDER_IDS, MODEL_ID_MAX_LENGTH } from '@/lib/ai-providers'
 
 const uuidSchema = z.string().uuid('Invalid entry id format')
 
@@ -57,6 +57,7 @@ export const ModuleTemplateSettingsSchema = z.object({
   theme: z.enum(['light', 'dark', 'auto']).optional(),
   refreshInterval: z.enum(['30', '60', '120']).optional(),
   selectedAiProvider: z.enum(AI_PROVIDER_IDS).nullable().optional(),
+  aiProviderModels: z.record(z.enum(AI_PROVIDER_IDS), z.string().max(MODEL_ID_MAX_LENGTH)).optional(),
 }).strict().openapi('ModuleTemplateSettings')
 
 export const SettingsSavedSchema = z.object({

@@ -96,6 +96,13 @@ export interface ModuleTemplateSettings {
   refreshInterval: '30' | '60' | '120'
 
   selectedAiProvider: AiProviderId | null
+
+  /**
+   * Per-module model override, keyed by provider id (e.g. { openai: 'gpt-5' }).
+   * Blank/absent for a provider = fall back to the global model from
+   * Settings → Integrations, then the provider's built-in default.
+   */
+  aiProviderModels?: Partial<Record<AiProviderId, string>>
 }
 
 /**

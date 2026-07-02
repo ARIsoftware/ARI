@@ -82,6 +82,7 @@ import { API_INTEGRATIONS_DOCS_URL } from '@/lib/constants'
 import {
   AI_CHAT_PROVIDERS,
   AI_VOICE_PROVIDERS,
+  MODEL_ID_MAX_LENGTH,
   type AiProvider,
   type AiProviderId,
 } from '@/lib/ai-providers'
@@ -190,6 +191,7 @@ function ProviderModelField({
           value={value}
           placeholder={defaultModel}
           onChange={(e) => onChange(e.target.value)}
+          maxLength={MODEL_ID_MAX_LENGTH}
           className="font-mono text-xs"
         />
         {data?.source === 'unavailable' ? (
@@ -297,6 +299,7 @@ function ProviderModelField({
           value={value}
           placeholder={defaultModel}
           onChange={(e) => onChange(e.target.value)}
+          maxLength={MODEL_ID_MAX_LENGTH}
           className="mt-2 font-mono text-xs"
         />
       )}

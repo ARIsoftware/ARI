@@ -26,6 +26,13 @@ export const AI_PROVIDER_IDS = [
 
 export type AiProviderId = (typeof AI_PROVIDER_IDS)[number]
 
+/**
+ * Max length of a per-module model-id override. Single source of truth for the
+ * client input cap (AiProviderCard) and the server-side Zod validation, so the
+ * two never drift.
+ */
+export const MODEL_ID_MAX_LENGTH = 200
+
 export interface AiProvider {
   id: AiProviderId
   name: string

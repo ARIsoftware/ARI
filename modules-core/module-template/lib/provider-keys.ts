@@ -57,12 +57,22 @@ export interface ProviderCredentials {
 /**
  * Resolve both the API key and model for a provider in a single settings read.
  * Combined so callers don't pay two DB round-trips for the same blob.
+ *
+ * `modelOverride` is the module's own per-module model (stored on this module's
+ * settings, not the global integrations blob). When set, it wins over the
+ * global model. Resolution order for the model: per-module override → global
+ * <PROVIDER>_MODEL → the provider's registry default.
  */
-export async function getProviderCredentials(userId: string, providerId: AiProviderId): Promise<ProviderCredentials> {
+export async function getProviderCredentials(
+  userId: string,
+  providerId: AiProviderId,
+  modelOverride?: string | null,
+): Promise<ProviderCredentials> {
   const provider = providerById(providerId)
   const saved = await readIntegrationsSettings(userId)
+  const override = typeof modelOverride === 'string' ? modelOverride.trim() : ''
   return {
     apiKey: resolve(saved, provider.primaryEnvKey),
-    model: resolve(saved, provider.modelEnvKey) ?? provider.modelPlaceholder,
+    model: override || resolve(saved, provider.modelEnvKey) || provider.modelPlaceholder,
   }
 }

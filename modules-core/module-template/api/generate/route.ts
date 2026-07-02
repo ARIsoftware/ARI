@@ -21,7 +21,8 @@ import {
 } from '@/modules/module-template/lib/validation'
 import { getProviderCredentials } from '@/modules/module-template/lib/provider-keys'
 import { callLLM } from '@/modules/module-template/lib/llm-clients'
-import { AI_PROVIDERS, type AiProviderId } from '@/lib/ai-providers'
+import type { ModuleTemplateSettings } from '@/modules/module-template/types'
+import { AI_CHAT_PROVIDERS } from '@/lib/ai-providers'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { moduleSettings } from '@/lib/db/schema'
@@ -63,17 +64,21 @@ export async function POST(request: NextRequest) {
         .where(eq(moduleSettings.moduleId, 'module-template'))
         .limit(1)
     )
-    const settings = (rows[0]?.settings ?? {}) as { selectedAiProvider?: AiProviderId | null }
+    const settings = (rows[0]?.settings ?? {}) as Partial<ModuleTemplateSettings>
     const provider = settings.selectedAiProvider ?? null
 
     if (!provider) {
       return createErrorResponse('No AI provider selected', 400)
     }
-    if (!AI_PROVIDERS.some((p) => p.id === provider)) {
+    if (!AI_CHAT_PROVIDERS.some((p) => p.id === provider)) {
       return createErrorResponse('Selected AI provider is not recognized', 400)
     }
 
-    const { apiKey, model } = await getProviderCredentials(user.id, provider)
+    const { apiKey, model } = await getProviderCredentials(
+      user.id,
+      provider,
+      settings.aiProviderModels?.[provider],
+    )
     if (!apiKey) {
       return createErrorResponse('Selected provider has no API key configured', 400)
     }

@@ -62,6 +62,7 @@ const DEFAULT_SETTINGS: ModuleTemplateSettings = {
   theme: 'auto',
   refreshInterval: '60',
   selectedAiProvider: null,
+  aiProviderModels: {},
 }
 
 /**
@@ -135,6 +136,13 @@ export function ModuleTemplateSettingsPanel() {
       <AiProviderCard
         value={settings.selectedAiProvider}
         onChange={(id) => updateSetting('selectedAiProvider', id)}
+        models={settings.aiProviderModels}
+        onModelChange={(id, model) =>
+          setSettings(prev => ({
+            ...prev,
+            aiProviderModels: { ...prev.aiProviderModels, [id]: model },
+          }))
+        }
         onSave={handleSave}
         isSaving={updateSettings.isPending}
         justSaved={saved}
