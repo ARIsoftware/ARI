@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   SidebarGroup,
@@ -26,10 +27,10 @@ export default function MotivationSubmenu(_props: ModuleSubmenuProps) {
           {menuItems.map((item) => (
             <SidebarMenuItem key={item.path}>
               <SidebarMenuButton asChild isActive={pathname === item.path}>
-                <a href={item.path} className="flex items-center">
+                <Link href={item.path} className="flex items-center">
                   <item.icon className="mr-2 size-4" />
                   <span>{item.label}</span>
-                </a>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}

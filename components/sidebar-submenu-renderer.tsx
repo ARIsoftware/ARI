@@ -1,7 +1,7 @@
 'use client'
 
 import React, { Suspense } from 'react'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import {
   SidebarMenuButton,
   SidebarGroup,
@@ -50,11 +50,10 @@ export function SubmenuRenderer({ moduleId, module, onBack }: SubmenuRendererPro
       {/* Submenu Content */}
       <div className="flex-1 overflow-auto">
         {LazySubmenu ? (
-          <Suspense fallback={
-            <div className="flex items-center justify-center p-4">
-              <Loader2 className="size-4 animate-spin text-muted-foreground" />
-            </div>
-          }>
+          // No spinner while the submenu chunk loads — it's a tiny list of links
+          // and resolves almost instantly. Rendering null (then the menu) is
+          // cleaner than flashing a spinner, matching app/[module]/[[...slug]]/loading.tsx.
+          <Suspense fallback={null}>
             <LazySubmenu moduleId={moduleId} module={module} />
           </Suspense>
         ) : (

@@ -74,7 +74,7 @@ export default function ModuleTemplatePage() {
   const deleteEntry = useDeleteModuleTemplateEntry()
 
   // Settings hooks for onboarding
-  const { data: settings, isLoading: settingsLoading } = useModuleTemplateSettings()
+  const { data: settings } = useModuleTemplateSettings()
   const updateSettings = useUpdateModuleTemplateSettings()
 
   // Local state for form
@@ -265,14 +265,12 @@ export default function ModuleTemplatePage() {
     })
   }
 
-  // Loading state while fetching settings
-  if (settingsLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
+  // NOTE: We intentionally do NOT block the whole page on the settings fetch.
+  // Rendering immediately (and letting the form hydrate from `settings` via the
+  // effect above) avoids a spinner flash on load. The onboarding form fields fill
+  // in the moment the query resolves. FOR REAL MODULES: if your view choice depends
+  // on settings, prefer a default that won't visibly reverse, or show a skeleton for
+  // just the data-dependent section — not the entire page.
 
   /**
    * ONBOARDING SCREEN

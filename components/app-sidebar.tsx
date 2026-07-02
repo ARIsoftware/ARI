@@ -2,6 +2,7 @@
 
 import type * as React from "react"
 import { useState, useEffect, useMemo } from "react"
+import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ChevronRight, Settings, Package } from "lucide-react"
 import {
@@ -81,6 +82,8 @@ function SortableSidebarGroup({ id, item, dragModeClass, position }: { id: strin
               return (
                 <SidebarMenuItem key={route.path}>
                   <SidebarMenuButton asChild>
+                    {/* Drag-mode preview only (pointer-events-none, never navigated).
+                        Keep as <a> so it doesn't register the router / trigger prefetch. */}
                     <a href={route.path} className="flex items-center pointer-events-none">
                       <Icon className="mr-2 size-4" />
                       <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
@@ -332,11 +335,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                 return (
                                   <SidebarMenuItem key={route.path}>
                                     <SidebarMenuButton asChild>
-                                      <a href={route.path} className="flex items-center">
+                                      <Link href={route.path} className="flex items-center">
                                         <Icon className="mr-2 size-4" />
                                         <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
                                         {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
-                                      </a>
+                                      </Link>
                                     </SidebarMenuButton>
                                   </SidebarMenuItem>
                                 )
@@ -363,11 +366,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                           return (
                             <SidebarMenuItem key={route.path}>
                               <SidebarMenuButton asChild>
-                                <a href={route.path} className="flex items-center">
+                                <Link href={route.path} className="flex items-center">
                                   <Icon className="mr-2 size-4" />
                                   <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
                                   {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
-                                </a>
+                                </Link>
                               </SidebarMenuButton>
                             </SidebarMenuItem>
                           )
@@ -400,11 +403,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                 return (
                                   <SidebarMenuItem key={route.path}>
                                     <SidebarMenuButton asChild>
-                                      <a href={route.path} className="flex items-center">
+                                      <Link href={route.path} className="flex items-center">
                                         <Icon className="mr-2 size-4" />
                                         <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
                                         {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
-                                      </a>
+                                      </Link>
                                     </SidebarMenuButton>
                                   </SidebarMenuItem>
                                 )
@@ -431,11 +434,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                           return (
                             <SidebarMenuItem key={route.path}>
                               <SidebarMenuButton asChild>
-                                <a href={route.path} className="flex items-center">
+                                <Link href={route.path} className="flex items-center">
                                   <Icon className="mr-2 size-4" />
                                   <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
                                   {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
-                                </a>
+                                </Link>
                               </SidebarMenuButton>
                             </SidebarMenuItem>
                           )
@@ -454,18 +457,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={pathname.startsWith('/modules')}>
-                <a href="/modules" className="flex items-center">
+                <Link href="/modules" className="flex items-center">
                   <Package className="mr-2 size-4" />
                   <span>Modules</span>
-                </a>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={pathname.startsWith('/settings')}>
-                <a href="/settings" className="flex items-center">
+                <Link href="/settings" className="flex items-center">
                   <Settings className="mr-2 size-4" />
                   <span>Settings</span>
-                </a>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
