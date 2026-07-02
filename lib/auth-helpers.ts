@@ -1,3 +1,4 @@
+import { cache } from "react"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
 import { NextResponse } from "next/server"
@@ -17,7 +18,7 @@ const NULL_AUTH = { user: null, session: null, withRLS: null }
  *
  * @returns Object with user, session, and withRLS (Drizzle helper)
  */
-export async function getAuthenticatedUser() {
+async function getAuthenticatedUserImpl() {
   // Skip auth during build/static generation to prevent build errors
   if (process.env.NEXT_PHASE === 'phase-production-build') {
     return NULL_AUTH
@@ -112,6 +113,16 @@ export async function getAuthenticatedUser() {
     return NULL_AUTH
   }
 }
+
+/**
+ * Authenticated user + RLS helper for server components and API routes.
+ *
+ * Wrapped in React.cache so multiple calls within the SAME server request
+ * (e.g. the shared app/(app)/layout.tsx and the module catch-all page) share a
+ * single session/DB lookup instead of repeating it. cache() memoizes per
+ * request only, so behavior is otherwise identical to a direct call.
+ */
+export const getAuthenticatedUser = cache(getAuthenticatedUserImpl)
 
 /**
  * Check whether users exist in the database. Used by the welcome layout guard

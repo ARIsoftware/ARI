@@ -17,19 +17,7 @@ import { notFound, redirect } from 'next/navigation'
 import { getEnabledModule } from '@/lib/modules/module-registry'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { ErrorBoundary, ModuleErrorFallback } from '@/components/error-boundary'
-import { AppSidebar } from '@/components/app-sidebar'
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
-import { TopBar } from '@/components/top-bar'
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb'
-import { TaskAnnouncement } from '@/components/task-announcement'
-import { MainContentWrapper } from '@/components/main-content-wrapper'
+import { FullscreenSlot } from '@/components/fullscreen-slot'
 import { MODULE_PAGES } from '@/lib/generated/module-pages-registry'
 
 /**
@@ -118,43 +106,14 @@ export default async function ModuleCatchAllPage({
       </ErrorBoundary>
     )
 
-    // Conditionally wrap based on fullscreen mode
+    // The app shell (sidebar, top bar, breadcrumb) is rendered once by
+    // app/(app)/layout.tsx and persists across navigation. Fullscreen modules
+    // render into a page-owned overlay that covers that shell; all other
+    // modules render straight into the layout's content slot.
     if (isFullscreen) {
-      // Fullscreen mode - pure module content only, no sidebar, no top bar
-      return (
-        <div className="min-h-screen bg-background">
-          {pageContent}
-        </div>
-      )
-    } else {
-      // Normal mode - show sidebar and top bar (default)
-      return (
-        <div className="min-h-screen bg-background">
-          <TaskAnnouncement />
-          <SidebarProvider>
-            <AppSidebar />
-            <SidebarInset>
-              <MainContentWrapper>
-                <TopBar>
-                  <Breadcrumb>
-                    <BreadcrumbList>
-                      <BreadcrumbItem>
-                        <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
-                      </BreadcrumbItem>
-                      <BreadcrumbSeparator />
-                      <BreadcrumbItem>
-                        <BreadcrumbPage>{moduleInfo.name}</BreadcrumbPage>
-                      </BreadcrumbItem>
-                    </BreadcrumbList>
-                  </Breadcrumb>
-                </TopBar>
-                {pageContent}
-              </MainContentWrapper>
-            </SidebarInset>
-          </SidebarProvider>
-        </div>
-      )
+      return <FullscreenSlot>{pageContent}</FullscreenSlot>
     }
+    return pageContent
   } catch (error: unknown) {
     // Log the error for debugging
     console.error(`Failed to load module ${module} page:`, error)

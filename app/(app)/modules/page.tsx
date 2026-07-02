@@ -2,21 +2,11 @@
 
 import { useState, useEffect, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { AppSidebar } from "@/components/app-sidebar"
-import { TaskAnnouncement } from "@/components/task-announcement"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-} from "@/components/ui/breadcrumb"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
-import { TopBar } from "@/components/top-bar"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -1024,22 +1014,8 @@ export default function ModulesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <TaskAnnouncement />
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <TopBar>
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbPage>Modules</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </TopBar>
-
-          <main className="flex-1 bg-background">
+    <>
+      <div className="bg-background">
             <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-8 lg:px-8 pb-24">
               {/* Header */}
               <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between md:gap-8">
@@ -1330,7 +1306,7 @@ export default function ModulesPage() {
                 </div>
               )}
             </div>
-          </main>
+          </div>
 
           {/* Install Success Full-Screen Overlay */}
           {!!installSuccess && (
@@ -1842,9 +1818,6 @@ export default function ModulesPage() {
               </div>
             </div>
           )}
-        </SidebarInset>
-      </SidebarProvider>
-
       <Dialog
         open={welcomeOpen}
         onOpenChange={(open) => {
@@ -1944,6 +1917,6 @@ export default function ModulesPage() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   )
 }

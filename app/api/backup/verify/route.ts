@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { logger } from '@/lib/logger'
 import { queryRows, EXCLUDED_TABLES } from '../utils'
-import type { RoleCheck } from '@/app/settings/types'
+import type { RoleCheck } from '@/app/(app)/settings/types'
 import { BackupVerifyResponseSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, UnauthorizedResponse } from '@/lib/openapi/common'

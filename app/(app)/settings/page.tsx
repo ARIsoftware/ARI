@@ -2,21 +2,11 @@
 
 import { Suspense, useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { AppSidebar } from "@/components/app-sidebar"
-import { TaskAnnouncement } from "@/components/task-announcement"
 import { authClient } from "@/lib/auth-client"
 import { useAuth } from "@/components/providers"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-} from "@/components/ui/breadcrumb"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
-import { TopBar } from "@/components/top-bar"
 import { useToast } from "@/hooks/use-toast"
 import {
   GeneralTab,
@@ -440,23 +430,8 @@ function SettingsPageContent(): React.ReactElement {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <TaskAnnouncement />
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <TopBar>
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbPage>Settings</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </TopBar>
-
-          <main className="flex-1 bg-background">
-            <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-8 lg:px-8">
+    <div className="bg-background">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-8 lg:px-8">
               <div className="flex flex-col gap-3">
                 <Badge className="w-fit text-sm font-medium">Crafted for focus-first teams</Badge>
                 <h1 className="text-3xl font-semibold tracking-tight text-foreground">Settings</h1>
@@ -578,10 +553,7 @@ function SettingsPageContent(): React.ReactElement {
                 </TabsContent>
               </Tabs>
 
-            </div>
-          </main>
-        </SidebarInset>
-      </SidebarProvider>
+      </div>
     </div>
   )
 }
