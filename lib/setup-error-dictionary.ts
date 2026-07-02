@@ -6,6 +6,7 @@ export type SetupErrorCode =
   | "auth_failed"
   | "permission_denied"
   | "no_database"
+  | "rate_limited"
   | "transient"
   | "unknown"
 
@@ -151,6 +152,28 @@ const NO_DATABASE: SetupErrorExplanation = {
   reconfigurable: true,
 }
 
+const RATE_LIMITED: SetupErrorExplanation = {
+  code: "rate_limited",
+  title: "Too many requests",
+  summary:
+    "You've hit ARI's rate limit — too many requests in a short time. This isn't a problem with your setup or database, and nothing was changed.",
+  diagnosis:
+    "ARI limits how many setup and sign-in requests a single visitor can make per minute to protect against abuse. " +
+    "Opening several tabs at once, refreshing rapidly, or retrying too quickly can trip it. The limit clears on its own after about a minute.",
+  actions: [
+    {
+      heading: "Wait about a minute",
+      body: "The limit resets on a rolling one-minute window. Give it ~60 seconds, then click Try again.",
+    },
+    {
+      heading: "Open one tab at a time",
+      body: "Opening several tabs together (or holding down refresh) sends a burst of requests that keeps re-tripping the limit. Try a single tab.",
+    },
+  ],
+  retryable: true,
+  reconfigurable: false,
+}
+
 const TRANSIENT: SetupErrorExplanation = {
   code: "transient",
   title: COMMON_TITLE,
@@ -201,6 +224,17 @@ export function classifyBootstrapError(
   if (status === "no_database") return NO_DATABASE
 
   const message = (rawMessage ?? "").toLowerCase()
+
+  // Rate limiting is not a setup/DB failure — classify it first (by message,
+  // since the 429 body carries no dedicated status) so it never falls through
+  // to the database-flavored TRANSIENT explanation.
+  if (
+    status === "rate_limited" ||
+    message.includes("rate limit") ||
+    message.includes("too many requests")
+  ) {
+    return RATE_LIMITED
+  }
 
   if (
     pgCode === "42704" &&

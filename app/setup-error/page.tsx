@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronRight,
   Database,
+  Clock,
   Terminal,
   Copy,
   Check,
@@ -35,6 +36,9 @@ function SetupErrorContent() {
     () => classifyBootstrapError(status, error, pgCode),
     [status, error, pgCode],
   )
+  // Rate limiting is not a database/setup failure, so drop the DB-flavored
+  // chrome (icon, "Retry installation" wording, the .env.local restart hint).
+  const isRateLimit = explanation.code === "rate_limited"
 
   const [showRaw, setShowRaw] = useState(false)
   const [retrying, setRetrying] = useState(false)
@@ -109,8 +113,12 @@ function SetupErrorContent() {
           <Card>
             <CardHeader className="pb-4">
               <CardTitle className="text-base flex items-center gap-2">
-                <Database className="h-4 w-4 text-muted-foreground" />
-                What we think went wrong
+                {isRateLimit ? (
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <Database className="h-4 w-4 text-muted-foreground" />
+                )}
+                {isRateLimit ? "What happened" : "What we think went wrong"}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -142,7 +150,7 @@ function SetupErrorContent() {
                 size="lg"
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${retrying ? "animate-spin" : ""}`} />
-                {retrying ? "Retrying..." : "Retry installation"}
+                {retrying ? "Retrying..." : isRateLimit ? "Try again" : "Retry installation"}
               </Button>
             )}
             {explanation.reconfigurable && (
@@ -159,9 +167,11 @@ function SetupErrorContent() {
             )}
           </div>
 
-          <p className="text-xs text-muted-foreground text-center">
-            Changed <code className="font-mono">.env.local</code>? Restart the dev server first — env vars are read at startup.
-          </p>
+          {!isRateLimit && (
+            <p className="text-xs text-muted-foreground text-center">
+              Changed <code className="font-mono">.env.local</code>? Restart the dev server first — env vars are read at startup.
+            </p>
+          )}
 
           {error && (
             <Card className="bg-muted/30">
