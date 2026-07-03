@@ -21,7 +21,7 @@ import dynamicIconImports from 'lucide-react/dynamicIconImports'
 import {
   BarChart3, BookOpen, CheckSquare, Clock, Dumbbell, FileBox, Ghost,
   Hand, LineChart, MessageSquare, Music, Network, Package, PawPrint,
-  Pencil, Plus, Quote, Radar, StickyNote, Users,
+  Newspaper, Pencil, Plus, Quote, Radar, StickyNote, Users,
 } from 'lucide-react'
 import type { LucideIcon, LucideProps } from 'lucide-react'
 import type { ComponentType } from 'react'
@@ -38,7 +38,7 @@ import type { ComponentType } from 'react'
 const PRELOADED_ICONS: Record<string, LucideIcon> = {
   BarChart3, BookOpen, CheckSquare, Clock, Dumbbell, FileBox, Ghost,
   Hand, LineChart, MessageSquare, Music, Network, Package, PawPrint,
-  Pencil, Plus, Quote, Radar, StickyNote, Users,
+  Newspaper, Pencil, Plus, Quote, Radar, StickyNote, Users,
 }
 
 const FALLBACK_ICON: LucideIcon = Package
