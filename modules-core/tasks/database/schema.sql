@@ -81,6 +81,74 @@ CREATE POLICY tasks_rls_delete ON tasks FOR DELETE
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
 -- =============================================================================
+-- SUBTASKS
+-- Real checklist items per task. The tasks.subtasks_completed/subtasks_total
+-- counters are kept in sync by the subtasks API on every mutation.
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS task_subtasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES public."user"(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  completed BOOLEAN NOT NULL DEFAULT FALSE,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Installs that created the table before NOT NULL was added: backfill any
+-- NULLs (only possible via out-of-band inserts), then enforce the constraint
+-- the app relies on (sorting by order_index/created_at, boolean checkboxes).
+UPDATE task_subtasks SET completed = FALSE WHERE completed IS NULL;
+UPDATE task_subtasks SET order_index = 0 WHERE order_index IS NULL;
+UPDATE task_subtasks SET created_at = NOW() WHERE created_at IS NULL;
+UPDATE task_subtasks SET updated_at = NOW() WHERE updated_at IS NULL;
+ALTER TABLE task_subtasks ALTER COLUMN completed SET NOT NULL;
+ALTER TABLE task_subtasks ALTER COLUMN order_index SET NOT NULL;
+ALTER TABLE task_subtasks ALTER COLUMN created_at SET NOT NULL;
+ALTER TABLE task_subtasks ALTER COLUMN updated_at SET NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_task_subtasks_task_id ON task_subtasks(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_subtasks_user_id ON task_subtasks(user_id);
+CREATE INDEX IF NOT EXISTS idx_task_subtasks_user_task ON task_subtasks(user_id, task_id);
+
+ALTER TABLE task_subtasks ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS task_subtasks_rls_select ON task_subtasks;
+CREATE POLICY task_subtasks_rls_select ON task_subtasks FOR SELECT
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+
+DROP POLICY IF EXISTS task_subtasks_rls_insert ON task_subtasks;
+CREATE POLICY task_subtasks_rls_insert ON task_subtasks FOR INSERT
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+
+DROP POLICY IF EXISTS task_subtasks_rls_update ON task_subtasks;
+CREATE POLICY task_subtasks_rls_update ON task_subtasks FOR UPDATE
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+
+DROP POLICY IF EXISTS task_subtasks_rls_delete ON task_subtasks;
+CREATE POLICY task_subtasks_rls_delete ON task_subtasks FOR DELETE
+  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+
+-- Reconcile the derived counters with the real subtask rows. Tasks created
+-- before subtasks were rows stored a hand-entered numeric counter; the API no
+-- longer accepts client counter values, so clear/recompute them here.
+-- Idempotent: re-running only touches rows that are out of sync.
+UPDATE tasks SET subtasks_total = 0, subtasks_completed = 0
+WHERE (subtasks_total IS DISTINCT FROM 0 OR subtasks_completed IS DISTINCT FROM 0)
+  AND id NOT IN (SELECT task_id FROM task_subtasks);
+
+UPDATE tasks t SET subtasks_total = c.total, subtasks_completed = c.completed
+FROM (
+  SELECT task_id, count(*)::int AS total, (count(*) FILTER (WHERE completed))::int AS completed
+  FROM task_subtasks
+  GROUP BY task_id
+) c
+WHERE c.task_id = t.id
+  AND (t.subtasks_total IS DISTINCT FROM c.total OR t.subtasks_completed IS DISTINCT FROM c.completed);
+
+-- =============================================================================
 -- SAMPLE DATA (only inserted on first install when table is empty)
 -- =============================================================================
 

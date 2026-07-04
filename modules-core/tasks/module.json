@@ -45,7 +45,7 @@
     "exportName": "QuickAddTaskProvider"
   },
   "database": {
-    "tables": ["tasks"]
+    "tables": ["tasks", "task_subtasks"]
   },
   "dashboard": {
     "widgets": true,

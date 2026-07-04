@@ -26,6 +26,21 @@ export type Task = {
   assigned_agent_id?: string | null
 }
 
+// Input for task creation. subtasks_completed/subtasks_total are
+// server-derived from task_subtasks rows and cannot be supplied by clients.
+export type CreateTaskInput = Omit<Task, 'id' | 'created_at' | 'updated_at' | 'order_index' | 'subtasks_completed' | 'subtasks_total'>
+
+export type Subtask = {
+  id: string
+  task_id: string
+  user_id: string
+  title: string
+  completed: boolean
+  order_index: number
+  created_at: string
+  updated_at: string
+}
+
 export interface MajorProject {
   id: string
   project_name: string

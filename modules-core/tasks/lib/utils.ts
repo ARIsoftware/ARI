@@ -1,7 +1,40 @@
-import { type Task } from "@/modules/tasks/types"
+import { type Task, type Subtask, type CreateTaskInput } from "@/modules/tasks/types"
+import { format } from "date-fns"
 import { incrementTaskCompletion } from "@/lib/fitness-stats"
 
-export type { Task }
+export type { Task, Subtask, CreateTaskInput }
+
+/**
+ * Serialize a calendar-picker date for the due_date column. format() keeps
+ * the local calendar day — toISOString() would shift the date back a day for
+ * timezones east of UTC.
+ */
+export function toDueDateString(date: Date | undefined): string | null {
+  return date ? format(date, "yyyy-MM-dd") : null
+}
+
+/** Dot color for an agent's status — shared by AssignedAgentBadge and the assignee picker. */
+export function agentStatusDotClass(status: string): string {
+  return status === 'working'
+    ? 'bg-emerald-500'
+    : status === 'blocked'
+      ? 'bg-red-500'
+      : 'bg-muted-foreground'
+}
+
+/**
+ * Record a completion for the fitness stats. Failures are logged, never
+ * thrown — stats must not block the task update that already succeeded.
+ * The single home for this rule; every path that flips completed to true
+ * (list checkbox, edit page button) goes through here.
+ */
+export async function recordTaskCompleted(id: string): Promise<void> {
+  try {
+    await incrementTaskCompletion(id)
+  } catch (error) {
+    console.error("Failed to increment completion count:", error)
+  }
+}
 
 export async function getTasks(): Promise<Task[]> {
   const response = await fetch('/api/modules/tasks')
@@ -15,7 +48,7 @@ export async function getTasks(): Promise<Task[]> {
   return await response.json()
 }
 
-export async function createTask(task: Omit<Task, "id" | "created_at" | "updated_at" | "order_index">): Promise<Task> {
+export async function createTask(task: CreateTaskInput): Promise<Task> {
   const response = await fetch('/api/modules/tasks', {
     method: 'POST',
     headers: {
@@ -88,11 +121,7 @@ export async function toggleTaskCompletion(id: string): Promise<Task> {
   })
 
   if (newCompleted) {
-    try {
-      await incrementTaskCompletion(id)
-    } catch (error) {
-      console.error("Failed to increment completion count:", error)
-    }
+    await recordTaskCompleted(id)
   }
 
   return updatedTask
@@ -117,6 +146,57 @@ export async function toggleTaskPin(id: string): Promise<Task> {
   return updateTask(id, {
     pinned: !currentTask.pinned,
   })
+}
+
+export async function createSubtask(taskId: string, title: string): Promise<Subtask> {
+  const response = await fetch('/api/modules/tasks/subtasks', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ subtask: { task_id: taskId, title } }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    console.error("Error creating subtask:", error)
+    throw new Error(error.error || 'Failed to create subtask')
+  }
+
+  return await response.json()
+}
+
+export async function updateSubtask(
+  id: string,
+  updates: { title?: string; completed?: boolean; order_index?: number }
+): Promise<Subtask> {
+  const response = await fetch('/api/modules/tasks/subtasks', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ id, updates }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    console.error("Error updating subtask:", error)
+    throw new Error(error.error || 'Failed to update subtask')
+  }
+
+  return await response.json()
+}
+
+export async function deleteSubtask(id: string): Promise<void> {
+  const response = await fetch(`/api/modules/tasks/subtasks?id=${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    console.error("Error deleting subtask:", error)
+    throw new Error(error.error || 'Failed to delete subtask')
+  }
 }
 
 export async function reorderTasks(taskIds: string[]): Promise<void> {

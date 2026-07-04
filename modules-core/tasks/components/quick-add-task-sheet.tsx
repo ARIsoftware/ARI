@@ -19,14 +19,15 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet"
-import { CalendarIcon, Plus, X, Pin, Loader2, Info } from "lucide-react"
-import { createTask } from "@/modules/tasks/lib/utils"
+import { CalendarIcon, Plus, Pin, Loader2, Info } from "lucide-react"
+import { createTask, toDueDateString } from "@/modules/tasks/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { calculatePriorityScore, getTaskPriorityLevel } from "@/modules/tasks/lib/priority-utils"
+import { AssigneePicker } from "@/modules/tasks/components/assignee-picker"
 
 // Context for opening/closing the quick add sheet
 interface QuickAddTaskContextType {
@@ -75,7 +76,7 @@ function QuickAddTaskForm({ onSuccess }: { onSuccess: () => void }) {
   const [formData, setFormData] = useState({
     title: "",
     assignees: [] as string[],
-    subtasks_total: 0,
+    assigned_agent_id: null as string | null,
     status: "Pending" as const,
     priority: "Medium" as const,
     pinned: false,
@@ -87,34 +88,15 @@ function QuickAddTaskForm({ onSuccess }: { onSuccess: () => void }) {
     strategic_fit: 3,
   })
 
-  const [newAssignee, setNewAssignee] = useState("")
-
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
-  }
-
-  const addAssignee = () => {
-    if (newAssignee.trim() && !formData.assignees.includes(newAssignee.trim())) {
-      setFormData((prev) => ({
-        ...prev,
-        assignees: [...prev.assignees, newAssignee.trim()],
-      }))
-      setNewAssignee("")
-    }
-  }
-
-  const removeAssignee = (assignee: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      assignees: prev.assignees.filter((a) => a !== assignee),
-    }))
   }
 
   const resetForm = () => {
     setFormData({
       title: "",
       assignees: [],
-      subtasks_total: 0,
+      assigned_agent_id: null,
       status: "Pending",
       priority: "Medium",
       pinned: false,
@@ -126,7 +108,6 @@ function QuickAddTaskForm({ onSuccess }: { onSuccess: () => void }) {
       strategic_fit: 3,
     })
     setDate(undefined)
-    setNewAssignee("")
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -143,9 +124,8 @@ function QuickAddTaskForm({ onSuccess }: { onSuccess: () => void }) {
       const taskData = {
         title: formData.title.trim(),
         assignees: formData.assignees,
-        due_date: date ? date.toISOString().split("T")[0] : null,
-        subtasks_total: formData.subtasks_total,
-        subtasks_completed: 0,
+        assigned_agent_id: formData.assigned_agent_id,
+        due_date: toDueDateString(date),
         status: formData.status,
         priority: formData.priority,
         pinned: formData.pinned,
@@ -203,33 +183,13 @@ function QuickAddTaskForm({ onSuccess }: { onSuccess: () => void }) {
         />
       </div>
 
-      {/* Assignees */}
+      {/* Assignee — one person or agent at a time */}
       <div className="space-y-2">
-        <Label className="text-sm font-medium">Assignees</Label>
-        <div className="flex gap-2">
-          <Input
-            placeholder="Add assignee..."
-            value={newAssignee}
-            onChange={(e) => setNewAssignee(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addAssignee())}
-            className="flex-1"
-          />
-          <Button type="button" onClick={addAssignee} variant="outline" size="icon">
-            <Plus className="w-4 h-4" />
-          </Button>
-        </div>
-        {formData.assignees.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-2">
-            {formData.assignees.map((assignee) => (
-              <Badge key={assignee} variant="secondary" className="flex items-center gap-1">
-                {assignee}
-                <button type="button" onClick={() => removeAssignee(assignee)} className="ml-1 hover:text-red-500">
-                  <X className="w-3 h-3" />
-                </button>
-              </Badge>
-            ))}
-          </div>
-        )}
+        <Label className="text-sm font-medium">Assignee</Label>
+        <AssigneePicker
+          value={{ assignees: formData.assignees, assigned_agent_id: formData.assigned_agent_id }}
+          onChange={(next) => setFormData((prev) => ({ ...prev, ...next }))}
+        />
       </div>
 
       {/* Due Date */}

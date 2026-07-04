@@ -3,26 +3,21 @@
 import type React from "react"
 import { Fragment } from "react"
 import { useAuth } from "@/components/providers"
-import { DM_Sans } from "next/font/google"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Search, Filter, List, Grid3X3, Calendar, Pin, Bell, Plus, Trash2, Pencil, Columns, Table, BarChart3 } from "lucide-react"
+import { Search, Filter, List, Grid3X3, Calendar, Pin, ListChecks, ChevronDown, Plus, Trash2, Pencil, Columns, Table, BarChart3 } from "lucide-react"
 import { useState, useEffect, useMemo } from "react"
-import { toggleTaskCompletion, toggleTaskPin, reorderTasks, deleteTask, updateTask, type Task } from "../lib/utils"
-import { useTasks } from "../hooks/use-tasks"
+import { toggleTaskCompletion, toggleTaskPin, reorderTasks, updateTask, agentStatusDotClass, type Task } from "../lib/utils"
+import { useTasks, useDeleteTask } from "../hooks/use-tasks"
+import { TaskSubtasks } from "../components/task-subtasks"
 import { useQueryClient } from "@tanstack/react-query"
 import type { MajorProject } from "../types"
 import { useModuleEnabled } from "@/lib/modules/module-hooks"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter, useSearchParams } from "next/navigation"
 import { schoolPride } from "@/lib/confetti"
-
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-})
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -111,11 +106,7 @@ function AssignedAgentBadge({ agentId }: { agentId: string }) {
     return () => { cancelled = true }
   }, [agentId, agentsEnabled])
   if (!agentsEnabled || !agent) return null
-  const dot = agent.status === 'working'
-    ? 'bg-emerald-500'
-    : agent.status === 'blocked'
-      ? 'bg-red-500'
-      : 'bg-muted-foreground'
+  const dot = agentStatusDotClass(agent.status)
   return (
     <span
       title={`Assigned to ${agent.name}`}
@@ -138,6 +129,39 @@ function AssignedAgentBadge({ agentId }: { agentId: string }) {
   )
 }
 
+/**
+ * "Subtasks: x/y" expander shared by the list and card views so the two
+ * copies can't drift; aria-expanded conveys the state the chevron shows.
+ */
+function SubtaskToggle({
+  task,
+  expanded,
+  onToggle,
+  small = false,
+}: {
+  task: Task
+  expanded: boolean
+  onToggle: () => void
+  small?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={expanded}
+      className={`flex items-center gap-1.5 transition-colors ${task.pinned ? "hover:text-white" : "hover:text-foreground"}`}
+    >
+      <ListChecks className="w-4 h-4" />
+      <span className={small ? "text-xs" : undefined}>
+        Subtasks: {task.subtasks_completed}/{task.subtasks_total}
+      </span>
+      <ChevronDown
+        className={`${small ? "w-3 h-3" : "w-3.5 h-3.5"} transition-transform ${expanded ? "" : "-rotate-90"}`}
+      />
+    </button>
+  )
+}
+
 export default function TasksPage() {
   const { session } = useAuth()
   const user = session?.user
@@ -148,12 +172,16 @@ export default function TasksPage() {
   // TanStack Query for tasks - replaces local state + realtime subscription
   const queryClient = useQueryClient()
   const { data: tasks = [], isLoading: loading, refetch: refetchTasks } = useTasks()
+  const deleteTaskMutation = useDeleteTask()
 
   const [activeFilter, setActiveFilter] = useState("All")
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [viewMode, setViewMode] = useState<"list" | "card" | "kanban" | "table">("list")
   const [fadingTasks, setFadingTasks] = useState<Set<string>>(new Set())
+  // Per-task override of subtask visibility. Unset = default, which is
+  // visible whenever the task has subtasks.
+  const [subtaskVisibility, setSubtaskVisibility] = useState<Record<string, boolean>>({})
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
   const [projects, setProjects] = useState<MajorProject[]>([])
@@ -385,6 +413,13 @@ export default function TasksPage() {
     }
   }
 
+  const isSubtasksVisible = (task: Task) =>
+    subtaskVisibility[task.id] ?? (task.subtasks_total ?? 0) > 0
+
+  const toggleSubtasksExpanded = (task: Task) => {
+    setSubtaskVisibility(prev => ({ ...prev, [task.id]: !isSubtasksVisible(task) }))
+  }
+
   const handleTogglePin = async (taskId: string) => {
     if (!user?.id) return
 
@@ -414,8 +449,9 @@ export default function TasksPage() {
 
     try {
       if (user?.id) {
-        await deleteTask(taskToDelete.id)
-        invalidateTasks() // Sync with server
+        // The mutation handles optimistic removal and invalidates both the
+        // tasks cache and the (cascade-deleted) subtasks cache.
+        await deleteTaskMutation.mutateAsync(taskToDelete.id)
       }
       toast({
         title: "Success",
@@ -1141,12 +1177,11 @@ export default function TasksPage() {
                             <span>{formatDate(task.due_date)}</span>
                           </div>
 
-                          <div className="flex items-center gap-1.5">
-                            <Bell className="w-4 h-4" />
-                            <span>
-                              Subtasks: {task.subtasks_completed}/{task.subtasks_total}
-                            </span>
-                          </div>
+                          <SubtaskToggle
+                            task={task}
+                            expanded={isSubtasksVisible(task)}
+                            onToggle={() => toggleSubtasksExpanded(task)}
+                          />
 
                           <div className="flex items-center gap-1.5">
                             <span className={`text-sm ${getTaskAgeColor(task.created_at, task.pinned)}`}>
@@ -1229,86 +1264,6 @@ export default function TasksPage() {
                           onChange={() => handleToggleCompletion(task.id)}
                           className="w-5 h-5 rounded border-gray-300"
                         />
-                        <button
-                          onClick={() => handleTogglePin(task.id)}
-                          className="transition-colors"
-                        >
-                          <Pin
-                            className={`w-5 h-5 ${task.pinned ? "text-white" : "text-muted-foreground hover:text-[hsl(var(--primary))]"}`}
-                            fill={task.pinned ? "white" : "none"}
-                          />
-                        </button>
-                      </div>
-
-                      <div className="flex-1">
-                        <h3
-                          className={`font-medium text-base mb-3 line-clamp-2 ${task.completed ? "line-through text-muted-foreground" : task.pinned ? "text-white" : "text-foreground"}`}
-                        >
-                          {task.title}
-                        </h3>
-
-                        <div className={`space-y-2 text-sm ${task.pinned ? "text-gray-300" : "text-muted-foreground"}`}>
-                          {(task.assigned_agent_id || (task.assignees?.length ?? 0) > 0) && (
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              {task.assigned_agent_id && <AssignedAgentBadge agentId={task.assigned_agent_id} />}
-                              {(task.assignees ?? []).map((name: string) => (
-                                <span
-                                  key={name}
-                                  className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.pinned ? "bg-white/10 text-gray-200" : "bg-muted text-muted-foreground"}`}
-                                >
-                                  {name}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-
-                          <div className="flex items-center gap-1.5">
-                            <Calendar className="w-4 h-4" />
-                            <span className="text-xs">{formatDate(task.due_date)}</span>
-                          </div>
-
-                          <div className="flex items-center gap-1.5">
-                            <Bell className="w-4 h-4" />
-                            <span className="text-xs">
-                              Subtasks: {task.subtasks_completed}/{task.subtasks_total}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-1.5">
-                            <span className={`text-xs ${getTaskAgeColor(task.created_at, task.pinned)}`}>
-                              {formatTaskAge(task.created_at)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between gap-2 mt-auto pt-2">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge
-                            variant="secondary"
-                            className={`font-medium text-xs ${task.pinned ? "bg-white/10 text-gray-200" : getStatusColor(task.status)}`}
-                          >
-                            {task.status}
-                          </Badge>
-                          <Badge
-                            variant="secondary"
-                            className={`font-medium text-xs ${task.pinned ? "bg-white/10 text-gray-200" : getPriorityColor(task.priority)}`}
-                          >
-                            {task.priority}
-                          </Badge>
-                          {majorProjectsEnabled && task.project_id && getProjectName(task.project_id, projects) && (
-                            <Badge
-                              variant="secondary"
-                              className={`font-medium text-xs cursor-pointer ${task.pinned ? "bg-white/10 text-gray-200 hover:bg-white/20" : "bg-blue-100 text-blue-700 hover:bg-blue-200"}`}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                router.push(`/tasks?filter=${task.project_id}`)
-                              }}
-                            >
-                              {getProjectName(task.project_id, projects)}
-                            </Badge>
-                          )}
-                        </div>
                         <div className="flex items-center gap-1">
                           <Button
                             variant="ghost"
@@ -1348,9 +1303,85 @@ export default function TasksPage() {
                           </Button>
                         </div>
                       </div>
+
+                      <div className="flex-1">
+                        <h3
+                          className={`font-medium text-base mb-3 line-clamp-2 ${task.completed ? "line-through text-muted-foreground" : task.pinned ? "text-white" : "text-foreground"}`}
+                        >
+                          {task.title}
+                        </h3>
+
+                        <div className={`space-y-2 text-sm ${task.pinned ? "text-gray-300" : "text-muted-foreground"}`}>
+                          {(task.assigned_agent_id || (task.assignees?.length ?? 0) > 0) && (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              {task.assigned_agent_id && <AssignedAgentBadge agentId={task.assigned_agent_id} />}
+                              {(task.assignees ?? []).map((name: string) => (
+                                <span
+                                  key={name}
+                                  className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.pinned ? "bg-white/10 text-gray-200" : "bg-muted text-muted-foreground"}`}
+                                >
+                                  {name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-1.5">
+                            <Calendar className="w-4 h-4" />
+                            <span className="text-xs">{formatDate(task.due_date)}</span>
+                          </div>
+
+                          <SubtaskToggle
+                            task={task}
+                            expanded={isSubtasksVisible(task)}
+                            onToggle={() => toggleSubtasksExpanded(task)}
+                            small
+                          />
+
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-xs ${getTaskAgeColor(task.created_at, task.pinned)}`}>
+                              {formatTaskAge(task.created_at)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {isSubtasksVisible(task) && (
+                          <TaskSubtasks taskId={task.id} pinned={task.pinned} cancelParentDrag />
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-wrap mt-auto pt-2">
+                        <Badge
+                          variant="secondary"
+                          className={`font-medium text-xs ${task.pinned ? "bg-white/10 text-gray-200" : getStatusColor(task.status)}`}
+                        >
+                          {task.status}
+                        </Badge>
+                        <Badge
+                          variant="secondary"
+                          className={`font-medium text-xs ${task.pinned ? "bg-white/10 text-gray-200" : getPriorityColor(task.priority)}`}
+                        >
+                          {task.priority}
+                        </Badge>
+                        {majorProjectsEnabled && task.project_id && getProjectName(task.project_id, projects) && (
+                          <Badge
+                            variant="secondary"
+                            className={`font-medium text-xs cursor-pointer ${task.pinned ? "bg-white/10 text-gray-200 hover:bg-white/20" : "bg-blue-100 text-blue-700 hover:bg-blue-200"}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              router.push(`/tasks?filter=${task.project_id}`)
+                            }}
+                          >
+                            {getProjectName(task.project_id, projects)}
+                          </Badge>
+                        )}
+                      </div>
                     </>
                   )}
                 </div>
+                    {viewMode === "list" && isSubtasksVisible(task) && (
+                      <TaskSubtasks taskId={task.id} variant="inline" />
+                    )}
                   </Fragment>
                 )
               })}

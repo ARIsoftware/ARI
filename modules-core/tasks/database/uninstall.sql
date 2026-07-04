@@ -8,4 +8,5 @@
 -- Running this will PERMANENTLY DELETE all data in the listed tables.
 -- ============================================================================
 
+DROP TABLE IF EXISTS task_subtasks CASCADE;
 DROP TABLE IF EXISTS tasks CASCADE;

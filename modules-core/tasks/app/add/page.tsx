@@ -2,7 +2,6 @@
 
 import type React from "react"
 import { useAuth } from "@/components/providers"
-import { DM_Sans } from "next/font/google"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,14 +10,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Switch } from "@/components/ui/switch"
 import { CalendarIcon, Plus, X, Pin, ArrowLeft, Loader2, Compass, Info } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Slider } from "@/components/ui/slider"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useState, useEffect } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { createTask } from "@/modules/tasks/lib/utils"
+import { createTask, createSubtask, toDueDateString } from "@/modules/tasks/lib/utils"
 import { getGoals, type Goal } from "@/lib/goals"
 import { useModuleEnabled } from "@/lib/modules/module-hooks"
 import { useToast } from "@/hooks/use-toast"
@@ -26,11 +24,7 @@ import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { calculatePriorityScore, getTaskPriorityLevel } from "@/modules/tasks/lib/priority-utils"
-
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-})
+import { AssigneePicker } from "@/modules/tasks/components/assignee-picker"
 
 const priorityOptions = [
   { value: "Low", label: "Low Priority", color: "bg-gray-100 text-gray-600" },
@@ -60,7 +54,7 @@ export default function AddTaskPage() {
   const [formData, setFormData] = useState({
     title: "",
     assignees: [] as string[],
-    subtasks_total: 0,
+    assigned_agent_id: null as string | null,
     status: "Pending" as const,
     priority: "Medium" as const,
     pinned: false,
@@ -72,7 +66,8 @@ export default function AddTaskPage() {
     strategic_fit: 3,
   })
 
-  const [newAssignee, setNewAssignee] = useState("")
+  const [subtasks, setSubtasks] = useState<string[]>([])
+  const [newSubtask, setNewSubtask] = useState("")
 
   const axisDescriptions = {
     impact: "How much this task affects your goals and objectives",
@@ -105,21 +100,16 @@ export default function AddTaskPage() {
     }))
   }
 
-  const addAssignee = () => {
-    if (newAssignee.trim() && !formData.assignees.includes(newAssignee.trim())) {
-      setFormData((prev) => ({
-        ...prev,
-        assignees: [...prev.assignees, newAssignee.trim()],
-      }))
-      setNewAssignee("")
+  const addSubtask = () => {
+    const title = newSubtask.trim()
+    if (title && !subtasks.includes(title)) {
+      setSubtasks((prev) => [...prev, title])
+      setNewSubtask("")
     }
   }
 
-  const removeAssignee = (assignee: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      assignees: prev.assignees.filter((a) => a !== assignee),
-    }))
+  const removeSubtask = (index: number) => {
+    setSubtasks((prev) => prev.filter((_, i) => i !== index))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -140,9 +130,8 @@ export default function AddTaskPage() {
       const taskData = {
         title: formData.title.trim(),
         assignees: formData.assignees,
-        due_date: date ? date.toISOString().split("T")[0] : null,
-        subtasks_total: formData.subtasks_total,
-        subtasks_completed: 0,
+        assigned_agent_id: formData.assigned_agent_id,
+        due_date: toDueDateString(date),
         status: formData.status,
         priority: formData.priority,
         pinned: formData.pinned,
@@ -167,14 +156,36 @@ export default function AddTaskPage() {
         return
       }
 
-      await createTask(taskData)
+      const createdTask = await createTask(taskData)
+
+      // The task exists from here on — a subtask failure must not be
+      // reported as a failed task creation (retrying would duplicate it).
+      // Sequential on purpose: it keeps the checklist in the entered order.
+      let failedSubtasks = 0
+      for (const title of subtasks) {
+        try {
+          await createSubtask(createdTask.id, title)
+        } catch (error) {
+          console.error("Failed to create subtask:", error)
+          failedSubtasks++
+        }
+      }
 
       await queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      await queryClient.invalidateQueries({ queryKey: ['task-subtasks'] })
 
-      toast({
-        title: "Success",
-        description: "Task created successfully!",
-      })
+      if (failedSubtasks > 0) {
+        toast({
+          title: "Task created",
+          description: `${failedSubtasks} subtask${failedSubtasks === 1 ? "" : "s"} could not be saved — you can re-add them from the task.`,
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Success",
+          description: "Task created successfully!",
+        })
+      }
 
       router.push("/tasks")
     } catch (error) {
@@ -193,7 +204,7 @@ export default function AddTaskPage() {
     setFormData({
       title: "",
       assignees: [],
-      subtasks_total: 0,
+      assigned_agent_id: null,
       status: "Pending",
       priority: "Medium",
       pinned: false,
@@ -205,7 +216,8 @@ export default function AddTaskPage() {
       strategic_fit: 3,
     })
     setDate(undefined)
-    setNewAssignee("")
+    setSubtasks([])
+    setNewSubtask("")
     setSelectedNorthStars([])
   }
 
@@ -249,37 +261,13 @@ export default function AddTaskPage() {
                     />
                   </div>
 
-                  {/* Assignees */}
+                  {/* Assignee — one person or agent at a time */}
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Assignees</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Add assignee name..."
-                        value={newAssignee}
-                        onChange={(e) => setNewAssignee(e.target.value)}
-                        onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addAssignee())}
-                        className="flex-1"
-                      />
-                      <Button type="button" onClick={addAssignee} variant="outline" size="icon">
-                        <Plus className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    {formData.assignees.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {formData.assignees.map((assignee) => (
-                          <Badge key={assignee} variant="secondary" className="flex items-center gap-1">
-                            {assignee}
-                            <button
-                              type="button"
-                              onClick={() => removeAssignee(assignee)}
-                              className="ml-1 hover:text-red-500"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
+                    <Label className="text-sm font-medium">Assignee</Label>
+                    <AssigneePicker
+                      value={{ assignees: formData.assignees, assigned_agent_id: formData.assigned_agent_id }}
+                      onChange={(next) => setFormData((prev) => ({ ...prev, ...next }))}
+                    />
                   </div>
 
                   {/* Due Date */}
@@ -304,16 +292,42 @@ export default function AddTaskPage() {
                   {/* Subtasks */}
                   <div className="space-y-2">
                     <Label htmlFor="subtasks" className="text-sm font-medium">
-                      Number of Subtasks
+                      Subtasks
                     </Label>
-                    <Input
-                      id="subtasks"
-                      type="number"
-                      min="0"
-                      value={formData.subtasks_total}
-                      onChange={(e) => handleInputChange("subtasks_total", Number.parseInt(e.target.value) || 0)}
-                      className="w-full"
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        id="subtasks"
+                        placeholder="Add a subtask..."
+                        value={newSubtask}
+                        onChange={(e) => setNewSubtask(e.target.value)}
+                        onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addSubtask())}
+                        maxLength={255}
+                        className="flex-1"
+                      />
+                      <Button type="button" onClick={addSubtask} variant="outline" size="icon">
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    {subtasks.length > 0 && (
+                      <div className="space-y-1.5 mt-2">
+                        {subtasks.map((subtask, index) => (
+                          <div
+                            key={`${subtask}-${index}`}
+                            className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-1.5"
+                          >
+                            <span className="flex-1 text-sm">{subtask}</span>
+                            <button
+                              type="button"
+                              onClick={() => removeSubtask(index)}
+                              className="text-muted-foreground hover:text-red-500"
+                              aria-label={`Remove subtask "${subtask}"`}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Status and Priority */}

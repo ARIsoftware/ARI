@@ -2,7 +2,6 @@
 
 import type React from "react"
 import { useAuth } from "@/components/providers"
-import { DM_Sans } from "next/font/google"
 import { useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,14 +11,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { CalendarIcon, Save, X, Pin, ArrowLeft, Loader2, Pencil, Info, Compass, Briefcase } from "lucide-react"
+import { CalendarIcon, Save, Pin, ArrowLeft, Loader2, Pencil, Info, Compass, Briefcase, ListChecks, CheckCircle2, RotateCcw } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useState, useEffect } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { getTasks, updateTask, type Task } from "@/modules/tasks/lib/utils"
+import { getTasks, updateTask, recordTaskCompleted, toDueDateString } from "@/modules/tasks/lib/utils"
+import { TaskSubtasks } from "@/modules/tasks/components/task-subtasks"
 import { getGoals, type Goal } from "@/lib/goals"
 import type { MajorProject } from "@/modules/tasks/types"
 import { useModuleEnabled } from "@/lib/modules/module-hooks"
@@ -28,11 +27,7 @@ import { useRouter } from "next/navigation"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { calculatePriorityScore, getTaskPriorityLevel } from "@/modules/tasks/lib/priority-utils"
-
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-})
+import { AssigneePicker } from "@/modules/tasks/components/assignee-picker"
 
 const priorityOptions = [
   { value: "Low", label: "Low Priority", color: "bg-gray-100 text-gray-600" },
@@ -71,7 +66,6 @@ export default function EditTaskPage() {
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
   const [date, setDate] = useState<Date>()
-  const [task, setTask] = useState<Task | null>(null)
   const [northStars, setNorthStars] = useState<Goal[]>([])
   const [selectedNorthStars, setSelectedNorthStars] = useState<string[]>([])
   const [projects, setProjects] = useState<MajorProject[]>([])
@@ -80,6 +74,7 @@ export default function EditTaskPage() {
   const [formData, setFormData] = useState({
     title: "",
     assignees: [] as string[],
+    assigned_agent_id: null as string | null,
     status: "Pending" as "Pending" | "In Progress" | "Completed",
     priority: "Medium" as "Low" | "Medium" | "High",
     pinned: false,
@@ -91,8 +86,6 @@ export default function EditTaskPage() {
     strategic_fit: 3,
     project_id: null as string | null,
   })
-
-  const [newAssignee, setNewAssignee] = useState("")
 
   // Load task data and northstars
   useEffect(() => {
@@ -114,10 +107,13 @@ export default function EditTaskPage() {
           return
         }
 
-        setTask(foundTask)
         setFormData({
           title: foundTask.title,
+          // Legacy tasks may hold several names. Keep them all — the picker
+          // shows the first, but truncating here would silently delete the
+          // rest on the next save even if the user never touched the field.
           assignees: foundTask.assignees ?? [],
+          assigned_agent_id: foundTask.assigned_agent_id ?? null,
           status: foundTask.status,
           priority: foundTask.priority,
           pinned: foundTask.pinned,
@@ -178,26 +174,7 @@ export default function EditTaskPage() {
     }))
   }
 
-  const addAssignee = () => {
-    if (newAssignee.trim() && !formData.assignees.includes(newAssignee.trim())) {
-      setFormData((prev) => ({
-        ...prev,
-        assignees: [...prev.assignees, newAssignee.trim()],
-      }))
-      setNewAssignee("")
-    }
-  }
-
-  const removeAssignee = (assignee: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      assignees: prev.assignees.filter((a) => a !== assignee),
-    }))
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
+  const saveTask = async (overrides: { completed?: boolean; status?: "Pending" | "In Progress" | "Completed" } = {}) => {
     if (!formData.title.trim()) {
       toast({
         title: "Error",
@@ -213,7 +190,8 @@ export default function EditTaskPage() {
       const updates = {
         title: formData.title.trim(),
         assignees: formData.assignees,
-        due_date: date ? date.toISOString().split("T")[0] : null,
+        assigned_agent_id: formData.assigned_agent_id,
+        due_date: toDueDateString(date),
         status: formData.status,
         priority: formData.priority,
         pinned: formData.pinned,
@@ -226,15 +204,24 @@ export default function EditTaskPage() {
         project_id: formData.project_id,
         // Note: northstar_ids would need to be added to the database schema
         // northstar_ids: selectedNorthStars,
+        ...overrides,
       }
 
       await updateTask(id, updates)
+
+      if (overrides.completed === true) {
+        await recordTaskCompleted(id)
+      }
 
       await queryClient.invalidateQueries({ queryKey: ['tasks'] })
 
       toast({
         title: "Success",
-        description: "Task updated successfully!",
+        description: overrides.completed === true
+          ? "Task completed!"
+          : overrides.completed === false
+            ? "Task reopened."
+            : "Task updated successfully!",
       })
 
       router.push("/tasks")
@@ -249,6 +236,28 @@ export default function EditTaskPage() {
       setLoading(false)
     }
   }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await saveTask()
+  }
+
+  const handleToggleComplete = async () => {
+    await saveTask(
+      formData.completed
+        ? { completed: false, status: "Pending" }
+        : { completed: true, status: "Completed" }
+    )
+  }
+
+  const priorityScore = calculatePriorityScore({
+    impact: formData.impact,
+    severity: formData.severity,
+    timeliness: formData.timeliness,
+    effort: formData.effort,
+    strategic_fit: formData.strategic_fit,
+  })
+  const priorityLevel = getTaskPriorityLevel(priorityScore)
 
   if (initialLoading) {
     return (
@@ -276,7 +285,7 @@ export default function EditTaskPage() {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="max-w-2xl">
+            <form onSubmit={handleSubmit} className="w-full">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -301,37 +310,13 @@ export default function EditTaskPage() {
                     />
                   </div>
 
-                  {/* Assignees */}
+                  {/* Assignee — one person or agent at a time */}
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Assignees</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Add assignee name..."
-                        value={newAssignee}
-                        onChange={(e) => setNewAssignee(e.target.value)}
-                        onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), addAssignee())}
-                        className="flex-1"
-                      />
-                      <Button type="button" onClick={addAssignee} variant="outline" size="icon">
-                        <Save className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    {formData.assignees && formData.assignees.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {formData.assignees.map((assignee) => (
-                          <Badge key={assignee} variant="secondary" className="flex items-center gap-1">
-                            {assignee}
-                            <button
-                              type="button"
-                              onClick={() => removeAssignee(assignee)}
-                              className="ml-1 hover:text-red-500"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
+                    <Label className="text-sm font-medium">Assignee</Label>
+                    <AssigneePicker
+                      value={{ assignees: formData.assignees, assigned_agent_id: formData.assigned_agent_id }}
+                      onChange={(next) => setFormData((prev) => ({ ...prev, ...next }))}
+                    />
                   </div>
 
                   {/* Due Date */}
@@ -351,6 +336,15 @@ export default function EditTaskPage() {
                         <Calendar mode="single" selected={date} onSelect={setDate} initialFocus />
                       </PopoverContent>
                     </Popover>
+                  </div>
+
+                  {/* Subtasks */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium flex items-center gap-2">
+                      <ListChecks className="w-4 h-4" />
+                      Subtasks
+                    </Label>
+                    <TaskSubtasks taskId={id} />
                   </div>
 
                   {/* Project Selection - Only show if major-projects module is enabled */}
@@ -448,127 +442,24 @@ export default function EditTaskPage() {
                     </button>
                   </div>
 
-                  {/* Completed */}
-                  <div className="flex items-center justify-between">
+                  {/* Priority Score */}
+                  <div className="flex items-center justify-between border-t pt-6">
                     <div className="space-y-0.5">
-                      <Label className="text-sm font-medium">Mark as Completed</Label>
-                      <p className="text-xs text-muted-foreground">Toggle to mark this task as done</p>
+                      <Label className="text-sm font-medium">Priority Score</Label>
+                      <p className="text-xs text-muted-foreground">Higher score = higher priority</p>
                     </div>
-                    <Switch
-                      checked={formData.completed}
-                      onCheckedChange={(checked) => handleInputChange("completed", checked)}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* NorthStar Alignment Section - only show if northstar module is enabled */}
-              {northstarEnabled && (
-              <Card className="mt-6">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Compass className="w-5 h-5" />
-                    NorthStar Alignment
-                  </CardTitle>
-                  <CardDescription>Select the NorthStar goals this task aligns with</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {northStars.length > 0 ? (
-                    <div className="space-y-3">
-                      {northStars.map((northstar) => (
-                        <div key={northstar.id} className="flex items-start space-x-3">
-                          <Checkbox
-                            id={northstar.id}
-                            checked={selectedNorthStars.includes(northstar.id)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedNorthStars([...selectedNorthStars, northstar.id])
-                              } else {
-                                setSelectedNorthStars(selectedNorthStars.filter((id) => id !== northstar.id))
-                              }
-                            }}
-                            className="mt-0.5"
-                          />
-                          <div className="flex-1">
-                            <label
-                              htmlFor={northstar.id}
-                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                            >
-                              {northstar.title}
-                            </label>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {northstar.description}
-                            </p>
-                            {northstar.category && (
-                              <Badge variant="outline" className="mt-1">
-                                {northstar.category}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      No NorthStar goals found. Create some goals in the NorthStar section first.
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-              )}
-
-              {/* Priority Score Section */}
-              <Card className="mt-6">
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    Priority Score
                     <div className="flex items-center gap-3">
-                      <span className="text-2xl font-bold">
-                        {calculatePriorityScore({
-                          impact: formData.impact,
-                          severity: formData.severity,
-                          timeliness: formData.timeliness,
-                          effort: formData.effort,
-                          strategic_fit: formData.strategic_fit,
-                        }).toFixed(1)}
-                      </span>
+                      <span className="text-2xl font-bold">{priorityScore.toFixed(1)}</span>
                       <Badge variant={
-                        getTaskPriorityLevel(calculatePriorityScore({
-                          impact: formData.impact,
-                          severity: formData.severity,
-                          timeliness: formData.timeliness,
-                          effort: formData.effort,
-                          strategic_fit: formData.strategic_fit,
-                        })) === 'critical' ? 'destructive' :
-                        getTaskPriorityLevel(calculatePriorityScore({
-                          impact: formData.impact,
-                          severity: formData.severity,
-                          timeliness: formData.timeliness,
-                          effort: formData.effort,
-                          strategic_fit: formData.strategic_fit,
-                        })) === 'high' ? 'default' :
-                        getTaskPriorityLevel(calculatePriorityScore({
-                          impact: formData.impact,
-                          severity: formData.severity,
-                          timeliness: formData.timeliness,
-                          effort: formData.effort,
-                          strategic_fit: formData.strategic_fit,
-                        })) === 'medium' ? 'secondary' :
+                        priorityLevel === 'critical' ? 'destructive' :
+                        priorityLevel === 'high' ? 'default' :
+                        priorityLevel === 'medium' ? 'secondary' :
                         'outline'
                       }>
-                        {getTaskPriorityLevel(calculatePriorityScore({
-                          impact: formData.impact,
-                          severity: formData.severity,
-                          timeliness: formData.timeliness,
-                          effort: formData.effort,
-                          strategic_fit: formData.strategic_fit,
-                        }))}
+                        {priorityLevel}
                       </Badge>
                     </div>
-                  </CardTitle>
-                  <CardDescription>Higher score = higher priority</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
+                  </div>
                   {/* Impact */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -740,27 +631,101 @@ export default function EditTaskPage() {
                     </p>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-3 pt-4">
-                    <Button type="submit" disabled={loading} className="bg-black hover:bg-gray-800">
-                      {loading ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Updating...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="w-4 h-4 mr-2" />
-                          Save Changes
-                        </>
-                      )}
-                    </Button>
-                    <Button type="button" variant="outline" onClick={() => router.push("/tasks")} disabled={loading}>
-                      Cancel
-                    </Button>
-                  </div>
                 </CardContent>
               </Card>
+
+              {/* NorthStar Alignment Section - only show if northstar module is enabled */}
+              {northstarEnabled && (
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Compass className="w-5 h-5" />
+                    NorthStar Alignment
+                  </CardTitle>
+                  <CardDescription>Select the NorthStar goals this task aligns with</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {northStars.length > 0 ? (
+                    <div className="space-y-3">
+                      {northStars.map((northstar) => (
+                        <div key={northstar.id} className="flex items-start space-x-3">
+                          <Checkbox
+                            id={northstar.id}
+                            checked={selectedNorthStars.includes(northstar.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedNorthStars([...selectedNorthStars, northstar.id])
+                              } else {
+                                setSelectedNorthStars(selectedNorthStars.filter((id) => id !== northstar.id))
+                              }
+                            }}
+                            className="mt-0.5"
+                          />
+                          <div className="flex-1">
+                            <label
+                              htmlFor={northstar.id}
+                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                            >
+                              {northstar.title}
+                            </label>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {northstar.description}
+                            </p>
+                            {northstar.category && (
+                              <Badge variant="outline" className="mt-1">
+                                {northstar.category}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No NorthStar goals found. Create some goals in the NorthStar section first.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 mt-6">
+                <Button type="submit" disabled={loading} className="bg-black hover:bg-gray-800">
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant={formData.completed ? "outline" : "destructive"}
+                  onClick={handleToggleComplete}
+                  disabled={loading}
+                >
+                  {formData.completed ? (
+                    <>
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      Reopen Task
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                      Mark as Complete
+                    </>
+                  )}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => router.push("/tasks")} disabled={loading}>
+                  Cancel
+                </Button>
+              </div>
             </form>
     </div>
   )

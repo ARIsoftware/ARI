@@ -1,12 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { Task } from '@/modules/tasks/types'
+import type { Task, CreateTaskInput } from '@/modules/tasks/types'
 
-// Input types for mutations
-export type CreateTaskInput = Omit<Task, 'id' | 'created_at' | 'updated_at' | 'order_index'>
+// Input types for mutations. subtasks_completed/subtasks_total are
+// server-derived from task_subtasks rows and cannot be supplied by clients.
+export type { CreateTaskInput }
 
 export type UpdateTaskInput = {
   id: string
-} & Partial<Omit<Task, 'id' | 'created_at' | 'updated_at'>>
+} & Partial<Omit<Task, 'id' | 'created_at' | 'updated_at' | 'subtasks_completed' | 'subtasks_total'>>
 
 /**
  * Fetch all tasks for the current user.
@@ -158,6 +159,8 @@ export function useDeleteTask() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      // Subtasks are cascade-deleted with the task — refresh their cache too.
+      queryClient.invalidateQueries({ queryKey: ['task-subtasks'] })
     },
   })
 }

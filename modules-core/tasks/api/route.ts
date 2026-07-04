@@ -150,8 +150,6 @@ export async function POST(request: NextRequest) {
         title: task.title,
         assignees: task.assignees,
         dueDate: task.due_date,
-        subtasksCompleted: task.subtasks_completed,
-        subtasksTotal: task.subtasks_total,
         status: task.status,
         priority: task.priority,
         pinned: task.pinned,
@@ -237,8 +235,8 @@ export async function PUT(request: NextRequest) {
     if (updates.title !== undefined) updateData.title = updates.title
     if (updates.assignees !== undefined) updateData.assignees = updates.assignees
     if (updates.due_date !== undefined) updateData.dueDate = updates.due_date
-    if (updates.subtasks_completed !== undefined) updateData.subtasksCompleted = updates.subtasks_completed
-    if (updates.subtasks_total !== undefined) updateData.subtasksTotal = updates.subtasks_total
+    // subtasks_completed/subtasks_total are derived from task_subtasks rows
+    // (recounted by the subtasks API) and are not client-writable.
     if (updates.status !== undefined) updateData.status = updates.status
     if (updates.priority !== undefined) updateData.priority = updates.priority
     if (updates.pinned !== undefined) updateData.pinned = updates.pinned

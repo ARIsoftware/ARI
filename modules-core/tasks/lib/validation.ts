@@ -3,7 +3,6 @@ import '@/lib/openapi/registry'
 
 const uuidSchema = z.string().uuid('Invalid UUID format')
 const nonEmptyString = z.string().min(1, 'Cannot be empty')
-const nonNegativeNumber = z.number().nonnegative('Cannot be negative')
 
 export const TaskStatus = z.enum(['Pending', 'In Progress', 'Completed'], {
   errorMap: () => ({ message: 'Invalid task status' })
@@ -32,8 +31,6 @@ export const createTaskSchema = z.object({
     ]).optional(),
     pinned: z.boolean().default(false),
     completed: z.boolean().default(false),
-    subtasks_total: nonNegativeNumber.max(100, 'Too many subtasks').default(0),
-    subtasks_completed: nonNegativeNumber.default(0),
     impact: z.number().min(1).max(5).default(3).optional(),
     severity: z.number().min(1).max(5).default(3).optional(),
     timeliness: z.number().min(1).max(5).default(3).optional(),
@@ -44,13 +41,7 @@ export const createTaskSchema = z.object({
     monster_type: z.union([z.string().max(50, 'Monster type too long'), z.null()]).optional(),
     monster_colors: z.union([MonsterColorsSchema, z.null()]).optional()
   })
-}).refine(
-  (data) => data.task.subtasks_completed <= data.task.subtasks_total,
-  {
-    message: 'Completed subtasks cannot exceed total subtasks',
-    path: ['task', 'subtasks_completed']
-  }
-).openapi('CreateTaskBody')
+}).openapi('CreateTaskBody')
 
 export const updateTaskSchema = z.object({
   task: z.object({
@@ -66,8 +57,6 @@ export const updateTaskSchema = z.object({
     ]).optional(),
     pinned: z.boolean().optional(),
     completed: z.boolean().optional(),
-    subtasks_total: nonNegativeNumber.max(100, 'Too many subtasks').optional(),
-    subtasks_completed: nonNegativeNumber.optional(),
     impact: z.number().min(1).max(5).optional(),
     severity: z.number().min(1).max(5).optional(),
     timeliness: z.number().min(1).max(5).optional(),
@@ -79,18 +68,8 @@ export const updateTaskSchema = z.object({
     monster_type: z.union([z.string().max(50, 'Monster type too long'), z.null()]).optional(),
     monster_colors: z.union([MonsterColorsSchema, z.null()]).optional(),
     order_index: z.number().int().nonnegative().optional()
-  }).refine(
-    (data) => !data.subtasks_completed || !data.subtasks_total || data.subtasks_completed <= data.subtasks_total,
-    {
-      message: 'Completed subtasks cannot exceed total subtasks',
-      path: ['subtasks_completed']
-    }
-  )
+  })
 }).openapi('UpdateTaskBody')
-
-export const uuidParamSchema = z.object({
-  id: uuidSchema
-})
 
 export const TaskSchema = z.object({
   id: z.string().uuid(),
@@ -122,6 +101,15 @@ export const TaskSchema = z.object({
 }).openapi('Task')
 
 export const TaskListSchema = z.array(TaskSchema).openapi('TaskList')
+
+export const AssignableUserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+}).openapi('AssignableUser')
+
+export const AssignableUsersResponseSchema = z.object({
+  users: z.array(AssignableUserSchema),
+}).openapi('AssignableUsersResponse')
 
 export const UpdateTaskRequestSchema = z.object({
   id: uuidSchema,
@@ -198,3 +186,40 @@ export const IncrementCompletionResponseSchema = z.object({
 export const DeleteSuccessSchema = z.object({
   success: z.literal(true),
 }).openapi('DeleteSuccess')
+
+// --- Subtasks ---
+
+export const SubtaskSchema = z.object({
+  id: z.string().uuid(),
+  task_id: z.string().uuid(),
+  user_id: z.string(),
+  title: z.string(),
+  completed: z.boolean(),
+  order_index: z.number().int(),
+  created_at: z.string(),
+  updated_at: z.string(),
+}).openapi('Subtask')
+
+export const SubtaskListSchema = z.array(SubtaskSchema).openapi('SubtaskList')
+
+export const createSubtaskSchema = z.object({
+  subtask: z.object({
+    task_id: uuidSchema,
+    title: nonEmptyString.max(255, 'Title too long'),
+  })
+}).openapi('CreateSubtaskBody')
+
+export const UpdateSubtaskRequestSchema = z.object({
+  id: uuidSchema,
+  updates: z.object({
+    title: nonEmptyString.max(255, 'Title too long').optional(),
+    completed: z.boolean().optional(),
+    order_index: z.number().int().nonnegative().optional(),
+  })
+}).openapi('UpdateSubtaskRequest')
+
+export const ListSubtasksQuerySchema = z.object({
+  task_id: uuidSchema.optional(),
+})
+
+export const DeleteSubtaskQuerySchema = DeleteTaskQuerySchema

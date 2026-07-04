@@ -1,5 +1,6 @@
-import { pgTable, index, pgPolicy, uuid, text, timestamp, integer, date, boolean, numeric, jsonb } from "drizzle-orm/pg-core"
+import { pgTable, index, pgPolicy, foreignKey, uuid, text, timestamp, integer, date, boolean, numeric, jsonb } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
+import { user } from "@/lib/db/schema/core-schema"
 
 export const tasks = pgTable("tasks", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
@@ -44,4 +45,33 @@ export const tasks = pgTable("tasks", {
 	pgPolicy("tasks_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id = (select current_setting('app.current_user_id')))` }),
 	pgPolicy("tasks_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
 	pgPolicy("tasks_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+]);
+
+export const taskSubtasks = pgTable("task_subtasks", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	taskId: uuid("task_id").notNull(),
+	userId: text("user_id").notNull(),
+	title: text().notNull(),
+	completed: boolean().default(false).notNull(),
+	orderIndex: integer("order_index").default(0).notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_task_subtasks_task_id").using("btree", table.taskId.asc().nullsLast().op("uuid_ops")),
+	index("idx_task_subtasks_user_id").using("btree", table.userId.asc().nullsLast().op("text_ops")),
+	index("idx_task_subtasks_user_task").using("btree", table.userId.asc().nullsLast().op("text_ops"), table.taskId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+		columns: [table.taskId],
+		foreignColumns: [tasks.id],
+		name: "task_subtasks_task_id_fkey",
+	}).onDelete("cascade"),
+	foreignKey({
+		columns: [table.userId],
+		foreignColumns: [user.id],
+		name: "task_subtasks_user_id_fkey",
+	}).onDelete("cascade"),
+	pgPolicy("task_subtasks_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("task_subtasks_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("task_subtasks_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("task_subtasks_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
 ]);
