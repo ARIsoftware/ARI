@@ -109,14 +109,27 @@ async function persistSchemaInstalled(
   }
 }
 
+// Bounds the schema-install gate, which runs on page loads AND on every
+// module API request (via getEnabledModule): concurrent callers share one
+// run instead of racing DDL transactions, and a failing schema.sql is
+// retried at most once per backoff window instead of on every request.
+// Failures are keyed by the attempted hash so a fixed schema.sql retries
+// immediately.
+const installInFlight = new Map<string, Promise<void>>()
+const installFailure = new Map<string, { hash: string; at: number }>()
+const SCHEMA_INSTALL_RETRY_MS = 60_000
+
 /**
- * Run the schema installer once and persist the install hash on success or
- * "already exists" (harmless) results. Errors are logged but never thrown —
- * a failed install must not break a page load. The gate retries on
- * subsequent access until install succeeds.
+ * Run the schema installer once and persist the install hash on success.
+ * Errors are logged but never thrown — a failed install must not break a
+ * page load or API request. Failed installs never advance the hash (the
+ * transaction rolled back, so nothing was applied); the gate retries on
+ * later access, backed off to once per SCHEMA_INSTALL_RETRY_MS per version.
  *
- * Idempotent: safe to call concurrently — the underlying installer itself
- * uses CREATE TABLE IF NOT EXISTS, DROP POLICY IF EXISTS, etc.
+ * Concurrent callers for the same module join the in-flight run. A joiner
+ * for a different user doesn't get its own hash marker persisted that
+ * round — harmless, since its next pass re-runs the (idempotent) installer
+ * and persists then.
  *
  * Callers must only invoke this when they have a hash to persist. The hash
  * is required (no longer optional) so call sites must explicitly handle
@@ -127,15 +140,38 @@ async function installAndMark(
   moduleId: string,
   expectedHash: string,
 ): Promise<void> {
-  const result = await runModuleSchemaInstall(moduleId)
-  if (!result.ok) {
-    // schema.sql runs in one transaction — any failure (including
-    // "already exists") rolls back every additive ALTER in the file, so
-    // a non-ok result must not advance the install hash.
-    console.error(`[Modules] Schema install failed for ${moduleId}: ${result.error}`)
+  const failure = installFailure.get(moduleId)
+  if (
+    failure &&
+    failure.hash === expectedHash &&
+    Date.now() - failure.at < SCHEMA_INSTALL_RETRY_MS
+  ) {
     return
   }
-  await persistSchemaInstalled(userId, moduleId, expectedHash)
+
+  const inFlight = installInFlight.get(moduleId)
+  if (inFlight) return inFlight
+
+  const run = (async () => {
+    const result = await runModuleSchemaInstall(moduleId)
+    if (!result.ok) {
+      // schema.sql runs in one transaction — any failure (including
+      // "already exists") rolls back every additive ALTER in the file, so
+      // a non-ok result must not advance the install hash.
+      console.error(`[Modules] Schema install failed for ${moduleId}: ${result.error}`)
+      installFailure.set(moduleId, { hash: expectedHash, at: Date.now() })
+      return
+    }
+    installFailure.delete(moduleId)
+    await persistSchemaInstalled(userId, moduleId, expectedHash)
+  })()
+
+  installInFlight.set(moduleId, run)
+  try {
+    await run
+  } finally {
+    installInFlight.delete(moduleId)
+  }
 }
 
 /**

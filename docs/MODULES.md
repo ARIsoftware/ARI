@@ -1510,7 +1510,7 @@ Public routes are API endpoints that can be accessed **without authentication**.
 2. **Health checks** - External monitoring services need to verify your endpoints are responsive
 3. **Public APIs** - Intentionally public data that doesn't require user context
 
-**WARNING**: Public routes bypass authentication. All public routes **MUST** have security configuration.
+**WARNING**: Public routes bypass authentication **and** the per-user module-enabled check (there is no user context to check against). A disabled module's public routes remain reachable, so each public route's declared security configuration is its only gate. All public routes **MUST** have security configuration.
 
 ### Configuring Public Routes in module.json
 
@@ -1668,6 +1668,8 @@ Every authenticated route that declares `security: DEFAULT_SECURITY` accepts **t
 2. **`x-api-key: <key>` header** — long-lived programmatic credentials minted by the user in **Settings → API**. The key prefix is defined by `API_KEY_PREFIX` in `lib/auth-middleware.ts`.
 
 There is nothing for a module to wire up — `getAuthenticatedUser()` resolves the request to a user regardless of which mechanism was used, and `withRLS()` scopes queries to that user identically in both cases. The same API key works against the Scalar Try-It-Out UI at `/api-docs`, against direct `curl` calls, and against any HTTP client.
+
+**Module enablement is enforced per request.** The module API catch-all (`app/api/modules/[module]/[[...path]]/route.ts`) verifies the credential *and* checks that the target module is enabled for the resolved user before dispatching to the module's handler. A disabled — or never-enabled — module's routes return `403 {"error":"Module '<id>' is disabled"}` for both credential types. The check reads `module_settings` on every request, so enabling/disabling a module in `/modules` takes effect immediately, with no restart. Note the check is **per-user**, not instance-wide: disabling a module only blocks that user's session and API keys; other users are unaffected.
 
 ### Public routes and the spec
 
@@ -2308,6 +2310,7 @@ Run through this checklist after creating or updating a module:
 - [ ] No console errors in browser
 - [ ] No errors in terminal/server logs
 - [ ] Module can be disabled and re-enabled without issues
+- [ ] Module API routes return 403 while the module is disabled (session and API key)
 - [ ] Build succeeds: `pnpm build`
 
 ---

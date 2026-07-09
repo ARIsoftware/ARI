@@ -2083,9 +2083,16 @@ export default function DatabaseTestPage() {
           data: { count: rows.length, source: test.fullPath }
         })
       } catch (error: unknown) {
+        const msg = errMsg(error)
+        // The module API returns 403 "Module 'x' is disabled" for modules the
+        // user intentionally disabled — that's healthy, not a failure.
+        const moduleDisabled = msg.includes('is disabled') || msg.includes('403')
+        const authWall = msg.includes('401') || msg.includes('Unauthorized')
         updateTestResult(test.name, {
-          status: errMsg(error).includes('401') || errMsg(error).includes('Unauthorized') ? 'warning' : 'error',
-          error: errMsg(error),
+          status: moduleDisabled || authWall ? 'warning' : 'error',
+          error: moduleDisabled
+            ? `${msg} — module is disabled for this user; enable it in /modules to include it in this test`
+            : msg,
           data: { hint: 'Tests the real API route with Better Auth + withRLS()', source: test.fullPath }
         })
       }
