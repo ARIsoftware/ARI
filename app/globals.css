@@ -276,7 +276,7 @@
 /* Terminal theme - green topbar border */
 [data-theme="terminal"] .topbar,
 [data-theme="terminal"] header.border-b {
-  border-bottom: 1px solid hsl(120 100% 50%) !important;
+  border-bottom: 1px solid hsl(134 100% 74.5%) !important;
 }
 
 /* Grayscale theme - subtle ruled-paper background pattern on main areas */
