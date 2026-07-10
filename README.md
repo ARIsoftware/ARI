@@ -8,29 +8,14 @@ Engineered for those who want complete command over the software that runs their
 
 https://ari.software
 
-## Quick Start
-
-Install ARI with a single command:
-
-**macOS / Linux:**
-```bash
-/bin/bash -c "$(curl -fsSL https://ari.software/install)"
-```
-
-**Windows** (PowerShell):
-```powershell
-irm https://ari.software/install-win | iex
-```
-
-The installer handles everything — dependencies, database setup, and configuration.
 
 ## Documentation
 
-Full documentation, guides, and module development resources:
+Full documentationm installation instructions, guides, and module development resources:
 
 https://ari.software/docs
+
 
 ## Need Help?
 
 Reach out to us at hello@ari.software
-
