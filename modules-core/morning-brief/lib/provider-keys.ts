@@ -1,0 +1,75 @@
+/**
+ * Morning Brief - AI provider credential resolution
+ *
+ * Resolves the API key (or base URL) and model for any provider in
+ * `@/lib/ai-providers`. Resolution order, per provider:
+ *   1. The user's saved value in `module_settings` (moduleId 'integrations'),
+ *      decrypted on the fly if it's a stored secret.
+ *   2. The matching `process.env` value.
+ *
+ * Mirrors modules-core/module-template/lib/provider-keys.ts so the module stays
+ * self-contained and automatically picks up any provider added to AI_PROVIDERS.
+ */
+import { withAdminDb } from '@/lib/db'
+import { moduleSettings } from '@/lib/db/schema'
+import { and, eq } from 'drizzle-orm'
+import { decrypt, isEncrypted } from '@/lib/crypto'
+import { INTEGRATIONS_MODULE_ID } from '@/lib/constants'
+import { AI_PROVIDERS, type AiProviderId } from '@/lib/ai-providers'
+
+function providerById(providerId: AiProviderId) {
+  const provider = AI_PROVIDERS.find((p) => p.id === providerId)
+  if (!provider) throw new Error(`Unknown AI provider: ${providerId}`)
+  return provider
+}
+
+/** Read the integrations settings blob for a user once (or {} if none). */
+async function readIntegrationsSettings(userId: string): Promise<Record<string, unknown>> {
+  const rows = await withAdminDb((db) =>
+    db
+      .select({ settings: moduleSettings.settings })
+      .from(moduleSettings)
+      .where(and(eq(moduleSettings.userId, userId), eq(moduleSettings.moduleId, INTEGRATIONS_MODULE_ID)))
+      .limit(1)
+  )
+  return (rows[0]?.settings ?? {}) as Record<string, unknown>
+}
+
+/** Saved value (decrypted) → env fallback → null. */
+function resolve(saved: Record<string, unknown>, envKey: string): string | null {
+  const raw = saved[envKey]
+  if (typeof raw === 'string' && raw.length > 0) {
+    return isEncrypted(raw) ? decrypt(raw) : raw
+  }
+  const envVal = process.env[envKey]
+  return envVal && envVal.length > 0 ? envVal : null
+}
+
+export interface ProviderCredentials {
+  /** API key, or for Ollama (no secret) the base URL standing in for one. Null when unset. */
+  apiKey: string | null
+  /** Configured model, falling back to the provider's registry default. */
+  model: string
+}
+
+/**
+ * Resolve both the API key and model for a provider in a single settings read.
+ *
+ * `modelOverride` is the module's own per-module model (from its module_settings,
+ * not the global integrations blob). When set, it wins over the global model.
+ * Resolution order for the model: per-module override → global <PROVIDER>_MODEL
+ * → the provider's registry default.
+ */
+export async function getProviderCredentials(
+  userId: string,
+  providerId: AiProviderId,
+  modelOverride?: string | null,
+): Promise<ProviderCredentials> {
+  const provider = providerById(providerId)
+  const saved = await readIntegrationsSettings(userId)
+  const override = typeof modelOverride === 'string' ? modelOverride.trim() : ''
+  return {
+    apiKey: resolve(saved, provider.primaryEnvKey),
+    model: override || resolve(saved, provider.modelEnvKey) || provider.modelPlaceholder,
+  }
+}

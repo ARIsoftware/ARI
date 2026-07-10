@@ -1,0 +1,50 @@
+{
+  "id": "morning-brief",
+  "group": "Overview",
+  "name": "Morning Brief",
+  "description": "A one-page printable morning brief, written like a secretary: a personal greeting, a motivational message, your top 5 priority tasks, and today's Google Calendar meetings.",
+  "version": "1.0.0",
+  "author": "ARI",
+  "icon": "Newspaper",
+  "enabled": false,
+  "fullscreen": false,
+  "menuPriority": 1,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": true
+  },
+  "routes": [
+    {
+      "path": "/morning-brief",
+      "label": "Morning Brief",
+      "icon": "Newspaper",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": ["morning_brief_google_tokens", "morning_brief_ical_subscriptions", "morning_brief_greetings"]
+  },
+  "npmDependencies": {
+    "ical-expander": "^3.2.0"
+  },
+  "dashboard": {
+    "widgets": true,
+    "widgetComponents": ["./components/dashboard-widget.tsx"]
+  },
+  "settings": {
+    "panel": "./components/settings-panel.tsx"
+  },
+  "topBarIcon": {
+    "icon": "Newspaper",
+    "route": "/morning-brief",
+    "tooltip": "Morning Brief"
+  },
+  "submenu": {
+    "component": "./components/sidebar-submenu.tsx"
+  }
+}

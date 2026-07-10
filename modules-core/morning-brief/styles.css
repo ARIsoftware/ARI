@@ -1,0 +1,39 @@
+/* Morning Brief — module-scoped print styles.
+ *
+ * Imported by app/page.tsx. Scoped entirely to @media print so it never affects
+ * the on-screen app. When printing, hide all app chrome (sidebar, top bar, page
+ * header, buttons) and show only the brief card, laid out as a clean one-pager.
+ */
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  #morning-brief-printable,
+  #morning-brief-printable * {
+    visibility: visible !important;
+  }
+
+  #morning-brief-printable {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Anything tagged with this class is screen-only (e.g. Print/Refresh buttons). */
+  .mb-no-print {
+    display: none !important;
+  }
+
+  @page {
+    margin: 1.5cm;
+  }
+}
