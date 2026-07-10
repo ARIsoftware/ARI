@@ -23,7 +23,7 @@ Before doing anything:
 - **All database operations MUST use `withRLS()`** — never use the raw Supabase client or unscoped Drizzle queries.
 - **All user input MUST be validated with Zod schemas** before use. Never trust client-provided data.
 - Never expose internal error details (stack traces, SQL errors) to the client. Return generic error messages.
-- **Public/webhook routes** require secret-based validation (HMAC signatures, bearer tokens, etc.). If needed, read `/docs/MODULES.md` section 7.5 for the `publicRoutes` and `createPublicRouteHandler` patterns.
+- **Public/webhook routes** require secret-based validation (HMAC signatures, bearer tokens, etc.) implemented **in the handler itself** — the declared `publicRoutes` security config is metadata only, the framework enforces nothing. If needed, read `/docs/MODULES.md` section 7.5 for the `publicRoutes` pattern and the `checkRateLimit`/`getClientIp` helpers from `@/lib/modules/public-route-security`.
 
 ### General Security Principles
 - Never store secrets, API keys, or credentials in code or client-accessible files. Use environment variables.
@@ -248,11 +248,11 @@ When approved, create the module following this order:
    - Verify no hardcoded mock data remains in any component
 10. **Run `pnpm generate-module-registry`** to register the new module (pages only - API routes were registered in step 5)
 11. **If public routes needed** (webhooks, external API access):
-    - Add `publicRoutes` array to module.json with security configuration
-    - Create route handler using `createPublicRouteHandler` wrapper
+    - Add `publicRoutes` array to module.json with security configuration (static paths only — no `[id]` segments)
+    - Write a plain route handler that implements the declared security itself: signature/key verification plus `checkRateLimit`/`getClientIp` from `@/lib/modules/public-route-security`. There is no framework wrapper — the handler is the only gate (public routes bypass auth AND the module-enabled check).
     - Document the required environment variable for the secret
-    - If needed, read `/docs/MODULES.md` section 7.5 for the `publicRoutes` and `createPublicRouteHandler` patterns
-12. **Database tables provision automatically.** Because `schema.sql` is auto-run by the module loader on every enable, you do NOT need to ask the user to run any SQL manually. The user only needs to enable the new module from Settings → Features and the tables will be created. (Exception: if the user wants to fully remove the module's tables later, they can manually run `uninstall.sql` from their SQL client — Supabase Studio, pgweb, or `psql`.)
+    - If needed, read `/docs/MODULES.md` section 7.5 for the full pattern, or copy `modules-core/module-template/api/webhook/route.ts.example`
+12. **Database tables provision automatically.** Because `schema.sql` is auto-run by the module loader on every enable, you do NOT need to ask the user to run any SQL manually. The user only needs to enable the new module from the `/modules` page and the tables will be created. (Exception: if the user wants to fully remove the module's tables later, they can manually run `uninstall.sql` from their SQL client — Supabase Studio, pgweb, or `psql`.)
 13. **If file storage needed** — set up ARI File Storage. See the "ARI File Storage System" section below.
 
 ## ARI File Storage System
@@ -972,13 +972,13 @@ Before marking complete, verify:
 - [ ] **Every `DialogContent`/`DrawerContent` includes a `DialogTitle`/`DrawerTitle`** (use `VisuallyHidden` if the design has no visible title)
 - [ ] **Random quote displayed under page title** when Quotes module is enabled (follows Module Template pattern)
 - [ ] Page does NOT block on session check (no "Authenticating..." spinner)
-- [ ] **Page does NOT include layout wrappers** (no SidebarProvider, AppSidebar, DarkModeProvider, SidebarInset, or header with breadcrumbs - these are already provided by the module routing system)
+- [ ] **Page does NOT include layout wrappers** (no SidebarProvider, AppSidebar, SidebarInset, TaskAnnouncement, or header with breadcrumbs - these are already provided by the shared app shell)
 - [ ] Component prefers semantic Tailwind tokens (`bg-background`, `text-foreground`, `bg-card`, `text-muted-foreground`, `border-border`, etc.) over raw palette classes for primary surfaces, text, and borders — see the Theming section
 - [ ] No TypeScript errors (`npx tsc --noEmit`)
 - [ ] Module appears in sidebar after registry generation
 - [ ] Page loads without errors in dev server (no duplicate toolbars)
 - [ ] **If public routes exist**: `publicRoutes` configured in module.json with security
-- [ ] **If public routes exist**: Route handler uses `createPublicRouteHandler` wrapper
+- [ ] **If public routes exist**: Handler implements the declared security itself (signature/key check + `checkRateLimit` from `@/lib/modules/public-route-security`) — the framework enforces nothing for public routes
 - [ ] **If public routes exist**: Endpoint visible in `/health` → Endpoints tab
 - [ ] **If onboarding exists**: Settings types include `onboardingCompleted` flag
 - [ ] **If onboarding exists**: Settings API with GET (fetch) and PUT (upsert) endpoints

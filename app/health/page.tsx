@@ -781,7 +781,7 @@ export default function DatabaseTestPage() {
             failedApiRoutes,
             allTests: apiRouteTests,
             modulesWithoutApiRoutes: skippedModules.length > 0 ? skippedModules : undefined,
-            hint: 'Check MODULE_API_ROUTES registry in /app/api/modules/[module]/[[...path]]/route.ts'
+            hint: 'Registry is auto-generated — restart the dev server (or run `pnpm generate-module-registry`) to re-discover module API routes, and check the module is enabled at /modules'
           }
         })
         console.warn('⚠️ Some module API routes have issues:', failedApiRoutes)

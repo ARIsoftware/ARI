@@ -45,7 +45,8 @@
 │                                                               │
 │  ┌──────────────────────────────────────┐                   │
 │  │ Catch-All Route                       │                   │
-│  │ /app/[module]/[[...slug]]/page.tsx   │                   │
+│  │ /app/(app)/[module]/[[...slug]]/     │                   │
+│  │   page.tsx                            │                   │
 │  │                                        │                   │
 │  │ 1. Validates module is enabled        │                   │
 │  │ 2. Checks MODULE_PAGES registry       │                   │
@@ -58,15 +59,15 @@
 │  │ Module Registry                       │                   │
 │  │ /lib/modules/module-registry.ts      │                   │
 │  │                                        │                   │
-│  │ • Scans /modules directory            │                   │
-│  │ • Validates module.json files         │                   │
-│  │ • Checks user permissions             │                   │
+│  │ • Reads the generated manifest        │                   │
+│  │ • Checks per-user enablement (DB)     │                   │
+│  │ • Runs the schema self-heal gate      │                   │
 │  │ • Provides query functions            │                   │
 │  └──────────────────────────────────────┘                   │
 └─────────────────────────────────────────────────────────────┘
                       ↓
 ┌─────────────────────────────────────────────────────────────┐
-│  Your Module (/modules/your-module)                          │
+│  Your Module (/modules-custom/your-module)                   │
 │                                                               │
 │  module.json         ← Required manifest file               │
 │  /app/page.tsx       ← Your module's main page              │
@@ -76,37 +77,45 @@
 └─────────────────────────────────────────────────────────────┘
 ```
 
+The module API catch-all (`/app/api/modules/[module]/[[...path]]/route.ts`)
+applies the same enablement rule to API traffic: it verifies the credential
+(session or API key) and checks per-user module enablement on **every
+request** before dispatching — a disabled module's API routes return
+`403 {"error":"Module '<id>' is disabled"}`, effective immediately on toggle.
+See [section 7](#7-api-routes).
+
 ### Registry-Based Routing
 
 **Why**: Next.js cannot dynamically discover pages outside `/app` at build time.
 
-**Solution**: Modules must be registered in the `MODULE_PAGES` object in `/lib/generated/module-pages-registry.ts`:
+**Solution**: `scripts/generate-module-registry.js` scans `modules-custom/` and
+`modules-core/` and writes `MODULE_PAGES` into
+`/lib/generated/module-pages-registry.ts`. The file is **auto-generated —
+never edit it manually**. It regenerates automatically before every
+`pnpm dev` / `pnpm build` (via `predev`/`prebuild`), or on demand with
+`pnpm generate-module-registry` (or `POST /api/modules/refresh` at runtime):
 
 ```typescript
+// AUTO-GENERATED — DO NOT EDIT
 export const MODULE_PAGES: Record<string, any> = {
   'module-template': () => import('@/modules/module-template/app/page'),
   'my-module': () => import('@/modules/my-module/app/page'),
-  // Add your module here
 }
-
-export const REGISTERED_MODULE_IDS = [
-  'module-template',
-  'my-module',
-  // Add your module ID here
-]
 ```
 
 ### API Route Proxying
 
-Module API routes are proxied through `/app/api/modules/[module]/[[...path]]/route.ts`:
+Module API routes are proxied through `/app/api/modules/[module]/[[...path]]/route.ts`,
+which dispatches via the auto-generated `MODULE_API_ROUTES` map in
+`/lib/generated/module-api-registry.ts`. The generator discovers every
+`api/**/route.ts` in each module automatically — there is nothing to register
+by hand:
 
 ```typescript
-const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
+// AUTO-GENERATED — DO NOT EDIT
+export const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
   'module-template': {
     'data': () => import('@/modules/module-template/api/data/route')
-  },
-  'my-module': {
-    'data': () => import('@/modules/my-module/api/data/route')
   },
 }
 ```
@@ -115,17 +124,21 @@ const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
 
 | Type | URL Pattern | Maps To |
 |------|------------|---------|
-| Page | `/module-template` | `/modules/module-template/app/page.tsx` |
-| Page | `/module-template/settings` | `/modules/module-template/app/settings/page.tsx` |
-| API | `/api/modules/module-template/data` | `/modules/module-template/api/data/route.ts` |
+| Page | `/module-template` | `/modules-core/module-template/app/page.tsx` |
+| Page | `/module-template/settings` | `/modules-core/module-template/app/settings/page.tsx` |
+| API | `/api/modules/module-template/data` | `/modules-core/module-template/api/data/route.ts` |
 
 ### Module Discovery Process
 
-1. App reads `/modules-custom` then `/modules-core` directories
-2. Validates each `module.json` file
-3. Checks if module is enabled for user
-4. Renders module in sidebar if routes defined
-5. Routes requests to module pages/APIs
+1. **Build/predev time**: `scripts/generate-module-registry.js` scans
+   `/modules-custom` then `/modules-core`, validates each `module.json`, and
+   writes the generated artifacts under `/lib/generated/` (module manifest,
+   page/API/submenu/top-bar/provider/dashboard registries, Drizzle schema
+   barrels, OpenAPI input). Nothing scans the filesystem at runtime — the
+   app reads the pre-generated manifest (required for serverless deploys).
+2. Runtime checks per-user enablement in the `module_settings` table
+3. Renders module in sidebar if routes defined
+4. Routes requests to module pages/APIs (both gated on enablement)
 
 ---
 
@@ -198,18 +211,17 @@ modules/[module-id]/
     └── uninstall.sql       ← Manual-only teardown (never auto-run)
 ```
 
-### External Registration Points (ONLY Exceptions)
+### External Registration Points: None
 
-These are the ONLY places where code/configuration must exist outside the module folder:
+There are **zero manual registration touchpoints** outside the module folder.
+Everything is discovered and wired automatically by
+`pnpm generate-module-registry` (auto-run before every `pnpm dev` /
+`pnpm build`): pages, API routes, Drizzle schema/relations barrels, submenu,
+top-bar icons, dashboard widgets, providers, and public routes.
 
-| Location | What to Add | When |
-|----------|-------------|------|
-| `/lib/generated/module-pages-registry.ts` | Page import in `MODULE_PAGES` + ID in `REGISTERED_MODULE_IDS` | Always |
-| `/app/api/modules/[module]/[[...path]]/route.ts` | API route imports in `MODULE_API_ROUTES` | If module has API |
-| `/lib/db/schema/schema.ts` | Drizzle table definition (see [Database Integration](#6-database-integration)) | If module has DB table |
-| `/app/health/page.tsx` (~line 274) | Module ID to `registeredModules` array | Always |
-
-**Developer must be informed**: When creating documentation or explaining module creation, always clearly list these external registration points.
+The files under `/lib/generated/` (and the barrels `/lib/db/schema/schema.ts`
++ `relations.ts`) are auto-generated — **never edit them manually**; your
+changes would be overwritten on the next dev/build run.
 
 ---
 
@@ -237,7 +249,7 @@ These are the ONLY places where code/configuration must exist outside the module
 | `version` | `string` | Semantic version (e.g., "1.0.0") |
 | `author` | `string` | Your name and email |
 | `icon` | `string` | [Lucide icon name](https://lucide.dev) (e.g., "Package", "Zap") |
-| `enabled` | `boolean` | Default enabled state for new users |
+| `enabled` | `boolean` | Default enabled state for new users — **core modules only**. Custom modules (`modules-custom/`) are always seeded disabled regardless of this value; the user must explicitly enable them at `/modules` (which also runs the module's `schema.sql`). |
 
 ### module.json - Optional Fields
 
@@ -259,16 +271,23 @@ These are the ONLY places where code/configuration must exist outside the module
       "sidebarPosition": "main"
     }
   ],
+  "dependencies": {
+    "modules": ["tasks"],
+    "coreFeatures": ["contacts"]
+  },
   "database": {
-    "tables": ["my_module_data"],
-    "migrations": "./database/migrations"
+    "tables": ["my_module_data"]
   },
   "dashboard": {
     "widgets": true,
+    "statCards": ["./components/stat-card.tsx"],
     "widgetComponents": ["./components/widget.tsx"]
   },
   "settings": {
     "panel": "./components/settings-panel.tsx"
+  },
+  "submenu": {
+    "component": "./components/submenu.tsx"
   },
   "topBarIcon": {
     "icon": "Zap",
@@ -289,11 +308,21 @@ These are the ONLY places where code/configuration must exist outside the module
 | `menuPriority` | `number` | Sort order in sidebar (1-100, lower = higher, default: 50). Users can override via drag-and-drop (Cmd+D), which saves to `module_settings.settings.menuPriority` |
 | `permissions` | `object` | Metadata about module capabilities (informational) |
 | `routes` | `array` | Navigation items for sidebar |
-| `database` | `object` | Database table configuration |
-| `dashboard` | `object` | Dashboard widget configuration |
+| `dependencies` | `object` | `{ modules?: string[], coreFeatures?: string[] }` — declares what this module reads from. **Informational only — not enforced**: nothing prevents disabling a dependency, so your module must degrade gracefully (gate fetches with `useModuleEnabled('<id>')` and show a notice; a disabled dependency's API returns 403). |
+| `database` | `object` | `{ tables: string[] }` — table names the module's `schema.sql` creates. Used for diagnostics; a `tables` list without a `schema.sql` logs a warning. |
+| `dashboard` | `object` | Dashboard configuration: `widgets` (boolean), `statCards` (small Quick Overview cards), `widgetComponents` (larger content-area widgets) — component paths relative to module root |
 | `settings` | `object` | Settings panel configuration |
-| `topBarIcon` | `object` | Top bar icon shortcut configuration |
+| `submenu` | `object` | `{ component: "./components/..." }` — custom sliding submenu shown when the module's sidebar item is clicked |
+| `topBarIcon` | `object` | Top bar icon shortcut: `icon`/`route`/`tooltip`, or `component` for a fully custom top-bar component |
+| `publicRoutes` | `array` | Unauthenticated API routes with mandatory security config — see [section 7.5](#75-public-routes) |
 | `npmDependencies` | `object` | npm packages the module imports at runtime. Auto-installed during marketplace install. See [npm Dependencies](#npm-dependencies) below. |
+
+> **Note:** a `database.migrations` field exists in older manifests but is
+> **inert** — no code reads it. Schema evolution works by editing the
+> idempotent `database/schema.sql`; the generator hashes it
+> (`schemaSha256` in the manifest) and the runtime gate re-runs it
+> automatically when the hash changes. See
+> [section 6](#6-database-integration).
 
 ### npm Dependencies
 
@@ -353,7 +382,7 @@ If a declared dependency conflicts with an incompatible version already in root 
 | `path` | `string` | **Must start with `/{module-id}`** |
 | `label` | `string` | Display text in sidebar |
 | `icon` | `string` | Lucide icon name (optional, inherits from module icon) |
-| `sidebarPosition` | `string` | Where to show: `"main"`, `"bottom"`, or `"secondary"` |
+| `sidebarPosition` | `string` | Where to show: `"main"`, `"bottom"`, `"secondary"`, or `"hidden"`/`"none"` (route exists but no sidebar item) |
 | `children` | `array` | Nested routes (optional) |
 
 ### Fullscreen Mode
@@ -456,11 +485,10 @@ Modules can add a quick access icon to the global top navigation bar:
 
   > **⚠️ CRITICAL: Do NOT include layout components!**
   >
-  > Module pages are rendered inside the module routing system (`/app/[module]/[[...slug]]/page.tsx`) which **already provides**:
+  > Module pages are rendered by the module catch-all (`/app/(app)/[module]/[[...slug]]/page.tsx`) inside the shared app shell (`/app/(app)/layout.tsx`), which **already provides**:
   > - `SidebarProvider` and `AppSidebar`
   > - `SidebarInset` wrapper
-  > - Top bar (`TaskAnnouncement`)
-  > - Breadcrumb header
+  > - Top bar (`TaskAnnouncement`) with breadcrumb header
   >
   > **Never include these in your module page** - doing so causes duplicate toolbars/headers (a nested layout bug).
   > Just return your content directly, optionally wrapped in a React fragment `<>`.
@@ -513,49 +541,20 @@ Modules can add a quick access icon to the global top navigation bar:
 
 - [ ] **4.5 Create API routes** (if needed) - See [API Routes](#7-api-routes)
 
-- [ ] **4.6 Register page in MODULE_PAGES**
+- [ ] **4.6 Regenerate the registries**
 
-  Edit `/lib/generated/module-pages-registry.ts`:
-  ```typescript
-  export const MODULE_PAGES: Record<string, any> = {
-    // ... existing modules
-    'my-module': () => import('@/modules/my-module/app/page'),
-  }
+  Restart the dev server (`pnpm dev` regenerates automatically) or run
+  `pnpm generate-module-registry`. Pages, API routes, schema barrels,
+  widgets, submenu, and top-bar icons are all discovered automatically —
+  there is **no manual registration step**.
 
-  export const REGISTERED_MODULE_IDS = [
-    // ... existing modules
-    'my-module',
-  ]
-  ```
+- [ ] **4.7 Database tables provision automatically**
 
-- [ ] **4.7 Register API routes** (if module has API)
+  `database/schema.sql` is executed by the module loader on every enable, so you do NOT need to run SQL manually. Just enable the module at `/modules` and the tables will be created. The script must be fully idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, `DROP POLICY IF EXISTS … CREATE POLICY …`) and must contain no `DROP TABLE`/`TRUNCATE`/`DROP COLUMN` statements — the runtime installer rejects files containing those tokens.
 
-  Edit `/app/api/modules/[module]/[[...path]]/route.ts`:
-  ```typescript
-  const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
-    // ... existing modules
-    'my-module': {
-      'data': () => import('@/modules/my-module/api/data/route')
-    },
-  }
-  ```
+  Note: custom modules always start **disabled** (regardless of `"enabled": true` in module.json) — enable them at `/modules`.
 
-- [ ] **4.8 Update health page**
-
-  Edit `/app/health/page.tsx`:
-  - Add module ID to `registeredModules` array (~line 274):
-    ```typescript
-    const registeredModules = [
-      // ... existing modules
-      'my-module',
-    ]
-    ```
-
-- [ ] **4.9 Database tables provision automatically**
-
-  `database/schema.sql` is executed by the module loader on every enable, so you do NOT need to copy SQL into Supabase manually. Just enable the module in Settings → Features and the tables will be created. The script must be fully idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, `DROP POLICY IF EXISTS … CREATE POLICY …`) and must contain no `DROP TABLE`/`TRUNCATE`/`DROP COLUMN` statements — the runtime installer rejects files containing those tokens.
-
-- [ ] **4.10 Test the module** - See [QA Verification Steps](#11-qa-verification-steps)
+- [ ] **4.8 Test the module** - See [QA Verification Steps](#11-qa-verification-steps)
 
 ---
 
@@ -568,7 +567,7 @@ Use this comprehensive checklist when converting an existing ARI feature into a 
 Before starting migration, ensure:
 
 - ✅ Module system is working (`/modules-core/module-template` loads successfully)
-- ✅ You have access to Supabase dashboard
+- ✅ You can run SQL against your database if needed (psql, Supabase Studio, or pgweb — depending on `ARI_DB_MODE`)
 - ✅ Development server can be restarted
 - ✅ Git working directory is clean (recommended)
 
@@ -590,7 +589,7 @@ Before starting migration, ensure:
 grep -r "feature-name" app/ lib/ --files-with-matches
 
 # Find database references
-grep -r "table_name" migrations/ database/
+grep -r "table_name" lib/db/ --include="*.sql" --include="*.ts"
 ```
 
 #### Step 5.1.2: Document Dependencies
@@ -633,12 +632,11 @@ grep -r "table_name" migrations/ database/
   ├── lib/
   ├── types/
   └── database/
-      └── migrations/
   ```
 
 **Command:**
 ```bash
-mkdir -p modules-core/[module-id]/{app,api/data,api/settings,components,lib,types,database/migrations}
+mkdir -p modules-core/[module-id]/{app,api/data,api/settings,components,lib,types,database}
 ```
 
 #### Step 5.2.2: Create module.json
@@ -648,7 +646,7 @@ mkdir -p modules-core/[module-id]/{app,api/data,api/settings,components,lib,type
 - [ ] Set `name` (display name for UI)
 - [ ] Write `description`
 - [ ] Choose Lucide `icon` name
-- [ ] Set `enabled: true`
+- [ ] Set `enabled: true` (default state — applies to core modules only; custom modules always start disabled)
 - [ ] Set `fullscreen: false` (unless special case)
 - [ ] Set `menuPriority` (lower = higher in list)
 - [ ] Configure `permissions` (database, api, dashboard)
@@ -863,22 +861,15 @@ import type { Item } from '@/modules/module-id/types'
 - [ ] Remove from feature descriptions
 - [ ] Module system will handle menu entry dynamically
 
-#### Step 5.6.3: Verify Middleware
+#### Step 5.6.3: Verify Auth Protection
 
-- [ ] Check `/middleware.ts` includes module route
-- [ ] Ensure route is in `protectedRoutes` array
-- [ ] Test that unauthenticated users are redirected
+- [ ] Routes are protected by default — `middleware.ts` protects everything not in a public list, so module routes never need adding to `protectedRoutes`
+- [ ] Test that unauthenticated users are redirected to `/sign-in`
 
-#### Step 5.6.4: Update Health Page
+#### Step 5.6.4: Regenerate + Verify
 
-- [ ] Add module ID to `registeredModules` array in `/app/health/page.tsx` (~line 274)
-- [ ] Run health tests to verify module is recognized
-
-#### Step 5.6.5: Register Module (Steps 4.6 - 4.8)
-
-- [ ] Register page in MODULE_PAGES
-- [ ] Register API routes (if applicable)
-- [ ] Update debug page
+- [ ] Restart the dev server (or run `pnpm generate-module-registry`) — pages, API routes, and schema barrels register automatically
+- [ ] Run `/health` system tests to verify the module's API fetch test passes
 - [ ] Update CLAUDE.md (if DB table)
 
 ### Phase 7: Cleanup
@@ -1025,7 +1016,6 @@ Closes #[issue-number]
 - [ ] Settings panel in components/settings-panel.tsx (named + default export)
 - [ ] README.md created
 - [ ] Module registry regenerated
-- [ ] Debug page updated
 - [ ] Old imports updated
 - [ ] Static menu entry removed
 - [ ] Old files deleted
@@ -1131,22 +1121,42 @@ export const myModuleDataRelations = relations(myModuleData, ({many}) => ({
 
 ### How Tables Are Provisioned
 
-`database/schema.sql` is **auto-executed by the module loader on every enable**, so you do NOT need to copy SQL into Supabase manually. Just enable the module in Settings → Features and the tables will be created.
+`database/schema.sql` is **auto-executed by the module loader on every enable**, so you do NOT need to run SQL manually. Just enable the module at `/modules` and the tables will be created.
 
 1. Create `database/schema.sql` (idempotent — auto-run on enable)
 2. Create `database/schema.ts` (Drizzle ORM definitions)
 3. Create `database/uninstall.sql` (manual-only teardown)
 4. Run `pnpm generate-module-registry` to regenerate the schema barrel
-5. Enable the module in Settings → Features (tables are created automatically)
+5. Enable the module at `/modules` (tables are created automatically)
 6. Verify the table works by testing your API routes
+
+### How Schema Changes Roll Out (Self-Heal Gate)
+
+You evolve a module's schema by **editing the idempotent `schema.sql`** —
+there is no separate migrations mechanism:
+
+1. The registry generator hashes `schema.sql` into the manifest
+   (`schemaSha256`).
+2. At runtime, the gate compares that hash against the per-user
+   `__schema_installed_hash` marker stored in `module_settings.settings`.
+   On mismatch it re-runs `schema.sql` automatically — on the next page
+   load **or module API request**. No manual migration step.
+3. The whole file runs in **one transaction**, and the hash marker advances
+   **only on success**. A failed run rolls back everything — so one broken
+   statement blocks ALL additive changes in the file until fixed.
+4. Failures are retried with a backoff (once per 60s per schema version)
+   and concurrent requests share a single install run — but don't rely on
+   retries; keep every statement idempotent.
+5. The installer **refuses** files containing destructive statements
+   (`DROP TABLE`/`DROP SCHEMA`/`DROP DATABASE`, `TRUNCATE`,
+   `ALTER … DROP COLUMN`, `DELETE` without `WHERE`).
 
 ### Register in module.json
 
 ```json
 {
   "database": {
-    "tables": ["my_module_data"],
-    "migrations": "./database/migrations"
+    "tables": ["my_module_data"]
   }
 }
 ```
@@ -1180,7 +1190,7 @@ For each module:
 2. **In `route.ts`, call `registry.registerPath({ ... })`** once per HTTP verb above the handler. Use `tags: ['<module-id>']`, `security: DEFAULT_SECURITY`, and the shared `ErrorResponseSchema` / `InternalServerErrorResponse` from `@/lib/openapi/common`.
 
 ```typescript
-// modules/my-module/lib/validation.ts
+// modules-custom/my-module/lib/validation.ts
 import { z } from 'zod'
 import '@/lib/openapi/registry'  // side-effect: extends zod with .openapi()
 
@@ -1209,7 +1219,7 @@ The reference implementation lives at `modules-core/module-template/lib/validati
 ### Basic API Route Template
 
 ```typescript
-// modules/my-module/api/data/route.ts
+// modules-custom/my-module/api/data/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { toSnakeCase } from '@/lib/api-helpers'
@@ -1385,12 +1395,36 @@ export async function DELETE(request: NextRequest) {
 }
 ```
 
+### Dispatcher Behavior (What Runs Before Your Handler)
+
+All module API traffic flows through the catch-all
+`/app/api/modules/[module]/[[...path]]/route.ts`. Before your handler runs,
+it:
+
+1. Rejects fully anonymous requests (no session cookie, no `x-api-key`) → 401
+2. Resolves the route (unknown module or route → 404)
+3. Verifies the credential and **checks per-user module enablement** — a
+   disabled (or never-enabled) module returns
+   `403 {"error":"Module '<id>' is disabled"}`, effective immediately on
+   toggle. Your handler does NOT need its own enablement check.
+4. Runs the schema self-heal gate (see [section 6](#6-database-integration))
+5. Records API-key usage (including rejected-key probes and 403 denials)
+
+Constraints the dispatcher imposes:
+
+- Only `GET`, `POST`, `PUT`, `DELETE`, `PATCH` are dispatched —
+  `OPTIONS`/`HEAD` handlers in module routes are never reached.
+- Dynamic segments must literally be named `[id]` (e.g. `api/data/[id]/route.ts`);
+  other param names are not resolved.
+- Keep your handler's own `getAuthenticatedUser()` check — it's
+  defense-in-depth and provides `withRLS`.
+
 ### Dynamic Route Template (PATCH by ID)
 
 For routes like `/api/modules/my-module/data/[id]`:
 
 ```typescript
-// modules/my-module/api/data/[id]/route.ts
+// modules-custom/my-module/api/data/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { toSnakeCase } from '@/lib/api-helpers'
@@ -1479,7 +1513,7 @@ export async function PATCH(
 - [ ] For INSERT: explicitly set `userId: user.id`
 - [ ] For UPDATE/DELETE: include `eq(table.userId, user.id)` in WHERE clause
 - [ ] Use `toSnakeCase()` for API responses (converts camelCase to snake_case)
-- [ ] Return appropriate HTTP status codes (401, 400, 404, 500)
+- [ ] Return appropriate HTTP status codes (401, 400, 404, 500 — note the dispatcher itself returns 403 when the module is disabled)
 - [ ] Log errors with descriptive context
 - [ ] Never expose internal error details to client
 
@@ -1510,7 +1544,9 @@ Public routes are API endpoints that can be accessed **without authentication**.
 2. **Health checks** - External monitoring services need to verify your endpoints are responsive
 3. **Public APIs** - Intentionally public data that doesn't require user context
 
-**WARNING**: Public routes bypass authentication **and** the per-user module-enabled check (there is no user context to check against). A disabled module's public routes remain reachable, so each public route's declared security configuration is its only gate. All public routes **MUST** have security configuration.
+**WARNING**: Public routes bypass authentication **and** the per-user module-enabled check (there is no user context to check against). A disabled module's public routes remain reachable, and the dispatcher enforces **nothing** for them — the security config declared in module.json is diagnostics metadata only (it surfaces as `x-ari-*` extensions in the OpenAPI spec, `/health`, and `/settings?tab=api`). **The route handler's own code is the only gate.** Every public route handler MUST implement its declared security itself.
+
+**Note**: public route paths are matched by **exact string comparison** against the request path — dynamic segments like `webhook/[id]` will never match. Declare static paths only.
 
 ### Configuring Public Routes in module.json
 
@@ -1535,15 +1571,18 @@ Add a `publicRoutes` array to your module.json:
 }
 ```
 
-### Security Types
+### Security Types (Declared Metadata)
 
-| Type | Description | Required Config |
-|------|-------------|-----------------|
-| `webhook_signature` | Validates cryptographic signatures (Svix, Stripe, GitHub) | `secretEnvVar` |
-| `api_key` | Validates API key in request header | `apiKeyEnvVar`, optionally `apiKeyHeader` |
-| `rate_limit_only` | Only applies rate limiting (use sparingly!) | `rateLimit` |
-| `ip_allowlist` | Restricts to specific IP addresses | `allowedIps[]` |
-| `custom` | Module handles its own validation | `customDescription` |
+The `security.type` you declare documents what your handler implements. It is
+**not enforced by the framework** — implement it in the handler:
+
+| Type | Your handler must | Declared Config |
+|------|-------------------|-----------------|
+| `webhook_signature` | Verify the sender's cryptographic signature (Svix, Stripe, GitHub, …) | `secretEnvVar` |
+| `api_key` | Compare a request header against a secret env var | `apiKeyEnvVar`, optionally `apiKeyHeader` |
+| `rate_limit_only` | Rate limit by client IP (use sparingly!) | `rateLimit` |
+| `ip_allowlist` | Reject IPs not on the list | `allowedIps[]` |
+| `custom` | Whatever you document | `customDescription` |
 
 ### PublicRouteSecurity Configuration
 
@@ -1559,53 +1598,56 @@ interface PublicRouteSecurity {
 }
 ```
 
-### Using createPublicRouteHandler
+### Implementing a Public Route Handler
 
-The recommended way to implement public routes is using the `createPublicRouteHandler` wrapper:
+Write a plain route handler and implement the security yourself. Real
+helpers are available in `@/lib/modules/public-route-security`:
+
+- `checkRateLimit(identifier, maxRequests)` — in-memory per-minute rate
+  limiter; returns `false` when the limit is exceeded
+- `getClientIp(request)` — extracts the client IP (proxy-aware)
+- `isSameOriginRequest(request)` — same-origin gate for setup-style endpoints
 
 ```typescript
-// modules/my-module/api/webhook/route.ts
-import { NextResponse } from 'next/server'
-import { createPublicRouteHandler } from '@/lib/modules/public-route-handler'
-import type { PublicRouteSecurity } from '@/lib/modules/module-types'
+// modules-custom/my-module/api/webhook/route.ts
+import crypto from 'crypto'
+import { NextRequest, NextResponse } from 'next/server'
+import { checkRateLimit, getClientIp } from '@/lib/modules/public-route-security'
 
-// Security config must match module.json publicRoutes entry
-const securityConfig: PublicRouteSecurity = {
-  type: 'webhook_signature',
-  secretEnvVar: 'MY_WEBHOOK_SECRET',
-  rateLimit: 100
-}
+// Implements the security declared in module.json:
+// { "type": "webhook_signature", "secretEnvVar": "MY_WEBHOOK_SECRET", "rateLimit": 100 }
+export async function POST(request: NextRequest) {
+  // 1. Rate limit by client IP
+  if (!checkRateLimit(`my-module-webhook:${getClientIp(request)}`, 100)) {
+    return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+  }
 
-export const POST = createPublicRouteHandler(securityConfig, async (request, context) => {
-  // Security already validated at this point!
-  // context.rawBody contains the raw request body
+  // 2. Verify the webhook signature (example: GitHub-style HMAC-SHA256)
+  const secret = process.env.MY_WEBHOOK_SECRET
+  if (!secret) {
+    return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })
+  }
+  const rawBody = await request.text()
+  const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex')
+  const received = request.headers.get('x-hub-signature-256') ?? ''
+  const valid = received.length === expected.length &&
+    crypto.timingSafeEqual(Buffer.from(received), Buffer.from(expected))
+  if (!valid) {
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+  }
 
-  const payload = JSON.parse(context.rawBody)
-
-  // Process the webhook payload...
+  // 3. Process the payload
+  const payload = JSON.parse(rawBody)
+  // ...
 
   return NextResponse.json({ received: true })
-})
-
-// Optional: Health check for the webhook endpoint
-export async function GET() {
-  return NextResponse.json({
-    status: 'ok',
-    endpoint: '/api/modules/my-module/webhook',
-    description: 'Webhook receiver for external service'
-  })
 }
 ```
 
-### Webhook Signature Support
-
-The security validation utility supports multiple webhook signature formats:
-
-- **Svix** (used by Resend): `svix-id`, `svix-timestamp`, `svix-signature` headers
-- **Stripe**: `stripe-signature` header
-- **GitHub**: `x-hub-signature-256` or `x-hub-signature` headers
-
-The correct format is auto-detected based on which headers are present.
+Each provider has its own signature scheme — check its docs (Svix/Resend:
+`svix-signature` headers; Stripe: `stripe-signature`; GitHub:
+`x-hub-signature-256`). There is no framework auto-detection; the handler
+must verify the scheme it expects.
 
 ### Verification Steps
 
@@ -1615,20 +1657,19 @@ After configuring public routes:
 2. Restart the dev server
 3. Navigate to `/health` → **Endpoints** tab
 4. Verify your public endpoint appears with the correct security type
-5. Test the endpoint:
-   - **Without signature**: Should return 400/401
-   - **With valid signature**: Should return 200
-   - **Rate limit test**: Send > rateLimit requests/minute, should get 429
+5. Test the endpoint against what YOUR handler implements:
+   - **Without signature**: should return 401 (your check)
+   - **With valid signature**: should return 200
+   - **Rate limit test**: send > rateLimit requests/minute, should get 429
 
 ### Public Routes Checklist
 
-- [ ] `publicRoutes` configured in module.json
+- [ ] `publicRoutes` configured in module.json (static paths only)
 - [ ] Security type chosen appropriately (prefer `webhook_signature` or `api_key`)
 - [ ] Environment variable for secret is set
-- [ ] `rateLimit` configured to prevent abuse
-- [ ] Route handler uses `createPublicRouteHandler` wrapper
+- [ ] Handler implements the declared security itself (signature/key check + `checkRateLimit`) — the framework enforces nothing for public routes
 - [ ] Route appears in `/health` → Endpoints tab
-- [ ] Tested without authentication (should fail without proper security headers)
+- [ ] Tested without security headers (should fail)
 - [ ] Tested with valid security headers (should succeed)
 
 ---
@@ -1642,7 +1683,7 @@ ARI publishes a unified OpenAPI 3.1 specification covering every authenticated a
 | Stage | What happens | Where |
 |---|---|---|
 | Build | `scripts/generate-openapi.ts` walks `app/api/` and `modules-{core,custom}/*/api/` collecting `registry.registerPath` calls, then writes the spec to `lib/generated/openapi.json` | Runs on `predev` and `prebuild` |
-| Serve | `/api/openapi.json` reads the generated file, overrides `servers[0].url` with the current origin, and returns it (auth-gated, in-memory cached) | `app/api/openapi.json/route.ts` |
+| Serve | `/api/openapi.json` reads the generated file, overrides `servers[0].url` with `BETTER_AUTH_URL` (falling back to the request origin), and returns it (auth-gated, in-memory cached) | `app/api/openapi.json/route.ts` |
 | Render | The Scalar viewer fetches the spec and renders an interactive Try-It-Out UI | `/api-docs` (`app/api-docs/page.tsx`) |
 | Inspect | Settings → API and the `/health` Endpoints panel both consume the same spec, classifying routes by tag (`app`/`auth` = core, anything else = module id) | `/settings?tab=api`, `/health` |
 
@@ -1671,6 +1712,13 @@ There is nothing for a module to wire up — `getAuthenticatedUser()` resolves t
 
 **Module enablement is enforced per request.** The module API catch-all (`app/api/modules/[module]/[[...path]]/route.ts`) verifies the credential *and* checks that the target module is enabled for the resolved user before dispatching to the module's handler. A disabled — or never-enabled — module's routes return `403 {"error":"Module '<id>' is disabled"}` for both credential types. The check reads `module_settings` on every request, so enabling/disabling a module in `/modules` takes effect immediately, with no restart. Note the check is **per-user**, not instance-wide: disabling a module only blocks that user's session and API keys; other users are unaffected.
 
+> This 403 is emitted by the dispatcher for every module route but is not
+> currently declared in per-route OpenAPI specs (there is no shared
+> `ForbiddenResponse` helper yet), so generated clients should treat 403 on
+> any module endpoint as "module disabled — enable it in `/modules`".
+
+**API-key usage logging**: every key-attributed request is recorded in `api_key_usage_logs` (visible in Settings → API), including 403 disabled-module denials and 401 rejections of a valid key (e.g. IP-allowlist block) — so probes of a leaked key stay visible. Keys presented on public routes are logged too; session-authenticated requests carrying a stray key header are not attributed to the key.
+
 ### Public routes and the spec
 
 Routes declared in `module.json` `publicRoutes` are merged into the spec with `x-ari-public`, `x-ari-security-type`, `x-ari-rate-limit`, and related extensions (`X_ARI.*` constants). They still need a `registry.registerPath` call to appear in `/api-docs` — just omit `security` (or set it to `[]`) since they don't require user auth. See [section 7.5](#75-public-routes) for security type details.
@@ -1683,12 +1731,12 @@ Routes declared in `module.json` `publicRoutes` are merged into the spec with `x
 
 **Module pages must NOT include their own layout components.**
 
-The module routing system (`/app/[module]/[[...slug]]/page.tsx`) already wraps your module page with:
-- `DarkModeProvider`
-- `TaskAnnouncement` (top bar)
+The shared app shell (`/app/(app)/layout.tsx`) already wraps every module page with:
+- `TaskAnnouncement` (top bar) with breadcrumb header
 - `SidebarProvider` + `AppSidebar`
 - `SidebarInset`
-- Breadcrumb header
+
+The module catch-all (`/app/(app)/[module]/[[...slug]]/page.tsx`) then renders your page inside an `ErrorBoundary` (and a fullscreen slot when `fullscreen: true` — the one layout decision a module makes). Theming comes from the global `ThemeProvider` in `components/providers.tsx`.
 
 **If you include any of these in your module page, you will see duplicate toolbars/headers (a nested layout bug).**
 
@@ -1698,12 +1746,11 @@ The module routing system (`/app/[module]/[[...slug]]/page.tsx`) already wraps y
 // ❌ WRONG - These cause duplicate toolbars!
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/app-sidebar'
-import { DarkModeProvider } from '@/components/dark-mode-provider'
 import { TaskAnnouncement } from '@/components/task-announcement'
 
 export default function MyModulePage() {
   return (
-    <DarkModeProvider>           {/* ❌ Already provided */}
+    <>
       <TaskAnnouncement />       {/* ❌ Already provided */}
       <SidebarProvider>          {/* ❌ Already provided */}
         <AppSidebar />           {/* ❌ Already provided */}
@@ -1712,7 +1759,7 @@ export default function MyModulePage() {
           <main>Content</main>
         </SidebarInset>
       </SidebarProvider>
-    </DarkModeProvider>
+    </>
   )
 }
 ```
@@ -1744,7 +1791,7 @@ When migrating existing pages from `/app/` to modules, **remove all layout wrapp
 ### Dashboard Widget Template
 
 ```tsx
-// modules/my-module/components/widget.tsx
+// modules-custom/my-module/components/widget.tsx
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -1798,7 +1845,7 @@ export default MyModuleWidget
 ### Settings Panel Template
 
 ```tsx
-// modules/my-module/components/settings-panel.tsx
+// modules-custom/my-module/components/settings-panel.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -1939,8 +1986,8 @@ import { useModuleEnabled } from '@/lib/modules/module-hooks'  // Module system 
 ARI uses TanStack Query (React Query) for client-side data fetching. **New modules should use TanStack Query** instead of manual `useState` + `useEffect` + `fetch` patterns.
 
 **Benefits:**
-- **Caching**: 30-second stale time prevents unnecessary refetches
-- **Auto-refetch on focus**: Data stays fresh when users switch tabs
+- **Caching**: 5-minute stale time prevents unnecessary refetches (set globally in `components/query-provider.tsx`)
+- **No refetch on focus**: `refetchOnWindowFocus` is disabled globally — queries needing fresher data opt in per-query with `refetchOnWindowFocus: true` or `refetchInterval`
 - **Optimistic updates**: Built-in support for instant UI feedback
 - **Loading/error states**: Clean `isLoading`, `isError` handling
 - **Consistency**: Matches patterns in tasks, contacts, and other modules
@@ -2152,62 +2199,41 @@ Import from `@/lib/modules/module-registry`:
 
 ```typescript
 import {
-  isModuleEnabled,
   getModules,
-  getModuleSettings,
-  getModulesByPosition,
-  getModulesWithWidgets
+  getEnabledModules,
+  getEnabledModule,
+  setModuleEnabled
 } from '@/lib/modules/module-registry'
 ```
 
 | Function | Description |
 |----------|-------------|
-| `isModuleEnabled(moduleId, userId?)` | Check if a module is enabled for a user. Returns `Promise<boolean>`. |
-| `getModules()` | Get all installed modules. Returns `Promise<ModuleMetadata[]>`. |
-| `getModuleSettings(moduleId, userId)` | Get settings for a specific module. Returns module-specific settings object. |
-| `getModulesByPosition(position, userId?)` | Get modules by sidebar position ('main', 'bottom', 'secondary'). |
-| `getModulesWithWidgets(userId?)` | Get all modules that have dashboard widgets enabled. |
+| `getModules()` | All discovered modules regardless of enablement. Returns `Promise<ModuleMetadata[]>`. |
+| `getEnabledModules(userId?)` | Modules enabled for the user (resolves the session if `userId` omitted). Also seeds `module_settings` rows and runs the schema self-heal gate. Returns `Promise<ModuleMetadata[]>`. |
+| `getEnabledModule(moduleId, userId?)` | The enablement primitive: returns `ModuleMetadata` if the module exists and is enabled for the user, else `null`. **Pass `userId` explicitly in API-key contexts** — the sessionless form returns `null` for key-authenticated requests. Also runs the schema self-heal gate. |
+| `setModuleEnabled(moduleId, userId, enabled)` | Toggle a module (runs `schema.sql` on enable). Returns `{ success, error?, warning? }`. |
 
-**Example - Check if module is enabled in API route:**
-```typescript
-import { isModuleEnabled } from '@/lib/modules/module-registry'
-import { getAuthenticatedUser } from '@/lib/auth-helpers'
-
-export async function GET(request: NextRequest) {
-  const { user } = await getAuthenticatedUser()
-
-  const quotesEnabled = await isModuleEnabled('quotes', user?.id)
-  if (!quotesEnabled) {
-    return NextResponse.json({ error: 'Module not enabled' }, { status: 403 })
-  }
-
-  // ... rest of handler
-}
-```
+**Note — you usually don't need an enablement check in module API handlers:**
+the dispatcher already returns `403 {"error":"Module '<id>' is disabled"}`
+before your handler runs (see [section 7](#7-api-routes)). If server code
+outside the dispatcher needs the check, use
+`await getEnabledModule('quotes', user.id) !== null`.
 
 ### Client-Side Hooks
 
 Import from `@/lib/modules/module-hooks`:
 
 ```typescript
-import {
-  useModules,
-  useModule,
-  useModuleEnabled,
-  useModulesByPosition,
-  useModulesWithWidgets
-} from '@/lib/modules/module-hooks'
+import { useModules, useModuleEnabled } from '@/lib/modules/module-hooks'
 ```
 
 | Hook | Description |
 |------|-------------|
-| `useModules()` | Get all modules with their enabled state. Returns `{ modules, loading, error }`. |
-| `useModule(moduleId)` | Get a specific module by ID. Returns `{ module, loading, error }`. |
-| `useModuleEnabled(moduleId)` | Check if a module is enabled. Returns `{ enabled, loading }`. |
-| `useModulesByPosition(position)` | Get modules for a sidebar position. Returns `{ modules, loading }`. |
-| `useModulesWithWidgets()` | Get modules with dashboard widgets. Returns `{ modules, loading }`. |
+| `useModules()` | The user's **enabled** modules, from server-prefetched context (no extra fetch). Returns `{ modules, loading, error }` — `loading` is always `false`. |
+| `useModuleEnabled(moduleId)` | Check if a module is enabled. Returns `{ enabled, loading, error }`. |
 
-**Example - Conditionally render based on module:**
+**Example - Conditionally render based on module** (use this to gate any
+cross-module fetch — a disabled module's API returns 403):
 ```tsx
 'use client'
 
@@ -2228,26 +2254,24 @@ export function MyComponent() {
 
 ### General Utilities
 
-Import from `@/lib/modules`:
-
 ```typescript
-import { isModuleInstalled, getModuleById } from '@/lib/modules'
+import { getInstalledModules } from '@/lib/modules'
+import { getModuleById, moduleExists } from '@/lib/modules/module-loader'
 ```
 
 | Function | Description |
 |----------|-------------|
-| `isModuleInstalled(moduleName)` | Check if a module folder exists (synchronous). Returns `boolean`. |
+| `getInstalledModules()` | Module IDs present in the generated manifest (synchronous). Returns `string[]`. |
+| `moduleExists(moduleId)` | Check if a module exists and is valid. Returns `Promise<boolean>`. |
 | `getModuleById(moduleId)` | Get module metadata by ID. Returns `Promise<ModuleMetadata \| null>`. |
 
 ### Module Context
 
-For components that need direct access to the modules context:
-
-```typescript
-import { useModulesContext } from '@/lib/modules/context'
-
-const { modules, enabledModules, loading, refreshModules } = useModulesContext()
-```
+The modules context (`@/lib/modules/context`) is server-prefetched and
+internal — components should use `useModuleEnabled()` / `useModules()` above.
+If you need the raw context value, the exported hook is
+`useEnabledModulesFromContext()`, returning
+`{ modules: string[], enabledModules: ModuleMetadata[] }`.
 
 ---
 
@@ -2257,7 +2281,7 @@ Run through this checklist after creating or updating a module:
 
 ### Settings & Sidebar
 
-- [ ] Module appears in Settings → Features tab
+- [ ] Module appears on the `/modules` page
 - [ ] Module shows correct name, icon, version, description
 - [ ] Module toggle works (enable/disable)
 - [ ] When enabled, module appears in sidebar
@@ -2323,13 +2347,13 @@ Run through this checklist after creating or updating a module:
 - [ ] `module.json` exists and is valid JSON
 - [ ] `routes` array is defined in manifest
 - [ ] Module ID matches folder name
-- [ ] Module registered in `MODULE_PAGES` object
-- [ ] Dev server restarted after changes
+- [ ] Dev server restarted after changes (regenerates the auto-generated `MODULE_PAGES` registry)
+- [ ] Module is enabled at `/modules`
 
 **Fix:**
 ```bash
 # Validate JSON syntax
-cat modules/my-module/module.json | jq .
+cat modules-custom/my-module/module.json | jq .
 
 # Clear Next.js cache and restart
 rm -rf .next && pnpm dev
@@ -2338,10 +2362,15 @@ rm -rf .next && pnpm dev
 ### API Routes Returning 404
 
 **Check:**
-- [ ] File path correct: `modules/[id]/api/[route]/route.ts`
-- [ ] Exports `GET`, `POST`, etc. functions correctly
-- [ ] API routes registered in `MODULE_API_ROUTES`
-- [ ] `permissions.api: true` in manifest
+- [ ] File path correct: `modules-custom/[id]/api/[route]/route.ts` (dynamic segments must be named `[id]`)
+- [ ] Exports `GET`, `POST`, etc. functions correctly (only GET/POST/PUT/DELETE/PATCH are dispatched)
+- [ ] Dev server restarted after adding routes (regenerates the auto-generated `MODULE_API_ROUTES` registry — or `POST /api/modules/refresh`)
+
+### API Routes Returning 403
+
+A `403 {"error":"Module '<id>' is disabled"}` means the module is disabled
+for the authenticated user — enable it at `/modules`. This applies to both
+session and API-key requests and takes effect immediately on toggle.
 
 **Fix:**
 ```bash
@@ -2354,7 +2383,7 @@ pnpm dev
 
 **Check:**
 - [ ] Module page uses `export default function` (not named export)
-- [ ] Module registered in `MODULE_PAGES`
+- [ ] Dev server restarted since the module was added (registry regenerates)
 - [ ] Check browser console for errors
 - [ ] Check server logs for import errors
 
@@ -2402,10 +2431,12 @@ SELECT * FROM pg_policies WHERE tablename = 'my_module_data';
 ### Module Shows as Disabled
 
 **Fix:**
-1. Go to Settings → Features → Modules
-2. Toggle the switch ON for your module
-3. Page will refresh
-4. Module should now appear in sidebar
+1. Go to the `/modules` page
+2. Toggle the switch ON for your module (this also runs its `schema.sql`)
+3. Module should now appear in sidebar
+
+Remember: custom modules always start disabled, regardless of
+`"enabled": true` in module.json.
 
 ### Build Fails with Module
 
@@ -2430,27 +2461,24 @@ pnpm build 2>&1 | head -50
 **Check:**
 - [ ] Module page does NOT import `SidebarProvider` or `SidebarInset`
 - [ ] Module page does NOT import `AppSidebar`
-- [ ] Module page does NOT import `DarkModeProvider`
 - [ ] Module page does NOT import `TaskAnnouncement`
 - [ ] Module page does NOT render its own `<header>` with breadcrumbs
 
 **Fix:**
 
-Remove all layout wrappers from your module page. The module routing system (`/app/[module]/[[...slug]]/page.tsx`) already provides these.
+Remove all layout wrappers from your module page. The shared app shell (`/app/(app)/layout.tsx`) already provides these.
 
 ```tsx
 // ❌ WRONG - causes duplicate toolbars
 export default function MyModulePage() {
   return (
-    <DarkModeProvider>
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <header>...</header>
-          <main>Content</main>
-        </SidebarInset>
-      </SidebarProvider>
-    </DarkModeProvider>
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <header>...</header>
+        <main>Content</main>
+      </SidebarInset>
+    </SidebarProvider>
   )
 }
 
@@ -2478,7 +2506,7 @@ See [Section 8: Components](#8-components) for full details.
 Use `/modules-core/module-template/` as a complete reference implementation. It demonstrates:
 - Module manifest with all fields
 - Main page with authentication
-- API routes (GET, POST, DELETE)
+- API routes (GET, POST, PUT, DELETE — plus settings/generate/upload routes)
 - Database table with RLS
 - Dashboard widget
 - Settings panel
@@ -2490,12 +2518,13 @@ Use `/modules-core/module-template/` as a complete reference implementation. It 
 | File | Purpose |
 |------|---------|
 | `/lib/modules/module-types.ts` | TypeScript definitions |
-| `/lib/modules/module-registry.ts` | Module state management |
-| `/lib/modules/module-loader.ts` | Module discovery |
-| `/app/[module]/[[...slug]]/page.tsx` | Catch-all page route |
-| `/app/api/modules/[module]/[[...path]]/route.ts` | API proxy |
+| `/lib/modules/module-registry.ts` | Module state management (enablement, schema gate) |
+| `/lib/modules/module-loader.ts` | Module discovery (reads generated manifest) |
+| `/app/(app)/[module]/[[...slug]]/page.tsx` | Catch-all page route |
+| `/app/api/modules/[module]/[[...path]]/route.ts` | API dispatcher (auth + enablement + usage logging) |
 | `/components/app-sidebar.tsx` | Sidebar rendering |
-| `/app/settings/page.tsx` | Module management UI |
+| `/app/(app)/modules/page.tsx` | Module management UI (`/modules`) |
+| `/scripts/generate-module-registry.js` | Build-time discovery + registry generation |
 
 ### Documentation
 

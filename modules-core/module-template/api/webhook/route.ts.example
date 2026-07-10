@@ -5,11 +5,11 @@
  * webhook endpoint with proper security validation.
  *
  * To use this template:
- * 1. Copy this file to your module: modules/your-module/api/webhook/route.ts
+ * 1. Copy this file to your module: modules-custom/your-module/api/webhook/route.ts
  * 2. Add publicRoutes to your module.json (see example below)
  * 3. Set the required environment variable
- * 4. Register the route in MODULE_API_ROUTES
- * 5. Run `pnpm generate-module-registry`
+ * 4. Restart the dev server (or run `pnpm generate-module-registry`) —
+ *    routes are discovered automatically, there is no manual registration
  *
  * Example module.json publicRoutes configuration:
  * ```json
@@ -28,20 +28,23 @@
  *   ]
  * }
  * ```
+ *
+ * IMPORTANT: the security block above is DECLARED METADATA — it surfaces in
+ * /health, /settings?tab=api, and the OpenAPI spec, but the framework does
+ * NOT enforce it. Public routes bypass authentication AND the module-enabled
+ * check entirely, so THIS HANDLER is the only gate. Implement every declared
+ * protection yourself, as shown below.
+ *
+ * Also note: public route paths are matched by exact string comparison —
+ * declare static paths only (no [id] segments).
  */
 
-import { NextResponse } from 'next/server'
-import { createPublicRouteHandler, createPublicHealthCheck } from '@/lib/modules/public-route-handler'
-import type { PublicRouteSecurity } from '@/lib/modules/module-types'
+import crypto from 'crypto'
+import { NextRequest, NextResponse } from 'next/server'
+import { checkRateLimit, getClientIp } from '@/lib/modules/public-route-security'
 
-/**
- * Security configuration - MUST match module.json publicRoutes entry
- */
-const securityConfig: PublicRouteSecurity = {
-  type: 'webhook_signature',
-  secretEnvVar: 'MY_WEBHOOK_SECRET', // Set this in your .env file
-  rateLimit: 100 // Max 100 requests per minute
-}
+/** Max requests per minute per client IP — keep in sync with module.json */
+const RATE_LIMIT = 100
 
 /**
  * Define your webhook payload type
@@ -56,23 +59,51 @@ interface WebhookPayload {
 }
 
 /**
+ * Verify an HMAC-SHA256 signature (GitHub-style `x-hub-signature-256`).
+ *
+ * Each provider has its own scheme — adapt to what your sender uses:
+ * - GitHub: `x-hub-signature-256: sha256=<hmac-sha256 of raw body>`
+ * - Stripe: `stripe-signature` (timestamped; see Stripe docs)
+ * - Svix / Resend: `svix-id` + `svix-timestamp` + `svix-signature`
+ *
+ * Always compare with crypto.timingSafeEqual, never `===`.
+ */
+function verifySignature(rawBody: string, received: string | null, secret: string): boolean {
+  if (!received) return false
+  const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex')
+  const receivedBuf = Buffer.from(received)
+  const expectedBuf = Buffer.from(expected)
+  return receivedBuf.length === expectedBuf.length && crypto.timingSafeEqual(receivedBuf, expectedBuf)
+}
+
+/**
  * POST handler - Receives webhook from external service
  *
- * Security validation happens automatically via createPublicRouteHandler:
- * - Signature verification (Svix, Stripe, or GitHub format)
- * - Rate limiting
- * - Replay attack protection (timestamp validation)
- *
- * If validation fails, the handler returns an appropriate error response
- * and your handler code is never executed.
+ * Implements the security declared in module.json publicRoutes:
+ * 1. Rate limiting by client IP
+ * 2. Signature verification of the raw body
  */
-export const POST = createPublicRouteHandler(securityConfig, async (request, context) => {
+export async function POST(request: NextRequest) {
   try {
-    // Security already validated at this point!
-    // context.rawBody contains the raw request body (string)
+    // 1. Rate limit by client IP (in-memory, per-minute window)
+    if (!checkRateLimit(`module-template-webhook:${getClientIp(request)}`, RATE_LIMIT)) {
+      return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
+    }
 
-    // Parse the webhook payload
-    const payload: WebhookPayload = JSON.parse(context.rawBody)
+    // 2. Verify the signature against the RAW body (read text before parsing —
+    //    re-serialized JSON won't match the sender's signature)
+    const secret = process.env.MY_WEBHOOK_SECRET
+    if (!secret) {
+      console.error('[Webhook] MY_WEBHOOK_SECRET is not configured')
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: 503 })
+    }
+    const rawBody = await request.text()
+    if (!verifySignature(rawBody, request.headers.get('x-hub-signature-256'), secret)) {
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+    }
+
+    // 3. Parse and process the webhook payload
+    const payload: WebhookPayload = JSON.parse(rawBody)
 
     // Log the event for debugging (remove in production if too verbose)
     console.log(`[Webhook] Received event: ${payload.type}`)
@@ -106,24 +137,27 @@ export const POST = createPublicRouteHandler(securityConfig, async (request, con
     // Log error for debugging
     console.error('[Webhook] Processing error:', error)
 
-    // Return 500 - webhook provider may retry
+    // Return 500 - webhook provider may retry. Don't echo error details on a
+    // public endpoint.
     return NextResponse.json(
-      { error: 'Failed to process webhook', details: error.message },
+      { error: 'Failed to process webhook' },
       { status: 500 }
     )
   }
-})
+}
 
 /**
  * GET handler - Health check endpoint
  *
- * This allows external services and monitoring tools to verify
- * the webhook endpoint is responsive without sending actual events.
- *
- * Note: GET requests bypass signature validation by default
- * since they're just health checks with no payload.
+ * Lets external services and monitoring tools verify the webhook endpoint is
+ * responsive without sending actual events. No payload, no signature — but
+ * remember to declare GET in the module.json publicRoutes methods array,
+ * otherwise GET requests require authentication.
  */
-export const GET = createPublicHealthCheck(
-  '/api/modules/module-template/webhook',
-  'Example webhook receiver for Module Template module'
-)
+export async function GET() {
+  return NextResponse.json({
+    status: 'ok',
+    endpoint: '/api/modules/module-template/webhook',
+    description: 'Example webhook receiver for Module Template module',
+  })
+}
