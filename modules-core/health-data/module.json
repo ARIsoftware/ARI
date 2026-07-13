@@ -1,0 +1,44 @@
+{
+  "id": "health-data",
+  "group": "Health",
+  "name": "Health Data",
+  "description": "Upload an Apple Health export zip and explore your activity, heart, sleep, and workout data. All data is automatically purged after 1 hour.",
+  "version": "1.0.0",
+  "author": "ARI",
+  "icon": "HeartPulse",
+  "enabled": false,
+  "fullscreen": false,
+  "menuPriority": 6,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": false
+  },
+  "routes": [
+    {
+      "path": "/health-data",
+      "label": "Health Data",
+      "icon": "HeartPulse",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": [
+      "health_data_imports",
+      "health_data_daily_metrics",
+      "health_data_workouts",
+      "health_data_activity_days",
+      "health_data_sleep_nights",
+      "health_data_routes",
+      "health_data_ecgs"
+    ]
+  },
+  "npmDependencies": {},
+  "submenu": {
+    "component": "./components/sidebar-submenu.tsx"
+  }
+}
