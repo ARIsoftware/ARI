@@ -357,6 +357,15 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Backups contain every user's rows (table discovery bypasses RLS) —
+    // admin only.
+    if (user.role !== 'admin') {
+      return NextResponse.json(
+        { error: "Backup export requires admin access" },
+        { status: 403 }
+      )
+    }
+
     // Check if operation is safe in production
     if (!isProductionSafeOperation()) {
       return NextResponse.json(

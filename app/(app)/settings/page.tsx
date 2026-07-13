@@ -4,9 +4,12 @@ import { Suspense, useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { authClient } from "@/lib/auth-client"
 import { useAuth } from "@/components/providers"
+import { useCurrentUser } from "@/hooks/use-users"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Lock, AlertCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import {
   GeneralTab,
@@ -60,7 +63,22 @@ function SettingsPageContent(): React.ReactElement {
   const router = useRouter()
   const searchParams = useSearchParams()
   const tabParam = searchParams.get("tab")
-  const activeTab: SettingsTab = isSettingsTab(tabParam) ? tabParam : DEFAULT_TAB
+
+  // Permission gating (the APIs enforce this independently — hiding is UX):
+  // - access_settings gates the whole page
+  // - git + backups tabs are admin-only (env-file writes, full-DB backup)
+  // - api tab requires generate_api_keys
+  const { data: currentUser, isLoading: permissionsLoading, isError: permissionsError, refetch: refetchPermissions } = useCurrentUser()
+  const isAdmin = currentUser?.role === "admin"
+  const canAccessSettings = isAdmin || currentUser?.permissions.access_settings === true
+  const isTabAllowed = (tab: SettingsTab): boolean => {
+    if (tab === "git" || tab === "backups") return isAdmin === true
+    if (tab === "api") return isAdmin || currentUser?.permissions.generate_api_keys === true
+    return true
+  }
+
+  const requestedTab: SettingsTab = isSettingsTab(tabParam) ? tabParam : DEFAULT_TAB
+  const activeTab: SettingsTab = isTabAllowed(requestedTab) ? requestedTab : DEFAULT_TAB
 
   function handleTabChange(value: string): void {
     const next = isSettingsTab(value) ? value : DEFAULT_TAB
@@ -429,6 +447,44 @@ function SettingsPageContent(): React.ReactElement {
     }
   }
 
+  if (permissionsLoading || permissionsError || !canAccessSettings) {
+    return (
+      <div className="bg-background">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-8 lg:px-8">
+          <div className="flex flex-col gap-3">
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">Settings</h1>
+          </div>
+          {permissionsError ? (
+            // A failed permission fetch must NOT masquerade as "access denied"
+            // (that would falsely lock out an admin on a transient DB blip).
+            <Card>
+              <CardContent className="flex flex-col items-center gap-3 p-12 text-center">
+                <AlertCircle className="size-8 text-muted-foreground" />
+                <div className="text-sm font-medium">Couldn&apos;t load your permissions</div>
+                <p className="max-w-sm text-xs text-muted-foreground">
+                  Something went wrong reaching the server. Check your connection and try again.
+                </p>
+                <Button variant="outline" size="sm" onClick={() => refetchPermissions()}>
+                  Retry
+                </Button>
+              </CardContent>
+            </Card>
+          ) : !permissionsLoading && (
+            <Card>
+              <CardContent className="flex flex-col items-center gap-3 p-12 text-center">
+                <Lock className="size-8 text-muted-foreground" />
+                <div className="text-sm font-medium">You don&apos;t have permission to access settings</div>
+                <p className="max-w-sm text-xs text-muted-foreground">
+                  Ask an admin to grant you the &ldquo;Access settings&rdquo; permission.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="bg-background">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-8 lg:px-8">
@@ -451,17 +507,19 @@ function SettingsPageContent(): React.ReactElement {
                     <TabsTrigger value="email">Email</TabsTrigger>
                     <TabsTrigger value="security">Security</TabsTrigger>
                     <TabsTrigger value="storage">Storage</TabsTrigger>
-                    <TabsTrigger value="api">API</TabsTrigger>
-                    <TabsTrigger value="git">GIT</TabsTrigger>
-                    <TabsTrigger value="backups">Backups</TabsTrigger>
+                    {isTabAllowed("api") && <TabsTrigger value="api">API</TabsTrigger>}
+                    {isTabAllowed("git") && <TabsTrigger value="git">GIT</TabsTrigger>}
+                    {isTabAllowed("backups") && <TabsTrigger value="backups">Backups</TabsTrigger>}
                   </TabsList>
                   <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" className="w-[125px]" onClick={() => window.location.href = "/health"}>
                       Health Check
                     </Button>
-                    <Button variant="outline" size="sm" className="w-[125px]" onClick={() => window.location.href = "/welcome"}>
-                      Rerun Setup
-                    </Button>
+                    {isAdmin && (
+                      <Button variant="outline" size="sm" className="w-[125px]" onClick={() => window.location.href = "/welcome"}>
+                        Rerun Setup
+                      </Button>
+                    )}
                   </div>
                 </div>
 
@@ -520,14 +578,19 @@ function SettingsPageContent(): React.ReactElement {
                   <EmailTab />
                 </TabsContent>
 
-                <TabsContent value="api">
-                  <ApiTab />
-                </TabsContent>
+                {isTabAllowed("api") && (
+                  <TabsContent value="api">
+                    <ApiTab />
+                  </TabsContent>
+                )}
 
-                <TabsContent value="git">
-                  <GitTab />
-                </TabsContent>
+                {isTabAllowed("git") && (
+                  <TabsContent value="git">
+                    <GitTab />
+                  </TabsContent>
+                )}
 
+                {isTabAllowed("backups") && (
                 <TabsContent value="backups">
                   <BackupsTab
                     message={message}
@@ -551,6 +614,7 @@ function SettingsPageContent(): React.ReactElement {
                     onConfirmDialogChange={setShowConfirmDialog}
                   />
                 </TabsContent>
+                )}
               </Tabs>
 
       </div>

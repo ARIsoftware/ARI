@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { hasPermission } from '@/lib/permissions'
 import { validateRequestBody, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
 import { apiKeys } from '@/lib/db/schema/core-schema'
 import {
@@ -56,6 +57,12 @@ export async function PATCH(
     const { user, withRLS } = await getAuthenticatedUser()
     if (!user || !withRLS) {
       return createErrorResponse('Authentication required', 401)
+    }
+
+    // Editing can extend expiry or widen the IP allowlist — same permission
+    // as creating keys. Revoking (DELETE) stays open to the key's owner.
+    if (!hasPermission(user, 'generate_api_keys')) {
+      return createErrorResponse('You do not have permission to manage API keys', 403)
     }
 
     const { id } = await params

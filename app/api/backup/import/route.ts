@@ -227,6 +227,16 @@ async function executeInTransaction(
     // Re-enable FK checks and commit
     await client.query("SET LOCAL session_replication_role = 'origin'")
     await client.query('COMMIT')
+
+    // A backup from the single-user era restores users without an admin.
+    // Same self-healing rule as lib/db/setup.sql: promote the earliest user
+    // when no admin exists. Best-effort — the boot backfill also covers it.
+    try {
+      await client.query(`UPDATE "user" SET "role" = 'admin'
+        WHERE "id" = (SELECT "id" FROM "user" ORDER BY "createdAt" ASC LIMIT 1)
+          AND NOT EXISTS (SELECT 1 FROM "user" WHERE "role" = 'admin')`)
+    } catch { /* pre-multi-user backup may lack the column until next boot */ }
+
     return { success: true, errors: [] }
 
   } catch (error: unknown) {
@@ -247,6 +257,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
+      )
+    }
+
+    // A restore rewrites every user's data — admin only.
+    if (user.role !== 'admin') {
+      return NextResponse.json(
+        { error: "Backup import requires admin access" },
+        { status: 403 }
       )
     }
 
@@ -399,6 +417,11 @@ export async function PUT(req: NextRequest) {
 
     if (!user || !withRLS) {
       return NextResponse.json({ error: "Authentication required" }, { status: 401 })
+    }
+
+    // Validation parses the full backup (all users' data) — admin only.
+    if (user.role !== 'admin') {
+      return NextResponse.json({ error: "Backup validation requires admin access" }, { status: 403 })
     }
 
     const formData = await req.formData()

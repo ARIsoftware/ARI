@@ -4,7 +4,7 @@ import type * as React from "react"
 import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ChevronRight, Settings, Package } from "lucide-react"
+import { ChevronRight, Settings, Package, Users } from "lucide-react"
 import {
   DndContext,
   PointerSensor,
@@ -21,6 +21,7 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { useEnabledModulesFromContext } from "@/lib/modules/context"
+import { useCurrentUser } from "@/hooks/use-users"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
 import { useDragDropMode } from "@/components/drag-drop-mode-context"
 import { useTheme } from "@/lib/theme/theme-context"
@@ -107,6 +108,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // Get enabled modules from context (pre-fetched server-side)
   const enabledModules = useEnabledModulesFromContext()
 
+  // Users/Settings links are only shown to accounts with the matching
+  // permission. The server enforces this independently — hiding is cosmetic.
+  const { data: currentUser } = useCurrentUser()
+  const canManageUsers =
+    currentUser?.role === 'admin' ||
+    currentUser?.permissions.manage_users === true ||
+    currentUser?.permissions.manage_admins === true
+  const canAccessSettings =
+    currentUser?.role === 'admin' ||
+    currentUser?.permissions.access_settings === true
+
   // Drag and drop mode
   const { isDragMode, setPendingOrder, moduleOrder } = useDragDropMode()
 
@@ -125,10 +137,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return module.routes?.some(route => pathname.startsWith(route.path))
   })
 
-  // Reset showMainMenu when navigating to a route outside the current submenu module
+  // Reset showMainMenu on any navigation. Previously this only fired when
+  // the active submenu module changed, so once a user pressed "Back" the
+  // main menu stuck for every subsequent page inside the same module.
   useEffect(() => {
     setShowMainMenu(false)
-  }, [activeSubmenuModule?.id])
+  }, [pathname, activeSubmenuModule?.id])
 
   // Sort modules by menuPriority (lower first), then alphabetically
   // Use moduleOrder from context if available (overrides server-side menuPriority)
@@ -335,7 +349,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                 return (
                                   <SidebarMenuItem key={route.path}>
                                     <SidebarMenuButton asChild>
-                                      <Link href={route.path} className="flex items-center">
+                                      <Link href={route.path} className="flex items-center" onClick={() => setShowMainMenu(false)}>
                                         <Icon className="mr-2 size-4" />
                                         <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
                                         {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
@@ -366,7 +380,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                           return (
                             <SidebarMenuItem key={route.path}>
                               <SidebarMenuButton asChild>
-                                <Link href={route.path} className="flex items-center">
+                                <Link href={route.path} className="flex items-center" onClick={() => setShowMainMenu(false)}>
                                   <Icon className="mr-2 size-4" />
                                   <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
                                   {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
@@ -403,7 +417,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                 return (
                                   <SidebarMenuItem key={route.path}>
                                     <SidebarMenuButton asChild>
-                                      <Link href={route.path} className="flex items-center">
+                                      <Link href={route.path} className="flex items-center" onClick={() => setShowMainMenu(false)}>
                                         <Icon className="mr-2 size-4" />
                                         <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
                                         {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
@@ -434,7 +448,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                           return (
                             <SidebarMenuItem key={route.path}>
                               <SidebarMenuButton asChild>
-                                <Link href={route.path} className="flex items-center">
+                                <Link href={route.path} className="flex items-center" onClick={() => setShowMainMenu(false)}>
                                   <Icon className="mr-2 size-4" />
                                   <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
                                   {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
@@ -455,6 +469,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarFooter>
         <div className="border-t border-sidebar-border/60 pt-[15px]">
           <SidebarMenu>
+            {canManageUsers && (
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/users')}>
+                  <Link href="/users" className="flex items-center">
+                    <Users className="mr-2 size-4" />
+                    <span>Users</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
             <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={pathname.startsWith('/modules')}>
                 <Link href="/modules" className="flex items-center">
@@ -463,14 +487,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname.startsWith('/settings')}>
-                <Link href="/settings" className="flex items-center">
-                  <Settings className="mr-2 size-4" />
-                  <span>Settings</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            {canAccessSettings && (
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname.startsWith('/settings')}>
+                  <Link href="/settings" className="flex items-center">
+                    <Settings className="mr-2 size-4" />
+                    <span>Settings</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
           </SidebarMenu>
         </div>
         <div

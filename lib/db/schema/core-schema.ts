@@ -16,6 +16,9 @@ export const user = pgTable("user", {
 	firstName: text(),
 	lastName: text(),
 	twoFactorEnabled: boolean().default(false),
+	role: text().default('user').notNull(),
+	permissions: jsonb().default({}).notNull(),
+	disabled: boolean().default(false).notNull(),
 }, (table) => [
 	index("idx_user_email").using("btree", table.email.asc().nullsLast().op("text_ops")),
 	unique("user_email_key").on(table.email),

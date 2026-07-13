@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import path from 'path'
 import { getGitHubConfig, commitModuleToGitHub } from '@/lib/modules/github-sync'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { hasPermission } from '@/lib/permissions'
 import { logger } from '@/lib/logger'
 import { safeErrorResponse } from '@/lib/api-error'
 import {
@@ -45,6 +46,14 @@ export async function POST(request: NextRequest) {
   const { user } = await getAuthenticatedUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Commits module code to the configured GitHub repo — module managers only.
+  if (!hasPermission(user, 'manage_modules')) {
+    return NextResponse.json(
+      { error: 'You do not have permission to manage modules' },
+      { status: 403 }
+    )
   }
 
   const config = getGitHubConfig()

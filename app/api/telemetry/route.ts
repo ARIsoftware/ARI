@@ -47,6 +47,11 @@ export async function PUT(request: Request) {
   const { user } = await getAuthenticatedUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  // Telemetry is a per-install setting, not per-user — admin only.
+  if (user.role !== 'admin') {
+    return NextResponse.json({ error: "Admin access required" }, { status: 403 })
+  }
+
   const body = await request.json().catch(() => null)
   if (!body || typeof body.enabled !== "boolean") {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 })

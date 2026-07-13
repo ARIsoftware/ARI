@@ -94,6 +94,14 @@ export async function getAuthenticatedUser() {
 - Better Auth API handler for all auth endpoints
 - Handles sign-in, sign-out, session management
 
+### Users, Roles & Permissions (multi-user)
+
+- Roles: `admin` | `user`, stored on the Better Auth `user` table (`role`, `permissions` JSONB, `disabled` columns). The **first account is automatically an admin** — an idempotent backfill in `lib/db/setup.sql` promotes the earliest-created user whenever no admin exists (runs on every boot; covers upgrades from single-user installs and restored old backups).
+- **Admins implicitly hold every permission** (stored grants ignored). Users resolve each key from `permissions` JSONB with per-key defaults in `lib/permissions.ts`: `manage_users`, `manage_admins` (off by default), `manage_modules`, `access_settings` (on by default), `generate_api_keys` (off). Missing key = default, so adding a new permission needs no migration.
+- `getAuthenticatedUser()` returns `user.role` and `user.permissions` (effective), **always read fresh from the DB row** — never check permissions from the cookie-cached session. Disabled accounts fail auth entirely (sessions rejected, API keys stop working, sign-in blocked via session-create hook).
+- Admin user CRUD lives at the `/users` page (`app/(app)/users/`) + `/api/users` routes. Invariants enforced server-side: the last active admin cannot be deleted/disabled/demoted; you cannot change your own role, disable or delete yourself; you can only grant permissions you hold yourself; creating/editing admins requires `manage_admins`.
+- Gating new features: server-side use `hasPermission(user, 'key')` / `canManageRole()` from `lib/permissions.ts`; client-side use `useCurrentUser()` from `hooks/use-users.ts` (backed by `/api/users/me`). UI hiding is cosmetic — the API must always enforce.
+
 ## Database Schema
 
 ### Database Modes

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { desc } from 'drizzle-orm'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { hasPermission } from '@/lib/permissions'
 import { validateRequestBody, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
 import { generateApiKey } from '@/lib/api-keys'
 import { apiKeys } from '@/lib/db/schema/core-schema'
@@ -79,6 +80,10 @@ export async function POST(request: NextRequest) {
     const { user, withRLS } = await getAuthenticatedUser()
     if (!user || !withRLS) {
       return createErrorResponse('Authentication required', 401)
+    }
+
+    if (!hasPermission(user, 'generate_api_keys')) {
+      return createErrorResponse('You do not have permission to generate API keys', 403)
     }
 
     const validation = await validateRequestBody(request, createApiKeySchema)

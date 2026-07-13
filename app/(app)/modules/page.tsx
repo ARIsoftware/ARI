@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
+import { useCurrentUser } from "@/hooks/use-users"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -255,6 +256,15 @@ export default function ModulesPage() {
     firstRoute?: string
   } | null>(null)
   const router = useRouter()
+
+  // Without manage_modules the page stays viewable but the enable/disable
+  // switches, install buttons and save bar are hidden. The APIs enforce the
+  // same permission server-side.
+  const { data: currentUser } = useCurrentUser()
+  const canManageModules =
+    currentUser?.role === 'admin' ||
+    currentUser?.permissions.manage_modules === true
+
   // Pre-install confirmation dialog state. When non-null, an AlertDialog
   // listing the module's declared npm packages is shown. Confirming kicks
   // off runInstall(); cancelling clears.
@@ -915,6 +925,15 @@ export default function ModulesPage() {
       const hasChanged = originalStates[mod.id] !== toggleStates[mod.id]
       const isOverridden = mod.isOverridden === true
 
+      // Without manage_modules: show the state, hide the toggle.
+      if (!canManageModules) {
+        return (
+          <span className={`text-sm font-medium text-muted-foreground ${isOverridden ? 'opacity-30' : ''}`}>
+            {isEnabled ? 'On' : 'Off'}
+          </span>
+        )
+      }
+
       return (
         <div className={`flex items-center gap-3 ${isOverridden ? 'opacity-30' : ''}`}>
           <span className={`text-sm font-medium ${hasChanged ? 'text-amber-600' : 'text-muted-foreground'}`}>
@@ -930,6 +949,7 @@ export default function ModulesPage() {
     }
 
     if (mod.status === "downloadable") {
+      if (!canManageModules) return null
       const isDownloading = downloading === mod.id
       return (
         <Button
@@ -1778,7 +1798,7 @@ export default function ModulesPage() {
           </AlertDialog>
 
           {/* Sticky Save Bar */}
-          {hasChanges && (
+          {hasChanges && canManageModules && (
             <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background shadow-lg">
               <div className="mx-auto max-w-6xl px-6 py-4">
                 <div className="flex items-center justify-between">

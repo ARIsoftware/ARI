@@ -23,3 +23,25 @@ export async function ensureSchema(): Promise<void> {
     console.error("⚠️  Failed to apply lib/db/setup.sql:", msg)
   }
 }
+
+/**
+ * Force-reapply setup.sql even if it already ran this process.
+ *
+ * Used to self-heal at runtime when a query hits an undefined-column error
+ * (e.g. a backup restore recreated a table from an older schema era). Unlike
+ * ensureSchema(), this ignores the once-per-process latch. Returns true only
+ * if setup.sql applied cleanly. Never throws.
+ */
+export async function reapplySchema(): Promise<boolean> {
+  if (!pool) return false
+  try {
+    await pool.query(setupSql)
+    ensured = true
+    console.log("✅ Schema re-applied (lib/db/setup.sql)")
+    return true
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error("⚠️  Failed to re-apply lib/db/setup.sql:", msg)
+    return false
+  }
+}

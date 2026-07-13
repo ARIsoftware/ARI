@@ -20,9 +20,11 @@ import {
   Loader2,
   Activity,
   FileCode,
+  Users,
 } from "lucide-react"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
 import { useModules } from "@/lib/modules/module-hooks"
+import { useCurrentUser } from "@/hooks/use-users"
 import { isPublicPathname } from "@/lib/route-helpers"
 
 interface CommandPaletteProps {
@@ -76,6 +78,17 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
   // Check if Tasks module is enabled for Quick Actions
   const tasksEnabled = modules.some(m => m.id === 'tasks')
 
+  // Users page is only offered to accounts that can manage users (the
+  // server enforces this independently — hiding the entry is cosmetic).
+  const { data: currentUser } = useCurrentUser({ enabled: !isPublicPage })
+  const canManageUsers =
+    currentUser?.role === 'admin' ||
+    currentUser?.permissions.manage_users === true ||
+    currentUser?.permissions.manage_admins === true
+  const canAccessSettings =
+    currentUser?.role === 'admin' ||
+    currentUser?.permissions.access_settings === true
+
   if (isPublicPage) return null
 
   return (
@@ -107,10 +120,18 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
             })
           ) : null}
           {/* Static core pages (not modules) */}
-          <CommandItem onSelect={() => runCommand(() => router.push("/settings"))}>
-            <Settings className="mr-2 h-4 w-4" />
-            <span>Settings</span>
-          </CommandItem>
+          {canManageUsers && (
+            <CommandItem onSelect={() => runCommand(() => router.push("/users"))}>
+              <Users className="mr-2 h-4 w-4" />
+              <span>Users</span>
+            </CommandItem>
+          )}
+          {canAccessSettings && (
+            <CommandItem onSelect={() => runCommand(() => router.push("/settings"))}>
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Settings</span>
+            </CommandItem>
+          )}
           <CommandItem onSelect={() => runCommand(() => router.push("/modules"))}>
             <Package className="mr-2 h-4 w-4" />
             <span>Modules Library</span>

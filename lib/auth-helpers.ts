@@ -7,8 +7,124 @@ import { withUserContext, withAdminDb, type DrizzleDb } from "@/lib/db"
 import { hashApiKey, lookupApiKey, checkIpAllowed } from "@/lib/api-keys"
 import { user as userTable } from "@/lib/db/schema/core-schema"
 import { eq } from "drizzle-orm"
+import { resolvePermissions, type PermissionMap, type UserRole } from "@/lib/permissions"
+import { getPgCode } from "@/lib/db/postgres-error"
 
 const NULL_AUTH = { user: null, session: null, withRLS: null }
+
+/** Transient pool/connection errors worth one retry (mirrors lib/db). */
+function isTransientDbError(error: unknown): boolean {
+  const msg = (error as { message?: string })?.message || ""
+  const code = (error as { code?: string })?.code || ""
+  return (
+    code === "ECONNREFUSED" ||
+    code === "ECONNRESET" ||
+    msg.includes("Connection terminated") ||
+    msg.includes("connection is closed") ||
+    msg.includes("Client has encountered a connection error")
+  )
+}
+
+/**
+ * Read role/permissions/disabled for a user, optionally validating that a
+ * specific session token still exists.
+ *
+ * Returns null for "no access" (row missing, disabled, or — when a token is
+ * given — the session was revoked), a resolved access object, or undefined to
+ * signal the columns don't exist yet (42703) so the caller can self-heal.
+ * Rethrows every other error so the caller decides whether to retry/fail.
+ */
+async function queryUserAccess(
+  userId: string,
+  sessionToken?: string
+): Promise<{ role: UserRole; permissions: PermissionMap } | null | undefined> {
+  if (!pool) return null
+  try {
+    // When a session token is supplied, require the session row to still
+    // exist. The 5-minute cookie cache can hand us a session that was already
+    // revoked (admin password reset, sign-out, disable) without a DB check;
+    // folding an EXISTS into this already-per-request query catches that
+    // immediately at no extra round trip.
+    const params: unknown[] = [userId]
+    let sql = 'SELECT "role", "permissions", "disabled" FROM "user" WHERE id = $1'
+    if (sessionToken) {
+      sql += ' AND EXISTS (SELECT 1 FROM "session" WHERE "token" = $2 AND "userId" = $1)'
+      params.push(sessionToken)
+    }
+    sql += " LIMIT 1"
+    const { rows } = await pool.query<{ role: string; permissions: unknown; disabled: boolean }>(sql, params)
+    const row = rows[0]
+    if (!row || row.disabled === true) return null
+    const role: UserRole = row.role === "admin" ? "admin" : "user"
+    return { role, permissions: resolvePermissions(role, row.permissions) }
+  } catch (error) {
+    if (getPgCode(error) === "42703") return undefined
+    throw error
+  }
+}
+
+/**
+ * Load role/permissions/disabled straight from the DB user row.
+ *
+ * Deliberately NOT read from the session payload: session cookies are cached
+ * for 5 minutes, so permission changes, a disable, or a session revocation
+ * must take effect from the live DB, not the stale cookie. Returns null (fail
+ * closed) when the user is disabled/missing, the session was revoked, or the
+ * lookup fails after a retry.
+ */
+async function loadUserAccess(
+  userId: string,
+  sessionToken?: string
+): Promise<{ role: UserRole; permissions: PermissionMap } | null> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const access = await queryUserAccess(userId, sessionToken)
+      if (access !== undefined) return access
+
+      // 42703 = the multi-user columns are missing. This can happen at runtime
+      // (a backup restore recreated "user" from an older schema era) not just
+      // pre-boot, so we self-heal by re-applying setup.sql (idempotent: adds
+      // the columns + runs the admin backfill) and retry once. We never fail
+      // open to admin — if healing or the retry doesn't produce the columns,
+      // fail closed.
+      const { reapplySchema } = await import("@/lib/db/ensure-schema")
+      const healed = await reapplySchema()
+      if (!healed) return null
+      const retry = await queryUserAccess(userId, sessionToken)
+      return retry ?? null
+    } catch (error) {
+      // A single stale pooled connection (DB restart, PgBouncer drop) shouldn't
+      // masquerade as "signed out" — retry once on a fresh connection before
+      // failing closed.
+      if (attempt === 0 && isTransientDbError(error)) continue
+      console.error("User access lookup failed:", error)
+      return null
+    }
+  }
+  return null
+}
+
+/** Fetch the full user row for API-key auth, healing on a missing column. */
+async function fetchApiKeyUserRow(userId: string) {
+  const run = () =>
+    withAdminDb(async (db) =>
+      db.select().from(userTable).where(eq(userTable.id, userId)).limit(1)
+    )
+  try {
+    return (await run())[0] ?? null
+  } catch (error) {
+    // Same upgrade window loadUserAccess handles: the row select now includes
+    // role/permissions/disabled, so on a pre-migration DB it 42703s. Heal and
+    // retry once so API-key auth doesn't hard-fail while sessions self-heal.
+    if (getPgCode(error) === "42703") {
+      const { reapplySchema } = await import("@/lib/db/ensure-schema")
+      if (await reapplySchema()) {
+        return (await run())[0] ?? null
+      }
+    }
+    throw error
+  }
+}
 
 /**
  * Get authenticated user and database client for API routes.
@@ -42,10 +158,18 @@ async function getAuthenticatedUserImpl() {
   }
 
   if (session) {
+    // Disabled accounts and revoked sessions are rejected here even if the
+    // session cookie is still cache-valid; permission grants always reflect
+    // the live DB row.
+    const access = await loadUserAccess(session.user.id, session.session.token)
+    if (!access) return NULL_AUTH
+
     return {
       user: {
         id: session.user.id,
         email: session.user.email,
+        role: access.role,
+        permissions: access.permissions,
         user_metadata: {
           first_name: session.user.firstName,
           last_name: session.user.lastName,
@@ -79,17 +203,20 @@ async function getAuthenticatedUserImpl() {
       return NULL_AUTH
     }
 
-    // Fetch user record
-    const userRows = await withAdminDb(async (db) =>
-      db.select().from(userTable).where(eq(userTable.id, keyRow.userId)).limit(1)
-    )
-    const userRow = userRows[0]
+    // Fetch user record (heals on the pre-migration missing-column window)
+    const userRow = await fetchApiKeyUserRow(keyRow.userId)
     if (!userRow) return NULL_AUTH
+
+    // API keys of disabled accounts stop authenticating immediately.
+    if (userRow.disabled === true) return NULL_AUTH
+    const keyUserRole: UserRole = userRow.role === "admin" ? "admin" : "user"
 
     return {
       user: {
         id: userRow.id,
         email: userRow.email,
+        role: keyUserRole,
+        permissions: resolvePermissions(keyUserRole, userRow.permissions),
         user_metadata: {
           first_name: userRow.firstName,
           last_name: userRow.lastName,

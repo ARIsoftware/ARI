@@ -154,6 +154,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ status: "error" }, { status: 500 })
       }
 
+      // First account = admin. setup.sql's boot-time backfill also promotes
+      // the earliest user when no admin exists, but doing it here means the
+      // very first session already carries the admin role.
+      await client.query('UPDATE "user" SET "role" = \'admin\' WHERE email = $1', [email])
+
       initialized = true
       await clearFirstRunAdminCredentials()
       return NextResponse.json({ status: "created" })

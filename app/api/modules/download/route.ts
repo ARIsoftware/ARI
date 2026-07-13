@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { hasPermission } from '@/lib/permissions'
 import { MODULES_API_BASE, buildClientInfo } from '@/lib/license-helpers'
 import { getLicenseKey } from '@/lib/license-helpers-server'
 import { z } from 'zod'
@@ -207,6 +208,14 @@ export async function POST(request: NextRequest) {
   const { user } = await getAuthenticatedUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // Installing writes to modules-custom/ and can run pnpm — module managers only.
+  if (!hasPermission(user, 'manage_modules')) {
+    return NextResponse.json(
+      { error: 'You do not have permission to install modules' },
+      { status: 403 }
+    )
   }
 
   let body: unknown

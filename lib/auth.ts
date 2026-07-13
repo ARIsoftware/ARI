@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth"
+import { APIError } from "better-auth/api"
 import { nextCookies } from "better-auth/next-js"
 import { twoFactor } from "better-auth/plugins/two-factor"
 import { hash as argon2Hash, verify as argon2Verify } from "@node-rs/argon2"
@@ -34,6 +35,19 @@ if (process.env.NODE_ENV !== 'production') {
   )
 }
 
+/**
+ * Hash a password with Argon2id (winner of the Password Hashing Competition).
+ * Shared by the Better Auth config below and the admin Users API
+ * (app/api/users), so admin-set passwords hash identically to sign-up ones.
+ */
+export async function hashPassword(password: string): Promise<string> {
+  return await argon2Hash(password, {
+    memoryCost: 19456, // 19 MiB
+    timeCost: 2,
+    parallelism: 1,
+  })
+}
+
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
   database: pool as any, // Will be null during build, but auth-helpers catches this
@@ -42,14 +56,7 @@ export const auth = betterAuth({
     enabled: true,
     password: {
       minLength: 18,
-      hash: async (password: string) => {
-        // Hash passwords with Argon2id (winner of Password Hashing Competition)
-        return await argon2Hash(password, {
-          memoryCost: 19456, // 19 MiB
-          timeCost: 2,
-          parallelism: 1,
-        })
-      },
+      hash: hashPassword,
       verify: async ({ hash: storedHash, password }: { hash: string; password: string }) => {
         // Verify with Argon2
         return await argon2Verify(storedHash, password)
@@ -60,16 +67,29 @@ export const auth = betterAuth({
     additionalFields: {
       firstName: { type: "string", required: false },
       lastName: { type: "string", required: false },
+      // Multi-user fields. input: false — only the Users admin API may set
+      // these; they must never be client-assignable at sign-up. Authoritative
+      // permission checks read the DB row (lib/permissions.ts), not the
+      // session payload, so a stale cookie cache can't grant stale access.
+      role: { type: "string", required: false, input: false, defaultValue: "user" },
+      disabled: { type: "boolean", required: false, input: false, defaultValue: false },
     },
   },
   // Cache session in a signed cookie to avoid DB hits on every get-session call
-  // This prevents 429s when many tabs are open simultaneously
+  // This prevents 429s when many tabs are open simultaneously.
+  //
+  // maxAge also bounds how long a revoked/disabled account can keep calling
+  // Better Auth's OWN endpoints (e.g. update-user, two-factor) that validate
+  // from this cache without a DB read. ARI's own API routes are unaffected —
+  // getAuthenticatedUser re-reads the live DB row (and verifies the session
+  // still exists) on every request — so 60s is a safe, tighter bound for the
+  // few self-scoped Better Auth endpoints while keeping get-session cheap.
   session: {
     expiresIn: 60 * 60 * 24 * 30, // 30 days
     updateAge: 60 * 60 * 24,       // refresh session expiry every 1 day of activity
     cookieCache: {
       enabled: true,
-      maxAge: 5 * 60, // 5 minutes
+      maxAge: 60, // 1 minute
     },
   },
   // Rate limiting to prevent brute force attacks
@@ -100,6 +120,31 @@ export const auth = betterAuth({
   databaseHooks: {
     session: {
       create: {
+        before: async (session) => {
+          // Disabled accounts must not be able to sign in. Request-time
+          // enforcement lives in getAuthenticatedUser(); this hook just
+          // rejects new sessions up front for a clear sign-in error.
+          if (pool) {
+            let isDisabled = false
+            try {
+              const { rows } = await pool.query<{ disabled: boolean }>(
+                'SELECT "disabled" FROM "user" WHERE id = $1 LIMIT 1',
+                [session.userId]
+              )
+              isDisabled = rows[0]?.disabled === true
+            } catch {
+              // Never break sign-in on a lookup failure (e.g. mid-upgrade
+              // before setup.sql added the column) — request-time checks
+              // in getAuthenticatedUser() still enforce the flag.
+            }
+            if (isDisabled) {
+              throw new APIError("FORBIDDEN", {
+                message: "This account has been disabled. Contact your administrator.",
+              })
+            }
+          }
+          return { data: session }
+        },
         after: async (session) => {
           if (firstSigninPingResolved) return
           void (async () => {

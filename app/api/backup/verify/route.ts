@@ -166,13 +166,22 @@ async function getRowCounts(tables: string[]): Promise<Record<string, number>> {
 
 export async function GET(req: NextRequest) {
   try {
-    // Authenticate user (any authenticated user can verify)
+    // Authenticate user
     const { user } = await getAuthenticatedUser()
 
     if (!user) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
+      )
+    }
+
+    // Verify enumerates the full schema and row counts across all users —
+    // admin only, same as export/import.
+    if (user.role !== 'admin') {
+      return NextResponse.json(
+        { error: "Backup verification requires admin access" },
+        { status: 403 }
       )
     }
 

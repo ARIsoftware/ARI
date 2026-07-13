@@ -59,12 +59,30 @@ CREATE TABLE IF NOT EXISTS "user" (
   "firstName" TEXT,
   "lastName" TEXT,
   "twoFactorEnabled" BOOLEAN DEFAULT FALSE,
+  "role" TEXT NOT NULL DEFAULT 'user',
+  "permissions" JSONB NOT NULL DEFAULT '{}',
+  "disabled" BOOLEAN NOT NULL DEFAULT FALSE,
   PRIMARY KEY ("id"),
   CONSTRAINT "user_email_key" UNIQUE ("email")
 );
 ALTER TABLE "user" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "user_rls_deny" ON "user";
 CREATE POLICY "user_rls_deny" ON "user" FOR ALL TO public USING (false);
+
+-- Multi-user columns for installs that predate them (idempotent upgrade path).
+-- role: 'admin' | 'user'. permissions: per-user grants (see lib/permissions.ts
+-- for keys + defaults; missing key = default so new permissions need no
+-- migration). disabled: blocks sign-in, sessions and API-key auth.
+ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "role" TEXT NOT NULL DEFAULT 'user';
+ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "permissions" JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE "user" ADD COLUMN IF NOT EXISTS "disabled" BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- First account = admin. If no admin exists (fresh upgrade from the
+-- single-user era, or a restored pre-multi-user backup), promote the
+-- earliest-created user. Runs on every boot, so this is self-healing.
+UPDATE "user" SET "role" = 'admin'
+WHERE "id" = (SELECT "id" FROM "user" ORDER BY "createdAt" ASC LIMIT 1)
+  AND NOT EXISTS (SELECT 1 FROM "user" WHERE "role" = 'admin');
 
 -- Table: session
 CREATE TABLE IF NOT EXISTS "session" (

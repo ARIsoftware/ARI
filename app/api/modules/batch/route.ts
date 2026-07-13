@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { hasPermission } from '@/lib/permissions'
 import { setModuleEnabled } from '@/lib/modules/module-registry'
 import { batchModulesSchema, BatchModulesResponseSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
@@ -45,6 +46,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401 }
+    )
+  }
+
+  if (!hasPermission(user, 'manage_modules')) {
+    return NextResponse.json(
+      { error: 'You do not have permission to enable or disable modules' },
+      { status: 403 }
     )
   }
 

@@ -51,6 +51,11 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
+  // GitHub sync config lives in .env.local (system-wide) — admin only.
+  if (user.role !== 'admin') {
+    return NextResponse.json({ error: "Admin access required" }, { status: 403 })
+  }
+
   const envPath = path.join(process.cwd(), ".env.local")
   let envContent = ""
   try {
@@ -97,6 +102,11 @@ export async function POST(request: NextRequest) {
   const { user } = await getAuthenticatedUser()
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  // Writes GITHUB_TOKEN and repo config to .env.local (system-wide) — admin only.
+  if (user.role !== 'admin') {
+    return NextResponse.json({ error: "Admin access required" }, { status: 403 })
   }
 
   let body: {

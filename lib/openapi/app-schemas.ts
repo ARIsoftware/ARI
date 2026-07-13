@@ -54,6 +54,59 @@ export const ApiKeyCreatedResponseSchema = z.object({
 }).openapi('ApiKeyCreatedResponse')
 
 // ────────────────────────────────────────────────────────────
+// /api/users — admin user management
+// ────────────────────────────────────────────────────────────
+
+export const AdminUserSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  name: z.string().nullable(),
+  first_name: z.string().nullable(),
+  last_name: z.string().nullable(),
+  image: z.string().nullable(),
+  role: z.enum(['admin', 'user']),
+  permissions: z.record(z.boolean()).openapi({ description: 'Effective permissions (admins always all true)' }),
+  disabled: z.boolean(),
+  two_factor_enabled: z.boolean().nullable(),
+  created_at: z.string().nullable(),
+  updated_at: z.string().nullable(),
+}).openapi('AdminUser')
+
+export const AdminUserListResponseSchema = z.array(AdminUserSchema).openapi('AdminUserList')
+
+export const createUserSchema = z.object({
+  // Lowercased to match Better Auth, which stores and looks up emails
+  // lowercased — a mixed-case email inserted verbatim could never sign in.
+  email: z.string().email().max(255).transform((s) => s.toLowerCase()),
+  password: z.string().min(18, 'Password must be at least 18 characters').max(256),
+  firstName: z.string().max(100).optional(),
+  lastName: z.string().max(100).optional(),
+  role: z.enum(['admin', 'user']).default('user'),
+  permissions: z.record(z.boolean()).optional(),
+}).openapi('CreateUserBody')
+
+export const updateUserSchema = z.object({
+  email: z.string().email().max(255).transform((s) => s.toLowerCase()).optional(),
+  firstName: z.string().max(100).nullable().optional(),
+  lastName: z.string().max(100).nullable().optional(),
+  password: z.string().min(18, 'Password must be at least 18 characters').max(256).optional(),
+  role: z.enum(['admin', 'user']).optional(),
+  permissions: z.record(z.boolean()).optional(),
+  disabled: z.boolean().optional(),
+}).openapi('UpdateUserBody')
+
+export const CurrentUserResponseSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  name: z.string().nullable(),
+  first_name: z.string().nullable(),
+  last_name: z.string().nullable(),
+  image: z.string().nullable(),
+  role: z.enum(['admin', 'user']),
+  permissions: z.record(z.boolean()),
+}).openapi('CurrentUser')
+
+// ────────────────────────────────────────────────────────────
 // /api/auth — Better Auth catch-all (documented as opaque proxy)
 // ────────────────────────────────────────────────────────────
 
