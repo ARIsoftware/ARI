@@ -63,7 +63,7 @@ export default async function RootLayout({
         <meta name="apple-mobile-web-app-title" content="ARI" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,200..900;1,200..900&family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&family=Google+Sans+Flex:opsz,wght@6..144,1..1000&family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Outfit:wght@100..900&family=Overpass+Mono:wght@300..700&family=Press+Start+2P&family=Raleway:ital,wght@0,100..900;1,100..900&family=Science+Gothic:wght@100..900&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,200..900;1,200..900&family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&family=Google+Sans+Flex:opsz,wght@6..144,1..1000&family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Outfit:wght@100..900&family=Overpass+Mono:wght@300..700&family=Press+Start+2P&family=Raleway:ital,wght@0,100..900;1,100..900&family=Science+Gothic:wght@100..900&display=swap" rel="stylesheet" />
         {/* External script to apply theme/font immediately before React hydration to prevent FOUT */}
         <script src="/theme-init.js" />
       </head>

@@ -64,6 +64,11 @@ export const FONTS: FontOption[] = [
     family: '"Crimson Pro", serif',
   },
   {
+    id: 'hanken-grotesk',
+    name: 'Hanken Grotesk',
+    family: '"Hanken Grotesk", sans-serif',
+  },
+  {
     id: 'press-start-2p',
     name: 'Press Start 2P',
     family: '"Press Start 2P", monospace',
