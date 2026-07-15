@@ -13,7 +13,7 @@ import {
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 import { quotes } from '@/lib/db/schema'
-import { eq, desc, sql, and } from 'drizzle-orm'
+import { eq, desc, sql } from 'drizzle-orm'
 
 registry.registerPath({
   method: 'get',
@@ -98,7 +98,6 @@ export async function GET(request: NextRequest) {
     const data = await withRLS((db) =>
       db.select()
         .from(quotes)
-        .where(eq(quotes.userId, user.id))
         .orderBy(desc(quotes.createdAt))
         .limit(limit)
         .offset(offset)
@@ -164,7 +163,7 @@ export async function PUT(request: NextRequest) {
           ...updates,
           updatedAt: sql`timezone('utc'::text, now())`
         })
-        .where(and(eq(quotes.id, id), eq(quotes.userId, user.id)))
+        .where(eq(quotes.id, id))
         .returning()
     )
 
@@ -197,7 +196,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     await withRLS((db) =>
-      db.delete(quotes).where(and(eq(quotes.id, id), eq(quotes.userId, user.id)))
+      db.delete(quotes).where(eq(quotes.id, id))
     )
 
     return NextResponse.json({ success: true })

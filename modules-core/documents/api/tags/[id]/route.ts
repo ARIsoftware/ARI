@@ -88,10 +88,7 @@ export async function PATCH(
     const existing = await withRLS((db) =>
       db.select()
         .from(documentTags)
-        .where(and(
-          eq(documentTags.id, id),
-          eq(documentTags.userId, user.id)
-        ))
+        .where(eq(documentTags.id, id))
         .limit(1)
     )
 
@@ -105,7 +102,6 @@ export async function PATCH(
         db.select()
           .from(documentTags)
           .where(and(
-            eq(documentTags.userId, user.id),
             eq(documentTags.name, name),
             ne(documentTags.id, id)
           ))
@@ -128,7 +124,7 @@ export async function PATCH(
     const updated = await withRLS((db) =>
       db.update(documentTags)
         .set(updateData)
-        .where(and(eq(documentTags.id, id), eq(documentTags.userId, user.id)))
+        .where(eq(documentTags.id, id))
         .returning()
     )
 
@@ -165,7 +161,7 @@ export async function DELETE(
     // Cascade will remove assignments. Returning gives us the rowcount for 404.
     const deleted = await withRLS((db) =>
       db.delete(documentTags)
-        .where(and(eq(documentTags.id, id), eq(documentTags.userId, user.id)))
+        .where(eq(documentTags.id, id))
         .returning({ id: documentTags.id })
     )
 

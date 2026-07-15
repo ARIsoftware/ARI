@@ -40,6 +40,21 @@ RETURNS TEXT AS $$
   SELECT current_setting('app.current_user_id', true);
 $$ LANGUAGE sql STABLE SET search_path = '';
 
+-- Shared-workspace access predicate (Phase 3: multi-user).
+-- Collaborative content (tasks, contacts, quotes, notes, brainstorm,
+-- documents, knowledge, motivation) is readable AND writable by any
+-- authenticated user. This is the single switch-point: SELECT/UPDATE/DELETE
+-- policies on shared tables call this instead of matching user_id, while
+-- INSERT still stamps the creator as owner (WITH CHECK user_id = self).
+-- Returns FALSE when no user context is set (unauthenticated / admin-bypass
+-- connections), so RLS still denies by default. Personal/secret tables keep
+-- their per-user policies and never call this.
+CREATE OR REPLACE FUNCTION app.can_access_shared()
+RETURNS BOOLEAN AS $$
+  SELECT current_setting('app.current_user_id', true) IS NOT NULL
+     AND current_setting('app.current_user_id', true) <> '';
+$$ LANGUAGE sql STABLE SET search_path = '';
+
 -- ================================================================
 -- AUTH TABLES (user must come first - referenced by others)
 -- ================================================================
@@ -324,16 +339,16 @@ ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "assigned_agent_id" TEXT;
 ALTER TABLE "tasks" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "tasks_rls_select" ON "tasks";
 CREATE POLICY "tasks_rls_select" ON "tasks" FOR SELECT TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 DROP POLICY IF EXISTS "tasks_rls_insert" ON "tasks";
 CREATE POLICY "tasks_rls_insert" ON "tasks" FOR INSERT TO public
   WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
 DROP POLICY IF EXISTS "tasks_rls_update" ON "tasks";
 CREATE POLICY "tasks_rls_update" ON "tasks" FOR UPDATE TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 DROP POLICY IF EXISTS "tasks_rls_delete" ON "tasks";
 CREATE POLICY "tasks_rls_delete" ON "tasks" FOR DELETE TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 -- Table: quotes
 CREATE TABLE IF NOT EXISTS "quotes" (
@@ -348,16 +363,16 @@ CREATE TABLE IF NOT EXISTS "quotes" (
 ALTER TABLE "quotes" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "quotes_rls_select" ON "quotes";
 CREATE POLICY "quotes_rls_select" ON "quotes" FOR SELECT TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 DROP POLICY IF EXISTS "quotes_rls_insert" ON "quotes";
 CREATE POLICY "quotes_rls_insert" ON "quotes" FOR INSERT TO public
   WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
 DROP POLICY IF EXISTS "quotes_rls_update" ON "quotes";
 CREATE POLICY "quotes_rls_update" ON "quotes" FOR UPDATE TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 DROP POLICY IF EXISTS "quotes_rls_delete" ON "quotes";
 CREATE POLICY "quotes_rls_delete" ON "quotes" FOR DELETE TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 -- Table: music_playlist
 CREATE TABLE IF NOT EXISTS "music_playlist" (
@@ -443,16 +458,16 @@ CREATE TABLE IF NOT EXISTS "brainstorm_boards" (
 ALTER TABLE "brainstorm_boards" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "brainstorm_boards_rls_select" ON "brainstorm_boards";
 CREATE POLICY "brainstorm_boards_rls_select" ON "brainstorm_boards" FOR SELECT TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 DROP POLICY IF EXISTS "brainstorm_boards_rls_insert" ON "brainstorm_boards";
 CREATE POLICY "brainstorm_boards_rls_insert" ON "brainstorm_boards" FOR INSERT TO public
   WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
 DROP POLICY IF EXISTS "brainstorm_boards_rls_update" ON "brainstorm_boards";
 CREATE POLICY "brainstorm_boards_rls_update" ON "brainstorm_boards" FOR UPDATE TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 DROP POLICY IF EXISTS "brainstorm_boards_rls_delete" ON "brainstorm_boards";
 CREATE POLICY "brainstorm_boards_rls_delete" ON "brainstorm_boards" FOR DELETE TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 -- Table: brainstorm_nodes
 CREATE TABLE IF NOT EXISTS "brainstorm_nodes" (
@@ -470,16 +485,16 @@ CREATE TABLE IF NOT EXISTS "brainstorm_nodes" (
 ALTER TABLE "brainstorm_nodes" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "brainstorm_nodes_rls_select" ON "brainstorm_nodes";
 CREATE POLICY "brainstorm_nodes_rls_select" ON "brainstorm_nodes" FOR SELECT TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 DROP POLICY IF EXISTS "brainstorm_nodes_rls_insert" ON "brainstorm_nodes";
 CREATE POLICY "brainstorm_nodes_rls_insert" ON "brainstorm_nodes" FOR INSERT TO public
   WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
 DROP POLICY IF EXISTS "brainstorm_nodes_rls_update" ON "brainstorm_nodes";
 CREATE POLICY "brainstorm_nodes_rls_update" ON "brainstorm_nodes" FOR UPDATE TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 DROP POLICY IF EXISTS "brainstorm_nodes_rls_delete" ON "brainstorm_nodes";
 CREATE POLICY "brainstorm_nodes_rls_delete" ON "brainstorm_nodes" FOR DELETE TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 -- Table: brainstorm_edges
 CREATE TABLE IF NOT EXISTS "brainstorm_edges" (
@@ -496,16 +511,16 @@ CREATE TABLE IF NOT EXISTS "brainstorm_edges" (
 ALTER TABLE "brainstorm_edges" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "brainstorm_edges_rls_select" ON "brainstorm_edges";
 CREATE POLICY "brainstorm_edges_rls_select" ON "brainstorm_edges" FOR SELECT TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 DROP POLICY IF EXISTS "brainstorm_edges_rls_insert" ON "brainstorm_edges";
 CREATE POLICY "brainstorm_edges_rls_insert" ON "brainstorm_edges" FOR INSERT TO public
   WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
 DROP POLICY IF EXISTS "brainstorm_edges_rls_update" ON "brainstorm_edges";
 CREATE POLICY "brainstorm_edges_rls_update" ON "brainstorm_edges" FOR UPDATE TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 DROP POLICY IF EXISTS "brainstorm_edges_rls_delete" ON "brainstorm_edges";
 CREATE POLICY "brainstorm_edges_rls_delete" ON "brainstorm_edges" FOR DELETE TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 -- ================================================================
 -- ARI INSTANCE (per-install identity for anonymous telemetry)

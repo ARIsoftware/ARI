@@ -11,7 +11,7 @@ import { VideoDeleteResponseSchema, uuidSchema } from '@/modules/motivation/lib/
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { motivationVideos } from '@/lib/db/schema'
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 
 registry.registerPath({
   method: 'delete',
@@ -51,7 +51,7 @@ export async function DELETE(
     const deleted = await withRLS((db) =>
       db
         .delete(motivationVideos)
-        .where(and(eq(motivationVideos.id, parsed.data), eq(motivationVideos.userId, user.id)))
+        .where(eq(motivationVideos.id, parsed.data))
         .returning({ id: motivationVideos.id }),
     )
 

@@ -19,7 +19,7 @@ import {
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { knowledgeCollections } from '@/lib/db/schema'
-import { eq, and } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -121,14 +121,11 @@ export async function PATCH(
       )
     }
 
-    // Explicit user_id filter is mandatory (BYPASSRLS — see docs/SECURITY.md)
+    // Shared workspace: RLS governs access; match by id only.
     const collection = await withRLS((db) =>
       db.update(knowledgeCollections)
         .set(updateData)
-        .where(and(
-          eq(knowledgeCollections.id, id),
-          eq(knowledgeCollections.userId, user.id)
-        ))
+        .where(eq(knowledgeCollections.id, id))
         .returning()
     )
 
@@ -175,13 +172,10 @@ export async function DELETE(
       )
     }
 
-    // Explicit user_id filter is mandatory (BYPASSRLS — see docs/SECURITY.md)
+    // Shared workspace: RLS governs access; match by id only.
     await withRLS((db) =>
       db.delete(knowledgeCollections)
-        .where(and(
-          eq(knowledgeCollections.id, id),
-          eq(knowledgeCollections.userId, user.id)
-        ))
+        .where(eq(knowledgeCollections.id, id))
     )
 
     return NextResponse.json({

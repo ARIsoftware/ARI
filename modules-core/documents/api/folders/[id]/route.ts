@@ -97,14 +97,12 @@ export async function PATCH(
             SELECT id, parent_id, 0
               FROM document_folders
              WHERE id = ${parent_id}
-               AND user_id = ${user.id}
                AND deleted_at IS NULL
             UNION ALL
             SELECT df.id, df.parent_id, a.depth + 1
               FROM document_folders df
               JOIN ancestors a ON df.id = a.parent_id
-             WHERE df.user_id = ${user.id}
-               AND a.depth < 100
+             WHERE a.depth < 100
           )
           SELECT id FROM ancestors
         `)
@@ -132,7 +130,6 @@ export async function PATCH(
         .set(updateData)
         .where(and(
           eq(documentFolders.id, id),
-          eq(documentFolders.userId, user.id),
           isNull(documentFolders.deletedAt)
         ))
         .returning()
@@ -176,10 +173,7 @@ export async function DELETE(
     const existing = await withRLS((db) =>
       db.select()
         .from(documentFolders)
-        .where(and(
-          eq(documentFolders.id, id),
-          eq(documentFolders.userId, user.id)
-        ))
+        .where(eq(documentFolders.id, id))
         .limit(1)
     )
 
@@ -200,7 +194,6 @@ export async function DELETE(
           SELECT df.id
             FROM document_folders df
             JOIN descendants d ON df.parent_id = d.id
-           WHERE df.user_id = ${user.id}
         )
         SELECT id FROM descendants
       `)
@@ -218,20 +211,14 @@ export async function DELETE(
       await withRLS((db) =>
         db.update(documents)
           .set({ deletedAt, updatedAt: deletedAt })
-          .where(and(
-            eq(documents.userId, user.id),
-            inArray(documents.folderId, allFolderIds)
-          ))
+          .where(inArray(documents.folderId, allFolderIds))
       )
 
       // Single batched soft-delete of the folders themselves.
       await withRLS((db) =>
         db.update(documentFolders)
           .set({ deletedAt, updatedAt: deletedAt })
-          .where(and(
-            eq(documentFolders.userId, user.id),
-            inArray(documentFolders.id, allFolderIds)
-          ))
+          .where(inArray(documentFolders.id, allFolderIds))
       )
     }
 

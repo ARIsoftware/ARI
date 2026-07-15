@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { toSnakeCase, validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
 import { documents, documentTags, documentTagAssignments } from '@/lib/db/schema'
-import { count, eq, and } from 'drizzle-orm'
+import { count, eq } from 'drizzle-orm'
 import {
   createTagSchema as CreateTagSchema,
   TagListResponseSchema,
@@ -65,11 +65,10 @@ export async function GET(_request: NextRequest) {
     const tags = await withRLS((db) =>
       db.select()
         .from(documentTags)
-        .where(eq(documentTags.userId, user.id))
         .orderBy(documentTags.name)
     )
 
-    // Get usage count per tag (only assignments on documents owned by the user)
+    // Get usage count per tag (assignments on existing documents)
     const usageCounts = await withRLS((db) =>
       db.select({
         tagId: documentTagAssignments.tagId,
@@ -77,7 +76,6 @@ export async function GET(_request: NextRequest) {
       })
         .from(documentTagAssignments)
         .innerJoin(documents, eq(documentTagAssignments.documentId, documents.id))
-        .where(eq(documents.userId, user.id))
         .groupBy(documentTagAssignments.tagId)
     )
 
@@ -122,10 +120,7 @@ export async function POST(request: NextRequest) {
     const existing = await withRLS((db) =>
       db.select()
         .from(documentTags)
-        .where(and(
-          eq(documentTags.userId, user.id),
-          eq(documentTags.name, name)
-        ))
+        .where(eq(documentTags.name, name))
         .limit(1)
     )
 

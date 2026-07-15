@@ -28,7 +28,7 @@ ALTER TABLE knowledge_collections ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view their own knowledge_collections" ON knowledge_collections;
 CREATE POLICY "Users can view their own knowledge_collections"
   ON knowledge_collections FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 DROP POLICY IF EXISTS "Users can insert their own knowledge_collections" ON knowledge_collections;
 CREATE POLICY "Users can insert their own knowledge_collections"
@@ -38,13 +38,12 @@ CREATE POLICY "Users can insert their own knowledge_collections"
 DROP POLICY IF EXISTS "Users can update their own knowledge_collections" ON knowledge_collections;
 CREATE POLICY "Users can update their own knowledge_collections"
   ON knowledge_collections FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')))
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 DROP POLICY IF EXISTS "Users can delete their own knowledge_collections" ON knowledge_collections;
 CREATE POLICY "Users can delete their own knowledge_collections"
   ON knowledge_collections FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 CREATE OR REPLACE FUNCTION update_knowledge_collections_updated_at()
 RETURNS TRIGGER AS $$
@@ -129,7 +128,7 @@ ALTER TABLE knowledge_articles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view their own knowledge_articles" ON knowledge_articles;
 CREATE POLICY "Users can view their own knowledge_articles"
   ON knowledge_articles FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 DROP POLICY IF EXISTS "Users can insert their own knowledge_articles" ON knowledge_articles;
 CREATE POLICY "Users can insert their own knowledge_articles"
@@ -139,13 +138,12 @@ CREATE POLICY "Users can insert their own knowledge_articles"
 DROP POLICY IF EXISTS "Users can update their own knowledge_articles" ON knowledge_articles;
 CREATE POLICY "Users can update their own knowledge_articles"
   ON knowledge_articles FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')))
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 DROP POLICY IF EXISTS "Users can delete their own knowledge_articles" ON knowledge_articles;
 CREATE POLICY "Users can delete their own knowledge_articles"
   ON knowledge_articles FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 CREATE OR REPLACE FUNCTION update_knowledge_articles_updated_at()
 RETURNS TRIGGER AS $$

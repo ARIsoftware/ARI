@@ -72,8 +72,12 @@ export class LocalFilesystemProvider implements StorageProviderInterface {
     _expiresInSeconds?: number,
     _opts?: { filename?: string }
   ): Promise<string> {
-    const { filename } = this.parsePath(path)
-    return `/api/storage/serve/${this.bucket}/${filename}`
+    const { userId, filename } = this.parsePath(path)
+    // Include the owner id so the serve route can stream a shared document
+    // uploaded by another user. The serve route only honours a cross-user
+    // owner for shared buckets (see its SHARED_STORAGE_BUCKETS allowlist),
+    // so this can't be used to read a private module's files.
+    return `/api/storage/serve/${this.bucket}/${filename}?owner=${encodeURIComponent(userId)}`
   }
 
   async delete(path: string): Promise<void> {

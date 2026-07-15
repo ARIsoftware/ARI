@@ -57,7 +57,6 @@ export async function POST(request: NextRequest) {
         SET position = v.position, updated_at = NOW()
         FROM (VALUES ${sql.join(tuples, sql`, `)}) AS v(id, position)
         WHERE m.id = v.id
-          AND m.user_id = ${user.id}
       `),
     )
 

@@ -34,7 +34,7 @@ ALTER TABLE motivation_videos ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS motivation_videos_rls_select ON motivation_videos;
 CREATE POLICY motivation_videos_rls_select ON motivation_videos FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 DROP POLICY IF EXISTS motivation_videos_rls_insert ON motivation_videos;
 CREATE POLICY motivation_videos_rls_insert ON motivation_videos FOR INSERT
@@ -42,9 +42,8 @@ CREATE POLICY motivation_videos_rls_insert ON motivation_videos FOR INSERT
 
 DROP POLICY IF EXISTS motivation_videos_rls_update ON motivation_videos;
 CREATE POLICY motivation_videos_rls_update ON motivation_videos FOR UPDATE
-  USING      (user_id = (SELECT current_setting('app.current_user_id')))
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 DROP POLICY IF EXISTS motivation_videos_rls_delete ON motivation_videos;
 CREATE POLICY motivation_videos_rls_delete ON motivation_videos FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());

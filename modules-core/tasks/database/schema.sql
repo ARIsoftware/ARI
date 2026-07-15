@@ -66,7 +66,7 @@ ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS tasks_rls_select ON tasks;
 CREATE POLICY tasks_rls_select ON tasks FOR SELECT
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 DROP POLICY IF EXISTS tasks_rls_insert ON tasks;
 CREATE POLICY tasks_rls_insert ON tasks FOR INSERT
@@ -74,11 +74,11 @@ CREATE POLICY tasks_rls_insert ON tasks FOR INSERT
 
 DROP POLICY IF EXISTS tasks_rls_update ON tasks;
 CREATE POLICY tasks_rls_update ON tasks FOR UPDATE
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 DROP POLICY IF EXISTS tasks_rls_delete ON tasks;
 CREATE POLICY tasks_rls_delete ON tasks FOR DELETE
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 -- =============================================================================
 -- SUBTASKS
@@ -117,7 +117,7 @@ ALTER TABLE task_subtasks ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS task_subtasks_rls_select ON task_subtasks;
 CREATE POLICY task_subtasks_rls_select ON task_subtasks FOR SELECT
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 DROP POLICY IF EXISTS task_subtasks_rls_insert ON task_subtasks;
 CREATE POLICY task_subtasks_rls_insert ON task_subtasks FOR INSERT
@@ -125,11 +125,11 @@ CREATE POLICY task_subtasks_rls_insert ON task_subtasks FOR INSERT
 
 DROP POLICY IF EXISTS task_subtasks_rls_update ON task_subtasks;
 CREATE POLICY task_subtasks_rls_update ON task_subtasks FOR UPDATE
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 DROP POLICY IF EXISTS task_subtasks_rls_delete ON task_subtasks;
 CREATE POLICY task_subtasks_rls_delete ON task_subtasks FOR DELETE
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 -- Reconcile the derived counters with the real subtask rows. Tasks created
 -- before subtasks were rows stored a hand-entered numeric counter; the API no

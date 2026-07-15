@@ -28,7 +28,7 @@ ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS contacts_rls_select ON contacts;
 CREATE POLICY contacts_rls_select ON contacts FOR SELECT
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 DROP POLICY IF EXISTS contacts_rls_insert ON contacts;
 CREATE POLICY contacts_rls_insert ON contacts FOR INSERT
@@ -36,8 +36,8 @@ CREATE POLICY contacts_rls_insert ON contacts FOR INSERT
 
 DROP POLICY IF EXISTS contacts_rls_update ON contacts;
 CREATE POLICY contacts_rls_update ON contacts FOR UPDATE
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 DROP POLICY IF EXISTS contacts_rls_delete ON contacts;
 CREATE POLICY contacts_rls_delete ON contacts FOR DELETE
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());

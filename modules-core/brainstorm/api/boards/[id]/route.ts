@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { and, asc, eq, sql } from 'drizzle-orm'
+import { asc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { toSnakeCase } from '@/lib/api-helpers'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
@@ -210,7 +210,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
 
     await withRLS((db) =>
       db.delete(brainstormBoards)
-        .where(and(eq(brainstormBoards.id, parsed.data.id), eq(brainstormBoards.userId, user.id)))
+        .where(eq(brainstormBoards.id, parsed.data.id))
     )
 
     return NextResponse.json({ success: true, message: 'Board deleted successfully' })

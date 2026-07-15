@@ -63,7 +63,6 @@ export async function POST(
         })
         .where(and(
           eq(documents.id, id),
-          eq(documents.userId, user.id),
           isNotNull(documents.deletedAt)
         ))
         .returning()

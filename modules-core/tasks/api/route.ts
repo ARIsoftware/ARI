@@ -13,7 +13,7 @@ import { calculatePriorityScore } from '@/modules/tasks/lib/priority-utils'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 import { tasks } from '@/lib/db/schema'
-import { desc, eq, asc, sql, and } from 'drizzle-orm'
+import { desc, eq, asc, sql } from 'drizzle-orm'
 
 registry.registerPath({
   method: 'get',
@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await withRLS((db) =>
-      db.select().from(tasks).where(eq(tasks.userId, user.id)).orderBy(asc(tasks.orderIndex))
+      db.select().from(tasks).orderBy(asc(tasks.orderIndex))
     )
 
     // Transform camelCase to snake_case for backward compatibility
@@ -124,7 +124,6 @@ export async function POST(request: NextRequest) {
     const maxOrderData = await withRLS((db) =>
       db.select({ orderIndex: tasks.orderIndex })
         .from(tasks)
-        .where(eq(tasks.userId, user.id))
         .orderBy(desc(tasks.orderIndex))
         .limit(1)
     )
@@ -210,7 +209,7 @@ export async function PUT(request: NextRequest) {
           strategicFit: tasks.strategicFit
         })
         .from(tasks)
-        .where(and(eq(tasks.id, id), eq(tasks.userId, user.id)))
+        .where(eq(tasks.id, id))
         .limit(1)
       )
 
@@ -256,7 +255,7 @@ export async function PUT(request: NextRequest) {
     const data = await withRLS((db) =>
       db.update(tasks)
         .set(updateData)
-        .where(and(eq(tasks.id, id), eq(tasks.userId, user.id)))
+        .where(eq(tasks.id, id))
         .returning()
     )
 
@@ -289,7 +288,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     await withRLS((db) =>
-      db.delete(tasks).where(and(eq(tasks.id, id), eq(tasks.userId, user.id)))
+      db.delete(tasks).where(eq(tasks.id, id))
     )
 
     return NextResponse.json({ success: true })

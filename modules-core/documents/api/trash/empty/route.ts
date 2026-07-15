@@ -82,7 +82,6 @@ export async function POST(request: NextRequest) {
         db.select()
           .from(documents)
           .where(and(
-            eq(documents.userId, user.id),
             isNotNull(documents.deletedAt),
             lte(documents.deletedAt, cutoffStr)
           ))
@@ -92,7 +91,6 @@ export async function POST(request: NextRequest) {
         db.select()
           .from(documentFolders)
           .where(and(
-            eq(documentFolders.userId, user.id),
             isNotNull(documentFolders.deletedAt),
             lte(documentFolders.deletedAt, cutoffStr)
           ))
@@ -102,19 +100,13 @@ export async function POST(request: NextRequest) {
       docsToDelete = await withRLS((db) =>
         db.select()
           .from(documents)
-          .where(and(
-            eq(documents.userId, user.id),
-            isNotNull(documents.deletedAt)
-          ))
+          .where(isNotNull(documents.deletedAt))
       )
 
       foldersToDelete = await withRLS((db) =>
         db.select()
           .from(documentFolders)
-          .where(and(
-            eq(documentFolders.userId, user.id),
-            isNotNull(documentFolders.deletedAt)
-          ))
+          .where(isNotNull(documentFolders.deletedAt))
       )
     }
 
@@ -143,10 +135,7 @@ export async function POST(request: NextRequest) {
       const docIds = docsToDelete.map((d: any) => d.id)
       await withRLS((db) =>
         db.delete(documents)
-          .where(and(
-            eq(documents.userId, user.id),
-            inArray(documents.id, docIds)
-          ))
+          .where(inArray(documents.id, docIds))
       )
     }
 
@@ -155,10 +144,7 @@ export async function POST(request: NextRequest) {
       const folderIds = foldersToDelete.map((f: any) => f.id)
       await withRLS((db) =>
         db.delete(documentFolders)
-          .where(and(
-            eq(documentFolders.userId, user.id),
-            inArray(documentFolders.id, folderIds)
-          ))
+          .where(inArray(documentFolders.id, folderIds))
       )
     }
 
@@ -204,7 +190,6 @@ export async function DELETE(request: NextRequest) {
           .from(documents)
           .where(and(
             eq(documents.id, id),
-            eq(documents.userId, user.id),
             isNotNull(documents.deletedAt)
           ))
           .limit(1)
@@ -228,7 +213,7 @@ export async function DELETE(request: NextRequest) {
       // Delete record
       await withRLS((db) =>
         db.delete(documents)
-          .where(and(eq(documents.id, id), eq(documents.userId, user.id)))
+          .where(eq(documents.id, id))
       )
 
       return NextResponse.json({
@@ -242,7 +227,6 @@ export async function DELETE(request: NextRequest) {
           .from(documentFolders)
           .where(and(
             eq(documentFolders.id, id),
-            eq(documentFolders.userId, user.id),
             isNotNull(documentFolders.deletedAt)
           ))
           .limit(1)
@@ -255,7 +239,7 @@ export async function DELETE(request: NextRequest) {
       // Delete record (documents should already be soft-deleted)
       await withRLS((db) =>
         db.delete(documentFolders)
-          .where(and(eq(documentFolders.id, id), eq(documentFolders.userId, user.id)))
+          .where(eq(documentFolders.id, id))
       )
 
       return NextResponse.json({

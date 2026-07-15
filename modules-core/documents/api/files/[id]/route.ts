@@ -90,7 +90,6 @@ export async function PATCH(
           .from(documentFolders)
           .where(and(
             eq(documentFolders.id, folder_id),
-            eq(documentFolders.userId, user.id),
             isNull(documentFolders.deletedAt)
           ))
           .limit(1)
@@ -104,10 +103,7 @@ export async function PATCH(
       const ownedTags = await withRLS((db) =>
         db.select({ id: documentTags.id })
           .from(documentTags)
-          .where(and(
-            eq(documentTags.userId, user.id),
-            inArray(documentTags.id, tag_ids)
-          ))
+          .where(inArray(documentTags.id, tag_ids))
       )
       if (ownedTags.length !== tag_ids.length) {
         return createErrorResponse('One or more tags do not exist', 400)
@@ -125,7 +121,6 @@ export async function PATCH(
         .set(updateData)
         .where(and(
           eq(documents.id, id),
-          eq(documents.userId, user.id),
           isNull(documents.deletedAt)
         ))
         .returning()
@@ -193,7 +188,6 @@ export async function DELETE(
         })
         .where(and(
           eq(documents.id, id),
-          eq(documents.userId, user.id),
           isNull(documents.deletedAt)
         ))
         .returning({ id: documents.id })

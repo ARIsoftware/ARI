@@ -14,7 +14,7 @@ import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 import type { DrizzleDb } from '@/lib/db'
 import { tasks, taskSubtasks } from '@/lib/db/schema'
-import { eq, asc, and, sql } from 'drizzle-orm'
+import { eq, asc, sql } from 'drizzle-orm'
 
 const MAX_SUBTASKS_PER_TASK = 100
 
@@ -103,7 +103,7 @@ async function lockParentTask(db: DrizzleDb, userId: string, taskId: string): Pr
   const rows = await db
     .select({ id: tasks.id })
     .from(tasks)
-    .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)))
+    .where(eq(tasks.id, taskId))
     .for('update')
   return rows.length > 0
 }
@@ -120,11 +120,11 @@ async function recountParent(db: DrizzleDb, userId: string, taskId: string) {
   await db
     .update(tasks)
     .set({
-      subtasksTotal: sql<number>`(select count(*)::int from task_subtasks where task_id = ${taskId} and user_id = ${userId})`,
-      subtasksCompleted: sql<number>`(select (count(*) filter (where completed))::int from task_subtasks where task_id = ${taskId} and user_id = ${userId})`,
+      subtasksTotal: sql<number>`(select count(*)::int from task_subtasks where task_id = ${taskId})`,
+      subtasksCompleted: sql<number>`(select (count(*) filter (where completed))::int from task_subtasks where task_id = ${taskId})`,
       updatedAt: new Date().toISOString(),
     })
-    .where(and(eq(tasks.id, taskId), eq(tasks.userId, userId)))
+    .where(eq(tasks.id, taskId))
 }
 
 export async function GET(request: NextRequest) {
@@ -148,8 +148,8 @@ export async function GET(request: NextRequest) {
         .from(taskSubtasks)
         .where(
           task_id
-            ? and(eq(taskSubtasks.userId, user.id), eq(taskSubtasks.taskId, task_id))
-            : eq(taskSubtasks.userId, user.id)
+            ? eq(taskSubtasks.taskId, task_id)
+            : undefined
         )
         .orderBy(asc(taskSubtasks.orderIndex), asc(taskSubtasks.createdAt))
     )
@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
           maxOrder: sql<number>`coalesce(max(order_index), -1)::int`,
         })
         .from(taskSubtasks)
-        .where(and(eq(taskSubtasks.taskId, subtask.task_id), eq(taskSubtasks.userId, user.id)))
+        .where(eq(taskSubtasks.taskId, subtask.task_id))
 
       if ((existing[0]?.count ?? 0) >= MAX_SUBTASKS_PER_TASK) {
         return { ok: false as const, reason: 'limit_reached' as const }
@@ -246,7 +246,7 @@ export async function PUT(request: NextRequest) {
       const rows = await db
         .update(taskSubtasks)
         .set(updateData)
-        .where(and(eq(taskSubtasks.id, id), eq(taskSubtasks.userId, user.id)))
+        .where(eq(taskSubtasks.id, id))
         .returning()
 
       if (rows.length === 0) return { ok: false as const }
@@ -285,7 +285,7 @@ export async function DELETE(request: NextRequest) {
     const result = await withRLS(async (db) => {
       const rows = await db
         .delete(taskSubtasks)
-        .where(and(eq(taskSubtasks.id, id), eq(taskSubtasks.userId, user.id)))
+        .where(eq(taskSubtasks.id, id))
         .returning()
 
       if (rows.length === 0) return { ok: false as const }

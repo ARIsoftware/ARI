@@ -13,7 +13,7 @@ import { z } from 'zod'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { createErrorResponse } from '@/lib/api-helpers'
 import { documents } from '@/lib/db/schema'
-import { eq, and } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { getStorageProvider } from '../../../../lib/providers'
 import type { StorageProvider } from '../../../../types'
 import {
@@ -60,12 +60,12 @@ export async function GET(
       return createErrorResponse('Invalid ID format', 400)
     }
 
-    // Get document — RLS plus an explicit user_id filter (defense-in-depth).
+    // Get document — access governed by RLS (shared across users).
     // Allow downloading from trash (don't filter by deletedAt).
     const doc = await withRLS((db) =>
       db.select()
         .from(documents)
-        .where(and(eq(documents.id, id), eq(documents.userId, user.id)))
+        .where(eq(documents.id, id))
         .limit(1)
     )
 

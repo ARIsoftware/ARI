@@ -91,11 +91,9 @@ export async function GET(request: NextRequest) {
     const limit = query.limit ?? 200
     const offset = query.offset ?? 0
 
-    // Build SQL WHERE conditions. The explicit user_id predicate is mandatory:
-    // the default Postgres role has BYPASSRLS, so RLS policies are NOT a
-    // sufficient tenant boundary on their own (see docs/SECURITY.md).
+    // Shared workspace: RLS (app.can_access_shared) governs visibility, so no
+    // per-user predicate here — articles are shared across all users.
     const conditions = [
-      eq(knowledgeArticles.userId, user.id),
       query.is_deleted === 'true'
         ? eq(knowledgeArticles.isDeleted, true)
         : eq(knowledgeArticles.isDeleted, false)
@@ -177,14 +175,13 @@ export async function GET(request: NextRequest) {
         .offset(offset)
     )
 
-    // Tag histogram over the user's non-deleted articles, aggregated in the DB
+    // Tag histogram over the shared non-deleted articles, aggregated in the DB
     // (unnest + GROUP BY) so we don't pull every row into memory.
     const tagRows = await withRLS(async (db) =>
       db.execute(sql`
         SELECT t AS name, count(*)::int AS count
           FROM ${knowledgeArticles}, unnest(${knowledgeArticles.tags}) AS t
-         WHERE ${knowledgeArticles.userId} = ${user.id}
-           AND ${knowledgeArticles.isDeleted} = false
+         WHERE ${knowledgeArticles.isDeleted} = false
          GROUP BY t
          ORDER BY count DESC, name ASC
       `)
@@ -273,10 +270,7 @@ export async function POST(request: NextRequest) {
       })
       .from(knowledgeArticles)
       .leftJoin(knowledgeCollections, eq(knowledgeArticles.collectionId, knowledgeCollections.id))
-      .where(and(
-        eq(knowledgeArticles.id, articleData[0].id),
-        eq(knowledgeArticles.userId, user.id)
-      ))
+      .where(eq(knowledgeArticles.id, articleData[0].id))
       .limit(1)
     )
 

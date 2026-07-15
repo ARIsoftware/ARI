@@ -18,7 +18,7 @@ import {
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { knowledgeCollections, knowledgeArticles } from '@/lib/db/schema'
-import { eq, and, asc, desc, sql } from 'drizzle-orm'
+import { eq, asc, desc, sql } from 'drizzle-orm'
 
 registry.registerPath({
   method: 'get',
@@ -64,11 +64,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Explicit user_id filter is mandatory (BYPASSRLS — see docs/SECURITY.md)
+    // Shared workspace: RLS (app.can_access_shared) governs visibility.
     const collections = await withRLS((db) =>
       db.select()
         .from(knowledgeCollections)
-        .where(eq(knowledgeCollections.userId, user.id))
         .orderBy(asc(knowledgeCollections.sortOrder), asc(knowledgeCollections.name))
     )
 
@@ -80,10 +79,7 @@ export async function GET(request: NextRequest) {
         count: sql<number>`count(*)::int`,
       })
         .from(knowledgeArticles)
-        .where(and(
-          eq(knowledgeArticles.userId, user.id),
-          eq(knowledgeArticles.isDeleted, false)
-        ))
+        .where(eq(knowledgeArticles.isDeleted, false))
         .groupBy(knowledgeArticles.collectionId)
     )
 
@@ -139,11 +135,10 @@ export async function POST(request: NextRequest) {
 
     const { name, color, icon } = parseResult.data
 
-    // Get max sort_order (explicit user_id filter — BYPASSRLS)
+    // Get max sort_order across the shared collections (RLS-governed).
     const existing = await withRLS((db) =>
       db.select({ sortOrder: knowledgeCollections.sortOrder })
         .from(knowledgeCollections)
-        .where(eq(knowledgeCollections.userId, user.id))
         .orderBy(desc(knowledgeCollections.sortOrder))
         .limit(1)
     )

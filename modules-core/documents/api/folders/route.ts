@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { toSnakeCase, validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
 import { documentFolders, documents } from '@/lib/db/schema'
-import { eq, isNull, and, sql, count } from 'drizzle-orm'
+import { eq, isNull, and, sql, count, type SQL } from 'drizzle-orm'
 import type { FolderWithChildren } from '../../types'
 import {
   listFoldersQuerySchema,
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
     const flat = searchParams.get('flat') === 'true'
     const includeDeleted = searchParams.get('include_deleted') === 'true'
 
-    const conditions = [eq(documentFolders.userId, user.id)]
+    const conditions: SQL[] = []
     if (!includeDeleted) {
       conditions.push(isNull(documentFolders.deletedAt))
     }
@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
         count: count(documents.id),
       })
         .from(documents)
-        .where(and(eq(documents.userId, user.id), isNull(documents.deletedAt)))
+        .where(isNull(documents.deletedAt))
         .groupBy(documents.folderId)
     )
 
@@ -164,7 +164,6 @@ export async function POST(request: NextRequest) {
         db.select()
           .from(documentFolders)
           .where(and(
-            eq(documentFolders.userId, user.id),
             eq(documentFolders.id, parent_id),
             isNull(documentFolders.deletedAt)
           ))

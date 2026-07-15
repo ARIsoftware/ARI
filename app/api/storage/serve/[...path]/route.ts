@@ -28,8 +28,19 @@ registry.registerPath({
   },
 })
 
+// Buckets whose files are shared across all authenticated users (collaborative
+// modules that store binary files — currently just the documents module's
+// bucket). Only these honour a cross-user `?owner=`; every other bucket
+// (fitness photos, health data, chat uploads, …) stays private to the
+// uploader. Extendable via ARI_SHARED_STORAGE_BUCKETS (comma-separated).
+const SHARED_STORAGE_BUCKETS = new Set(
+  ['documents', ...(process.env.ARI_SHARED_STORAGE_BUCKETS?.split(',') ?? [])]
+    .map((b) => b.trim())
+    .filter(Boolean)
+)
+
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   try {
@@ -60,8 +71,29 @@ export async function GET(
       return createErrorResponse('Invalid filename', 400)
     }
 
+    // Files are stored under the uploader's id. By default we serve the
+    // requester's own files. A cross-user `?owner=` is honoured ONLY for
+    // shared buckets, so private-module files can never be read by another
+    // user even if they guess the path.
+    const requestedOwner = request.nextUrl.searchParams.get('owner')
+    let ownerId = user.id
+    if (requestedOwner && requestedOwner !== user.id) {
+      // owner becomes an on-disk directory segment, so validate it as a plain
+      // account id (no path separators or traversal) before trusting it — the
+      // filesystem provider only guards against escaping the storage root, not
+      // against landing in another user's directory. Cross-user access is then
+      // allowed only for shared buckets.
+      if (!/^[A-Za-z0-9_-]{1,128}$/.test(requestedOwner)) {
+        return createErrorResponse('Invalid owner', 400)
+      }
+      if (!SHARED_STORAGE_BUCKETS.has(sanitizedBucket)) {
+        return createErrorResponse('Forbidden', 403)
+      }
+      ownerId = requestedOwner
+    }
+
     const provider = getStorageProvider(storageConfig)
-    const result = await provider.serve(user.id, sanitizedBucket, validFilename)
+    const result = await provider.serve(ownerId, sanitizedBucket, validFilename)
 
     if (!result) {
       return createErrorResponse('File not found', 404)

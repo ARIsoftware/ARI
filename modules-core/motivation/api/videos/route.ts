@@ -97,10 +97,9 @@ export async function GET(request: NextRequest) {
       const totalRow = await db
         .select({ count: sql<number>`count(*)::int` })
         .from(motivationVideos)
-        .where(eq(motivationVideos.userId, user.id))
       const total = totalRow[0]?.count ?? 0
 
-      const base = db.select().from(motivationVideos).where(eq(motivationVideos.userId, user.id))
+      const base = db.select().from(motivationVideos)
       const ordered =
         sort === 'newest'
           ? base.orderBy(desc(motivationVideos.createdAt))
@@ -162,7 +161,7 @@ export async function POST(request: NextRequest) {
             title: meta.title,
             channel: meta.channel,
             thumbnailUrl: thumbnailFor(youtubeId),
-            position: sql<number>`(SELECT COALESCE(MAX(${motivationVideos.position}), 0) + 1 FROM ${motivationVideos} WHERE ${motivationVideos.userId} = ${user.id})`,
+            position: sql<number>`(SELECT COALESCE(MAX(${motivationVideos.position}), 0) + 1 FROM ${motivationVideos})`,
           })
           .returning(),
       )

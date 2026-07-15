@@ -8,7 +8,7 @@ import {
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 import { tasks } from '@/lib/db/schema'
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 
 registry.registerPath({
   method: 'post',
@@ -45,11 +45,10 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // Defense-in-depth: explicit user_id filter in addition to RLS.
     const taskData = await withRLS((db) =>
       db.select({ completionCount: tasks.completionCount })
         .from(tasks)
-        .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)))
+        .where(eq(tasks.id, taskId))
         .limit(1)
     )
 
@@ -72,7 +71,7 @@ export async function POST(request: NextRequest) {
           completionCount: newCount,
           updatedAt: new Date().toISOString()
         })
-        .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)))
+        .where(eq(tasks.id, taskId))
     )
 
     return NextResponse.json({ success: true, completion_count: newCount })

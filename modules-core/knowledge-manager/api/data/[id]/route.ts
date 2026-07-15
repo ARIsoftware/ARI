@@ -22,7 +22,7 @@ import {
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { knowledgeArticles, knowledgeCollections } from '@/lib/db/schema'
-import { eq, and, sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 
 // Runtime schema adds tag normalization transform that the OpenAPI schema omits
 // so the spec describes the raw input shape.
@@ -143,10 +143,7 @@ export async function GET(
       })
       .from(knowledgeArticles)
       .leftJoin(knowledgeCollections, eq(knowledgeArticles.collectionId, knowledgeCollections.id))
-      .where(and(
-        eq(knowledgeArticles.id, id),
-        eq(knowledgeArticles.userId, user.id)
-      ))
+      .where(eq(knowledgeArticles.id, id))
       .limit(1)
     )
 
@@ -246,10 +243,7 @@ export async function PATCH(
     await withRLS((db) =>
       db.update(knowledgeArticles)
         .set(updateData)
-        .where(and(
-          eq(knowledgeArticles.id, id),
-          eq(knowledgeArticles.userId, user.id)
-        ))
+        .where(eq(knowledgeArticles.id, id))
     )
 
     // Fetch updated article with collection
@@ -276,10 +270,7 @@ export async function PATCH(
       })
       .from(knowledgeArticles)
       .leftJoin(knowledgeCollections, eq(knowledgeArticles.collectionId, knowledgeCollections.id))
-      .where(and(
-        eq(knowledgeArticles.id, id),
-        eq(knowledgeArticles.userId, user.id)
-      ))
+      .where(eq(knowledgeArticles.id, id))
       .limit(1)
     )
 
@@ -335,10 +326,7 @@ export async function DELETE(
       // Hard delete
       await withRLS((db) =>
         db.delete(knowledgeArticles)
-          .where(and(
-            eq(knowledgeArticles.id, id),
-            eq(knowledgeArticles.userId, user.id)
-          ))
+          .where(eq(knowledgeArticles.id, id))
       )
 
       return NextResponse.json({
@@ -353,10 +341,7 @@ export async function DELETE(
             isDeleted: true,
             deletedAt: sql`timezone('utc'::text, now())`
           })
-          .where(and(
-            eq(knowledgeArticles.id, id),
-            eq(knowledgeArticles.userId, user.id)
-          ))
+          .where(eq(knowledgeArticles.id, id))
       )
 
       return NextResponse.json({

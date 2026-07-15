@@ -13,7 +13,7 @@ import {
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 import { tasks } from '@/lib/db/schema'
-import { eq, desc, and, inArray } from 'drizzle-orm'
+import { eq, desc, inArray } from 'drizzle-orm'
 
 // Force dynamic rendering - no caching
 export const dynamic = 'force-dynamic'
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
       return parsed.response
     }
     const { limit, offset } = parsed.data
-    // and() drops undefined args, so this conditionally filters by completion.
+    // Undefined leaves the query unfiltered, so this conditionally filters by completion.
     const completedFilter = parsed.data.completed
       ? eq(tasks.completed, parsed.data.completed === 'true')
       : undefined
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
       let q = db
         .select()
         .from(tasks)
-        .where(and(eq(tasks.userId, user.id), completedFilter))
+        .where(completedFilter)
         .orderBy(desc(tasks.priorityScore))
         .$dynamic()
       if (limit !== undefined) q = q.limit(limit)
@@ -134,7 +134,7 @@ export async function PUT(request: NextRequest) {
           priorityScore: String(priorityScore),
           updatedAt: new Date().toISOString()
         })
-        .where(and(eq(tasks.id, taskId), eq(tasks.userId, user.id)))
+        .where(eq(tasks.id, taskId))
         .returning()
     )
 
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
           strategicFit: tasks.strategicFit,
         })
         .from(tasks)
-        .where(and(inArray(tasks.id, taskIds), eq(tasks.userId, user.id)))
+        .where(inArray(tasks.id, taskIds))
 
       return Promise.all(
         rows.map(async (row) => {
@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
           await db
             .update(tasks)
             .set({ priorityScore: String(priorityScore), updatedAt })
-            .where(and(eq(tasks.id, row.id), eq(tasks.userId, user.id)))
+            .where(eq(tasks.id, row.id))
           return { taskId: row.id, priorityScore }
         })
       )

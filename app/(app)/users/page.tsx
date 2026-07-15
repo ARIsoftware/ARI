@@ -69,7 +69,6 @@ import {
 import {
   Ban,
   CircleCheck,
-  KeyRound,
   Loader2,
   Lock,
   RefreshCw,
@@ -285,17 +284,64 @@ function UserDetailSheet({
   const [firstName, setFirstName] = useState(user.first_name ?? "")
   const [lastName, setLastName] = useState(user.last_name ?? "")
   const [email, setEmail] = useState(user.email)
+  const [role, setRole] = useState<UserRole>(user.role)
+  const [permissions, setPermissions] = useState<Record<PermissionKey, boolean>>(() => ({ ...user.permissions }))
   const [newPassword, setNewPassword] = useState("")
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  const profileDirty =
-    firstName !== (user.first_name ?? "") ||
-    lastName !== (user.last_name ?? "") ||
-    email !== user.email
-
-  const canChangeRole = actorPermissions.manage_admins && !isSelf
   const isAdmin = user.role === "admin"
+  const roleIsAdmin = role === "admin"
+  const canChangeRole = actorPermissions.manage_admins && !isSelf
 
+  // Everything in the form is edited in local state and persisted together by
+  // the single Save button — nothing saves on change. Trimmed comparisons so a
+  // whitespace-only edit doesn't count as dirty (and doesn't re-dirty on save).
+  const profileDirty =
+    firstName.trim() !== (user.first_name ?? "") ||
+    lastName.trim() !== (user.last_name ?? "") ||
+    email.trim() !== user.email
+  const roleDirty = role !== user.role
+  const permsDirty = role === "user" && PERMISSION_KEYS.some((k) => permissions[k] !== user.permissions[k])
+  const passwordSet = newPassword.length >= 18
+  const isDirty = profileDirty || roleDirty || permsDirty || passwordSet
+
+  const handleSave = async () => {
+    const updates: Omit<UpdateUserInput, "id"> = {}
+    if (profileDirty) {
+      updates.firstName = firstName.trim() || null
+      updates.lastName = lastName.trim() || null
+      updates.email = email.trim()
+    }
+    if (roleDirty) {
+      // A role change saves on its own — the new role's permission defaults
+      // apply, and toggles are adjusted in a follow-up save. Sending an admin's
+      // all-true effective map on demotion would 403 for an actor who doesn't
+      // hold every permission, rolling back the whole save.
+      updates.role = role
+    } else if (permsDirty) {
+      // Send only the toggles that actually changed, so the backend's
+      // grant-only-what-you-hold check never trips on an unchanged permission.
+      const delta: Partial<Record<PermissionKey, boolean>> = {}
+      for (const k of PERMISSION_KEYS) {
+        if (permissions[k] !== user.permissions[k]) delta[k] = permissions[k]
+      }
+      updates.permissions = delta
+    }
+    if (passwordSet) updates.password = newPassword
+    try {
+      await updateUser.mutateAsync({ id: user.id, ...updates })
+      setNewPassword("")
+      toast({ title: "Saved" })
+    } catch (error) {
+      toast({
+        title: "Save failed",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Immediate action for the danger-zone enable/disable toggle only.
   const mutate = async (updates: Omit<UpdateUserInput, "id">, success: string) => {
     try {
       await updateUser.mutateAsync({ id: user.id, ...updates })
@@ -365,40 +411,15 @@ function UserDetailSheet({
           <Label htmlFor="edit-email">Email</Label>
           <Input id="edit-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={!canEdit} />
         </div>
-        {canEdit && (
-          <Button
-            size="sm"
-            className="self-start"
-            disabled={!profileDirty || updateUser.isPending}
-            onClick={() =>
-              mutate(
-                {
-                  firstName: firstName.trim() || null,
-                  lastName: lastName.trim() || null,
-                  email: email.trim(),
-                },
-                "Profile updated"
-              )
-            }
-          >
-            {updateUser.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
-            Save profile
-          </Button>
-        )}
       </section>
 
       {/* Role */}
       <section className="flex flex-col gap-3">
         <h3 className="text-sm font-medium text-foreground">Role</h3>
         <Select
-          value={user.role}
+          value={role}
           disabled={!canChangeRole || updateUser.isPending}
-          onValueChange={(value) => {
-            const nextRole = value as UserRole
-            if (nextRole !== user.role) {
-              void mutate({ role: nextRole }, nextRole === "admin" ? "Promoted to admin" : "Changed to user")
-            }
-          }}
+          onValueChange={(value) => setRole(value as UserRole)}
         >
           <SelectTrigger className="w-48">
             <SelectValue />
@@ -423,18 +444,20 @@ function UserDetailSheet({
       <section className="flex flex-col gap-1">
         <h3 className="text-sm font-medium text-foreground">Permissions</h3>
         <p className="pb-2 text-xs text-muted-foreground">
-          {isAdmin
-            ? "Admins always hold every permission — toggles are locked on."
-            : isSelf
-              ? "You cannot change your own permissions."
-              : "You can only change permissions you hold yourself."}
+          {roleDirty
+            ? "Save the role change first, then adjust permissions."
+            : roleIsAdmin
+              ? "Admins always hold every permission — toggles are locked on."
+              : isSelf
+                ? "You cannot change your own permissions."
+                : "You can only change permissions you hold yourself."}
         </p>
         <div className="flex flex-col divide-y divide-border rounded-lg border">
           {PERMISSION_KEYS.map((key) => {
             const info = PERMISSION_INFO[key]
-            const value = isAdmin ? true : user.permissions[key]
+            const value = roleIsAdmin ? true : permissions[key]
             const toggleDisabled =
-              isAdmin || isSelf || !canEdit || !actorPermissions[key] || updateUser.isPending
+              roleIsAdmin || isSelf || !canEdit || !actorPermissions[key] || updateUser.isPending || roleDirty
             return (
               <div key={key} className="flex items-start justify-between gap-4 p-3">
                 <div className="min-w-0">
@@ -445,10 +468,7 @@ function UserDetailSheet({
                   checked={value}
                   disabled={toggleDisabled}
                   onCheckedChange={(checked) =>
-                    mutate(
-                      { permissions: { [key]: checked } },
-                      checked ? `Granted ${info.label.toLowerCase()}` : `Revoked ${info.label.toLowerCase()}`
-                    )
+                    setPermissions((prev) => ({ ...prev, [key]: checked }))
                   }
                   aria-label={info.label}
                 />
@@ -483,20 +503,21 @@ function UserDetailSheet({
                 <RefreshCw className="size-4" />
               </Button>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="self-start"
-              disabled={newPassword.length < 18 || updateUser.isPending}
-              onClick={async () => {
-                await mutate({ password: newPassword }, "Password reset — existing sessions signed out")
-                setNewPassword("")
-              }}
-            >
-              <KeyRound className="mr-2 size-4" />
-              Set new password
-            </Button>
+            <p className="text-xs text-muted-foreground">
+              Leave blank to keep the current password. Saving a new password signs the user out
+              of existing sessions.
+            </p>
           </section>
+
+          {/* Single save for the whole form (profile, role, permissions, password) */}
+          <Button
+            className="w-full"
+            disabled={!isDirty || updateUser.isPending}
+            onClick={handleSave}
+          >
+            {updateUser.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
+            Save
+          </Button>
 
           <Separator />
 
@@ -505,15 +526,15 @@ function UserDetailSheet({
             <h3 className="text-sm font-medium text-destructive">Danger zone</h3>
             <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
               <div>
-                <div className="text-sm font-medium">{user.disabled ? "Re-enable account" : "Disable account"}</div>
+                <div className="text-sm font-medium">{user.disabled ? "Disabled" : "Enabled"}</div>
                 <div className="text-xs text-muted-foreground">
                   {isSelf
                     ? "You cannot disable your own account."
                     : isLastActiveAdmin
                       ? "The last active admin cannot be disabled."
                       : user.disabled
-                        ? "Allow this user to sign in again."
-                        : "Blocks sign-in, revokes sessions and stops API keys."}
+                        ? "Blocked from signing in. Turn on to allow access again."
+                        : "Can sign in. Turn off to block sign-in and revoke sessions."}
                 </div>
               </div>
               <Switch

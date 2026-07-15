@@ -433,7 +433,7 @@ ALTER TABLE document_folders ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS document_folders_rls_select ON document_folders;
 CREATE POLICY document_folders_rls_select ON document_folders FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 DROP POLICY IF EXISTS document_folders_rls_insert ON document_folders;
 CREATE POLICY document_folders_rls_insert ON document_folders FOR INSERT
@@ -441,18 +441,18 @@ CREATE POLICY document_folders_rls_insert ON document_folders FOR INSERT
 
 DROP POLICY IF EXISTS document_folders_rls_update ON document_folders;
 CREATE POLICY document_folders_rls_update ON document_folders FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 DROP POLICY IF EXISTS document_folders_rls_delete ON document_folders;
 CREATE POLICY document_folders_rls_delete ON document_folders FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 -- documents
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS documents_rls_select ON documents;
 CREATE POLICY documents_rls_select ON documents FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 DROP POLICY IF EXISTS documents_rls_insert ON documents;
 CREATE POLICY documents_rls_insert ON documents FOR INSERT
@@ -460,18 +460,18 @@ CREATE POLICY documents_rls_insert ON documents FOR INSERT
 
 DROP POLICY IF EXISTS documents_rls_update ON documents;
 CREATE POLICY documents_rls_update ON documents FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 DROP POLICY IF EXISTS documents_rls_delete ON documents;
 CREATE POLICY documents_rls_delete ON documents FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 -- document_tags
 ALTER TABLE document_tags ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS document_tags_rls_select ON document_tags;
 CREATE POLICY document_tags_rls_select ON document_tags FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 DROP POLICY IF EXISTS document_tags_rls_insert ON document_tags;
 CREATE POLICY document_tags_rls_insert ON document_tags FOR INSERT
@@ -479,18 +479,18 @@ CREATE POLICY document_tags_rls_insert ON document_tags FOR INSERT
 
 DROP POLICY IF EXISTS document_tags_rls_update ON document_tags;
 CREATE POLICY document_tags_rls_update ON document_tags FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 DROP POLICY IF EXISTS document_tags_rls_delete ON document_tags;
 CREATE POLICY document_tags_rls_delete ON document_tags FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 -- document_tag_assignments — direct user_id check (post-denormalization).
 ALTER TABLE document_tag_assignments ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS document_tag_assignments_rls_select ON document_tag_assignments;
 CREATE POLICY document_tag_assignments_rls_select ON document_tag_assignments FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 DROP POLICY IF EXISTS document_tag_assignments_rls_insert ON document_tag_assignments;
 CREATE POLICY document_tag_assignments_rls_insert ON document_tag_assignments FOR INSERT
@@ -498,11 +498,11 @@ CREATE POLICY document_tag_assignments_rls_insert ON document_tag_assignments FO
 
 DROP POLICY IF EXISTS document_tag_assignments_rls_update ON document_tag_assignments;
 CREATE POLICY document_tag_assignments_rls_update ON document_tag_assignments FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 DROP POLICY IF EXISTS document_tag_assignments_rls_delete ON document_tag_assignments;
 CREATE POLICY document_tag_assignments_rls_delete ON document_tag_assignments FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (app.can_access_shared());
 
 -- =============================================================================
 -- VERIFICATION QUERIES

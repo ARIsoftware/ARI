@@ -11,7 +11,7 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { toSnakeCase, validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
 import { z } from 'zod'
 import { documents, documentFolders, documentTags, documentTagAssignments } from '@/lib/db/schema'
-import { eq, desc, isNull, and, inArray, gte, lte, sql } from 'drizzle-orm'
+import { eq, desc, isNull, and, inArray, gte, lte, sql, type SQL } from 'drizzle-orm'
 import { v4 as uuidv4 } from 'uuid'
 import { getStorageProvider, getCurrentBucket, getActiveProvider } from '../../lib/providers'
 import { getDocumentsSettings } from '../../lib/get-settings'
@@ -208,7 +208,7 @@ export async function GET(request: NextRequest) {
       ? Math.min(Math.floor(rawOffset), 10_000)
       : 0
 
-    const conditions = [eq(documents.userId, user.id)]
+    const conditions: SQL[] = []
 
     if (folderId === 'root' || folderId === '') {
       // Sentinel: caller wants documents at the root (folder_id IS NULL).
@@ -447,7 +447,6 @@ export async function POST(request: NextRequest) {
         db.select()
           .from(documentFolders)
           .where(and(
-            eq(documentFolders.userId, user.id),
             eq(documentFolders.id, folderId),
             isNull(documentFolders.deletedAt)
           ))
@@ -556,7 +555,6 @@ export async function PATCH(request: NextRequest) {
         db.select({ id: documents.id })
           .from(documents)
           .where(and(
-            eq(documents.userId, user.id),
             inArray(documents.id, ids),
             isNull(documents.deletedAt)
           ))
@@ -568,7 +566,6 @@ export async function PATCH(request: NextRequest) {
         db.update(documents)
           .set({ deletedAt: now, updatedAt: now })
           .where(and(
-            eq(documents.userId, user.id),
             inArray(documents.id, ids),
             isNull(documents.deletedAt)
           ))
@@ -585,7 +582,6 @@ export async function PATCH(request: NextRequest) {
             .from(documentFolders)
             .where(and(
               eq(documentFolders.id, folder_id),
-              eq(documentFolders.userId, user.id),
               isNull(documentFolders.deletedAt)
             ))
             .limit(1)
@@ -599,7 +595,6 @@ export async function PATCH(request: NextRequest) {
         db.update(documents)
           .set({ folderId: folder_id, updatedAt: now })
           .where(and(
-            eq(documents.userId, user.id),
             inArray(documents.id, ids),
             sql`${documents.folderId} IS DISTINCT FROM ${folder_id}`
           ))
@@ -616,10 +611,7 @@ export async function PATCH(request: NextRequest) {
     const owned = await withRLS((db) =>
       db.select({ id: documents.id })
         .from(documents)
-        .where(and(
-          eq(documents.userId, user.id),
-          inArray(documents.id, ids)
-        ))
+        .where(inArray(documents.id, ids))
     )
     if (owned.length !== ids.length) {
       return createErrorResponse('One or more documents do not exist', 404)
@@ -628,10 +620,7 @@ export async function PATCH(request: NextRequest) {
       const ownedTags = await withRLS((db) =>
         db.select({ id: documentTags.id })
           .from(documentTags)
-          .where(and(
-            eq(documentTags.userId, user.id),
-            inArray(documentTags.id, tag_ids)
-          ))
+          .where(inArray(documentTags.id, tag_ids))
       )
       if (ownedTags.length !== tag_ids.length) {
         return createErrorResponse('One or more tags do not exist', 400)
