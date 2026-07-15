@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { AlertCircle, CheckCircle2, XCircle, Loader2, Shield, ShieldAlert, ShieldCheck, Database as DatabaseIcon, Package, Save, Key, Globe, Lock, ChevronRight, HardDrive } from 'lucide-react'
+import { AlertCircle, CheckCircle2, CircleSlash, XCircle, Loader2, Shield, ShieldAlert, ShieldCheck, Database as DatabaseIcon, Package, Save, Key, Globe, Lock, ChevronRight, HardDrive } from 'lucide-react'
 import moduleManifest from '@/lib/generated/module-manifest.json'
 import { HTTP_METHODS, NON_MODULE_TAGS, X_ARI, type OpenApiSpec } from '@/lib/openapi/types'
 
@@ -150,7 +150,7 @@ function DataToggle({ data, variant = 'success' }: { data: any; variant?: 'succe
 
 interface TestResult {
   name: string
-  status: 'pending' | 'testing' | 'success' | 'error' | 'warning'
+  status: 'pending' | 'testing' | 'success' | 'error' | 'warning' | 'skipped'
   message?: string
   data?: any
   error?: any
@@ -319,6 +319,7 @@ export default function DatabaseTestPage() {
     { name: 'Session Status', status: 'pending' },
     ...DYNAMIC_MODULE_TESTS.map((t) => ({ name: t.name, status: 'pending' as const })),
     { name: 'Test RLS Policies', status: 'pending' },
+    { name: 'Multi-User Setup', status: 'pending' },
   ])
   const [securityResults, setSecurityResults] = useState<SecurityTestResult[]>([])
   const [moduleResults, setModuleResults] = useState<TestResult[]>([])
@@ -2049,7 +2050,35 @@ export default function DatabaseTestPage() {
     }
     const phase3Summaries = new Map<string, Phase3Summary>()
 
-    const phase3Tests = DYNAMIC_MODULE_TESTS.map((test) => async () => {
+    // DYNAMIC_MODULE_TESTS only knows install-level enablement (build-time
+    // manifest). Fetch the per-user enabled map so modules the user disabled
+    // in /modules are skipped outright instead of failing with a 403.
+    // If the fetch fails, run everything — the 403 handler below still
+    // catches disabled modules, just less gracefully.
+    let userEnabledModules: Record<string, { enabled: boolean }> | null = null
+    try {
+      const statusResponse = await fetch(route('health-module-status'))
+      if (statusResponse.ok) {
+        const status = await statusResponse.json()
+        if (status?.moduleChecks) userEnabledModules = status.moduleChecks
+      }
+    } catch { /* fall through — run all tests */ }
+
+    const runnableTests: DynamicModuleTest[] = []
+    for (const test of DYNAMIC_MODULE_TESTS) {
+      if (userEnabledModules && userEnabledModules[test.moduleId]?.enabled === false) {
+        updateTestResult(test.name, {
+          status: 'skipped',
+          message: `Skipped — module '${test.moduleId}' is disabled for this user (enable it in /modules to include it)`,
+          error: undefined,
+          data: undefined,
+        })
+      } else {
+        runnableTests.push(test)
+      }
+    }
+
+    const phase3Tests = runnableTests.map((test) => async () => {
       updateTestResult(test.name, { status: 'testing' })
       try {
         const response = await fetch(test.fullPath)
@@ -2084,17 +2113,25 @@ export default function DatabaseTestPage() {
         })
       } catch (error: unknown) {
         const msg = errMsg(error)
-        // The module API returns 403 "Module 'x' is disabled" for modules the
-        // user intentionally disabled — that's healthy, not a failure.
+        // Fallback for modules disabled after the per-user map was fetched
+        // (or when that fetch failed): the module API returns 403
+        // "Module 'x' is disabled" — that's healthy, not a failure.
         const moduleDisabled = msg.includes('is disabled') || msg.includes('403')
         const authWall = msg.includes('401') || msg.includes('Unauthorized')
-        updateTestResult(test.name, {
-          status: moduleDisabled || authWall ? 'warning' : 'error',
-          error: moduleDisabled
-            ? `${msg} — module is disabled for this user; enable it in /modules to include it in this test`
-            : msg,
-          data: { hint: 'Tests the real API route with Better Auth + withRLS()', source: test.fullPath }
-        })
+        if (moduleDisabled) {
+          updateTestResult(test.name, {
+            status: 'skipped',
+            message: `Skipped — module '${test.moduleId}' is disabled for this user (enable it in /modules to include it)`,
+            error: undefined,
+            data: undefined,
+          })
+        } else {
+          updateTestResult(test.name, {
+            status: authWall ? 'warning' : 'error',
+            error: msg,
+            data: { hint: 'Tests the real API route with Better Auth + withRLS()', source: test.fullPath }
+          })
+        }
       }
     })
 
@@ -2111,82 +2148,63 @@ export default function DatabaseTestPage() {
           data: { note: 'Sign in to test RLS policies' }
         })
       } else {
-        let probe: (Phase3Summary & { moduleId: string }) | null = null
-        for (const [moduleId, summary] of phase3Summaries) {
-          if (summary.hasUserScoping && summary.rowCount > 0) {
-            probe = { moduleId, ...summary }
-            break
+        // Verify per-user isolation via a sentinel row on module_settings,
+        // which stays per-user even after Phase 3 made the content modules
+        // shared. (The previous approach probed a content module and asserted
+        // that every returned row belonged to the current user — that now
+        // false-alarms on shared modules like tasks, which intentionally
+        // return other users' rows.)
+        try {
+          // POST because the endpoint inserts/deletes a sentinel row —
+          // it's not a safe/idempotent GET.
+          const response = await fetch(route('health-rls-test'), { method: 'POST' })
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
           }
-        }
+          const rls = await response.json()
 
-        if (!probe) {
-          // No module returned user-scoped rows to probe (fresh install or
-          // empty DB). Fall back to a direct RLS check against module_settings
-          // via a dedicated debug endpoint, so the test still runs.
-          try {
-            // POST because the endpoint inserts/deletes a sentinel row —
-            // it's not a safe/idempotent GET.
-            const response = await fetch(route('health-rls-test'), { method: 'POST' })
-            if (!response.ok) {
-              throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-            }
-            const rls = await response.json()
-
-            if (rls.error || !rls.authenticated) {
-              updateTestResult('Test RLS Policies', {
-                status: 'error',
-                message: rls.error || 'Not authenticated',
-                data: rls
-              })
-            } else if (rls.success) {
-              updateTestResult('Test RLS Policies', {
-                status: 'success',
-                message: `RLS working — verified via module_settings (positive + negative tests passed)`,
-                data: {
-                  note: 'Tested using a sentinel row on module_settings since no module had user-scoped data',
-                  positiveTest: rls.positiveTest,
-                  negativeTest: rls.negativeTest,
-                  tableTested: rls.tableTested
-                }
-              })
-            } else {
-              updateTestResult('Test RLS Policies', {
-                status: 'error',
-                message: 'RLS ISSUE — sentinel-row RLS check failed',
-                data: {
-                  hint: rls.negativeTest?.passed === false
-                    ? 'Negative test failed — a different user context saw rows it should not have'
-                    : 'Positive test failed — current user context did not see their own inserted row',
-                  positiveTest: rls.positiveTest,
-                  negativeTest: rls.negativeTest
-                }
-              })
-            }
-          } catch (fallbackError: unknown) {
+          if (rls.error || !rls.authenticated) {
             updateTestResult('Test RLS Policies', {
-              status: 'warning',
-              message: 'No installed module returned user-scoped rows — fallback RLS check failed',
+              status: 'error',
+              message: rls.error || 'Not authenticated',
+              data: rls
+            })
+          } else if (rls.success) {
+            updateTestResult('Test RLS Policies', {
+              status: 'success',
+              message: rls.bypassRls
+                ? 'Isolation enforced at the app layer — the connection role bypasses RLS (ARI\'s documented default)'
+                : 'Per-user isolation working — RLS enforcing (positive + negative tests passed)',
               data: {
-                note: 'RLS test requires at least one module API to return rows containing user_id/userId, or a working /api/health/rls-test endpoint',
-                checkedModules: Array.from(phase3Summaries.keys()),
-                fallbackError: errMsg(fallbackError)
+                note: rls.bypassRls
+                  ? 'The default superuser connection has BYPASSRLS, so RLS is defense-in-depth only; user isolation comes from the application layer. Content modules are shared (Phase 3); per-user tables (settings, prefs, API keys) stay isolated via app-layer filters.'
+                  : 'Content modules are shared (Phase 3); this confirms the per-user tables (module settings, preferences, API keys) are still isolated by RLS',
+                bypassRls: rls.bypassRls,
+                positiveTest: rls.positiveTest,
+                negativeTest: rls.negativeTest,
+                tableTested: rls.tableTested
+              }
+            })
+          } else {
+            updateTestResult('Test RLS Policies', {
+              status: 'error',
+              message: 'ISOLATION ISSUE — sentinel-row check failed',
+              data: {
+                hint: rls.negativeTest?.passed === false
+                  ? 'Negative test failed — a different user context saw rows it should not have'
+                  : 'Positive test failed — current user context did not see their own inserted row',
+                positiveTest: rls.positiveTest,
+                negativeTest: rls.negativeTest
               }
             })
           }
-        } else {
-          const allOwned = probe.allOwnedByCurrentUser === true
+        } catch (rlsError: unknown) {
           updateTestResult('Test RLS Policies', {
-            status: allOwned ? 'success' : 'error',
-            message: allOwned
-              ? `RLS working — all ${probe.rowCount} record(s) from ${probe.moduleId} belong to current user`
-              : `RLS ISSUE — found ${probe.moduleId} records belonging to other users!`,
+            status: 'warning',
+            message: 'Could not run the per-user isolation check',
             data: {
-              userId: user.id,
-              probedModule: probe.moduleId,
-              source: probe.source,
-              rowCount: probe.rowCount,
-              allOwnedByUser: allOwned,
-              note: 'API routes use Drizzle ORM with withRLS() for user isolation'
+              note: 'Requires a working /api/health/rls-test endpoint',
+              error: errMsg(rlsError)
             }
           })
         }
@@ -2196,6 +2214,50 @@ export default function DatabaseTestPage() {
         status: 'error',
         error: errMsg(error),
         data: { hint: 'Tests user isolation via withRLS()' }
+      })
+    }
+
+    // Multi-user setup — the role/permissions/disabled columns are installed
+    // and at least one active admin exists (so the install stays manageable).
+    updateTestResult('Multi-User Setup', { status: 'testing' })
+    try {
+      const response = await fetch(route('health-multi-user'))
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      const mu = await response.json()
+      if (mu.error) {
+        updateTestResult('Multi-User Setup', { status: 'error', error: mu.error, data: mu })
+      } else if (!mu.columnsPresent) {
+        updateTestResult('Multi-User Setup', {
+          status: 'error',
+          message: `Multi-user schema incomplete — missing column(s): ${mu.missingColumns.join(', ')}`,
+          data: { ...mu, hint: 'Restart the app so lib/db/setup.sql re-applies, or check the boot logs for a schema error.' }
+        })
+      } else if (!mu.sharedAccessFunction) {
+        updateTestResult('Multi-User Setup', {
+          status: 'error',
+          message: 'Shared-workspace function app.can_access_shared() is missing',
+          data: { ...mu, hint: 'Phase 3 DDL did not fully apply (e.g. a restored pre-Phase-3 backup). Restart the app so lib/db/setup.sql re-creates it.' }
+        })
+      } else if (!mu.hasActiveAdmin) {
+        updateTestResult('Multi-User Setup', {
+          status: 'error',
+          message: 'No active admin — nobody can manage users',
+          data: { ...mu, hint: 'The earliest user should have been promoted on boot. Check that setup.sql ran, or promote a user directly.' }
+        })
+      } else {
+        updateTestResult('Multi-User Setup', {
+          status: 'success',
+          message: `Schema installed — ${mu.activeAdminCount} active admin${mu.activeAdminCount === 1 ? '' : 's'}`,
+          data: mu
+        })
+      }
+    } catch (error: unknown) {
+      updateTestResult('Multi-User Setup', {
+        status: 'error',
+        error: errMsg(error),
+        data: { hint: 'Checks user.role/permissions/disabled columns + active admin count' }
       })
     }
 
@@ -2215,6 +2277,8 @@ export default function DatabaseTestPage() {
         return <AlertCircle className="h-5 w-5 text-yellow-500" />
       case 'error':
         return <XCircle className="h-5 w-5 text-red-500" />
+      case 'skipped':
+        return <CircleSlash className="h-5 w-5 text-gray-400" />
     }
   }
 
@@ -2239,7 +2303,8 @@ export default function DatabaseTestPage() {
       testing: 'secondary',
       success: 'default',
       warning: 'secondary',
-      error: 'destructive'
+      error: 'destructive',
+      skipped: 'outline'
     }
 
     return (

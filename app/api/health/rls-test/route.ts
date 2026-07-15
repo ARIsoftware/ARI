@@ -16,6 +16,7 @@ import { NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { withUserContext } from '@/lib/db'
+import { pool } from '@/lib/db/pool'
 import { moduleSettings } from '@/lib/db/schema'
 import { safeErrorResponse } from '@/lib/api-error'
 import { and, eq } from 'drizzle-orm'
@@ -42,6 +43,25 @@ registry.registerPath({
 // Sentinel module_id used exclusively by this diagnostic. Chosen to be
 // visually obvious and unlikely to collide with any real module id.
 const SENTINEL_MODULE_ID = '__debug_rls_test__'
+
+/**
+ * Whether the pooled connection role bypasses RLS (superuser or the explicit
+ * BYPASSRLS attribute). Returns null if it can't be determined. When true,
+ * RLS policies are not enforced and the tenant boundary is the application
+ * layer — the documented ARI default.
+ */
+async function connectionBypassesRls(): Promise<boolean | null> {
+  if (!pool) return null
+  try {
+    const { rows } = await pool.query<{ bypass: boolean }>(
+      `SELECT (rolsuper OR rolbypassrls) AS bypass
+         FROM pg_roles WHERE rolname = current_user`
+    )
+    return rows[0]?.bypass ?? null
+  } catch {
+    return null
+  }
+}
 
 // POST (not GET) because this endpoint mutates the database (INSERT/DELETE on
 // module_settings). Using POST matches REST semantics and blocks trivial CSRF
@@ -108,12 +128,22 @@ export async function POST() {
       )
       const negativePass = negativeRows.length === 0
 
-      const allPass = positivePass && negativePass
+      // Whether the connection role bypasses RLS. ARI's documented default
+      // (docs/SECURITY.md) connects as a Postgres superuser, which has
+      // BYPASSRLS — so the negative test intentionally "leaks" the row and
+      // isolation is enforced at the application layer, not by RLS. Only when
+      // the role does NOT bypass RLS is a failed negative test a real problem.
+      const bypassRls = await connectionBypassesRls()
+
+      // Positive test must always pass (the user must see their own row).
+      // The negative test only counts when RLS is actually being enforced.
+      const allPass = positivePass && (negativePass || bypassRls === true)
 
       return NextResponse.json({
         authenticated: true,
         userId: user.id,
         success: allPass,
+        bypassRls,
         positiveTest: {
           description: 'Current user can see their own inserted row',
           rowCount: positiveRows.length,
@@ -129,7 +159,9 @@ export async function POST() {
           passed: negativePass
         },
         tableTested: 'module_settings',
-        note: 'End-to-end RLS check using a sentinel row — works on fresh installs with no real data'
+        note: bypassRls
+          ? 'Connection role bypasses RLS (documented default) — user isolation is enforced at the application layer; RLS is defense-in-depth only'
+          : 'End-to-end RLS check using a sentinel row — works on fresh installs with no real data'
       })
     } finally {
       // Always clean up the sentinel row, even if an assertion failed above.

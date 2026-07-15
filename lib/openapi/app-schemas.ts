@@ -194,12 +194,23 @@ export const HealthRlsTestSchema = z.object({
   authenticated: z.boolean(),
   userId: z.string().optional(),
   success: z.boolean().optional(),
+  bypassRls: z.boolean().nullable().optional(),
   positiveTest: z.unknown().optional(),
   negativeTest: z.unknown().optional(),
   tableTested: z.string().optional(),
   note: z.string().optional(),
   error: z.string().optional(),
 }).openapi('HealthRlsTestResult')
+
+export const HealthMultiUserSchema = z.object({
+  ok: z.boolean(),
+  columnsPresent: z.boolean(),
+  missingColumns: z.array(z.string()),
+  sharedAccessFunction: z.boolean(),
+  activeAdminCount: z.number().int().nullable(),
+  hasActiveAdmin: z.boolean(),
+  error: z.string().optional(),
+}).openapi('HealthMultiUser')
 
 export const HealthCheckSchema = z.object({
   status: z.enum(['ok', 'error']),
