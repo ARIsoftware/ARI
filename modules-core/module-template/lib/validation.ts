@@ -57,7 +57,10 @@ export const ModuleTemplateSettingsSchema = z.object({
   theme: z.enum(['light', 'dark', 'auto']).optional(),
   refreshInterval: z.enum(['30', '60', '120']).optional(),
   selectedAiProvider: z.enum(AI_PROVIDER_IDS).nullable().optional(),
-  aiProviderModels: z.record(z.enum(AI_PROVIDER_IDS), z.string().max(MODEL_ID_MAX_LENGTH)).optional(),
+  // Keys are deliberately NOT restricted to the current AI_PROVIDER_IDS: the
+  // client round-trips the whole stored map, so a stale key from a provider
+  // that was later removed from the registry must not brick every save.
+  aiProviderModels: z.record(z.string().max(64), z.string().max(MODEL_ID_MAX_LENGTH)).optional(),
 }).strict().openapi('ModuleTemplateSettings')
 
 export const SettingsSavedSchema = z.object({

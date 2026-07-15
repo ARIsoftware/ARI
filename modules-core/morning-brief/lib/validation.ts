@@ -1,12 +1,16 @@
 import { z } from 'zod'
 import '@/lib/openapi/registry'
-import { AI_PROVIDER_IDS } from '@/lib/ai-providers'
+import { AI_PROVIDER_IDS, MODEL_ID_MAX_LENGTH } from '@/lib/ai-providers'
 
 // ─── Settings ───────────────────────────────────────────────────────────────
 export const MorningBriefSettingsSchema = z.object({
   selectedAiProvider: z.enum(AI_PROVIDER_IDS).nullable().optional(),
   selectedVoiceProvider: z.enum(AI_PROVIDER_IDS).nullable().optional(),
   elevenLabsVoiceId: z.string().max(100).nullable().optional(),
+  // Keys are deliberately NOT restricted to the current AI_PROVIDER_IDS: the
+  // client round-trips the whole stored map, so a stale key from a provider
+  // that was later removed from the registry must not brick every save.
+  aiProviderModels: z.record(z.string().max(64), z.string().max(MODEL_ID_MAX_LENGTH)).optional(),
 }).strict().openapi('MorningBriefSettings')
 
 export const SettingsSavedSchema = z.object({
