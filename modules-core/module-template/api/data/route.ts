@@ -3,10 +3,24 @@
  *
  * Reference template demonstrating ARI's API conventions:
  * - `validateRequestBody` / `validateQueryParams` for input validation
- * - `getAuthenticatedUser()` + `withRLS()` for tenant isolation
- * - Defense-in-depth: explicit `user_id` filters in addition to RLS
+ * - `getAuthenticatedUser()` + `withRLS()` for DB access
  * - `createErrorResponse` + safe error logging
  * - All four CRUD verbs (GET / POST / PUT / DELETE)
+ *
+ * MULTI-USER — this template is PER-USER (private): every SELECT/UPDATE/DELETE
+ * filters by `user_id = user.id`, so each user only sees their own entries.
+ * These explicit filters are the REAL tenant boundary, not just belt-and-
+ * suspenders: the default DB role has BYPASSRLS, so the RLS policies in
+ * database/schema.sql don't filter on their own (see docs/SECURITY.md).
+ *
+ *   → To make this module SHARED (all users read/write the same rows, like
+ *     tasks/contacts/documents): remove the `eq(...userId, user.id)` filters
+ *     from GET/PUT/DELETE below AND switch the schema.sql policies to
+ *     app.can_access_shared(). Keep `userId: user.id` on INSERT either way.
+ *
+ * To gate an endpoint on a permission (e.g. an admin-only action), use
+ * `requirePermission(user, 'manage_modules')` / `requireAdmin(user)` from
+ * `@/lib/api-helpers` — see docs/MODULES.md.
  *
  * Endpoints:
  * - GET    /api/modules/module-template/data       - List entries (paginated)
@@ -156,6 +170,8 @@ const entries = await withRLS((db) =>
       db
         .select()
         .from(moduleTemplateEntries)
+        // PER-USER boundary: only the caller's rows. Remove this .where() to
+        // make the module shared (all users see every entry).
         .where(eq(moduleTemplateEntries.userId, user.id))
         .orderBy(desc(moduleTemplateEntries.createdAt))
         .limit(limit)
@@ -220,6 +236,8 @@ const data = await withRLS((db) =>
       db
         .update(moduleTemplateEntries)
         .set({ message, updatedAt: new Date().toISOString() })
+        // PER-USER boundary: you can only update your own row. For a shared
+        // module, drop the userId condition: .where(eq(...id, id)).
         .where(and(eq(moduleTemplateEntries.id, id), eq(moduleTemplateEntries.userId, user.id)))
         .returning()
     )
@@ -251,6 +269,8 @@ export async function DELETE(request: NextRequest) {
 await withRLS((db) =>
       db
         .delete(moduleTemplateEntries)
+        // PER-USER boundary: you can only delete your own row. For a shared
+        // module, drop the userId condition: .where(eq(...id, id)).
         .where(and(eq(moduleTemplateEntries.id, queryValidation.data.id), eq(moduleTemplateEntries.userId, user.id)))
     )
 

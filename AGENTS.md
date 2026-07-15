@@ -100,7 +100,17 @@ export async function getAuthenticatedUser() {
 - **Admins implicitly hold every permission** (stored grants ignored). Users resolve each key from `permissions` JSONB with per-key defaults in `lib/permissions.ts`: `manage_users`, `manage_admins` (off by default), `manage_modules`, `access_settings` (on by default), `generate_api_keys` (off). Missing key = default, so adding a new permission needs no migration.
 - `getAuthenticatedUser()` returns `user.role` and `user.permissions` (effective), **always read fresh from the DB row** — never check permissions from the cookie-cached session. Disabled accounts fail auth entirely (sessions rejected, API keys stop working, sign-in blocked via session-create hook).
 - Admin user CRUD lives at the `/users` page (`app/(app)/users/`) + `/api/users` routes. Invariants enforced server-side: the last active admin cannot be deleted/disabled/demoted; you cannot change your own role, disable or delete yourself; you can only grant permissions you hold yourself; creating/editing admins requires `manage_admins`.
-- Gating new features: server-side use `hasPermission(user, 'key')` / `canManageRole()` from `lib/permissions.ts`; client-side use `useCurrentUser()` from `hooks/use-users.ts` (backed by `/api/users/me`). UI hiding is cosmetic — the API must always enforce.
+- Gating new features: server-side use `requirePermission(user, 'key')` / `requireAdmin(user)` from `lib/api-helpers.ts` (return a 401/403 response or null), or the pure predicates `hasPermission` / `canManageRole` / `canViewUsers` from `lib/permissions.ts`; client-side use `useCurrentUser()` from `hooks/use-users.ts` (backed by `/api/users/me`) with the same `lib/permissions.ts` predicates. UI hiding is cosmetic — the API must always enforce.
+
+#### Shared vs per-user data (multi-user data model)
+
+ARI is a shared multi-user workspace. **Every content table is either per-user (private) or shared (collaborative)** — decide this when you create a module, and keep the RLS policy (`database/schema.sql`) and the API queries consistent.
+
+- **Per-user (private) — the safe default.** Each user only sees their own rows (fitness, health, journal, notes; and all config/secrets — `module_settings`, `user_preferences`, `api_keys`, OAuth tokens). RLS: `USING (user_id = current_setting('app.current_user_id'))`. **API must filter every SELECT/UPDATE/DELETE by `user_id = user.id`.**
+- **Shared (collaborative).** All authenticated users read/write the same rows (tasks, contacts, quotes, brainstorm, documents, knowledge-manager, motivation). RLS SELECT/UPDATE/DELETE use `app.can_access_shared()` (defined in `lib/db/setup.sql`; returns true for any authenticated context). **API must NOT filter reads/writes by `user_id`.**
+- **INSERT stamps `user_id = user.id` (the owner) in both models.**
+- **The API-layer filter is the real tenant boundary, not RLS** — the default DB role has `BYPASSRLS`, so RLS is defense-in-depth only. A per-user query missing its filter leaks other users' rows; a shared query keeping one hides shared rows. See `docs/SECURITY.md` and the fully-commented `modules-core/module-template/database/schema.sql` + `api/data/route.ts` for the canonical patterns.
+- Module enable/disable is per-user (`module_settings`); shared modules present per-user *views* over the same shared data. Cross-user file serving (`/api/storage/serve`) is allowed only for buckets in `SHARED_STORAGE_BUCKETS`.
 
 ## Database Schema
 

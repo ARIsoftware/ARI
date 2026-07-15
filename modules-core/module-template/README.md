@@ -73,6 +73,35 @@ do not configure storage themselves — `getStorageProvider(readStorageConfig())
 returns the right backend automatically. If your module needs provider-aware
 behavior, read `process.env.ARI_STORAGE_PROVIDER` directly.
 
+## Multi-User: Per-User vs Shared Data
+
+ARI is multi-user. When you create a module, decide whether its content is
+**per-user (private)** or **shared (collaborative)** — this template is
+**per-user** (each user only sees their own entries), which is the safe default.
+
+| | Per-user (private) — *default* | Shared (collaborative) |
+|---|---|---|
+| Examples | fitness, health, journal, notes | tasks, contacts, documents |
+| `schema.sql` SELECT/UPDATE/DELETE | `USING (user_id = current_setting('app.current_user_id'))` | `USING (app.can_access_shared())` |
+| `schema.sql` INSERT | `WITH CHECK (user_id = current_setting(...))` | *same* — always stamp the owner |
+| API reads/writes | **filter every query by `user_id = user.id`** | **no `user_id` filter** |
+| API INSERT | `userId: user.id` | *same* — record the creator |
+
+**The API-layer filter is the real boundary, not RLS.** The default database
+role has `BYPASSRLS`, so the RLS policies are defense-in-depth only (see
+`docs/SECURITY.md`). A per-user module that forgets a `user_id` filter will
+leak other users' rows; a shared module that keeps one will hide shared rows.
+Keep `schema.sql` and your API queries consistent.
+
+**To convert this template to shared:** switch the SELECT/UPDATE/DELETE policies
+in `database/schema.sql` to `app.can_access_shared()`, and remove the
+`eq(...userId, user.id)` filters from `api/data/route.ts` (GET/PUT/DELETE) —
+both are marked with inline comments. Leave INSERT stamping the owner.
+
+**Gating on permissions:** to restrict an endpoint (e.g. an admin-only action),
+use `requirePermission(user, 'manage_modules')` or `requireAdmin(user)` from
+`@/lib/api-helpers` after the auth check — see `docs/MODULES.md`.
+
 ## Installation
 
 This module is already installed in the `/modules` directory. To use it:

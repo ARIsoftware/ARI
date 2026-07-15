@@ -685,20 +685,36 @@ mkdir -p modules-core/[module-id]/{app,api/data,api/settings,components,lib,type
 - [ ] Schema additions in updates use `ALTER TABLE … ADD COLUMN IF NOT EXISTS …`
 - [ ] **Contains no** `DROP TABLE`, `DROP SCHEMA`, `DROP DATABASE`, `TRUNCATE`, `ALTER TABLE … DROP COLUMN`, or unconditional `DELETE` (the runtime installer at `lib/modules/schema-installer.ts` will refuse to execute the file)
 - [ ] Ensure RLS is enabled on every table
-- [ ] Include all 4 RLS policies (SELECT, INSERT, UPDATE, DELETE) referencing `current_setting('app.current_user_id')`
+- [ ] Decide **per-user vs shared** (see below) and add all 4 RLS policies (SELECT, INSERT, UPDATE, DELETE) accordingly
 - [ ] Add indexes for common queries
 - [ ] Document each column with inline comments
 
 A sibling file `database/uninstall.sql` should also exist with `DROP TABLE IF EXISTS … CASCADE` statements for every table the module owns. **`uninstall.sql` is never auto-run** — it's a manual teardown the user can run themselves in their SQL client of choice (Supabase Studio for cloud Supabase, the local Studio at `http://127.0.0.1:54323` when running `./ari start`, pgweb for standalone local Postgres, or `psql` directly).
 
+**Multi-user: per-user (private) vs shared (collaborative).** ARI is multi-user, so every content table is one of two kinds. This choice must be made consistently in **both** `schema.sql` (RLS policy) and your API queries (Step 5.4.1):
+
+- **Per-user (private) — the default.** Each user only sees their own rows (fitness, journal, notes). SELECT/UPDATE/DELETE match `user_id`; the API filters every read/write by `user_id = user.id`.
+- **Shared (collaborative).** All authenticated users read/write the same rows (tasks, contacts, documents). SELECT/UPDATE/DELETE use `app.can_access_shared()`; the API does **not** filter by `user_id`.
+
+`INSERT` stamps `user_id = user.id` (the owner) in both models. Because the default DB role has `BYPASSRLS`, the **API-layer filter is the real boundary** — the RLS policy is defense-in-depth (see `docs/SECURITY.md`).
+
 **RLS Policy Pattern:**
 ```sql
--- Users can view their own records
+-- PER-USER (default): only the owner can see/modify the row
 DROP POLICY IF EXISTS my_table_rls_select ON my_table;
 CREATE POLICY my_table_rls_select ON my_table FOR SELECT
   USING (user_id = (SELECT current_setting('app.current_user_id')));
+
+-- SHARED: any authenticated user can see/modify the row
+-- CREATE POLICY my_table_rls_select ON my_table FOR SELECT
+--   USING (app.can_access_shared());
+
+-- INSERT is identical for both — stamp the creator as owner:
+DROP POLICY IF EXISTS my_table_rls_insert ON my_table;
+CREATE POLICY my_table_rls_insert ON my_table FOR INSERT
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
 ```
-**Note:** Do NOT use `auth.uid()` — Better Auth doesn't populate that function. Use `current_setting('app.current_user_id')` which is set by `withRLS()`. See `modules-core/module-template/database/schema.sql` for the complete pattern with all four policies.
+**Note:** Do NOT use `auth.uid()` — Better Auth doesn't populate that function. Use `current_setting('app.current_user_id')` which is set by `withRLS()`. `app.can_access_shared()` is defined in `lib/db/setup.sql`. See `modules-core/module-template/database/schema.sql` for the complete pattern with all four policies and how to switch a table between per-user and shared.
 
 #### Step 5.3.3: Utility Functions (`lib/utils.ts`)
 
@@ -722,19 +738,20 @@ CREATE POLICY my_table_rls_select ON my_table FOR SELECT
 
 #### Step 5.4.1: Data Endpoints (`api/data/route.ts`)
 
-- [ ] Implement GET handler (list all for user)
-- [ ] Implement POST handler (create new)
+- [ ] Implement GET handler (list)
+- [ ] Implement POST handler (create new; set `user_id: user.id`)
 - [ ] Add Zod validation schemas
 - [ ] Add authentication checks
-- [ ] Add explicit user_id filtering (defense-in-depth)
+- [ ] **Per-user tables:** filter every read/write by `user_id = user.id`. **Shared tables:** do NOT filter (see the schema step). This must match the table's RLS policy.
+- [ ] Gate privileged actions with `requirePermission(user, 'key')` / `requireAdmin(user)` from `@/lib/api-helpers`
 - [ ] Add comprehensive JSDoc comments
-- [ ] Include developer notes section
 - [ ] Add error handling with descriptive messages
 
-**Pattern (Drizzle + withRLS):**
+**Pattern (Drizzle + withRLS) — per-user (default):**
 ```typescript
 import { myTable } from '@/lib/db/schema'
-import { desc } from 'drizzle-orm'
+import { eq, desc } from 'drizzle-orm'
+import { requirePermission } from '@/lib/api-helpers'
 
 export async function GET(request: NextRequest) {
   const { user, withRLS } = await getAuthenticatedUser()
@@ -742,8 +759,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // Optional: gate the whole route on a permission (admins always pass):
+  //   const denied = requirePermission(user, 'manage_modules'); if (denied) return denied
+
   const data = await withRLS((db) =>
-    db.select().from(myTable).orderBy(desc(myTable.createdAt))
+    db.select().from(myTable)
+      // PER-USER boundary — remove this .where() for a SHARED module:
+      .where(eq(myTable.userId, user.id))
+      .orderBy(desc(myTable.createdAt))
   )
 
   return NextResponse.json({ data: toSnakeCase(data) })

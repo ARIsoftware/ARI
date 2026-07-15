@@ -13,14 +13,20 @@ Before doing anything:
 **Security is absolutely paramount.** Every module must be secure by default. No exceptions.
 
 ### Database Security
-- **All Supabase tables MUST have Row Level Security (RLS) policies enabled.** A table without RLS is an open table — any authenticated user can read/write any row.
-- RLS policies must enforce `user_id` isolation so users can only access their own data.
-- Since Better Auth does not use `auth.uid()`, RLS policies should use application-level enforcement via the `withRLS()` helper. However, if creating raw SQL policies, ensure they restrict access appropriately.
+- **All tables MUST have Row Level Security (RLS) policies enabled.** A table without RLS is an open table.
+- **Decide per-user vs shared for each content table (ARI is multi-user).** The choice must be consistent in BOTH `database/schema.sql` (RLS policy) and your API queries:
+  - **Per-user (private) — the safe default.** Users only see their own rows (fitness, journal, notes, and all config/secrets). RLS: `USING (user_id = (SELECT current_setting('app.current_user_id')))`; **API filters every SELECT/UPDATE/DELETE by `user_id = user.id`**.
+  - **Shared (collaborative).** All authenticated users read/write the same rows (like the built-in tasks/contacts/documents). RLS SELECT/UPDATE/DELETE: `USING (app.can_access_shared())`; **API does NOT filter by `user_id`**. Only make a table shared if the user explicitly wants collaborative data.
+  - INSERT stamps `user_id = user.id` (the owner) in BOTH models.
+- **The API-layer filter is the real tenant boundary, not RLS** — the default DB role has `BYPASSRLS`, so RLS is defense-in-depth only. A per-user query that forgets its `user_id` filter leaks other users' rows. See `docs/SECURITY.md`.
+- Since Better Auth does not use `auth.uid()`, RLS policies use `current_setting('app.current_user_id')` (set by `withRLS()`). `app.can_access_shared()` is defined in `lib/db/setup.sql`. See `modules-core/module-template/database/schema.sql` for the commented per-user/shared pattern.
 - Never create tables with RLS disabled, even for "temporary" or "simple" modules.
 
 ### API Security
 - **Every API route MUST call `getAuthenticatedUser()` and verify the user exists** before doing anything else. Unauthenticated requests must be rejected immediately.
 - **All database operations MUST use `withRLS()`** — never use the raw Supabase client or unscoped Drizzle queries.
+- **Match the API query to the table's per-user/shared choice** (see Database Security): per-user tables filter every read/write by `user_id = user.id`; shared tables do not.
+- **Gate privileged actions** with `requirePermission(user, 'key')` / `requireAdmin(user)` from `@/lib/api-helpers` (keys: `manage_users`, `manage_admins`, `manage_modules`, `access_settings`, `generate_api_keys`). Admins pass every permission.
 - **All user input MUST be validated with Zod schemas** before use. Never trust client-provided data.
 - Never expose internal error details (stack traces, SQL errors) to the client. Return generic error messages.
 - **Public/webhook routes** require secret-based validation (HMAC signatures, bearer tokens, etc.) implemented **in the handler itself** — the declared `publicRoutes` security config is metadata only, the framework enforces nothing. If needed, read `/docs/MODULES.md` section 7.5 for the `publicRoutes` pattern and the `checkRateLimit`/`getClientIp` helpers from `@/lib/modules/public-route-security`.
@@ -77,6 +83,7 @@ Ask the user the following questions ONE AT A TIME, waiting for each answer befo
 7. **Dashboard Widget**: Should this module add a card or widget to the main Dashboard? If yes, describe what it should display (e.g., summary stat, chart, recent items list). There are two types: **stat cards** (small cards in the Quick Overview grid) and **widgets** (larger components in the content area below).
 8. **File Storage**: Does this module need to store files (images, documents, audio, etc.)? If yes, what types of files and are there any size limits? (Files are stored via the ARI File Storage System — works in all database modes with no extra configuration.)
 9. **AI Provider**: Should we add an AI Provider configuration screen where users can select the provider they want this module to use (e.g., Claude, Gemini, OpenAI)? (If yes, the settings panel includes the shared `AiProviderCard` — see "AI Provider Selection" below. Only ask/build this when the module actually calls an LLM.)
+10. **Per-user vs shared data**: ARI is multi-user. Should this module's data be **per-user (private)** — each person only sees their own (the default; right for personal data like logs, notes, health) — or **shared (collaborative)** — everyone sees and edits the same records (like a shared task list or document library)? This decides the RLS policy and whether API queries filter by `user_id` (see Security Requirements → Database Security). Default to per-user unless the user asks for collaboration.
 
 If the user provides v0 code:
 - Read and analyze all provided v0 code files
