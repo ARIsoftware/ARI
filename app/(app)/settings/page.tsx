@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { authClient } from "@/lib/auth-client"
 import { useAuth } from "@/components/providers"
 import { useCurrentUser } from "@/hooks/use-users"
+import { hasPermission } from "@/lib/permissions"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
@@ -70,10 +71,10 @@ function SettingsPageContent(): React.ReactElement {
   // - api tab requires generate_api_keys
   const { data: currentUser, isLoading: permissionsLoading, isError: permissionsError, refetch: refetchPermissions } = useCurrentUser()
   const isAdmin = currentUser?.role === "admin"
-  const canAccessSettings = isAdmin || currentUser?.permissions.access_settings === true
+  const canAccessSettings = hasPermission(currentUser, 'access_settings')
   const isTabAllowed = (tab: SettingsTab): boolean => {
     if (tab === "git" || tab === "backups") return isAdmin === true
-    if (tab === "api") return isAdmin || currentUser?.permissions.generate_api_keys === true
+    if (tab === "api") return hasPermission(currentUser, 'generate_api_keys')
     return true
   }
 

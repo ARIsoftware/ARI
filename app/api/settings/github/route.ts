@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { readFile, writeFile, copyFile, access } from "fs/promises"
 import path from "path"
 import { getAuthenticatedUser } from "@/lib/auth-helpers"
+import { requireAdmin } from "@/lib/api-helpers"
 import { upsertEnvVars } from "@/lib/env-file"
 import {
   SettingsGithubStatusSchema,
@@ -52,9 +53,8 @@ export async function GET() {
   }
 
   // GitHub sync config lives in .env.local (system-wide) — admin only.
-  if (user.role !== 'admin') {
-    return NextResponse.json({ error: "Admin access required" }, { status: 403 })
-  }
+  const denied = requireAdmin(user, "Admin access required")
+  if (denied) return denied
 
   const envPath = path.join(process.cwd(), ".env.local")
   let envContent = ""
@@ -105,9 +105,8 @@ export async function POST(request: NextRequest) {
   }
 
   // Writes GITHUB_TOKEN and repo config to .env.local (system-wide) — admin only.
-  if (user.role !== 'admin') {
-    return NextResponse.json({ error: "Admin access required" }, { status: 403 })
-  }
+  const denied = requireAdmin(user, "Admin access required")
+  if (denied) return denied
 
   let body: {
     githubToken?: string

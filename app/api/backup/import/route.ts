@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { requireAdmin } from '@/lib/api-helpers'
 import { isProductionSafeOperation } from '@/lib/admin-helpers'
 import { getPoolClient } from '@/lib/db'
 import { logger } from '@/lib/logger'
@@ -261,12 +262,8 @@ export async function POST(req: NextRequest) {
     }
 
     // A restore rewrites every user's data — admin only.
-    if (user.role !== 'admin') {
-      return NextResponse.json(
-        { error: "Backup import requires admin access" },
-        { status: 403 }
-      )
-    }
+    const denied = requireAdmin(user, "Backup import requires admin access")
+    if (denied) return denied
 
     // Check if operation is safe in production
     if (!isProductionSafeOperation()) {
@@ -420,9 +417,8 @@ export async function PUT(req: NextRequest) {
     }
 
     // Validation parses the full backup (all users' data) — admin only.
-    if (user.role !== 'admin') {
-      return NextResponse.json({ error: "Backup validation requires admin access" }, { status: 403 })
-    }
+    const denied = requireAdmin(user, "Backup validation requires admin access")
+    if (denied) return denied
 
     const formData = await req.formData()
     const file = formData.get('file') as File

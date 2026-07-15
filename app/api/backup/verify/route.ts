@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { requireAdmin } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
 import { queryRows, EXCLUDED_TABLES } from '../utils'
 import type { RoleCheck } from '@/app/(app)/settings/types'
@@ -178,12 +179,8 @@ export async function GET(req: NextRequest) {
 
     // Verify enumerates the full schema and row counts across all users —
     // admin only, same as export/import.
-    if (user.role !== 'admin') {
-      return NextResponse.json(
-        { error: "Backup verification requires admin access" },
-        { status: 403 }
-      )
-    }
+    const denied = requireAdmin(user, "Backup verification requires admin access")
+    if (denied) return denied
 
     logger.info(`[Backup Verify] Verification requested by user: ${user.id.slice(0, 8)}…`)
 

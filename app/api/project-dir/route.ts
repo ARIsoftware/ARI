@@ -3,6 +3,7 @@ import { existsSync } from "fs"
 import path from "path"
 import { getDbMode } from "@/lib/db/mode"
 import { getAuthenticatedUser } from "@/lib/auth-helpers"
+import { requireAdmin } from "@/lib/api-helpers"
 import { ProjectDirResponseSchema } from "@/lib/openapi/app-schemas"
 import { registry } from "@/lib/openapi/registry"
 import { DEFAULT_SECURITY, ErrorResponseSchema } from "@/lib/openapi/common"
@@ -29,9 +30,8 @@ export async function GET() {
   }
 
   // Reveals filesystem paths and env configuration state — admin only.
-  if (user.role !== 'admin') {
-    return NextResponse.json({ error: "Admin access required" }, { status: 403 })
-  }
+  const denied = requireAdmin(user, "Admin access required")
+  if (denied) return denied
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const hasAnonKey = !!(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)

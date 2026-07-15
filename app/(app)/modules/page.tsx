@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
 import { useCurrentUser } from "@/hooks/use-users"
+import { hasPermission } from "@/lib/permissions"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -261,9 +262,7 @@ export default function ModulesPage() {
   // switches, install buttons and save bar are hidden. The APIs enforce the
   // same permission server-side.
   const { data: currentUser } = useCurrentUser()
-  const canManageModules =
-    currentUser?.role === 'admin' ||
-    currentUser?.permissions.manage_modules === true
+  const canManageModules = hasPermission(currentUser, 'manage_modules')
 
   // Pre-install confirmation dialog state. When non-null, an AlertDialog
   // listing the module's declared npm packages is shown. Confirming kicks

@@ -1,6 +1,7 @@
 // API route helpers for validation and error handling
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import { hasPermission, type PermissionActor, type PermissionKey } from '@/lib/permissions'
 
 // `received` only exists on a subset of ZodIssue union members
 // (e.g. ZodInvalidTypeIssue) — narrow before access.
@@ -137,6 +138,41 @@ export function createErrorResponse(
   }
   
   return NextResponse.json(body, { status })
+}
+
+/**
+ * Gate an API route on a permission. Returns a 401/403 NextResponse to return
+ * early, or null when the actor is allowed. Admins pass every permission.
+ *
+ * @example
+ *   const { user } = await getAuthenticatedUser()
+ *   const denied = requirePermission(user, 'manage_modules')
+ *   if (denied) return denied
+ */
+export function requirePermission(
+  user: PermissionActor | null | undefined,
+  key: PermissionKey,
+  message?: string
+): NextResponse | null {
+  if (!user) return createErrorResponse('Authentication required', 401)
+  if (!hasPermission(user, key)) {
+    return createErrorResponse(message ?? 'You do not have permission to perform this action', 403)
+  }
+  return null
+}
+
+/**
+ * Gate an API route on the admin role (for system-wide operations that aren't
+ * a per-user permission — backups, env-file writes, telemetry). Returns a
+ * 401/403 NextResponse to return early, or null when allowed.
+ */
+export function requireAdmin(
+  user: { role?: string } | null | undefined,
+  message = 'Admin access required'
+): NextResponse | null {
+  if (!user) return createErrorResponse('Authentication required', 401)
+  if (user.role !== 'admin') return createErrorResponse(message, 403)
+  return null
 }
 
 /**

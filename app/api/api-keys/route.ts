@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { desc } from 'drizzle-orm'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { hasPermission } from '@/lib/permissions'
-import { validateRequestBody, createErrorResponse, toSnakeCase } from '@/lib/api-helpers'
+import { validateRequestBody, createErrorResponse, toSnakeCase, requirePermission } from '@/lib/api-helpers'
 import { generateApiKey } from '@/lib/api-keys'
 import { apiKeys } from '@/lib/db/schema/core-schema'
 import crypto from 'crypto'
@@ -82,9 +81,8 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    if (!hasPermission(user, 'generate_api_keys')) {
-      return createErrorResponse('You do not have permission to generate API keys', 403)
-    }
+    const denied = requirePermission(user, 'generate_api_keys', 'You do not have permission to generate API keys')
+    if (denied) return denied
 
     const validation = await validateRequestBody(request, createApiKeySchema)
     if (!validation.success) return validation.response

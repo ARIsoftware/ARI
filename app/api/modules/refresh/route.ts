@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { hasPermission } from '@/lib/permissions'
+import { requirePermission } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
 import { safeErrorResponse } from '@/lib/api-error'
 import { ModuleRefreshResponseSchema } from '@/lib/openapi/app-schemas'
@@ -35,12 +35,8 @@ export async function POST() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  if (!hasPermission(user, 'manage_modules')) {
-    return NextResponse.json(
-      { error: 'You do not have permission to manage modules' },
-      { status: 403 }
-    )
-  }
+  const denied = requirePermission(user, 'manage_modules', 'You do not have permission to manage modules')
+  if (denied) return denied
 
   try {
     const { exec } = await import('child_process')

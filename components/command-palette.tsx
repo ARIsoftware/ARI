@@ -25,6 +25,7 @@ import {
 import { getLucideIcon } from "@/lib/modules/icon-utils"
 import { useModules } from "@/lib/modules/module-hooks"
 import { useCurrentUser } from "@/hooks/use-users"
+import { canViewUsers, hasPermission } from "@/lib/permissions"
 import { isPublicPathname } from "@/lib/route-helpers"
 
 interface CommandPaletteProps {
@@ -81,13 +82,8 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
   // Users page is only offered to accounts that can manage users (the
   // server enforces this independently — hiding the entry is cosmetic).
   const { data: currentUser } = useCurrentUser({ enabled: !isPublicPage })
-  const canManageUsers =
-    currentUser?.role === 'admin' ||
-    currentUser?.permissions.manage_users === true ||
-    currentUser?.permissions.manage_admins === true
-  const canAccessSettings =
-    currentUser?.role === 'admin' ||
-    currentUser?.permissions.access_settings === true
+  const canManageUsers = canViewUsers(currentUser)
+  const canAccessSettings = hasPermission(currentUser, 'access_settings')
 
   if (isPublicPage) return null
 

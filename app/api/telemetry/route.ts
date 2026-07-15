@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getAuthenticatedUser } from "@/lib/auth-helpers"
+import { requireAdmin } from "@/lib/api-helpers"
 import { getAriInstance, setTelemetryEnabled } from "@/lib/telemetry/instance"
 import { updateTelemetrySchema, TelemetryResponseSchema } from "@/lib/openapi/app-schemas"
 import { registry } from "@/lib/openapi/registry"
@@ -48,9 +49,8 @@ export async function PUT(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   // Telemetry is a per-install setting, not per-user — admin only.
-  if (user.role !== 'admin') {
-    return NextResponse.json({ error: "Admin access required" }, { status: 403 })
-  }
+  const denied = requireAdmin(user, "Admin access required")
+  if (denied) return denied
 
   const body = await request.json().catch(() => null)
   if (!body || typeof body.enabled !== "boolean") {

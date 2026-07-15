@@ -22,6 +22,7 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 import { useEnabledModulesFromContext } from "@/lib/modules/context"
 import { useCurrentUser } from "@/hooks/use-users"
+import { canViewUsers, hasPermission } from "@/lib/permissions"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
 import { useDragDropMode } from "@/components/drag-drop-mode-context"
 import { useTheme } from "@/lib/theme/theme-context"
@@ -111,13 +112,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // Users/Settings links are only shown to accounts with the matching
   // permission. The server enforces this independently — hiding is cosmetic.
   const { data: currentUser } = useCurrentUser()
-  const canManageUsers =
-    currentUser?.role === 'admin' ||
-    currentUser?.permissions.manage_users === true ||
-    currentUser?.permissions.manage_admins === true
-  const canAccessSettings =
-    currentUser?.role === 'admin' ||
-    currentUser?.permissions.access_settings === true
+  const canManageUsers = canViewUsers(currentUser)
+  const canAccessSettings = hasPermission(currentUser, 'access_settings')
 
   // Drag and drop mode
   const { isDragMode, setPendingOrder, moduleOrder } = useDragDropMode()

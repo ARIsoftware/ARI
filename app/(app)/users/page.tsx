@@ -63,6 +63,9 @@ import {
 import {
   PERMISSION_INFO,
   PERMISSION_KEYS,
+  canManageRole,
+  canViewUsers,
+  hasPermission,
   type PermissionKey,
   type UserRole,
 } from "@/lib/permissions"
@@ -601,10 +604,7 @@ function UserDetailSheet({
 
 export default function UsersPage() {
   const { data: currentUser, isLoading: currentUserLoading } = useCurrentUser()
-  const canView =
-    currentUser?.role === "admin" ||
-    currentUser?.permissions.manage_users === true ||
-    currentUser?.permissions.manage_admins === true
+  const canView = canViewUsers(currentUser)
 
   const { data: users, isLoading: usersLoading, error } = useUsers({ enabled: canView === true })
   const [createOpen, setCreateOpen] = useState(false)
@@ -731,7 +731,7 @@ export default function UsersPage() {
       <CreateUserDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
-        canCreateAdmins={currentUser?.permissions.manage_admins === true}
+        canCreateAdmins={hasPermission(currentUser, 'manage_admins')}
       />
 
       <Sheet open={!!selected} onOpenChange={(open) => { if (!open) setSelectedId(null) }}>
@@ -747,11 +747,7 @@ export default function UsersPage() {
               isSelf={selected.id === currentUser.id}
               isLastActiveAdmin={selected.role === "admin" && !selected.disabled && activeAdminCount === 1}
               actorPermissions={currentUser.permissions}
-              canEdit={
-                selected.role === "admin"
-                  ? currentUser.permissions.manage_admins === true
-                  : currentUser.permissions.manage_users === true || currentUser.permissions.manage_admins === true
-              }
+              canEdit={canManageRole(currentUser, selected.role)}
               onClose={() => setSelectedId(null)}
             />
           )}
