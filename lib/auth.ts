@@ -4,6 +4,9 @@ import { nextCookies } from "better-auth/next-js"
 import { twoFactor } from "better-auth/plugins/two-factor"
 import { hash as argon2Hash, verify as argon2Verify } from "@node-rs/argon2"
 import { pool } from "@/lib/db/pool"
+// Regenerated on every predev/prebuild — reflects the modules actually on
+// disk in this build (same pattern as middleware.ts).
+import moduleManifest from "@/lib/generated/module-manifest.json"
 import { getAriInstance, tryClaimFirstSigninPing } from "@/lib/telemetry/instance"
 import { sendTvConnect } from "@/lib/telemetry/send-tv-connect"
 
@@ -11,6 +14,12 @@ import { sendTvConnect } from "@/lib/telemetry/send-tv-connect"
 // one-shot first-login ping. Keeps subsequent sign-ins from hitting the DB
 // for a flag that can never flip back.
 let firstSigninPingResolved = false
+
+// The module whose presence unlocks multi-user (see the user.create hook
+// below). Must match the `id` in modules-custom/users/module.json — if that
+// module is ever renamed, update both together or the single-user cap will
+// never unlock.
+const MULTI_USER_MODULE_ID = "users"
 
 // Build trusted origins
 const trustedOrigins: string[] = []
@@ -37,8 +46,9 @@ if (process.env.NODE_ENV !== 'production') {
 
 /**
  * Hash a password with Argon2id (winner of the Password Hashing Competition).
- * Shared by the Better Auth config below and the admin Users API
- * (app/api/users), so admin-set passwords hash identically to sign-up ones.
+ * Shared by the Better Auth config below and the Users module's admin API
+ * (modules-custom/users/api), so admin-set passwords hash identically to
+ * sign-up ones.
  */
 export async function hashPassword(password: string): Promise<string> {
   return await argon2Hash(password, {
@@ -118,6 +128,42 @@ export const auth = betterAuth({
     },
   },
   databaseHooks: {
+    user: {
+      create: {
+        before: async (user) => {
+          // Single-user cap: without the Users module installed (its code
+          // present in this build), ARI is single-user — only the first
+          // account may ever be created. The check is on module PRESENCE,
+          // not the per-user enabled flag: installing the module is the key
+          // that unlocks multi-user. The module's own admin API inserts user
+          // rows directly (not via Better Auth), so it is unaffected here.
+          const multiUserInstalled = moduleManifest.modules.some(
+            (m: { id: string }) => m.id === MULTI_USER_MODULE_ID
+          )
+          if (pool && !multiUserInstalled) {
+            let hasUsers = false
+            try {
+              const { rows } = await pool.query<{ count: string }>(
+                'SELECT COUNT(*) AS count FROM "user"'
+              )
+              hasUsers = parseInt(rows[0]?.count ?? "0", 10) >= 1
+            } catch {
+              // Never break account creation on a lookup failure (e.g. a
+              // fresh install before setup.sql created the table) — the
+              // first-run bootstrap must always succeed, and middleware
+              // still blocks public sign-up.
+            }
+            if (hasUsers) {
+              throw new APIError("FORBIDDEN", {
+                message:
+                  "This ARI install is single-user. Install the Users module to add more accounts.",
+              })
+            }
+          }
+          return { data: user }
+        },
+      },
+    },
     session: {
       create: {
         before: async (session) => {
