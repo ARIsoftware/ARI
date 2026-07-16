@@ -1,0 +1,40 @@
+{
+  "id": "board-of-advisors",
+  "group": "AI",
+  "name": "Board of Advisors",
+  "description": "Assemble a virtual board of advisor personas and put your questions to a roundtable — every advisor answers in turn, reacting to what the others said.",
+  "version": "1.0.0",
+  "author": "ARI",
+  "icon": "Users",
+  "enabled": false,
+  "fullscreen": false,
+  "menuPriority": 4,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": false
+  },
+  "routes": [
+    {
+      "path": "/board-of-advisors",
+      "label": "Board of Advisors",
+      "icon": "Users",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": ["board_advisors", "board_conversations", "board_messages"]
+  },
+  "npmDependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2"
+  },
+  "submenu": {
+    "component": "./components/sidebar-submenu.tsx"
+  }
+}
