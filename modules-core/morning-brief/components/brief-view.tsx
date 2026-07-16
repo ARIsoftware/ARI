@@ -29,7 +29,7 @@ import {
   Square,
   type LucideIcon,
 } from 'lucide-react'
-import type { BriefGreeting, BriefTask, BriefMeeting, BriefWeather } from '@/modules/morning-brief/types'
+import type { BriefGreeting, BriefQuote, BriefTask, BriefMeeting, BriefWeather } from '@/modules/morning-brief/types'
 import { classifyWeatherCode, type WeatherKind } from '@/modules/morning-brief/lib/weather-codes'
 import { useToast } from '@/hooks/use-toast'
 import { useApiKeysStatus } from '@/hooks/use-api-keys-status'
@@ -50,6 +50,8 @@ interface BriefViewProps {
   tasksEnabled: boolean
   calendar: SectionState<{ events: BriefMeeting[]; connected: boolean }>
   weather?: BriefWeather
+  /** Random quote from the Quotes module (null/absent = no quote line). */
+  quote?: BriefQuote | null
   onRefresh: () => void
   isRefreshing: boolean
   /** Embedded mode (e.g. the dashboard): drops the desk backdrop + action bar
@@ -121,11 +123,13 @@ function buildBriefSpeech({
   tasksEnabled,
   calendar,
   weather,
-}: Pick<BriefViewProps, 'greeting' | 'tasks' | 'tasksEnabled' | 'calendar' | 'weather'>): string {
+  quote,
+}: Pick<BriefViewProps, 'greeting' | 'tasks' | 'tasksEnabled' | 'calendar' | 'weather' | 'quote'>): string {
   const parts: string[] = []
 
   if (greeting.data?.greeting) parts.push(greeting.data.greeting.trim())
   if (greeting.data?.message) parts.push(greeting.data.message.trim())
+  if (quote?.quote) parts.push(`Today's quote: ${quote.quote.trim()}`)
 
   if (weather?.available && weather.high != null && weather.low != null) {
     const where = weather.city ? ` in ${weather.city}` : ''
@@ -167,6 +171,7 @@ function BriefSheet({
   tasksEnabled,
   calendar,
   weather,
+  quote,
   embedded = false,
 }: Omit<BriefViewProps, 'onRefresh' | 'isRefreshing'>) {
   return (
@@ -212,6 +217,12 @@ function BriefSheet({
             {greeting.data?.message && (
               <p className="mt-3 max-w-2xl text-lg leading-relaxed text-muted-foreground">
                 {greeting.data.message}
+              </p>
+            )}
+            {quote?.quote && (
+              <p className="mt-3 max-w-2xl text-lg leading-relaxed text-muted-foreground">
+                <span className="font-semibold">Today&apos;s Quote:</span>{' '}
+                &quot;<span className="italic">{quote.quote}</span>&quot;
               </p>
             )}
           </>
@@ -265,6 +276,7 @@ export function BriefView({
   tasksEnabled,
   calendar,
   weather,
+  quote,
   onRefresh,
   isRefreshing,
   embedded = false,
@@ -285,7 +297,7 @@ export function BriefView({
       speech.stop()
       return
     }
-    const text = buildBriefSpeech({ greeting, tasks, tasksEnabled, calendar, weather })
+    const text = buildBriefSpeech({ greeting, tasks, tasksEnabled, calendar, weather, quote })
     speech.play(text).catch((err) =>
       toast({
         variant: 'destructive',
@@ -363,11 +375,14 @@ export function BriefView({
     }
   }, [fsMounted])
 
-  const sheetProps = { dateLabel, greeting, tasks, tasksEnabled, calendar, weather, embedded }
+  const sheetProps = { dateLabel, greeting, tasks, tasksEnabled, calendar, weather, quote, embedded }
 
   return (
     <div className={cn(!embedded && 'p-6 sm:p-10')}>
-      <div className={cn(!embedded && 'mx-auto max-w-[820px] space-y-5')}>
+      {/* Letter width: grows with the window up to 1300px; the min() min-width
+          keeps a letter-like 640px floor where space allows without ever
+          forcing horizontal scroll on narrow screens. */}
+      <div className={cn(!embedded && 'mx-auto w-full min-w-[min(100%,40rem)] max-w-[1300px] space-y-5')}>
         {/* Screen-only action bar (page mode only) */}
         {!embedded && (
           <div className="mb-no-print flex items-center justify-end gap-2">

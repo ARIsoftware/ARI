@@ -51,6 +51,12 @@ export interface BriefGreeting {
   model: string | null
 }
 
+/** A quote from the Quotes module, shown in the letter when that module is enabled. */
+export interface BriefQuote {
+  quote: string
+  author?: string | null
+}
+
 /** A single calendar meeting, display-ready (times pre-formatted in the user's tz). */
 export interface BriefMeeting {
   id: string

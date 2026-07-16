@@ -7,15 +7,18 @@
  * - greeting        → /api/modules/morning-brief/greeting  (cached per day)
  * - calendar        → /api/modules/morning-brief/calendar  (live, never cached)
  * - top tasks       → /api/modules/tasks/priorities        (live, never cached)
+ * - today's quote   → /api/modules/quotes/quotes           (random pick client-side)
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { stripSurroundingQuotes } from '@/modules/morning-brief/lib/format'
 import type {
   MorningBriefSettings,
   GoogleStatus,
   IcalStatus,
   BriefGreeting,
+  BriefQuote,
   CalendarResponse,
   BriefTask,
   BriefWeather,
@@ -39,6 +42,7 @@ export const ICAL_STATUS_KEY = ['morning-brief-ical-status']
 export const GREETING_KEY = ['morning-brief-greeting']
 export const CALENDAR_KEY = ['morning-brief-calendar']
 export const TOP_TASKS_KEY = ['morning-brief-top-tasks']
+export const QUOTE_KEY = ['morning-brief-quote']
 export const WEATHER_KEY = ['morning-brief-weather']
 export const VOICES_KEY = ['morning-brief-elevenlabs-voices']
 
@@ -239,6 +243,37 @@ export function useTopTasks(enabled: boolean) {
       if (!res.ok) throw new Error('Failed to load tasks')
       return await res.json()
     },
+  })
+}
+
+// ─── Today's quote (random, from the Quotes module) ──────────────────────────
+// Module-level select fn so React Query memoizes the pick per fetched list —
+// the quote stays put across re-renders and only changes on a fresh fetch.
+function pickRandomQuote(list: BriefQuote[]): BriefQuote | null {
+  // Strip quote marks stored around the text — the letter adds its own — and
+  // drop entries that were nothing but quote marks.
+  const usable = list
+    .map((q) => ({ ...q, quote: stripSurroundingQuotes(q.quote ?? '') }))
+    .filter((q) => q.quote.length > 0)
+  if (usable.length === 0) return null
+  return usable[Math.floor(Math.random() * usable.length)]
+}
+
+export function useRandomQuote(enabled: boolean) {
+  return useQuery({
+    queryKey: QUOTE_KEY,
+    enabled,
+    staleTime: 1000 * 60 * 30,
+    refetchOnWindowFocus: false,
+    queryFn: async (): Promise<BriefQuote[]> => {
+      // Loose HTTP coupling to the Quotes module: any failure = no quote line,
+      // the brief renders fine without it.
+      const res = await fetch('/api/modules/quotes/quotes')
+      if (!res.ok) return []
+      const data = await res.json()
+      return Array.isArray(data) ? data : []
+    },
+    select: pickRandomQuote,
   })
 }
 

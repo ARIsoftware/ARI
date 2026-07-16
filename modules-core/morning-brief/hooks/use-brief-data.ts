@@ -20,6 +20,7 @@ import {
   useCalendar,
   useWeather,
   useGreeting,
+  useRandomQuote,
   CALENDAR_KEY,
   TOP_TASKS_KEY,
   WEATHER_KEY,
@@ -44,6 +45,10 @@ export function useBriefData() {
   const topTasks = useTopTasks(tasksQueryEnabled)
   const calendar = useCalendar(calendarActive)
   const weather = useWeather(aiReady)
+
+  // Today's quote — only when the Quotes module is enabled (absent = no line).
+  const { enabled: quotesEnabled, loading: quotesModuleLoading } = useModuleEnabled('quotes')
+  const quote = useRandomQuote(quotesEnabled && !quotesModuleLoading)
 
   // The greeting needs the day's load to flavor its message, so only fetch it
   // once tasks + calendar have settled (success or error).
@@ -91,6 +96,7 @@ export function useBriefData() {
       ...sectionMeta(calendar),
     },
     weather: weather.data,
+    quote: quote.data ?? null,
   }
 
   return {
