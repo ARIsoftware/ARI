@@ -149,3 +149,6 @@ supabase/.env
 # ARI local CLI (tracked; runtime state ignored)
 .ari/*
 !.ari/cli.js
+
+# Private custom modules — never commit to the public repo
+modules-custom/chat/
