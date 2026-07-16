@@ -15,12 +15,6 @@ import { sendTvConnect } from "@/lib/telemetry/send-tv-connect"
 // for a flag that can never flip back.
 let firstSigninPingResolved = false
 
-// The module whose presence unlocks multi-user (see the user.create hook
-// below). Must match the `id` in modules-custom/users/module.json — if that
-// module is ever renamed, update both together or the single-user cap will
-// never unlock.
-const MULTI_USER_MODULE_ID = "users"
-
 // Build trusted origins
 const trustedOrigins: string[] = []
 
@@ -47,7 +41,7 @@ if (process.env.NODE_ENV !== 'production') {
 /**
  * Hash a password with Argon2id (winner of the Password Hashing Competition).
  * Shared by the Better Auth config below and the Users module's admin API
- * (modules-custom/users/api), so admin-set passwords hash identically to
+ * (modules-custom/ari-users/api), so admin-set passwords hash identically to
  * sign-up ones.
  */
 export async function hashPassword(password: string): Promise<string> {
@@ -138,7 +132,7 @@ export const auth = betterAuth({
           // that unlocks multi-user. The module's own admin API inserts user
           // rows directly (not via Better Auth), so it is unaffected here.
           const multiUserInstalled = moduleManifest.modules.some(
-            (m: { id: string }) => m.id === MULTI_USER_MODULE_ID
+            (m: { id: string }) => m.id === "ari-users"
           )
           if (pool && !multiUserInstalled) {
             let hasUsers = false
