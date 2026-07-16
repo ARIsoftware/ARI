@@ -20,12 +20,11 @@ import {
   Loader2,
   Activity,
   FileCode,
-  Users,
 } from "lucide-react"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
 import { useModules } from "@/lib/modules/module-hooks"
 import { useCurrentUser } from "@/hooks/use-users"
-import { canViewUsers, hasPermission } from "@/lib/permissions"
+import { hasPermission } from "@/lib/permissions"
 import { isPublicPathname } from "@/lib/route-helpers"
 
 interface CommandPaletteProps {
@@ -79,10 +78,10 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
   // Check if Tasks module is enabled for Quick Actions
   const tasksEnabled = modules.some(m => m.id === 'tasks')
 
-  // Users page is only offered to accounts that can manage users (the
-  // server enforces this independently — hiding the entry is cosmetic).
+  // Settings is only offered to accounts with the permission (the server
+  // enforces this independently — hiding the entry is cosmetic). The Users
+  // entry comes from the Users module's manifest routes when installed.
   const { data: currentUser } = useCurrentUser({ enabled: !isPublicPage })
-  const canManageUsers = canViewUsers(currentUser)
   const canAccessSettings = hasPermission(currentUser, 'access_settings')
 
   if (isPublicPage) return null
@@ -116,12 +115,6 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
             })
           ) : null}
           {/* Static core pages (not modules) */}
-          {canManageUsers && (
-            <CommandItem onSelect={() => runCommand(() => router.push("/users"))}>
-              <Users className="mr-2 h-4 w-4" />
-              <span>Users</span>
-            </CommandItem>
-          )}
           {canAccessSettings && (
             <CommandItem onSelect={() => runCommand(() => router.push("/settings"))}>
               <Settings className="mr-2 h-4 w-4" />

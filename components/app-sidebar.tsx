@@ -4,7 +4,7 @@ import type * as React from "react"
 import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ChevronRight, Settings, Package, Users } from "lucide-react"
+import { ChevronRight, Settings, Package } from "lucide-react"
 import {
   DndContext,
   PointerSensor,
@@ -22,7 +22,7 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 import { useEnabledModulesFromContext } from "@/lib/modules/context"
 import { useCurrentUser } from "@/hooks/use-users"
-import { canViewUsers, hasPermission } from "@/lib/permissions"
+import { hasPermission } from "@/lib/permissions"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
 import { useDragDropMode } from "@/components/drag-drop-mode-context"
 import { useTheme } from "@/lib/theme/theme-context"
@@ -109,10 +109,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // Get enabled modules from context (pre-fetched server-side)
   const enabledModules = useEnabledModulesFromContext()
 
-  // Users/Settings links are only shown to accounts with the matching
+  // The Settings link is only shown to accounts with the matching
   // permission. The server enforces this independently — hiding is cosmetic.
+  // (The Users link comes from the Users module's manifest routes.)
   const { data: currentUser } = useCurrentUser()
-  const canManageUsers = canViewUsers(currentUser)
   const canAccessSettings = hasPermission(currentUser, 'access_settings')
 
   // Drag and drop mode
@@ -465,16 +465,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarFooter>
         <div className="border-t border-sidebar-border/60 pt-[15px]">
           <SidebarMenu>
-            {canManageUsers && (
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname.startsWith('/users')}>
-                  <Link href="/users" className="flex items-center">
-                    <Users className="mr-2 size-4" />
-                    <span>Users</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
             <SidebarMenuItem>
               <SidebarMenuButton asChild isActive={pathname.startsWith('/modules')}>
                 <Link href="/modules" className="flex items-center">

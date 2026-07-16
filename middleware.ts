@@ -58,7 +58,6 @@ const protectedRoutes = [
   "/tests",
   "/settings",
   "/modules",
-  "/users",
   "/profile",
   "/logs",
   "/health",
