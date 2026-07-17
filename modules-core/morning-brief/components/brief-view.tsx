@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -173,7 +173,8 @@ function BriefSheet({
   weather,
   quote,
   embedded = false,
-}: Omit<BriefViewProps, 'onRefresh' | 'isRefreshing'>) {
+  listenButton,
+}: Omit<BriefViewProps, 'onRefresh' | 'isRefreshing'> & { listenButton?: ReactNode }) {
   return (
     <>
       {/* Letterhead */}
@@ -186,9 +187,12 @@ function BriefSheet({
             Morning Brief
           </p>
         </div>
-        <div className="flex flex-col items-end gap-1">
-          {weather?.available && weather.high != null && <WeatherBadge weather={weather} />}
-          <p className="text-xs text-muted-foreground">{dateLabel}</p>
+        <div className="flex items-center gap-4">
+          {listenButton}
+          <div className="flex flex-col items-end gap-1">
+            {weather?.available && weather.high != null && <WeatherBadge weather={weather} />}
+            <p className="text-xs text-muted-foreground">{dateLabel}</p>
+          </div>
         </div>
       </div>
 
@@ -375,7 +379,50 @@ export function BriefView({
     }
   }, [fsMounted])
 
-  const sheetProps = { dateLabel, greeting, tasks, tasksEnabled, calendar, weather, quote, embedded }
+  // One Listen button for both homes: the page-mode action bar and the embedded
+  // (dashboard) letterhead — identical behavior and states in each.
+  const listenButton = (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleListen}
+      disabled={!narrationEnabled || (speech.status === 'idle' && !greetingReady)}
+      title={
+        !narrationEnabled
+          ? 'Select a voice in Morning Brief settings to enable'
+          : undefined
+      }
+    >
+      {speech.status === 'loading' ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Preparing…
+        </>
+      ) : speech.status === 'playing' ? (
+        <>
+          <Square className="mr-2 h-4 w-4" />
+          Stop
+        </>
+      ) : (
+        <>
+          <Volume2 className="mr-2 h-4 w-4" />
+          Listen
+        </>
+      )}
+    </Button>
+  )
+
+  const sheetProps = {
+    dateLabel,
+    greeting,
+    tasks,
+    tasksEnabled,
+    calendar,
+    weather,
+    quote,
+    embedded,
+    listenButton: embedded ? listenButton : undefined,
+  }
 
   return (
     <div className={cn(!embedded && 'p-6 sm:p-10')}>
@@ -386,34 +433,7 @@ export function BriefView({
         {/* Screen-only action bar (page mode only) */}
         {!embedded && (
           <div className="mb-no-print flex items-center justify-end gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleListen}
-              disabled={!narrationEnabled || (speech.status === 'idle' && !greetingReady)}
-              title={
-                !narrationEnabled
-                  ? 'Select a voice in Morning Brief settings to enable'
-                  : undefined
-              }
-            >
-              {speech.status === 'loading' ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Preparing…
-                </>
-              ) : speech.status === 'playing' ? (
-                <>
-                  <Square className="mr-2 h-4 w-4" />
-                  Stop
-                </>
-              ) : (
-                <>
-                  <Volume2 className="mr-2 h-4 w-4" />
-                  Listen
-                </>
-              )}
-            </Button>
+            {listenButton}
             <Button variant="outline" size="sm" onClick={openFullscreen}>
               <Maximize2 className="mr-2 h-4 w-4" />
               Full screen
