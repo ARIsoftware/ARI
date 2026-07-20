@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Lock, AlertCircle } from "lucide-react"
+import { Lock, AlertCircle, Settings2, Palette, Keyboard, Sparkles, Mail, Shield, HardDrive, Code, GitBranch, Save } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import {
   GeneralTab,
@@ -451,7 +451,7 @@ function SettingsPageContent(): React.ReactElement {
   if (permissionsLoading || permissionsError || !canAccessSettings) {
     return (
       <div className="bg-background">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-8 lg:px-8">
+        <div className="mx-auto flex w-full max-w-[90%] flex-col gap-8 px-6 py-8 lg:px-8">
           <div className="flex flex-col gap-3">
             <h1 className="text-3xl font-semibold tracking-tight text-foreground">Settings</h1>
           </div>
@@ -488,7 +488,7 @@ function SettingsPageContent(): React.ReactElement {
 
   return (
     <div className="bg-background">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-8 lg:px-8">
+      <div className="mx-auto flex w-full max-w-[90%] flex-col gap-8 px-6 py-8 lg:px-8">
               <div className="flex flex-col gap-3">
                 <Badge className="w-fit text-sm font-medium">Crafted for focus-first teams</Badge>
                 <h1 className="text-3xl font-semibold tracking-tight text-foreground">Settings</h1>
@@ -498,31 +498,65 @@ function SettingsPageContent(): React.ReactElement {
               </div>
 
               <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-                <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
-                  <TabsList>
-                    <TabsTrigger value="general">General</TabsTrigger>
-                    <TabsTrigger value="themes">Themes</TabsTrigger>
-                    <TabsTrigger value="keybindings">Shortcuts</TabsTrigger>
-                    {/* <TabsTrigger value="notifications">Notifications</TabsTrigger> */}
-                    <TabsTrigger value="integrations">AI Providers</TabsTrigger>
-                    <TabsTrigger value="email">Email</TabsTrigger>
-                    <TabsTrigger value="security">Security</TabsTrigger>
-                    <TabsTrigger value="storage">Storage</TabsTrigger>
-                    {isTabAllowed("api") && <TabsTrigger value="api">API</TabsTrigger>}
-                    {isTabAllowed("git") && <TabsTrigger value="git">GIT</TabsTrigger>}
-                    {isTabAllowed("backups") && <TabsTrigger value="backups">Backups</TabsTrigger>}
-                  </TabsList>
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" className="w-[125px]" onClick={() => window.location.href = "/health"}>
-                      Health Check
+                <div className="flex items-center justify-end gap-2 pb-4">
+                  <Button variant="outline" size="sm" className="w-[125px]" onClick={() => window.location.href = "/health"}>
+                    Health Check
+                  </Button>
+                  {isAdmin && (
+                    <Button variant="outline" size="sm" className="w-[125px]" onClick={() => window.location.href = "/welcome"}>
+                      Rerun Setup
                     </Button>
-                    {isAdmin && (
-                      <Button variant="outline" size="sm" className="w-[125px]" onClick={() => window.location.href = "/welcome"}>
-                        Rerun Setup
-                      </Button>
-                    )}
-                  </div>
+                  )}
                 </div>
+                <TabsList className="grid w-full grid-flow-col auto-cols-fr h-[50px] mb-8">
+                  <TabsTrigger value="general" className="flex h-full items-center gap-2">
+                    <Settings2 className="h-4 w-4" />
+                    General
+                  </TabsTrigger>
+                  <TabsTrigger value="themes" className="flex h-full items-center gap-2">
+                    <Palette className="h-4 w-4" />
+                    Themes
+                  </TabsTrigger>
+                  <TabsTrigger value="keybindings" className="flex h-full items-center gap-2">
+                    <Keyboard className="h-4 w-4" />
+                    Shortcuts
+                  </TabsTrigger>
+                  {/* <TabsTrigger value="notifications">Notifications</TabsTrigger> */}
+                  <TabsTrigger value="integrations" className="flex h-full items-center gap-2">
+                    <Sparkles className="h-4 w-4" />
+                    AI Providers
+                  </TabsTrigger>
+                  <TabsTrigger value="email" className="flex h-full items-center gap-2">
+                    <Mail className="h-4 w-4" />
+                    Email
+                  </TabsTrigger>
+                  <TabsTrigger value="security" className="flex h-full items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    Security
+                  </TabsTrigger>
+                  <TabsTrigger value="storage" className="flex h-full items-center gap-2">
+                    <HardDrive className="h-4 w-4" />
+                    Storage
+                  </TabsTrigger>
+                  {isTabAllowed("api") && (
+                    <TabsTrigger value="api" className="flex h-full items-center gap-2">
+                      <Code className="h-4 w-4" />
+                      API
+                    </TabsTrigger>
+                  )}
+                  {isTabAllowed("git") && (
+                    <TabsTrigger value="git" className="flex h-full items-center gap-2">
+                      <GitBranch className="h-4 w-4" />
+                      GIT
+                    </TabsTrigger>
+                  )}
+                  {isTabAllowed("backups") && (
+                    <TabsTrigger value="backups" className="flex h-full items-center gap-2">
+                      <Save className="h-4 w-4" />
+                      Backups
+                    </TabsTrigger>
+                  )}
+                </TabsList>
 
                 <TabsContent value="general">
                   <GeneralTab

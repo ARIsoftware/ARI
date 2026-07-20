@@ -2475,32 +2475,32 @@ export default function DatabaseTestPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="database" className="w-full">
-        <TabsList className="grid w-full grid-cols-7 mb-8">
-          <TabsTrigger value="database" className="flex items-center gap-2">
+        <TabsList className="grid w-full grid-cols-7 h-[50px] mb-8">
+          <TabsTrigger value="database" className="flex h-full items-center gap-2">
             <DatabaseIcon className="h-4 w-4" />
             Database
           </TabsTrigger>
-          <TabsTrigger value="endpoints" className="flex items-center gap-2">
+          <TabsTrigger value="endpoints" className="flex h-full items-center gap-2">
             <Globe className="h-4 w-4" />
             Endpoints
           </TabsTrigger>
-          <TabsTrigger value="security" className="flex items-center gap-2">
+          <TabsTrigger value="security" className="flex h-full items-center gap-2">
             <Shield className="h-4 w-4" />
             Security
           </TabsTrigger>
-          <TabsTrigger value="authconfig" className="flex items-center gap-2">
+          <TabsTrigger value="authconfig" className="flex h-full items-center gap-2">
             <Key className="h-4 w-4" />
             Auth Config
           </TabsTrigger>
-          <TabsTrigger value="modules" className="flex items-center gap-2">
+          <TabsTrigger value="modules" className="flex h-full items-center gap-2">
             <Package className="h-4 w-4" />
             Modules
           </TabsTrigger>
-          <TabsTrigger value="storage" className="flex items-center gap-2">
+          <TabsTrigger value="storage" className="flex h-full items-center gap-2">
             <HardDrive className="h-4 w-4" />
             Storage
           </TabsTrigger>
-          <TabsTrigger value="backup" className="flex items-center gap-2">
+          <TabsTrigger value="backup" className="flex h-full items-center gap-2">
             <Save className="h-4 w-4" />
             Backup
           </TabsTrigger>
@@ -3404,7 +3404,7 @@ export default function DatabaseTestPage() {
                             {endpointsData.publicEndpoints.map((endpoint, i) => (
                               <div key={i} className="flex items-start justify-between p-3 rounded-lg bg-muted/30 border border-orange-500/30">
                                 <div className="space-y-1">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex h-full items-center gap-2">
                                     <Badge variant="outline" className="bg-blue-500/20 text-blue-500 border-blue-500/50">
                                       <Globe className="h-3 w-3 mr-1" />
                                       Public
@@ -3460,7 +3460,7 @@ export default function DatabaseTestPage() {
                         <div className="space-y-2">
                           {endpointsData.coreEndpoints.map((endpoint, i) => (
                             <div key={i} className="flex items-center justify-between p-2 rounded bg-muted/30 border border-blue-500/20">
-                              <div className="flex items-center gap-2">
+                              <div className="flex h-full items-center gap-2">
                                 <Badge variant="outline" className="bg-blue-500/20 text-blue-500 border-blue-500/50 text-xs">
                                   Core
                                 </Badge>
@@ -3492,7 +3492,7 @@ export default function DatabaseTestPage() {
                         <div className="space-y-2">
                           {endpointsData.moduleEndpoints.map((endpoint, i) => (
                             <div key={i} className="flex items-center justify-between p-2 rounded bg-muted/30 border border-green-500/20">
-                              <div className="flex items-center gap-2">
+                              <div className="flex h-full items-center gap-2">
                                 <Badge variant="outline" className="bg-green-500/20 text-green-500 border-green-500/50 text-xs">
                                   {endpoint.moduleId}
                                 </Badge>
