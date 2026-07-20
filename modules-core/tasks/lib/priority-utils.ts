@@ -82,17 +82,17 @@ export function getTaskPriorityLevel(score: number): 'critical' | 'high' | 'medi
 }
 
 export function getTaskColor(task: Task): string {
-  // Color based on due date urgency
-  if (!task.due_date) return 'hsl(200, 70%, 50%)' // Blue for no due date
+  // Color based on due date urgency — restrained, desaturated dashboard tones
+  if (!task.due_date) return '#3f6699' // Dusty blue for no due date
 
   const now = new Date()
   const dueDate = new Date(task.due_date)
   const daysUntilDue = Math.floor((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
-  if (daysUntilDue < 0) return 'hsl(0, 70%, 50%)'     // Red for overdue
-  if (daysUntilDue <= 3) return 'hsl(30, 70%, 50%)'   // Orange for due soon
-  if (daysUntilDue <= 7) return 'hsl(60, 70%, 50%)'   // Yellow for due this week
-  return 'hsl(120, 70%, 50%)'                          // Green for not urgent
+  if (daysUntilDue < 0) return '#b0413a'     // Desaturated red for overdue
+  if (daysUntilDue <= 3) return '#b07636'    // Clay amber for due soon
+  if (daysUntilDue <= 7) return '#9a8a3f'    // Muted gold for due this week
+  return '#4f7a63'                            // Slate green for not urgent
 }
 
 export function getTaskSize(impact: number): number {

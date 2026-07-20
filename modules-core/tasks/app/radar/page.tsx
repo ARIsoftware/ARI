@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Filter, TrendingUp } from "lucide-react"
 import { PolarAngleAxis, PolarGrid, Radar, RadarChart, PolarRadiusAxis } from "recharts"
 import {
   Card,
@@ -65,11 +64,10 @@ function prepareRadarData(tasks: Task[]) {
 
 export default function RadarPage() {
   const [tasks, setTasks] = useState<Task[]>([])
-  const [filteredTasks, setFilteredTasks] = useState<Task[]>([])
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [filterStatus, setFilterStatus] = useState<string>("all")
+  const [viewMode, setViewMode] = useState<"priority" | "pinned">("priority")
   const [hoveredTask, setHoveredTask] = useState<string | null>(null)
 
   useEffect(() => {
@@ -84,7 +82,6 @@ export default function RadarPage() {
       if (!response.ok) throw new Error('Failed to fetch tasks')
       const data = await response.json()
       setTasks(data)
-      setFilteredTasks(data)
     } catch (error) {
       console.error('Error fetching tasks:', error)
     } finally {
@@ -92,30 +89,24 @@ export default function RadarPage() {
     }
   }
 
-  // Apply filters
-  useEffect(() => {
-    let filtered = [...tasks]
-    
-    if (filterStatus !== "all") {
-      filtered = filtered.filter(task => {
-        if (filterStatus === "completed") return task.completed
-        if (filterStatus === "pending") return !task.completed
-        if (filterStatus === "pinned") return task.pinned
-        return true
-      })
-    }
-    
-    // Sort by priority score (higher is higher priority)
-    filtered.sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0))
-    
-    setFilteredTasks(filtered)
-  }, [tasks, filterStatus])
-
-  // Get top 5 incomplete tasks for priority display and radar dots
+  // Get top 5 incomplete tasks by priority score
   const priorityTasks = tasks
     .filter(task => !task.completed) // Always exclude completed tasks
     .sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0))
     .slice(0, 5)
+
+  // Get up to 5 pinned (incomplete) tasks, highest priority first
+  const pinnedTasks = tasks
+    .filter(task => task.pinned && !task.completed)
+    .sort((a, b) => (b.priority_score || 0) - (a.priority_score || 0))
+    .slice(0, 5)
+
+  // Which set the radar + list currently display
+  const displayTasks = viewMode === "pinned" ? pinnedTasks : priorityTasks
+
+  const pageTitle = viewMode === "pinned"
+    ? `Task Radar: ${pinnedTasks.length} Pinned Task${pinnedTasks.length === 1 ? "" : "s"}`
+    : "Task Radar: Top 5 Priority Tasks"
 
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task)
@@ -143,68 +134,45 @@ export default function RadarPage() {
     }
   }
 
-  const radarData = prepareRadarData(filteredTasks)
-  const transformedTasks = filteredTasks.map(transformTaskForRadar)
-  const transformedPriorityTasks = priorityTasks.map(transformTaskForRadar)
+  const radarData = prepareRadarData(displayTasks)
+  const transformedDisplayTasks = displayTasks.map(transformTaskForRadar)
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
             <div className="flex justify-between items-start">
               <div>
-                <h1 className="text-3xl font-medium">Task Priority Radar</h1>
+                <h1 className="text-3xl font-medium">{pageTitle}</h1>
                 <p className="text-sm text-muted-foreground mt-1">
                   Visualize and prioritize tasks based on multiple factors
                 </p>
               </div>
-              
+
               <div className="flex gap-2">
                 <Button
-                  variant={filterStatus === "all" ? "default" : "outline"}
+                  variant={viewMode === "priority" ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setFilterStatus("all")}
+                  onClick={() => setViewMode("priority")}
                 >
-                  All
+                  Priority
                 </Button>
                 <Button
-                  variant={filterStatus === "pending" ? "default" : "outline"}
+                  variant={viewMode === "pinned" ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setFilterStatus("pending")}
-                >
-                  Pending
-                </Button>
-                <Button
-                  variant={filterStatus === "completed" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setFilterStatus("completed")}
-                >
-                  Completed
-                </Button>
-                <Button
-                  variant={filterStatus === "pinned" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setFilterStatus("pinned")}
+                  onClick={() => setViewMode("pinned")}
                 >
                   Pinned
                 </Button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Radar Chart */}
-              <Card>
-                <CardHeader className="items-center">
-                  <CardTitle>Priority Distribution</CardTitle>
-                  <CardDescription className="text-center">
-                    Task positions based on calculated priority scores
-                    <br />
-                    Showing 5 highest priority tasks — closer to center = higher priority
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pb-0 overflow-visible">
+              <Card className="lg:col-span-2">
+                <CardContent className="pt-6 pb-0 overflow-visible">
                   <div className="relative overflow-visible">
                     <ChartContainer
                       config={chartConfig}
-                      className="mx-auto aspect-square max-h-[450px] w-full p-4"
+                      className="mx-auto aspect-square max-h-[calc(100vh-15rem)] w-full"
                     >
                       <RadarChart 
                         data={radarData}
@@ -234,9 +202,9 @@ export default function RadarPage() {
                       </RadarChart>
                     </ChartContainer>
                     
-                    {/* Overlay task dots - only show 5 highest priority incomplete tasks */}
+                    {/* Overlay task dots — the currently selected set (priority or pinned) */}
                     <RadarTaskDots
-                      tasks={priorityTasks}
+                      tasks={displayTasks}
                       hoveredTask={hoveredTask}
                       onTaskHover={setHoveredTask}
                       onTaskClick={handleTaskClick}
@@ -247,11 +215,11 @@ export default function RadarPage() {
                 <CardFooter className="flex-col gap-2 text-sm">
                   <div className="flex gap-4">
                     <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 rounded-full bg-red-500" />
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#b0413a' }} />
                       <span className="text-xs">Overdue</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 rounded-full bg-orange-500" />
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#b07636' }} />
                       <span className="text-xs">Due Soon</span>
                     </div>
                   </div>
@@ -261,19 +229,23 @@ export default function RadarPage() {
               {/* Priority List */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Top 5 Priority Tasks</CardTitle>
+                  <CardTitle>{viewMode === "pinned" ? "Pinned Tasks" : "Top 5 Priority Tasks"}</CardTitle>
                   <CardDescription>
-                    Top 5 priority tasks based on calculated scores
+                    {viewMode === "pinned"
+                      ? "Your pinned tasks, highest priority first"
+                      : "Top 5 priority tasks based on calculated scores"}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2 max-h-[400px] overflow-y-auto">
                     {loading ? (
                       <p className="text-muted-foreground">Loading tasks...</p>
-                    ) : transformedPriorityTasks.length === 0 ? (
-                      <p className="text-muted-foreground">No incomplete tasks found</p>
+                    ) : transformedDisplayTasks.length === 0 ? (
+                      <p className="text-muted-foreground">
+                        {viewMode === "pinned" ? "No pinned tasks found" : "No incomplete tasks found"}
+                      </p>
                     ) : (
-                      transformedPriorityTasks.map((task, index) => {
+                      transformedDisplayTasks.map((task, index) => {
                         const fullTask = tasks.find(t => t.id === task.id)
                         if (!fullTask) return null
                         
@@ -329,6 +301,10 @@ export default function RadarPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Understanding the Priority Radar</CardTitle>
+                <CardDescription>
+                  Task positions based on calculated priority scores. Showing the 5
+                  highest priority tasks — closer to center = higher priority.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">

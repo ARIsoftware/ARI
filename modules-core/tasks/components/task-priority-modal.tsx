@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import type { Task } from "@/modules/tasks/types"
 import {
   Dialog,
@@ -15,7 +16,7 @@ import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { Badge } from "@/components/ui/badge"
 import { calculatePriorityScore, getTaskPriorityLevel } from "../lib/priority-utils"
-import { Info } from "lucide-react"
+import { ExternalLink, Info } from "lucide-react"
 import {
   Tooltip,
   TooltipContent,
@@ -50,6 +51,7 @@ export function TaskPriorityModal({
   onClose,
   onUpdate
 }: TaskPriorityModalProps) {
+  const router = useRouter()
   const [axes, setAxes] = useState({
     impact: task.impact || 3,
     severity: task.severity || 3,
@@ -91,7 +93,19 @@ export function TaskPriorityModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
+        <Button
+          type="button"
+          variant="link"
+          className="absolute right-12 top-3 h-auto gap-1.5 p-0 text-base text-primary"
+          onClick={() => {
+            onClose()
+            router.push(`/tasks/edit/${task.id}`)
+          }}
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+          View task
+        </Button>
+        <DialogHeader className="pr-32">
           <DialogTitle>{task.title}</DialogTitle>
           <DialogDescription>
             Adjust the priority score
