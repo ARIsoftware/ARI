@@ -147,6 +147,7 @@ export async function POST(request: NextRequest) {
     const data = await withRLS((db) =>
       db.insert(tasks).values({
         title: task.title,
+        notes: task.notes ?? null,
         assignees: task.assignees,
         dueDate: task.due_date,
         status: task.status,
@@ -232,6 +233,7 @@ export async function PUT(request: NextRequest) {
     }
 
     if (updates.title !== undefined) updateData.title = updates.title
+    if (updates.notes !== undefined) updateData.notes = updates.notes
     if (updates.assignees !== undefined) updateData.assignees = updates.assignees
     if (updates.due_date !== undefined) updateData.dueDate = updates.due_date
     // subtasks_completed/subtasks_total are derived from task_subtasks rows

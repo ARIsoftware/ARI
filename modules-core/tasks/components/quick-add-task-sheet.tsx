@@ -5,6 +5,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from "rea
 import { useAuth } from "@/components/providers"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
@@ -75,6 +76,7 @@ function QuickAddTaskForm({ onSuccess }: { onSuccess: () => void }) {
 
   const [formData, setFormData] = useState({
     title: "",
+    notes: "",
     assignees: [] as string[],
     assigned_agent_id: null as string | null,
     status: "Pending" as const,
@@ -95,6 +97,7 @@ function QuickAddTaskForm({ onSuccess }: { onSuccess: () => void }) {
   const resetForm = () => {
     setFormData({
       title: "",
+      notes: "",
       assignees: [],
       assigned_agent_id: null,
       status: "Pending",
@@ -123,6 +126,7 @@ function QuickAddTaskForm({ onSuccess }: { onSuccess: () => void }) {
     try {
       const taskData = {
         title: formData.title.trim(),
+        notes: formData.notes.trim() || null,
         assignees: formData.assignees,
         assigned_agent_id: formData.assigned_agent_id,
         due_date: toDueDateString(date),
@@ -180,6 +184,19 @@ function QuickAddTaskForm({ onSuccess }: { onSuccess: () => void }) {
           value={formData.title}
           onChange={(e) => handleInputChange("title", e.target.value)}
           autoFocus
+        />
+      </div>
+
+      {/* Notes */}
+      <div className="space-y-2">
+        <Label htmlFor="quick-notes" className="text-sm font-medium">Notes</Label>
+        <Textarea
+          id="quick-notes"
+          placeholder="Add any notes or details..."
+          value={formData.notes}
+          onChange={(e) => handleInputChange("notes", e.target.value)}
+          maxLength={5000}
+          rows={3}
         />
       </div>
 

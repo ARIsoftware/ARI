@@ -4,6 +4,7 @@ import type React from "react"
 import { useAuth } from "@/components/providers"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,7 +15,7 @@ import { CalendarIcon, Plus, X, Pin, ArrowLeft, Loader2, Compass, Info } from "l
 import { Checkbox } from "@/components/ui/checkbox"
 import { Slider } from "@/components/ui/slider"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { createTask, createSubtask, toDueDateString } from "@/modules/tasks/lib/utils"
 import { getGoals, type Goal } from "@/lib/goals"
@@ -25,6 +26,8 @@ import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { calculatePriorityScore, getTaskPriorityLevel } from "@/modules/tasks/lib/priority-utils"
 import { AssigneePicker } from "@/modules/tasks/components/assignee-picker"
+import { useUnsavedChangesGuard } from "@/modules/tasks/hooks/use-unsaved-changes-guard"
+import { UnsavedChangesDialog } from "@/modules/tasks/components/unsaved-changes-dialog"
 
 const priorityOptions = [
   { value: "Low", label: "Low Priority", color: "bg-gray-100 text-gray-600" },
@@ -53,6 +56,7 @@ export default function AddTaskPage() {
   // Form state
   const [formData, setFormData] = useState({
     title: "",
+    notes: "",
     assignees: [] as string[],
     assigned_agent_id: null as string | null,
     status: "Pending" as const,
@@ -68,6 +72,9 @@ export default function AddTaskPage() {
 
   const [subtasks, setSubtasks] = useState<string[]>([])
   const [newSubtask, setNewSubtask] = useState("")
+  // Set once the task is created so navigating to /tasks afterwards doesn't
+  // trip the unsaved-changes guard.
+  const [justSaved, setJustSaved] = useState(false)
 
   const axisDescriptions = {
     impact: "How much this task affects your goals and objectives",
@@ -112,16 +119,26 @@ export default function AddTaskPage() {
     setSubtasks((prev) => prev.filter((_, i) => i !== index))
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
+  // Persist the task (and its subtasks) without navigating. Returns true on
+  // success so both the normal submit and the unsaved-changes guard can decide
+  // where to go next.
+  const persistTask = async (): Promise<boolean> => {
     if (!formData.title.trim()) {
       toast({
         title: "Error",
         description: "Please enter a task title.",
         variant: "destructive",
       })
-      return
+      return false
+    }
+
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to create tasks.",
+        variant: "destructive",
+      })
+      return false
     }
 
     setLoading(true)
@@ -129,6 +146,7 @@ export default function AddTaskPage() {
     try {
       const taskData = {
         title: formData.title.trim(),
+        notes: formData.notes.trim() || null,
         assignees: formData.assignees,
         assigned_agent_id: formData.assigned_agent_id,
         due_date: toDueDateString(date),
@@ -145,15 +163,6 @@ export default function AddTaskPage() {
         updated_at: new Date().toISOString(),
         // Note: northstar_ids would need to be added to the database schema
         // northstar_ids: selectedNorthStars,
-      }
-
-      if (!user?.id) {
-        toast({
-          title: "Error",
-          description: "You must be logged in to create tasks.",
-          variant: "destructive",
-        })
-        return
       }
 
       const createdTask = await createTask(taskData)
@@ -187,7 +196,8 @@ export default function AddTaskPage() {
         })
       }
 
-      router.push("/tasks")
+      setJustSaved(true)
+      return true
     } catch (error) {
       console.error("Failed to create task:", error)
       toast({
@@ -195,14 +205,22 @@ export default function AddTaskPage() {
         description: "Failed to create task. Please try again.",
         variant: "destructive",
       })
+      return false
     } finally {
       setLoading(false)
     }
   }
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const ok = await persistTask()
+    if (ok) router.push("/tasks")
+  }
+
   const resetForm = () => {
     setFormData({
       title: "",
+      notes: "",
       assignees: [],
       assigned_agent_id: null,
       status: "Pending",
@@ -221,6 +239,33 @@ export default function AddTaskPage() {
     setSelectedNorthStars([])
   }
 
+  // Dirty tracking: compare the current form against the initial (empty) state.
+  // Serializing avoids threading a flag through every field/slider/picker and
+  // correctly clears when the user undoes their edits or resets the form.
+  const currentSnapshot = JSON.stringify({
+    title: formData.title,
+    notes: formData.notes,
+    assignees: formData.assignees,
+    assigned_agent_id: formData.assigned_agent_id,
+    status: formData.status,
+    priority: formData.priority,
+    pinned: formData.pinned,
+    completed: formData.completed,
+    impact: formData.impact,
+    severity: formData.severity,
+    timeliness: formData.timeliness,
+    effort: formData.effort,
+    strategic_fit: formData.strategic_fit,
+    due: toDueDateString(date),
+    subtasks,
+  })
+  const initialSnapshotRef = useRef<string | null>(null)
+  if (initialSnapshotRef.current === null) initialSnapshotRef.current = currentSnapshot
+  const hasUnsavedChanges = !justSaved && currentSnapshot !== initialSnapshotRef.current
+
+  const { pendingHref, isSaving, requestNavigation, closeDialog, discardAndLeave, saveAndLeave } =
+    useUnsavedChangesGuard({ hasUnsavedChanges, onSave: persistTask })
+
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
             {/* Header */}
@@ -229,7 +274,7 @@ export default function AddTaskPage() {
                 <h1 className="text-3xl font-medium">Add New Task</h1>
                 {user && <p className="text-sm text-muted-foreground mt-1">Create a new task for your todo list</p>}
               </div>
-              <Button variant="outline" onClick={() => router.push("/tasks")} className="bg-white">
+              <Button variant="outline" onClick={() => requestNavigation("/tasks")} className="bg-white">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Tasks
               </Button>
@@ -258,6 +303,22 @@ export default function AddTaskPage() {
                       onChange={(e) => handleInputChange("title", e.target.value)}
                       className="w-full"
                       required
+                    />
+                  </div>
+
+                  {/* Notes */}
+                  <div className="space-y-2">
+                    <Label htmlFor="notes" className="text-sm font-medium">
+                      Notes
+                    </Label>
+                    <Textarea
+                      id="notes"
+                      placeholder="Add any notes or details..."
+                      value={formData.notes}
+                      onChange={(e) => handleInputChange("notes", e.target.value)}
+                      maxLength={5000}
+                      rows={4}
+                      className="w-full"
                     />
                   </div>
 
@@ -699,6 +760,14 @@ export default function AddTaskPage() {
                 </CardContent>
               </Card>
             </form>
+
+            <UnsavedChangesDialog
+              open={pendingHref !== null}
+              onOpenChange={(open) => { if (!open) closeDialog() }}
+              isSaving={isSaving}
+              onDiscard={discardAndLeave}
+              onSave={saveAndLeave}
+            />
     </div>
   )
 }

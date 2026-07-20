@@ -5,6 +5,7 @@ import { user } from "@/lib/db/schema/core-schema"
 export const tasks = pgTable("tasks", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	title: text().notNull(),
+	notes: text(),
 	assignees: text().array().default([""]),
 	dueDate: date("due_date"),
 	subtasksCompleted: integer("subtasks_completed").default(0),

@@ -5,6 +5,7 @@ import { useAuth } from "@/components/providers"
 import { useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,7 +16,7 @@ import { Slider } from "@/components/ui/slider"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { CalendarIcon, Save, Pin, ArrowLeft, Loader2, Pencil, Info, Compass, Briefcase, ListChecks, CheckCircle2, RotateCcw } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { getTasks, updateTask, recordTaskCompleted, toDueDateString } from "@/modules/tasks/lib/utils"
 import { TaskSubtasks } from "@/modules/tasks/components/task-subtasks"
@@ -28,6 +29,31 @@ import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { calculatePriorityScore, getTaskPriorityLevel } from "@/modules/tasks/lib/priority-utils"
 import { AssigneePicker } from "@/modules/tasks/components/assignee-picker"
+import { useUnsavedChangesGuard } from "@/modules/tasks/hooks/use-unsaved-changes-guard"
+import { UnsavedChangesDialog } from "@/modules/tasks/components/unsaved-changes-dialog"
+
+type TaskEditFormValues = {
+  title: string
+  notes: string
+  assignees: string[]
+  assigned_agent_id: string | null
+  status: "Pending" | "In Progress" | "Completed"
+  priority: "Low" | "Medium" | "High"
+  pinned: boolean
+  completed: boolean
+  impact: number
+  severity: number
+  timeliness: number
+  effort: number
+  strategic_fit: number
+  project_id: string | null
+}
+
+// Stable serializer shared by the baseline capture (on load) and the per-render
+// comparison, so "dirty" only reflects real edits to persisted fields.
+function taskFormSnapshot(form: TaskEditFormValues, date: Date | undefined): string {
+  return JSON.stringify({ ...form, due: toDueDateString(date) })
+}
 
 const priorityOptions = [
   { value: "Low", label: "Low Priority", color: "bg-gray-100 text-gray-600" },
@@ -69,10 +95,16 @@ export default function EditTaskPage() {
   const [northStars, setNorthStars] = useState<Goal[]>([])
   const [selectedNorthStars, setSelectedNorthStars] = useState<string[]>([])
   const [projects, setProjects] = useState<MajorProject[]>([])
+  // Set after a successful save so the follow-up navigation doesn't re-trip the
+  // unsaved-changes guard.
+  const [justSaved, setJustSaved] = useState(false)
+  // Baseline snapshot of the loaded task; compared against the live form.
+  const initialSnapshotRef = useRef<string | null>(null)
 
   // Form state
   const [formData, setFormData] = useState({
     title: "",
+    notes: "",
     assignees: [] as string[],
     assigned_agent_id: null as string | null,
     status: "Pending" as "Pending" | "In Progress" | "Completed",
@@ -107,8 +139,9 @@ export default function EditTaskPage() {
           return
         }
 
-        setFormData({
+        const loaded: TaskEditFormValues = {
           title: foundTask.title,
+          notes: foundTask.notes ?? "",
           // Legacy tasks may hold several names. Keep them all — the picker
           // shows the first, but truncating here would silently delete the
           // rest on the next save even if the user never touched the field.
@@ -124,11 +157,15 @@ export default function EditTaskPage() {
           effort: foundTask.effort || 3,
           strategic_fit: foundTask.strategic_fit || 3,
           project_id: foundTask.project_id || null,
-        })
-
-        if (foundTask.due_date) {
-          setDate(new Date(foundTask.due_date))
         }
+
+        const loadedDate = foundTask.due_date ? new Date(foundTask.due_date) : undefined
+
+        setFormData(loaded)
+        setDate(loadedDate)
+        // Capture the baseline now, from the same values fed into state, so the
+        // first post-load render isn't briefly flagged as dirty.
+        initialSnapshotRef.current = taskFormSnapshot(loaded, loadedDate)
 
         // Load northstars/goals if northstar module is enabled
         if (northstarEnabled) {
@@ -174,14 +211,18 @@ export default function EditTaskPage() {
     }))
   }
 
-  const saveTask = async (overrides: { completed?: boolean; status?: "Pending" | "In Progress" | "Completed" } = {}) => {
+  // Persist the task without navigating. Returns true on success so both the
+  // normal save buttons and the unsaved-changes guard can decide where to go.
+  const persistTask = async (
+    overrides: { completed?: boolean; status?: "Pending" | "In Progress" | "Completed" } = {},
+  ): Promise<boolean> => {
     if (!formData.title.trim()) {
       toast({
         title: "Error",
         description: "Please enter a task title.",
         variant: "destructive",
       })
-      return
+      return false
     }
 
     setLoading(true)
@@ -189,6 +230,7 @@ export default function EditTaskPage() {
     try {
       const updates = {
         title: formData.title.trim(),
+        notes: formData.notes.trim() || null,
         assignees: formData.assignees,
         assigned_agent_id: formData.assigned_agent_id,
         due_date: toDueDateString(date),
@@ -224,7 +266,8 @@ export default function EditTaskPage() {
             : "Task updated successfully!",
       })
 
-      router.push("/tasks")
+      setJustSaved(true)
+      return true
     } catch (error) {
       console.error("Failed to update task:", error)
       toast({
@@ -232,9 +275,15 @@ export default function EditTaskPage() {
         description: "Failed to update task. Please try again.",
         variant: "destructive",
       })
+      return false
     } finally {
       setLoading(false)
     }
+  }
+
+  const saveTask = async (overrides: { completed?: boolean; status?: "Pending" | "In Progress" | "Completed" } = {}) => {
+    const ok = await persistTask(overrides)
+    if (ok) router.push("/tasks")
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -259,6 +308,17 @@ export default function EditTaskPage() {
   })
   const priorityLevel = getTaskPriorityLevel(priorityScore)
 
+  // Dirty tracking against the loaded baseline. Note: subtasks are managed by
+  // <TaskSubtasks> and saved independently, so they're intentionally excluded.
+  const currentSnapshot = taskFormSnapshot(formData, date)
+  const hasUnsavedChanges =
+    !justSaved &&
+    initialSnapshotRef.current !== null &&
+    currentSnapshot !== initialSnapshotRef.current
+
+  const { pendingHref, isSaving, requestNavigation, closeDialog, discardAndLeave, saveAndLeave } =
+    useUnsavedChangesGuard({ hasUnsavedChanges, onSave: () => persistTask() })
+
   if (initialLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -278,7 +338,7 @@ export default function EditTaskPage() {
                 <h1 className="text-3xl font-medium">Edit Task</h1>
                 {user && <p className="text-sm text-muted-foreground mt-1">Update your task details</p>}
               </div>
-              <Button variant="outline" onClick={() => router.push("/tasks")} className="bg-white">
+              <Button variant="outline" onClick={() => requestNavigation("/tasks")} className="bg-white">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Tasks
               </Button>
@@ -307,6 +367,22 @@ export default function EditTaskPage() {
                       onChange={(e) => handleInputChange("title", e.target.value)}
                       className="w-full"
                       required
+                    />
+                  </div>
+
+                  {/* Notes */}
+                  <div className="space-y-2">
+                    <Label htmlFor="notes" className="text-sm font-medium">
+                      Notes
+                    </Label>
+                    <Textarea
+                      id="notes"
+                      placeholder="Add any notes or details..."
+                      value={formData.notes}
+                      onChange={(e) => handleInputChange("notes", e.target.value)}
+                      maxLength={5000}
+                      rows={4}
+                      className="w-full"
                     />
                   </div>
 
@@ -722,11 +798,19 @@ export default function EditTaskPage() {
                     </>
                   )}
                 </Button>
-                <Button type="button" variant="outline" onClick={() => router.push("/tasks")} disabled={loading}>
+                <Button type="button" variant="outline" onClick={() => requestNavigation("/tasks")} disabled={loading}>
                   Cancel
                 </Button>
               </div>
             </form>
+
+            <UnsavedChangesDialog
+              open={pendingHref !== null}
+              onOpenChange={(open) => { if (!open) closeDialog() }}
+              isSaving={isSaving}
+              onDiscard={discardAndLeave}
+              onSave={saveAndLeave}
+            />
     </div>
   )
 }

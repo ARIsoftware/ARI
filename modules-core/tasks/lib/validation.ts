@@ -20,6 +20,7 @@ const MonsterColorsSchema = z.object({
 export const createTaskSchema = z.object({
   task: z.object({
     title: nonEmptyString.max(255, 'Title too long'),
+    notes: z.union([z.string().max(5000, 'Notes too long'), z.null()]).optional(),
     description: z.string().max(2000, 'Description too long').optional(),
     status: TaskStatus.default('Pending'),
     priority: TaskPriority.default('Medium'),
@@ -46,6 +47,7 @@ export const createTaskSchema = z.object({
 export const updateTaskSchema = z.object({
   task: z.object({
     title: nonEmptyString.max(255, 'Title too long').optional(),
+    notes: z.union([z.string().max(5000, 'Notes too long'), z.null()]).optional(),
     description: z.string().max(2000, 'Description too long').optional(),
     status: TaskStatus.optional(),
     priority: TaskPriority.optional(),
@@ -74,6 +76,7 @@ export const updateTaskSchema = z.object({
 export const TaskSchema = z.object({
   id: z.string().uuid(),
   title: z.string(),
+  notes: z.string().nullable(),
   assignees: z.array(z.string()).nullable(),
   due_date: z.string().nullable(),
   subtasks_completed: z.number().int().nullable(),

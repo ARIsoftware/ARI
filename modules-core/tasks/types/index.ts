@@ -1,6 +1,7 @@
 export type Task = {
   id: string
   title: string
+  notes?: string | null
   assignees: string[]
   due_date: string | null
   subtasks_completed: number

@@ -5,6 +5,7 @@
 CREATE TABLE IF NOT EXISTS tasks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
+  notes TEXT,
   assignees TEXT[] DEFAULT '{}'::TEXT[],
   due_date DATE,
   subtasks_completed INTEGER DEFAULT 0,
@@ -31,6 +32,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 );
 
 -- For modules updating from older schemas, make additive changes idempotent:
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS notes TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS impact INTEGER DEFAULT 3;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS severity INTEGER DEFAULT 3;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS timeliness INTEGER DEFAULT 3;
