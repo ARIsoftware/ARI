@@ -69,7 +69,7 @@ vi.mock('drizzle-orm', () => ({
   sql: vi.fn(() => ({ sql: true })),
 }))
 
-vi.mock('/Users/noam/Documents/github/ARI/lib/modules/schema-installer', () => ({
+vi.mock('@/lib/modules/schema-installer', () => ({
   runModuleSchemaInstall: mockRunModuleSchemaInstall,
 }))
 

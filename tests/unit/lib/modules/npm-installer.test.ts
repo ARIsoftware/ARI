@@ -15,9 +15,10 @@ import { EventEmitter } from 'node:events'
 // ── semver-range mock ─────────────────────────────────────────────────────────
 // npm-installer.ts imports from '../../scripts/lib/semver-range.js' (relative
 // to its own position at lib/modules/). When vitest resolves the mock id, it
-// needs to match what the bundler sees. We use the repo-root-relative path.
+// needs to match what the bundler sees. The @/ alias resolves to the repo root
+// in both tsconfig and vitest.config.ts, so both ids point at the same file.
 
-vi.mock('/Users/noam/Documents/github/ARI/scripts/lib/semver-range.js', () => ({
+vi.mock('@/scripts/lib/semver-range.js', () => ({
   satisfies: vi.fn(),
   rangeAnchor: vi.fn(),
 }))
@@ -41,7 +42,7 @@ vi.mock('child_process', () => ({
 import { installModuleNpmDeps, validateNpmDeps } from '@/lib/modules/npm-installer'
 import { readFile, readdir, utimes } from 'fs/promises'
 import { spawn } from 'child_process'
-import { satisfies, rangeAnchor } from '/Users/noam/Documents/github/ARI/scripts/lib/semver-range.js'
+import { satisfies, rangeAnchor } from '@/scripts/lib/semver-range.js'
 
 const mockReadFile = readFile as unknown as ReturnType<typeof vi.fn>
 const mockReaddir = readdir as unknown as ReturnType<typeof vi.fn>
