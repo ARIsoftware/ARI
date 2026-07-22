@@ -6,6 +6,7 @@ import { TopBar } from "@/components/top-bar"
 import { TaskAnnouncement } from "@/components/task-announcement"
 import { MainContentWrapper } from "@/components/main-content-wrapper"
 import { AppBreadcrumb } from "@/components/app-breadcrumb"
+import { UpdateNoticeDialog } from "@/components/update-notice-dialog"
 
 /**
  * Shared shell for all authenticated app routes served from app/(app)/
@@ -35,6 +36,7 @@ export default async function AppLayout({
 
   return (
     <div className="min-h-screen bg-background">
+      <UpdateNoticeDialog />
       <TaskAnnouncement />
       <SidebarProvider>
         <AppSidebar />

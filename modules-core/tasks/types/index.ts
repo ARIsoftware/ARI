@@ -10,8 +10,16 @@ export type Task = {
   priority: "Low" | "Medium" | "High"
   pinned: boolean
   completed: boolean
+  // Soft delete: true means the task is hidden from normal views and lives in
+  // the "Deleted" tab until it is permanently removed. deleted_at is stamped at
+  // soft-delete time (cleared on restore) and orders the Deleted tab.
+  deleted?: boolean
+  deleted_at?: string | null
   created_at: string
   updated_at: string
+  // Instant the task was last marked complete (null when not completed). Powers
+  // the Analytics page; stamped/cleared by the API on completion toggle.
+  completed_at?: string | null
   order_index: number
   impact?: number
   severity?: number
@@ -46,4 +54,22 @@ export interface MajorProject {
   id: string
   project_name: string
   [key: string]: any
+}
+
+// Aggregated analytics returned by GET /api/modules/tasks/stats (Analytics page).
+export type TaskStats = {
+  timezone: string
+  total_completed: number
+  active_days: number
+  this_week: number
+  current_streak: number
+  longest_streak: number
+  best_day: { date: string; count: number } | null
+  by_weekday: { day_of_week: number; label: string; count: number }[]
+  by_priority: { priority: "High" | "Medium" | "Low"; count: number }[]
+  daily: { date: string; count: number }[]
+  open_tasks: number
+  overdue: number
+  completion_rate: number
+  recent: { id: string; title: string; priority: "High" | "Medium" | "Low"; completed_at: string }[]
 }

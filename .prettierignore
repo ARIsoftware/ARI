@@ -1,0 +1,21 @@
+# Build output & deps
+.next
+node_modules
+coverage
+
+# Lockfiles
+pnpm-lock.yaml
+
+# Generated code (see scripts/generate-module-registry.js)
+lib/generated
+lib/db/schema/schema.ts
+lib/db/schema/relations.ts
+next-env.d.ts
+
+# Static & runtime assets
+public
+data
+.ari
+
+# Docs are hand-maintained — don't let Prettier reflow Markdown
+**/*.md

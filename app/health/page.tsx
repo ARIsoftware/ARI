@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from "@/components/providers"
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { AlertCircle, CheckCircle2, CircleSlash, XCircle, Loader2, Shield, ShieldAlert, ShieldCheck, Database as DatabaseIcon, Package, Save, Key, Globe, Lock, ChevronRight, HardDrive } from 'lucide-react'
+import { AlertCircle, CheckCircle2, CircleSlash, XCircle, Loader2, Shield, ShieldAlert, ShieldCheck, Database as DatabaseIcon, Package, Save, Key, Globe, Lock, ChevronRight, HardDrive, FlaskConical } from 'lucide-react'
 import moduleManifest from '@/lib/generated/module-manifest.json'
 import { HTTP_METHODS, NON_MODULE_TAGS, X_ARI, type OpenApiSpec } from '@/lib/openapi/types'
 
@@ -154,6 +154,75 @@ interface TestResult {
   message?: string
   data?: any
   error?: any
+}
+
+// Shape returned by /api/health/unit-tests (a static vitest snapshot).
+interface UnitTestFileEntry {
+  name: string
+  status: string
+  passed: number
+  failed: number
+  skipped: number
+  durationMs: number
+  message: string | null // file-level error (e.g. import/collect failure), else null
+  tests: { title: string; status: string; durationMs: number; failureMessage: string | null }[]
+}
+interface UnitTestReport {
+  ok: boolean
+  error: string | null
+  generatedAt: string | null
+  totals: { total: number; passed: number; failed: number; skipped: number; passRate: number; durationMs: number }
+  files: UnitTestFileEntry[]
+}
+
+// Maps a vitest status to the same green/red/gray palette the page's
+// getStatusIcon uses; `cls` sizes it for the compact test list (default) or the
+// larger file-row header.
+function unitStatusIcon(status: string, cls = 'h-3.5 w-3.5 mt-0.5') {
+  if (status === 'passed') return <CheckCircle2 className={`${cls} text-green-500 shrink-0`} />
+  if (status === 'failed') return <XCircle className={`${cls} text-red-500 shrink-0`} />
+  return <CircleSlash className={`${cls} text-gray-400 shrink-0`} />
+}
+
+/** One test file: a collapsible row that expands to its individual tests. */
+function UnitTestFileRow({ file }: { file: UnitTestFileEntry }) {
+  const [open, setOpen] = useState(false)
+  // status === 'failed' also covers load/collect errors (0 failed assertions).
+  const hasFailures = file.status === 'failed'
+  const totalInFile = file.passed + file.failed + file.skipped
+  return (
+    <Card className="border">
+      <CardContent className="p-3">
+        <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-3 text-left">
+          <ChevronRight className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} />
+          {unitStatusIcon(hasFailures ? 'failed' : 'passed', 'h-4 w-4')}
+          <span className="text-sm font-mono flex-1 truncate">{file.name}</span>
+          <span className="text-xs text-muted-foreground shrink-0">{file.passed}/{totalInFile}</span>
+          {file.failed > 0 && <Badge variant="destructive" className="shrink-0">{file.failed} failed</Badge>}
+          {file.failed === 0 && hasFailures && <Badge variant="destructive" className="shrink-0">load error</Badge>}
+        </button>
+        {open && (
+          <div className="mt-2 pl-7 space-y-1">
+            {file.message && (
+              <pre className="p-2 bg-red-50 dark:bg-red-950 rounded text-[11px] text-red-600 dark:text-red-300 whitespace-pre-wrap break-all">{file.message}</pre>
+            )}
+            {file.tests.map((t, i) => (
+              <div key={i} className="text-xs">
+                <div className="flex items-start gap-2">
+                  {unitStatusIcon(t.status)}
+                  <span className={t.status === 'failed' ? 'text-red-500 dark:text-red-400' : 'text-muted-foreground'}>{t.title}</span>
+                  <span className="ml-auto shrink-0 text-muted-foreground/70">{t.durationMs}ms</span>
+                </div>
+                {t.failureMessage && (
+                  <pre className="mt-1 ml-[22px] p-2 bg-red-50 dark:bg-red-950 rounded text-[11px] text-red-600 dark:text-red-300 whitespace-pre-wrap break-all">{t.failureMessage}</pre>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
 }
 
 interface SecurityTestResult {
@@ -2348,6 +2417,30 @@ export default function DatabaseTestPage() {
     })
   }, [])
 
+  // Unit-test report — a static snapshot fetched lazily the first time the Unit
+  // Tests tab is opened (wired to the Tabs onValueChange below), so /health
+  // visits that never open the tab pay nothing.
+  const [unitTests, setUnitTests] = useState<UnitTestReport | null>(null)
+  const [unitTestsLoading, setUnitTestsLoading] = useState(false)
+  const [unitTestsError, setUnitTestsError] = useState<string | null>(null)
+  const unitTestsRequested = useRef(false)
+  const loadUnitTests = () => {
+    if (unitTestsRequested.current) return
+    unitTestsRequested.current = true
+    setUnitTestsLoading(true)
+    ;(async () => {
+      try {
+        const res = await fetch(route('unit-tests'))
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        setUnitTests((await res.json()) as UnitTestReport)
+      } catch (e) {
+        setUnitTestsError(errMsg(e))
+      } finally {
+        setUnitTestsLoading(false)
+      }
+    })()
+  }
+
   // Calculate database summary
   const databaseSummary = {
     total: testResults.length,
@@ -2474,8 +2567,8 @@ export default function DatabaseTestPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="database" className="w-full">
-        <TabsList className="grid w-full grid-cols-7 h-[50px] mb-8">
+      <Tabs defaultValue="database" className="w-full" onValueChange={(v) => { if (v === 'unittests') loadUnitTests() }}>
+        <TabsList className="grid w-full grid-cols-8 h-[50px] mb-8">
           <TabsTrigger value="database" className="flex h-full items-center gap-2">
             <DatabaseIcon className="h-4 w-4" />
             Database
@@ -2490,7 +2583,11 @@ export default function DatabaseTestPage() {
           </TabsTrigger>
           <TabsTrigger value="authconfig" className="flex h-full items-center gap-2">
             <Key className="h-4 w-4" />
-            Auth Config
+            Auth
+          </TabsTrigger>
+          <TabsTrigger value="unittests" className="flex h-full items-center gap-2">
+            <FlaskConical className="h-4 w-4" />
+            Unit Tests
           </TabsTrigger>
           <TabsTrigger value="modules" className="flex h-full items-center gap-2">
             <Package className="h-4 w-4" />
@@ -2971,6 +3068,88 @@ export default function DatabaseTestPage() {
             </div>
           </CardContent>
         </Card>
+        </TabsContent>
+
+        {/* Unit Tests Tab */}
+        <TabsContent value="unittests" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-2xl flex items-center gap-2">
+                <FlaskConical className="h-6 w-6" />
+                Unit Tests
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                Static snapshot from the last <code>vitest</code> run (regenerated on dev start / build).
+                {unitTests?.generatedAt && <> Generated {new Date(unitTests.generatedAt).toLocaleString()}.</>}
+              </p>
+            </CardHeader>
+            <CardContent>
+              {unitTestsLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading report…
+                </div>
+              ) : unitTestsError || !unitTests || !unitTests.ok ? (
+                <div className="rounded-lg border border-dashed p-6 text-center">
+                  <AlertCircle className="h-6 w-6 text-yellow-500 mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    {unitTests?.error || unitTestsError || 'No unit-test report available.'}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Run <code>pnpm generate-test-report</code> (or restart the dev server) to generate it.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Summary */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="rounded-lg border px-4 py-3">
+                      <div className="text-2xl font-bold">{unitTests.totals.total}</div>
+                      <p className="text-xs text-muted-foreground">Total Tests</p>
+                    </div>
+                    <div className="rounded-lg border px-4 py-3">
+                      <div className="text-2xl font-bold text-green-500">{unitTests.totals.passed}</div>
+                      <p className="text-xs text-muted-foreground">Passed</p>
+                    </div>
+                    <div className="rounded-lg border px-4 py-3">
+                      <div className="text-2xl font-bold text-red-500">{unitTests.totals.failed}</div>
+                      <p className="text-xs text-muted-foreground">Failed</p>
+                    </div>
+                    <div className="rounded-lg border px-4 py-3">
+                      <div className="text-2xl font-bold text-gray-400">{unitTests.totals.skipped}</div>
+                      <p className="text-xs text-muted-foreground">Skipped</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    {unitTests.totals.failed === 0 ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        <span className="font-medium text-green-600 dark:text-green-400">
+                          {unitTests.totals.passRate}% passed
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-4 w-4 text-red-500" />
+                        <span className="font-medium">
+                          {unitTests.totals.passRate}% passed
+                        </span>
+                      </>
+                    )}
+                    <span className="text-muted-foreground">
+                      · {unitTests.files.length} files · {(unitTests.totals.durationMs / 1000).toFixed(1)}s
+                    </span>
+                  </div>
+
+                  {/* Per-file tree */}
+                  <div className="space-y-2">
+                    {unitTests.files.map((f) => (
+                      <UnitTestFileRow key={f.name} file={f} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Modules Tests Tab */}

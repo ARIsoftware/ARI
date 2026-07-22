@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   priority TEXT DEFAULT 'Medium',
   pinned BOOLEAN DEFAULT FALSE,
   completed BOOLEAN DEFAULT FALSE,
+  deleted BOOLEAN DEFAULT FALSE,
+  deleted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   order_index INTEGER DEFAULT 0,
@@ -43,6 +45,19 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS project_id UUID;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS monster_type TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS monster_colors JSONB;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assigned_agent_id TEXT;
+-- Soft delete: deleted tasks are hidden from all normal views and kept in the
+-- "Deleted" tab until they are permanently removed. The DEFAULT populates every
+-- existing row with FALSE, so this is never NULL. deleted_at is stamped when a
+-- task is soft-deleted (cleared on restore) so the Deleted tab can order by it.
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS deleted BOOLEAN DEFAULT FALSE;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+
+-- Completion timestamp: stamped when a task is marked complete, cleared when it
+-- is un-completed. Powers the Analytics page (completions-per-day, streaks). We
+-- backfill existing completed rows from updated_at so the history isn't empty on
+-- first load; this only runs once per row (guarded by completed_at IS NULL).
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
+UPDATE tasks SET completed_at = updated_at WHERE completed = TRUE AND completed_at IS NULL;
 
 -- Older installs ran CREATE TABLE with no default (or DEFAULT ARRAY['']::TEXT[]),
 -- leaving rows with NULL or the [""] sentinel that fail array validation on edit.
@@ -54,6 +69,9 @@ UPDATE tasks SET assignees = '{}'::TEXT[]
 CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_user_id_completed ON tasks(user_id, completed);
 CREATE INDEX IF NOT EXISTS idx_ari_database_completed ON tasks(completed);
+CREATE INDEX IF NOT EXISTS idx_tasks_deleted ON tasks(deleted);
+CREATE INDEX IF NOT EXISTS idx_tasks_deleted_at ON tasks(deleted_at);
+CREATE INDEX IF NOT EXISTS idx_tasks_completed_at ON tasks(completed_at);
 CREATE INDEX IF NOT EXISTS idx_ari_database_completion_count ON tasks(completion_count);
 CREATE INDEX IF NOT EXISTS idx_ari_database_created_at ON tasks(created_at);
 CREATE INDEX IF NOT EXISTS idx_ari_database_order ON tasks(order_index);

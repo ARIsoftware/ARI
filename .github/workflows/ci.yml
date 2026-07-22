@@ -20,5 +20,17 @@ jobs:
       - run: pnpm generate-module-registry
       - run: pnpm generate-openapi
       - run: pnpm typecheck
-      - run: pnpm test
+      # Report-only for now: surfaces ESLint findings in the PR log without
+      # failing CI while the initial backlog is burned down. To make it a hard
+      # gate later, just drop `continue-on-error`.
+      - name: Lint (report-only)
+        run: pnpm lint
+        continue-on-error: true
+      - run: pnpm test:coverage
+      # The test suite already ran in test:coverage, so skip the in-build
+      # test-report generation (prebuild) to avoid running the whole suite a
+      # second time. Vercel builds don't set this, so production still generates
+      # a fresh report.
       - run: pnpm build
+        env:
+          ARI_SKIP_TEST_REPORT: '1'

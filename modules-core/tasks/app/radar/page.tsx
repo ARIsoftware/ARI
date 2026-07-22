@@ -22,6 +22,7 @@ import type { Task } from "@/modules/tasks/types"
 import { transformTaskForRadar, getTaskPriorityLevel } from "@/modules/tasks/lib/priority-utils"
 import { TaskPriorityModal } from "@/modules/tasks/components/task-priority-modal"
 import { RadarTaskDots } from "@/modules/tasks/components/radar-task-dots"
+import { playTaskSound } from "@/modules/tasks/lib/task-sounds"
 
 const chartConfig = {
   value: {
@@ -109,8 +110,16 @@ export default function RadarPage() {
     : "Task Radar: Top 5 Priority Tasks"
 
   const handleTaskClick = (task: Task) => {
+    playTaskSound("tap")
     setSelectedTask(task)
     setIsModalOpen(true)
+  }
+
+  // Tap feedback when switching the radar between its Priority and Pinned views,
+  // but only on an actual change so re-clicking the active button stays silent.
+  const handleViewModeChange = (mode: "priority" | "pinned") => {
+    if (mode !== viewMode) playTaskSound("tap")
+    setViewMode(mode)
   }
 
   const handleTaskUpdate = async (taskId: string, axes: any) => {
@@ -122,9 +131,11 @@ export default function RadarPage() {
       })
       
       if (!response.ok) throw new Error('Failed to update task')
-      
+
       const updatedTask = await response.json()
-      
+
+      playTaskSound("edit")
+
       // Update local state
       setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t))
       setIsModalOpen(false)
@@ -151,14 +162,14 @@ export default function RadarPage() {
                 <Button
                   variant={viewMode === "priority" ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setViewMode("priority")}
+                  onClick={() => handleViewModeChange("priority")}
                 >
                   Priority
                 </Button>
                 <Button
                   variant={viewMode === "pinned" ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setViewMode("pinned")}
+                  onClick={() => handleViewModeChange("pinned")}
                 >
                   Pinned
                 </Button>

@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useState, useEffect, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { createTask, createSubtask, toDueDateString } from "@/modules/tasks/lib/utils"
+import { playTaskSound } from "@/modules/tasks/lib/task-sounds"
 import { getGoals, type Goal } from "@/lib/goals"
 import { useModuleEnabled } from "@/lib/modules/module-hooks"
 import { useToast } from "@/hooks/use-toast"
@@ -166,6 +167,8 @@ export default function AddTaskPage() {
       }
 
       const createdTask = await createTask(taskData)
+
+      playTaskSound("add")
 
       // The task exists from here on — a subtask failure must not be
       // reported as a failed task creation (retrying would duplicate it).

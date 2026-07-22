@@ -51,3 +51,40 @@ describe('checkIpAllowed — IPv6-mapped IPv4', () => {
     expect(checkIpAllowed(['1.2.3.4'], '::ffff:1.2.3.4')).toBe(true)
   })
 })
+
+describe('checkIpAllowed — CIDR edge cases', () => {
+  it('returns false for CIDR with invalid bits (isNaN(bits) branch)', () => {
+    // '10.0.0.0/invalid' → parseInt('invalid', 10) = NaN → isNaN → false
+    expect(checkIpAllowed(['10.0.0.0/invalid'], '10.0.0.1')).toBe(false)
+  })
+
+  it('returns false when IP is IPv6 and CIDR is IPv4 (ipToNumber returns null)', () => {
+    // IPv6 can't be converted to a number → ipNum === null → false
+    expect(checkIpAllowed(['10.0.0.0/8'], '2001:db8::1')).toBe(false)
+  })
+
+  it('returns true for /0 CIDR (bits === 0 → mask = 0, matches everything)', () => {
+    // bits === 0 → mask = 0 → (ipNum & 0) === (rangeNum & 0) → 0 === 0 → true
+    expect(checkIpAllowed(['0.0.0.0/0'], '1.2.3.4')).toBe(true)
+  })
+
+  it('returns false when requestIp is IPv6 pure (non-mapped) — not IPv4', () => {
+    // ::1 is the IPv6 loopback; ipToNumber returns null for non-4-part IPs
+    expect(checkIpAllowed(['127.0.0.0/8'], '::1')).toBe(false)
+  })
+
+  it('returns false for CIDR with out-of-range octet in range address', () => {
+    // '999.0.0.0/8' → ipToNumber('999.0.0.0') returns null → false
+    expect(checkIpAllowed(['999.0.0.0/8'], '10.0.0.1')).toBe(false)
+  })
+
+  it('returns false when IP has a non-numeric octet', () => {
+    // 'abc.0.0.1' → parseInt('abc') = NaN → ipToNumber returns null
+    expect(checkIpAllowed(['10.0.0.0/8'], 'abc.0.0.1')).toBe(false)
+  })
+
+  it('returns false for exact match when allowed IP has invalid octet', () => {
+    // normalizeIp('256.0.0.1') returns '256.0.0.1'; exact string comparison fails
+    expect(checkIpAllowed(['256.0.0.1'], '10.0.0.1')).toBe(false)
+  })
+})

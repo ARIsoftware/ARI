@@ -34,12 +34,21 @@
       "sidebarPosition": "none"
     },
     {
+      "path": "/tasks/analytics",
+      "label": "Analytics",
+      "icon": "LineChart",
+      "sidebarPosition": "none"
+    },
+    {
       "path": "/tasks/edit",
       "label": "Edit Task",
       "icon": "Pencil",
       "sidebarPosition": "none"
     }
   ],
+  "submenu": {
+    "component": "./components/sidebar-submenu.tsx"
+  },
   "globalProvider": {
     "component": "./components/quick-add-task-sheet.tsx",
     "exportName": "QuickAddTaskProvider"

@@ -8,11 +8,13 @@ import {
   UpdateTaskRequestSchema,
   DeleteTaskQuerySchema,
   DeleteSuccessSchema,
+  ListTasksQuerySchema,
 } from '@/modules/tasks/lib/validation'
 import { calculatePriorityScore } from '@/modules/tasks/lib/priority-utils'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 import { tasks } from '@/lib/db/schema'
+import { notDeleted } from '@/modules/tasks/lib/task-query'
 import { desc, eq, asc, sql } from 'drizzle-orm'
 
 registry.registerPath({
@@ -22,9 +24,10 @@ registry.registerPath({
   summary: 'List tasks',
   tags: ['tasks'],
   security: DEFAULT_SECURITY,
+  request: { query: ListTasksQuerySchema },
   responses: {
     200: {
-      description: "All of the authenticated user's tasks, ordered by order_index",
+      description: "The authenticated user's tasks, ordered by order_index. Active tasks by default; soft-deleted tasks when deleted=true.",
       content: { 'application/json': { schema: TaskListSchema } },
     },
     401: UnauthorizedResponse,
@@ -93,8 +96,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
+    const { searchParams } = new URL(request.url)
+    const queryValidation = validateQueryParams(searchParams, ListTasksQuerySchema)
+    if (!queryValidation.success) {
+      return queryValidation.response
+    }
+
+    // Default view returns active tasks only, so every consumer of this endpoint
+    // automatically excludes soft-deleted rows. `deleted=true` returns just the
+    // Deleted tab. `IS NOT TRUE` also matches legacy rows where deleted is NULL.
+    const deletedFilter = queryValidation.data.deleted === 'true'
+      ? sql`${tasks.deleted} IS TRUE`
+      : notDeleted()
+
     const data = await withRLS((db) =>
-      db.select().from(tasks).orderBy(asc(tasks.orderIndex))
+      db.select().from(tasks).where(deletedFilter).orderBy(asc(tasks.orderIndex))
     )
 
     // Transform camelCase to snake_case for backward compatibility
@@ -154,6 +170,9 @@ export async function POST(request: NextRequest) {
         priority: task.priority,
         pinned: task.pinned,
         completed: task.completed,
+        // Stamp the completion instant up front so a task created as already-
+        // completed still feeds the Analytics page (which keys off completed_at).
+        completedAt: task.completed ? new Date().toISOString() : null,
         orderIndex: nextOrderIndex,
         userId: user.id,
         impact: task.impact,
@@ -241,7 +260,18 @@ export async function PUT(request: NextRequest) {
     if (updates.status !== undefined) updateData.status = updates.status
     if (updates.priority !== undefined) updateData.priority = updates.priority
     if (updates.pinned !== undefined) updateData.pinned = updates.pinned
-    if (updates.completed !== undefined) updateData.completed = updates.completed
+    if (updates.completed !== undefined) {
+      updateData.completed = updates.completed
+      // Stamp the completion instant so the Analytics page has an accurate
+      // per-day/streak signal; clear it when a task is un-completed.
+      updateData.completedAt = updates.completed ? new Date().toISOString() : null
+    }
+    if (updates.deleted !== undefined) {
+      updateData.deleted = updates.deleted
+      // Stamp the deletion instant (cleared on restore) so the Deleted tab can
+      // order by when each task was actually deleted.
+      updateData.deletedAt = updates.deleted ? new Date().toISOString() : null
+    }
     if (updates.order_index !== undefined) updateData.orderIndex = updates.order_index
     if (updates.impact !== undefined) updateData.impact = updates.impact
     if (updates.severity !== undefined) updateData.severity = updates.severity

@@ -59,6 +59,7 @@ export const updateTaskSchema = z.object({
     ]).optional(),
     pinned: z.boolean().optional(),
     completed: z.boolean().optional(),
+    deleted: z.boolean().optional(),
     impact: z.number().min(1).max(5).optional(),
     severity: z.number().min(1).max(5).optional(),
     timeliness: z.number().min(1).max(5).optional(),
@@ -85,8 +86,11 @@ export const TaskSchema = z.object({
   priority: z.string().nullable(),
   pinned: z.boolean().nullable(),
   completed: z.boolean().nullable(),
+  deleted: z.boolean().nullable(),
+  deleted_at: z.string().nullable(),
   created_at: z.string().nullable(),
   updated_at: z.string().nullable(),
+  completed_at: z.string().nullable(),
   order_index: z.number().int().nullable(),
   completion_count: z.number().int().nullable(),
   user_email: z.string().nullable(),
@@ -121,6 +125,13 @@ export const UpdateTaskRequestSchema = z.object({
 
 export const DeleteTaskQuerySchema = z.object({
   id: uuidSchema,
+})
+
+// GET /api/modules/tasks filters. By default (no param) only active tasks are
+// returned so every existing consumer automatically excludes soft-deleted rows.
+// `deleted=true` returns only soft-deleted tasks (for the "Deleted" tab).
+export const ListTasksQuerySchema = z.object({
+  deleted: z.enum(['true', 'false']).optional(),
 })
 
 export const PrioritiesAxesSchema = z.object({
@@ -175,6 +186,38 @@ export const AnalyticsResponseSchema = z.object({
     days: z.number().int().positive(),
   }),
 }).openapi('TaskAnalyticsResponse')
+
+export const TaskStatsResponseSchema = z.object({
+  timezone: z.string(),
+  total_completed: z.number().int().nonnegative(),
+  active_days: z.number().int().nonnegative(),
+  this_week: z.number().int().nonnegative(),
+  current_streak: z.number().int().nonnegative(),
+  longest_streak: z.number().int().nonnegative(),
+  best_day: z.object({ date: z.string(), count: z.number().int().positive() }).nullable(),
+  by_weekday: z.array(z.object({
+    day_of_week: z.number().int().min(1).max(7),
+    label: z.string(),
+    count: z.number().int().nonnegative(),
+  })),
+  by_priority: z.array(z.object({
+    priority: z.enum(['High', 'Medium', 'Low']),
+    count: z.number().int().nonnegative(),
+  })),
+  daily: z.array(z.object({
+    date: z.string(),
+    count: z.number().int().nonnegative(),
+  })),
+  open_tasks: z.number().int().nonnegative(),
+  overdue: z.number().int().nonnegative(),
+  completion_rate: z.number().min(0).max(100),
+  recent: z.array(z.object({
+    id: z.string().uuid(),
+    title: z.string(),
+    priority: z.enum(['High', 'Medium', 'Low']),
+    completed_at: z.string(),
+  })),
+}).openapi('TaskStatsResponse')
 
 export const incrementCompletionSchema = z.object({
   taskId: uuidSchema,

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { Task, CreateTaskInput } from '@/modules/tasks/types'
+import type { Task, CreateTaskInput, TaskStats } from '@/modules/tasks/types'
 
 // Input types for mutations. subtasks_completed/subtasks_total are
 // server-derived from task_subtasks rows and cannot be supplied by clients.
@@ -23,6 +23,99 @@ export function useTasks() {
         throw new Error(error.error || 'Failed to fetch tasks')
       }
       return res.json()
+    },
+  })
+}
+
+/**
+ * Fetch aggregated task analytics (totals, streaks, weekday/priority buckets,
+ * recent completions) for the Analytics page.
+ */
+export function useTaskStats() {
+  return useQuery({
+    queryKey: ['task-stats'],
+    queryFn: async (): Promise<TaskStats> => {
+      const res = await fetch('/api/modules/tasks/stats')
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}))
+        throw new Error(error.error || 'Failed to fetch task stats')
+      }
+      return res.json()
+    },
+  })
+}
+
+/**
+ * Fetch the soft-deleted tasks for the "Deleted" tab. Kept in a separate
+ * query key (a child of ['tasks']) so invalidating ['tasks'] refreshes both
+ * the active list and this one. Pass `enabled: false` to skip the fetch until
+ * the Deleted tab is actually opened.
+ */
+export function useDeletedTasks(enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['tasks', 'deleted'],
+    enabled,
+    queryFn: async (): Promise<Task[]> => {
+      const res = await fetch('/api/modules/tasks?deleted=true')
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || 'Failed to fetch deleted tasks')
+      }
+      return res.json()
+    },
+  })
+}
+
+/**
+ * Soft-delete (deleted:true) or restore (deleted:false) a task with optimistic
+ * updates across BOTH the active ['tasks'] and Deleted ['tasks','deleted']
+ * lists. Centralizes the cancel → snapshot → optimistic-remove → rollback →
+ * invalidate dance (so the page doesn't hand-roll it), and refreshes the
+ * analytics (['task-stats']) and dashboard (['dashboard-tasks']) counts, which
+ * exclude soft-deleted rows.
+ */
+export function useSetTaskDeleted() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ id, deleted }: { id: string; deleted: boolean }): Promise<Task> => {
+      const res = await fetch('/api/modules/tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, updates: { deleted } }),
+      })
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || 'Failed to update task')
+      }
+      return res.json()
+    },
+    onMutate: async ({ id, deleted }) => {
+      // Prefix-cancel both ['tasks'] and ['tasks','deleted'] so an in-flight
+      // refetch can't re-add the row after we optimistically remove it.
+      await queryClient.cancelQueries({ queryKey: ['tasks'] })
+      const previous = queryClient.getQueryData<Task[]>(['tasks'])
+      const previousDeleted = queryClient.getQueryData<Task[]>(['tasks', 'deleted'])
+
+      // Drop the row from the list it's leaving; onSettled refetches both lists
+      // so it reappears in the correct one.
+      const fromKey = deleted ? ['tasks'] : ['tasks', 'deleted']
+      queryClient.setQueryData<Task[]>(fromKey, (old = []) => old.filter(t => t.id !== id))
+
+      return { previous, previousDeleted }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['tasks'], context.previous)
+      }
+      if (context?.previousDeleted) {
+        queryClient.setQueryData(['tasks', 'deleted'], context.previousDeleted)
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      queryClient.invalidateQueries({ queryKey: ['task-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-tasks'] })
     },
   })
 }
@@ -143,24 +236,36 @@ export function useDeleteTask() {
       }
     },
     onMutate: async (deletedId) => {
+      // Prefix-cancel covers both the active (['tasks']) and deleted
+      // (['tasks','deleted']) queries — a permanent delete can target either.
       await queryClient.cancelQueries({ queryKey: ['tasks'] })
       const previous = queryClient.getQueryData<Task[]>(['tasks'])
+      const previousDeleted = queryClient.getQueryData<Task[]>(['tasks', 'deleted'])
 
       queryClient.setQueryData<Task[]>(['tasks'], (old = []) =>
         old.filter(t => t.id !== deletedId)
       )
+      queryClient.setQueryData<Task[]>(['tasks', 'deleted'], (old = []) =>
+        old.filter(t => t.id !== deletedId)
+      )
 
-      return { previous }
+      return { previous, previousDeleted }
     },
     onError: (_err, _deletedId, context) => {
       if (context?.previous) {
         queryClient.setQueryData(['tasks'], context.previous)
+      }
+      if (context?.previousDeleted) {
+        queryClient.setQueryData(['tasks', 'deleted'], context.previousDeleted)
       }
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       // Subtasks are cascade-deleted with the task — refresh their cache too.
       queryClient.invalidateQueries({ queryKey: ['task-subtasks'] })
+      // Keep the analytics/dashboard counts (which exclude deleted rows) fresh.
+      queryClient.invalidateQueries({ queryKey: ['task-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-tasks'] })
     },
   })
 }

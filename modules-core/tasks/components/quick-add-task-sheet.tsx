@@ -29,6 +29,7 @@ import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { calculatePriorityScore, getTaskPriorityLevel } from "@/modules/tasks/lib/priority-utils"
 import { AssigneePicker } from "@/modules/tasks/components/assignee-picker"
+import { playTaskSound } from "@/modules/tasks/lib/task-sounds"
 
 // Context for opening/closing the quick add sheet
 interface QuickAddTaskContextType {
@@ -150,6 +151,7 @@ function QuickAddTaskForm({ onSuccess }: { onSuccess: () => void }) {
 
       await createTask(taskData)
 
+      playTaskSound("add")
       toast({ title: "Success", description: "Task created successfully!" })
 
       // Invalidate tasks queries so lists refresh
@@ -357,6 +359,11 @@ function QuickAddTaskForm({ onSuccess }: { onSuccess: () => void }) {
 
 export function QuickAddTaskProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
+
+  // Soft "panel open" cue whenever the quick-add sheet slides in.
+  useEffect(() => {
+    if (open) playTaskSound("panel")
+  }, [open])
 
   // Keyboard shortcut: Cmd+Shift+N to open quick add task
   useEffect(() => {

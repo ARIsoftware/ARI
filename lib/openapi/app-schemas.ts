@@ -306,6 +306,12 @@ export const ModuleRefreshResponseSchema = z.object({
 
 export const ModuleLibraryResponseSchema = z.unknown().openapi('ModuleLibraryResponse')
 
+export const VersionCheckResponseSchema = z.object({
+  updateAvailable: z.boolean(),
+  currentVersion: z.string(),
+  latestVersion: z.string().nullable(),
+}).openapi('VersionCheckResponse')
+
 // ────────────────────────────────────────────────────────────
 // /api/settings
 // ────────────────────────────────────────────────────────────

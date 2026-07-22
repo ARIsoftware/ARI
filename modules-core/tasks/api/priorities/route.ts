@@ -13,7 +13,8 @@ import {
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 import { tasks } from '@/lib/db/schema'
-import { eq, desc, inArray } from 'drizzle-orm'
+import { notDeleted } from '@/modules/tasks/lib/task-query'
+import { eq, desc, inArray, and } from 'drizzle-orm'
 
 // Force dynamic rendering - no caching
 export const dynamic = 'force-dynamic'
@@ -81,16 +82,17 @@ export async function GET(request: NextRequest) {
       return parsed.response
     }
     const { limit, offset } = parsed.data
-    // Undefined leaves the query unfiltered, so this conditionally filters by completion.
-    const completedFilter = parsed.data.completed
-      ? eq(tasks.completed, parsed.data.completed === 'true')
-      : undefined
+    // The radar never shows soft-deleted tasks. Optionally narrow to a
+    // completion state on top of the not-deleted filter.
+    const whereClause = parsed.data.completed
+      ? and(notDeleted(), eq(tasks.completed, parsed.data.completed === 'true'))
+      : notDeleted()
 
     const data = await withRLS((db) => {
       let q = db
         .select()
         .from(tasks)
-        .where(completedFilter)
+        .where(whereClause)
         .orderBy(desc(tasks.priorityScore))
         .$dynamic()
       if (limit !== undefined) q = q.limit(limit)

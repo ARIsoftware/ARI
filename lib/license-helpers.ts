@@ -1,11 +1,12 @@
 export const LICENSE_MODULE_ID = "__license__"
-export const MODULES_API_BASE = "https://api.ari.software"
+// Env override supports pointing at a locally-run ARI-API during development.
+export const MODULES_API_BASE = process.env.MODULES_API_BASE ?? "https://api.ari.software"
 
 const PLATFORM = process.platform === 'darwin' ? 'darwin' : process.platform === 'win32' ? 'windows' : 'linux'
 
 export function buildClientInfo() {
   return {
-    ari_version: "1.0.0",
+    ari_version: process.env.NEXT_PUBLIC_ARI_VERSION || "0.0.0",
     platform: PLATFORM,
     timestamp: new Date().toISOString(),
   }

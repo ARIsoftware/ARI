@@ -6,16 +6,23 @@
   "scripts": {
     "generate-module-registry": "node scripts/generate-module-registry.js",
     "generate-openapi": "tsx scripts/generate-openapi.ts",
+    "generate-test-report": "node scripts/generate-test-report.mjs",
     "openapi:lint": "redocly lint lib/generated/openapi.json",
-    "prebuild": "node scripts/generate-module-registry.js && tsx scripts/generate-openapi.ts && redocly lint lib/generated/openapi.json",
+    "prebuild": "node scripts/generate-module-registry.js && tsx scripts/generate-openapi.ts && redocly lint lib/generated/openapi.json && node scripts/generate-test-report.mjs",
     "build": "next build",
-    "predev": "node scripts/generate-module-registry.js && tsx scripts/generate-openapi.ts",
+    "predev": "node scripts/generate-module-registry.js && tsx scripts/generate-openapi.ts && node scripts/generate-test-report.mjs",
     "dev": "next dev",
     "start": "next start",
     "setup": "node scripts/install.js",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "coverage:bump": "vitest run --coverage --update"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.3.0",
@@ -96,14 +103,16 @@
       "sharp",
       "core-js",
       "protobufjs",
-      "vue-demi"
+      "vue-demi",
+      "unrs-resolver"
     ],
     "allowBuilds": {
       "esbuild": true,
       "sharp": true,
       "core-js": true,
       "protobufjs": true,
-      "vue-demi": true
+      "vue-demi": true,
+      "unrs-resolver": true
     }
   },
   "devDependencies": {
@@ -114,10 +123,15 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.184.1",
+    "@vitest/coverage-v8": "4.1.8",
     "drizzle-kit": "^0.31.10",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "16.2.6",
+    "eslint-config-prettier": "^10.1.8",
     "postcss": "^8.5.14",
+    "prettier": "^3.9.5",
     "tailwindcss": "^3.4.19",
-    "tsx": "^4.20.0",
+    "tsx": "^4.23.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.8"
   }

@@ -5,7 +5,8 @@ import { analyticsQuerySchema, AnalyticsResponseSchema } from '@/modules/tasks/l
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 import { tasks } from '@/lib/db/schema'
-import { eq, and, gte, lte } from 'drizzle-orm'
+import { notDeleted } from '@/modules/tasks/lib/task-query'
+import { eq, and, gte, lte, isNotNull } from 'drizzle-orm'
 
 registry.registerPath({
   method: 'get',
@@ -52,18 +53,24 @@ export async function GET(request: NextRequest) {
         .from(tasks)
         .where(
           and(
+            notDeleted(),
             gte(tasks.createdAt, startDate.toISOString()),
             lte(tasks.createdAt, endDate.toISOString())
           )
         )
 
-      const completion = await db.select({ updatedAt: tasks.updatedAt, completed: tasks.completed })
+      // Bucket completions by completed_at (the stamped completion instant),
+      // not updated_at — otherwise editing/soft-deleting/restoring a task would
+      // move its completion to the wrong day. Matches the /stats endpoint.
+      const completion = await db.select({ completedAt: tasks.completedAt })
         .from(tasks)
         .where(
           and(
             eq(tasks.completed, true),
-            gte(tasks.updatedAt, startDate.toISOString()),
-            lte(tasks.updatedAt, endDate.toISOString())
+            notDeleted(),
+            isNotNull(tasks.completedAt),
+            gte(tasks.completedAt, startDate.toISOString()),
+            lte(tasks.completedAt, endDate.toISOString())
           )
         )
 
@@ -95,8 +102,8 @@ export async function GET(request: NextRequest) {
 
     // Count task completions
     taskCompletionData?.forEach(task => {
-      if (task.updatedAt) {
-        const dateStr = new Date(task.updatedAt).toISOString().split('T')[0]
+      if (task.completedAt) {
+        const dateStr = new Date(task.completedAt).toISOString().split('T')[0]
         if (dailyData[dateStr]) {
           dailyData[dateStr].tasksCompleted++
         }

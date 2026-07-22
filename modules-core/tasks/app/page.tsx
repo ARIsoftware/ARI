@@ -7,10 +7,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Search, Filter, List, Grid3X3, Calendar, Pin, ListChecks, ChevronDown, Plus, Trash2, Pencil, Columns, Table, BarChart3 } from "lucide-react"
-import { useState, useEffect, useMemo } from "react"
+import { Search, Filter, List, Grid3X3, Calendar, Pin, ListChecks, ChevronDown, Plus, Trash2, Pencil, Columns, Table, BarChart3, LineChart, GripVertical, RotateCcw } from "lucide-react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { toggleTaskCompletion, toggleTaskPin, reorderTasks, updateTask, agentStatusDotClass, type Task } from "../lib/utils"
-import { useTasks, useDeleteTask } from "../hooks/use-tasks"
+import { playTaskSound, primeTaskSoundUnlock } from "../lib/task-sounds"
+import { TaskSoundToggle } from "../components/task-sound-toggle"
+import { useTasks, useDeletedTasks, useDeleteTask, useSetTaskDeleted } from "../hooks/use-tasks"
 import { TaskSubtasks } from "../components/task-subtasks"
 import { useQueryClient } from "@tanstack/react-query"
 import type { MajorProject } from "../types"
@@ -173,9 +175,15 @@ export default function TasksPage() {
   const queryClient = useQueryClient()
   const { data: tasks = [], isLoading: loading, refetch: refetchTasks } = useTasks()
   const deleteTaskMutation = useDeleteTask()
+  const setTaskDeletedMutation = useSetTaskDeleted()
 
   const [activeFilter, setActiveFilter] = useState("All")
   const [draggedTask, setDraggedTask] = useState<string | null>(null)
+  // Rows are draggable, but a drag only actually starts when the gesture began
+  // on a grip handle. The handle's onMouseDown arms this ref; handleDragStart
+  // cancels any drag that wasn't armed, and dragEnd/mouseUp disarms it. A ref
+  // (not state) avoids a re-render race with the browser's dragstart.
+  const dragFromHandleRef = useRef(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [viewMode, setViewMode] = useState<"list" | "card" | "kanban" | "table">("list")
   const [fadingTasks, setFadingTasks] = useState<Set<string>>(new Set())
@@ -188,7 +196,17 @@ export default function TasksPage() {
   const router = useRouter()
   const projectFilter = searchParams.get('filter')
 
-  const filters = ["All", "Pinned", "In Progress", "Completed"]
+  const filters = ["All", "Pinned", "In Progress", "Completed", "Deleted"]
+
+  // Soft-deleted tasks for the "Deleted" tab. Fetched only while that tab is
+  // open; invalidating ['tasks'] refreshes this alongside the active list.
+  const { data: deletedTasks = [], isLoading: deletedLoading } = useDeletedTasks(activeFilter === "Deleted")
+
+  // Unlock audio on the first user gesture so hover sounds aren't blocked by the
+  // browser autoplay policy on a fresh load.
+  useEffect(() => {
+    primeTaskSoundUnlock()
+  }, [])
 
   // Redirect to sign-in if user is not authenticated
   useEffect(() => {
@@ -256,7 +274,28 @@ export default function TasksPage() {
       return a.order_index - b.order_index
     })
 
+  // The "Deleted" tab draws from its own query (soft-deleted rows only). Search
+  // and the project filter still apply; most-recently-deleted shows first.
+  const filteredDeletedTasks = deletedTasks
+    .filter((task) => {
+      const matchesSearch =
+        task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (task.assignees ?? []).some((assignee: string) => assignee.toLowerCase().includes(searchQuery.toLowerCase()))
+      const matchesProject = !projectFilter || task.project_id === projectFilter
+      return matchesSearch && matchesProject
+    })
+    // Most-recently-deleted first. deleted_at is stamped at delete time; fall
+    // back to updated_at for any legacy row soft-deleted before the column.
+    .sort((a, b) =>
+      new Date(b.deleted_at ?? b.updated_at).getTime() - new Date(a.deleted_at ?? a.updated_at).getTime()
+    )
+
   const handleDragStart = (e: React.DragEvent, taskId: string) => {
+    // Ignore drags that didn't begin on the row's grip handle.
+    if (!dragFromHandleRef.current) {
+      e.preventDefault()
+      return
+    }
     setDraggedTask(taskId)
     e.dataTransfer.effectAllowed = "move"
   }
@@ -286,20 +325,18 @@ export default function TasksPage() {
       order_index: index
     }))
 
-    // Update cache immediately for better UX (optimistic update)
+    // Optimistic cache update, then persist the new order to the server.
     setTasksCache(() => updatedTasks)
     setDraggedTask(null)
 
     try {
-      // Update order in database
       if (user?.id) {
         await reorderTasks(updatedTasks.map((task) => task.id))
         invalidateTasks() // Sync with server
       }
     } catch (error) {
       console.error("Failed to reorder tasks:", error)
-      // Revert cache on error
-      invalidateTasks()
+      invalidateTasks() // Revert to the server's order on failure
       toast({
         title: "Error",
         description: "Failed to reorder tasks. Please try again.",
@@ -310,6 +347,7 @@ export default function TasksPage() {
 
   const handleDragEnd = () => {
     setDraggedTask(null)
+    dragFromHandleRef.current = false
   }
 
   const handleKanbanDrop = async (e: React.DragEvent, columnType: string) => {
@@ -358,6 +396,10 @@ export default function TasksPage() {
     try {
       const task = tasks.find(t => t.id === taskId)
       if (!task) return
+
+      // Play the tactile sound on the click itself so it feels instant, even
+      // when the completion write is deferred behind the fade animation below.
+      playTaskSound(task.completed ? "uncomplete" : "complete")
 
       // If marking as complete and not in Completed filter, add fade animation
       if (!task.completed && activeFilter !== "Completed") {
@@ -417,12 +459,26 @@ export default function TasksPage() {
     subtaskVisibility[task.id] ?? (task.subtasks_total ?? 0) > 0
 
   const toggleSubtasksExpanded = (task: Task) => {
+    playTaskSound("tab")
     setSubtaskVisibility(prev => ({ ...prev, [task.id]: !isSubtasksVisible(task) }))
+  }
+
+  // Segmented switches — play the soft "tab" tick only on an actual change so
+  // re-clicking the current tab/view stays silent.
+  const changeFilter = (filter: string) => {
+    if (filter !== activeFilter) playTaskSound("tab")
+    setActiveFilter(filter)
+  }
+
+  const changeViewMode = (mode: "list" | "card" | "kanban" | "table") => {
+    if (mode !== viewMode) playTaskSound("tab")
+    setViewMode(mode)
   }
 
   const handleTogglePin = async (taskId: string) => {
     if (!user?.id) return
 
+    playTaskSound("tap")
     try {
       await toggleTaskPin(taskId)
       invalidateTasks() // Sync with server
@@ -436,6 +492,9 @@ export default function TasksPage() {
     }
   }
 
+  // Trash on an active task → confirm, then soft delete (move to the Deleted
+  // tab). taskToDelete.deleted stays false here, so the dialog + confirm handler
+  // run the soft-delete branch.
   const handleDeleteTask = (taskId: string) => {
     const task = tasks.find(t => t.id === taskId)
     if (task) {
@@ -444,18 +503,37 @@ export default function TasksPage() {
     }
   }
 
+  // Red trash on an already-deleted task → confirm, then permanently remove it
+  // from the database. taskToDelete.deleted is true, so confirm runs the hard
+  // delete branch.
+  const handlePermanentDelete = (task: Task) => {
+    setTaskToDelete(task)
+    setDeleteDialogOpen(true)
+  }
+
   const confirmDeleteTask = async () => {
     if (!taskToDelete) return
+    // No authenticated user → do nothing (and don't claim success).
+    if (!user?.id) {
+      setDeleteDialogOpen(false)
+      setTaskToDelete(null)
+      return
+    }
+
+    const permanent = !!taskToDelete.deleted
+    const target = taskToDelete
 
     try {
-      if (user?.id) {
-        // The mutation handles optimistic removal and invalidates both the
-        // tasks cache and the (cascade-deleted) subtasks cache.
-        await deleteTaskMutation.mutateAsync(taskToDelete.id)
+      playTaskSound("delete")
+      // Both mutations own their optimistic cache updates + rollback-on-error.
+      if (permanent) {
+        await deleteTaskMutation.mutateAsync(target.id)
+      } else {
+        await setTaskDeletedMutation.mutateAsync({ id: target.id, deleted: true })
       }
       toast({
         title: "Success",
-        description: "Task deleted successfully.",
+        description: permanent ? "Task permanently deleted." : "Task moved to Deleted.",
       })
     } catch (error) {
       console.error("Failed to delete task:", error)
@@ -470,6 +548,29 @@ export default function TasksPage() {
     }
   }
 
+  // Restore a soft-deleted task back to the active list. The mutation owns the
+  // optimistic removal + rollback; a completed task reappears under the
+  // Completed tab, so the toast says where it went to avoid "did it work?".
+  const restoreTask = async (task: Task) => {
+    playTaskSound("tap")
+    try {
+      await setTaskDeletedMutation.mutateAsync({ id: task.id, deleted: false })
+      toast({
+        title: "Restored",
+        description: task.completed
+          ? `"${task.title}" was restored to the Completed tab.`
+          : `"${task.title}" was restored.`,
+      })
+    } catch (error) {
+      console.error("Failed to restore task:", error)
+      toast({
+        title: "Error",
+        description: "Failed to restore task. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
               {/* Header */}
@@ -481,11 +582,16 @@ export default function TasksPage() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={() => router.push("/tasks/radar")}>
+                <TaskSoundToggle />
+                <Button variant="outline" onClick={() => { playTaskSound("button"); router.push("/tasks/radar") }}>
                   <BarChart3 className="w-4 h-4 mr-2" />
                   Priority Radar
                 </Button>
-                <Button onClick={() => router.push("/tasks/add")}>
+                <Button variant="outline" onClick={() => { playTaskSound("button"); router.push("/tasks/analytics") }}>
+                  <LineChart className="w-4 h-4 mr-2" />
+                  Analytics
+                </Button>
+                <Button onClick={() => { playTaskSound("button"); router.push("/tasks/add") }}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add Task
                 </Button>
@@ -500,7 +606,7 @@ export default function TasksPage() {
                     key={filter}
                     variant="ghost"
                     size="sm"
-                    onClick={() => setActiveFilter(filter)}
+                    onClick={() => changeFilter(filter)}
                     className={`h-8 px-4 rounded-md transition-colors ${
                       activeFilter === filter ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"
                     }`}
@@ -528,7 +634,7 @@ export default function TasksPage() {
                     variant="ghost"
                     size="icon"
                     className={`rounded-r-none ${viewMode === "list" ? "bg-muted" : ""}`}
-                    onClick={() => setViewMode("list")}
+                    onClick={() => changeViewMode("list")}
                   >
                     <List className="w-4 h-4" />
                   </Button>
@@ -536,7 +642,7 @@ export default function TasksPage() {
                     variant="ghost"
                     size="icon"
                     className={`border-x ${viewMode === "card" ? "bg-muted" : ""}`}
-                    onClick={() => setViewMode("card")}
+                    onClick={() => changeViewMode("card")}
                   >
                     <Grid3X3 className="w-4 h-4" />
                   </Button>
@@ -544,7 +650,7 @@ export default function TasksPage() {
                     variant="ghost"
                     size="icon"
                     className={`border-x ${viewMode === "kanban" ? "bg-muted" : ""}`}
-                    onClick={() => setViewMode("kanban")}
+                    onClick={() => changeViewMode("kanban")}
                   >
                     <Columns className="w-4 h-4" />
                   </Button>
@@ -552,7 +658,7 @@ export default function TasksPage() {
                     variant="ghost"
                     size="icon"
                     className={`rounded-l-none ${viewMode === "table" ? "bg-muted" : ""}`}
-                    onClick={() => setViewMode("table")}
+                    onClick={() => changeViewMode("table")}
                   >
                     <Table className="w-4 h-4" />
                   </Button>
@@ -561,7 +667,89 @@ export default function TasksPage() {
             </div>
 
             {/* Task List/Grid/Kanban/Table */}
-            {viewMode === "table" ? (
+            {activeFilter === "Deleted" ? (
+              /* Deleted View — soft-deleted tasks; restore or delete forever */
+              <div className="space-y-3">
+                {filteredDeletedTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className="flex items-start gap-4 p-4 border rounded-lg bg-card border-border hover:shadow-sm transition-all"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-foreground truncate">{task.title}</h3>
+                      <div className="flex items-center flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground mt-2">
+                        {(task.assigned_agent_id || (task.assignees?.length ?? 0) > 0) && (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {task.assigned_agent_id && <AssignedAgentBadge agentId={task.assigned_agent_id} />}
+                            {(task.assignees ?? []).map((name: string) => (
+                              <span
+                                key={name}
+                                className="px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-muted-foreground"
+                              >
+                                {name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5">
+                          <Calendar className="w-4 h-4" />
+                          <span>{formatDate(task.due_date)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge
+                        variant="secondary"
+                        className={`font-medium text-xs ${getStatusColor(task.status)}`}
+                      >
+                        {task.status}
+                      </Badge>
+                      <Badge
+                        variant="secondary"
+                        className={`font-medium text-xs ${getPriorityColor(task.priority)}`}
+                      >
+                        {task.priority}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Restore task"
+                        title="Restore task"
+                        className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-muted"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          restoreTask(task)
+                        }}
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Delete permanently"
+                        title="Delete permanently"
+                        className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-500/10"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handlePermanentDelete(task)
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+
+                {filteredDeletedTasks.length === 0 && !deletedLoading && (
+                  <div className="text-center py-12 text-muted-foreground">
+                    {searchQuery
+                      ? "No deleted tasks match your search."
+                      : "Nothing here. Deleted tasks are kept in this tab until you permanently delete them."}
+                  </div>
+                )}
+              </div>
+            ) : viewMode === "table" ? (
               /* Table View */
               <div className="bg-card rounded-lg border overflow-hidden">
                 <div className="overflow-x-auto">
@@ -1121,11 +1309,12 @@ export default function TasksPage() {
                       onDragOver={handleDragOver}
                       onDrop={(e) => handleDrop(e, task.id)}
                       onDragEnd={handleDragEnd}
+                      onMouseEnter={() => playTaskSound("hover")}
                       className={`${
                         viewMode === "card"
-                          ? "flex flex-col gap-3 p-4 border rounded-lg hover:shadow-md transition-all cursor-move h-full"
-                          : "flex items-start gap-4 p-4 border rounded-lg hover:shadow-sm transition-all cursor-move"
-                      } ${
+                          ? "flex flex-col gap-3 p-4 border rounded-lg hover:shadow-md transition-all h-full"
+                          : "flex items-start gap-4 p-4 border rounded-lg hover:shadow-sm transition-all"
+                      } hover:scale-[1.01] ${
                         task.pinned ? "bg-[#214b88] text-white shadow-lg" : "bg-card border-border"
                       } ${draggedTask === task.id ? "opacity-50" : ""} ${task.completed ? "taskdone" : ""} ${fadingTasks.has(task.id) ? "task-fade-out" : ""}`}
                     >
@@ -1252,6 +1441,18 @@ export default function TasksPage() {
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Drag to reorder"
+                          title="Drag to reorder"
+                          onMouseDown={() => { dragFromHandleRef.current = true }}
+                          onMouseUp={() => { dragFromHandleRef.current = false }}
+                          onClick={(e) => e.stopPropagation()}
+                          className={`h-8 w-8 cursor-grab active:cursor-grabbing ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+                        >
+                          <GripVertical className="w-4 h-4" />
+                        </Button>
                       </div>
                     </>
                   ) : (
@@ -1300,6 +1501,18 @@ export default function TasksPage() {
                             }}
                           >
                             <Trash2 className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Drag to reorder"
+                            title="Drag to reorder"
+                            onMouseDown={() => { dragFromHandleRef.current = true }}
+                            onMouseUp={() => { dragFromHandleRef.current = false }}
+                            onClick={(e) => e.stopPropagation()}
+                            className={`h-8 w-8 cursor-grab active:cursor-grabbing ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+                          >
+                            <GripVertical className="w-4 h-4" />
                           </Button>
                         </div>
                       </div>
@@ -1388,7 +1601,7 @@ export default function TasksPage() {
               </div>
             )}
 
-      {filteredTasks.length === 0 && !loading && (
+      {activeFilter !== "Deleted" && filteredTasks.length === 0 && !loading && (
         <div className="text-center py-12 text-muted-foreground">
           {searchQuery || activeFilter !== "All"
             ? "No tasks found matching your criteria."
@@ -1396,13 +1609,16 @@ export default function TasksPage() {
         </div>
       )}
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Confirmation Dialog — soft delete (move to Deleted) for an active
+          task, permanent delete for one that's already in the Deleted tab. */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Task</DialogTitle>
+            <DialogTitle>{taskToDelete?.deleted ? "Delete Permanently" : "Move Task to Deleted"}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete the task "{taskToDelete?.title}"? This action cannot be undone.
+              {taskToDelete?.deleted
+                ? `"${taskToDelete?.title}" will be permanently deleted from the database. This action cannot be undone.`
+                : `"${taskToDelete?.title}" will be moved to the Deleted tab. You can restore it or permanently delete it from there.`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1410,7 +1626,7 @@ export default function TasksPage() {
               Cancel
             </Button>
             <Button variant="destructive" onClick={confirmDeleteTask}>
-              Delete
+              {taskToDelete?.deleted ? "Delete Permanently" : "Move to Deleted"}
             </Button>
           </DialogFooter>
         </DialogContent>

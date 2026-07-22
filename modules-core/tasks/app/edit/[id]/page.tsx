@@ -19,6 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { useState, useEffect, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { getTasks, updateTask, recordTaskCompleted, toDueDateString } from "@/modules/tasks/lib/utils"
+import { playTaskSound } from "@/modules/tasks/lib/task-sounds"
 import { TaskSubtasks } from "@/modules/tasks/components/task-subtasks"
 import { getGoals, type Goal } from "@/lib/goals"
 import type { MajorProject } from "@/modules/tasks/types"
@@ -127,7 +128,17 @@ export default function EditTaskPage() {
       try {
         // Load task
         const tasks = await getTasks()
-        const foundTask = tasks.find((t) => t.id === id)
+        let foundTask = tasks.find((t) => t.id === id)
+
+        // getTasks() returns active tasks only; a soft-deleted task reached via
+        // a direct/bookmarked link won't be there, so check the Deleted set too.
+        if (!foundTask) {
+          const res = await fetch('/api/modules/tasks?deleted=true')
+          if (res.ok) {
+            const deleted = (await res.json()) as typeof tasks
+            foundTask = deleted.find((t) => t.id === id)
+          }
+        }
 
         if (!foundTask) {
           toast({
@@ -254,6 +265,14 @@ export default function EditTaskPage() {
       if (overrides.completed === true) {
         await recordTaskCompleted(id)
       }
+
+      playTaskSound(
+        overrides.completed === true
+          ? "complete"
+          : overrides.completed === false
+            ? "uncomplete"
+            : "edit"
+      )
 
       await queryClient.invalidateQueries({ queryKey: ['tasks'] })
 
