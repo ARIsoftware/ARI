@@ -124,7 +124,8 @@ function validateNpmDeps(manifest, source) {
   const deps = manifest.npmDependencies;
   if (!deps || typeof deps !== 'object' || Object.keys(deps).length === 0) return;
   const rootPkg = getRootPackageJson();
-  const rootDeps = rootPkg.dependencies || {};
+  // devDependencies satisfy module deps too (e.g. @types/* packages)
+  const rootDeps = { ...(rootPkg.devDependencies || {}), ...(rootPkg.dependencies || {}) };
 
   const missing = [];
   const conflicts = [];
