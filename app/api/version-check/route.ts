@@ -52,20 +52,21 @@ async function readLastCheckedAt(userId: string): Promise<number> {
 
 /** Atomic JSONB merge — same race-safe upsert pattern as the api-keys route. */
 async function stampLastCheckedAt(userId: string) {
-  const patch = JSON.stringify({ lastCheckedAt: new Date().toISOString() })
+  const now = new Date().toISOString()
+  const patch = JSON.stringify({ lastCheckedAt: now })
   await withAdminDb(async (db) =>
     db.insert(moduleSettings)
       .values({
         userId,
         moduleId: UPDATE_CHECK_MODULE_ID,
         enabled: true,
-        settings: { lastCheckedAt: new Date().toISOString() },
+        settings: { lastCheckedAt: now },
       })
       .onConflictDoUpdate({
         target: [moduleSettings.userId, moduleSettings.moduleId],
         set: {
           settings: sql`COALESCE(${moduleSettings.settings}, '{}'::jsonb) || ${patch}::jsonb`,
-          updatedAt: new Date().toISOString(),
+          updatedAt: now,
         },
       })
   )
