@@ -486,7 +486,7 @@ export function BriefView({
             ref={overlayRef}
             className={cn(
               'relative my-8 h-fit w-[90vw] rounded-md border border-border/60 bg-card px-8 py-10 shadow-2xl ring-1 ring-black/[0.03] sm:px-16 sm:py-16',
-              'origin-center transform-gpu transition-all duration-[400ms] ease-[cubic-bezier(0.16,1,0.3,1)] will-change-transform',
+              'origin-center transform-gpu transition-all [transition-duration:400ms] [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] will-change-transform',
               fsVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0',
             )}
             onClick={(e) => e.stopPropagation()}
