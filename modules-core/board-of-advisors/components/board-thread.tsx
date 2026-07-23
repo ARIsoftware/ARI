@@ -5,15 +5,20 @@ import Link from 'next/link'
 import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { AlertTriangle, RefreshCw, Settings as SettingsIcon } from 'lucide-react'
+import { AlertTriangle, Loader2, Play, RefreshCw, Settings as SettingsIcon, Square, Volume2 } from 'lucide-react'
 import { cn, formatRelativeTime } from '@/lib/utils'
+import { useToast } from '@/hooks/use-toast'
 import {
   askBoardStream,
+  useAdvisorSpeech,
   useBoardConversationDetail,
   CONVERSATIONS_KEY,
   conversationDetailKey,
+  type AdvisorSpeech,
+  type AdvisorSpeechStatus,
 } from '@/modules/board-of-advisors/hooks/use-board-of-advisors'
 import { humanizeBoardError, type FriendlyBoardError } from '@/modules/board-of-advisors/lib/errors'
+import { destructiveToast } from '@/modules/board-of-advisors/lib/utils'
 import { AdvisorAvatar } from './advisor-avatar'
 import { Composer } from './composer'
 import { CopyButton } from './copy-button'
@@ -50,6 +55,8 @@ const FOOTER_NOTE = 'Advisors are AI personas and can make mistakes. Check impor
 
 export function BoardThread({ conversationId, advisors, onCreateConversation, onActivate }: BoardThreadProps) {
   const queryClient = useQueryClient()
+  const { toast } = useToast()
+  const speech = useAdvisorSpeech()
   const { data, isLoading, isError, refetch } = useBoardConversationDetail(conversationId)
   const conversation = data?.conversation
   const persistedMessages = useMemo(() => data?.messages ?? [], [data?.messages])
@@ -85,6 +92,12 @@ export function BoardThread({ conversationId, advisors, onCreateConversation, on
   useEffect(() => {
     return () => abortRef.current?.abort()
   }, [])
+
+  // Stop any read-aloud audio when switching to a different conversation.
+  const stopSpeech = speech.stop
+  useEffect(() => {
+    stopSpeech()
+  }, [conversationId, stopSpeech])
 
   // Auto-scroll as new tokens arrive — coalesced to one scroll per frame, and
   // suspended while the user has scrolled up.
@@ -265,6 +278,25 @@ export function BoardThread({ conversationId, advisors, onCreateConversation, on
 
   const visibleStreaming = streaming && streaming.conversationId === conversationId ? streaming : null
 
+  // Advisor replies that can be read aloud, in speaking order.
+  const playableReplies = useMemo(
+    () =>
+      visibleMessages
+        .filter((m) => m.role === 'advisor' && m.content.trim().length > 0)
+        .map((m) => ({ id: m.id, text: m.content, advisorId: m.advisor_id })),
+    [visibleMessages]
+  )
+
+  const handleRoundtable = () => {
+    if (speech.sequenceActive) {
+      speech.stop()
+      return
+    }
+    speech.playSequence(playableReplies).catch((err) =>
+      toast(destructiveToast('Could not play the roundtable', err instanceof Error ? err : new Error('Please try again.')))
+    )
+  }
+
   // Loading an existing discussion that hasn't streamed yet.
   if (conversationId && isLoading && persistedMessages.length === 0 && !pendingUser && !streaming) {
     return (
@@ -308,7 +340,7 @@ export function BoardThread({ conversationId, advisors, onCreateConversation, on
   if (showWelcome) {
     return (
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto flex min-h-full max-w-2xl flex-col justify-center px-4 py-10">
+        <div className="mx-auto flex min-h-full max-w-5xl flex-col justify-center px-4 py-10">
           <div className="mb-7 flex flex-col items-center text-center animate-in fade-in zoom-in-95 duration-500">
             {advisors.length > 0 && (
               <div className="mb-4 flex -space-x-2.5">
@@ -323,7 +355,7 @@ export function BoardThread({ conversationId, advisors, onCreateConversation, on
               </div>
             )}
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">The board is in session</h2>
-            <p className="mt-1.5 text-sm text-muted-foreground">
+            <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">
               Set up your advisors in Settings, then use this chat whenever you need guidance. You can pressure-test an idea, explore a go-to-market strategy, or work through a challenging situation. Each advisor will respond one at a time, giving you a range of perspectives to consider.
             </p>
           </div>
@@ -366,24 +398,55 @@ export function BoardThread({ conversationId, advisors, onCreateConversation, on
               started {formatRelativeTime(new Date(conversation.created_at))}
             </p>
           </div>
-          {advisors.length > 0 && (
-            <div className="flex shrink-0 -space-x-1.5" title={advisors.map((a) => a.name).join(', ')}>
-              {advisors.slice(0, 5).map((a) => (
-                <AdvisorAvatar key={a.id} name={a.name} color={a.color} size="sm" className="border-2 border-background" />
-              ))}
-              {advisors.length > 5 && (
-                <span className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-semibold text-muted-foreground">
-                  +{advisors.length - 5}
-                </span>
-              )}
-            </div>
-          )}
+          <div className="flex shrink-0 items-center gap-3">
+            {playableReplies.length > 0 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleRoundtable}
+                className="h-8 gap-1.5 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                title={speech.sequenceActive ? 'Stop playback' : 'Read every advisor reply aloud in order'}
+              >
+                {speech.sequenceActive ? (
+                  <>
+                    <Square className="h-3.5 w-3.5" />
+                    Stop
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-3.5 w-3.5" />
+                    Play roundtable
+                  </>
+                )}
+              </Button>
+            )}
+            {advisors.length > 0 && (
+              <div className="flex -space-x-1.5" title={advisors.map((a) => a.name).join(', ')}>
+                {advisors.slice(0, 5).map((a) => (
+                  <AdvisorAvatar key={a.id} name={a.name} color={a.color} size="sm" className="border-2 border-background" />
+                ))}
+                {advisors.length > 5 && (
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-semibold text-muted-foreground">
+                    +{advisors.length - 5}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </header>
       )}
 
       <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl space-y-7 px-4 py-6">
-          {visibleMessages.map((msg) => <MessageRow key={msg.id} message={msg} />)}
+          {visibleMessages.map((msg) => (
+            <MessageRow
+              key={msg.id}
+              message={msg}
+              play={speech.play}
+              stop={speech.stop}
+              playState={speech.playingId === msg.id ? speech.status : 'idle'}
+            />
+          ))}
           {visibleStreaming && (
             <MessageRow
               message={{
@@ -474,7 +537,21 @@ function AdvisorReplyBody({ content, streaming }: { content: string; streaming?:
   return <Markdown content={content} />
 }
 
-const MessageRow = memo(function MessageRow({ message, streaming }: { message: BoardMessage; streaming?: boolean }) {
+const MessageRow = memo(function MessageRow({
+  message,
+  streaming,
+  play,
+  stop,
+  playState = 'idle',
+}: {
+  message: BoardMessage
+  streaming?: boolean
+  play?: AdvisorSpeech['play']
+  stop?: AdvisorSpeech['stop']
+  playState?: AdvisorSpeechStatus
+}) {
+  const { toast } = useToast()
+
   // User — subtle pill on the right, no avatar.
   if (message.role === 'user') {
     return (
@@ -489,6 +566,21 @@ const MessageRow = memo(function MessageRow({ message, streaming }: { message: B
   const advisorName = message.advisor_name ?? 'Advisor'
   const advisorColor = message.advisor_color ?? '#64748b'
 
+  const isLoading = playState === 'loading'
+  const isPlaying = playState === 'playing'
+  const isActive = isLoading || isPlaying
+
+  const handleListen = () => {
+    if (!play || !stop) return
+    if (isActive) {
+      stop()
+      return
+    }
+    play(message.id, message.content, message.advisor_id).catch((err) =>
+      toast(destructiveToast('Could not play audio', err instanceof Error ? err : new Error('Please try again.')))
+    )
+  }
+
   // Advisor — colored-initials avatar + name + content + action row.
   return (
     <div className="group flex gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -499,13 +591,43 @@ const MessageRow = memo(function MessageRow({ message, streaming }: { message: B
         </p>
         <AdvisorReplyBody content={message.content} streaming={streaming} />
         {!streaming && message.content && (
-          <CopyButton
-            text={message.content}
-            className={cn(
-              'text-[11px] opacity-0 transition-all',
-              'group-hover:opacity-100 focus-visible:opacity-100',
+          <div className="flex items-center gap-1">
+            <CopyButton
+              text={message.content}
+              className={cn(
+                'text-[11px] opacity-0 transition-all',
+                'group-hover:opacity-100 focus-visible:opacity-100',
+              )}
+            />
+            {play && stop && (
+              <button
+                type="button"
+                onClick={handleListen}
+                aria-label={isActive ? 'Stop reading aloud' : 'Read this reply aloud'}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground transition-all hover:text-foreground',
+                  isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
+                )}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Preparing…
+                  </>
+                ) : isPlaying ? (
+                  <>
+                    <Square className="h-3 w-3" />
+                    Stop
+                  </>
+                ) : (
+                  <>
+                    <Volume2 className="h-3 w-3" />
+                    Listen
+                  </>
+                )}
+              </button>
             )}
-          />
+          </div>
         )}
       </div>
     </div>

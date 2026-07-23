@@ -99,6 +99,8 @@ export async function POST(request: NextRequest) {
           description: validation.data.description,
           color: pickAdvisorColor(total),
           sortOrder: maxOrder === null ? 0 : maxOrder + 1,
+          sex: validation.data.sex ?? 'not_specified',
+          voiceId: validation.data.voice_id || null,
         })
         .returning()
     })

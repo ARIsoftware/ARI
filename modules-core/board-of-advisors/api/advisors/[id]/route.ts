@@ -25,7 +25,7 @@ registry.registerPath({
   method: 'patch',
   path: '/api/modules/board-of-advisors/advisors/{id}',
   operationId: 'updateBoardAdvisor',
-  summary: "Update an advisor's name and/or personality description",
+  summary: "Update an advisor's name, personality, sex, and/or voice",
   tags: ['board-of-advisors'],
   security: DEFAULT_SECURITY,
   request: { params: advisorIdParamSchema, body: { content: { 'application/json': { schema: updateAdvisorSchema } } } },
@@ -80,6 +80,8 @@ export async function PATCH(
         .set({
           ...(validation.data.name !== undefined ? { name: validation.data.name } : {}),
           ...(validation.data.description !== undefined ? { description: validation.data.description } : {}),
+          ...(validation.data.sex !== undefined ? { sex: validation.data.sex } : {}),
+          ...(validation.data.voice_id !== undefined ? { voiceId: validation.data.voice_id || null } : {}),
           updatedAt: sql`now()`,
         })
         .where(and(eq(boardAdvisors.id, id), eq(boardAdvisors.userId, user.id)))

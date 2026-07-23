@@ -3,6 +3,7 @@ import {
   createAdvisorSchema,
   updateAdvisorSchema,
   reorderAdvisorsSchema,
+  TtsRequestSchema,
   BoardAdvisorSchema,
   AdvisorListResponseSchema,
   AdvisorSingleResponseSchema,
@@ -110,6 +111,71 @@ describe('updateAdvisorSchema', () => {
   it('rejects empty description string', () => {
     expect(updateAdvisorSchema.safeParse({ description: '' }).success).toBe(false)
   })
+
+  it('accepts only sex (refine counts voice fields)', () => {
+    expect(updateAdvisorSchema.safeParse({ sex: 'male' }).success).toBe(true)
+  })
+
+  it('accepts only voice_id, including null (auto)', () => {
+    expect(updateAdvisorSchema.safeParse({ voice_id: 'v1' }).success).toBe(true)
+    expect(updateAdvisorSchema.safeParse({ voice_id: null }).success).toBe(true)
+  })
+
+  it('rejects invalid sex value', () => {
+    expect(updateAdvisorSchema.safeParse({ sex: 'robot' }).success).toBe(false)
+  })
+
+  it('rejects empty or over-long voice_id', () => {
+    expect(updateAdvisorSchema.safeParse({ voice_id: '' }).success).toBe(false)
+    expect(updateAdvisorSchema.safeParse({ voice_id: 'x'.repeat(101) }).success).toBe(false)
+  })
+})
+
+// ─── createAdvisorSchema voice fields ─────────────────────────────────────────
+
+describe('createAdvisorSchema voice fields', () => {
+  const base = { name: 'Ada', description: 'desc' }
+
+  it('accepts optional sex and voice_id', () => {
+    expect(createAdvisorSchema.safeParse({ ...base, sex: 'female', voice_id: 'v1' }).success).toBe(true)
+    expect(createAdvisorSchema.safeParse({ ...base, voice_id: null }).success).toBe(true)
+  })
+
+  it('rejects invalid sex', () => {
+    expect(createAdvisorSchema.safeParse({ ...base, sex: 'unknown' }).success).toBe(false)
+  })
+
+  it('rejects voice_id at 101 chars, accepts at 100', () => {
+    expect(createAdvisorSchema.safeParse({ ...base, voice_id: 'x'.repeat(100) }).success).toBe(true)
+    expect(createAdvisorSchema.safeParse({ ...base, voice_id: 'x'.repeat(101) }).success).toBe(false)
+  })
+})
+
+// ─── TtsRequestSchema ─────────────────────────────────────────────────────────
+
+describe('TtsRequestSchema', () => {
+  it('accepts text with optional advisorId (uuid or null)', () => {
+    expect(TtsRequestSchema.safeParse({ text: 'Hello' }).success).toBe(true)
+    expect(TtsRequestSchema.safeParse({ text: 'Hello', advisorId: VALID_UUID }).success).toBe(true)
+    expect(TtsRequestSchema.safeParse({ text: 'Hello', advisorId: null }).success).toBe(true)
+  })
+
+  it('rejects empty text and text over 20000 chars', () => {
+    expect(TtsRequestSchema.safeParse({ text: '' }).success).toBe(false)
+    expect(TtsRequestSchema.safeParse({ text: 'x'.repeat(20001) }).success).toBe(false)
+  })
+
+  it('accepts text at exactly 20000 chars', () => {
+    expect(TtsRequestSchema.safeParse({ text: 'x'.repeat(20000) }).success).toBe(true)
+  })
+
+  it('rejects non-UUID advisorId', () => {
+    expect(TtsRequestSchema.safeParse({ text: 'Hi', advisorId: 'nope' }).success).toBe(false)
+  })
+
+  it('rejects unknown keys (strict)', () => {
+    expect(TtsRequestSchema.safeParse({ text: 'Hi', voice: 'v' }).success).toBe(false)
+  })
 })
 
 // ─── reorderAdvisorsSchema ────────────────────────────────────────────────────
@@ -148,6 +214,8 @@ describe('BoardAdvisorSchema', () => {
     description: 'desc',
     color: '#ff0000',
     sort_order: 0,
+    sex: 'not_specified',
+    voice_id: null,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
   }
@@ -162,6 +230,21 @@ describe('BoardAdvisorSchema', () => {
 
   it('rejects non-integer sort_order', () => {
     expect(BoardAdvisorSchema.safeParse({ ...valid, sort_order: 1.5 }).success).toBe(false)
+  })
+
+  it('accepts explicit voice_id and each sex value', () => {
+    for (const sex of ['male', 'female', 'not_specified']) {
+      expect(BoardAdvisorSchema.safeParse({ ...valid, sex, voice_id: 'v1' }).success).toBe(true)
+    }
+  })
+
+  it('rejects unknown sex value', () => {
+    expect(BoardAdvisorSchema.safeParse({ ...valid, sex: 'other' }).success).toBe(false)
+  })
+
+  it('rejects missing sex/voice_id fields', () => {
+    const { sex: _s, voice_id: _v, ...withoutVoice } = valid
+    expect(BoardAdvisorSchema.safeParse(withoutVoice).success).toBe(false)
   })
 })
 
@@ -184,6 +267,8 @@ describe('AdvisorSingleResponseSchema', () => {
       description: 'd',
       color: 'blue',
       sort_order: 0,
+      sex: 'female',
+      voice_id: null,
       created_at: '2024-01-01T00:00:00Z',
       updated_at: '2024-01-01T00:00:00Z',
     }

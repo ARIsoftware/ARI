@@ -1,5 +1,7 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type {
+  AdvisorSex,
   BoardAdvisor,
   BoardConversation,
   BoardMessage,
@@ -43,7 +45,7 @@ export function useCreateAdvisor() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (params: { name: string; description: string }): Promise<BoardAdvisor> => {
+    mutationFn: async (params: { name: string; description: string; sex?: AdvisorSex; voice_id?: string | null }): Promise<BoardAdvisor> => {
       const res = await fetch('/api/modules/board-of-advisors/advisors', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -66,7 +68,7 @@ export function useUpdateAdvisor() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ id, ...patch }: { id: string; name?: string; description?: string }): Promise<BoardAdvisor> => {
+    mutationFn: async ({ id, ...patch }: { id: string; name?: string; description?: string; sex?: AdvisorSex; voice_id?: string | null }): Promise<BoardAdvisor> => {
       const res = await fetch(`/api/modules/board-of-advisors/advisors/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -416,3 +418,200 @@ export function useUpdateBoardSettings() {
     },
   })
 }
+
+// ─── Speech (ElevenLabs read-aloud) ────────────────────────────────────
+
+export type AdvisorSpeechStatus = 'idle' | 'loading' | 'playing'
+
+export interface SpeechItem {
+  /** The board_messages id — used as the playback identity + cache key. */
+  id: string
+  text: string
+  advisorId: string | null
+}
+
+// Keep at most this many synthesized clips cached at once, so a long thread
+// doesn't accumulate blob URLs forever.
+const SPEECH_CACHE_LIMIT = 24
+
+/**
+ * Play advisor replies aloud via the module's ElevenLabs TTS route.
+ *
+ * A single hook instance drives all playback in a thread: `playingId` marks the
+ * message currently sounding, so each reply's button can show its own state,
+ * while `playSequence` reads a whole roundtable in order. Clips are cached by
+ * message id (blob Object URLs) so replays don't re-bill ElevenLabs; a run
+ * token lets `stop()` (or a newer play) cancel an in-flight fetch/sequence
+ * cleanly, including a mid-play pause.
+ */
+export function useAdvisorSpeech() {
+  const [status, setStatus] = useState<AdvisorSpeechStatus>('idle')
+  const [playingId, setPlayingId] = useState<string | null>(null)
+  const [sequenceActive, setSequenceActive] = useState(false)
+
+  // ONE persistent <audio> element, reused for every clip. Reusing it (rather
+  // than a fresh `new Audio()` per clip) keeps it "unlocked" after the first
+  // user-gesture play, so roundtable items 2..N — started from `onended`, not a
+  // click — aren't blocked by browser autoplay policy.
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+  // message id → blob Object URL. Bounded via rememberClip().
+  const cacheRef = useRef<Map<string, string>>(new Map())
+  const settleRef = useRef<(() => void) | null>(null)
+  // Bumped on every stop()/new play() — any in-flight run whose token no longer
+  // matches bails out instead of racing the newer one.
+  const runRef = useRef(0)
+
+  const getAudio = useCallback((): HTMLAudioElement => {
+    if (!audioRef.current) audioRef.current = new Audio()
+    return audioRef.current
+  }, [])
+
+  // Insert a clip and evict oldest entries past the cap (never the one that's
+  // currently loaded in the element). Also refreshes recency on a repeat.
+  const rememberClip = useCallback((id: string, url: string) => {
+    const cache = cacheRef.current
+    cache.delete(id)
+    cache.set(id, url)
+    if (cache.size <= SPEECH_CACHE_LIMIT) return
+    const currentSrc = audioRef.current?.src
+    for (const [key, value] of cache) {
+      if (cache.size <= SPEECH_CACHE_LIMIT) break
+      if (value === currentSrc) continue
+      cache.delete(key)
+      URL.revokeObjectURL(value)
+    }
+  }, [])
+
+  const teardownAudio = useCallback(() => {
+    const audio = audioRef.current
+    if (audio) {
+      audio.onended = null
+      audio.onerror = null
+      audio.pause()
+    }
+    abortRef.current?.abort()
+    abortRef.current = null
+    // Resolve any awaiting playback promise so a stopped sequence doesn't hang.
+    const settle = settleRef.current
+    settleRef.current = null
+    settle?.()
+  }, [])
+
+  const stop = useCallback(() => {
+    runRef.current++
+    teardownAudio()
+    setStatus('idle')
+    setPlayingId(null)
+    setSequenceActive(false)
+  }, [teardownAudio])
+
+  // Fetch (or reuse) one clip and play it to completion. Throws on TTS error.
+  const playOne = useCallback(async (item: SpeechItem, token: number): Promise<void> => {
+    teardownAudio()
+    setStatus('loading')
+    setPlayingId(item.id)
+
+    let url = cacheRef.current.get(item.id)
+    if (url) {
+      rememberClip(item.id, url) // refresh recency on a cache hit
+    } else {
+      const controller = new AbortController()
+      abortRef.current = controller
+      const res = await fetch('/api/modules/board-of-advisors/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: item.text, advisorId: item.advisorId }),
+        signal: controller.signal,
+      })
+      if (token !== runRef.current || controller.signal.aborted) return
+      if (!res.ok) throw new Error(await readJsonError(res, 'Could not generate audio'))
+      const blob = await res.blob()
+      if (token !== runRef.current || controller.signal.aborted) return
+      url = URL.createObjectURL(blob)
+      rememberClip(item.id, url)
+    }
+
+    if (token !== runRef.current) return
+
+    await new Promise<void>((resolve, reject) => {
+      const audio = getAudio()
+      settleRef.current = resolve
+      // Guards: a handler left over from a superseded run must not resolve/reject
+      // or clear settleRef, which now belongs to a newer clip.
+      audio.onended = () => {
+        if (token !== runRef.current) return
+        settleRef.current = null
+        resolve()
+      }
+      audio.onerror = () => {
+        if (token !== runRef.current) return
+        settleRef.current = null
+        reject(new Error('Audio playback failed'))
+      }
+      audio.src = url!
+      audio
+        .play()
+        .then(() => {
+          if (token === runRef.current) setStatus('playing')
+        })
+        .catch((err) => {
+          if (token !== runRef.current) return
+          settleRef.current = null
+          reject(err)
+        })
+    })
+  }, [teardownAudio, getAudio, rememberClip])
+
+  /** Play (or stop, if already this message) a single reply. */
+  const play = useCallback(async (id: string, text: string, advisorId: string | null) => {
+    const token = ++runRef.current
+    setSequenceActive(false)
+    try {
+      await playOne({ id, text, advisorId }, token)
+    } finally {
+      if (token === runRef.current) {
+        setStatus('idle')
+        setPlayingId(null)
+      }
+    }
+  }, [playOne])
+
+  /** Read a set of replies aloud back-to-back, in the given order. */
+  const playSequence = useCallback(async (items: SpeechItem[]) => {
+    const token = ++runRef.current
+    setSequenceActive(true)
+    try {
+      for (const item of items) {
+        if (token !== runRef.current) break
+        await playOne(item, token)
+      }
+    } finally {
+      if (token === runRef.current) {
+        setStatus('idle')
+        setPlayingId(null)
+        setSequenceActive(false)
+      }
+    }
+  }, [playOne])
+
+  // Abort + release everything on unmount.
+  useEffect(() => {
+    return () => {
+      runRef.current++
+      teardownAudio()
+      const audio = audioRef.current
+      if (audio) {
+        audio.removeAttribute('src')
+        audio.load()
+        audioRef.current = null
+      }
+      for (const url of cacheRef.current.values()) URL.revokeObjectURL(url)
+      cacheRef.current.clear()
+    }
+  }, [teardownAudio])
+
+  return { status, playingId, sequenceActive, play, stop, playSequence }
+}
+
+export type AdvisorSpeech = ReturnType<typeof useAdvisorSpeech>

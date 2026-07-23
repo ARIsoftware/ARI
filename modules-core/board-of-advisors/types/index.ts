@@ -1,5 +1,7 @@
 import type { AiProviderId } from '@/lib/ai-providers'
 export type { AiProviderId }
+import type { AdvisorSex } from '@/modules/board-of-advisors/lib/voices'
+export type { AdvisorSex }
 
 export type BoardRole = 'user' | 'advisor'
 
@@ -11,6 +13,10 @@ export interface BoardAdvisor {
   description: string
   color: string
   sort_order: number
+  /** Drives the automatic voice pick when voice_id is unset. */
+  sex: AdvisorSex
+  /** Explicit ElevenLabs voice id, or null = auto (resolved by sex at playback). */
+  voice_id: string | null
   created_at: string
   updated_at: string
 }

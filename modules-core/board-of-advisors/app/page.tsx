@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { Loader2, Settings, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -14,7 +15,6 @@ import {
   useCreateBoardConversation,
   useUpdateBoardSettings,
 } from '@/modules/board-of-advisors/hooks/use-board-of-advisors'
-import { useRandomQuote } from '@/modules/board-of-advisors/hooks/use-random-quote'
 import { destructiveToast } from '@/modules/board-of-advisors/lib/utils'
 import { ConversationList } from '@/modules/board-of-advisors/components/conversation-list'
 import { BoardThread } from '@/modules/board-of-advisors/components/board-thread'
@@ -22,7 +22,6 @@ import { BoardOnboarding } from '@/modules/board-of-advisors/components/onboardi
 
 export default function BoardOfAdvisorsPage() {
   const { toast } = useToast()
-  const { quotesEnabled, randomQuote } = useRandomQuote()
 
   const {
     data: settings,
@@ -39,6 +38,14 @@ export default function BoardOfAdvisorsPage() {
 
   const [activeId, setActiveId] = useState<string | null>(null)
   const autoSelectedRef = useRef(false)
+
+  // The provider pill renders into the global breadcrumb top bar via portal
+  // (same treatment as the Chat module), so it sits at the bar's right edge
+  // no matter what other bars are stacked above it.
+  const [topBarEl, setTopBarEl] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    setTopBarEl(document.querySelector<HTMLElement>('header.topbar'))
+  }, [])
 
   // Default-select the most recent discussion ONCE on initial load. A later
   // null activeId is deliberate (e.g. the active discussion was deleted) and
@@ -92,9 +99,6 @@ export default function BoardOfAdvisorsPage() {
       <div className="p-6">
         <div className="mb-4">
           <h1 className="text-4xl font-medium">Board of Advisors</h1>
-          {quotesEnabled && randomQuote && (
-            <p className="text-sm text-[#aa2020] mt-1">{randomQuote.quote}</p>
-          )}
         </div>
         <BoardOnboarding
           isPending={updateSettings.isPending}
@@ -112,35 +116,35 @@ export default function BoardOfAdvisorsPage() {
   const provider = providerStatus?.selected ?? null
   const providerReady = !!provider?.configured
 
+  const providerPill = (
+    <Link
+      href="/board-of-advisors/settings"
+      className="group ml-auto hidden shrink-0 items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-xs shadow-sm transition-colors hover:border-accent/40 hover:bg-accent/5 sm:flex"
+    >
+      {providerReady ? (
+        <>
+          <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+          <span className="font-medium">{provider!.name}</span>
+          <span className="font-mono text-muted-foreground">{provider!.model}</span>
+        </>
+      ) : (
+        <>
+          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+          <span className="text-muted-foreground">No provider configured</span>
+        </>
+      )}
+      <Settings className="h-3 w-3 text-muted-foreground transition-colors group-hover:text-foreground" />
+    </Link>
+  )
+
   return (
-    <div className="flex flex-col h-[calc(100vh-3.5rem)] min-h-[600px]">
+    <div className="relative flex flex-col h-[calc(100vh-3.5rem)] min-h-[600px]">
+      {topBarEl
+        ? createPortal(providerPill, topBarEl)
+        : <div className="absolute right-4 top-3 z-10">{providerPill}</div>}
+
       <div className="border-b px-6 pb-3 pt-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="text-3xl font-medium tracking-tight">Board of Advisors</h1>
-            {quotesEnabled && randomQuote && (
-              <p className="mt-1.5 text-sm italic text-[#aa2020]">&ldquo;{randomQuote.quote}&rdquo;</p>
-            )}
-          </div>
-          <Link
-            href="/board-of-advisors/settings"
-            className="group flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-xs shadow-sm transition-colors hover:border-accent/40 hover:bg-accent/5"
-          >
-            {providerReady ? (
-              <>
-                <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-                <span className="font-medium">{provider!.name}</span>
-                <span className="font-mono text-muted-foreground">{provider!.model}</span>
-              </>
-            ) : (
-              <>
-                <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
-                <span className="text-muted-foreground">No provider configured</span>
-              </>
-            )}
-            <Settings className="h-3 w-3 text-muted-foreground transition-colors group-hover:text-foreground" />
-          </Link>
-        </div>
+        <h1 className="text-3xl font-medium tracking-tight">Board of Advisors</h1>
       </div>
 
       {providerStatus && !providerReady && (

@@ -23,19 +23,33 @@ const conversationTitleSchema = z.string().trim()
   .min(1, 'Title is required')
   .max(CONVERSATION_TITLE_MAX, `Title must be ${CONVERSATION_TITLE_MAX} characters or fewer`)
 
+// Advisor voice (ElevenLabs). sex drives the automatic voice pick; voice_id is
+// an optional explicit voice. '' or null both mean "auto by sex".
+const advisorSexSchema = z.enum(['male', 'female', 'not_specified'])
+const voiceIdSchema = z.string().min(1, 'Voice id is required').max(100, 'Voice id must be 100 characters or fewer').nullable()
+
 // ─── Advisors ──────────────────────────────────────────────────────────
 
 export const createAdvisorSchema = z.object({
   name: advisorNameSchema,
   description: advisorDescriptionSchema,
+  sex: advisorSexSchema.optional(),
+  voice_id: voiceIdSchema.optional(),
 }).openapi('BoardCreateAdvisorBody')
 
 export const updateAdvisorSchema = z.object({
   name: advisorNameSchema.optional(),
   description: advisorDescriptionSchema.optional(),
-}).refine((body) => body.name !== undefined || body.description !== undefined, {
-  message: 'Provide a name or description to update',
-}).openapi('BoardUpdateAdvisorBody')
+  sex: advisorSexSchema.optional(),
+  voice_id: voiceIdSchema.optional(),
+}).refine(
+  (body) =>
+    body.name !== undefined ||
+    body.description !== undefined ||
+    body.sex !== undefined ||
+    body.voice_id !== undefined,
+  { message: 'Provide a field to update' },
+).openapi('BoardUpdateAdvisorBody')
 
 export const reorderAdvisorsSchema = z.object({
   order: z.array(advisorIdSchema)
@@ -50,9 +64,20 @@ export const BoardAdvisorSchema = z.object({
   description: z.string(),
   color: z.string(),
   sort_order: z.number().int(),
+  sex: advisorSexSchema,
+  voice_id: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
 }).openapi('BoardAdvisor')
+
+// Read a reply aloud with ElevenLabs. advisorId selects the voice (by the
+// advisor's explicit voice_id or automatic sex-based pick); omitted → default.
+// The route chunks long text into multiple ElevenLabs requests, so the cap here
+// is a generous abuse guard rather than the per-request ElevenLabs limit.
+export const TtsRequestSchema = z.object({
+  text: z.string().min(1, 'text is required').max(20000, 'text is too long (max 20000 characters)'),
+  advisorId: z.string().uuid().nullable().optional(),
+}).strict().openapi('BoardTtsBody')
 
 export const AdvisorListResponseSchema = z.object({
   advisors: z.array(BoardAdvisorSchema),

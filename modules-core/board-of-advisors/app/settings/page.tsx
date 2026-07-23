@@ -2,23 +2,18 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Users } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { AiProviderCard } from '@/components/ai-provider-card'
 import {
   useBoardSettings,
   useUpdateBoardSettings,
 } from '@/modules/board-of-advisors/hooks/use-board-of-advisors'
-import { useRandomQuote } from '@/modules/board-of-advisors/hooks/use-random-quote'
 import { destructiveToast } from '@/modules/board-of-advisors/lib/utils'
-import { AdvisorList } from '@/modules/board-of-advisors/components/advisor-list'
 import type { AiProviderId } from '@/modules/board-of-advisors/types'
 
 export default function BoardOfAdvisorsSettingsPage() {
   const { toast } = useToast()
-  const { quotesEnabled, randomQuote } = useRandomQuote()
 
   const {
     data: settings,
@@ -68,29 +63,11 @@ export default function BoardOfAdvisorsSettingsPage() {
     <div className="p-6 max-w-3xl space-y-6">
       <div>
         <h1 className="text-3xl font-medium">Board settings</h1>
-        {quotesEnabled && randomQuote && (
-          <p className="text-sm text-[#aa2020] mt-1">{randomQuote.quote}</p>
-        )}
         <p className="text-sm text-muted-foreground mt-2">
-          Manage who sits at the table, their speaking order, and which AI provider powers the
-          roundtable.
+          Choose which AI provider powers the roundtable. Manage who sits at the table on the
+          Advisors page.
         </p>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Users className="w-5 h-5 text-accent" />
-            Your advisors
-          </CardTitle>
-          <CardDescription>
-            Each advisor answers every question, in this order. Drag to change who speaks first.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <AdvisorList />
-        </CardContent>
-      </Card>
 
       {settingsLoading ? (
         <Skeleton className="h-48 w-full rounded-xl" />

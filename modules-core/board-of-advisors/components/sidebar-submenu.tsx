@@ -10,13 +10,18 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from '@/components/ui/sidebar'
-import { MessagesSquare, Settings } from 'lucide-react'
+import { MessagesSquare, Settings, Users } from 'lucide-react'
 
 const menuItems = [
   {
     label: 'Chat',
     path: '/board-of-advisors',
     icon: MessagesSquare,
+  },
+  {
+    label: 'Advisors',
+    path: '/board-of-advisors/advisors',
+    icon: Users,
   },
   {
     label: 'Settings',

@@ -8,6 +8,8 @@ export const boardAdvisors = pgTable("board_advisors", {
 	description: varchar({ length: 2000 }).notNull(),
 	color: varchar({ length: 20 }).notNull(),
 	sortOrder: integer("sort_order").notNull().default(0),
+	sex: varchar({ length: 16 }).notNull().default('not_specified'),
+	voiceId: varchar("voice_id", { length: 100 }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
 }, (table) => [

@@ -13,6 +13,11 @@ CREATE TABLE IF NOT EXISTS board_advisors (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Voice playback (ElevenLabs). sex drives the automatic voice pick; voice_id is
+-- an optional explicit ElevenLabs voice (NULL = auto by sex, resolved at playback).
+ALTER TABLE board_advisors ADD COLUMN IF NOT EXISTS sex VARCHAR(16) NOT NULL DEFAULT 'not_specified';
+ALTER TABLE board_advisors ADD COLUMN IF NOT EXISTS voice_id VARCHAR(100);
+
 CREATE INDEX IF NOT EXISTS idx_board_advisors_user_id ON board_advisors(user_id);
 CREATE INDEX IF NOT EXISTS idx_board_advisors_user_sort ON board_advisors(user_id, sort_order ASC);
 
