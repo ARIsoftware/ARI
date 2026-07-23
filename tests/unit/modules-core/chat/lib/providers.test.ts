@@ -7,8 +7,10 @@
  *  - @/lib/storage (getStorageProvider, readStorageConfig, sanitize helpers)
  *  - global fetch  (SSE bodies built as ReadableStream<Uint8Array>)
  *
- * @/lib/db/schema, drizzle-orm, @/lib/constants and @/lib/ai-providers stay
- * real — they are pure definitions.
+ * @/lib/constants and @/lib/ai-providers stay real (pure definitions).
+ * @/lib/db/schema must be mocked: the real barrel re-exports untracked
+ * modules-custom schemas the vitest alias cannot resolve. drizzle-orm's
+ * eq/and are mocked alongside so they accept the fake column objects.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
@@ -16,6 +18,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('@/lib/db', () => ({
   withAdminDb: vi.fn(),
+}))
+
+vi.mock('@/lib/db/schema', () => ({
+  moduleSettings: { userId: 'userId', moduleId: 'moduleId', settings: 'settings' },
+}))
+
+vi.mock('drizzle-orm', () => ({
+  eq: vi.fn((_col: unknown, _val: unknown) => ({ eq: true })),
+  and: vi.fn((...args: unknown[]) => ({ and: args })),
 }))
 
 vi.mock('@/lib/crypto', () => ({
