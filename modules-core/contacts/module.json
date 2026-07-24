@@ -31,7 +31,6 @@
     "migrations": "./database/migrations"
   },
   "dashboard": {
-    "widgets": true,
-    "statCards": ["./components/dashboard-stat-card.tsx"]
+    "widgets": true
   }
 }
