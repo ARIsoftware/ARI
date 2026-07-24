@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/button'
 import { Plus, BarChart3, Activity } from 'lucide-react'
 import { useDashboardData } from '@/modules/dashboard/hooks/use-dashboard'
 import { useDragDropMode } from '@/components/drag-drop-mode-context'
-import { RecentActivityFeed } from '../components/recent-activity-feed'
+import { TasksFeed } from '../components/tasks-feed'
 import { DashboardStatCards, DashboardWidgetArea } from '../components/dashboard-widgets'
 
 export default function DashboardPage() {
-  const { tasksEnabled, quote, recentActivity } = useDashboardData()
+  const { tasksEnabled, quote } = useDashboardData()
   const { isDragMode } = useDragDropMode()
 
   // No loading gates — render the shell unconditionally. Modules-list and
@@ -73,9 +73,9 @@ export default function DashboardPage() {
           <DashboardWidgetArea />
         </div>
 
-        {/* Right Sidebar - Recent Activity */}
+        {/* Right Sidebar - Tasks */}
         <div className="w-80 shrink-0 border-l">
-          <RecentActivityFeed activities={recentActivity} />
+          <TasksFeed enabled={tasksEnabled} />
         </div>
       </div>
     </>
