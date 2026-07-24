@@ -20,7 +20,7 @@ export default function DashboardPage() {
     <>
       <div className="flex flex-1 relative min-h-[calc(100svh-4rem)]">
         {/* Main Content */}
-        <div className="flex-1 flex flex-col gap-6 p-6 pr-3">
+        <div className="flex-1 flex flex-col gap-6 p-6">
           {/* Welcome Header */}
           <div className="flex items-center justify-between">
             <div>
