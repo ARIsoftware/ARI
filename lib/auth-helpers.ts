@@ -292,3 +292,30 @@ export async function requireAuthIfUsersExist(requestHeaders: Headers): Promise<
   }
   return null
 }
+
+/**
+ * Like requireAuthIfUsersExist, but once the first user exists the caller must
+ * be an admin — not merely authenticated. Used by the config-writing setup
+ * routes (.env.local): during first-run setup no user exists yet (status is
+ * no-env / no-pool / no-table / no-users), so this returns null and the
+ * /welcome wizard can still write .env.local. After an admin exists, writing
+ * server secrets/config is admin-only.
+ */
+export async function requireAdminIfUsersExist(requestHeaders: Headers): Promise<NextResponse | null> {
+  const check = await checkUsersExist()
+  if (check.status === "db-error") {
+    return NextResponse.json({ error: "Service unavailable" }, { status: 503 })
+  }
+  if (check.status !== "has-users") return null
+  const session = await auth.api.getSession({ headers: requestHeaders })
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+  // Resolve role/permissions from the live DB row (rejects disabled accounts
+  // and cookie-cached grants); never trust the role from the session cookie.
+  const { user } = await getAuthenticatedUser()
+  if (!user || user.role !== "admin") {
+    return NextResponse.json({ error: "Admin access required" }, { status: 403 })
+  }
+  return null
+}

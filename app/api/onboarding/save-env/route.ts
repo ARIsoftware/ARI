@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { access, rename, writeFile } from 'fs/promises'
 import path from 'path'
 import { checkRateLimit, getClientIp, isSameOriginRequest } from '@/lib/modules/public-route-security'
-import { requireAuthIfUsersExist } from '@/lib/auth-helpers'
+import { requireAdminIfUsersExist } from '@/lib/auth-helpers'
 import { welcomeEnvSaveRequestSchema, flattenZodErrors } from '@/lib/validation'
 import { renderEnvFile } from '@/lib/env-file'
 import { SaveEnvSuccessSchema } from '@/lib/openapi/app-schemas'
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const denied = await requireAuthIfUsersExist(request.headers)
+  const denied = await requireAdminIfUsersExist(request.headers)
   if (denied) return denied
 
   try {

@@ -75,7 +75,7 @@ vi.mock('@/lib/db/ensure-schema', () => ({
 // logic via checkUsersExist and requireAuthIfUsersExist which use the pool
 // directly, and we test getAuthenticatedUser at the module level.
 
-import { checkUsersExist, requireAuthIfUsersExist, getAuthenticatedUser } from '@/lib/auth-helpers'
+import { checkUsersExist, requireAuthIfUsersExist, requireAdminIfUsersExist, getAuthenticatedUser } from '@/lib/auth-helpers'
 import { withUserContext } from '@/lib/db'
 
 // ─── checkUsersExist ──────────────────────────────────────────────────────
@@ -184,6 +184,78 @@ describe('requireAuthIfUsersExist', () => {
     expect(res!.status).toBe(401)
     const json = await res!.json()
     expect(json.error).toBe('Unauthorized')
+  })
+})
+
+// ─── requireAdminIfUsersExist ─────────────────────────────────────────────
+
+describe('requireAdminIfUsersExist', () => {
+  beforeEach(() => {
+    mockPoolQuery.mockReset()
+    mockGetSession.mockReset()
+    mockHeadersGet.mockReturnValue(null)
+    process.env.DATABASE_URL = 'postgresql://localhost:5432/test'
+    process.env.BETTER_AUTH_SECRET = 'test-secret'
+    delete process.env.NEXT_PHASE
+  })
+
+  it('returns 503 when checkUsersExist returns db-error', async () => {
+    mockPoolQuery.mockRejectedValue(new Error('boom'))
+    const res = await requireAdminIfUsersExist(new Headers())
+    expect(res).not.toBeNull()
+    expect(res!.status).toBe(503)
+  })
+
+  it('returns null when there are no users (first-run setup — /welcome can write .env.local)', async () => {
+    mockPoolQuery.mockResolvedValue({ rows: [{ has_users: false }] })
+    const res = await requireAdminIfUsersExist(new Headers())
+    expect(res).toBeNull()
+  })
+
+  it('returns null when status is no-table (pre-setup)', async () => {
+    mockPoolQuery.mockRejectedValue({ code: '42P01' })
+    const res = await requireAdminIfUsersExist(new Headers())
+    expect(res).toBeNull()
+  })
+
+  it('returns 401 when users exist but there is no session', async () => {
+    mockPoolQuery.mockResolvedValue({ rows: [{ has_users: true }] })
+    mockGetSession.mockResolvedValue(null)
+    const res = await requireAdminIfUsersExist(new Headers())
+    expect(res).not.toBeNull()
+    expect(res!.status).toBe(401)
+  })
+
+  it('returns 403 when users exist and the caller is a non-admin user', async () => {
+    // 1st pool.query = checkUsersExist; 2nd = loadUserAccess (role lookup)
+    mockPoolQuery
+      .mockResolvedValueOnce({ rows: [{ has_users: true }] })
+      .mockResolvedValueOnce({ rows: [{ role: 'user', permissions: null, disabled: false }] })
+    mockGetSession.mockResolvedValue(makeSession())
+    const res = await requireAdminIfUsersExist(new Headers())
+    expect(res).not.toBeNull()
+    expect(res!.status).toBe(403)
+    const json = await res!.json()
+    expect(json.error).toBe('Admin access required')
+  })
+
+  it('returns 403 when the caller is a disabled account', async () => {
+    mockPoolQuery
+      .mockResolvedValueOnce({ rows: [{ has_users: true }] })
+      .mockResolvedValueOnce({ rows: [{ role: 'admin', permissions: null, disabled: true }] })
+    mockGetSession.mockResolvedValue(makeSession())
+    const res = await requireAdminIfUsersExist(new Headers())
+    expect(res).not.toBeNull()
+    expect(res!.status).toBe(403)
+  })
+
+  it('returns null when users exist and the caller is an admin', async () => {
+    mockPoolQuery
+      .mockResolvedValueOnce({ rows: [{ has_users: true }] })
+      .mockResolvedValueOnce({ rows: [{ role: 'admin', permissions: null, disabled: false }] })
+    mockGetSession.mockResolvedValue(makeSession())
+    const res = await requireAdminIfUsersExist(new Headers())
+    expect(res).toBeNull()
   })
 })
 

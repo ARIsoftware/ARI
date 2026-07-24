@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse, toSnakeCase, requirePermission } from '@/lib/api-helpers'
 import { apiKeys } from '@/lib/db/schema/core-schema'
@@ -58,8 +58,8 @@ export async function PATCH(
       return createErrorResponse('Authentication required', 401)
     }
 
-    // Editing can extend expiry or widen the IP allowlist — same permission
-    // as creating keys. Revoking (DELETE) stays open to the key's owner.
+    // Managing a key (editing here, revoking in DELETE) requires the same
+    // permission as creating one — both extend/relax or destroy a key.
     const denied = requirePermission(user, 'generate_api_keys', 'You do not have permission to manage API keys')
     if (denied) return denied
 
@@ -76,7 +76,7 @@ export async function PATCH(
       db
         .update(apiKeys)
         .set(updates)
-        .where(eq(apiKeys.id, id))
+        .where(and(eq(apiKeys.id, id), eq(apiKeys.userId, user.id)))
         .returning({
           id: apiKeys.id,
           label: apiKeys.label,
@@ -111,12 +111,16 @@ export async function DELETE(
       return createErrorResponse('Authentication required', 401)
     }
 
+    // Revoking a key is part of managing keys — same permission as creating one.
+    const denied = requirePermission(user, 'generate_api_keys', 'You do not have permission to manage API keys')
+    if (denied) return denied
+
     const { id } = await params
 
     const [deleted] = await withRLS((db) =>
       db
         .delete(apiKeys)
-        .where(eq(apiKeys.id, id))
+        .where(and(eq(apiKeys.id, id), eq(apiKeys.userId, user.id)))
         .returning({ id: apiKeys.id })
     )
 

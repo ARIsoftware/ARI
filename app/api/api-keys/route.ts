@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { desc } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse, toSnakeCase, requirePermission } from '@/lib/api-helpers'
 import { generateApiKey } from '@/lib/api-keys'
@@ -64,6 +64,7 @@ export async function GET() {
           createdAt: apiKeys.createdAt,
         })
         .from(apiKeys)
+        .where(eq(apiKeys.userId, user.id))
         .orderBy(desc(apiKeys.createdAt))
     )
 

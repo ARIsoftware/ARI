@@ -323,7 +323,9 @@ function detectRouteMetadata(filePath) {
     if (roleMatch) meta.debugRole = roleMatch[1];
     if (/export\s+const\s+isPublic\s*=\s*true\b/.test(content)) meta.isPublic = true;
     if (/\bcheckRateLimit\b/.test(content)) meta.hasRateLimit = true;
-    if (/\brequireAuthIfUsersExist\b/.test(content)) meta.requiresAuthIfUsers = true;
+    // Matches both requireAuthIfUsersExist and its stricter admin-only sibling
+    // requireAdminIfUsersExist — either one gates the route once a user exists.
+    if (/\brequire(?:Auth|Admin)IfUsersExist\b/.test(content)) meta.requiresAuthIfUsers = true;
     // Reliability check: warn if a route is marked public but also pulls in
     // the auth helper — likely an accidental contradiction.
     if (meta.isPublic && /getAuthenticatedUser/.test(content)) {
