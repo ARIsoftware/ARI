@@ -35,7 +35,7 @@ export default function TasksDashboardStatCard() {
         <Button
           variant="ghost"
           size="sm"
-          className="w-full mt-2 text-xs"
+          className="w-full mt-2 text-xs rounded-full hover:bg-secondary hover:text-secondary-foreground"
           onClick={() => (window.location.href = '/tasks')}
         >
           <Eye className="w-3 h-3 mr-1" />

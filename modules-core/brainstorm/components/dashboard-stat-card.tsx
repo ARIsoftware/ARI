@@ -28,7 +28,7 @@ export default function BrainstormDashboardStatCard() {
         <Button
           variant="ghost"
           size="sm"
-          className="mt-2 w-full text-xs"
+          className="mt-2 w-full text-xs rounded-full hover:bg-secondary hover:text-secondary-foreground"
           onClick={() => { window.location.href = '/brainstorm' }}
         >
           <Eye className="mr-1 h-3 w-3" />

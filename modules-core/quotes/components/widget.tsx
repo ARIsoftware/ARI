@@ -148,7 +148,7 @@ export function QuotesWidget() {
         <Button
           variant="ghost"
           size="sm"
-          className="w-full mt-3 text-xs"
+          className="w-full mt-3 text-xs rounded-full hover:bg-secondary hover:text-secondary-foreground"
           onClick={() => window.location.href = '/quotes'}
         >
           <Quote className="w-3 h-3 mr-1" />
