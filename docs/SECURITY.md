@@ -19,7 +19,7 @@ The middleware at `/middleware.ts` validates the session cookie before allowing 
 
 **Sign-up is disabled at the middleware level.** `POST /api/auth/sign-up*` returns `403`; only server-side bootstrap (via the `/welcome` setup flow or `ARI_FIRST_RUN_ADMIN_*` env vars) can create accounts.
 
-**Optional IP allowlist.** Setting `ALLOWED_IPS` (comma-separated IPs and/or hostnames) rejects requests from any other origin at the middleware. Loopback (`127.0.0.1`, `::1`, `localhost`) is always permitted.
+**IP restriction.** ARI deliberately does *not* implement IP allowlisting in application middleware — request headers like `X-Forwarded-For` are client-controlled and trivially spoofed or omitted, so any header-based check can be bypassed and only creates false confidence. Restrict access at the network edge instead, where the source IP is authoritative: Vercel Firewall, Cloudflare WAF/Access, an nginx/Caddy `allow`/`deny` block, or host firewall rules (`iptables`/`ufw`/security groups).
 
 ## Layer 2: Application-Level Query Filtering (Primary)
 

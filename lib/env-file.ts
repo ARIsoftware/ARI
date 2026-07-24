@@ -157,12 +157,6 @@ export function renderEnvFile(
   lines.push("ARI_LICENSE_KEY=")
   lines.push("")
 
-  lines.push("## Optionally restrict Access to specific IP addresses.")
-  lines.push("## Example: ALLOWED_IPS=1.1.1.1,8.8.8.8")
-  lines.push("## 127.0.0.1 and localhost and ::1 are always allowed.")
-  lines.push("ALLOWED_IPS=")
-  lines.push("")
-
   lines.push("# Show the Next.js dev indicator overlay (the floating badge shown in dev mode).")
   lines.push("# Set to true to show it, false to hide it. Default: false (hidden).")
   lines.push("devIndicators=false")

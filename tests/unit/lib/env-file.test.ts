@@ -245,7 +245,6 @@ describe('renderEnvFile', () => {
     expect(result).toContain('BETTER_AUTH_URL=http://localhost:3000')
     expect(result).toContain('ALLOW_BACKUP_OPERATIONS=true')
     expect(result).toContain('ARI_LICENSE_KEY=')
-    expect(result).toContain('ALLOWED_IPS=')
     expect(result).toContain('devIndicators=false')
   })
 
