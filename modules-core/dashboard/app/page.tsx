@@ -18,7 +18,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <div className="flex flex-1 relative">
+      <div className="flex flex-1 relative min-h-[calc(100svh-4rem)]">
         {/* Main Content */}
         <div className="flex-1 flex flex-col gap-6 p-6 pr-3">
           {/* Welcome Header */}
@@ -74,7 +74,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Right Sidebar - Recent Activity */}
-        <div className="w-80 bg-background p-6 pl-3">
+        <div className="w-80 shrink-0 border-l">
           <RecentActivityFeed activities={recentActivity} />
         </div>
       </div>

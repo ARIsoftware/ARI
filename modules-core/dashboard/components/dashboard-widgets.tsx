@@ -79,12 +79,12 @@ function DynamicWidget({ loader }: { loader: () => Promise<DynamicModule> }) {
   // Render nothing while the chunk loads — widget pops in when ready.
   // Chunks are cached after first load, so this is invisible on warm navigations.
   if (!Component) return null
-  return <div className="h-full [&>*]:h-full"><Component /></div>
+  return <div className="h-full [&>*]:h-full [&>*]:rounded-[0.8rem]"><Component /></div>
 }
 
 // --- Sortable wrapper ---
 
-const DRAG_MODE_CLASS = 'outline outline-[3px] outline-[#60a5fa80] shadow-[0_0_12px_rgba(96,165,250,0.2)] rounded-lg cursor-grab'
+const DRAG_MODE_CLASS = 'outline outline-[3px] outline-[#60a5fa80] shadow-[0_0_12px_rgba(96,165,250,0.2)] rounded-[0.8rem] cursor-grab'
 
 function SortableItem({ id, isDragMode, fullHeight, children }: { id: string; isDragMode: boolean; fullHeight?: boolean; children: React.ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
@@ -113,7 +113,7 @@ function SortableItem({ id, isDragMode, fullHeight, children }: { id: string; is
 
 function SystemStatusCard() {
   return (
-    <Card className="hover:shadow-md transition-shadow h-full">
+    <Card className="rounded-[0.8rem] hover:shadow-md transition-shadow h-full">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">System Status</CardTitle>
         <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>

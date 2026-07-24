@@ -60,15 +60,15 @@ function getActivityColor(type: ActivityItem['type']) {
 export function RecentActivityFeed({ activities }: RecentActivityFeedProps) {
   if (activities.length === 0) {
     return (
-      <Card>
+      <Card className="flex h-full flex-col rounded-none border-0 shadow-none">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="w-5 h-5 text-blue-600" />
             Activity
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center h-[300px]">
+        <CardContent className="flex-1">
+          <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <Clock className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
               <p className="text-muted-foreground">No recent activity</p>
@@ -83,7 +83,7 @@ export function RecentActivityFeed({ activities }: RecentActivityFeedProps) {
   }
 
   return (
-    <Card>
+    <Card className="h-full rounded-none border-0 shadow-none">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Activity className="w-5 h-5 text-blue-600" />
@@ -92,7 +92,7 @@ export function RecentActivityFeed({ activities }: RecentActivityFeedProps) {
       </CardHeader>
       <CardContent>
         <TooltipProvider>
-          <div className="space-y-4 max-h-[800px] overflow-y-auto">
+          <div className="space-y-4">
             {activities.map((activity) => (
               <div
                 key={activity.id}
