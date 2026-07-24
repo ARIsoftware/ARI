@@ -25,7 +25,7 @@ registry.registerPath({
   request: { query: ContactQuerySchema },
   responses: {
     200: {
-      description: "Paginated list of the authenticated user's contacts",
+      description: 'Paginated list of contacts (shared across all workspace users)',
       content: { 'application/json': { schema: ContactListResponseSchema } },
     },
     401: {
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Math.max(1, Number(searchParams.get('limit')) || DEFAULT_LIMIT), MAX_LIMIT)
     const offset = Math.max(0, Number(searchParams.get('offset')) || 0)
 
-    // RLS automatically filters by user_id
+    // SHARED model: all authenticated users read the same contacts — no user_id filter
     const [data, countResult] = await withRLS(async (db) => {
       const rows = await db.select().from(contacts).orderBy(asc(contacts.name)).limit(limit).offset(offset)
       const total = await db.select({ count: sql<number>`count(*)::int` }).from(contacts)
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Authentication required', 401)
     }
 
-    // INSERT requires explicit user_id
+    // INSERT stamps user_id = creator (owner); the row stays visible to all users
     const data = await withRLS((db) =>
       db.insert(contacts)
         .values({ ...contact, userId: user.id })

@@ -114,7 +114,7 @@ export async function GET(
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // RLS automatically filters by user_id
+    // SHARED model: any authenticated user can view any contact — no user_id filter
     const data = await withRLS((db) =>
       db.select()
         .from(contacts)
@@ -150,7 +150,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // RLS automatically ensures user can only update their own contacts
+    // SHARED model: any authenticated user can update any contact — no user_id filter
     const data = await withRLS((db) =>
       db.update(contacts)
         .set({ ...updates, updatedAt: new Date().toISOString() })
@@ -182,7 +182,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // RLS automatically ensures user can only delete their own contacts
+    // SHARED model: any authenticated user can delete any contact — no user_id filter
     await withRLS((db) =>
       db.delete(contacts).where(eq(contacts.id, id))
     )
