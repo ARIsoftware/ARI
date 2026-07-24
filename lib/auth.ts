@@ -91,6 +91,13 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 30, // 30 days
     updateAge: 60 * 60 * 24,       // refresh session expiry every 1 day of activity
+    // Better Auth gates /list-sessions behind a session "freshness" check
+    // (default 24h, measured against createdAt — which never refreshes even
+    // as updateAge extends expiry). With 30-day sessions users are almost
+    // always past 24h, so Settings → Security "Active Sessions" got a 403
+    // and rendered empty. 0 disables the check; the only other fresh-gated
+    // endpoints (unlink-account, delete-user) are unused/disabled in ARI.
+    freshAge: 0,
     cookieCache: {
       enabled: true,
       maxAge: 60, // 1 minute

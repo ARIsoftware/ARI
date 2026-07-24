@@ -156,6 +156,14 @@ function SettingsPageContent(): React.ReactElement {
       const result = await authClient.listSessions()
       if (result.data) {
         setSessions(result.data)
+      } else if (result.error) {
+        // Surface the failure instead of masquerading as "no sessions"
+        console.error("Failed to load sessions:", result.error)
+        toast({
+          variant: "destructive",
+          title: "Failed to load sessions",
+          description: result.error.message || "Please try again.",
+        })
       }
       // Use session from context instead of fetching again
       if (session?.token) {
