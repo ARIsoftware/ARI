@@ -942,6 +942,15 @@ rm lib/old-feature.ts
 
 **Objective:** Comprehensively test the migrated module.
 
+#### Automated Unit Tests (Vitest)
+
+Unit tests live centrally in `/tests/unit/` — never inside the module folder. For a core module, put tests under `tests/unit/modules-core/[module-id]/`, mirroring the module's `lib/` files.
+
+- [ ] **Coverage**: Any logic in a core module's `lib/` is in coverage scope (`modules-core/**/lib/**`) — add matching tests, or the ratcheted coverage thresholds fail CI (`pnpm test:coverage`)
+- [ ] **Imports/Mocks**: Use the `@/` path alias in test imports and `vi.mock` ids (never absolute paths)
+- [ ] **Custom modules**: `modules-custom/` is untracked and excluded from coverage — unit tests are optional there
+- [ ] **Suite passes**: `pnpm test` is green before committing
+
 #### Step 5.8.1: Functional Testing
 
 - [ ] **Create**: Add new items successfully

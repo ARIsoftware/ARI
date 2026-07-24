@@ -13,6 +13,8 @@ ARI is a Next.js 16 (React 19) application using Better Auth for authentication 
 - **Data Fetching**: TanStack Query (React Query) for client-side data fetching with optimistic updates
 - **Styling**: Tailwind CSS + Shadcn/ui components
 - **Font**: DM Sans
+- **Testing**: Vitest with V8 coverage (centralized unit tests in `/tests/unit`, ratcheted coverage thresholds)
+- **Linting/Formatting**: ESLint (native flat config) + Prettier
 - **Deployment**: Vercel-ready
 
 ## Authentication Architecture
@@ -380,6 +382,15 @@ Module-specific schemas live in `modules-{core,custom}/<id>/database/schema.sql`
       uninstall.sql     # Manual-only teardown script — never auto-runs
 
 /modules-custom         # User-created modules (same structure as modules-core)
+
+/tests/unit             # Centralized Vitest unit tests — mirrors source paths
+  /lib/                 # Tests for root lib/** (e.g. auth-helpers.test.ts)
+  /modules-core/        # Tests for core modules' lib/** code
+
+vitest.config.ts        # Vitest + V8 coverage config (scope + ratcheted thresholds)
+eslint.config.mjs       # ESLint native flat config
+.prettierrc.json        # Prettier style config (.prettierignore excludes Markdown)
+.github/workflows/ci.yml # CI: typecheck, lint (report-only), tests + coverage, build
 ```
 
 ### Module Top Bar Icons
@@ -465,6 +476,43 @@ pnpm dev              # Run development server
 pnpm build            # Build for production
 pnpm start            # Run production build
 ```
+
+### Unit Tests (Vitest)
+
+Unit tests use Vitest with V8 coverage. All tests live centrally in `/tests/unit/`, mirroring source paths (e.g. `tests/unit/lib/auth-helpers.test.ts`, `tests/unit/modules-core/<module-id>/...`) — never next to the source files.
+
+```bash
+pnpm test            # Run the full suite once
+pnpm test:watch      # Watch mode
+pnpm test:coverage   # Run with coverage report (HTML/lcov in coverage/)
+pnpm coverage:bump   # Raise the coverage ratchet floor after adding tests
+```
+
+Key rules (see `vitest.config.ts` for the authoritative config):
+
+- **Coverage scope is business logic only**: root `lib/**/*.ts` plus each core module's `modules-core/**/lib/**/*.ts`. React components, pages, thin API-route glue, generated code, and Drizzle schema definitions are out of scope. `modules-custom/` is untracked (local-only) and intentionally excluded so CI matches a fresh checkout.
+- **Thresholds are a ratchet** (currently 99% lines/functions/statements, 97% branches): only ever raise them via `pnpm coverage:bump`, never lower them by hand. A drop below the floor fails CI.
+- **Every in-scope file counts toward coverage**, even if no test imports it — new logic in `lib/` or a core module's `lib/` needs matching tests or it shows as 0% and drags the suite below the ratchet.
+- Use the `@/` path alias in test imports and `vi.mock` ids (never hardcoded absolute paths). `@/modules/*` resolves `modules-custom` first, then `modules-core` — same as tsconfig.
+
+### Linting & Formatting (ESLint + Prettier)
+
+```bash
+pnpm lint            # ESLint over the repo
+pnpm lint:fix        # ESLint with --fix
+pnpm format          # Prettier --write .
+pnpm format:check    # Prettier --check .
+pnpm typecheck       # tsc --noEmit
+```
+
+- ESLint uses a **native flat config** (`eslint.config.mjs`) that spreads `eslint-config-next`'s flat arrays directly — do NOT reintroduce `FlatCompat`/`@eslint/eslintrc`. `eslint-config-prettier` is last so it disables stylistic rules that would fight the formatter.
+- Prettier style (`.prettierrc.json`): no semicolons, single quotes, 100-char print width, trailing commas.
+- **Markdown is deliberately excluded from Prettier** (`.prettierignore`) — docs are hand-maintained; don't let Prettier reflow them.
+- Build output, runtime assets, and generated code (`lib/generated/`, `lib/db/schema/schema.ts`, `lib/db/schema/relations.ts`) are ignored by both tools — never hand-edit or lint-fix generated files.
+
+### Continuous Integration
+
+`.github/workflows/ci.yml` runs on pushes to `main` and on PRs: it regenerates `lib/generated/*` and the schema barrel (fresh checkouts don't have them), then runs `typecheck` → `lint` → `test:coverage` → `build`. Lint is currently **report-only** (`continue-on-error`) while the initial backlog is burned down — findings show in the PR log without failing CI; drop `continue-on-error` to make it a hard gate. The coverage ratchet **is** a hard gate.
 
 ### Authentication Testing
 1. Sign in at `/sign-in` with existing credentials
