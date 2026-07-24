@@ -4,7 +4,7 @@ import type * as React from "react"
 import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ChevronRight, Settings, Package } from "lucide-react"
+import { ChevronRight } from "lucide-react"
 import {
   DndContext,
   PointerSensor,
@@ -21,8 +21,6 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { useEnabledModulesFromContext } from "@/lib/modules/context"
-import { useCurrentUser } from "@/hooks/use-users"
-import { hasPermission } from "@/lib/permissions"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
 import { useDragDropMode } from "@/components/drag-drop-mode-context"
 import { useTheme } from "@/lib/theme/theme-context"
@@ -36,7 +34,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-  SidebarFooter,
 } from "@/components/ui/sidebar"
 import { SubmenuRenderer } from "@/components/sidebar-submenu-renderer"
 
@@ -108,12 +105,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   // Get enabled modules from context (pre-fetched server-side)
   const enabledModules = useEnabledModulesFromContext()
-
-  // The Settings link is only shown to accounts with the matching
-  // permission. The server enforces this independently — hiding is cosmetic.
-  // (The Users link comes from the Users module's manifest routes.)
-  const { data: currentUser } = useCurrentUser()
-  const canAccessSettings = hasPermission(currentUser, 'access_settings')
 
   // Drag and drop mode
   const { isDragMode, setPendingOrder, moduleOrder } = useDragDropMode()
@@ -461,37 +452,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             })}
           </>
         )}
-      </SidebarContent>
-      <SidebarFooter>
-        <div className="border-t border-sidebar-border/60 pt-[15px]">
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname.startsWith('/modules')}>
-                <Link href="/modules" className="flex items-center">
-                  <Package className="mr-2 size-4" />
-                  <span>Modules</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            {canAccessSettings && (
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname.startsWith('/settings')}>
-                  <Link href="/settings" className="flex items-center">
-                    <Settings className="mr-2 size-4" />
-                    <span>Settings</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-          </SidebarMenu>
-        </div>
         <div
-          className="px-2 py-1 text-[10px] text-muted-foreground/60 font-mono select-none"
+          className="mt-auto px-4 py-2 text-[10px] text-muted-foreground/60 font-mono select-none"
           title={`commit ${process.env.NEXT_PUBLIC_ARI_COMMIT}`}
         >
           ARI {process.env.NEXT_PUBLIC_ARI_VERSION}
         </div>
-      </SidebarFooter>
+      </SidebarContent>
       <SidebarRail />
     </Sidebar>
   )
