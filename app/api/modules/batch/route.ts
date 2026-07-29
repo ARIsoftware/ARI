@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { requirePermission } from '@/lib/api-helpers'
 import { setModuleEnabled } from '@/lib/modules/module-registry'
+import { logActivity } from '@/lib/activity-log'
 import { batchModulesSchema, BatchModulesResponseSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
@@ -90,6 +91,15 @@ export async function POST(request: NextRequest) {
         error: result.error,
         warning: result.warning
       })
+      if (result.success) {
+        logActivity({
+          userId: user.id,
+          type: enabled ? 'module_enabled' : 'module_disabled',
+          description: `${enabled ? 'Enabled' : 'Disabled'} module "${moduleId}"`,
+          source: 'modules',
+          metadata: { moduleId },
+        })
+      }
     }
 
     // Check if any failed

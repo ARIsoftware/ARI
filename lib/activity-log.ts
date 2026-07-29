@@ -30,13 +30,15 @@ export interface ActivityEvent {
   metadata?: Record<string, unknown>
 }
 
-const INSERT_SQL = `INSERT INTO "activity_log" ("user_id", "event_type", "source", "description", "metadata")
-   VALUES ($1, $2, $3, $4, $5::jsonb)`
+// user_email is denormalized at write time (resolved from "user" inside the
+// same statement) so log rows are self-describing when read directly.
+const INSERT_SQL = `INSERT INTO "activity_log" ("user_id", "user_email", "event_type", "source", "description", "metadata")
+   VALUES ($1, (SELECT "email" FROM "user" WHERE "id" = $1), $2, $3, $4, $5::jsonb)`
 
-// Same guard, but only inserts when no event of this type already references
-// the same metadata value (e.g. one api_key_expired per key, ever).
-const INSERT_ONCE_SQL = `INSERT INTO "activity_log" ("user_id", "event_type", "source", "description", "metadata")
-   SELECT $1, $2, $3, $4, $5::jsonb
+// Same insert, but only when no event of this type already references the
+// same metadata value (e.g. one api_key_expired per key, ever).
+const INSERT_ONCE_SQL = `INSERT INTO "activity_log" ("user_id", "user_email", "event_type", "source", "description", "metadata")
+   SELECT $1, (SELECT "email" FROM "user" WHERE "id" = $1), $2, $3, $4, $5::jsonb
    WHERE NOT EXISTS (
      SELECT 1 FROM "activity_log" WHERE "event_type" = $2 AND "metadata"->>$6 = $7
    )`

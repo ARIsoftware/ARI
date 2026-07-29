@@ -220,6 +220,7 @@ export const apiKeyUsageLogs = pgTable("api_key_usage_logs", {
 export const activityLog = pgTable("activity_log", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	userId: text("user_id").notNull(),
+	userEmail: text("user_email"),
 	eventType: varchar("event_type", { length: 100 }).notNull(),
 	source: varchar({ length: 100 }).notNull(),
 	description: text().notNull(),

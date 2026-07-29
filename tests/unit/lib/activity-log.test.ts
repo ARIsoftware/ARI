@@ -62,6 +62,8 @@ describe('logActivity', () => {
     expect(mockQuery).toHaveBeenCalledTimes(1)
     const [sql, params] = mockQuery.mock.calls[0]
     expect(sql).toContain('INSERT INTO "activity_log"')
+    // user_email is denormalized at write time via a subquery on "user"
+    expect(sql).toContain('(SELECT "email" FROM "user" WHERE "id" = $1)')
     expect(params).toEqual(['u1', 'profile_updated', 'settings', 'Updated profile', '{}'])
   })
 
@@ -119,6 +121,7 @@ describe('logActivityOnce', () => {
     expect(mockQuery).toHaveBeenCalledTimes(1)
     const [sql, params] = mockQuery.mock.calls[0]
     expect(sql).toContain('WHERE NOT EXISTS')
+    expect(sql).toContain('(SELECT "email" FROM "user" WHERE "id" = $1)')
     expect(params).toHaveLength(7)
     expect(params[1]).toBe('api_key_expired')
     expect(params[5]).toBe('apiKeyId')

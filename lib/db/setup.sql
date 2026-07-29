@@ -315,6 +315,7 @@ CREATE POLICY "api_key_usage_logs_rls_delete" ON "api_key_usage_logs" FOR DELETE
 CREATE TABLE IF NOT EXISTS "activity_log" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "user_id" TEXT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "user_email" TEXT,
   "event_type" VARCHAR(100) NOT NULL,
   "source" VARCHAR(100) NOT NULL,
   "description" TEXT NOT NULL,
@@ -322,6 +323,12 @@ CREATE TABLE IF NOT EXISTS "activity_log" (
   "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY ("id")
 );
+-- Additive upgrade for installs that predate user_email, then backfill any
+-- rows written before the column existed (no-op once backfilled).
+ALTER TABLE "activity_log" ADD COLUMN IF NOT EXISTS "user_email" TEXT;
+UPDATE "activity_log" SET "user_email" = u."email"
+  FROM "user" u
+  WHERE "activity_log"."user_email" IS NULL AND u."id" = "activity_log"."user_id";
 CREATE INDEX IF NOT EXISTS "idx_activity_log_created" ON "activity_log" ("created_at" DESC);
 CREATE INDEX IF NOT EXISTS "idx_activity_log_user_created" ON "activity_log" ("user_id", "created_at" DESC);
 ALTER TABLE "activity_log" ENABLE ROW LEVEL SECURITY;

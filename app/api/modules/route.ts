@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { requirePermission } from '@/lib/api-helpers'
 import { getEnabledModules, setModuleEnabled } from '@/lib/modules/module-registry'
+import { logActivity } from '@/lib/activity-log'
 import {
   toggleModuleSchema,
   ToggleModuleResponseSchema,
@@ -127,6 +128,14 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    logActivity({
+      userId: user.id,
+      type: enabled ? 'module_enabled' : 'module_disabled',
+      description: `${enabled ? 'Enabled' : 'Disabled'} module "${moduleId}"`,
+      source: 'modules',
+      metadata: { moduleId },
+    })
 
     return NextResponse.json({
       success: true,
