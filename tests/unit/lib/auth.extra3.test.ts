@@ -28,6 +28,7 @@ vi.mock('better-auth/api', () => ({
       super(opts.message)
     }
   },
+  createAuthMiddleware: (fn: unknown) => fn,
 }))
 
 vi.mock('better-auth/next-js', () => ({ nextCookies: vi.fn(() => ({})) }))

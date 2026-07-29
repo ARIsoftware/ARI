@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { requireAdmin } from '@/lib/api-helpers'
 import { isProductionSafeOperation } from '@/lib/admin-helpers'
+import { logActivity } from '@/lib/activity-log'
 import { getPoolClient } from '@/lib/db'
 import { logger } from '@/lib/logger'
 import { safeErrorResponse } from '@/lib/api-error'
@@ -395,6 +396,21 @@ export async function POST(req: NextRequest) {
       },
       integrityCheck: integrityCheck.passed ? 'passed' : integrityCheck,
     }
+
+    // Best-effort: a restore from a pre-activity_log backup leaves the table
+    // missing until the boot self-heal re-applies setup.sql, and the acting
+    // admin's user row may not exist in a foreign backup — logActivity
+    // swallows both failures.
+    logActivity({
+      userId: user.id,
+      type: 'backup_imported',
+      description: 'Imported database backup (full restore)',
+      metadata: {
+        tablesCreated: creates.length,
+        recordsImported: inserts.length,
+        integrityCheck: integrityCheck.passed ? 'passed' : 'failed',
+      },
+    })
 
     return NextResponse.json(response, { status: 200 })
 

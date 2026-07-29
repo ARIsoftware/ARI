@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse, toSnakeCase, requirePermission } from '@/lib/api-helpers'
+import { logActivity } from '@/lib/activity-log'
 import { apiKeys } from '@/lib/db/schema/core-schema'
 import {
   appIdParamSchema,
@@ -121,12 +122,19 @@ export async function DELETE(
       db
         .delete(apiKeys)
         .where(and(eq(apiKeys.id, id), eq(apiKeys.userId, user.id)))
-        .returning({ id: apiKeys.id })
+        .returning({ id: apiKeys.id, label: apiKeys.label, keyPrefix: apiKeys.keyPrefix })
     )
 
     if (!deleted) {
       return createErrorResponse('API key not found', 404)
     }
+
+    logActivity({
+      userId: user.id,
+      type: 'api_key_deleted',
+      description: `Deleted API key "${deleted.label}"`,
+      metadata: { apiKeyId: deleted.id, label: deleted.label, keyPrefix: deleted.keyPrefix },
+    })
 
     return NextResponse.json({ success: true })
   } catch (error) {

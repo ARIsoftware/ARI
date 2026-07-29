@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { userPreferences } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { toSnakeCase } from '@/lib/api-helpers'
+import { logActivity } from '@/lib/activity-log'
 import { profileFieldSchemas, emptyToNull } from '@/lib/validation'
 import { UserPreferencesSchema, updateUserPreferencesSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
@@ -147,6 +148,13 @@ export async function PUT(request: NextRequest) {
         })
         .returning()
     )
+
+    logActivity({
+      userId: user.id,
+      type: 'profile_updated',
+      description: 'Updated profile information',
+      metadata: { fields: Object.keys(validatedData) },
+    })
 
     return NextResponse.json(toSnakeCase(result[0]))
   } catch (error) {

@@ -77,6 +77,62 @@ describe('withUserContext', () => {
     expect(release).toHaveBeenCalled()
   })
 
+  it('sets app.current_user_role in the same round trip when a role is given', async () => {
+    const queryCalls: string[] = []
+    const client = makeRawClient({
+      query: async (q: any) => {
+        queryCalls.push(typeof q === 'string' ? q : '')
+        return { rows: [] }
+      },
+    })
+    mockPoolConnect.mockResolvedValue(client)
+    const pool = { connect: mockPoolConnect, end: mockPoolEnd }
+    const { withUserContext } = await loadDbIndex(pool)
+
+    await withUserContext('user1', async () => 'ok', 'admin')
+
+    const setLocalCall = queryCalls.find(q => q.includes('SET LOCAL'))
+    expect(setLocalCall).toBe(
+      "SET LOCAL app.current_user_id = 'user1'; SET LOCAL app.current_user_role = 'admin'"
+    )
+  })
+
+  it('omits app.current_user_role when no role is given', async () => {
+    const queryCalls: string[] = []
+    const client = makeRawClient({
+      query: async (q: any) => {
+        queryCalls.push(typeof q === 'string' ? q : '')
+        return { rows: [] }
+      },
+    })
+    mockPoolConnect.mockResolvedValue(client)
+    const pool = { connect: mockPoolConnect, end: mockPoolEnd }
+    const { withUserContext } = await loadDbIndex(pool)
+
+    await withUserContext('user1', async () => 'ok')
+
+    const setLocalCall = queryCalls.find(q => q.includes('SET LOCAL'))
+    expect(setLocalCall).not.toContain('app.current_user_role')
+  })
+
+  it('escapes single quotes in the role', async () => {
+    const queryCalls: string[] = []
+    const client = makeRawClient({
+      query: async (q: any) => {
+        queryCalls.push(typeof q === 'string' ? q : '')
+        return { rows: [] }
+      },
+    })
+    mockPoolConnect.mockResolvedValue(client)
+    const pool = { connect: mockPoolConnect, end: mockPoolEnd }
+    const { withUserContext } = await loadDbIndex(pool)
+
+    await withUserContext('user1', async () => 'ok', "adm'in")
+
+    const setLocalCall = queryCalls.find(q => q.includes('current_user_role'))
+    expect(setLocalCall).toContain("adm''in")
+  })
+
   it('escapes single quotes in userId to prevent SQL injection', async () => {
     const queryCalls: string[] = []
     const client = makeRawClient({

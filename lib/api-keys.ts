@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import { eq, and, sql } from 'drizzle-orm'
+import { logActivityOnce } from '@/lib/activity-log'
 import { withAdminDb } from '@/lib/db'
 import { apiKeys, apiKeyUsageLogs } from '@/lib/db/schema/core-schema'
 import { API_KEY_PREFIX } from '@/lib/auth-middleware'
@@ -49,7 +50,28 @@ export async function lookupApiKey(keyHash: string): Promise<ApiKeyRow | null> {
   )
 
   const key = rows[0]
-  if (!key || (key.expiresAt && new Date(key.expiresAt) < new Date())) {
+  if (!key) {
+    keyCache.set(keyHash, { result: null, ts: Date.now() })
+    return null
+  }
+  if (key.expiresAt && new Date(key.expiresAt) < new Date()) {
+    // Expiry has no triggering request of its own — it's detected here, on the
+    // first use after the deadline. This runs on every request presenting the
+    // key, so dedupe to exactly one event per key.
+    logActivityOnce(
+      {
+        userId: key.userId,
+        type: 'api_key_expired',
+        description: `API key "${key.label}" expired`,
+        metadata: {
+          apiKeyId: key.id,
+          label: key.label,
+          keyPrefix: key.keyPrefix,
+          expiredAt: key.expiresAt,
+        },
+      },
+      'apiKeyId'
+    )
     keyCache.set(keyHash, { result: null, ts: Date.now() })
     return null
   }

@@ -182,7 +182,7 @@ async function getAuthenticatedUserImpl() {
         user: session.user,
       },
       withRLS: <T>(operation: (db: DrizzleDb) => Promise<T>): Promise<T> =>
-        withUserContext(session.user.id, operation),
+        withUserContext(session.user.id, operation, access.role),
     }
   }
 
@@ -226,7 +226,7 @@ async function getAuthenticatedUserImpl() {
       },
       session: null,
       withRLS: <T>(operation: (db: DrizzleDb) => Promise<T>): Promise<T> =>
-        withUserContext(keyRow.userId, operation),
+        withUserContext(keyRow.userId, operation, keyUserRole),
       /** API key metadata — only set when authenticated via API key */
       apiKey: {
         id: keyRow.id,

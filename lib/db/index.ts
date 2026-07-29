@@ -68,7 +68,8 @@ function isStaleConnectionError(error: any): boolean {
 
 export async function withUserContext<T>(
   userId: string,
-  operation: (db: DrizzleDb) => Promise<T>
+  operation: (db: DrizzleDb) => Promise<T>,
+  role?: string
 ): Promise<T> {
   if (!pool) {
     throw new Error('Database pool not initialized')
@@ -90,7 +91,15 @@ export async function withUserContext<T>(
       // Note: SET doesn't support parameterized queries, so we escape manually
       // Escape single quotes to prevent SQL injection
       const escapedUserId = userId.replace(/'/g, "''")
-      await client.query(`SET LOCAL app.current_user_id = '${escapedUserId}'`)
+      // app.current_user_role backs admin-only policies (e.g. activity_log
+      // SELECT). Batched into the same round trip as the user id; when absent,
+      // current_setting('app.current_user_role', true) is NULL → not admin.
+      let setContext = `SET LOCAL app.current_user_id = '${escapedUserId}'`
+      if (role) {
+        const escapedRole = role.replace(/'/g, "''")
+        setContext += `; SET LOCAL app.current_user_role = '${escapedRole}'`
+      }
+      await client.query(setContext)
 
       // Create Drizzle instance for this connection
       const db = drizzle(client as PoolClient)

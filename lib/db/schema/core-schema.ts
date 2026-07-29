@@ -211,6 +211,35 @@ export const apiKeyUsageLogs = pgTable("api_key_usage_logs", {
 ]);
 
 // =============================================================================
+// ACTIVITY LOG
+// =============================================================================
+
+// Central activity/audit trail — written post-response by lib/activity-log.ts.
+// SELECT is admin-only via app.current_user_role (set by withUserContext);
+// rows are immutable (UPDATE denied), DELETE admin-only.
+export const activityLog = pgTable("activity_log", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	userId: text("user_id").notNull(),
+	eventType: varchar("event_type", { length: 100 }).notNull(),
+	source: varchar({ length: 100 }).notNull(),
+	description: text().notNull(),
+	metadata: jsonb().default({}).notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_activity_log_created").using("btree", table.createdAt.desc().nullsFirst()),
+	index("idx_activity_log_user_created").using("btree", table.userId.asc().nullsLast().op("text_ops"), table.createdAt.desc().nullsFirst()),
+	foreignKey({
+		columns: [table.userId],
+		foreignColumns: [user.id],
+		name: "activity_log_user_id_fkey"
+	}).onDelete("cascade"),
+	pgPolicy("activity_log_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`((select current_setting('app.current_user_role', true)) = 'admin')` }),
+	pgPolicy("activity_log_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id = (select current_setting('app.current_user_id')))` }),
+	pgPolicy("activity_log_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`false` }),
+	pgPolicy("activity_log_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`((select current_setting('app.current_user_role', true)) = 'admin')` }),
+]);
+
+// =============================================================================
 // SHARED TABLES (not owned by any specific module)
 // =============================================================================
 

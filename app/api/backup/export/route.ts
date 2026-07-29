@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { requireAdmin } from '@/lib/api-helpers'
 import { isProductionSafeOperation } from '@/lib/admin-helpers'
+import { logActivity } from '@/lib/activity-log'
 import { logger } from '@/lib/logger'
 import { safeErrorResponse } from '@/lib/api-error'
 import { queryRows, EXCLUDED_TABLES, calculateChecksum, stripNul } from '../utils'
@@ -679,6 +680,17 @@ export async function POST(req: NextRequest) {
     }
 
     sqlContent += `\n-- End of backup\n`
+
+    logActivity({
+      userId: user.id,
+      type: 'backup_exported',
+      description: 'Exported database backup',
+      metadata: {
+        tables: metadata.tables.length,
+        rows: metadata.totalRows,
+        partial: failedTables.length > 0,
+      },
+    })
 
     // Return the SQL file as a downloadable response
     return new NextResponse(sqlContent, {

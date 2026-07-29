@@ -3,6 +3,7 @@ import { desc, eq } from 'drizzle-orm'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse, toSnakeCase, requirePermission } from '@/lib/api-helpers'
 import { generateApiKey } from '@/lib/api-keys'
+import { logActivity } from '@/lib/activity-log'
 import { apiKeys } from '@/lib/db/schema/core-schema'
 import crypto from 'crypto'
 import {
@@ -113,6 +114,13 @@ export async function POST(request: NextRequest) {
         createdAt: apiKeys.createdAt,
       })
     )
+
+    logActivity({
+      userId: user.id,
+      type: 'api_key_created',
+      description: `Generated API key "${label}"`,
+      metadata: { apiKeyId: id, label, keyPrefix, expiresAt: expiresAt || null },
+    })
 
     return NextResponse.json({
       key: toSnakeCase(created),

@@ -304,6 +304,44 @@ CREATE POLICY "api_key_usage_logs_rls_delete" ON "api_key_usage_logs" FOR DELETE
   USING (user_id = (SELECT current_setting('app.current_user_id')));
 
 -- ================================================================
+-- ACTIVITY LOG
+-- ================================================================
+
+-- Table: activity_log
+-- Central activity/audit trail. Rows are written post-response by
+-- lib/activity-log.ts directly on the pool (no RLS transaction). SELECT is
+-- admin-only: the policy reads app.current_user_role, which withUserContext()
+-- sets from the server-verified user row. Like all policies here this is
+-- defense-in-depth (the default role has BYPASSRLS) — any viewer API route
+-- must still enforce admin access itself. Rows are immutable (no UPDATE);
+-- DELETE is admin-only so a future viewer can offer log pruning.
+CREATE TABLE IF NOT EXISTS "activity_log" (
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "user_id" TEXT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "event_type" VARCHAR(100) NOT NULL,
+  "source" VARCHAR(100) NOT NULL,
+  "description" TEXT NOT NULL,
+  "metadata" JSONB NOT NULL DEFAULT '{}'::jsonb,
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY ("id")
+);
+CREATE INDEX IF NOT EXISTS "idx_activity_log_created" ON "activity_log" ("created_at" DESC);
+CREATE INDEX IF NOT EXISTS "idx_activity_log_user_created" ON "activity_log" ("user_id", "created_at" DESC);
+ALTER TABLE "activity_log" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "activity_log_rls_select" ON "activity_log";
+CREATE POLICY "activity_log_rls_select" ON "activity_log" FOR SELECT TO public
+  USING ((SELECT current_setting('app.current_user_role', true)) = 'admin');
+DROP POLICY IF EXISTS "activity_log_rls_insert" ON "activity_log";
+CREATE POLICY "activity_log_rls_insert" ON "activity_log" FOR INSERT TO public
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+DROP POLICY IF EXISTS "activity_log_rls_update" ON "activity_log";
+CREATE POLICY "activity_log_rls_update" ON "activity_log" FOR UPDATE TO public
+  USING (false);
+DROP POLICY IF EXISTS "activity_log_rls_delete" ON "activity_log";
+CREATE POLICY "activity_log_rls_delete" ON "activity_log" FOR DELETE TO public
+  USING ((SELECT current_setting('app.current_user_role', true)) = 'admin');
+
+-- ================================================================
 -- MODULE TABLES
 -- ================================================================
 

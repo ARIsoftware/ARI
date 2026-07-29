@@ -31,6 +31,13 @@ vi.mock('drizzle-orm', () => ({
   sql: vi.fn(),
 }))
 
+// ── mock activity log (expired keys emit a deduped event) ─────────────────
+const mockLogActivityOnce = vi.fn()
+vi.mock('@/lib/activity-log', () => ({
+  logActivityOnce: (...args: unknown[]) => mockLogActivityOnce(...args),
+  logActivity: vi.fn(),
+}))
+
 import { generateApiKey, hashApiKey, lookupApiKey, recordApiKeyUsage } from '@/lib/api-keys'
 import { API_KEY_PREFIX } from '@/lib/auth-middleware'
 
@@ -130,6 +137,7 @@ describe('lookupApiKey — expired key returns null', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     mockWithAdminDb.mockReset()
+    mockLogActivityOnce.mockReset()
   })
   afterEach(() => {
     vi.useRealTimers()
@@ -149,6 +157,57 @@ describe('lookupApiKey — expired key returns null', () => {
 
     const result = await lookupApiKey('expiredhash')
     expect(result).toBeNull()
+  })
+
+  it('logs a deduped api_key_expired event with key metadata', async () => {
+    const expiresAt = new Date(Date.now() - 1000).toISOString()
+    const row = makeKeyRow({
+      id: 'key-exp',
+      label: 'ci key',
+      keyPrefix: 'ari_expired1',
+      expiresAt,
+    })
+    mockWithAdminDb.mockImplementation(async (cb: (db: any) => Promise<unknown>) => {
+      const db = {
+        select: () => db,
+        from: () => db,
+        where: () => db,
+        limit: () => [row],
+      }
+      return cb(db)
+    })
+
+    await lookupApiKey('expiredhash2')
+    expect(mockLogActivityOnce).toHaveBeenCalledTimes(1)
+    expect(mockLogActivityOnce).toHaveBeenCalledWith(
+      {
+        userId: 'user-1',
+        type: 'api_key_expired',
+        description: 'API key "ci key" expired',
+        metadata: {
+          apiKeyId: 'key-exp',
+          label: 'ci key',
+          keyPrefix: 'ari_expired1',
+          expiredAt: expiresAt,
+        },
+      },
+      'apiKeyId'
+    )
+  })
+
+  it('does not log an expiry event when the key simply does not exist', async () => {
+    mockWithAdminDb.mockImplementation(async (cb: (db: any) => Promise<unknown>) => {
+      const db = {
+        select: () => db,
+        from: () => db,
+        where: () => db,
+        limit: () => [],
+      }
+      return cb(db)
+    })
+
+    await lookupApiKey('missinghash2')
+    expect(mockLogActivityOnce).not.toHaveBeenCalled()
   })
 })
 

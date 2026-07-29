@@ -38,6 +38,8 @@ vi.mock('better-auth/api', () => ({
       this.code = code
     }
   },
+  // Identity passthrough so the config-level hooks.after handler is directly callable
+  createAuthMiddleware: (fn: unknown) => fn,
 }))
 
 vi.mock('better-auth/next-js', () => ({
@@ -78,6 +80,13 @@ vi.mock('@/lib/telemetry/instance', () => ({
 }))
 vi.mock('@/lib/telemetry/send-tv-connect', () => ({
   sendTvConnect: (...args: unknown[]) => mockSendTvConnect(...args),
+}))
+
+// ── activity log mock (password-change audit hook) ────────────────────────────
+const mockLogActivity = vi.fn()
+vi.mock('@/lib/activity-log', () => ({
+  logActivity: (...args: unknown[]) => mockLogActivity(...args),
+  logActivityOnce: vi.fn(),
 }))
 
 // ── Import the module under test ──────────────────────────────────────────────
@@ -387,6 +396,57 @@ describe('databaseHooks.session.create.after — telemetry ping', () => {
     mockGetAriInstance.mockRejectedValue(new Error('telemetry network error'))
     const session = { userId: 'user-t6' }
     await expect(sessionCreateAfter()(session)).resolves.toBeUndefined()
+  })
+})
+
+// ─── hooks.after — password-change activity log ───────────────────────────────
+
+describe('hooks.after — password_changed audit', () => {
+  // createAuthMiddleware is mocked as identity, so this is the raw handler.
+  const afterHook = () => capturedConfigHolder.cfg.hooks.after
+
+  beforeEach(() => {
+    mockLogActivity.mockReset()
+  })
+
+  it('logs password_changed on a successful /change-password', async () => {
+    await afterHook()({
+      path: '/change-password',
+      context: { returned: { status: true }, session: { user: { id: 'user-9' } } },
+    })
+    expect(mockLogActivity).toHaveBeenCalledTimes(1)
+    expect(mockLogActivity).toHaveBeenCalledWith({
+      userId: 'user-9',
+      type: 'password_changed',
+      description: 'Changed account password',
+    })
+  })
+
+  it('ignores other Better Auth endpoints', async () => {
+    await afterHook()({
+      path: '/sign-in/email',
+      context: { returned: {}, session: { user: { id: 'user-9' } } },
+    })
+    expect(mockLogActivity).not.toHaveBeenCalled()
+  })
+
+  it('does not log when the attempt failed (APIError returned)', async () => {
+    await afterHook()({
+      path: '/change-password',
+      context: {
+        returned: new APIError('BAD_REQUEST', { message: 'Invalid password' }),
+        session: { user: { id: 'user-9' } },
+      },
+    })
+    expect(mockLogActivity).not.toHaveBeenCalled()
+  })
+
+  it('does not log without a session in context', async () => {
+    await afterHook()({
+      path: '/change-password',
+      context: { returned: { status: true }, session: null },
+    })
+    expect(mockLogActivity).not.toHaveBeenCalled()
   })
 })
 

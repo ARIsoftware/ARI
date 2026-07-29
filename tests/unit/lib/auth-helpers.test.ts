@@ -382,7 +382,7 @@ describe('getAuthenticatedUser — session auth', () => {
     const opFn = vi.fn().mockResolvedValue('op-result')
     const ret = await result.withRLS!(opFn as any)
 
-    expect(mockWithUserContext).toHaveBeenCalledWith('user-1', opFn)
+    expect(mockWithUserContext).toHaveBeenCalledWith('user-1', opFn, 'user')
     expect(ret).toBe('operation-result')
   })
 
@@ -545,7 +545,7 @@ describe('getAuthenticatedUser — API key auth', () => {
     const result = await getAuthenticatedUser()
     const opFn = vi.fn().mockResolvedValue('op')
     await result.withRLS!(opFn as any)
-    expect(mockWithUserContext).toHaveBeenCalledWith('user-2', opFn)
+    expect(mockWithUserContext).toHaveBeenCalledWith('user-2', opFn, 'user')
   })
 
   it('invokes withAdminDb callback with a fake db (covers fetchApiKeyUserRow inner callback)', async () => {

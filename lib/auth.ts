@@ -1,5 +1,5 @@
 import { betterAuth } from "better-auth"
-import { APIError } from "better-auth/api"
+import { APIError, createAuthMiddleware } from "better-auth/api"
 import { nextCookies } from "better-auth/next-js"
 import { twoFactor } from "better-auth/plugins/two-factor"
 import { hash as argon2Hash, verify as argon2Verify } from "@node-rs/argon2"
@@ -9,6 +9,7 @@ import { pool } from "@/lib/db/pool"
 import moduleManifest from "@/lib/generated/module-manifest.json"
 import { getAriInstance, tryClaimFirstSigninPing } from "@/lib/telemetry/instance"
 import { sendTvConnect } from "@/lib/telemetry/send-tv-connect"
+import { logActivity } from "@/lib/activity-log"
 
 // Short-circuits the session-create hook after we've confirmed (or sent) the
 // one-shot first-login ping. Keeps subsequent sign-ins from hitting the DB
@@ -127,6 +128,23 @@ export const auth = betterAuth({
         max: 500, // Session checks are read-only and cookie-cached, safe to allow many
       },
     },
+  },
+  // Password changes go through Better Auth's own /change-password endpoint
+  // (no ARI route to instrument), so this config-level after hook is the only
+  // interception point. Logs successful changes only — an APIError in
+  // `returned` means the attempt failed (wrong current password etc.).
+  hooks: {
+    after: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== "/change-password") return
+      if (ctx.context.returned instanceof APIError) return
+      const userId = ctx.context.session?.user?.id
+      if (!userId) return
+      logActivity({
+        userId,
+        type: "password_changed",
+        description: "Changed account password",
+      })
+    }),
   },
   databaseHooks: {
     user: {

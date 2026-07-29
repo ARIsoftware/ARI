@@ -4,6 +4,7 @@ import { withAdminDb } from "@/lib/db"
 import { moduleSettings } from "@/lib/db/schema"
 import { eq, and, sql } from "drizzle-orm"
 import { encrypt, decrypt, isEncrypted } from "@/lib/crypto"
+import { logActivity } from "@/lib/activity-log"
 import { INTEGRATIONS_MODULE_ID } from "@/lib/constants"
 import {
   AI_PROVIDER_SECRET_ENV_KEYS,
@@ -190,9 +191,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid key" }, { status: 400 })
   }
 
+  // Email keys and AI-provider keys share this route; classify by key name so
+  // the activity log attributes the event to the right settings tab. Metadata
+  // carries the key NAME only — never the value.
+  const isEmailKey = key === "RESEND_API_KEY" || key === "RESEND_WEBHOOK_SECRET"
+  const keyKind = isEmailKey ? "email" : "AI provider"
+
   // Empty value = delete the key (atomic JSONB minus).
   if (!value) {
     await deleteKey(user.id, key)
+    logActivity({
+      userId: user.id,
+      type: isEmailKey ? "email_key_removed" : "provider_key_removed",
+      description: `Removed ${keyKind} setting ${key}`,
+      metadata: { key },
+    })
     return NextResponse.json({ success: true, deleted: true })
   }
 
@@ -201,6 +214,13 @@ export async function POST(request: NextRequest) {
   // parallel POSTs (e.g. key + model) from one Save can't drop each other.
   const stored = MODEL_KEYS.has(key) ? value : encrypt(value)
   await upsertKey(user.id, key, stored)
+
+  logActivity({
+    userId: user.id,
+    type: isEmailKey ? "email_key_saved" : "provider_key_saved",
+    description: `Updated ${keyKind} setting ${key}`,
+    metadata: { key },
+  })
 
   return NextResponse.json({
     success: true,
