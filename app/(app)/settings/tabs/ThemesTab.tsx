@@ -23,6 +23,7 @@ import {
   PanelLeft,
 } from "lucide-react"
 import { useTheme, THEME_PRESETS, FONTS } from "@/lib/theme/theme-context"
+import { LoginScreenSection } from "./LoginScreenSection"
 
 export function ThemesTab(): React.ReactElement {
   const {
@@ -44,6 +45,9 @@ export function ThemesTab(): React.ReactElement {
 
   return (
     <div className="space-y-6">
+      {/* Login Screen Card (admin only — renders null for non-admins) */}
+      <LoginScreenSection />
+
       {/* Theme Selection Card */}
       <Card>
         <CardHeader>

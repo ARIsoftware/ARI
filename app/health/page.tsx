@@ -386,6 +386,7 @@ export default function DatabaseTestPage() {
     { name: 'Database Connectivity', status: 'pending' },
     { name: 'Authentication Status', status: 'pending' },
     { name: 'Session Status', status: 'pending' },
+    { name: 'Login Screen Logo', status: 'pending' },
     ...DYNAMIC_MODULE_TESTS.map((t) => ({ name: t.name, status: 'pending' as const })),
     { name: 'Test RLS Policies', status: 'pending' },
     { name: 'Multi-User Setup', status: 'pending' },
@@ -2107,6 +2108,42 @@ export default function DatabaseTestPage() {
       console.error('❌ Session check failed:', error)
     }
 
+    // Test 6: Login Screen Logo (public, pre-auth serve endpoint)
+    // 200 = a logo is configured; 404 = none set (default screen) — both are
+    // healthy, they just confirm the unauthenticated endpoint is reachable.
+    updateTestResult('Login Screen Logo', { status: 'testing' })
+    try {
+      const response = await fetch('/api/branding/login-logo', { cache: 'no-store' })
+      if (response.status === 200) {
+        updateTestResult('Login Screen Logo', {
+          status: 'success',
+          message: 'Custom login logo is configured and served',
+          data: {
+            endpoint: '/api/branding/login-logo',
+            contentType: response.headers.get('content-type') || 'unknown',
+          },
+        })
+      } else if (response.status === 404) {
+        updateTestResult('Login Screen Logo', {
+          status: 'success',
+          message: 'No custom logo set — default login screen (endpoint reachable)',
+          data: { endpoint: '/api/branding/login-logo', hint: 'Set one in Settings → Themes → Login Screen' },
+        })
+      } else {
+        updateTestResult('Login Screen Logo', {
+          status: 'error',
+          error: `Unexpected HTTP ${response.status}`,
+          data: { endpoint: '/api/branding/login-logo' },
+        })
+      }
+    } catch (error: unknown) {
+      updateTestResult('Login Screen Logo', {
+        status: 'error',
+        error: errMsg(error),
+        data: { endpoint: '/api/branding/login-logo' },
+      })
+    }
+
     // PHASE 3: Data fetching tests via API routes (run in parallel).
     // One test per installed module with a GET API route. For each successful
     // fetch we compute RLS ownership in-place (instead of stashing the rows)
@@ -3572,7 +3609,7 @@ export default function DatabaseTestPage() {
                           Public Endpoints
                         </CardTitle>
                         <p className="text-sm text-muted-foreground">
-                          Setup-only endpoints — public during first-run, protected after a user account exists
+                          Endpoints reachable without authentication — some are always public, others are setup-only (public during first-run, protected once a user account exists)
                         </p>
                       </CardHeader>
                       <CardContent>

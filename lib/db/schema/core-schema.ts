@@ -156,6 +156,25 @@ export const userPreferences = pgTable("user_preferences", {
 ]);
 
 // =============================================================================
+// APP BRANDING (global, single-row login-screen customization)
+// =============================================================================
+
+// Global admin-managed login-screen branding. The login logo is stored inline
+// as base64 (`loginLogoData`) so it survives storage-provider changes and can be
+// served to unauthenticated visitors before sign-in. Single row, id always 1.
+export const appBranding = pgTable("app_branding", {
+	id: integer().default(1).primaryKey().notNull(),
+	loginLogoData: text("login_logo_data"),
+	loginLogoContentType: text("login_logo_content_type"),
+	loginLogoFilename: text("login_logo_filename"),
+	loginLogoUpdatedAt: timestamp("login_logo_updated_at", { withTimezone: true, mode: 'string' }),
+	loginLogoUpdatedBy: text("login_logo_updated_by"),
+}, (table) => [
+	check("app_branding_singleton", sql`${table.id} = 1`),
+	pgPolicy("app_branding_rls_all", { as: "permissive", for: "all", to: ["public"], using: sql`true`, withCheck: sql`true` }),
+]);
+
+// =============================================================================
 // API KEY TABLES
 // =============================================================================
 

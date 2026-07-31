@@ -202,6 +202,33 @@ DROP POLICY IF EXISTS "user_preferences_rls_delete" ON "user_preferences";
 CREATE POLICY "user_preferences_rls_delete" ON "user_preferences" FOR DELETE TO public
   USING (user_id::text = (SELECT current_setting('app.current_user_id')));
 
+-- Table: app_branding
+-- Global, single-row login-screen branding (admin-managed). The login logo is
+-- stored inline as base64 so it is (a) independent of the configured storage
+-- provider — switching filesystem/S3/R2 never breaks it — and (b) readable by
+-- the unauthenticated public serve endpoint before any user has logged in.
+-- Enforcement is at the API layer (admin only); RLS here is permissive so the
+-- pre-auth public logo endpoint can read the row.
+CREATE TABLE IF NOT EXISTS "app_branding" (
+  "id" INTEGER NOT NULL DEFAULT 1,
+  "login_logo_data" TEXT,
+  "login_logo_content_type" TEXT,
+  "login_logo_filename" TEXT,
+  "login_logo_updated_at" TIMESTAMPTZ,
+  "login_logo_updated_by" TEXT,
+  PRIMARY KEY ("id"),
+  CONSTRAINT "app_branding_singleton" CHECK ("id" = 1)
+);
+
+ALTER TABLE "app_branding" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "app_branding_rls_all" ON "app_branding";
+CREATE POLICY "app_branding_rls_all" ON "app_branding" FOR ALL TO public
+  USING (true) WITH CHECK (true);
+
+-- Seed the single row so reads/updates never have to branch on existence.
+INSERT INTO "app_branding" ("id")
+  SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM "app_branding");
+
 -- Table: module_settings
 CREATE TABLE IF NOT EXISTS "module_settings" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
