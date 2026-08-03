@@ -76,7 +76,7 @@ const getTaskAgeColor = (createdAt: string, isStarred: boolean = false) => {
   if (days > 4) {
     return "text-destructive"
   }
-  return isStarred ? "text-gray-300" : "text-muted-foreground"
+  return isStarred ? "text-[hsl(var(--primary-foreground))]/75 dark:text-[hsl(var(--muted-foreground))]" : "text-muted-foreground"
 }
 
 const getProjectName = (projectId: string | null | undefined, projects: MajorProject[]): string | null => {
@@ -151,7 +151,7 @@ function SubtaskToggle({
       type="button"
       onClick={onToggle}
       aria-expanded={expanded}
-      className={`flex items-center gap-1.5 transition-colors ${task.pinned ? "hover:text-white" : "hover:text-foreground"}`}
+      className={`flex items-center gap-1.5 transition-colors ${task.pinned ? "hover:text-[hsl(var(--primary-foreground))] dark:hover:text-[hsl(var(--foreground))]" : "hover:text-foreground"}`}
     >
       <ListChecks className="w-4 h-4" />
       <span className={small ? "text-xs" : undefined}>
@@ -1315,7 +1315,7 @@ export default function TasksPage() {
                           ? "flex flex-col gap-3 p-4 border rounded-lg hover:shadow-md transition-all h-full"
                           : "flex items-start gap-4 p-4 border rounded-lg hover:shadow-sm transition-all"
                       } hover:scale-[1.01] ${
-                        task.pinned ? "bg-[#214b88] text-white shadow-lg" : "bg-card border-border"
+                        task.pinned ? "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] shadow-lg dark:bg-transparent dark:text-[hsl(var(--foreground))] dark:border-[hsl(var(--primary))] dark:shadow-none" : "bg-card border-border"
                       } ${draggedTask === task.id ? "opacity-50" : ""} ${task.completed ? "taskdone" : ""} ${fadingTasks.has(task.id) ? "task-fade-out" : ""}`}
                     >
                   {viewMode === "list" ? (
@@ -1331,7 +1331,7 @@ export default function TasksPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
                           <h3
-                            className={`font-medium ${task.completed ? "line-through text-muted-foreground" : task.pinned ? "text-white" : "text-foreground"}`}
+                            className={`font-medium ${task.completed ? "line-through text-muted-foreground" : task.pinned ? "text-[hsl(var(--primary-foreground))] dark:text-[hsl(var(--foreground))]" : "text-foreground"}`}
                           >
                             {task.title}
                           </h3>
@@ -1340,21 +1340,21 @@ export default function TasksPage() {
                             className="transition-colors"
                           >
                             <Pin
-                              className={`w-5 h-5 ${task.pinned ? "text-white" : "text-muted-foreground hover:text-[hsl(var(--primary))]"}`}
-                              fill={task.pinned ? "white" : "none"}
+                              className={`w-5 h-5 ${task.pinned ? "text-[hsl(var(--primary-foreground))] dark:text-[hsl(var(--primary))]" : "text-muted-foreground hover:text-[hsl(var(--primary))]"}`}
+                              fill={task.pinned ? "currentColor" : "none"}
                             />
                           </button>
                         </div>
 
                         <div
-                          className={`flex items-center flex-wrap gap-x-4 gap-y-2 text-sm ${task.pinned ? "text-gray-300" : "text-muted-foreground"}`}
+                          className={`flex items-center flex-wrap gap-x-4 gap-y-2 text-sm ${task.pinned ? "text-[hsl(var(--primary-foreground))]/75 dark:text-[hsl(var(--muted-foreground))]" : "text-muted-foreground"}`}
                         >
                           <div className="flex items-center gap-2 flex-wrap">
                             {task.assigned_agent_id && <AssignedAgentBadge agentId={task.assigned_agent_id} />}
                             {(task.assignees ?? []).map((name: string) => (
                               <span
                                 key={name}
-                                className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.pinned ? "bg-white/10 text-gray-200" : "bg-muted text-muted-foreground"}`}
+                                className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.pinned ? "bg-[hsl(var(--primary-foreground))]/15 text-[hsl(var(--primary-foreground))]/90 dark:bg-[hsl(var(--muted))] dark:text-[hsl(var(--muted-foreground))]" : "bg-muted text-muted-foreground"}`}
                               >
                                 {name}
                               </span>
@@ -1383,20 +1383,20 @@ export default function TasksPage() {
                       <div className="flex items-center gap-2 mt-1">
                         <Badge
                           variant="secondary"
-                          className={`font-medium text-xs ${task.pinned ? "bg-white/10 text-gray-200" : getStatusColor(task.status)}`}
+                          className={`font-medium text-xs ${task.pinned ? "bg-[hsl(var(--primary-foreground))]/15 text-[hsl(var(--primary-foreground))]/90 dark:bg-[hsl(var(--muted))] dark:text-[hsl(var(--muted-foreground))]" : getStatusColor(task.status)}`}
                         >
                           {task.status}
                         </Badge>
                         <Badge
                           variant="secondary"
-                          className={`font-medium text-xs ${task.pinned ? "bg-white/10 text-gray-200" : getPriorityColor(task.priority)}`}
+                          className={`font-medium text-xs ${task.pinned ? "bg-[hsl(var(--primary-foreground))]/15 text-[hsl(var(--primary-foreground))]/90 dark:bg-[hsl(var(--muted))] dark:text-[hsl(var(--muted-foreground))]" : getPriorityColor(task.priority)}`}
                         >
                           {task.priority}
                         </Badge>
                         {majorProjectsEnabled && task.project_id && getProjectName(task.project_id, projects) && (
                           <Badge
                             variant="secondary"
-                            className={`font-medium text-xs cursor-pointer ${task.pinned ? "bg-white/10 text-gray-200 hover:bg-white/20" : "bg-blue-100 text-blue-700 hover:bg-blue-200"}`}
+                            className={`font-medium text-xs cursor-pointer ${task.pinned ? "bg-[hsl(var(--primary-foreground))]/15 text-[hsl(var(--primary-foreground))]/90 dark:bg-[hsl(var(--muted))] dark:text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--primary-foreground))]/25 dark:hover:bg-[hsl(var(--muted))]/80" : "bg-blue-100 text-blue-700 hover:bg-blue-200"}`}
                             onClick={(e) => {
                               e.stopPropagation()
                               router.push(`/tasks?filter=${task.project_id}`)
@@ -1415,14 +1415,14 @@ export default function TasksPage() {
                           }}
                         >
                           <Pin
-                            className={`w-4 h-4 ${task.pinned ? "text-white" : "text-muted-foreground hover:text-[hsl(var(--primary))]"}`}
-                            fill={task.pinned ? "white" : "none"}
+                            className={`w-4 h-4 ${task.pinned ? "text-[hsl(var(--primary-foreground))] dark:text-[hsl(var(--primary))]" : "text-muted-foreground hover:text-[hsl(var(--primary))]"}`}
+                            fill={task.pinned ? "currentColor" : "none"}
                           />
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-muted-foreground hover:text-primary hover:bg-muted"}`}
+                          className={`h-8 w-8 ${task.pinned ? "text-[hsl(var(--primary-foreground))]/75 hover:text-[hsl(var(--primary-foreground))] hover:bg-[hsl(var(--primary-foreground))]/15 dark:text-[hsl(var(--muted-foreground))] dark:hover:text-[hsl(var(--foreground))] dark:hover:bg-[hsl(var(--muted))]" : "text-muted-foreground hover:text-primary hover:bg-muted"}`}
                           onClick={(e) => {
                             e.stopPropagation()
                             router.push(`/tasks/edit/${task.id}`)
@@ -1433,7 +1433,7 @@ export default function TasksPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-muted-foreground hover:text-destructive hover:bg-destructive/10"}`}
+                          className={`h-8 w-8 ${task.pinned ? "text-[hsl(var(--primary-foreground))]/75 hover:text-[hsl(var(--primary-foreground))] hover:bg-[hsl(var(--primary-foreground))]/15 dark:text-[hsl(var(--muted-foreground))] dark:hover:text-[hsl(var(--foreground))] dark:hover:bg-[hsl(var(--muted))]" : "text-muted-foreground hover:text-destructive hover:bg-destructive/10"}`}
                           onClick={(e) => {
                             e.stopPropagation()
                             handleDeleteTask(task.id)
@@ -1449,7 +1449,7 @@ export default function TasksPage() {
                           onMouseDown={() => { dragFromHandleRef.current = true }}
                           onMouseUp={() => { dragFromHandleRef.current = false }}
                           onClick={(e) => e.stopPropagation()}
-                          className={`h-8 w-8 cursor-grab active:cursor-grabbing ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+                          className={`h-8 w-8 cursor-grab active:cursor-grabbing ${task.pinned ? "text-[hsl(var(--primary-foreground))]/75 hover:text-[hsl(var(--primary-foreground))] hover:bg-[hsl(var(--primary-foreground))]/15 dark:text-[hsl(var(--muted-foreground))] dark:hover:text-[hsl(var(--foreground))] dark:hover:bg-[hsl(var(--muted))]" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
                         >
                           <GripVertical className="w-4 h-4" />
                         </Button>
@@ -1476,14 +1476,14 @@ export default function TasksPage() {
                             }}
                           >
                             <Pin
-                              className={`w-4 h-4 ${task.pinned ? "text-white" : "text-muted-foreground hover:text-[hsl(var(--primary))]"}`}
-                              fill={task.pinned ? "white" : "none"}
+                              className={`w-4 h-4 ${task.pinned ? "text-[hsl(var(--primary-foreground))] dark:text-[hsl(var(--primary))]" : "text-muted-foreground hover:text-[hsl(var(--primary))]"}`}
+                              fill={task.pinned ? "currentColor" : "none"}
                             />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-muted-foreground hover:text-primary hover:bg-muted"}`}
+                            className={`h-8 w-8 ${task.pinned ? "text-[hsl(var(--primary-foreground))]/75 hover:text-[hsl(var(--primary-foreground))] hover:bg-[hsl(var(--primary-foreground))]/15 dark:text-[hsl(var(--muted-foreground))] dark:hover:text-[hsl(var(--foreground))] dark:hover:bg-[hsl(var(--muted))]" : "text-muted-foreground hover:text-primary hover:bg-muted"}`}
                             onClick={(e) => {
                               e.stopPropagation()
                               router.push(`/tasks/edit/${task.id}`)
@@ -1494,7 +1494,7 @@ export default function TasksPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className={`h-8 w-8 ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-muted-foreground hover:text-destructive hover:bg-destructive/10"}`}
+                            className={`h-8 w-8 ${task.pinned ? "text-[hsl(var(--primary-foreground))]/75 hover:text-[hsl(var(--primary-foreground))] hover:bg-[hsl(var(--primary-foreground))]/15 dark:text-[hsl(var(--muted-foreground))] dark:hover:text-[hsl(var(--foreground))] dark:hover:bg-[hsl(var(--muted))]" : "text-muted-foreground hover:text-destructive hover:bg-destructive/10"}`}
                             onClick={(e) => {
                               e.stopPropagation()
                               handleDeleteTask(task.id)
@@ -1510,7 +1510,7 @@ export default function TasksPage() {
                             onMouseDown={() => { dragFromHandleRef.current = true }}
                             onMouseUp={() => { dragFromHandleRef.current = false }}
                             onClick={(e) => e.stopPropagation()}
-                            className={`h-8 w-8 cursor-grab active:cursor-grabbing ${task.pinned ? "text-gray-300 hover:text-white hover:bg-white/10" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+                            className={`h-8 w-8 cursor-grab active:cursor-grabbing ${task.pinned ? "text-[hsl(var(--primary-foreground))]/75 hover:text-[hsl(var(--primary-foreground))] hover:bg-[hsl(var(--primary-foreground))]/15 dark:text-[hsl(var(--muted-foreground))] dark:hover:text-[hsl(var(--foreground))] dark:hover:bg-[hsl(var(--muted))]" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
                           >
                             <GripVertical className="w-4 h-4" />
                           </Button>
@@ -1519,19 +1519,19 @@ export default function TasksPage() {
 
                       <div className="flex-1">
                         <h3
-                          className={`font-medium text-base mb-3 line-clamp-2 ${task.completed ? "line-through text-muted-foreground" : task.pinned ? "text-white" : "text-foreground"}`}
+                          className={`font-medium text-base mb-3 line-clamp-2 ${task.completed ? "line-through text-muted-foreground" : task.pinned ? "text-[hsl(var(--primary-foreground))] dark:text-[hsl(var(--foreground))]" : "text-foreground"}`}
                         >
                           {task.title}
                         </h3>
 
-                        <div className={`space-y-2 text-sm ${task.pinned ? "text-gray-300" : "text-muted-foreground"}`}>
+                        <div className={`space-y-2 text-sm ${task.pinned ? "text-[hsl(var(--primary-foreground))]/75 dark:text-[hsl(var(--muted-foreground))]" : "text-muted-foreground"}`}>
                           {(task.assigned_agent_id || (task.assignees?.length ?? 0) > 0) && (
                             <div className="flex flex-wrap items-center gap-1.5">
                               {task.assigned_agent_id && <AssignedAgentBadge agentId={task.assigned_agent_id} />}
                               {(task.assignees ?? []).map((name: string) => (
                                 <span
                                   key={name}
-                                  className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.pinned ? "bg-white/10 text-gray-200" : "bg-muted text-muted-foreground"}`}
+                                  className={`px-2 py-0.5 rounded-md text-xs font-medium ${task.pinned ? "bg-[hsl(var(--primary-foreground))]/15 text-[hsl(var(--primary-foreground))]/90 dark:bg-[hsl(var(--muted))] dark:text-[hsl(var(--muted-foreground))]" : "bg-muted text-muted-foreground"}`}
                                 >
                                   {name}
                                 </span>
@@ -1566,20 +1566,20 @@ export default function TasksPage() {
                       <div className="flex items-center gap-2 flex-wrap mt-auto pt-2">
                         <Badge
                           variant="secondary"
-                          className={`font-medium text-xs ${task.pinned ? "bg-white/10 text-gray-200" : getStatusColor(task.status)}`}
+                          className={`font-medium text-xs ${task.pinned ? "bg-[hsl(var(--primary-foreground))]/15 text-[hsl(var(--primary-foreground))]/90 dark:bg-[hsl(var(--muted))] dark:text-[hsl(var(--muted-foreground))]" : getStatusColor(task.status)}`}
                         >
                           {task.status}
                         </Badge>
                         <Badge
                           variant="secondary"
-                          className={`font-medium text-xs ${task.pinned ? "bg-white/10 text-gray-200" : getPriorityColor(task.priority)}`}
+                          className={`font-medium text-xs ${task.pinned ? "bg-[hsl(var(--primary-foreground))]/15 text-[hsl(var(--primary-foreground))]/90 dark:bg-[hsl(var(--muted))] dark:text-[hsl(var(--muted-foreground))]" : getPriorityColor(task.priority)}`}
                         >
                           {task.priority}
                         </Badge>
                         {majorProjectsEnabled && task.project_id && getProjectName(task.project_id, projects) && (
                           <Badge
                             variant="secondary"
-                            className={`font-medium text-xs cursor-pointer ${task.pinned ? "bg-white/10 text-gray-200 hover:bg-white/20" : "bg-blue-100 text-blue-700 hover:bg-blue-200"}`}
+                            className={`font-medium text-xs cursor-pointer ${task.pinned ? "bg-[hsl(var(--primary-foreground))]/15 text-[hsl(var(--primary-foreground))]/90 dark:bg-[hsl(var(--muted))] dark:text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--primary-foreground))]/25 dark:hover:bg-[hsl(var(--muted))]/80" : "bg-blue-100 text-blue-700 hover:bg-blue-200"}`}
                             onClick={(e) => {
                               e.stopPropagation()
                               router.push(`/tasks?filter=${task.project_id}`)
