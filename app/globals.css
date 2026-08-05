@@ -279,6 +279,12 @@
   border-bottom: 1px solid hsl(134 100% 74.5%) !important;
 }
 
+/* Terminal Amber theme - orange topbar border */
+[data-theme="terminal-amber"] .topbar,
+[data-theme="terminal-amber"] header.border-b {
+  border-bottom: 1px solid hsl(17 100% 56%) !important;
+}
+
 /* Grayscale theme - subtle ruled-paper background pattern on main areas */
 [data-theme="grayscale"] main {
   background-image: repeating-linear-gradient(
