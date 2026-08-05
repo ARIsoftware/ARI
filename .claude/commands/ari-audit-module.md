@@ -41,7 +41,7 @@ When the agent runtime supports delegation, split the audit across **4 subagents
 
 ### Subagent 1 — Security
 Scope: the entire module directory (`modules-core/[id]/**` or `modules-custom/[id]/**`) including `api/`, `components/`, `lib/`, `app/`, `hooks/`, `database/`, `module.json`, fixtures, and any docs. The hardcoded-credential scan in category 11 must cover **all file types**, not just TypeScript.
-Runs Part A (Security Audit — 16 categories below). Returns findings as `{severity, file, line, category, issue, risk, recommendation}`.
+Runs Part A (Security Audit — 17 categories below, including §17 Destructive & Runtime-Dangerous Operations). Returns findings as `{severity, file, line, category, issue, risk, recommendation}`.
 
 > Context for Subagent 1: `getAuthenticatedUser()` now accepts **two** credentials — the Better Auth session cookie AND an `x-api-key` header (see `lib/auth-helpers.ts`, `lib/api-keys.ts`, `lib/auth-middleware.ts` `API_KEY_PREFIX`). The module dispatcher at `app/api/modules/[module]/[[...path]]/route.ts` already does a coarse "cookie or API key present" gate before invoking the handler, so the *only* check that matters in the module handler is `getAuthenticatedUser()` — do not separately flag a missing cookie check. Routes listed in `module.json` `publicRoutes` bypass the dispatcher gate entirely and must implement their own security per the rules below.
 
@@ -237,6 +237,43 @@ Every confirmed hardcoded secret must appear in the report with file + line and 
 - [ ] Dynamic routes exposing internal IDs or unvalidated parameters — **Medium**
 - [ ] `revalidate`/caching that might expose private data to other users — **High**
 - [ ] Middleware that modifies auth/cookies in unexpected ways — **High**
+
+### 17. Destructive & Runtime-Dangerous Operations (run explicitly)
+
+Part B3 already scans **install/auto-loaded `.sql` files** for destructive SQL, and the runtime installer (`lib/modules/schema-installer.ts`) refuses to execute those files if they contain it. That scanner is **blind to code that runs later** — an API route, hook, or server-side helper can still erase data, wipe the filesystem, or execute arbitrary commands while the app is running. This category covers that runtime blast radius.
+
+Scan **every** `*.ts` / `*.tsx` / `*.js` file in the module (not just `database/`). Grep patterns below are case-insensitive; any real match (not a comment, type, or string in docs) is a finding at the stated severity.
+
+**17a. Destructive database operations at runtime**
+- [ ] **Drizzle `db.delete(table)` or `db.update(table)` with no `.where(...)`** — deletes/alters *every row in the table across all users*. **High**. Grep: `\.delete\(` / `\.update\(` in `api/**` then confirm a `.where(` is chained before `await`/return.
+- [ ] **Raw `DELETE FROM` / `UPDATE ... SET` / `TRUNCATE` / `DROP TABLE` / `DROP SCHEMA` / `ALTER TABLE ... DROP COLUMN`** executed at runtime via `db.execute(sql\`...\`)`, `pool.query(...)`, `client.query(...)`, or a Supabase `.rpc('exec_sql', ...)` call — **High**. A `DELETE`/`UPDATE` without a `WHERE` (or without a `user_id`/owner predicate) is the worst case; call it out explicitly.
+- [ ] **Bulk-delete / "delete all" / "reset" endpoints missing a `user_id` (owner) filter** — even with a `WHERE`, if it isn't scoped to `user.id` it wipes *other users'* rows (cross-tenant erase). **High**. Per `docs/SECURITY.md` the default role has `BYPASSRLS`, so the explicit filter is the only real boundary.
+- [ ] **Calling the backup `exec_sql` RPC (or any arbitrary-SQL passthrough) from module code** — lets the module run anything against the DB. **High**. This RPC exists for the core backup system only; a module must never invoke it.
+
+**17b. Filesystem destruction**
+- [ ] **Recursive/forced deletes** — `fs.rm(..., { recursive: true })`, `fs.rmSync`, `fs.rmdir`, `fs.promises.rm`, `rimraf(...)`, `fs-extra.remove/emptyDir`, or `fs.unlink` in a loop. **High**, and **especially High** when the target path is built from user input (path-traversal → arbitrary deletion). Grep: `rm\s*\(|rmSync|rmdir|rimraf|emptyDir|\.remove\(|unlink`.
+- [ ] **Writes/overwrites to shared or config files** — anything writing outside `data/storage/{user_id}/…`, e.g. `.env*`, `package.json`, `next.config.*`, `middleware.ts`, files under `lib/`/`app/`/`components/`. **High** for `.env*`/config, **Medium** otherwise. Modules must go through `getStorageProvider(readStorageConfig())`, never `fs.writeFile` to project paths.
+- [ ] **Storage deletes not scoped to the caller's `user_id` bucket path** — bulk/prefix deletes that could clear another user's (or a shared) bucket. **High**.
+
+**17c. Shell-out & arbitrary code execution (ban entirely for modules)**
+Modules must **never** spawn a subprocess or evaluate dynamic code. Beyond the RCE surface, `child_process` won't run on Vercel serverless (no shell/system binaries), so it's also a portability bug. Core infrastructure (e.g. `lib/modules/npm-installer.ts`) has narrow, reviewed exceptions — a **module** has none.
+- [ ] **Any `child_process` usage** — `require('child_process')`, `import ... from 'node:child_process'`, `exec`, `execSync`, `execFile`, `spawn`, `spawnSync`, `fork` — anywhere in the module. **High**, regardless of the command string. Grep: `child_process|execSync|execFileSync|spawnSync|\bexec\(|\bspawn\(|\bfork\(`.
+  - When the command string contains a destructive verb (`rm -rf`, `dd`, `mkfs`, `git clean -fdx`, `shutdown`, `kill`, `DROP DATABASE`), keep the **High** severity but sharpen the recommendation to name the data-loss/erase risk explicitly.
+- [ ] **`eval(...)`, `new Function(...)`, `vm.runInContext` / `vm.runInNewContext`** on any non-literal input — **High**. Grep: `\beval\(|new\s+Function\(|vm\.run`.
+- [ ] **`process.exit()` / `process.kill()` / `process.abort()` in a request path** — crashes the server (DoS). **Medium**.
+
+**17d. Teardown wiring (extends Part B3's `uninstall.sql` check)**
+- [ ] **Any file containing `DROP TABLE` / `DROP SCHEMA` / `TRUNCATE`** (including `uninstall.sql`) referenced from a code path that runs automatically — `lib/modules/module-loader.ts`, an enable/disable hook, `module.json`, a cron/scheduled task, or any `api/**` route. **High** — teardown SQL must be manual-only. (Part B3 checks `uninstall.sql` specifically; this broadens it to *any* destructive SQL file being auto-wired.)
+
+**17e. Data exfiltration via destructive-adjacent flows (lightweight — overlaps §13 SSRF)**
+- [ ] **Reading whole tables / all rows and POSTing them to an external, non-allowlisted URL** — bulk read + outbound `fetch`/`axios` to a user-supplied or hardcoded external host. **Medium**. Note the overlap with §13 (SSRF/outbound) rather than double-reporting the same line.
+
+**Acceptable (not a finding):**
+- The strings above appearing only in comments, type definitions, doc examples, or `uninstall.sql` when it is confirmed manual-only (labeled and not auto-wired — see §17d).
+- A scoped `db.delete(table).where(eq(table.id, id), eq(table.userId, user.id))` — a properly filtered single/owner delete is normal and expected.
+- `fetch`/HTTP to a fixed, documented first-party or well-known third-party API (still subject to §13 SSRF review).
+
+Every confirmed finding must appear with file + line, the concrete data-loss/RCE risk, and a recommendation (scope the query to `user.id`, replace the subprocess/`fs` call with an ARI abstraction, or move teardown SQL to a manual-only path).
 
 ---
 
