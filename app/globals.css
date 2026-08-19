@@ -186,6 +186,7 @@
 .topbar {
   font-size: 16px;
   height: 45px;
+  border-bottom: 1px solid hsl(var(--border));
 }
 
 /* Topbar icon buttons - maintain 32px size (was h-8 w-8 = 2rem) */
