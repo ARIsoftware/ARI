@@ -118,13 +118,13 @@ This module requires one database table: `module_template_entries`
 
 ### Automatic install on enable
 
-`database/schema.sql` is executed automatically by the module loader every time the module is enabled. The script is fully idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, `DROP POLICY IF EXISTS … CREATE POLICY …`), so re-enabling is a safe no-op. You do not need to paste the SQL into Supabase manually.
+`database/schema.sql` is executed automatically every time the module is enabled (by `lib/modules/schema-installer.ts`, invoked from `lib/modules/module-registry.ts`). The script is fully idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, `DROP POLICY IF EXISTS … CREATE POLICY …`), so re-enabling is a safe no-op. You do not need to paste the SQL into Supabase manually.
 
-To ship a schema change in a module update, edit `schema.sql` additively (`ALTER TABLE … ADD COLUMN IF NOT EXISTS …`) and update `schema.ts` to match. The next enable will pick up the change.
+To ship a schema change in a module update, edit `schema.sql` additively (`ALTER TABLE … ADD COLUMN IF NOT EXISTS …`) and update `schema.ts` to match, then re-run `pnpm generate-module-registry` so the new file hash lands in the manifest. **No re-enable is needed:** ARI compares that hash against the one recorded for each user and re-runs `schema.sql` automatically on their next page load or module API request. The whole file runs in one transaction and the recorded hash only advances on success, so a single broken statement blocks every additive change in the file until it is fixed.
 
 ### Manual uninstall
 
-`database/uninstall.sql` is **never** run by the module loader. It exists only as a manual teardown script — open it in your SQL client of choice (Supabase Studio, pgweb, or `psql`) and run it yourself if you want to permanently drop this module's tables.
+`database/uninstall.sql` is **never** run automatically by ARI — not on enable, not on disable, and not from any API route. It exists only as a manual teardown script — open it in your SQL client of choice (Supabase Studio, pgweb, or `psql`) and run it yourself if you want to permanently drop this module's tables.
 
 ## File Structure
 

@@ -226,7 +226,7 @@ When approved, create the module following this order:
      ```
    - See existing modules in that file for patterns (`modules-core/module-template`, tasks, etc.)
 6. **Create database files** if the module owns tables. **All three files are required** and live in `[module-folder]/database/`:
-   - **`schema.sql`** — auto-executed by the module loader on **every** module enable. **Must be fully idempotent**:
+   - **`schema.sql`** — auto-executed on **every** module enable (by `lib/modules/schema-installer.ts`). **Must be fully idempotent**:
      - Every `CREATE TABLE` uses `IF NOT EXISTS`
      - Every `CREATE INDEX` uses `IF NOT EXISTS`
      - Every policy is wrapped: `DROP POLICY IF EXISTS … ON <table>; CREATE POLICY …`
@@ -237,7 +237,7 @@ When approved, create the module following this order:
      - Do NOT use `auth.uid()` (Better Auth doesn't use this) — use application-level enforcement via `withRLS()`
      - Use the `supabase-postgres-best-practices` skill to verify best practices for data types, indexes, and constraints
    - **`schema.ts`** — Drizzle ORM definitions used by API routes via `withRLS()`. The runtime source of truth. Must mirror `schema.sql` exactly.
-   - **`uninstall.sql`** — manual-only teardown script containing only `DROP TABLE IF EXISTS … CASCADE` statements (drop in reverse FK order) plus the standard header warning. **This file is NEVER auto-run** by the module loader, an enable hook, a disable hook, or any API route. It exists only so a user can manually drop the module's tables from their SQL client of choice (Supabase Studio, pgweb for local Postgres, or `psql`).
+   - **`uninstall.sql`** — manual-only teardown script containing only `DROP TABLE IF EXISTS … CASCADE` statements (drop in reverse FK order) plus the standard header warning. **This file is NEVER auto-run** by the schema installer, an enable hook, a disable hook, or any API route. It exists only so a user can manually drop the module's tables from their SQL client of choice (Supabase Studio, pgweb for local Postgres, or `psql`).
    - See `modules-core/module-template/database/` for the canonical example of all three files.
 7. **Add Drizzle schema definition** to `/lib/db/schema/schema.ts` (REQUIRED for API routes to work)
    - See existing table definitions in that file for examples
@@ -259,7 +259,7 @@ When approved, create the module following this order:
     - Write a plain route handler that implements the declared security itself: signature/key verification plus `checkRateLimit`/`getClientIp` from `@/lib/modules/public-route-security`. There is no framework wrapper — the handler is the only gate (public routes bypass auth AND the module-enabled check).
     - Document the required environment variable for the secret
     - If needed, read `/docs/MODULES.md` section 7.5 for the full pattern, or copy `modules-core/module-template/api/webhook/route.ts.example`
-12. **Database tables provision automatically.** Because `schema.sql` is auto-run by the module loader on every enable, you do NOT need to ask the user to run any SQL manually. The user only needs to enable the new module from the `/modules` page and the tables will be created. (Exception: if the user wants to fully remove the module's tables later, they can manually run `uninstall.sql` from their SQL client — Supabase Studio, pgweb, or `psql`.)
+12. **Database tables provision automatically.** Because `schema.sql` is auto-run on every module enable, you do NOT need to ask the user to run any SQL manually. The user only needs to enable the new module from the `/modules` page and the tables will be created. (Exception: if the user wants to fully remove the module's tables later, they can manually run `uninstall.sql` from their SQL client — Supabase Studio, pgweb, or `psql`.)
 13. **If file storage needed** — set up ARI File Storage. See the "ARI File Storage System" section below.
 
 ## ARI File Storage System

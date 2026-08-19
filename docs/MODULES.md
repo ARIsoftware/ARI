@@ -140,6 +140,35 @@ export const MODULE_API_ROUTES: Record<string, Record<string, any>> = {
 3. Renders module in sidebar if routes defined
 4. Routes requests to module pages/APIs (both gated on enablement)
 
+### What the Generator Validates
+
+The generator is the only path from a module folder into the running app, so
+its checks act as gates — a module that fails one is skipped rather than
+half-loaded. Re-run it with `pnpm generate-module-registry` (or
+`POST /api/modules/refresh`) after any manifest, schema, or route change.
+
+| Check | Effect on failure |
+|---|---|
+| `module.json` exists and parses as JSON | Module skipped, warning logged |
+| `module.json` declares an `id` | Module skipped, warning logged |
+| A module that declares `routes` has an `app/page.tsx` | Module skipped, warning logged. A module with no routes *and* no pages is valid (e.g. a top-bar-only module) |
+| `npmDependencies` are present in the root `package.json` at a compatible range | Warning only — the build still succeeds. (The hard limits — 25-package cap, package-name pattern, forbidden `git:`/`file:`/`link:`/`workspace:`/`npm:`/`..` specs — are enforced separately by `lib/modules/npm-installer.ts` at install time, not here.) |
+| `database/schema.sql` hashed into the manifest as `schemaSha256` | Omitted when the file is absent — the self-heal gate ([section 6](#6-database-integration)) then has nothing to compare and never re-runs |
+| A route exporting `isPublic = true` must not also import `getAuthenticatedUser` | Warning — flagged as a likely contradiction |
+| `database/relations.ts` may only reference tables that exist | File skipped with a warning; the build still succeeds but those relations are unavailable at runtime |
+| Submenu / dashboard widget / stat-card component paths resolve | Warning |
+| Top-bar icon / provider component paths resolve | **Throws — the build fails** |
+
+Duplicate module ids are handled separately by `scanForDuplicateModuleIds()`
+(`lib/modules/scanner.ts`): two modules sharing an id *within the same root*
+is an error, while the same id in `modules-custom` and `modules-core` is an
+intentional override — the custom copy wins and the core copy is marked
+`isOverridden`.
+
+For the install-time gates that run after this (archive extraction, npm
+installation, and the destructive-SQL scan), see `docs/SECURITY.md` →
+"Layer 5: Module Supply Chain".
+
 ---
 
 ## 2. Module Self-Containment Rule
@@ -550,7 +579,7 @@ Modules can add a quick access icon to the global top navigation bar:
 
 - [ ] **4.7 Database tables provision automatically**
 
-  `database/schema.sql` is executed by the module loader on every enable, so you do NOT need to run SQL manually. Just enable the module at `/modules` and the tables will be created. The script must be fully idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, `DROP POLICY IF EXISTS … CREATE POLICY …`) and must contain no `DROP TABLE`/`TRUNCATE`/`DROP COLUMN` statements — the runtime installer rejects files containing those tokens.
+  `database/schema.sql` is executed automatically on every module enable, so you do NOT need to run SQL manually. Just enable the module at `/modules` and the tables will be created. The script must be fully idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, `DROP POLICY IF EXISTS … CREATE POLICY …`) and must contain no `DROP TABLE`/`TRUNCATE`/`DROP COLUMN` statements — the runtime installer rejects files containing those tokens.
 
   Note: custom modules always start **disabled** (regardless of `"enabled": true` in module.json) — enable them at `/modules`.
 
@@ -677,7 +706,7 @@ mkdir -p modules-core/[module-id]/{app,api/data,api/settings,components,lib,type
 
 #### Step 5.3.2: Database Schema (`database/schema.sql`)
 
-`schema.sql` is **auto-executed by the module loader on every enable**, so it must be fully idempotent. It is NOT a manual setup file.
+`schema.sql` is **auto-executed on every module enable**, so it must be fully idempotent. It is NOT a manual setup file.
 
 - [ ] Every `CREATE TABLE` uses `IF NOT EXISTS`
 - [ ] Every `CREATE INDEX` uses `IF NOT EXISTS`
@@ -1153,7 +1182,7 @@ export const myModuleDataRelations = relations(myModuleData, ({many}) => ({
 
 ### How Tables Are Provisioned
 
-`database/schema.sql` is **auto-executed by the module loader on every enable**, so you do NOT need to run SQL manually. Just enable the module at `/modules` and the tables will be created.
+`database/schema.sql` is **auto-executed on every module enable** (by `lib/modules/schema-installer.ts`, invoked from `lib/modules/module-registry.ts`), so you do NOT need to run SQL manually. Just enable the module at `/modules` and the tables will be created.
 
 1. Create `database/schema.sql` (idempotent — auto-run on enable)
 2. Create `database/schema.ts` (Drizzle ORM definitions)
@@ -2369,6 +2398,16 @@ Run through this checklist after creating or updating a module:
 - [ ] Module API routes return 403 while the module is disabled (session and API key)
 - [ ] Build succeeds: `pnpm build`
 
+### Static Audit
+
+- [ ] Run `/ari-audit-module <module-id>` before shipping. It is a read-only
+      static review (it never edits code or runs SQL) that fans out across four
+      concerns — security (17 categories, including destructive and
+      runtime-dangerous operations), production-readiness (manifest,
+      self-containment, install SQL, API patterns, OpenAPI annotations,
+      registration), database/Postgres practices, and frontend quality —
+      and returns one report graded High / Medium / Low.
+
 ---
 
 ## 12. Troubleshooting
@@ -2552,6 +2591,8 @@ Use `/modules-core/module-template/` as a complete reference implementation. It 
 | `/lib/modules/module-types.ts` | TypeScript definitions |
 | `/lib/modules/module-registry.ts` | Module state management (enablement, schema gate) |
 | `/lib/modules/module-loader.ts` | Module discovery (reads generated manifest) |
+| `/lib/modules/schema-installer.ts` | Runs `schema.sql` (destructive-SQL refusal + single transaction) |
+| `/lib/modules/npm-installer.ts` | Installs a module's `npmDependencies` (limits, forbidden specs, conflict abort) |
 | `/app/(app)/[module]/[[...slug]]/page.tsx` | Catch-all page route |
 | `/app/api/modules/[module]/[[...path]]/route.ts` | API dispatcher (auth + enablement + usage logging) |
 | `/components/app-sidebar.tsx` | Sidebar rendering |

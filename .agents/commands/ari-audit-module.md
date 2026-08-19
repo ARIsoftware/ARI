@@ -263,7 +263,7 @@ Modules must **never** spawn a subprocess or evaluate dynamic code. Beyond the R
 - [ ] **`process.exit()` / `process.kill()` / `process.abort()` in a request path** — crashes the server (DoS). **Medium**.
 
 **17d. Teardown wiring (extends Part B3's `uninstall.sql` check)**
-- [ ] **Any file containing `DROP TABLE` / `DROP SCHEMA` / `TRUNCATE`** (including `uninstall.sql`) referenced from a code path that runs automatically — `lib/modules/module-loader.ts`, an enable/disable hook, `module.json`, a cron/scheduled task, or any `api/**` route. **High** — teardown SQL must be manual-only. (Part B3 checks `uninstall.sql` specifically; this broadens it to *any* destructive SQL file being auto-wired.)
+- [ ] **Any file containing `DROP TABLE` / `DROP SCHEMA` / `TRUNCATE`** (including `uninstall.sql`) referenced from a code path that runs automatically — the schema install path (`lib/modules/module-registry.ts` → `lib/modules/schema-installer.ts`), an enable/disable hook, `module.json`, a cron/scheduled task, or any `api/**` route. **High** — teardown SQL must be manual-only. (Part B3 checks `uninstall.sql` specifically; this broadens it to *any* destructive SQL file being auto-wired.)
 
 **17e. Data exfiltration via destructive-adjacent flows (lightweight — overlaps §13 SSRF)**
 - [ ] **Reading whole tables / all rows and POSTing them to an external, non-allowlisted URL** — bulk read + outbound `fetch`/`axios` to a user-supplied or hardcoded external host. **Medium**. Note the overlap with §13 (SSRF/outbound) rather than double-reporting the same line.
@@ -339,23 +339,23 @@ Findings:
 ### B3. Install-time SQL (user-emphasized)
 
 **Required database files.** Every module that owns tables must ship all three of these files inside `[module]/database/`:
-- [ ] `database/schema.sql` — the canonical CREATE TABLE / CREATE INDEX / RLS policy script that the module loader runs at install time. **High** if missing.
+- [ ] `database/schema.sql` — the canonical CREATE TABLE / CREATE INDEX / RLS policy script that ARI runs on every module enable. **High** if missing.
 - [ ] `database/schema.ts` — the Drizzle ORM table definitions used by API routes via `withRLS()`. **High** if missing.
 - [ ] `database/uninstall.sql` — a manual-only teardown script (DROP TABLE statements). This file is **never executed automatically**; it exists only so a user can manually run it from their SQL client of choice (Supabase Studio, pgweb, or `psql`) if they want to fully remove the module's tables. **Medium** if missing.
 
-**Install SQL must run every time the module is enabled.** The module loader is expected to execute `schema.sql` on every enable (not just first install), so the script must be fully idempotent. Verify by reading `lib/modules/module-loader.ts`:
+**Install SQL must run every time the module is enabled.** ARI executes `schema.sql` on every enable (not just first install), so the script must be fully idempotent. Note that `lib/modules/module-loader.ts` does *not* do this — it only reads the generated manifest. The install path is `lib/modules/module-registry.ts` (`setModuleEnabled` on toggle, `installAndMark` for the runtime self-heal gate) → `lib/modules/schema-installer.ts` (which runs the file). Verify by reading those two:
 - [ ] Confirm `schema.sql` is executed on enable, not gated behind a "first install only" check. **High** if not executed on enable.
 - [ ] Every `CREATE TABLE` uses `IF NOT EXISTS` so re-running the script on an already-installed module is a no-op. **High** if any CREATE TABLE is non-idempotent.
 - [ ] Every `CREATE INDEX` uses `IF NOT EXISTS`. **Medium** if missing.
 - [ ] Every `CREATE POLICY` is wrapped in `DROP POLICY IF EXISTS ...; CREATE POLICY ...` (or equivalent) so re-runs don't fail on duplicate policies. **Medium** if missing.
 
-**Install SQL must never be destructive.** The install script (`schema.sql`) and any other `.sql` file the module loader executes must NOT contain anything that can destroy user data. The runtime installer at `lib/modules/schema-installer.ts` will *refuse* to execute the file if it sees any of these (the regex scan strips SQL comments first, so wrapping a forbidden statement in `--` won't sneak it past — and won't help an audit either):
+**Install SQL must never be destructive.** The install script (`schema.sql`) and any other `.sql` file ARI executes automatically must NOT contain anything that can destroy user data. The runtime installer at `lib/modules/schema-installer.ts` will *refuse* to execute the file if it sees any of these (the regex scan strips SQL comments first, so wrapping a forbidden statement in `--` won't sneak it past — and won't help an audit either):
 - [ ] **No `DROP TABLE`, `DROP SCHEMA`, `DROP DATABASE`, or `TRUNCATE`** anywhere in `schema.sql` or any auto-loaded SQL file. **High** — installer rejects and the module fails to enable. (`DROP INDEX`, `DROP POLICY`, `DROP TRIGGER` are allowed; they're needed for re-runnable schema.)
 - [ ] **No `DELETE FROM ...` without a `WHERE` clause** in any auto-loaded SQL file. **High** — installer rejects.
 - [ ] **No `ALTER TABLE ... DROP COLUMN`** in `schema.sql`. **High** — installer rejects.
 
-**`uninstall.sql` is manual-only.** This file is allowed (and expected) to contain `DROP TABLE` statements, but it must never be wired into the module loader, an enable hook, a disable hook, or any API route:
-- [ ] Confirm `uninstall.sql` is NOT referenced from `lib/modules/module-loader.ts`, `module.json`, or any code path that runs on enable/disable. **High** if it is auto-executed anywhere.
+**`uninstall.sql` is manual-only.** This file is allowed (and expected) to contain `DROP TABLE` statements, but it must never be wired into the schema installer, an enable hook, a disable hook, or any API route:
+- [ ] Confirm `uninstall.sql` is NOT referenced from `lib/modules/schema-installer.ts`, `lib/modules/module-registry.ts`, `lib/modules/module-loader.ts`, `module.json`, or any code path that runs on enable/disable. **High** if it is auto-executed anywhere. (In a clean checkout the only mention of `uninstall.sql` anywhere in the codebase is a comment in `schema-installer.ts` stating that it is never read.)
 - [ ] The file should be clearly labeled at the top as a manual-only teardown script (comment block explaining the user must run it themselves in their SQL client — Supabase Studio, pgweb, or `psql`). **Low** if the warning comment is missing.
 - [ ] All `CREATE INDEX` statements use `IF NOT EXISTS` — **Low**
 - [ ] Every table has `user_id TEXT NOT NULL` in `schema.sql` — **High**. Must be `TEXT`, **not** `UUID`. Better Auth stores user IDs as text (see `core-schema.ts`: `session.userId`, `account.userId`, `moduleSettings.userId`, `userPreferences.userId` are all `text()`). Using `UUID` causes a type mismatch with `current_setting('app.current_user_id')` and with `user.id` returned by `getAuthenticatedUser()`.

@@ -17,6 +17,8 @@ All routes require authentication via Better Auth session cookies, except:
 
 The middleware at `/middleware.ts` validates the session cookie before allowing access. API routes return `401 Unauthorized`; page routes redirect to `/sign-in`. API routes may alternatively authenticate via an API key header — full validation still happens server-side in `getAuthenticatedUser()`.
 
+**Public routes are fixed at build time.** The list is compiled into `lib/generated/module-manifest.json` by the registry generator, so a module cannot make one of its routes public at runtime — the declaration must pass through the generator. Public routes skip both authentication *and* the module-enabled check (there is no user context), so each handler must enforce its own security using the primitives in `lib/modules/public-route-security.ts` (`checkRateLimit`, `isSameOriginRequest`, `getClientIp`). The `security` block a public route declares in `module.json` is metadata that documents the intent — the framework enforces nothing on its behalf.
+
 **Sign-up is disabled at the middleware level.** `POST /api/auth/sign-up*` returns `403`; only server-side bootstrap (via the `/welcome` setup flow or `ARI_FIRST_RUN_ADMIN_*` env vars) can create accounts.
 
 **IP restriction.** ARI deliberately does *not* implement IP allowlisting in application middleware — request headers like `X-Forwarded-For` are client-controlled and trivially spoofed or omitted, so any header-based check can be bypassed and only creates false confidence. Restrict access at the network edge instead, where the source IP is authoritative: Vercel Firewall, Cloudflare WAF/Access, an nginx/Caddy `allow`/`deny` block, or host firewall rules (`iptables`/`ufw`/security groups).
@@ -101,6 +103,50 @@ if (denied) return denied
 
 UI gating is cosmetic — always enforce on the server. Client components read `useCurrentUser()` (`hooks/use-users.ts`) and the helpers `hasPermission` / `canViewUsers` / `canManageRole` from `lib/permissions.ts`. See `CLAUDE.md` and `docs/MODULES.md` for module-author guidance.
 
+## Layer 5: Module Supply Chain (Install-Time)
+
+Layers 1–4 govern what a *request* can reach. This layer governs what can be *installed* in the first place: a module is third-party code that ships pages, API routes, npm dependencies, and SQL.
+
+### Installing a module
+
+`POST /api/modules/download` (`app/api/modules/download/route.ts`) is gated by `requirePermission(user, 'manage_modules')` — authentication alone is not sufficient.
+
+### Archive extraction (Zip Slip)
+
+The installer uses a pure Node `zlib` extractor that rejects, before writing any file:
+
+- absolute paths and Windows drive letters (`C:\…`)
+- any `..` path segment
+- any entry whose *resolved* destination falls outside the extraction directory
+
+### npm dependencies
+
+Declared in `module.json` under `npmDependencies` and installed by `lib/modules/npm-installer.ts`:
+
+- **Cap of 25 packages per module**; names must match a strict npm-name pattern; version specs ≤ 100 characters.
+- **Forbidden spec tokens** — `git:`, `http:`, `https:`, `file:`, `link:`, `workspace:`, `npm:`, `..` — any of which would let a module pull code from an arbitrary source.
+- **Conflict policy: abort, never silently upgrade.** The check is generic: if the host's root `package.json` already pins the package at a range incompatible with the module's, the install fails with the two versions named, rather than resolving it. In practice the packages this protects are the shared framework ones (`react`, `next`, `drizzle-orm`, `better-auth`), since a module install must never move the host off its own framework versions.
+- A module-level mutex serializes installs so concurrent requests cannot race pnpm's lockfile.
+
+### Module SQL
+
+`lib/modules/schema-installer.ts` scans every `schema.sql` **before** executing it. SQL comments are stripped first, so a forbidden statement cannot hide behind `--`. Refused outright:
+
+| Refused | Allowed (required for re-runnable schema) |
+|---|---|
+| `DROP TABLE`, `DROP SCHEMA`, `DROP DATABASE` | `DROP POLICY` |
+| `TRUNCATE` | `DROP INDEX` |
+| `ALTER TABLE … DROP COLUMN` | `DROP TRIGGER` |
+| `DELETE FROM <table>` with no `WHERE` | |
+
+A match means the file is not executed and the module does not enable. If the scan passes, the whole file runs inside a **single transaction** — a partially applied schema is impossible.
+
+`database/uninstall.sql` is **never read by any code path** — not the loader, not an enable/disable hook, not an API route. It exists only so a user can run teardown manually in psql, pgweb, or Supabase Studio.
+
+### Unvalidated code cannot run
+
+The module loader never scans the filesystem at runtime — it reads the pre-generated manifest. `scripts/generate-module-registry.js` validates each module at build time and emits static registries under `lib/generated/`; the application imports only those. A module that fails validation is unreachable — there is no dynamic `require` of module code. See `docs/MODULES.md` §1.
+
 ## Authentication Hardening
 
 - **Password hashing.** Argon2id (OWASP-recommended; winner of the Password Hashing Competition). Minimum password length: 18 characters.
@@ -149,3 +195,4 @@ When writing new API routes or module APIs:
 4. Never rely on implicit RLS filtering alone — the default DB role bypasses RLS
 5. Gate privileged actions with `requirePermission(user, 'key')` / `requireAdmin(user)` from `lib/api-helpers.ts` (see Layer 4)
 6. Use `createErrorResponse()` from `lib/api-helpers.ts` or `safeErrorResponse()` from `lib/api-error.ts` in catch blocks — never expose internal error details to the client
+7. In **module** code, never shell out (`child_process`, `exec`, `spawn`), never `eval` / `new Function` / `vm.run`, never recursively delete from the filesystem, and never issue a `db.delete()` / `db.update()` without a `.where(...)` scoped to the owner. Core infrastructure has a few narrow, reviewed exceptions (e.g. `lib/modules/npm-installer.ts` spawning `pnpm`); a module has none.
