@@ -332,11 +332,13 @@
   align-items: center;
 }
 
-/* Each group becomes a centered block; the gap between groups reads as sections */
+/* Each group is a centered block. Zero the group's own vertical padding so it
+ * doesn't add extra space between groups — all row spacing comes uniformly from
+ * each row's symmetric top/bottom padding (see the menu-button rule below). */
 [data-mobile="true"] .mobile-main-nav [data-sidebar="group"] {
   width: 100%;
   max-width: 28rem;
-  padding: 0.5rem 0;
+  padding: 0;
 }
 
 /* Hide group labels — the spacing between groups is enough structure on mobile */
@@ -344,9 +346,10 @@
   display: none !important;
 }
 
-/* Uniform, roomy spacing between rows */
+/* No extra gap between rows — spacing is provided by each row's own padding, so
+ * within-group and cross-group gaps stay identical */
 [data-mobile="true"] .mobile-main-nav [data-sidebar="menu"] {
-  gap: 0.25rem;
+  gap: 0;
 }
 
 /* Menu rows: full width, centered, large, tappable */

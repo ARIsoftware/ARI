@@ -206,7 +206,7 @@ const Sidebar = React.forwardRef<
                     aria-label="Back"
                   >
                     <ArrowLeft className="size-6" />
-                    <span className="text-2xl font-semibold tracking-tight">Back</span>
+                    <span className="text-[1.5rem] font-semibold leading-[1.2] tracking-[-0.01em]">Back</span>
                   </button>
                 ) : (
                   <span />
