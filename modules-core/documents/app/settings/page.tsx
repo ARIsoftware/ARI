@@ -145,7 +145,7 @@ export default function DocumentsSettingsPage() {
       <div className="p-6 max-w-2xl">
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Couldn't load settings</AlertTitle>
+          <AlertTitle>Couldn&apos;t load settings</AlertTitle>
           <AlertDescription className="space-y-2">
             <p>{settingsError instanceof Error ? settingsError.message : 'Unknown error'}</p>
             <Button variant="outline" size="sm" onClick={() => refetchSettings()}>
@@ -273,7 +273,7 @@ export default function DocumentsSettingsPage() {
           {tagsError && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Couldn't load tags</AlertTitle>
+              <AlertTitle>Couldn&apos;t load tags</AlertTitle>
               <AlertDescription className="space-y-2">
                 <p>{tagsError instanceof Error ? tagsError.message : 'Unknown error'}</p>
                 <Button variant="outline" size="sm" onClick={() => refetchTags()}>

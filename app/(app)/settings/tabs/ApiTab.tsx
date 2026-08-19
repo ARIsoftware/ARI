@@ -54,19 +54,19 @@ interface EndpointData {
 
 function specToEndpoints(spec: OpenApiSpec): EndpointData {
   const core: EndpointData['coreEndpoints'] = []
-  const module: EndpointData['moduleEndpoints'] = []
+  const mod: EndpointData['moduleEndpoints'] = []
   for (const [path, item] of Object.entries(spec.paths ?? {})) {
     const firstMethodKey = HTTP_METHODS.find((m) => m in item)
     if (!firstMethodKey) continue
     const methods = HTTP_METHODS.filter((m) => m in item).map((m) => m.toUpperCase())
     const tag = item[firstMethodKey]?.tags?.[0]
     if (tag && !NON_MODULE_TAGS.has(tag)) {
-      module.push({ fullPath: path, methods, moduleId: tag })
+      mod.push({ fullPath: path, methods, moduleId: tag })
     } else {
       core.push({ fullPath: path, methods })
     }
   }
-  return { coreEndpoints: core, moduleEndpoints: module }
+  return { coreEndpoints: core, moduleEndpoints: mod }
 }
 
 export function ApiTab(): React.ReactElement {

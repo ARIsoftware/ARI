@@ -570,7 +570,7 @@ describe('installModuleNpmDeps — queue serialisation', () => {
   it('emits waiting message when a second install queues behind an active install', async () => {
     // We need the first install to still be in-flight when the second starts.
     // Use slow child processes so the first doesn't finish before the second enqueues.
-    let spawnCount = 0
+    const spawnCount = 0
     const events1: any[] = []
     const events2: any[] = []
 

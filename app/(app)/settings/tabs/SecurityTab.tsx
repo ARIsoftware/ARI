@@ -73,7 +73,7 @@ export function SecurityTab({
                 Active Sessions
               </CardTitle>
               <CardDescription>
-                Manage devices where you're currently signed in.
+                Manage devices where you&apos;re currently signed in.
               </CardDescription>
             </div>
             <Button

@@ -128,7 +128,7 @@ export function QuotesWidget() {
           <div className="mt-3 pt-3 border-t">
             <p className="text-xs text-muted-foreground mb-1">Daily inspiration:</p>
             <p className="text-sm font-medium line-clamp-3 italic">
-              "{stats.randomQuote.quote}"
+              &quot;{stats.randomQuote.quote}&quot;
             </p>
             {stats.randomQuote.author && (
               <p className="text-xs text-muted-foreground mt-1">

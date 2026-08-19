@@ -202,15 +202,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const grouped: Record<string, typeof mainModules> = {}
     const ungrouped: typeof mainModules = []
 
-    for (const module of modulesWithRoutes) {
-      const groupName = module.group
+    for (const mod of modulesWithRoutes) {
+      const groupName = mod.group
       if (groupName) {
         if (!grouped[groupName]) {
           grouped[groupName] = []
         }
-        grouped[groupName].push(module)
+        grouped[groupName].push(mod)
       } else {
-        ungrouped.push(module)
+        ungrouped.push(mod)
       }
     }
 
@@ -234,11 +234,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }
 
     // Add ungrouped modules as singles
-    for (const module of ungrouped) {
+    for (const mod of ungrouped) {
       renderItems.push({
         type: 'single',
-        module,
-        minPriority: getEffectivePriority(module)
+        module: mod,
+        minPriority: getEffectivePriority(mod)
       })
     }
 
@@ -390,20 +390,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 )
               } else {
                 // Render a single ungrouped module
-                const module = item.module
-                const mainRoutes = module.routes?.filter(r => r.sidebarPosition === 'main') || []
-                const hasSubmenu = !!module.submenu?.component
+                const mod = item.module
+                const mainRoutes = mod.routes?.filter(r => r.sidebarPosition === 'main') || []
+                const hasSubmenu = !!mod.submenu?.component
 
                 return (
-                  <SidebarGroup key={module.id}>
+                  <SidebarGroup key={mod.id}>
                     <SidebarGroupContent>
                       <SidebarMenu>
                         {mainRoutes.map((route) => {
-                          const Icon = getLucideIcon(route.icon || module.icon)
+                          const Icon = getLucideIcon(route.icon || mod.icon)
                           return (
                             <SidebarMenuItem key={route.path}>
                               <SidebarMenuButton asChild>
-                                <Link href={route.path} className="flex items-center" onClick={(e) => handleMainItemClick(e, module)}>
+                                <Link href={route.path} className="flex items-center" onClick={(e) => handleMainItemClick(e, mod)}>
                                   <Icon className="mr-2 size-4" />
                                   <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
                                   {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
@@ -458,20 +458,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 )
               } else {
                 // Render a single ungrouped module
-                const module = item.module
-                const bottomRoutes = module.routes?.filter(r => r.sidebarPosition === 'bottom') || []
-                const hasSubmenu = !!module.submenu?.component
+                const mod = item.module
+                const bottomRoutes = mod.routes?.filter(r => r.sidebarPosition === 'bottom') || []
+                const hasSubmenu = !!mod.submenu?.component
 
                 return (
-                  <SidebarGroup key={module.id}>
+                  <SidebarGroup key={mod.id}>
                     <SidebarGroupContent>
                       <SidebarMenu>
                         {bottomRoutes.map((route) => {
-                          const Icon = getLucideIcon(route.icon || module.icon)
+                          const Icon = getLucideIcon(route.icon || mod.icon)
                           return (
                             <SidebarMenuItem key={route.path}>
                               <SidebarMenuButton asChild>
-                                <Link href={route.path} className="flex items-center" onClick={(e) => handleMainItemClick(e, module)}>
+                                <Link href={route.path} className="flex items-center" onClick={(e) => handleMainItemClick(e, mod)}>
                                   <Icon className="mr-2 size-4" />
                                   <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
                                   {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}

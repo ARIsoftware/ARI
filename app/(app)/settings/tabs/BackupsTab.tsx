@@ -431,7 +431,7 @@ export function BackupsTab({
               )}
             </Button>
             <p className="text-xs text-muted-foreground">
-              Click "Preview Backup" to verify what will be exported before downloading
+              Click &quot;Preview Backup&quot; to verify what will be exported before downloading
             </p>
           </CardContent>
         </Card>

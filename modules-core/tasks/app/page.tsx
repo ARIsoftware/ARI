@@ -358,7 +358,7 @@ export default function TasksPage() {
     const task = tasks.find((t) => t.id === draggedTask)
     if (!task) return
 
-    let updates: Partial<Task> = {}
+    const updates: Partial<Task> = {}
 
     if (columnType === "pinned") {
       updates.pinned = true

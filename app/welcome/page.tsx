@@ -1866,7 +1866,7 @@ export default function WelcomePage() {
                       }`}
                       style={{ borderRadius: '6px' }}
                     >
-                      I've restarted — sign in
+                      I&apos;ve restarted — sign in
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>

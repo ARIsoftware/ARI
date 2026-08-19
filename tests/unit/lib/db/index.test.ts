@@ -308,7 +308,7 @@ describe('withUserContext', () => {
 
   it('swallows rollback errors on dead connections', async () => {
     const staleRelease = vi.fn()
-    let count = 0
+    const count = 0
     const staleClient = makeRawClient({
       query: async () => {
         // All queries (including ROLLBACK) fail with stale error

@@ -28,8 +28,8 @@ export function useModules() {
  */
 function useModule(moduleId: string | null) {
   const modules = useEnabledModulesFromContext()
-  const module = moduleId ? modules.find(m => m.id === moduleId) ?? null : null
-  return { module, loading: false, error: null }
+  const mod = moduleId ? modules.find(m => m.id === moduleId) ?? null : null
+  return { module: mod, loading: false, error: null }
 }
 
 /**

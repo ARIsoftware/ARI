@@ -1879,7 +1879,7 @@ export default function ModulesPage() {
                 onClick={dismissWelcomeForever}
                 className="mx-auto -mb-2 mt-1 block text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
               >
-                Don't show this again
+                Don&apos;t show this again
               </button>
             </>
           ) : (
@@ -1894,7 +1894,7 @@ export default function ModulesPage() {
               <DialogHeader>
                 <DialogTitle className="text-xl">Build your own modules</DialogTitle>
                 <DialogDescription className="pt-2 text-base">
-                  You're not limited to what's in the library — ARI lets you easily
+                  You&apos;re not limited to what&apos;s in the library — ARI lets you easily
                   create/fork/modify/share modules and build your very own modules!{' '}
                   <a
                     href="https://ari.software/docs/creating-modules"
@@ -1930,7 +1930,7 @@ export default function ModulesPage() {
                 onClick={dismissWelcomeForever}
                 className="mx-auto -mb-2 mt-1 block text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
               >
-                Don't show this again
+                Don&apos;t show this again
               </button>
             </>
           )}

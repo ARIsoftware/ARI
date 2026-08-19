@@ -259,28 +259,28 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
   // Render a single icon's content (shared between drag and normal mode)
   const renderIconContent = (icon: typeof sortedIcons[0]) => {
     if (icon.type === "module") {
-      const module = icon.module
-      if (module.topBarIcon!.component) {
-        const TopBarComponent = MODULE_TOPBAR_ICONS[module.id]
+      const mod = icon.module
+      if (mod.topBarIcon!.component) {
+        const TopBarComponent = MODULE_TOPBAR_ICONS[mod.id]
         if (!TopBarComponent) return null
         return <TopBarComponent isDragMode={isDragMode} />
       }
-      if (!module.topBarIcon!.icon || !module.topBarIcon!.route) return null
-      const Icon = getLucideIcon(module.topBarIcon!.icon)
-      return module.topBarIcon!.tooltip ? (
+      if (!mod.topBarIcon!.icon || !mod.topBarIcon!.route) return null
+      const Icon = getLucideIcon(mod.topBarIcon!.icon)
+      return mod.topBarIcon!.tooltip ? (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
               className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 hover:text-topbar-foreground ${dragItemClass}`}
-              onClick={isDragMode ? undefined : () => router.push(module.topBarIcon!.route!)}
+              onClick={isDragMode ? undefined : () => router.push(mod.topBarIcon!.route!)}
             >
               <Icon className="h-5 w-5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{module.topBarIcon!.tooltip}</p>
+            <p>{mod.topBarIcon!.tooltip}</p>
           </TooltipContent>
         </Tooltip>
       ) : (
@@ -288,7 +288,7 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
           variant="ghost"
           size="icon"
           className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 hover:text-topbar-foreground ${dragItemClass}`}
-          onClick={isDragMode ? undefined : () => router.push(module.topBarIcon!.route!)}
+          onClick={isDragMode ? undefined : () => router.push(mod.topBarIcon!.route!)}
         >
           <Icon className="h-5 w-5" />
         </Button>

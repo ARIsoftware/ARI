@@ -9,7 +9,6 @@ import { z } from 'zod'
 vi.mock('@asteasolutions/zod-to-openapi', () => ({
   extendZodWithOpenApi: (zodInstance: typeof z) => {
     // Add a no-op .openapi() to every ZodType prototype so `.openapi('Name')` works
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const proto = (zodInstance as any).ZodType.prototype
     if (!proto.openapi) {
       proto.openapi = function () { return this }

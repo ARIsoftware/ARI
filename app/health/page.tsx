@@ -707,11 +707,11 @@ export default function DatabaseTestPage() {
       // Test 3: Validate module manifests
       updateModuleResult('Manifest Validation', { status: 'testing' })
       const invalidModules = []
-      for (const module of modules) {
+      for (const mod of modules) {
         const required = ['id', 'name', 'description', 'version', 'icon']
-        const missing = required.filter((field: any) => !(field in module))
+        const missing = required.filter((field: any) => !(field in mod))
         if (missing.length > 0) {
-          invalidModules.push({ id: module.id, missing })
+          invalidModules.push({ id: mod.id, missing })
         }
       }
 
@@ -736,9 +736,9 @@ export default function DatabaseTestPage() {
       const enabledModules = modules.filter((m: any) => m.isEnabled && m.routes && m.routes.length > 0)
       const routeTests: Array<{ module: string; accessible: boolean; status?: number }> = []
 
-      for (const module of enabledModules) {
+      for (const mod of enabledModules) {
         try {
-          const response = await fetch(`/${module.id}`, {
+          const response = await fetch(`/${mod.id}`, {
             method: 'HEAD',
             redirect: 'manual'
           })
@@ -747,13 +747,13 @@ export default function DatabaseTestPage() {
                            response.status === 302 || response.status === 307 ||
                            response.type === 'opaqueredirect'
           routeTests.push({
-            module: module.id,
+            module: mod.id,
             accessible,
             status: response.status
           })
         } catch (error) {
           routeTests.push({
-            module: module.id,
+            module: mod.id,
             accessible: false
           })
         }

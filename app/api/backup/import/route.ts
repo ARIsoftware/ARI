@@ -352,7 +352,7 @@ export async function POST(req: NextRequest) {
 
     // Verify data integrity via row counts (lightweight and reliable)
     const SAFE_TABLE_NAME = /^[a-z_][a-z0-9_]*$/i
-    let integrityCheck = { passed: true, failures: [] as string[] }
+    const integrityCheck = { passed: true, failures: [] as string[] }
     if (validation.metadata?.rowCounts) {
       try {
         const verifyClient = await getPoolClient()

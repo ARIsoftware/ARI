@@ -709,7 +709,7 @@ export default function DocumentsPage() {
       {docsError ? (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Couldn't load documents</AlertTitle>
+          <AlertTitle>Couldn&apos;t load documents</AlertTitle>
           <AlertDescription className="space-y-2">
             <p>{docsError instanceof Error ? docsError.message : 'Unknown error'}</p>
             <Button variant="outline" size="sm" onClick={() => refetchDocs()}>

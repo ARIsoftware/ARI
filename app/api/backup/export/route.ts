@@ -396,7 +396,7 @@ export async function POST(req: NextRequest) {
     const tableSchemas: Record<string, ColumnInfo[]> = {}
     const checksums: Record<string, string> = {}
     let totalRows = 0
-    let errors: string[] = [...warnings]
+    const errors: string[] = [...warnings]
     const failedTables: string[] = []
 
     // Process each table

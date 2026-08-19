@@ -445,7 +445,7 @@ export default function AddTaskPage() {
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label className="text-sm font-medium">Pin this task</Label>
-                      <p className="text-xs text-muted-foreground">Pinned tasks will appear in the "Pinned" filter</p>
+                      <p className="text-xs text-muted-foreground">Pinned tasks will appear in the &quot;Pinned&quot; filter</p>
                     </div>
                     <button
                       type="button"

@@ -355,8 +355,8 @@ export async function getEnabledModule(
   const allModules = await getModules()
 
   // Find the requested module
-  const module = allModules.find(m => m.id === moduleId)
-  if (!module) {
+  const mod = allModules.find(m => m.id === moduleId)
+  if (!mod) {
     return null // Module doesn't exist
   }
 
@@ -375,8 +375,8 @@ export async function getEnabledModule(
 
   // If no setting exists, seed just this module's record
   if (!setting) {
-    const isCustom = module.path?.includes('modules-custom')
-    const defaultEnabled = isCustom ? false : (module.enabled ?? true)
+    const isCustom = mod.path?.includes('modules-custom')
+    const defaultEnabled = isCustom ? false : (mod.enabled ?? true)
 
     try {
       await withAdminDb(async (db) => {
@@ -387,27 +387,27 @@ export async function getEnabledModule(
           })
       })
       if (defaultEnabled) {
-        warnIfMisconfiguredSchema(module)
-        if (module.schemaSha256) {
-          await installAndMark(currentUserId, moduleId, module.schemaSha256)
+        warnIfMisconfiguredSchema(mod)
+        if (mod.schemaSha256) {
+          await installAndMark(currentUserId, moduleId, mod.schemaSha256)
         }
       }
     } catch (error) {
       console.error(`[Modules] Bootstrap for ${moduleId} failed:`, error)
     }
 
-    return defaultEnabled ? module : null
+    return defaultEnabled ? mod : null
   }
 
   if (!setting.enabled) return null
 
-  warnIfMisconfiguredSchema(module)
+  warnIfMisconfiguredSchema(mod)
   const settingJsonb = (setting.settings as Record<string, unknown> | null) ?? null
-  if (module.schemaSha256 && !isSchemaUpToDate(settingJsonb, module.schemaSha256)) {
-    await installAndMark(currentUserId, moduleId, module.schemaSha256)
+  if (mod.schemaSha256 && !isSchemaUpToDate(settingJsonb, mod.schemaSha256)) {
+    await installAndMark(currentUserId, moduleId, mod.schemaSha256)
   }
 
-  return module
+  return mod
 }
 
 /**
@@ -424,11 +424,11 @@ export async function setModuleEnabled(
   enabled: boolean
 ): Promise<{ success: boolean; error?: string; warning?: string }> {
   // Verify module exists
-  const module = await getModules().then(modules =>
+  const mod = await getModules().then(modules =>
     modules.find(m => m.id === moduleId)
   )
 
-  if (!module) {
+  if (!mod) {
     return {
       success: false,
       error: `Module '${moduleId}' not found`
@@ -477,8 +477,8 @@ export async function setModuleEnabled(
   }
 
   // Persist the marker after the row exists so the JSONB merge has a target.
-  if (schemaProvisioned && module.schemaSha256) {
-    await persistSchemaInstalled(userId, moduleId, module.schemaSha256)
+  if (schemaProvisioned && mod.schemaSha256) {
+    await persistSchemaInstalled(userId, moduleId, mod.schemaSha256)
   }
 
   return { success: true, warning: schemaWarning }
