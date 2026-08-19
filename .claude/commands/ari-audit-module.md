@@ -46,7 +46,7 @@ Runs Part A (Security Audit — 17 categories below, including §17 Destructive 
 > Context for Subagent 1: `getAuthenticatedUser()` now accepts **two** credentials — the Better Auth session cookie AND an `x-api-key` header (see `lib/auth-helpers.ts`, `lib/api-keys.ts`, `lib/auth-middleware.ts` `API_KEY_PREFIX`). The module dispatcher at `app/api/modules/[module]/[[...path]]/route.ts` already does a coarse "cookie or API key present" gate before invoking the handler, so the *only* check that matters in the module handler is `getAuthenticatedUser()` — do not separately flag a missing cookie check. Routes listed in `module.json` `publicRoutes` bypass the dispatcher gate entirely and must implement their own security per the rules below.
 
 ### Subagent 2 — Production-Readiness
-Scope: the entire module folder plus the registration touchpoints listed in Part B.
+Scope: the entire module folder plus the generated registries listed in Part B.
 Runs Part B (manifest, self-containment, install SQL, API patterns, OpenAPI annotations, public routes, registration, page hygiene, type safety).
 
 ### Subagent 3 — Database / Supabase / Postgres
@@ -300,7 +300,7 @@ Every confirmed finding must appear with file + line, the concrete data-loss/RCE
 
 ### B2.1. Shared-file pollution (forbidden edits outside the module folder)
 
-**Context:** `/ari-create-module` defines a hard rule that a module is created by adding ONE folder under `modules-custom/<id>/` and editing only three registration touchpoints (`/lib/db/schema/schema.ts`, `MODULE_API_ROUTES`, `sidebar-submenu-renderer.tsx`). Anything else outside the module folder is forbidden because those files are upstream-managed and edits will be wiped — and will block `ari-update` — the next time the user updates. This audit must look for evidence that the rule was violated.
+**Context:** `/ari-create-module` defines a hard rule that a module is created by adding ONE folder under `modules-custom/<id>/` and editing **nothing** outside it. There are no manual registration touchpoints: `pnpm generate-module-registry` discovers pages, API routes, schema/relations barrels, submenus, top-bar icons, dashboard widgets, and public routes from the folder layout and `module.json` (see `docs/MODULES.md` §2). Files outside the module folder are upstream-managed, so edits there will be wiped — and will block `ari-update` — the next time the user updates. This audit must look for evidence that the rule was violated.
 
 **Files to scan** (each one is forbidden territory for module-specific content):
 
@@ -332,8 +332,8 @@ Findings:
 **False-positive guardrails (do NOT flag these):**
 
 - The module id appearing inside `lib/generated/*` files (auto-generated registries are expected to reference every module id)
-- The module id appearing inside `app/api/modules/[module]/[[...path]]/route.ts` only as part of the `MODULE_API_ROUTES` registration — that file IS one of the three allowed touchpoints
-- The module id appearing inside `/components/sidebar-submenu-renderer.tsx` as part of the `SUBMENU_COMPONENTS` registry — also an allowed touchpoint
+- The module id appearing inside `lib/generated/module-api-registry.ts` (`MODULE_API_ROUTES`) or `lib/generated/module-submenu-registry.ts` (`MODULE_SUBMENUS`) — these are auto-generated registries and are expected to name every module
+- Conversely, a module id hand-written into `app/api/modules/[module]/[[...path]]/route.ts` or `/components/sidebar-submenu-renderer.tsx` **is** a finding: neither file contains a per-module list, both read the generated registries, and any such edit is overwritten on the next dev/build run
 - The module id appearing inside `/lib/db/schema/schema.ts` as a re-export — also allowed
 
 ### B3. Install-time SQL (user-emphasized)

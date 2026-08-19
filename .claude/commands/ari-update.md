@@ -84,7 +84,7 @@ If they say no, stop.
 
 After a successful merge:
 
-1. **Check if dependencies changed**: Run `git diff ORIG_HEAD..HEAD --name-only` and look for `package.json` or `package-lock.json`. (Use `ORIG_HEAD`, not `HEAD~1` — fast-forward merges advance HEAD across multiple commits, so `HEAD~1` would only see the last one and miss earlier dependency changes.)
+1. **Check if dependencies changed**: Run `git diff ORIG_HEAD..HEAD --name-only` and look for `package.json` or `pnpm-lock.yaml` (ARI uses pnpm; there is no `package-lock.json`). (Use `ORIG_HEAD`, not `HEAD~1` — fast-forward merges advance HEAD across multiple commits, so `HEAD~1` would only see the last one and miss earlier dependency changes.)
    - If changed, ask the user: "Dependencies have changed. Run `pnpm install` now?"
    - If they confirm, run `pnpm install`.
 
@@ -95,9 +95,13 @@ After a successful merge:
 3. **Check if module files changed**: Look for changes in `modules-core/` or `module.json` files.
    - If changed, run `pnpm generate-module-registry` automatically.
 
-4. **Check for new environment variables**: Run `git diff ORIG_HEAD..HEAD -- .env.example` to see if new env vars were added.
-   - If changed, tell the user:
-     > "`.env.example` has been updated with new environment variables. Please review and update your `.env` file."
+4. **Check for new environment variables**: ARI ships no committed `.env.example`, so scan the diff for newly referenced env vars instead:
+   ```bash
+   git diff ORIG_HEAD..HEAD -U0 | grep -E '^\+' | grep -oE 'process\.env\.[A-Z0-9_]+' | sort -u
+   ```
+   - Compare any hits against the keys already present in the user's `.env.local`.
+   - If something is referenced but not configured, tell the user:
+     > "This update references new environment variables that aren't in your `.env.local`: `<names>`. Please add them before restarting.""
 
 ### 9. Summary
 
