@@ -572,16 +572,16 @@ export default function TasksPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-6">
+    <div className="flex flex-1 flex-col gap-6 p-6 min-w-0">
               {/* Header */}
-              <div className="flex items-center justify-between">
-              <div>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="min-w-0">
                 <h1 className="text-3xl font-medium">Todo List</h1>
                 <p className="text-sm text-muted-foreground mt-1" suppressHydrationWarning>
                   {user ? `Welcome back, ${user.firstName || user.email || "there"}!` : '\u00A0'}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <TaskSoundToggle />
                 <Button variant="outline" onClick={() => { playTaskSound("button"); router.push("/tasks/radar") }}>
                   <BarChart3 className="w-4 h-4 mr-2" />
@@ -599,15 +599,15 @@ export default function TasksPage() {
             </div>
 
             {/* Filters and Search */}
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-center gap-1 p-1 bg-muted rounded-lg overflow-x-auto">
                 {filters.map((filter) => (
                   <Button
                     key={filter}
                     variant="ghost"
                     size="sm"
                     onClick={() => changeFilter(filter)}
-                    className={`h-8 px-4 rounded-md transition-colors ${
+                    className={`h-8 px-4 rounded-md shrink-0 whitespace-nowrap transition-colors ${
                       activeFilter === filter ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"
                     }`}
                   >
@@ -616,20 +616,20 @@ export default function TasksPage() {
                 ))}
               </div>
 
-              <div className="flex items-center gap-2">
-                <div className="relative">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative flex-1 min-w-[12rem] lg:flex-none">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                   <Input
                     placeholder="Search tasks..."
-                    className="pl-10 w-64"
+                    className="pl-10 w-full lg:w-64"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
-                <Button variant="outline" size="icon">
+                <Button variant="outline" size="icon" className="shrink-0">
                   <Filter className="w-4 h-4" />
                 </Button>
-                <div className="flex items-center rounded-lg border bg-card">
+                <div className="flex items-center rounded-lg border bg-card shrink-0">
                   <Button
                     variant="ghost"
                     size="icon"
@@ -1380,7 +1380,7 @@ export default function TasksPage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex flex-wrap items-center justify-end gap-2 mt-1 shrink-0">
                         <Badge
                           variant="secondary"
                           className={`font-medium text-xs ${task.pinned ? "bg-[hsl(var(--primary-foreground))]/15 text-[hsl(var(--primary-foreground))]/90 dark:bg-[hsl(var(--muted))] dark:text-[hsl(var(--muted-foreground))]" : getStatusColor(task.status)}`}
