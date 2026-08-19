@@ -64,9 +64,14 @@ export default async function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,200..900;1,200..900&family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&family=Google+Sans+Flex:opsz,wght@6..144,1..1000&family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Outfit:wght@100..900&family=Overpass+Mono:wght@300..700&family=Press+Start+2P&family=Raleway:ital,wght@0,100..900;1,100..900&family=Science+Gothic:wght@100..900&display=swap" rel="stylesheet" />
-        {/* External script to apply theme/font immediately before React hydration to prevent FOUT */}
-        {/* eslint-disable-next-line @next/next/no-sync-scripts -- intentional blocking pre-hydration theme script; async/defer would reintroduce FOUT */}
-        <script src="/theme-init.js" />
+        {/* Inline theme/font bootstrap: runs synchronously before first paint to
+            prevent FOUT. Inlined (no external file) so there is no network round-trip.
+            Mirrors the theme cache in localStorage['ari-theme-cache']. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var c=localStorage.getItem('ari-theme-cache');if(c){var s=JSON.parse(c);var fonts={'overpass-mono':'"Overpass Mono", monospace','geist':'"Geist", sans-serif','geist-mono':'"Geist Mono", monospace','open-sans':'"Open Sans", sans-serif','outfit':'"Outfit", sans-serif','science-gothic':'"Science Gothic", sans-serif','inter':'"Inter", sans-serif','jetbrains-mono':'"JetBrains Mono", monospace','ibm-plex-sans':'"IBM Plex Sans", sans-serif','fira-code':'"Fira Code", monospace','crimson-pro':'"Crimson Pro", serif','hanken-grotesk':'"Hanken Grotesk", sans-serif','press-start-2p':'"Press Start 2P", monospace'};var themeFontSize={'8-bit':'11px'};if(s.activeFont&&fonts[s.activeFont]){document.documentElement.style.setProperty('--font-family',fonts[s.activeFont])}if(s.activeThemeId&&themeFontSize[s.activeThemeId]){document.documentElement.style.fontSize=themeFontSize[s.activeThemeId]}}}catch(e){}})();`,
+          }}
+        />
       </head>
       <body>
         {/*

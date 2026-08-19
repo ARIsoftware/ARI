@@ -45,6 +45,10 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined)
 const THEME_CACHE_KEY = 'ari-theme-cache'
 // Stores the user's explicitly chosen font (so theme defaults don't permanently override it)
 const USER_FONT_KEY = 'ari-user-font'
+// Marks that localStorage holds theme changes not yet confirmed-saved to the server.
+// Read on next load so a refresh before the debounced save fires prefers the local
+// cache over a stale server fetch (see the API-sync effect and saveSettings below).
+const THEME_DIRTY_KEY = 'ari-theme-dirty'
 
 // Apply theme colors to document
 function applyThemeColors(colors: ThemeColors) {
@@ -197,6 +201,24 @@ export function ThemeProvider({ children, isAuthenticated: isAuthProp, isAuthLoa
         throw new Error('Not authenticated')
       })
       .then((settings: ThemeSettings) => {
+        // If the cache has local changes the server hasn't confirmed yet (user
+        // changed the theme then refreshed before the debounced save fired), the
+        // server response is stale. Keep the local cache (already applied on mount)
+        // and push it to the server instead of clobbering it.
+        if (localStorage.getItem(THEME_DIRTY_KEY) === '1') {
+          const cachedLocal = localStorage.getItem(THEME_CACHE_KEY)
+          if (cachedLocal) {
+            fetch('/api/theme', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: cachedLocal,
+            })
+              .then(() => localStorage.removeItem(THEME_DIRTY_KEY))
+              .catch((e) => console.error('[Theme] Failed to resync local theme:', e))
+          }
+          return
+        }
+
         setActiveThemeId(settings.activeThemeId || DEFAULT_THEME_ID)
         setActiveFont(settings.activeFont || DEFAULT_FONT_ID)
         setCustomThemes(settings.customThemes || [])
@@ -243,10 +265,15 @@ export function ThemeProvider({ children, isAuthenticated: isAuthProp, isAuthLoa
       const updated = { ...current, ...settings }
       localStorage.setItem(THEME_CACHE_KEY, JSON.stringify(updated))
 
+      // Flag the cache as ahead of the server so a refresh before the debounced
+      // save fires isn't clobbered by a stale server fetch on next load. Only
+      // meaningful when authenticated (guests never sync to the server).
+      if (isAuthenticatedState) localStorage.setItem(THEME_DIRTY_KEY, '1')
+
       // Merge with any pending unsaved settings
       pendingSettingsRef.current = { ...pendingSettingsRef.current, ...settings }
 
-      // Debounce the API call — only the last change within 1.5s hits the server
+      // Debounce the API call — only the last change within 2s hits the server
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
       saveTimerRef.current = setTimeout(() => {
         const toSave = pendingSettingsRef.current
@@ -256,7 +283,12 @@ export function ThemeProvider({ children, isAuthenticated: isAuthProp, isAuthLoa
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(toSave),
-          }).catch((e) => console.error('[Theme] Failed to save to API:', e))
+          })
+            .then(() => {
+              // Server is now in sync — clear the flag unless a newer change queued.
+              if (pendingSettingsRef.current === null) localStorage.removeItem(THEME_DIRTY_KEY)
+            })
+            .catch((e) => console.error('[Theme] Failed to save to API:', e))
         }
       }, 2000)
     },
