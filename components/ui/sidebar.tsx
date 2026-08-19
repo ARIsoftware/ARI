@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { type VariantProps, cva } from "class-variance-authority"
-import { PanelLeft } from "lucide-react"
+import { ArrowLeft, PanelLeft, X } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
@@ -11,7 +11,7 @@ import { setSecureCookie } from "@/lib/cookies"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
@@ -41,6 +41,26 @@ function useSidebar() {
   }
 
   return context
+}
+
+// Lets a submenu register a "Back" action to render in the mobile sheet header,
+// on the same row as the close (X) button. A ref indirection keeps the
+// registered callback stable so child re-renders don't thrash provider state.
+type MobileHeaderContextValue = { setBack: (fn: (() => void) | null) => void }
+const MobileHeaderContext = React.createContext<MobileHeaderContextValue | null>(null)
+
+function useMobileHeaderBack(active: boolean, onBack: () => void) {
+  const ctx = React.useContext(MobileHeaderContext)
+  const setBack = ctx?.setBack
+  const onBackRef = React.useRef(onBack)
+  React.useEffect(() => {
+    onBackRef.current = onBack
+  })
+  React.useEffect(() => {
+    if (!setBack || !active) return
+    setBack(() => () => onBackRef.current())
+    return () => setBack(null)
+  }, [setBack, active])
 }
 
 const SidebarProvider = React.forwardRef<
@@ -145,6 +165,7 @@ const Sidebar = React.forwardRef<
   }
 >(({ side = "left", variant = "sidebar", collapsible = "offcanvas", className, children, ...props }, ref) => {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+  const [mobileBack, setMobileBack] = React.useState<(() => void) | null>(null)
 
   if (collapsible === "none") {
     return (
@@ -160,21 +181,50 @@ const Sidebar = React.forwardRef<
 
   if (isMobile) {
     return (
-      <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
-        <SheetContent
-          data-sidebar="sidebar"
-          data-mobile="true"
-          className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
-          style={
-            {
-              "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
-            } as React.CSSProperties
-          }
-          side={side}
-        >
-          <div className="flex h-full w-full flex-col">{children}</div>
-        </SheetContent>
-      </Sheet>
+      <MobileHeaderContext.Provider value={{ setBack: setMobileBack }}>
+        <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
+          <SheetContent
+            data-sidebar="sidebar"
+            data-mobile="true"
+            className="w-screen max-w-none bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+            style={
+              {
+                "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
+              } as React.CSSProperties
+            }
+            side={side}
+          >
+            <div className="flex h-full w-full flex-col">
+              <SheetTitle className="sr-only">Navigation menu</SheetTitle>
+              {/* Header row: optional Back (left) on the same line as Close (right) */}
+              <div className="flex shrink-0 items-center justify-between px-4 pt-4">
+                {mobileBack ? (
+                  <button
+                    type="button"
+                    onClick={mobileBack}
+                    className="flex h-10 items-center gap-2 rounded-full pl-2 pr-4 text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
+                    aria-label="Back"
+                  >
+                    <ArrowLeft className="size-6" />
+                    <span className="text-2xl font-semibold tracking-tight">Back</span>
+                  </button>
+                ) : (
+                  <span />
+                )}
+                <button
+                  type="button"
+                  onClick={() => setOpenMobile(false)}
+                  className="flex size-10 items-center justify-center rounded-full text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                  aria-label="Close menu"
+                >
+                  <X className="size-6" />
+                </button>
+              </div>
+              {children}
+            </div>
+          </SheetContent>
+        </Sheet>
+      </MobileHeaderContext.Provider>
     )
   }
 
@@ -275,7 +325,7 @@ const SidebarInset = React.forwardRef<HTMLDivElement, React.ComponentProps<"main
     <main
       ref={ref}
       className={cn(
-        "relative flex min-h-svh flex-1 flex-col bg-background",
+        "relative flex min-h-svh min-w-0 flex-1 flex-col bg-background",
         "peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow",
         className,
       )}
@@ -612,6 +662,7 @@ SidebarMenuSubButton.displayName = "SidebarMenuSubButton"
 
 export {
   Sidebar,
+  useMobileHeaderBack,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,

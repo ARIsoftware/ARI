@@ -34,6 +34,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import { SubmenuRenderer } from "@/components/sidebar-submenu-renderer"
 
@@ -112,6 +113,31 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // Theme settings for sidebar view
   const { sidebarView } = useTheme()
   const isCompressed = sidebarView === 'compressed'
+
+  // Close the full-screen mobile menu after navigating
+  const { isMobile, openMobile, setOpenMobile } = useSidebar()
+  const handleNavClick = () => {
+    setShowMainMenu(false)
+    if (isMobile) setOpenMobile(false)
+  }
+
+  // On mobile, tapping a main-menu item that has a submenu should reveal that
+  // submenu inside the sheet (rather than navigating away and closing it, which
+  // makes the submenu easy to miss). Items without a submenu navigate directly.
+  const [mobileSubmenuId, setMobileSubmenuId] = useState<string | null>(null)
+  const handleMainItemClick = (e: React.MouseEvent, module: typeof enabledModules[0]) => {
+    if (isMobile && module.submenu?.component) {
+      e.preventDefault()
+      setMobileSubmenuId(module.id)
+      return
+    }
+    handleNavClick()
+  }
+  // Reset the forced submenu whenever the sheet closes, so reopening starts at
+  // the main menu.
+  useEffect(() => {
+    if (!openMobile) setMobileSubmenuId(null)
+  }, [openMobile])
   // dnd-kit sensors with distance activation to avoid accidental drags
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -129,6 +155,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // main menu stuck for every subsequent page inside the same module.
   useEffect(() => {
     setShowMainMenu(false)
+    setMobileSubmenuId(null)
   }, [pathname, activeSubmenuModule?.id])
 
   // Sort modules by menuPriority (lower first), then alphabetically
@@ -271,15 +298,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     setPendingOrder(newOrder)
   }
 
-  // If we're on a page with a submenu and not forcing main menu, show the submenu
-  if (activeSubmenuModule && !showMainMenu) {
+  // Mobile: a submenu the user explicitly tapped into takes precedence and its
+  // Back button returns to the main menu. Desktop/default: show the submenu for
+  // the current page unless the user pressed Back to force the main menu.
+  const mobileSubmenuModule = mobileSubmenuId
+    ? enabledModules.find(module => module.id === mobileSubmenuId)
+    : undefined
+  const submenuToShow = mobileSubmenuModule ?? (showMainMenu ? undefined : activeSubmenuModule)
+  if (submenuToShow) {
     return (
       <Sidebar {...props}>
         <SidebarContent>
           <SubmenuRenderer
-            moduleId={activeSubmenuModule.id}
-            module={activeSubmenuModule}
-            onBack={() => setShowMainMenu(true)}
+            moduleId={submenuToShow.id}
+            module={submenuToShow}
+            onBack={() => {
+              setMobileSubmenuId(null)
+              setShowMainMenu(true)
+            }}
           />
         </SidebarContent>
         <SidebarRail />
@@ -295,7 +331,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // Otherwise show the main menu
   return (
     <Sidebar {...props} className={isDragMode ? "drag-mode-active" : ""}>
-      <SidebarContent className="-mt-3.5">
+      <SidebarContent className="mobile-main-nav -mt-3.5">
         {/* Modules container - groups are draggable units */}
         {isDragMode ? (
           /* Drag mode: Groups as draggable units via dnd-kit */
@@ -336,7 +372,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                 return (
                                   <SidebarMenuItem key={route.path}>
                                     <SidebarMenuButton asChild>
-                                      <Link href={route.path} className="flex items-center" onClick={() => setShowMainMenu(false)}>
+                                      <Link href={route.path} className="flex items-center" onClick={(e) => handleMainItemClick(e, module)}>
                                         <Icon className="mr-2 size-4" />
                                         <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
                                         {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
@@ -367,7 +403,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                           return (
                             <SidebarMenuItem key={route.path}>
                               <SidebarMenuButton asChild>
-                                <Link href={route.path} className="flex items-center" onClick={() => setShowMainMenu(false)}>
+                                <Link href={route.path} className="flex items-center" onClick={(e) => handleMainItemClick(e, module)}>
                                   <Icon className="mr-2 size-4" />
                                   <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
                                   {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
@@ -404,7 +440,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                 return (
                                   <SidebarMenuItem key={route.path}>
                                     <SidebarMenuButton asChild>
-                                      <Link href={route.path} className="flex items-center" onClick={() => setShowMainMenu(false)}>
+                                      <Link href={route.path} className="flex items-center" onClick={(e) => handleMainItemClick(e, module)}>
                                         <Icon className="mr-2 size-4" />
                                         <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
                                         {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
@@ -435,7 +471,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                           return (
                             <SidebarMenuItem key={route.path}>
                               <SidebarMenuButton asChild>
-                                <Link href={route.path} className="flex items-center" onClick={() => setShowMainMenu(false)}>
+                                <Link href={route.path} className="flex items-center" onClick={(e) => handleMainItemClick(e, module)}>
                                   <Icon className="mr-2 size-4" />
                                   <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
                                   {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}

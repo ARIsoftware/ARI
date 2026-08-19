@@ -6,6 +6,8 @@ import {
   SidebarMenuButton,
   SidebarGroup,
   SidebarGroupContent,
+  useSidebar,
+  useMobileHeaderBack,
 } from '@/components/ui/sidebar'
 import { MODULE_SUBMENUS } from '@/lib/generated/module-submenu-registry'
 import type { ModuleSubmenuProps } from '@/lib/modules/submenu-types'
@@ -34,18 +36,34 @@ interface SubmenuRendererProps {
 
 export function SubmenuRenderer({ moduleId, module, onBack }: SubmenuRendererProps) {
   const LazySubmenu = getLazySubmenu(moduleId)
+  const { isMobile, setOpenMobile } = useSidebar()
+
+  // On mobile the "Back" control lives in the sheet header (aligned with the
+  // close button); register it there instead of rendering it in the content.
+  useMobileHeaderBack(isMobile, onBack)
+
+  // On mobile the submenu fills the screen, so tapping a link must also close
+  // the sheet. The per-module submenu links live in core module components we
+  // can't edit, so close via delegation when any link inside is activated.
+  const handleContentClick = (e: React.MouseEvent) => {
+    if (isMobile && (e.target as HTMLElement).closest('a')) {
+      setOpenMobile(false)
+    }
+  }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Back Header */}
-      <SidebarGroup>
-        <SidebarGroupContent>
-          <SidebarMenuButton onClick={onBack} className="w-full">
-            <ArrowLeft className="mr-2 size-4" />
-            <span>Back</span>
-          </SidebarMenuButton>
-        </SidebarGroupContent>
-      </SidebarGroup>
+    <div className="mobile-sub-nav flex flex-col h-full overflow-hidden" onClick={handleContentClick}>
+      {/* Back header — desktop only; on mobile it renders in the sheet header */}
+      {!isMobile && (
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenuButton onClick={onBack} className="w-full">
+              <ArrowLeft className="mr-2 size-4" />
+              <span>Back</span>
+            </SidebarMenuButton>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      )}
 
       {/* Submenu Content */}
       <div className="flex-1 overflow-auto">

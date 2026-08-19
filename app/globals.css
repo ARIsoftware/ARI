@@ -312,3 +312,120 @@
   filter: grayscale(1);
 }
 
+
+/* ============================================================
+ * Mobile navigation menu (full-screen sheet)
+ *
+ * The sidebar renders inside a full-width Sheet on mobile
+ * (SheetContent[data-mobile="true"]). On phones we want a clean,
+ * app-style menu: full width, centered rows, large type, no icons.
+ * These overrides are scoped to the mobile sheet only, so the
+ * desktop sidebar is untouched.
+ * ============================================================ */
+
+/* Center the menu as a comfortable single column; the close-button row above
+ * already supplies the top spacing, so keep our own top padding small */
+[data-mobile="true"] .mobile-main-nav {
+  margin-top: 0;
+  padding: 0.5rem 1rem 2rem;
+  gap: 0;
+  align-items: center;
+}
+
+/* Each group becomes a centered block; the gap between groups reads as sections */
+[data-mobile="true"] .mobile-main-nav [data-sidebar="group"] {
+  width: 100%;
+  max-width: 28rem;
+  padding: 0.5rem 0;
+}
+
+/* Hide group labels — the spacing between groups is enough structure on mobile */
+[data-mobile="true"] .mobile-main-nav [data-sidebar="group-label"] {
+  display: none !important;
+}
+
+/* Uniform, roomy spacing between rows */
+[data-mobile="true"] .mobile-main-nav [data-sidebar="menu"] {
+  gap: 0.25rem;
+}
+
+/* Menu rows: full width, centered, large, tappable */
+[data-mobile="true"] .mobile-main-nav [data-sidebar="menu-button"] {
+  height: auto !important;
+  justify-content: center;
+  gap: 0;
+  padding: 1rem 1.25rem !important;
+  border-radius: 0.875rem;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* No icons or chevrons in the mobile menu */
+[data-mobile="true"] .mobile-main-nav [data-sidebar="menu-button"] svg {
+  display: none !important;
+}
+
+/* Center the label even when it was set to flex-1 for a chevron */
+[data-mobile="true"] .mobile-main-nav [data-sidebar="menu-button"] > span {
+  flex: none !important;
+  text-align: center;
+}
+
+/* Version footer: keep it quiet and centered at the bottom */
+[data-mobile="true"] .mobile-main-nav > div:last-child {
+  text-align: center;
+  margin-top: 1.5rem;
+  padding-bottom: 0.5rem;
+}
+
+/* ------------------------------------------------------------
+ * Mobile module submenu (Back + section links)
+ *
+ * Consistent with the main menu: centered rows, large type, no
+ * icons. The active highlight is full-bleed edge-to-edge.
+ * ------------------------------------------------------------ */
+
+[data-mobile="true"] .mobile-sub-nav {
+  padding-top: 1rem;
+}
+
+
+/* Full-bleed rows: drop the group's side padding so highlights reach the edge */
+[data-mobile="true"] .mobile-sub-nav [data-sidebar="group"],
+[data-mobile="true"] .mobile-sub-nav [data-sidebar="group-content"] {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Roomy spacing between rows */
+[data-mobile="true"] .mobile-sub-nav [data-sidebar="menu"] {
+  gap: 0.25rem;
+}
+
+/* Large, centered, tappable rows */
+[data-mobile="true"] .mobile-sub-nav [data-sidebar="menu-button"] {
+  height: auto !important;
+  justify-content: center;
+  gap: 0;
+  padding: 1rem 1.25rem !important;
+  border-radius: 0;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* No icons — consistent with the main menu */
+[data-mobile="true"] .mobile-sub-nav [data-sidebar="menu-button"] svg {
+  display: none !important;
+}
+
+/* Center the label even when it was set to flex-1 for a chevron */
+[data-mobile="true"] .mobile-sub-nav [data-sidebar="menu-button"] > span {
+  flex: none !important;
+  text-align: center;
+}
+
+/* (Back is rendered in the sheet header on mobile — see sidebar.tsx) */
