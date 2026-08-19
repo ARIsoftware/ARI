@@ -1,7 +1,7 @@
 "use client"
 
-import type * as React from "react"
-import { useState, useEffect, useMemo } from "react"
+import * as React from "react"
+import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ChevronRight } from "lucide-react"
@@ -24,6 +24,8 @@ import { useEnabledModulesFromContext } from "@/lib/modules/context"
 import { getLucideIcon } from "@/lib/modules/icon-utils"
 import { useDragDropMode } from "@/components/drag-drop-mode-context"
 import { useTheme } from "@/lib/theme/theme-context"
+import { useCanHover } from "@/hooks/use-can-hover"
+import { cn } from "@/lib/utils"
 import {
   Sidebar,
   SidebarContent,
@@ -52,6 +54,83 @@ type SingleModule = {
   minPriority: number
 }
 type RenderItem = ModuleGroup | SingleModule
+
+// Mini view: the sidebar column sits at rail width and grows to full width
+// while the pointer is over it, pushing the page content across with it.
+const MINI_RAIL_WIDTH = "3.25rem"
+const MINI_FULL_WIDTH = "16rem"
+// Hover intent: sweeping the pointer across the rail on the way to the top bar
+// shouldn't expand it (the whole page shifts right when it does), and brushing
+// past the edge on the way out shouldn't collapse it mid-click.
+const MINI_OPEN_DELAY_MS = 150
+const MINI_CLOSE_DELAY_MS = 120
+
+type ModuleItem = ReturnType<typeof useEnabledModulesFromContext>[0]
+
+/**
+ * Renders the module nav for one sidebar position. Shared by every view:
+ * Default (group labels), Compressed (no labels) and Mini (icons only in the
+ * rail, full labels in the hover panel).
+ */
+function ModuleNavGroups({
+  items,
+  position,
+  showGroupLabels,
+  onItemClick,
+}: {
+  items: RenderItem[]
+  position: 'main' | 'bottom'
+  showGroupLabels: boolean
+  onItemClick: (e: React.MouseEvent, module: ModuleItem) => void
+}) {
+  return (
+    <>
+      {items.map((item) => {
+        const modules = item.type === 'group' ? item.modules : [item.module]
+        const groupKey = item.type === 'group' ? `${position}-group-${item.title}` : item.module.id
+
+        return (
+          <SidebarGroup key={groupKey}>
+            {item.type === 'group' && showGroupLabels && <SidebarGroupLabel>{item.title}</SidebarGroupLabel>}
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {modules.map((module, moduleIndex) => {
+                  const routes = module.routes?.filter(r => r.sidebarPosition === position) || []
+                  const hasSubmenu = !!module.submenu?.component
+                  // Tighter spacing for non-first modules in a group
+                  const groupingClass = moduleIndex > 0 ? '[&>li]:mt-0' : ''
+
+                  const links = routes.map((route) => {
+                    const Icon = getLucideIcon(route.icon || module.icon)
+                    return (
+                      <SidebarMenuItem key={route.path}>
+                        <SidebarMenuButton asChild>
+                          <Link href={route.path} className="flex items-center" onClick={(e) => onItemClick(e, module)}>
+                            <Icon className="mr-2 size-4" />
+                            <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
+                            {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    )
+                  })
+
+                  // Groups wrap each module so the spacing tweak applies per module;
+                  // ungrouped singles render their items straight into the menu.
+                  return item.type === 'group' ? (
+                    <div key={module.id} className={groupingClass}>{links}</div>
+                  ) : (
+                    <React.Fragment key={module.id}>{links}</React.Fragment>
+                  )
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )
+      })}
+    </>
+  )
+}
 
 // Sortable wrapper for sidebar groups in drag mode
 function SortableSidebarGroup({ id, item, dragModeClass, position }: { id: string; item: RenderItem; dragModeClass: string; position: 'main' | 'bottom' }) {
@@ -116,9 +195,56 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   // Close the full-screen mobile menu after navigating
   const { isMobile, openMobile, setOpenMobile } = useSidebar()
+
+  // Mini view: an icon rail that expands on hover, pushing the page across.
+  // Mobile uses the full-screen sheet, drag mode needs full-width groups to be
+  // draggable, and a touch-only device can never fire the hover that reveals
+  // the labels — all three fall back to the regular rendering.
+  const canHover = useCanHover()
+  const isMini = sidebarView === 'mini' && !isMobile && !isDragMode && canHover
+  const [miniExpanded, setMiniExpanded] = useState(false)
+  // Open and close are mutually exclusive, so one timer covers both.
+  const miniTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clearMiniTimer = () => {
+    if (miniTimer.current) {
+      clearTimeout(miniTimer.current)
+      miniTimer.current = null
+    }
+  }
+  const openMini = useCallback(() => {
+    clearMiniTimer()
+    miniTimer.current = setTimeout(() => setMiniExpanded(true), MINI_OPEN_DELAY_MS)
+  }, [])
+  const closeMini = useCallback(() => {
+    clearMiniTimer()
+    miniTimer.current = setTimeout(() => setMiniExpanded(false), MINI_CLOSE_DELAY_MS)
+  }, [])
+  // Keyboard users get no hover: expand immediately when focus enters the rail so
+  // the focused link is readable. Limited to :focus-visible so clicking an icon
+  // (where the pointer is already there to hover with) doesn't jump the column.
+  const handleMiniFocus = useCallback((e: React.FocusEvent) => {
+    if (!(e.target instanceof HTMLElement) || !e.target.matches(':focus-visible')) return
+    clearMiniTimer()
+    setMiniExpanded(true)
+  }, [])
+  // Collapse when the view switches away from Mini (e.g. the user picks another
+  // sidebar view, or drag mode takes over) — adjusted during render rather than
+  // in an effect so there's no extra pass with a stale expanded panel.
+  const [wasMini, setWasMini] = useState(isMini)
+  if (wasMini !== isMini) {
+    setWasMini(isMini)
+    // A pending collapse timer can still fire afterwards; it only sets the same
+    // false value, so there's nothing to clean up here.
+    if (!isMini) setMiniExpanded(false)
+  }
+  // Drop any pending collapse timer on unmount.
+  useEffect(() => clearMiniTimer, [])
+
   const handleNavClick = () => {
     setShowMainMenu(false)
     if (isMobile) setOpenMobile(false)
+    // Mini deliberately stays open after a click — the panel follows the
+    // pointer, so it collapses when the cursor leaves, not when you navigate.
   }
 
   // On mobile, tapping a main-menu item that has a submenu should reveal that
@@ -305,6 +431,73 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     ? enabledModules.find(module => module.id === mobileSubmenuId)
     : undefined
   const submenuToShow = mobileSubmenuModule ?? (showMainMenu ? undefined : activeSubmenuModule)
+
+  // Version stamp shown at the bottom of the full menu (Default / Compressed /
+  // the Mini hover panel — the icon rail is too narrow for it).
+  const versionFooter = (
+    <div
+      className="mt-auto px-4 py-2 text-[10px] text-muted-foreground/60 font-mono select-none"
+      title={`commit ${process.env.NEXT_PUBLIC_ARI_COMMIT}`}
+    >
+      ARI {process.env.NEXT_PUBLIC_ARI_VERSION}
+    </div>
+  )
+
+  // Mini view. Handled before the submenu early-return below because it renders
+  // both the main menu and module submenus itself: the column is pinned at rail
+  // width and expands on hover, pushing the page content across (labels are
+  // clipped by the width and faded out via .mini-sidebar in globals.css).
+  if (isMini) {
+    return (
+      <Sidebar
+        {...props}
+        style={
+          {
+            '--sidebar-width': miniExpanded ? MINI_FULL_WIDTH : MINI_RAIL_WIDTH,
+            ...props.style,
+          } as React.CSSProperties
+        }
+        className={cn('mini-sidebar', props.className)}
+        data-mini-expanded={miniExpanded}
+        onMouseEnter={openMini}
+        onMouseLeave={closeMini}
+        onFocusCapture={handleMiniFocus}
+        onBlurCapture={closeMini}
+      >
+        <SidebarContent className="overflow-x-hidden">
+          {submenuToShow ? (
+            <SubmenuRenderer
+              moduleId={submenuToShow.id}
+              module={submenuToShow}
+              onBack={() => {
+                setMobileSubmenuId(null)
+                setShowMainMenu(true)
+              }}
+            />
+          ) : (
+            <>
+              <ModuleNavGroups
+                items={mainRenderItems}
+                position="main"
+                showGroupLabels={false}
+                onItemClick={handleMainItemClick}
+              />
+              <ModuleNavGroups
+                items={bottomRenderItems}
+                position="bottom"
+                showGroupLabels={false}
+                onItemClick={handleMainItemClick}
+              />
+              {/* Too wide for the rail — only shown once expanded */}
+              {miniExpanded && versionFooter}
+            </>
+          )}
+        </SidebarContent>
+        <SidebarRail />
+      </Sidebar>
+    )
+  }
+
   if (submenuToShow) {
     return (
       <Sidebar {...props}>
@@ -351,149 +544,23 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           /* Normal mode: Grouped modules */
           <>
             {/* Module navigation - Main position */}
-            {mainRenderItems.map((item) => {
-              if (item.type === 'group') {
-                // Render a group of modules under one title
-                return (
-                  <SidebarGroup key={`main-group-${item.title}`}>
-                    {!isCompressed && <SidebarGroupLabel>{item.title}</SidebarGroupLabel>}
-                    <SidebarGroupContent>
-                      <SidebarMenu>
-                        {item.modules.map((module, moduleIndex) => {
-                          const mainRoutes = module.routes?.filter(r => r.sidebarPosition === 'main') || []
-                          const hasSubmenu = !!module.submenu?.component
-                          // Tighter spacing for non-first modules in group
-                          const groupingClass = moduleIndex > 0 ? '[&>li]:mt-0' : ''
-
-                          return (
-                            <div key={module.id} className={groupingClass}>
-                              {mainRoutes.map((route) => {
-                                const Icon = getLucideIcon(route.icon || module.icon)
-                                return (
-                                  <SidebarMenuItem key={route.path}>
-                                    <SidebarMenuButton asChild>
-                                      <Link href={route.path} className="flex items-center" onClick={(e) => handleMainItemClick(e, module)}>
-                                        <Icon className="mr-2 size-4" />
-                                        <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
-                                        {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
-                                      </Link>
-                                    </SidebarMenuButton>
-                                  </SidebarMenuItem>
-                                )
-                              })}
-                            </div>
-                          )
-                        })}
-                      </SidebarMenu>
-                    </SidebarGroupContent>
-                  </SidebarGroup>
-                )
-              } else {
-                // Render a single ungrouped module
-                const mod = item.module
-                const mainRoutes = mod.routes?.filter(r => r.sidebarPosition === 'main') || []
-                const hasSubmenu = !!mod.submenu?.component
-
-                return (
-                  <SidebarGroup key={mod.id}>
-                    <SidebarGroupContent>
-                      <SidebarMenu>
-                        {mainRoutes.map((route) => {
-                          const Icon = getLucideIcon(route.icon || mod.icon)
-                          return (
-                            <SidebarMenuItem key={route.path}>
-                              <SidebarMenuButton asChild>
-                                <Link href={route.path} className="flex items-center" onClick={(e) => handleMainItemClick(e, mod)}>
-                                  <Icon className="mr-2 size-4" />
-                                  <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
-                                  {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
-                                </Link>
-                              </SidebarMenuButton>
-                            </SidebarMenuItem>
-                          )
-                        })}
-                      </SidebarMenu>
-                    </SidebarGroupContent>
-                  </SidebarGroup>
-                )
-              }
-            })}
+            <ModuleNavGroups
+              items={mainRenderItems}
+              position="main"
+              showGroupLabels={!isCompressed}
+              onItemClick={handleMainItemClick}
+            />
 
             {/* Module navigation - Bottom position */}
-            {bottomRenderItems.map((item) => {
-              if (item.type === 'group') {
-                // Render a group of modules under one title
-                return (
-                  <SidebarGroup key={`bottom-group-${item.title}`}>
-                    {!isCompressed && <SidebarGroupLabel>{item.title}</SidebarGroupLabel>}
-                    <SidebarGroupContent>
-                      <SidebarMenu>
-                        {item.modules.map((module, moduleIndex) => {
-                          const bottomRoutes = module.routes?.filter(r => r.sidebarPosition === 'bottom') || []
-                          const hasSubmenu = !!module.submenu?.component
-                          const groupingClass = moduleIndex > 0 ? '[&>li]:mt-0' : ''
-
-                          return (
-                            <div key={module.id} className={groupingClass}>
-                              {bottomRoutes.map((route) => {
-                                const Icon = getLucideIcon(route.icon || module.icon)
-                                return (
-                                  <SidebarMenuItem key={route.path}>
-                                    <SidebarMenuButton asChild>
-                                      <Link href={route.path} className="flex items-center" onClick={(e) => handleMainItemClick(e, module)}>
-                                        <Icon className="mr-2 size-4" />
-                                        <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
-                                        {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
-                                      </Link>
-                                    </SidebarMenuButton>
-                                  </SidebarMenuItem>
-                                )
-                              })}
-                            </div>
-                          )
-                        })}
-                      </SidebarMenu>
-                    </SidebarGroupContent>
-                  </SidebarGroup>
-                )
-              } else {
-                // Render a single ungrouped module
-                const mod = item.module
-                const bottomRoutes = mod.routes?.filter(r => r.sidebarPosition === 'bottom') || []
-                const hasSubmenu = !!mod.submenu?.component
-
-                return (
-                  <SidebarGroup key={mod.id}>
-                    <SidebarGroupContent>
-                      <SidebarMenu>
-                        {bottomRoutes.map((route) => {
-                          const Icon = getLucideIcon(route.icon || mod.icon)
-                          return (
-                            <SidebarMenuItem key={route.path}>
-                              <SidebarMenuButton asChild>
-                                <Link href={route.path} className="flex items-center" onClick={(e) => handleMainItemClick(e, mod)}>
-                                  <Icon className="mr-2 size-4" />
-                                  <span className={hasSubmenu ? "flex-1" : undefined}>{route.label}</span>
-                                  {hasSubmenu && <ChevronRight className="size-4 text-muted-foreground" />}
-                                </Link>
-                              </SidebarMenuButton>
-                            </SidebarMenuItem>
-                          )
-                        })}
-                      </SidebarMenu>
-                    </SidebarGroupContent>
-                  </SidebarGroup>
-                )
-              }
-            })}
+            <ModuleNavGroups
+              items={bottomRenderItems}
+              position="bottom"
+              showGroupLabels={!isCompressed}
+              onItemClick={handleMainItemClick}
+            />
           </>
         )}
-        <div
-          className="mt-auto px-4 py-2 text-[10px] text-muted-foreground/60 font-mono select-none"
-          title={`commit ${process.env.NEXT_PUBLIC_ARI_COMMIT}`}
-        >
-          ARI {process.env.NEXT_PUBLIC_ARI_VERSION}
-        </div>
+        {versionFooter}
       </SidebarContent>
       <SidebarRail />
     </Sidebar>

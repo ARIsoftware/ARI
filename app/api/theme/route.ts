@@ -99,7 +99,7 @@ const CustomThemeSchema = z.object({
 })
 
 // Schema for sidebar view
-const SidebarViewSchema = z.enum(['default', 'compressed'])
+const SidebarViewSchema = z.enum(['default', 'compressed', 'mini'])
 
 // Schema for updating theme settings
 const UpdateThemeSettingsSchema = z.object({
@@ -153,7 +153,7 @@ export async function GET() {
       activeThemeId: (settings.activeThemeId as string) || DEFAULT_THEME_SETTINGS.activeThemeId,
       activeFont: (settings.activeFont as string) || DEFAULT_THEME_SETTINGS.activeFont,
       customThemes: (settings.customThemes as CustomTheme[]) || DEFAULT_THEME_SETTINGS.customThemes,
-      sidebarView: (settings.sidebarView as 'default' | 'compressed') || DEFAULT_THEME_SETTINGS.sidebarView,
+      sidebarView: (settings.sidebarView as SidebarView) || DEFAULT_THEME_SETTINGS.sidebarView,
     }
 
     return NextResponse.json(themeSettings)
@@ -209,7 +209,7 @@ export async function PUT(request: NextRequest) {
         activeThemeId: updates.activeThemeId ?? (existingSettings.activeThemeId as string) ?? DEFAULT_THEME_SETTINGS.activeThemeId,
         activeFont: updates.activeFont ?? (existingSettings.activeFont as string) ?? DEFAULT_THEME_SETTINGS.activeFont,
         customThemes: updates.customThemes ?? (existingSettings.customThemes as CustomTheme[]) ?? DEFAULT_THEME_SETTINGS.customThemes,
-        sidebarView: updates.sidebarView ?? (existingSettings.sidebarView as 'default' | 'compressed') ?? DEFAULT_THEME_SETTINGS.sidebarView,
+        sidebarView: updates.sidebarView ?? (existingSettings.sidebarView as SidebarView) ?? DEFAULT_THEME_SETTINGS.sidebarView,
       }
 
       if (existingResult.length === 0) {

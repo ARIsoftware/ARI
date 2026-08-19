@@ -86,7 +86,7 @@ export interface CustomTheme extends ThemePreset {
   basePresetId?: string
 }
 
-export type SidebarView = 'default' | 'compressed'
+export type SidebarView = 'default' | 'compressed' | 'mini'
 
 export interface ThemeSettings {
   activeThemeId: string

@@ -433,3 +433,30 @@
 }
 
 /* (Back is rendered in the sheet header on mobile — see sidebar.tsx) */
+
+/* ============================================================
+ * Mini sidebar view (Settings > Themes > Sidebar > Mini)
+ *
+ * The column is pinned at rail width and grows to full width on
+ * hover, pushing the page content across. Everything after the
+ * leading icon of a row is faded out while collapsed so no
+ * half-clipped label or ellipsis peeks out of the rail. Scoped by
+ * class, so it also covers module-owned submenu components.
+ * ============================================================ */
+
+.mini-sidebar [data-sidebar="menu-button"] > *:not(:first-child),
+.mini-sidebar [data-sidebar="group-label"] {
+  transition: opacity 150ms ease;
+}
+
+/* Collapsed: keep rows on one line so nothing wraps into the rail, and fade out
+ * everything but the leading icon. The group-label rule is for labels a module
+ * submenu renders — the main nav intentionally omits them in Mini. */
+.mini-sidebar[data-mini-expanded="false"] [data-sidebar="menu-button"] {
+  white-space: nowrap;
+}
+
+.mini-sidebar[data-mini-expanded="false"] [data-sidebar="menu-button"] > *:not(:first-child),
+.mini-sidebar[data-mini-expanded="false"] [data-sidebar="group-label"] {
+  opacity: 0;
+}

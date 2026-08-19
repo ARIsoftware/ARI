@@ -48,6 +48,38 @@ export function ThemesTab(): React.ReactElement {
       {/* Login Screen Card (admin only — renders null for non-admins) */}
       <LoginScreenSection />
 
+      {/* Sidebar Settings Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <PanelLeft className="h-5 w-5 text-primary" />
+            Sidebar
+          </CardTitle>
+          <CardDescription>
+            Customize how the sidebar appears.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <label className="text-sm font-medium">Sidebar View</label>
+            <Select value={sidebarView} onValueChange={setSidebarView}>
+              <SelectTrigger className="w-full max-w-xs">
+                <SelectValue placeholder="Select a view" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">Default</SelectItem>
+                <SelectItem value="compressed">Compressed</SelectItem>
+                <SelectItem value="mini">Mini</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Compressed view hides group labels for a more compact sidebar. Mini view shows
+              icons only and expands on hover, pushing the page content across.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Theme Selection Card */}
       <Card>
         <CardHeader>
@@ -149,36 +181,6 @@ export function ThemesTab(): React.ReactElement {
             </p>
             <p className="text-sm mt-1">
               ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Sidebar Settings Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <PanelLeft className="h-5 w-5 text-primary" />
-            Sidebar
-          </CardTitle>
-          <CardDescription>
-            Customize how the sidebar appears.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <label className="text-sm font-medium">Sidebar View</label>
-            <Select value={sidebarView} onValueChange={setSidebarView}>
-              <SelectTrigger className="w-full max-w-xs">
-                <SelectValue placeholder="Select a view" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="default">Default</SelectItem>
-                <SelectItem value="compressed">Compressed</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Compressed view hides group labels for a more compact sidebar.
             </p>
           </div>
         </CardContent>

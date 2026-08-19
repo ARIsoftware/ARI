@@ -330,6 +330,15 @@ Module-specific schemas live in `modules-{core,custom}/<id>/database/schema.sql`
 - Go to Settings > Themes > Sidebar section
 - **Default**: Shows group labels (Overview, Dashboard, Todo, etc.)
 - **Compressed**: Hides group labels for a more compact sidebar
+- **Mini**: Icon-only rail (`3.25rem`) that expands to the full `16rem` on hover (150ms
+  hover-intent delay in, 120ms out) or on keyboard focus, pushing the page content across
+  with it. Everything after a row's leading icon — labels, chevrons, any submenu group
+  label — is faded out while collapsed via the `.mini-sidebar` rules in `app/globals.css`
+  (scoped by class, so module-owned submenu components are covered too); the main nav
+  omits group labels entirely, like Compressed. Module submenus render in the rail exactly
+  as in Default. Falls back to the normal rendering on mobile, on touch-only devices
+  (`hooks/use-can-hover.ts` — no hover means no way to reveal the labels), and in drag mode
+  (`Cmd+D`), where full-width groups are needed.
 
 ## File Structure
 

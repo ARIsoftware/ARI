@@ -843,12 +843,20 @@ describe('ThemeSettingsSchema', () => {
       sidebarView: 'default',
     })
   })
+  it('accepts sidebarView mini', () => {
+    pass(ThemeSettingsSchema, {
+      activeThemeId: 'dark',
+      activeFont: 'dm-sans',
+      customThemes: [],
+      sidebarView: 'mini',
+    })
+  })
   it('rejects unknown sidebarView', () => {
     fail(ThemeSettingsSchema, {
       activeThemeId: 'dark',
       activeFont: 'dm-sans',
       customThemes: [],
-      sidebarView: 'mini',
+      sidebarView: 'tiny',
     })
   })
 })
@@ -860,6 +868,9 @@ describe('updateThemeSchema', () => {
   })
   it('accepts sidebarView compressed', () => {
     pass(updateThemeSchema, { sidebarView: 'compressed' })
+  })
+  it('accepts sidebarView mini', () => {
+    pass(updateThemeSchema, { sidebarView: 'mini' })
   })
 })
 

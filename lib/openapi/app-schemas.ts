@@ -460,14 +460,14 @@ export const ThemeSettingsSchema = z.object({
   activeThemeId: z.string(),
   activeFont: z.string(),
   customThemes: z.array(customThemeSchema),
-  sidebarView: z.enum(['default', 'compressed']),
+  sidebarView: z.enum(['default', 'compressed', 'mini']),
 }).openapi('ThemeSettings')
 
 export const updateThemeSchema = z.object({
   activeThemeId: z.string().optional(),
   activeFont: z.string().optional(),
   customThemes: z.array(customThemeSchema).optional(),
-  sidebarView: z.enum(['default', 'compressed']).optional(),
+  sidebarView: z.enum(['default', 'compressed', 'mini']).optional(),
 }).openapi('UpdateThemeBody')
 
 // ────────────────────────────────────────────────────────────
