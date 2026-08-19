@@ -18,12 +18,12 @@ export default function DashboardPage() {
 
   return (
     <>
-      <div className="flex flex-1 relative min-h-[calc(100svh-4rem)]">
+      <div className="flex flex-col lg:flex-row flex-1 relative min-h-[calc(100svh-4rem)]">
         {/* Main Content */}
         <div className="flex-1 flex flex-col gap-6 p-6">
           {/* Welcome Header */}
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="min-w-0">
               <h1 className="text-3xl font-medium">Dashboard</h1>
               <p className="text-sm text-red-700 dark:text-red-400 mt-1">
                 {quote ? (
@@ -73,8 +73,8 @@ export default function DashboardPage() {
           <DashboardWidgetArea />
         </div>
 
-        {/* Right Sidebar - Tasks */}
-        <div className="w-80 shrink-0 border-l">
+        {/* Right Sidebar - Tasks (stacks below main content on narrow screens) */}
+        <div className="w-full lg:w-80 shrink-0 border-t lg:border-t-0 lg:border-l">
           <TasksFeed enabled={tasksEnabled} />
         </div>
       </div>
