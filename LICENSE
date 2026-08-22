@@ -30,11 +30,11 @@ Licensed Work:        The ARI software contained in this repository and
                       distributed by the Licensor under this License is treated
                       separately for purposes of the Change Date.
 
-                      For clarity, separately distributed modules, extensions,
-                      commercial components, hosted services, and other
-                      software not contained in this repository are not part
-                      of the Licensed Work and may be provided under separate
-                      license terms.
+                      For clarity, modules, extensions, commercial components,
+                      hosted services, and other software that are separately
+                      licensed or identified as subject to separate license
+                      terms are not part of the Licensed Work, whether
+                      distributed separately or alongside the Licensed Work.
 
 Additional Use Grant: You may make production use of the Licensed Work,
                       including self-hosting and internal use within your
@@ -47,15 +47,16 @@ Additional Use Grant: You may make production use of the Licensed Work,
                       A “Competitive Offering” is a product or service that:
 
                       (a) is offered to third parties for commercial advantage
-                          or monetary compensation, including through a fee,
-                          subscription, license, paid support arrangement,
-                          monetized bundle, or similar commercial arrangement;
+                          or monetary compensation, including through a one-time
+                          sale, fee, subscription, license, paid support
+                          arrangement, monetized bundle, or similar commercial
+                          arrangement;
 
                       (b) significantly overlaps with, substitutes for, or
-                          reproduces the core platform capabilities of ARI
-                          Software as offered by the Licensor at the time the
-                          product or service is first made generally available;
-                          and
+                          reproduces the core platform capabilities of the
+                          Licensed Work as offered by the Licensor at the time
+                          the product or service is first made generally
+                          available; and
 
                       (c) hosts, manages, embeds, incorporates, redistributes,
                           rebrands, or otherwise makes the Licensed Work or a
@@ -68,10 +69,20 @@ Additional Use Grant: You may make production use of the Licensed Work,
                         purposes within your organization and its affiliates
                         under common control is permitted.
 
-                      - Developing internal applications, modules,
+                      - Developing, distributing, licensing, or selling
+                        independent applications, modules, plugins,
                         integrations, extensions, workflows, or other software
                         that uses or interoperates with the Licensed Work is
-                        permitted.
+                        permitted, provided that such software does not itself
+                        constitute a Competitive Offering.
+
+                      - An independent module, plugin, integration, extension,
+                        or other software will not become a Competitive Offering
+                        solely because its functionality overlaps with a
+                        separately licensed module, extension, or commercial
+                        component offered by the Licensor, provided that it does
+                        not itself reproduce or substitute for the core platform
+                        capabilities of the Licensed Work.
 
                       - Providing consulting, implementation, integration,
                         customization, training, or support services to help a
@@ -79,6 +90,15 @@ Additional Use Grant: You may make production use of the Licensed Work,
                         customer's own internal purposes is permitted, provided
                         the service provider does not itself offer the Licensed
                         Work as a Competitive Offering.
+
+                      - For avoidance of doubt, a one-time sale, license,
+                        white-label arrangement, or other commercial transaction
+                        involving the Licensed Work, or a derivative work
+                        substantially based on the Licensed Work, is treated as
+                        a commercial arrangement under paragraph (a) and may be
+                        a Competitive Offering if paragraphs (b) and (c) are
+                        also satisfied. The fact that a transaction is not
+                        recurring does not exclude it from this definition.
 
                       - Creating, testing, and submitting modifications or
                         contributions to the Licensed Work is permitted.
