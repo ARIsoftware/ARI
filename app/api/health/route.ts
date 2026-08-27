@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
-import { pool } from "@/lib/db/pool"
 import { getAuthenticatedUser } from "@/lib/auth-helpers"
-import { safeErrorResponse } from "@/lib/api-error"
+import { checkDatabase } from "@/lib/health/checks"
 import { HealthCheckSchema } from "@/lib/openapi/app-schemas"
 import { registry } from "@/lib/openapi/registry"
 import { DEFAULT_SECURITY, ErrorResponseSchema, UnauthorizedResponse } from "@/lib/openapi/common"
@@ -32,32 +31,6 @@ export async function GET() {
     return NextResponse.json({ error: "Authentication required" }, { status: 401 })
   }
 
-  const checks: Record<string, { status: "ok" | "error"; message?: string }> = {}
-
-  // Database check
-  try {
-    if (!pool) {
-      checks.database = { status: "error", message: "DATABASE_URL not configured" }
-    } else {
-      const client = await pool.connect()
-      try {
-        await client.query("SELECT 1")
-        checks.database = { status: "ok" }
-      } finally {
-        client.release()
-      }
-    }
-  } catch (err) {
-    checks.database = {
-      status: "error",
-      message: safeErrorResponse(err),
-    }
-  }
-
-  const allOk = Object.values(checks).every((c) => c.status === "ok")
-
-  return NextResponse.json(
-    { status: allOk ? "ok" : "error", checks },
-    { status: allOk ? 200 : 503 }
-  )
+  const result = await checkDatabase()
+  return NextResponse.json(result, { status: result.status === 'ok' ? 200 : 503 })
 }

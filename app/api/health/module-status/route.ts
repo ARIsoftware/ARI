@@ -7,10 +7,8 @@
 
 import { NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
-import { moduleSettings } from '@/lib/db/schema'
-import { getModules } from '@/lib/modules/module-registry'
+import { checkModuleStatus } from '@/lib/health/checks'
 import { safeErrorResponse } from '@/lib/api-error'
-import { eq } from 'drizzle-orm'
 import { HealthModuleStatusSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
@@ -45,37 +43,7 @@ export async function GET() {
       })
     }
 
-    const allModules = await getModules()
-
-    // Get user's module settings
-    const settings = await withRLS((db) =>
-      db.select().from(moduleSettings).where(eq(moduleSettings.userId, user.id))
-    )
-
-    // Build a per-user enabled map: a module is enabled iff its manifest is
-    // enabled AND the user hasn't explicitly disabled it.
-    const userDisabled = new Set(
-      settings
-        .filter((s: any) => s.enabled === false)
-        .map((s: any) => s.moduleId ?? s.module_id)
-        .filter(Boolean)
-    )
-
-    const moduleChecks: Record<string, { exists: true; enabled: boolean }> = {}
-    for (const m of allModules) {
-      moduleChecks[m.id] = {
-        exists: true,
-        enabled: m.enabled !== false && !userDisabled.has(m.id),
-      }
-    }
-
-    return NextResponse.json({
-      authenticated: true,
-      userId: user.id,
-      allModules: allModules.map(m => ({ id: m.id, enabled: m.enabled })),
-      userSettings: settings,
-      moduleChecks,
-    })
+    return NextResponse.json(await checkModuleStatus(user.id, withRLS))
   } catch (error: unknown) {
     console.error('[Debug] Module status error:', error)
     return NextResponse.json({

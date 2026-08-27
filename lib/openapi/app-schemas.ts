@@ -183,6 +183,29 @@ export const HealthCheckSchema = z.object({
   })),
 }).openapi('HealthCheck')
 
+export const HealthScanCheckSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  status: z.enum(['ok', 'warn', 'fail', 'skip']),
+  message: z.string(),
+  durationMs: z.number().int().nonnegative(),
+  details: z.unknown().optional(),
+})
+
+export const HealthScanSchema = z.object({
+  status: z.enum(['ok', 'warn', 'fail']),
+  startedAt: z.string(),
+  durationMs: z.number().int().nonnegative(),
+  summary: z.object({
+    total: z.number().int().nonnegative(),
+    ok: z.number().int().nonnegative(),
+    warn: z.number().int().nonnegative(),
+    fail: z.number().int().nonnegative(),
+    skip: z.number().int().nonnegative(),
+  }),
+  checks: z.array(HealthScanCheckSchema),
+}).openapi('HealthScan')
+
 // ────────────────────────────────────────────────────────────
 // /api/license
 // ────────────────────────────────────────────────────────────

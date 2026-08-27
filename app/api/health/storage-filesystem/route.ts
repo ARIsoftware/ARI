@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server'
-import * as fs from 'fs/promises'
-import * as path from 'path'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
+import { checkStorageFilesystem } from '@/lib/health/checks'
 import { safeErrorResponse } from '@/lib/api-error'
-import { readStorageConfig, getDefaultLocalStorageBasePath, isStorageUnavailable } from '@/lib/storage'
 import { HealthStorageFilesystemSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
@@ -32,41 +30,7 @@ export async function GET() {
   }
 
   try {
-    const config = readStorageConfig()
-    if (config.provider !== 'filesystem') {
-      return NextResponse.json({ provider: config.provider, applicable: false })
-    }
-
-    const basePath = getDefaultLocalStorageBasePath()
-    const isEphemeral = isStorageUnavailable(config)
-
-    let exists = false
-    let writable = false
-    let error: string | undefined
-
-    try {
-      await fs.mkdir(basePath, { recursive: true })
-      exists = true
-      // Prove writability by actually writing — fs.access(W_OK) is TOCTOU and
-      // misses quota/noexec/parent-perm-changed-after-mkdir cases.
-      const probe = path.join(basePath, `.ari-health-write-probe-${process.pid}-${Date.now()}`)
-      await fs.writeFile(probe, '')
-      await fs.unlink(probe)
-      writable = true
-    } catch (err: unknown) {
-      const e = err as NodeJS.ErrnoException
-      error = e.code ? `${e.code}: ${e.message}` : (e.message ?? String(err))
-    }
-
-    return NextResponse.json({
-      provider: 'filesystem',
-      applicable: true,
-      basePath,
-      exists,
-      writable,
-      isEphemeral,
-      ...(error ? { error } : {}),
-    })
+    return NextResponse.json(await checkStorageFilesystem())
   } catch (err: unknown) {
     return NextResponse.json({ error: `Filesystem check failed: ${safeErrorResponse(err)}` }, { status: 500 })
   }
