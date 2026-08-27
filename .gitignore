@@ -109,8 +109,9 @@ lib/db/migrations/
 .cache/
 *.cache
 
-# Logs
-logs/
+# Logs (root-level runtime logs only — anchored so app route dirs named
+# "logs", e.g. app/api/api-keys/[id]/logs/, stay tracked)
+/logs/
 *.log
 !.gitkeep
 

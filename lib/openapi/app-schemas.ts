@@ -53,6 +53,18 @@ export const ApiKeyCreatedResponseSchema = z.object({
   raw_key: z.string(),
 }).openapi('ApiKeyCreatedResponse')
 
+export const ApiKeyUsageLogSchema = z.object({
+  id: z.string(),
+  endpoint: z.string(),
+  method: z.string(),
+  status_code: z.number().int(),
+  ip_address: z.string().nullable(),
+  user_agent: z.string().nullable(),
+  created_at: z.string(),
+}).openapi('ApiKeyUsageLogRow')
+
+export const ApiKeyUsageLogListResponseSchema = z.array(ApiKeyUsageLogSchema).openapi('ApiKeyUsageLogList')
+
 // ────────────────────────────────────────────────────────────
 // /api/users/me — current account (admin user CRUD schemas live in the
 // Users module: modules-custom/users/lib/validation.ts)
