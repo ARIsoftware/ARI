@@ -52,7 +52,7 @@ export function DocumentList({
     <div className="flex flex-col h-full border-r bg-background">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b">
-        <h2 className="text-lg font-semibold">Documents</h2>
+        <h2 className="text-lg font-semibold">Articles</h2>
       </div>
 
       {/* Search */}
@@ -60,7 +60,7 @@ export function DocumentList({
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Filter documents..."
+            placeholder="Filter articles..."
             value={searchQuery}
             onChange={(e) => onSearch(e.target.value)}
             className="pl-9 h-9"
@@ -102,9 +102,9 @@ export function DocumentList({
           </div>
         ) : articles.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-32 text-center p-4">
-            <p className="text-sm text-muted-foreground">No documents found</p>
+            <p className="text-sm text-muted-foreground">No articles found</p>
             <Button variant="link" size="sm" onClick={onCreateNew}>
-              Create your first document
+              Create your first article
             </Button>
           </div>
         ) : (
@@ -125,7 +125,7 @@ export function DocumentList({
 
       {/* Footer */}
       <div className="flex items-center justify-between px-4 py-2 border-t text-xs text-muted-foreground">
-        <span>{articles.length} document{articles.length !== 1 ? 's' : ''}</span>
+        <span>{articles.length} article{articles.length !== 1 ? 's' : ''}</span>
       </div>
     </div>
   )

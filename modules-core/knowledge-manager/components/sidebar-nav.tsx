@@ -61,7 +61,7 @@ export function SidebarNav({
   const [searchQuery, setSearchQuery] = useState('')
 
   const navItems = [
-    { id: 'all' as const, label: 'All Documents', icon: FileText, count: counts.all },
+    { id: 'all' as const, label: 'All Articles', icon: FileText, count: counts.all },
     { id: 'recent' as const, label: 'Recent', icon: Clock, count: counts.recent },
     { id: 'favorites' as const, label: 'Favorites', icon: Star, count: counts.favorites },
     { id: 'trash' as const, label: 'Trash', icon: Trash2, count: counts.trash },

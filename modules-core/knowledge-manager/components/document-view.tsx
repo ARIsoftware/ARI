@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ChevronRight, Star, Share2, Edit2, Trash2, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -42,6 +41,8 @@ interface DocumentViewProps {
   onDelete: () => void
   onRestore?: () => void
   onCreateNew?: () => void
+  onDirtyChange?: (dirty: boolean) => void
+  registerSave?: (fn: (() => void) | null) => void
 }
 
 export function DocumentView({
@@ -55,13 +56,25 @@ export function DocumentView({
   onToggleFavorite,
   onDelete,
   onRestore,
-  onCreateNew
+  onCreateNew,
+  onDirtyChange,
+  registerSave
 }: DocumentViewProps) {
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
   const [editTags, setEditTags] = useState<string[]>([])
   const [editStatus, setEditStatus] = useState<ArticleStatus>('draft')
   const [editCollectionId, setEditCollectionId] = useState<string | null>(null)
+  const titleRef = useRef<HTMLTextAreaElement>(null)
+
+  // Grow the title textarea to fit its content so it wraps like the saved h1
+  useEffect(() => {
+    const el = titleRef.current
+    if (isEditing && el) {
+      el.style.height = 'auto'
+      el.style.height = `${el.scrollHeight}px`
+    }
+  }, [isEditing, editTitle])
 
   // Sync edit state when article changes while in edit mode
   useEffect(() => {
@@ -99,20 +112,40 @@ export function DocumentView({
     onToggleEdit()
   }
 
+  // Report unsaved edits so the parent can guard navigation away from this document
+  useEffect(() => {
+    const dirty =
+      isEditing &&
+      !!article &&
+      (editTitle !== article.title ||
+        editContent !== article.content ||
+        editStatus !== article.status ||
+        editCollectionId !== article.collection_id ||
+        editTags.length !== article.tags.length ||
+        editTags.some((t, i) => t !== article.tags[i]))
+    onDirtyChange?.(dirty)
+  })
+
+  // Let the parent trigger a save (from the unsaved-changes dialog)
+  useEffect(() => {
+    registerSave?.(handleSave)
+    return () => registerSave?.(null)
+  })
+
   if (!article) {
     return (
       <div className="flex-1 flex flex-col overflow-hidden bg-muted/30">
         <div className="flex items-center justify-end px-6 py-3 border-b">
           {onCreateNew && (
-            <Button size="sm" onClick={onCreateNew} className="text-white" style={{ backgroundColor: 'hsl(var(--accent))', fontSize: '0.80rem', fontWeight: 500 }}>
-              NEW DOCUMENT
+            <Button size="sm" onClick={onCreateNew} className="text-white" style={{ backgroundColor: 'hsl(var(--accent))', fontSize: '0.88rem', fontWeight: 500 }}>
+              NEW ARTICLE
             </Button>
           )}
         </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center text-muted-foreground">
-            <p className="text-lg font-medium">No document selected</p>
-            <p className="text-sm mt-1">Select a document from the list to view its contents</p>
+            <p className="text-lg font-medium">No article selected</p>
+            <p className="text-sm mt-1">Select an article from the list to view its contents</p>
           </div>
         </div>
       </div>
@@ -133,7 +166,7 @@ export function DocumentView({
             </>
           ) : (
             <>
-              <span className="text-muted-foreground">All Documents</span>
+              <span className="text-muted-foreground">All Articles</span>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </>
           )}
@@ -152,12 +185,12 @@ export function DocumentView({
             <Star className="h-4 w-4" fill={article.is_favorite ? 'currentColor' : 'none'} />
           </Button>
           {!article.is_deleted && (
-            <Button variant="ghost" size="icon" onClick={isEditing ? handleCancel : startEditing} aria-label={isEditing ? 'Cancel editing' : 'Edit document'}>
+            <Button variant="ghost" size="icon" onClick={isEditing ? handleCancel : startEditing} aria-label={isEditing ? 'Cancel editing' : 'Edit article'}>
               <Edit2 className="h-4 w-4" />
             </Button>
           )}
           {article.is_deleted && onRestore ? (
-            <Button variant="ghost" size="icon" onClick={onRestore} aria-label="Restore document">
+            <Button variant="ghost" size="icon" onClick={onRestore} aria-label="Restore article">
               <RotateCcw className="h-4 w-4" />
             </Button>
           ) : null}
@@ -171,8 +204,8 @@ export function DocumentView({
             </>
           )}
           {onCreateNew && (
-            <Button size="sm" onClick={onCreateNew} className="text-white" style={{ backgroundColor: 'hsl(var(--accent))', fontSize: '0.80rem', fontWeight: 500 }}>
-              NEW DOCUMENT
+            <Button size="sm" onClick={onCreateNew} className="text-white" style={{ backgroundColor: 'hsl(var(--accent))', fontSize: '0.88rem', fontWeight: 500 }}>
+              NEW ARTICLE
             </Button>
           )}
         </div>
@@ -183,10 +216,14 @@ export function DocumentView({
         <div className="max-w-3xl mx-auto px-6 py-8 flex-1 flex flex-col w-full">
           {/* Title */}
           {isEditing ? (
-            <Input
+            <Textarea
+              ref={titleRef}
               value={editTitle}
-              onChange={(e) => setEditTitle(e.target.value)}
-              className="!text-4xl !font-semibold border-0 px-0 focus-visible:ring-0 mb-4 h-auto"
+              onChange={(e) => setEditTitle(e.target.value.replace(/[\r\n]+/g, ' '))}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault() }}
+              rows={1}
+              className="!text-4xl !font-semibold !min-h-0 rounded-none border-0 px-0 focus-visible:ring-0 focus-visible:ring-offset-0 mb-4 resize-none overflow-hidden"
+              style={{ paddingTop: '6.75px', paddingBottom: '6.75px' }}
               placeholder="Title"
             />
           ) : (

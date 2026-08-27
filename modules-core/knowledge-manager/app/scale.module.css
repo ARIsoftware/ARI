@@ -1,0 +1,44 @@
+/*
+ * Scales the module's type to ~110% of the Tailwind defaults (user preference:
+ * matches browser zoom at 110%). Scoped to the module root, so portaled
+ * overlays (dialogs, select dropdowns) keep the app-wide default size.
+ * Font sizes only — spacing and icons are untouched.
+ */
+.scale :global(.text-\[10px\]) {
+  font-size: 11px;
+}
+.scale :global(.text-xs) {
+  font-size: 0.825rem;
+  line-height: 1.1rem;
+}
+.scale :global(.text-sm) {
+  font-size: 0.9625rem;
+  line-height: 1.375rem;
+}
+.scale :global(.text-base) {
+  font-size: 1.1rem;
+  line-height: 1.65rem;
+}
+.scale :global(.text-lg) {
+  font-size: 1.2375rem;
+  line-height: 1.925rem;
+}
+.scale :global(.text-4xl),
+.scale :global(.\!text-4xl) {
+  font-size: 2.475rem !important;
+  line-height: 2.75rem !important;
+}
+
+/* Inputs switch to text-sm at the md breakpoint via md:text-sm */
+@media (min-width: 768px) {
+  .scale :global(.md\:text-sm) {
+    font-size: 0.9625rem;
+    line-height: 1.375rem;
+  }
+}
+
+/* Declared last so explicit leading utilities keep winning over the
+   line-heights set above (unitless, so it scales with the new font size). */
+.scale :global(.leading-tight) {
+  line-height: 1.25;
+}

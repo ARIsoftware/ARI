@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertCircle } from 'lucide-react'
 import {
   Dialog,
@@ -44,6 +44,7 @@ import type {
   SortDirection,
   NavigationCounts,
 } from '../types'
+import styles from './scale.module.css'
 
 const EMPTY_COUNTS: NavigationCounts = { all: 0, favorites: 0, trash: 0, recent: 0 }
 
@@ -74,6 +75,47 @@ export default function KnowledgeManagerPage() {
   const [newArticleTitle, setNewArticleTitle] = useState('')
   const [collectionName, setCollectionName] = useState('')
   const [collectionColor, setCollectionColor] = useState('#6b7280')
+
+  // Unsaved-changes guard (same pattern as the brainstorm module)
+  const dirtyRef = useRef(false)
+  const saveRef = useRef<(() => void) | null>(null)
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null)
+  const pendingActionRef = useRef<(() => void) | null>(null)
+  useEffect(() => { pendingActionRef.current = pendingAction }, [pendingAction])
+
+  // Run `action` immediately, or ask about unsaved edits first
+  const guardNav = (action: () => void) => {
+    if (dirtyRef.current) setPendingAction(() => action)
+    else action()
+  }
+
+  // Warn on tab close / refresh
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (!dirtyRef.current) return
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [])
+
+  // Intercept in-app link clicks while dirty
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (!dirtyRef.current) return
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+      const target = (e.target as HTMLElement | null)?.closest('a') as HTMLAnchorElement | null
+      if (!target) return
+      const href = target.getAttribute('href')
+      if (!href || href.startsWith('http') || href.startsWith('#') || target.target === '_blank') return
+      // Same-origin nav: intercept
+      e.preventDefault()
+      setPendingAction(() => () => { window.location.href = href })
+    }
+    document.addEventListener('click', handler, true)
+    return () => document.removeEventListener('click', handler, true)
+  }, [])
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(searchQuery), 300)
@@ -114,16 +156,20 @@ export default function KnowledgeManagerPage() {
 
   // ─── Handlers ────────────────────────────────────────────────────────
   const handleViewChange = (view: ArticleView, collectionId?: string | null, tag?: string | null) => {
-    setActiveView(view)
-    setActiveCollectionId(collectionId ?? null)
-    setActiveTag(tag ?? null)
-    setSelectedArticle(null)
-    setIsEditing(false)
+    guardNav(() => {
+      setActiveView(view)
+      setActiveCollectionId(collectionId ?? null)
+      setActiveTag(tag ?? null)
+      setSelectedArticle(null)
+      setIsEditing(false)
+    })
   }
 
   const handleSelectArticle = (article: KnowledgeArticle) => {
-    setSelectedArticle(article)
-    setIsEditing(false)
+    guardNav(() => {
+      setSelectedArticle(article)
+      setIsEditing(false)
+    })
   }
 
   const handleToggleFavorite = (article: KnowledgeArticle) => {
@@ -134,7 +180,18 @@ export default function KnowledgeManagerPage() {
     if (!selectedArticle) return
     updateArticle.mutate(
       { id: selectedArticle.id, updates },
-      { onSuccess: () => setIsEditing(false) }
+      {
+        onSuccess: () => {
+          setIsEditing(false)
+          dirtyRef.current = false
+          // If save came from the unsaved-changes dialog, continue the blocked navigation
+          const act = pendingActionRef.current
+          pendingActionRef.current = null
+          setPendingAction(null)
+          act?.()
+        },
+        onError: () => setPendingAction(null),
+      }
     )
   }
 
@@ -227,12 +284,12 @@ export default function KnowledgeManagerPage() {
   const savingCollection = createCollection.isPending || updateCollection.isPending
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
+    <div className={`flex flex-col h-[calc(100vh-4rem)] overflow-hidden ${styles.scale}`}>
       {articlesQuery.isError && (
         <div className="flex items-center justify-between gap-3 border-b border-destructive/20 bg-destructive/10 px-4 py-2 text-sm text-destructive">
           <span className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4 shrink-0" />
-            Failed to load documents. Check your connection and try again.
+            Failed to load articles. Check your connection and try again.
           </span>
           <Button
             variant="ghost"
@@ -257,7 +314,7 @@ export default function KnowledgeManagerPage() {
             onSearch={setSearchQuery}
             onSort={(field, dir) => { setSortBy(field); setSortDir(dir) }}
             onToggleFavorite={handleToggleFavorite}
-            onCreateNew={() => setShowNewArticle(true)}
+            onCreateNew={() => guardNav(() => setShowNewArticle(true))}
             loading={articlesQuery.isLoading}
           />
         </div>
@@ -279,7 +336,9 @@ export default function KnowledgeManagerPage() {
             }
           }}
           onRestore={handleRestoreArticle}
-          onCreateNew={() => setShowNewArticle(true)}
+          onCreateNew={() => guardNav(() => setShowNewArticle(true))}
+          onDirtyChange={(d) => { dirtyRef.current = d }}
+          registerSave={(fn) => { saveRef.current = fn }}
         />
 
         {/* Right Panel - Sidebar Navigation */}
@@ -301,7 +360,7 @@ export default function KnowledgeManagerPage() {
       <Dialog open={showNewArticle} onOpenChange={setShowNewArticle}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create New Document</DialogTitle>
+            <DialogTitle>Create New Article</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -310,7 +369,7 @@ export default function KnowledgeManagerPage() {
                 id="km-new-article-title"
                 value={newArticleTitle}
                 onChange={(e) => setNewArticleTitle(e.target.value)}
-                placeholder="Document title..."
+                placeholder="Article title..."
                 onKeyDown={(e) => e.key === 'Enter' && handleCreateArticle()}
               />
             </div>
@@ -386,6 +445,43 @@ export default function KnowledgeManagerPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Unsaved Changes Confirmation */}
+      <AlertDialog open={pendingAction !== null} onOpenChange={(open) => { if (!open) setPendingAction(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes to this article. Save before leaving?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay</AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const act = pendingAction
+                dirtyRef.current = false
+                setIsEditing(false)
+                setPendingAction(null)
+                act?.()
+              }}
+            >
+              Discard
+            </Button>
+            <AlertDialogAction
+              disabled={updateArticle.isPending}
+              onClick={(e) => {
+                // Keep the dialog open until the save mutation settles
+                e.preventDefault()
+                saveRef.current?.()
+              }}
+            >
+              {updateArticle.isPending ? 'Saving…' : 'Save'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Delete Article Confirmation */}
       <AlertDialog open={!!deleteArticleId} onOpenChange={() => setDeleteArticleId(null)}>
         <AlertDialogContent>
@@ -395,8 +491,8 @@ export default function KnowledgeManagerPage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {isPermanentDelete
-                ? 'This action cannot be undone. The document will be permanently deleted.'
-                : 'The document will be moved to trash. You can restore it later.'}
+                ? 'This action cannot be undone. The article will be permanently deleted.'
+                : 'The article will be moved to trash. You can restore it later.'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -417,7 +513,7 @@ export default function KnowledgeManagerPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Collection?</AlertDialogTitle>
             <AlertDialogDescription>
-              The collection will be deleted. Documents in this collection will not be deleted,
+              The collection will be deleted. Articles in this collection will not be deleted,
               but they will no longer be assigned to any collection.
             </AlertDialogDescription>
           </AlertDialogHeader>
