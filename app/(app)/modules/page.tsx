@@ -547,6 +547,41 @@ export default function ModulesPage() {
 
   const hasChanges = pendingChanges.length > 0
 
+  // Unsaved-changes guard (same pattern as brainstorm / knowledge-manager)
+  const hasChangesRef = useRef(false)
+  useEffect(() => { hasChangesRef.current = hasChanges }, [hasChanges])
+  const [pendingHref, setPendingHref] = useState<string | null>(null)
+  const pendingHrefRef = useRef<string | null>(null)
+  useEffect(() => { pendingHrefRef.current = pendingHref }, [pendingHref])
+
+  // Warn on tab close / refresh
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (!hasChangesRef.current) return
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [])
+
+  // Intercept in-app link clicks while there are unsaved toggle changes
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (!hasChangesRef.current) return
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+      const target = (e.target as HTMLElement | null)?.closest('a') as HTMLAnchorElement | null
+      if (!target) return
+      const href = target.getAttribute('href')
+      if (!href || href.startsWith('http') || href.startsWith('#') || target.target === '_blank') return
+      // Same-origin nav: intercept
+      e.preventDefault()
+      setPendingHref(href)
+    }
+    document.addEventListener('click', handler, true)
+    return () => document.removeEventListener('click', handler, true)
+  }, [])
+
   const toggleModule = (moduleId: string) => {
     setToggleStates(prev => ({
       ...prev,
@@ -591,11 +626,17 @@ export default function ModulesPage() {
         console.warn('Module schema warnings:', data.warnings)
       }
 
-      window.location.reload()
+      // If the save came from the unsaved-changes dialog, continue the blocked
+      // navigation — a full document load, so modules refresh just like reload.
+      hasChangesRef.current = false
+      const href = pendingHrefRef.current
+      if (href) window.location.href = href
+      else window.location.reload()
     } catch (error) {
       console.error('Error saving module changes:', error)
       const errorText = error instanceof Error ? error.message : 'Failed to save changes'
       setMessage({ type: 'error', text: `${errorText}. Please try again.` })
+      setPendingHref(null)
       setIsSaving(false)
     }
   }
@@ -1837,6 +1878,44 @@ export default function ModulesPage() {
               </div>
             </div>
           )}
+
+          {/* Unsaved Changes Confirmation */}
+          <AlertDialog open={pendingHref !== null} onOpenChange={(open) => { if (!open && !isSaving) setPendingHref(null) }}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
+                <AlertDialogDescription>
+                  You have unsaved module changes. Save before leaving?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={isSaving}>Stay</AlertDialogCancel>
+                <Button
+                  variant="outline"
+                  disabled={isSaving}
+                  onClick={() => {
+                    const href = pendingHref
+                    hasChangesRef.current = false
+                    discardChanges()
+                    setPendingHref(null)
+                    if (href) window.location.href = href
+                  }}
+                >
+                  Discard
+                </Button>
+                <AlertDialogAction
+                  disabled={isSaving}
+                  onClick={(e) => {
+                    // Keep the dialog open until the save settles
+                    e.preventDefault()
+                    saveChanges()
+                  }}
+                >
+                  {isSaving ? 'Saving…' : 'Save'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
       <Dialog
         open={welcomeOpen}
         onOpenChange={(open) => {
