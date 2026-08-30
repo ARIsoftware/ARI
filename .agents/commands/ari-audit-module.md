@@ -66,11 +66,30 @@ The main agent collects all four subagent results, removes duplicates (same file
 
 For every file under `[module]/api/**/*.ts`, `[module]/components/**`, and any server-side utilities, check for the following.
 
+### 0. Data-model classification (run FIRST — the filter checks below depend on it)
+
+ARI tables are either **per-user** (private: fitness, journal, notepad, and all config — `module_settings`, `user_preferences`, `api_keys`) or **shared** (collaborative: tasks, contacts, quotes, documents, knowledge-manager, motivation, brainstorm). The correct filter behavior is *opposite* in the two models, so classify before flagging anything.
+
+Derive the model **per table** from the RLS policies (strip SQL comments first — the module-template's comments mention both patterns):
+
+- `USING (app.can_access_shared())` on SELECT/UPDATE/DELETE → **shared** (note: shared tables still use `current_setting` in their INSERT `WITH CHECK` — that does not make them per-user)
+- Policies built on `current_setting('app.current_user_id')` → **per-user**
+
+Sources: the module's own `database/schema.sql`, plus `lib/db/setup.sql` for any **core** tables the module's routes touch (`module_settings` is the common one — it is per-user).
+
+Then verify model consistency:
+
+- [ ] **Per-user table**: every SELECT/UPDATE/DELETE in `api/**` filters by `eq(table.userId, user.id)` (directly, via a local variable bound from `user.id`, or `${user.id}` in raw SQL) — **High** if missing (cross-user data leak/write; see §1 and §14)
+- [ ] **Shared table**: SELECT/UPDATE/DELETE must **NOT** filter reads by `user_id` — a leftover owner filter hides other users' shared rows — **Medium** (data-visibility bug, not a leak)
+- [ ] **Both models**: INSERT stamps `userId: user.id` — **High** if missing or taken from the request body
+- [ ] Model mismatch between `schema.sql` policies and the API queries (e.g. shared policies but per-user filtering, or vice versa) — **High**; the module's intent is ambiguous and one layer is wrong
+- [ ] **Module routes touching `module_settings`** (settings GET/PUT endpoints): the query filters by BOTH `moduleId` AND `userId`. Filtering by `moduleId` alone reads/overwrites the *first user's* settings row — **High**. (This exact bug shipped in several modules copied from an older template; the automated scan in `tests/unit/route-security-scan.test.ts` now catches it — a module that fails that scan fails this audit too.)
+
 ### 1. Authentication & Authorization
 - [ ] Missing `getAuthenticatedUser()` call at start of route handler — **High**
 - [ ] Missing 401 response when both `user` AND `withRLS` are not returned — **High**
 - [ ] User ID taken from request body or query string instead of session/key — **High** (user impersonation)
-- [ ] Missing `user_id` filter on SELECT/UPDATE/DELETE — relying solely on RLS — **High**. Per `docs/SECURITY.md`: the default Postgres role has `BYPASSRLS`, so explicit `where(eq(table.userId, user.id))` is **required**, not defense-in-depth.
+- [ ] Missing `user_id` filter on SELECT/UPDATE/DELETE of a **per-user** table (see §0 classification) — relying solely on RLS — **High**. Per `docs/SECURITY.md`: the default Postgres role has `BYPASSRLS`, so explicit `where(eq(table.userId, user.id))` is **required**, not defense-in-depth. (Do NOT flag shared tables — see §0.)
 - [ ] Routes that should be admin-only but accessible to all authenticated users — **High**
 - [ ] Role/permission checks on the client only — **High**
 - [ ] Hardcoded user IDs, roles, or tenant IDs — **Medium**
@@ -219,6 +238,7 @@ Every confirmed hardcoded secret must appear in the report with file + line and 
 - [ ] Public route handlers still validate input with Zod before processing payload — **Medium**
 
 ### 14. Multi-tenancy & Data Segregation
+Apply the §0 classification: "should filter" means per-user tables; shared tables must not filter reads.
 - [ ] Queries that don't filter by tenant/user where they should — **High**
 - [ ] Mixed-tenant data on the same screens or exports — **High**
 - [ ] Global IDs / tables without tenant context — **Medium**
@@ -362,7 +382,7 @@ Findings:
 - [ ] Every table has `userId: text("user_id").notNull()` in `schema.ts` (Drizzle) — **High**. Must be `text()`, **not** `uuid()`, for the same reason above. A `uuid("user_id")` column will silently accept inserts but may cause cast errors or comparison failures with the text-typed user ID from Better Auth.
 - [ ] Every table has `created_at` and `updated_at` (TIMESTAMPTZ) — **Low**
 - [ ] Every table has `ALTER TABLE ... ENABLE ROW LEVEL SECURITY;` — **High**
-- [ ] Every table has SELECT/INSERT/UPDATE/DELETE policies referencing `current_setting('app.current_user_id')` — **High**
+- [ ] Every table has SELECT/INSERT/UPDATE/DELETE policies matching its data model (§0): per-user tables reference `current_setting('app.current_user_id')`; shared tables use `app.can_access_shared()` for SELECT/UPDATE/DELETE with `current_setting` only in the INSERT `WITH CHECK` — **High** if policies are missing or use the wrong model
 - [ ] No `auth.uid()` references (Better Auth incompatibility) — **High**
 - [ ] Indexes exist on `user_id` and frequently filtered columns — **Medium**
 
@@ -372,7 +392,7 @@ For every `[module]/api/**/route.ts` (skip routes listed in `module.json` `publi
 - [ ] Every exported handler (`GET`/`POST`/`PUT`/`DELETE`/`PATCH`) calls `getAuthenticatedUser()` and returns 401 when `user` OR `withRLS` is missing **before any DB access** — **High**
 - [ ] Handler does not read `session.*` fields directly — use `user.*` instead. When the caller authenticated via `x-api-key`, `session` is `null` (see `lib/auth-helpers.ts`), so any `session.user.email` / `session.access_token` dereference crashes the route for API-key callers — **Medium**
 - [ ] All DB operations use `withRLS((db) => ...)`. Any direct use of the legacy `supabase` client is **Medium**
-- [ ] SELECT/UPDATE/DELETE queries include `.where(eq(table.userId, user.id))` (or `and(...)` with the resource id) — **High**. Per `docs/SECURITY.md`: the default Postgres role has `BYPASSRLS`, so explicit filters are **mandatory**, not defense-in-depth.
+- [ ] SELECT/UPDATE/DELETE queries on **per-user** tables (§0) include `.where(eq(table.userId, user.id))` (or `and(...)` with the resource id) — **High**. Per `docs/SECURITY.md`: the default Postgres role has `BYPASSRLS`, so explicit filters are **mandatory**, not defense-in-depth. On **shared** tables the reads must NOT be owner-filtered (§0) — **Medium** if they are.
 - [ ] Inserts explicitly set `userId: user.id` (Drizzle camelCase) — **High**
 - [ ] Request bodies validated via `validateRequestBody` from `lib/api-helpers.ts` **OR** `Schema.safeParse()` — **Medium**
 - [ ] Path/query params validated via `validatePathParams` / `validateQueryParams` — **Medium**

@@ -18,7 +18,7 @@ import {
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { moduleSettings } from '@/lib/db/schema'
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 
 registry.registerPath({
   method: 'get',
@@ -67,11 +67,12 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Fetch settings from module_settings table (RLS filters automatically)
+    // Fetch this user's settings — module_settings is per-user, so the
+    // explicit user_id filter is required (BYPASSRLS; see docs/SECURITY.md)
     const data = await withRLS((db) =>
       db.select({ settings: moduleSettings.settings })
         .from(moduleSettings)
-        .where(eq(moduleSettings.moduleId, 'quotes'))
+        .where(and(eq(moduleSettings.userId, user.id), eq(moduleSettings.moduleId, 'quotes')))
         .limit(1)
     )
 
@@ -110,7 +111,7 @@ export async function PUT(request: NextRequest) {
     const existing = await withRLS((db) =>
       db.select({ id: moduleSettings.id })
         .from(moduleSettings)
-        .where(eq(moduleSettings.moduleId, 'quotes'))
+        .where(and(eq(moduleSettings.userId, user.id), eq(moduleSettings.moduleId, 'quotes')))
         .limit(1)
     )
 

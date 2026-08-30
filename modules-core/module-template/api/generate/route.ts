@@ -26,7 +26,7 @@ import { AI_CHAT_PROVIDERS } from '@/lib/ai-providers'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { moduleSettings } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 
 registry.registerPath({
   method: 'post',
@@ -61,7 +61,9 @@ export async function POST(request: NextRequest) {
     const rows = await withRLS((db) =>
       db.select({ settings: moduleSettings.settings })
         .from(moduleSettings)
-        .where(eq(moduleSettings.moduleId, 'module-template'))
+        .where(
+          and(eq(moduleSettings.userId, user.id), eq(moduleSettings.moduleId, 'module-template'))
+        )
         .limit(1)
     )
     const settings = (rows[0]?.settings ?? {}) as Partial<ModuleTemplateSettings>

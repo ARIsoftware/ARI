@@ -9,7 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { validateRequestBody, createErrorResponse } from '@/lib/api-helpers'
 import { moduleSettings } from '@/lib/db/schema'
@@ -63,7 +63,7 @@ export async function GET() {
       db
         .select({ settings: moduleSettings.settings })
         .from(moduleSettings)
-        .where(eq(moduleSettings.moduleId, MODULE_ID))
+        .where(and(eq(moduleSettings.userId, user.id), eq(moduleSettings.moduleId, MODULE_ID)))
         .limit(1),
     )
 
@@ -97,7 +97,7 @@ export async function PUT(request: NextRequest) {
       db
         .select({ id: moduleSettings.id, settings: moduleSettings.settings })
         .from(moduleSettings)
-        .where(eq(moduleSettings.moduleId, MODULE_ID))
+        .where(and(eq(moduleSettings.userId, user.id), eq(moduleSettings.moduleId, MODULE_ID)))
         .limit(1),
     )
 

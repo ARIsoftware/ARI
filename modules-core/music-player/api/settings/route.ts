@@ -8,7 +8,7 @@ import {
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { moduleSettings } from '@/lib/db/schema'
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 
 registry.registerPath({
   method: 'get',
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
     const data = await withRLS((db) =>
       db.select({ settings: moduleSettings.settings })
         .from(moduleSettings)
-        .where(eq(moduleSettings.moduleId, 'music-player'))
+        .where(and(eq(moduleSettings.userId, user.id), eq(moduleSettings.moduleId, 'music-player')))
         .limit(1)
     )
 
@@ -80,7 +80,7 @@ export async function PUT(request: NextRequest) {
     const existing = await withRLS((db) =>
       db.select({ id: moduleSettings.id, settings: moduleSettings.settings })
         .from(moduleSettings)
-        .where(eq(moduleSettings.moduleId, 'music-player'))
+        .where(and(eq(moduleSettings.userId, user.id), eq(moduleSettings.moduleId, 'music-player')))
         .limit(1)
     )
 
