@@ -1,11 +1,6 @@
 'use client'
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { CheckSquare, Eye, ListTodo, Loader2 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
@@ -95,9 +90,7 @@ export function TasksFeed({ enabled }: TasksFeedProps) {
             <div className="text-center">
               <ListTodo className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
               <p className="text-muted-foreground">No tasks yet</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Create a task to see it here
-              </p>
+              <p className="text-sm text-muted-foreground mt-1">Create a task to see it here</p>
             </div>
           </div>
           <ViewAllButton />

@@ -11,7 +11,7 @@
   "menuPriority": 1,
   "permissions": {
     "database": false,
-    "api": false,
+    "api": true,
     "dashboard": false
   },
   "routes": [
@@ -22,6 +22,9 @@
       "sidebarPosition": "main"
     }
   ],
+  "submenu": {
+    "component": "./components/sidebar-submenu.tsx"
+  },
   "dependencies": {
     "modules": ["tasks"]
   }

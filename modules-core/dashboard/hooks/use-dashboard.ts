@@ -1,11 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import type { ActivityItem } from '../types'
-
-interface Quote {
-  id: string
-  quote: string
-  author?: string | null
-}
+import type { ActivityItem, DashboardQuote } from '../types'
 
 /**
  * Hook to fetch enabled modules
@@ -44,7 +38,7 @@ export function useTasksModuleEnabled() {
 export function useDashboardQuote(enabled: boolean) {
   return useQuery({
     queryKey: ['dashboard-quote'],
-    queryFn: async (): Promise<Quote | null> => {
+    queryFn: async (): Promise<DashboardQuote | null> => {
       const res = await fetch('/api/modules/quotes/quotes/random')
       if (!res.ok) return null
       return res.json()
@@ -80,7 +74,8 @@ export function useDashboardRecentActivity(tasksEnabled: boolean, contactsEnable
  * Module-specific data (tasks, contacts, fitness) is now fetched by each module's own widget components.
  */
 export function useDashboardData() {
-  const { data: enabledModules = new Set<string>(), isLoading: modulesLoading } = useEnabledModules()
+  const { data: enabledModules = new Set<string>(), isLoading: modulesLoading } =
+    useEnabledModules()
 
   const tasksEnabled = enabledModules.has('tasks')
   const contactsEnabled = enabledModules.has('contacts')

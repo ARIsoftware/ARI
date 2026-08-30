@@ -29,12 +29,21 @@ import {
   Square,
   type LucideIcon,
 } from 'lucide-react'
-import type { BriefGreeting, BriefQuote, BriefTask, BriefMeeting, BriefWeather } from '@/modules/morning-brief/types'
+import type {
+  BriefGreeting,
+  BriefQuote,
+  BriefTask,
+  BriefMeeting,
+  BriefWeather,
+} from '@/modules/morning-brief/types'
 import { classifyWeatherCode, type WeatherKind } from '@/modules/morning-brief/lib/weather-codes'
 import { useToast } from '@/hooks/use-toast'
 import { useApiKeysStatus } from '@/hooks/use-api-keys-status'
 import { AI_VOICE_PROVIDERS } from '@/lib/ai-providers'
-import { useBriefSpeech, useMorningBriefSettings } from '@/modules/morning-brief/hooks/use-morning-brief'
+import {
+  useBriefSpeech,
+  useMorningBriefSettings,
+} from '@/modules/morning-brief/hooks/use-morning-brief'
 
 interface SectionState<T> {
   data: T | undefined
@@ -98,8 +107,10 @@ function WeatherBadge({ weather }: { weather: BriefWeather }) {
 function priorityLabel(score: string | null): { label: string; className: string } {
   const n = score == null ? 0 : Number(score)
   if (n > 7) return { label: 'Critical', className: 'bg-red-500/10 text-red-600 border-red-500/30' }
-  if (n > 5) return { label: 'High', className: 'bg-orange-500/10 text-orange-600 border-orange-500/30' }
-  if (n > 3) return { label: 'Medium', className: 'bg-yellow-500/10 text-yellow-700 border-yellow-500/30' }
+  if (n > 5)
+    return { label: 'High', className: 'bg-orange-500/10 text-orange-600 border-orange-500/30' }
+  if (n > 3)
+    return { label: 'Medium', className: 'bg-yellow-500/10 text-yellow-700 border-yellow-500/30' }
   return { label: 'Low', className: 'bg-muted text-muted-foreground border-border' }
 }
 
@@ -124,7 +135,10 @@ function buildBriefSpeech({
   calendar,
   weather,
   quote,
-}: Pick<BriefViewProps, 'greeting' | 'tasks' | 'tasksEnabled' | 'calendar' | 'weather' | 'quote'>): string {
+}: Pick<
+  BriefViewProps,
+  'greeting' | 'tasks' | 'tasksEnabled' | 'calendar' | 'weather' | 'quote'
+>): string {
   const parts: string[] = []
 
   if (greeting.data?.greeting) parts.push(greeting.data.greeting.trim())
@@ -135,7 +149,9 @@ function buildBriefSpeech({
     const where = weather.city ? ` in ${weather.city}` : ''
     const desc = weather.description ? `${weather.description}, with ` : ''
     const scale = weather.unit === 'F' ? 'Fahrenheit' : 'Celsius'
-    parts.push(`Today's weather${where}: ${desc}a high of ${weather.high} and a low of ${weather.low} degrees ${scale}.`)
+    parts.push(
+      `Today's weather${where}: ${desc}a high of ${weather.high} and a low of ${weather.low} degrees ${scale}.`,
+    )
   }
 
   if (tasksEnabled) {
@@ -151,7 +167,9 @@ function buildBriefSpeech({
   if (calendar.data?.connected) {
     const events = calendar.data.events ?? []
     if (events.length > 0) {
-      const items = events.map((e) => `${e.allDay ? 'All day' : e.startLabel}, ${e.title}.`).join(' ')
+      const items = events
+        .map((e) => `${e.allDay ? 'All day' : e.startLabel}, ${e.title}.`)
+        .join(' ')
       parts.push(`On your schedule today: ${items}`)
     } else {
       parts.push('You have no meetings scheduled today.')
@@ -207,7 +225,9 @@ function BriefSheet({
           <div className="flex items-start gap-2 text-sm text-destructive">
             <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
             <span>
-              {greeting.error instanceof Error ? greeting.error.message : 'Could not write the greeting.'}{' '}
+              {greeting.error instanceof Error
+                ? greeting.error.message
+                : 'Could not write the greeting.'}{' '}
               <Link href="/morning-brief/settings" className="underline underline-offset-4">
                 Check settings
               </Link>
@@ -219,14 +239,13 @@ function BriefSheet({
               {greeting.data?.greeting}
             </h1>
             {greeting.data?.message && (
-              <p className="mt-3 max-w-2xl text-lg leading-relaxed text-muted-foreground">
+              <p className="mt-3 max-w-2xl text-lg font-normal leading-relaxed text-muted-foreground">
                 {greeting.data.message}
               </p>
             )}
             {quote?.quote && (
-              <p className="mt-3 max-w-2xl text-lg leading-relaxed text-muted-foreground">
-                <span className="font-semibold">Today&apos;s Quote:</span>{' '}
-                &quot;<span className="italic">{quote.quote}</span>&quot;
+              <p className="mt-3 max-w-2xl text-lg font-normal leading-relaxed text-muted-foreground">
+                Today&apos;s Quote: &quot;{quote.quote}&quot;
               </p>
             )}
           </>
@@ -292,8 +311,10 @@ export function BriefView({
   // Narration is on only when the chosen voice provider's key is still configured
   // (a stale selection after key removal stays disabled). Driven by the registry,
   // so a future voice provider works with no change here.
-  const voiceProvider = AI_VOICE_PROVIDERS.find((p) => p.id === settings?.selectedVoiceProvider) ?? null
-  const narrationEnabled = !!voiceProvider && (providerKeys[voiceProvider.primaryEnvKey]?.configured ?? false)
+  const voiceProvider =
+    AI_VOICE_PROVIDERS.find((p) => p.id === settings?.selectedVoiceProvider) ?? null
+  const narrationEnabled =
+    !!voiceProvider && (providerKeys[voiceProvider.primaryEnvKey]?.configured ?? false)
   const greetingReady = !greeting.isLoading && !greeting.isError && Boolean(greeting.data?.greeting)
 
   const handleListen = () => {
@@ -383,15 +404,12 @@ export function BriefView({
   // (dashboard) letterhead — identical behavior and states in each.
   const listenButton = (
     <Button
+      data-brief-listen
       variant="outline"
       size="sm"
       onClick={handleListen}
       disabled={!narrationEnabled || (speech.status === 'idle' && !greetingReady)}
-      title={
-        !narrationEnabled
-          ? 'Select a voice in Morning Brief settings to enable'
-          : undefined
-      }
+      title={!narrationEnabled ? 'Select a voice in Morning Brief settings to enable' : undefined}
     >
       {speech.status === 'loading' ? (
         <>
@@ -429,7 +447,11 @@ export function BriefView({
       {/* Letter width: grows with the window up to 1300px; the min() min-width
           keeps a letter-like 640px floor where space allows without ever
           forcing horizontal scroll on narrow screens. */}
-      <div className={cn(!embedded && 'mx-auto w-full min-w-[min(100%,40rem)] max-w-[1300px] space-y-5')}>
+      <div
+        className={cn(
+          !embedded && 'mx-auto w-full min-w-[min(100%,40rem)] max-w-[1300px] space-y-5',
+        )}
+      >
         {/* Screen-only action bar (page mode only) */}
         {!embedded && (
           <div className="mb-no-print flex items-center justify-end gap-2">
@@ -555,10 +577,7 @@ function PrioritiesSection({
         const priority = priorityLabel(task.priority_score)
         const due = dueLabel(task.due_date)
         return (
-          <li
-            key={task.id}
-            className="flex items-start gap-3 py-3 first:pt-0 last:pb-0"
-          >
+          <li key={task.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
             <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
               {i + 1}
             </span>
@@ -634,10 +653,7 @@ function ScheduleSection({
   return (
     <ul className="divide-y divide-border/50">
       {events.map((event) => (
-        <li
-          key={event.id}
-          className="flex items-start gap-3 py-3 first:pt-0 last:pb-0"
-        >
+        <li key={event.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
           <div className="flex w-24 flex-shrink-0 items-center gap-1.5 text-sm font-medium text-foreground">
             <Clock className="h-3.5 w-3.5 text-muted-foreground" />
             <span>{event.startLabel}</span>

@@ -9,12 +9,7 @@ import {
   closestCenter,
   type DragEndEvent,
 } from '@dnd-kit/core'
-import {
-  SortableContext,
-  rectSortingStrategy,
-  useSortable,
-  arrayMove,
-} from '@dnd-kit/sortable'
+import { SortableContext, rectSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -33,7 +28,7 @@ function useEnabledDashboardModuleIds(): Set<string> {
   const { modules } = useModules()
   return useMemo(
     () => new Set(modules.filter((m) => m.dashboard?.widgets).map((m) => m.id)),
-    [modules]
+    [modules],
   )
 }
 
@@ -72,22 +67,41 @@ function DynamicWidget({ loader }: { loader: () => Promise<DynamicModule> }) {
           setFailed(true)
         }
       })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [loader])
 
   if (failed) return null
   // Render nothing while the chunk loads — widget pops in when ready.
   // Chunks are cached after first load, so this is invisible on warm navigations.
   if (!Component) return null
-  return <div className="h-full [&>*]:h-full [&>*]:rounded-[0.8rem]"><Component /></div>
+  return (
+    <div className="h-full [&>*]:h-full [&>*]:rounded-[0.8rem]">
+      <Component />
+    </div>
+  )
 }
 
 // --- Sortable wrapper ---
 
-const DRAG_MODE_CLASS = 'outline outline-[3px] outline-[#60a5fa80] shadow-[0_0_12px_rgba(96,165,250,0.2)] rounded-[0.8rem] cursor-grab'
+const DRAG_MODE_CLASS =
+  'outline outline-[3px] outline-[#60a5fa80] shadow-[0_0_12px_rgba(96,165,250,0.2)] rounded-[0.8rem] cursor-grab'
 
-function SortableItem({ id, isDragMode, fullHeight, children }: { id: string; isDragMode: boolean; fullHeight?: boolean; children: React.ReactNode }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+function SortableItem({
+  id,
+  isDragMode,
+  fullHeight,
+  children,
+}: {
+  id: string
+  isDragMode: boolean
+  fullHeight?: boolean
+  children: React.ReactNode
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  })
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -136,11 +150,10 @@ const SYSTEM_STATUS_KEY = '__system-status__'
 
 export function DashboardStatCards() {
   const enabledIds = useEnabledDashboardModuleIds()
-  const { isDragMode, statCardOrder, pendingStatCardOrder, setPendingStatCardOrder } = useDragDropMode()
+  const { isDragMode, statCardOrder, pendingStatCardOrder, setPendingStatCardOrder } =
+    useDragDropMode()
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
-  )
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   const loaders = useMemo(() => {
     const result: { key: string; loader: (() => Promise<DynamicModule>) | null }[] = []
@@ -166,14 +179,18 @@ export function DashboardStatCards() {
     })
   }, [loaders, statCardOrder, pendingStatCardOrder])
 
-  const itemIds = useMemo(() => sortedLoaders.map(l => l.key), [sortedLoaders])
+  const itemIds = useMemo(() => sortedLoaders.map((l) => l.key), [sortedLoaders])
   const totalItems = sortedLoaders.length
 
   // Tailwind requires full class names at build time — use a static map
-  const lgColsClass = totalItems <= 1 ? 'lg:grid-cols-1'
-    : totalItems === 2 ? 'lg:grid-cols-2'
-    : totalItems === 3 ? 'lg:grid-cols-3'
-    : 'lg:grid-cols-4'
+  const lgColsClass =
+    totalItems <= 1
+      ? 'lg:grid-cols-1'
+      : totalItems === 2
+        ? 'lg:grid-cols-2'
+        : totalItems === 3
+          ? 'lg:grid-cols-3'
+          : 'lg:grid-cols-4'
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
@@ -184,16 +201,17 @@ export function DashboardStatCards() {
     const reordered = arrayMove(itemIds, oldIndex, newIndex)
 
     const newOrder: Record<string, number> = {}
-    reordered.forEach((key, i) => { newOrder[key] = i })
+    reordered.forEach((key, i) => {
+      newOrder[key] = i
+    })
     setPendingStatCardOrder(newOrder)
   }
 
   const gridClassName = `grid grid-cols-1 md:grid-cols-2 ${lgColsClass} gap-4`
 
   const content = sortedLoaders.map(({ key, loader }) => {
-    const card = key === SYSTEM_STATUS_KEY
-      ? <SystemStatusCard />
-      : <DynamicWidget loader={loader!} />
+    const card =
+      key === SYSTEM_STATUS_KEY ? <SystemStatusCard /> : <DynamicWidget loader={loader!} />
 
     if (isDragMode) {
       return (
@@ -202,16 +220,18 @@ export function DashboardStatCards() {
         </SortableItem>
       )
     }
-    return <div key={key} className="h-full">{card}</div>
+    return (
+      <div key={key} className="h-full">
+        {card}
+      </div>
+    )
   })
 
   if (isDragMode) {
     return (
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={itemIds} strategy={rectSortingStrategy}>
-          <div className={gridClassName}>
-            {content}
-          </div>
+          <div className={gridClassName}>{content}</div>
         </SortableContext>
       </DndContext>
     )
@@ -226,9 +246,7 @@ export function DashboardWidgetArea() {
   const enabledIds = useEnabledDashboardModuleIds()
   const { isDragMode, widgetOrder, pendingWidgetOrder, setPendingWidgetOrder } = useDragDropMode()
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
-  )
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   const loaders = useMemo(() => {
     const result: { key: string; loader: () => Promise<DynamicModule> }[] = []
@@ -252,7 +270,7 @@ export function DashboardWidgetArea() {
     })
   }, [loaders, widgetOrder, pendingWidgetOrder])
 
-  const itemIds = useMemo(() => sortedLoaders.map(l => l.key), [sortedLoaders])
+  const itemIds = useMemo(() => sortedLoaders.map((l) => l.key), [sortedLoaders])
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
@@ -263,7 +281,9 @@ export function DashboardWidgetArea() {
     const reordered = arrayMove(itemIds, oldIndex, newIndex)
 
     const newOrder: Record<string, number> = {}
-    reordered.forEach((key, i) => { newOrder[key] = i })
+    reordered.forEach((key, i) => {
+      newOrder[key] = i
+    })
     setPendingWidgetOrder(newOrder)
   }
 
@@ -284,17 +304,11 @@ export function DashboardWidgetArea() {
     return (
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={itemIds} strategy={rectSortingStrategy}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {widgetContent}
-          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">{widgetContent}</div>
         </SortableContext>
       </DndContext>
     )
   }
 
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {widgetContent}
-    </div>
-  )
+  return <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">{widgetContent}</div>
 }
