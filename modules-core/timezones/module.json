@@ -1,0 +1,33 @@
+{
+  "id": "timezones",
+  "group": "Modules",
+  "name": "Timezones",
+  "description": "Schedule across time zones — edit any person's clock and every other clock follows",
+  "version": "1.0.0",
+  "author": "ARI",
+  "icon": "Globe",
+  "enabled": false,
+  "fullscreen": false,
+  "menuPriority": 10,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": false
+  },
+  "routes": [
+    {
+      "path": "/timezones",
+      "label": "Timezones",
+      "icon": "Globe",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": ["timezone_people"]
+  },
+  "npmDependencies": {}
+}

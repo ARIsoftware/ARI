@@ -1,0 +1,22 @@
+/* Timezones — module-scoped display scale.
+ *
+ * Imported by app/page.tsx. The board reads better a little larger than the
+ * app's base size, so the page renders at 110% — the same result as setting
+ * browser zoom to 110%, but scoped to this module instead of the whole app.
+ *
+ * `zoom` (rather than `transform: scale`) because it participates in layout:
+ * the surrounding page reserves the scaled size, so nothing overlaps and the
+ * card row still wraps at the right point. Adjust the one number below to
+ * re-tune; 1 restores the app's normal size.
+ *
+ * Radix renders popovers (the time zone list, the date calendar) into a portal
+ * on <body>, outside this subtree, so they would otherwise render smaller than
+ * the control that opened them. They opt back in with `.timezones-scaled` on an
+ * inner wrapper — never on the positioned element itself, since zooming a
+ * fixed-position float would also scale the offsets anchoring it to its trigger.
+ */
+
+.timezones-board,
+.timezones-scaled {
+  zoom: 1.1;
+}
