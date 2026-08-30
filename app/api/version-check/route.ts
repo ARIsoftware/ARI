@@ -9,6 +9,7 @@ import { stripBuildMetadata, isNewerVersion, parseSemver } from '@/lib/version-c
 import { VersionCheckResponseSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'get',
@@ -72,7 +73,7 @@ async function stampLastCheckedAt(userId: string) {
   )
 }
 
-export async function GET() {
+async function handleGET() {
   const { user } = await getAuthenticatedUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -127,3 +128,5 @@ export async function GET() {
     return gatedResponse(currentVersion)
   }
 }
+
+export const GET = withApiLogging(handleGET)

@@ -45,6 +45,14 @@ interface PublicRouteEntry {
 
 const publicRoutes: PublicRouteEntry[] = (moduleManifest.publicRoutes || []) as PublicRouteEntry[]
 
+/** Identity of the API key behind a request, once auth has resolved it. */
+interface ApiKeyMeta {
+  id: string
+  userId: string
+  ipAddress: string | null
+  userAgent: string | null
+}
+
 /**
  * Check if a route is configured as public in module.json
  */
@@ -108,10 +116,43 @@ async function handleRequest(
   const apiKeyValue = request.headers.get('x-api-key')
   const endpoint = `/api/modules/${module}${apiPath ? '/' + apiPath : ''}`
 
+  // Hoisted out of the try so the catch-all 500 handler can still attribute the
+  // request to its API key.
+  let isPublic = false
+  let apiKeyMeta: ApiKeyMeta | null = null
+
+  /**
+   * Record this request against its API key, if one is behind it.
+   *
+   * `preAuth` marks the paths that return before credentials are verified
+   * (unknown module / unknown route), where no session could own the request
+   * and a presented key is therefore safe to attribute. Otherwise a raw key is
+   * only attributed on public routes — a session request carrying a stray
+   * x-api-key header must not be logged against that key.
+   */
+  const logUsage = async (statusCode: number, preAuth = false): Promise<void> => {
+    const meta: ApiKeyMeta | null = apiKeyMeta
+    if (meta) {
+      recordApiKeyUsage({
+        apiKeyId: meta.id,
+        userId: meta.userId,
+        endpoint,
+        method,
+        statusCode,
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+      })
+      return
+    }
+    if (apiKeyValue && (preAuth || isPublic)) {
+      await recordUsageByKeyValue(request, apiKeyValue, endpoint, method, statusCode)
+    }
+  }
+
   try {
     // Check if this is a public route (configured in module.json publicRoutes)
     // Public routes skip authentication but must implement their own security
-    const isPublic = isPublicRoute(module, apiPath, method)
+    isPublic = isPublicRoute(module, apiPath, method)
 
     if (!isPublic) {
       // Fast-path rejection for fully anonymous requests — no DB work.
@@ -134,6 +175,7 @@ async function handleRequest(
     const moduleRoutes = MODULE_API_ROUTES[module]
     if (!moduleRoutes) {
       console.error(`[Module API] Module '${module}' not found in registry`)
+      await logUsage(404, true)
       return NextResponse.json(
         { error: `API routes not registered for module: ${module}` },
         { status: 404 }
@@ -176,6 +218,7 @@ async function handleRequest(
 
     if (!routeLoader) {
       console.error(`[Module API] Route '${apiPath}' not found in module '${module}' registry`)
+      await logUsage(404, true)
       return NextResponse.json(
         { error: `API route not found: /api/modules/${module}/${apiPath}` },
         { status: 404 }
@@ -190,37 +233,19 @@ async function handleRequest(
     // too (a sessionless getEnabledModule() call would return null).
     // Public routes skip this: they have no user context, so a module's
     // public routes remain reachable while the module is disabled.
-    let apiKeyMeta: {
-      id: string
-      userId: string
-      ipAddress: string | null
-      userAgent: string | null
-    } | null = null
     if (!isPublic) {
       const authResult = await getAuthenticatedUser()
       if (!authResult.user) {
         // A rejected request may still carry a real key (e.g. valid key from
         // a non-allowlisted IP) — record it so the key owner can see probes.
-        if (apiKeyValue) {
-          await recordUsageByKeyValue(request, apiKeyValue, endpoint, method, 401)
-        }
+        await logUsage(401, true)
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
       apiKeyMeta = 'apiKey' in authResult ? authResult.apiKey ?? null : null
 
       const enabledModule = await getEnabledModule(module, authResult.user.id)
       if (!enabledModule) {
-        if (apiKeyMeta) {
-          recordApiKeyUsage({
-            apiKeyId: apiKeyMeta.id,
-            userId: apiKeyMeta.userId,
-            endpoint,
-            method,
-            statusCode: 403,
-            ipAddress: apiKeyMeta.ipAddress,
-            userAgent: apiKeyMeta.userAgent,
-          })
-        }
+        await logUsage(403)
         return NextResponse.json(
           { error: `Module '${module}' is disabled` },
           { status: 403 }
@@ -233,6 +258,7 @@ async function handleRequest(
 
     // Check if the HTTP method is supported by this handler
     if (!handler[method]) {
+      await logUsage(405)
       return NextResponse.json(
         { error: `Method ${method} not allowed` },
         { status: 405 }
@@ -249,19 +275,7 @@ async function handleRequest(
     // attributed by value instead — keys used only against public endpoints
     // must not look dormant in Settings → API.
     // recordApiKeyUsage is fire-and-forget and catches its own errors.
-    if (apiKeyMeta) {
-      recordApiKeyUsage({
-        apiKeyId: apiKeyMeta.id,
-        userId: apiKeyMeta.userId,
-        endpoint,
-        method,
-        statusCode: result.status,
-        ipAddress: apiKeyMeta.ipAddress,
-        userAgent: apiKeyMeta.userAgent,
-      })
-    } else if (isPublic && apiKeyValue) {
-      await recordUsageByKeyValue(request, apiKeyValue, endpoint, method, result.status)
-    }
+    await logUsage(result.status)
 
     return result
   } catch (error: unknown) {
@@ -277,6 +291,9 @@ async function handleRequest(
     if (isDev && error instanceof Error) {
       body.message = error.message
     }
+    // A key-authenticated request that throws must still appear in the audit
+    // trail — otherwise the most interesting requests are the invisible ones.
+    await logUsage(500)
     return NextResponse.json(body, { status: 500 })
   }
 }

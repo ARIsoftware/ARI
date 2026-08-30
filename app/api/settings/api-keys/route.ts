@@ -17,6 +17,7 @@ import {
 } from "@/lib/openapi/app-schemas"
 import { registry } from "@/lib/openapi/registry"
 import { DEFAULT_SECURITY, ErrorResponseSchema } from "@/lib/openapi/common"
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'get',
@@ -134,7 +135,7 @@ async function deleteKey(userId: string, key: string) {
   )
 }
 
-export async function GET() {
+async function handleGET() {
   const { user } = await getAuthenticatedUser()
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -171,7 +172,7 @@ export async function GET() {
   return NextResponse.json(result)
 }
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   const { user } = await getAuthenticatedUser()
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -227,3 +228,6 @@ export async function POST(request: NextRequest) {
     masked: MODEL_KEYS.has(key) ? value : maskValue(value),
   })
 }
+
+export const GET = withApiLogging(handleGET)
+export const POST = withApiLogging(handlePOST)

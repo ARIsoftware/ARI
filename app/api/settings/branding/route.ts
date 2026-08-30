@@ -13,6 +13,7 @@ import {
 import { z } from 'zod'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 // Admin-managed login-screen branding. The logo is stored inline (base64) in the
 // single-row `app_branding` table so it survives storage-provider changes and can
@@ -80,7 +81,7 @@ registry.registerPath({
 })
 
 /** GET — current login-logo metadata (never returns the raw bytes). */
-export async function GET() {
+async function handleGET() {
   const { user } = await getAuthenticatedUser()
   const denied = requireAdmin(user)
   if (denied) return denied
@@ -100,7 +101,7 @@ export async function GET() {
 }
 
 /** POST — upload/replace the login logo (multipart/form-data with `file`). */
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   const { user } = await getAuthenticatedUser()
   const denied = requireAdmin(user)
   if (denied || !user) return denied ?? createErrorResponse('Authentication required', 401)
@@ -174,7 +175,7 @@ export async function POST(request: NextRequest) {
 }
 
 /** DELETE — remove the login logo (revert to the default login screen). */
-export async function DELETE() {
+async function handleDELETE() {
   const { user } = await getAuthenticatedUser()
   const denied = requireAdmin(user)
   if (denied || !user) return denied ?? createErrorResponse('Authentication required', 401)
@@ -200,3 +201,7 @@ export async function DELETE() {
 
   return NextResponse.json({ hasLogo: false })
 }
+
+export const GET = withApiLogging(handleGET)
+export const POST = withApiLogging(handlePOST)
+export const DELETE = withApiLogging(handleDELETE)

@@ -5,6 +5,7 @@ import { getAriInstance, setTelemetryEnabled } from "@/lib/telemetry/instance"
 import { updateTelemetrySchema, TelemetryResponseSchema } from "@/lib/openapi/app-schemas"
 import { registry } from "@/lib/openapi/registry"
 import { DEFAULT_SECURITY, ErrorResponseSchema } from "@/lib/openapi/common"
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'get',
@@ -35,7 +36,7 @@ registry.registerPath({
   },
 })
 
-export async function GET() {
+async function handleGET() {
   const { user } = await getAuthenticatedUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
@@ -44,7 +45,7 @@ export async function GET() {
   return NextResponse.json({ telemetryEnabled: instance.telemetryEnabled })
 }
 
-export async function PUT(request: Request) {
+async function handlePUT(request: Request) {
   const { user } = await getAuthenticatedUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
@@ -60,3 +61,6 @@ export async function PUT(request: Request) {
   await setTelemetryEnabled(body.enabled)
   return NextResponse.json({ telemetryEnabled: body.enabled })
 }
+
+export const GET = withApiLogging(handleGET)
+export const PUT = withApiLogging(handlePUT)

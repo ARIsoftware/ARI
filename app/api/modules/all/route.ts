@@ -15,6 +15,7 @@ import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } fr
 export const debugRole = "modules-list-all"
 import { moduleSettings } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'get',
@@ -35,7 +36,7 @@ registry.registerPath({
  * Returns ALL discovered modules (both enabled and disabled)
  * Used by Settings page to allow users to manage module state
  */
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   const { user, withRLS } = await getAuthenticatedUser()
 
   // Validate authentication
@@ -94,3 +95,5 @@ export async function GET(request: NextRequest) {
     )
   }
 }
+
+export const GET = withApiLogging(handleGET)

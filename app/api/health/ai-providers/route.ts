@@ -4,6 +4,7 @@ import { checkAiProviders } from '@/lib/health/checks'
 import { HealthAiProvidersSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 export const debugRole = "health-ai-providers"
 
@@ -26,7 +27,7 @@ registry.registerPath({
  * Reports, per provider, whether a primary key is configured and where it comes
  * from (`env` takes precedence over a `db`-saved value). Never returns secrets.
  */
-export async function GET() {
+async function handleGET() {
   try {
     const { user, withRLS } = await getAuthenticatedUser()
     if (!user || !withRLS) {
@@ -38,3 +39,5 @@ export async function GET() {
     return NextResponse.json({ error: 'Failed to check AI providers' }, { status: 500 })
   }
 }
+
+export const GET = withApiLogging(handleGET)

@@ -13,6 +13,7 @@ import {
 import { storageUploadFormSchema, StorageUploadResponseSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'post',
@@ -32,7 +33,7 @@ registry.registerPath({
   },
 })
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     const { user, withRLS } = await getAuthenticatedUser()
     if (!user || !withRLS) {
@@ -116,3 +117,5 @@ export async function POST(request: NextRequest) {
     return createErrorResponse(exposed, 500)
   }
 }
+
+export const POST = withApiLogging(handlePOST)

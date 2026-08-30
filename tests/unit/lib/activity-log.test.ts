@@ -28,6 +28,16 @@ vi.mock('@/lib/db/pool', () => ({
   },
 }))
 
+// ── retention mock: the sampled prune hooked into the write path ───────────
+const retentionHolder = vi.hoisted(() => ({ prune: false, pruned: [] as string[] }))
+vi.mock('@/lib/api-log-retention', () => ({
+  shouldPrune: () => retentionHolder.prune,
+  pruneActivityLog: vi.fn(async (userId: string) => {
+    retentionHolder.pruned.push(userId)
+    return 0
+  }),
+}))
+
 import { logActivity, logActivityOnce } from '@/lib/activity-log'
 
 const mockQuery = vi.fn()
@@ -43,10 +53,36 @@ beforeEach(() => {
   afterHolder.throwOnCall = false
   mockQuery.mockReset().mockResolvedValue({ rows: [] })
   poolHolder.pool = { query: mockQuery }
+  retentionHolder.prune = false
+  retentionHolder.pruned = []
 })
 
 afterEach(() => {
   vi.restoreAllMocks()
+})
+
+describe('logActivity — sampled retention', () => {
+  it('prunes the actor\'s expired rows when the sampler fires', async () => {
+    retentionHolder.prune = true
+    logActivity({ userId: 'u1', type: 't', description: 'd' })
+    await flushAfter()
+    expect(retentionHolder.pruned).toEqual(['u1'])
+  })
+
+  it('skips the prune otherwise', async () => {
+    retentionHolder.prune = false
+    logActivity({ userId: 'u1', type: 't', description: 'd' })
+    await flushAfter()
+    expect(retentionHolder.pruned).toEqual([])
+  })
+
+  it('does not prune when there is no pool (the insert never ran)', async () => {
+    retentionHolder.prune = true
+    poolHolder.pool = null
+    logActivity({ userId: 'u1', type: 't', description: 'd' })
+    await flushAfter()
+    expect(retentionHolder.pruned).toEqual([])
+  })
 })
 
 describe('logActivity', () => {

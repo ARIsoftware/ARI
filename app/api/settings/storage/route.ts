@@ -5,6 +5,7 @@ import { readStorageConfig, PROVIDER_LABELS } from '@/lib/storage'
 import { SettingsStorageInfoSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'get',
@@ -44,7 +45,7 @@ const PROVIDER_ENV_VARS: Record<string, Array<{ name: string; required: boolean 
   ],
 }
 
-export async function GET() {
+async function handleGET() {
   try {
     const { user } = await getAuthenticatedUser()
     if (!user) {
@@ -75,3 +76,5 @@ export async function GET() {
     return createErrorResponse('Internal server error', 500)
   }
 }
+
+export const GET = withApiLogging(handleGET)

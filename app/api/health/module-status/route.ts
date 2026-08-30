@@ -12,6 +12,7 @@ import { safeErrorResponse } from '@/lib/api-error'
 import { HealthModuleStatusSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 export const debugRole = "health-module-status"
 
@@ -32,7 +33,7 @@ registry.registerPath({
   },
 })
 
-export async function GET() {
+async function handleGET() {
   try {
     const { user, withRLS } = await getAuthenticatedUser()
 
@@ -51,3 +52,5 @@ export async function GET() {
     }, { status: 500 })
   }
 }
+
+export const GET = withApiLogging(handleGET)

@@ -1,5 +1,6 @@
 import { after } from 'next/server'
 import { pool } from '@/lib/db/pool'
+import { pruneActivityLog, shouldPrune } from '@/lib/api-log-retention'
 
 /**
  * Central activity log — writes one row to activity_log per event.
@@ -70,11 +71,24 @@ function schedule(work: () => Promise<unknown>): void {
   }
 }
 
+/**
+ * Opportunistic retention, mirroring lib/api-log-retention.ts: a sampled
+ * fraction of writes also prunes the actor's expired rows. Hooked into this
+ * table's own write path (rather than the API-request path) so pruning scales
+ * with activity_log's own volume — an install with no API-key traffic still
+ * keeps this table bounded.
+ */
+async function maybePrune(userId: string): Promise<void> {
+  if (!shouldPrune()) return
+  await pruneActivityLog(userId)
+}
+
 /** Record an activity event. Returns immediately; never throws. */
 export function logActivity(event: ActivityEvent): void {
   schedule(async () => {
     if (!pool) return
     await pool.query(INSERT_SQL, eventParams(event))
+    await maybePrune(event.userId)
   })
 }
 

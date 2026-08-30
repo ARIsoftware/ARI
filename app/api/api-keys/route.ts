@@ -13,6 +13,7 @@ import {
 } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'get',
@@ -44,7 +45,7 @@ registry.registerPath({
   },
 })
 
-export async function GET() {
+async function handleGET() {
   try {
     const { user, withRLS } = await getAuthenticatedUser()
     if (!user || !withRLS) {
@@ -76,7 +77,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     const { user, withRLS } = await getAuthenticatedUser()
     if (!user || !withRLS) {
@@ -131,3 +132,6 @@ export async function POST(request: NextRequest) {
     return createErrorResponse('Failed to create API key', 500)
   }
 }
+
+export const GET = withApiLogging(handleGET)
+export const POST = withApiLogging(handlePOST)

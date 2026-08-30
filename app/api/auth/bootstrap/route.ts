@@ -7,6 +7,7 @@ import { setupSql } from "@/lib/db/setup-sql"
 import { upsertEnvVars } from "@/lib/env-file"
 import { checkRateLimit, getClientIp, isSameOriginRequest } from "@/lib/modules/public-route-security"
 import { getPgCode } from "@/lib/db/postgres-error"
+import { safeErrorResponse } from "@/lib/api-error"
 import { BootstrapStatusSchema } from "@/lib/openapi/app-schemas"
 import { registry } from "@/lib/openapi/registry"
 import { ErrorResponseSchema } from "@/lib/openapi/common"
@@ -104,11 +105,13 @@ export async function POST(request: NextRequest) {
       try {
         await client.query(setupSql)
       } catch (installError: unknown) {
-        const message = installError instanceof Error ? installError.message : String(installError)
+        // This endpoint is unauthenticated, so the response must not carry raw
+        // Postgres detail. The full error (message + pgCode) still goes to the
+        // server log, where the operator can read it.
         const pgCode = getPgCode(installError)
-        console.error("Bootstrap install failed:", installError)
+        console.error("Bootstrap install failed:", { pgCode, error: installError })
         return NextResponse.json(
-          { status: "install_failed", error: message, pgCode },
+          { status: "install_failed", error: safeErrorResponse(installError) },
           { status: 500 }
         )
       }
@@ -177,10 +180,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: "error" }, { status: 500 })
     }
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error)
+    // Same reasoning as the install path above — no raw DB detail over the wire.
     const pgCode = getPgCode(error)
-    console.error("Bootstrap error:", error)
-    return NextResponse.json({ status: "error", error: message, pgCode }, { status: 500 })
+    console.error("Bootstrap error:", { pgCode, error })
+    return NextResponse.json(
+      { status: "error", error: safeErrorResponse(error) },
+      { status: 500 }
+    )
   } finally {
     if (lockHeld) {
       try {

@@ -5,6 +5,7 @@ import { getStorageProvider, sanitizeBucketName, validateStoredFilename, readSto
 import { storageDeleteSchema as deleteSchema, SuccessSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'delete',
@@ -22,7 +23,7 @@ registry.registerPath({
   },
 })
 
-export async function DELETE(request: NextRequest) {
+async function handleDELETE(request: NextRequest) {
   try {
     const { user, withRLS } = await getAuthenticatedUser()
     if (!user || !withRLS) {
@@ -63,3 +64,5 @@ export async function DELETE(request: NextRequest) {
     return createErrorResponse(exposed, 500)
   }
 }
+
+export const DELETE = withApiLogging(handleDELETE)

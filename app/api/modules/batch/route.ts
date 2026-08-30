@@ -12,6 +12,7 @@ import { logActivity } from '@/lib/activity-log'
 import { batchModulesSchema, BatchModulesResponseSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 interface ModuleChange {
   moduleId: string
@@ -40,7 +41,7 @@ registry.registerPath({
  *
  * Body: { changes: Array<{ moduleId: string, enabled: boolean }> }
  */
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   const { user, withRLS } = await getAuthenticatedUser()
 
   if (!user || !withRLS) {
@@ -131,3 +132,5 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export const POST = withApiLogging(handlePOST)

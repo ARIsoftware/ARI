@@ -5,6 +5,7 @@ import { createErrorResponse } from '@/lib/api-helpers'
 import { getStorageProvider, sanitizeBucketName, validateStoredFilename, readStorageConfig } from '@/lib/storage'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'get',
@@ -39,7 +40,7 @@ const SHARED_STORAGE_BUCKETS = new Set(
     .filter(Boolean)
 )
 
-export async function GET(
+async function handleGET(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
@@ -119,3 +120,5 @@ export async function GET(
     return createErrorResponse(exposed, 500)
   }
 }
+
+export const GET = withApiLogging(handleGET)

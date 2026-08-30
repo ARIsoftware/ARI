@@ -27,6 +27,7 @@ import {
 } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'get',
@@ -72,7 +73,7 @@ const OrderSchema = z.object({
 const orderFieldSchema = z.record(z.string(), z.number()).optional()
 const menuPrioritySchema = z.object({ menuPriority: z.number() }).partial()
 
-export async function GET() {
+async function handleGET() {
   const { user } = await getAuthenticatedUser()
 
   if (!user) {
@@ -127,7 +128,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   const { user } = await getAuthenticatedUser()
 
   if (!user) {
@@ -217,3 +218,6 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export const GET = withApiLogging(handleGET)
+export const POST = withApiLogging(handlePOST)

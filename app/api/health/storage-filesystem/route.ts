@@ -5,6 +5,7 @@ import { safeErrorResponse } from '@/lib/api-error'
 import { HealthStorageFilesystemSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 export const dynamic = 'force-dynamic'
 export const debugRole = 'health-storage-filesystem'
@@ -23,7 +24,7 @@ registry.registerPath({
   },
 })
 
-export async function GET() {
+async function handleGET() {
   const { user } = await getAuthenticatedUser()
   if (!user) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
@@ -35,3 +36,5 @@ export async function GET() {
     return NextResponse.json({ error: `Filesystem check failed: ${safeErrorResponse(err)}` }, { status: 500 })
   }
 }
+
+export const GET = withApiLogging(handleGET)

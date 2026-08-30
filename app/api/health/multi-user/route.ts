@@ -4,6 +4,7 @@ import { checkMultiUser } from '@/lib/health/checks'
 import { HealthMultiUserSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 export const debugRole = "health-multi-user"
 
@@ -29,7 +30,7 @@ registry.registerPath({
  *  2. at least one active (non-disabled) admin exists — without one, nobody
  *     can manage users and the install is unmanageable.
  */
-export async function GET() {
+async function handleGET() {
   const { user } = await getAuthenticatedUser()
   if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
 
@@ -45,3 +46,5 @@ export async function GET() {
     )
   }
 }
+
+export const GET = withApiLogging(handleGET)

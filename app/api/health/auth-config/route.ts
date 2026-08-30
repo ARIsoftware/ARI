@@ -4,6 +4,7 @@ import { checkAuthConfig } from '@/lib/health/checks'
 import { HealthAuthConfigSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 export const debugRole = "auth-config"
 
@@ -26,7 +27,7 @@ registry.registerPath({
  * Returns non-sensitive auth configuration details for debugging.
  * Does NOT expose secrets.
  */
-export async function GET() {
+async function handleGET() {
   const { user } = await getAuthenticatedUser()
 
   if (!user) {
@@ -39,3 +40,5 @@ export async function GET() {
     return NextResponse.json({ error: 'Failed to get auth config' }, { status: 500 })
   }
 }
+
+export const GET = withApiLogging(handleGET)

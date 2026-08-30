@@ -9,6 +9,7 @@ import { queryRows, EXCLUDED_TABLES, calculateChecksum, stripNul } from '../util
 import { BackupExportRequestSchema, BackupExportResponseSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, UnauthorizedResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 type ColumnInfo = {
   column_name: string
@@ -347,7 +348,7 @@ async function fetchTableData(tableName: string, chunkSize: number = 1000): Prom
   return allData
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   try {
     // Authenticate user
     const { user } = await getAuthenticatedUser()
@@ -719,3 +720,5 @@ export async function POST(req: NextRequest) {
     )
   }
 }
+
+export const POST = withApiLogging(handlePOST)

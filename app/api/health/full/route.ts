@@ -21,6 +21,7 @@ import {
   InternalServerErrorResponse,
   UnauthorizedResponse,
 } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 export const dynamic = 'force-dynamic'
 export const debugRole = 'health-full'
@@ -46,7 +47,7 @@ registry.registerPath({
   },
 })
 
-export async function POST() {
+async function handlePOST() {
   try {
     const { user, withRLS } = await getAuthenticatedUser()
     if (!user || !withRLS) {
@@ -63,3 +64,5 @@ export async function POST() {
     return NextResponse.json({ error: safeErrorResponse(err) }, { status: 500 })
   }
 }
+
+export const POST = withApiLogging(handlePOST)

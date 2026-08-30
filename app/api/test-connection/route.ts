@@ -5,6 +5,7 @@ import { pool } from '@/lib/db/pool'
 import { TestConnectionResponseSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, UnauthorizedResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 export const debugRole = "test-connection"
 
@@ -21,7 +22,7 @@ registry.registerPath({
   },
 })
 
-export async function GET() {
+async function handleGET() {
   // Require authentication for this diagnostic endpoint
   const { user } = await getAuthenticatedUser()
 
@@ -61,3 +62,5 @@ export async function GET() {
     })
   }
 }
+
+export const GET = withApiLogging(handleGET)

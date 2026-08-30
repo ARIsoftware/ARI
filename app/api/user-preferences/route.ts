@@ -9,6 +9,7 @@ import { profileFieldSchemas, emptyToNull } from '@/lib/validation'
 import { UserPreferencesSchema, updateUserPreferencesSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'get',
@@ -73,7 +74,7 @@ const DEFAULT_PREFS = (userId: string, email: string) => ({
   timezone: 'UTC',
 })
 
-export async function GET() {
+async function handleGET() {
   try {
     const { user, withRLS } = await getAuthenticatedUser()
 
@@ -99,7 +100,7 @@ export async function GET() {
   }
 }
 
-export async function PUT(request: NextRequest) {
+async function handlePUT(request: NextRequest) {
   try {
     const { user, withRLS } = await getAuthenticatedUser()
 
@@ -165,3 +166,6 @@ export async function PUT(request: NextRequest) {
     )
   }
 }
+
+export const GET = withApiLogging(handleGET)
+export const PUT = withApiLogging(handlePUT)

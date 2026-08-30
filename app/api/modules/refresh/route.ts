@@ -6,6 +6,7 @@ import { safeErrorResponse } from '@/lib/api-error'
 import { ModuleRefreshResponseSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'post',
@@ -22,7 +23,7 @@ registry.registerPath({
   },
 })
 
-export async function POST() {
+async function handlePOST() {
   if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
     return NextResponse.json(
       { error: 'Registry refresh is not available in production. Redeploy to update module registries.' },
@@ -61,3 +62,5 @@ export async function POST() {
     )
   }
 }
+
+export const POST = withApiLogging(handlePOST)

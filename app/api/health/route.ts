@@ -4,6 +4,7 @@ import { checkDatabase } from "@/lib/health/checks"
 import { HealthCheckSchema } from "@/lib/openapi/app-schemas"
 import { registry } from "@/lib/openapi/registry"
 import { DEFAULT_SECURITY, ErrorResponseSchema, UnauthorizedResponse } from "@/lib/openapi/common"
+import { withApiLogging } from '@/lib/api-logging'
 
 export const dynamic = "force-dynamic"
 // Identifier consumed by /health via the manifest — do not rename without
@@ -24,7 +25,7 @@ registry.registerPath({
   },
 })
 
-export async function GET() {
+async function handleGET() {
   const { user } = await getAuthenticatedUser()
 
   if (!user) {
@@ -34,3 +35,5 @@ export async function GET() {
   const result = await checkDatabase()
   return NextResponse.json(result, { status: result.status === 'ok' ? 200 : 503 })
 }
+
+export const GET = withApiLogging(handleGET)

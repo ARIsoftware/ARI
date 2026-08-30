@@ -684,6 +684,11 @@ CREATE INDEX IF NOT EXISTS idx_api_keys_key_hash ON "api_keys"("key_hash");
 CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON "api_keys"("user_id");
 CREATE INDEX IF NOT EXISTS idx_api_key_usage_logs_key_created ON "api_key_usage_logs"("api_key_id", "created_at" DESC);
 CREATE INDEX IF NOT EXISTS idx_api_key_usage_logs_user_id ON "api_key_usage_logs"("user_id");
+-- Serves the per-user retention prune (lib/api-log-retention.ts):
+-- DELETE ... WHERE user_id = $1 AND created_at < $2. The (user_id) index above
+-- is a redundant prefix of this one but is left in place — dropping an index is
+-- a destructive change and needs its own decision.
+CREATE INDEX IF NOT EXISTS idx_api_key_usage_logs_user_created ON "api_key_usage_logs"("user_id", "created_at");
 CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON "tasks"("user_id");
 CREATE INDEX IF NOT EXISTS idx_tasks_user_id_completed ON "tasks"("user_id", "completed");
 -- Drop legacy duplicate indexes (now defined in module schema.sql files)
@@ -729,12 +734,17 @@ AS $$
   FROM information_schema.tables t
   WHERE t.table_schema = 'public'
     AND t.table_type = 'BASE TABLE'
+    -- Keep in sync with EXCLUDED_TABLES in app/api/backup/utils.ts.
+    -- PostGIS/system tables, plus append-only telemetry that would otherwise
+    -- dominate backup size without carrying user content.
     AND t.table_name NOT IN (
       'spatial_ref_sys',
       'schema_migrations',
       'pg_stat_statements',
       'geography_columns',
-      'geometry_columns'
+      'geometry_columns',
+      'activity_log',
+      'api_key_usage_logs'
     )
   ORDER BY t.table_name;
 $$;

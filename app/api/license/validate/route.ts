@@ -6,6 +6,7 @@ import { LICENSE_MODULE_ID } from '@/lib/license-helpers'
 import { validateLicenseSchema as ValidateSchema, ValidateLicenseResponseSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 const POLAR_ORGANIZATION_ID = "b1e4ddc2-774b-4bfb-aedd-5ffb0f67e8e3"
 
@@ -27,7 +28,7 @@ registry.registerPath({
   },
 })
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   const { user } = await getAuthenticatedUser()
 
   if (!user) {
@@ -149,3 +150,5 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export const POST = withApiLogging(handlePOST)

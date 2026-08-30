@@ -4,6 +4,7 @@ import { createErrorResponse } from '@/lib/api-helpers'
 import { CurrentUserResponseSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'get',
@@ -20,7 +21,7 @@ registry.registerPath({
   },
 })
 
-export async function GET() {
+async function handleGET() {
   try {
     const { user } = await getAuthenticatedUser()
     if (!user) return createErrorResponse('Authentication required', 401)
@@ -40,3 +41,5 @@ export async function GET() {
     return createErrorResponse('Failed to load current user', 500)
   }
 }
+
+export const GET = withApiLogging(handleGET)

@@ -12,6 +12,7 @@ import {
 } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'get',
@@ -42,7 +43,7 @@ registry.registerPath({
   },
 })
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   const { user } = await getAuthenticatedUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -94,7 +95,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+async function handleGET() {
   const { user } = await getAuthenticatedUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -114,3 +115,6 @@ export async function GET() {
     }),
   })
 }
+
+export const GET = withApiLogging(handleGET)
+export const POST = withApiLogging(handlePOST)

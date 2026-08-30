@@ -6,6 +6,7 @@ import { apiKeys, apiKeyUsageLogs } from '@/lib/db/schema/core-schema'
 import { appIdParamSchema, ApiKeyUsageLogListResponseSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 const MAX_LIMIT = 100
 const DEFAULT_LIMIT = 20
@@ -26,7 +27,7 @@ registry.registerPath({
   },
 })
 
-export async function GET(
+async function handleGET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -76,3 +77,5 @@ export async function GET(
     return createErrorResponse('Failed to list API key usage logs', 500)
   }
 }
+
+export const GET = withApiLogging(handleGET)

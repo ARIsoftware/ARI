@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { LicenseStatusSchema, SuccessSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'get',
@@ -50,7 +51,7 @@ function maskKey(key: string): string {
   return key.slice(0, -18) + '*'.repeat(18)
 }
 
-export async function GET() {
+async function handleGET() {
   const { user } = await getAuthenticatedUser()
 
   if (!user) {
@@ -95,7 +96,7 @@ export async function GET() {
   }
 }
 
-export async function DELETE() {
+async function handleDELETE() {
   const { user } = await getAuthenticatedUser()
 
   if (!user) {
@@ -122,3 +123,6 @@ export async function DELETE() {
     )
   }
 }
+
+export const GET = withApiLogging(handleGET)
+export const DELETE = withApiLogging(handleDELETE)

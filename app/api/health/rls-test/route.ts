@@ -12,6 +12,7 @@ import { safeErrorResponse } from '@/lib/api-error'
 import { HealthRlsTestSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, UnauthorizedResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 export const debugRole = "health-rls-test"
 
@@ -33,7 +34,7 @@ registry.registerPath({
 // module_settings). Using POST matches REST semantics and blocks trivial CSRF
 // via <img>/<link> tags that only issue GET. The auth cookie's SameSite=Lax
 // already blocks cross-site POSTs, so this gives defense in depth.
-export async function POST() {
+async function handlePOST() {
   try {
     const { user, withRLS } = await getAuthenticatedUser()
 
@@ -52,3 +53,5 @@ export async function POST() {
     }, { status: 500 })
   }
 }
+
+export const POST = withApiLogging(handlePOST)

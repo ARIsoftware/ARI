@@ -34,11 +34,5 @@
         }
       ]
     }
-  ],
-  "crons": [
-    {
-      "path": "/api/modules/backup-manager/scheduled",
-      "schedule": "0 * * * *"
-    }
   ]
 }

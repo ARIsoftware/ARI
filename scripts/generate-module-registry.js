@@ -295,13 +295,55 @@ const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
 /**
  * Read a route file and detect which HTTP methods it exports.
+ *
+ * Two forms are recognised:
+ *   export async function GET(...)            — plain handler
+ *   export const GET = withApiLogging(handleGET)  — logged handler
  */
 function detectExportedMethods(filePath) {
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
     return HTTP_METHODS.filter(method =>
-      new RegExp(`export\\s+(async\\s+)?function\\s+${method}\\b`).test(content)
+      new RegExp(`export\\s+(async\\s+)?function\\s+${method}\\b`).test(content) ||
+      new RegExp(`export\\s+const\\s+${method}\\s*=`).test(content)
     );
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Which exported methods of a core route are NOT wrapped in withApiLogging.
+ *
+ * Core routes are physically separate files with no dispatcher, so the wrapper
+ * has to be applied per export. A forgotten wrapper is a silent hole in the
+ * API-key audit trail — exactly the failure this system exists to close — so
+ * the build fails rather than letting it drift. See lib/api-logging.ts.
+ *
+ * Routes that never authenticate (public setup endpoints, static stubs) are
+ * exempt: with no getAuthenticatedUser call there is no key to attribute.
+ */
+function findUnwrappedMethods(filePath) {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    if (!/getAuthenticatedUser/.test(content)) return [];
+
+    return HTTP_METHODS.filter(method => {
+      // Direct `export async function GET(...)` — never wrapped.
+      if (new RegExp(`export\\s+(async\\s+)?function\\s+${method}\\b`).test(content)) {
+        return true;
+      }
+      // `export const GET = <expr>` — wrapped only if the expression actually
+      // calls withApiLogging. Checking for the assignment alone would let
+      // `export const GET = handleGET` (one edit away from the wrapped form,
+      // and exactly what the error message below suggests) pass silently.
+      const assigned = content.match(
+        new RegExp(`export\\s+const\\s+${method}\\s*=\\s*([^\\n]*)`)
+      );
+      if (assigned) return !/\bwithApiLogging\s*\(/.test(assigned[1]);
+
+      return false; // method not exported at all
+    });
   } catch {
     return [];
   }
@@ -1137,6 +1179,56 @@ function main() {
     console.log(`  - ${id} (from ${dirName}/${folder})`);
   }
   console.log('');
+
+  checkApiLoggingCoverage();
+}
+
+/**
+ * Fail the build when an authenticated core route exports an unwrapped method.
+ *
+ * Runs last so the generated files are still written — the failure is about the
+ * source tree, not the generation.
+ */
+function checkApiLoggingCoverage() {
+  const apiDir = path.join(process.cwd(), 'app', 'api');
+  const offenders = [];
+
+  for (const routePath of scanApiRoutesRecursively(apiDir)) {
+    if (routePath === 'auth/[...all]') continue;
+    if (routePath === 'modules/[module]/[[...path]]') continue;
+
+    const routeFile = path.join(apiDir, routePath, 'route.ts');
+    const routeFileJs = path.join(apiDir, routePath, 'route.js');
+    const actualFile = fs.existsSync(routeFile) ? routeFile : routeFileJs;
+
+    const unwrapped = findUnwrappedMethods(actualFile);
+    if (unwrapped.length > 0) {
+      offenders.push({ routePath, methods: unwrapped });
+    }
+  }
+
+  if (offenders.length === 0) {
+    console.log('✅ API logging coverage: all authenticated core routes are wrapped');
+    return;
+  }
+
+  console.error('');
+  console.error('❌ API request logging coverage check failed.');
+  console.error('');
+  console.error('These core routes authenticate but export unwrapped handlers, so');
+  console.error('API-key requests to them would go unlogged:');
+  console.error('');
+  for (const { routePath, methods } of offenders) {
+    console.error(`   /api/${routePath}  →  ${methods.join(', ')}`);
+  }
+  console.error('');
+  console.error('Fix: rename the handler and export it wrapped, e.g.');
+  console.error('');
+  console.error("   import { withApiLogging } from '@/lib/api-logging'");
+  console.error('   async function handleGET(request: NextRequest) { ... }');
+  console.error('   export const GET = withApiLogging(handleGET)');
+  console.error('');
+  process.exit(1);
 }
 
 main();

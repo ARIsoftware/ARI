@@ -11,6 +11,7 @@ import {
 } from "@/lib/openapi/app-schemas"
 import { registry } from "@/lib/openapi/registry"
 import { DEFAULT_SECURITY, ErrorResponseSchema } from "@/lib/openapi/common"
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'get',
@@ -46,7 +47,7 @@ registry.registerPath({
  * can drift from disk if the file is edited externally or Next.js doesn't re-load env on HMR.
  * The token itself is never returned for security.
  */
-export async function GET() {
+async function handleGET() {
   const { user } = await getAuthenticatedUser()
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -98,7 +99,7 @@ function parseEnvFile(source: string): Record<string, string> {
  * POST: Update GITHUB_TOKEN, GITHUB_REPO_OWNER, and GITHUB_REPO_NAME in .env.local.
  * Preserves all other env vars; backs up the existing file before writing.
  */
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   const { user } = await getAuthenticatedUser()
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -185,3 +186,6 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ success: true })
 }
 
+
+export const GET = withApiLogging(handleGET)
+export const POST = withApiLogging(handlePOST)

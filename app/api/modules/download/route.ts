@@ -18,6 +18,7 @@ import { downloadModuleSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema } from '@/lib/openapi/common'
 import { TARGET_EXISTS_CODE, type ConflictType } from '@/lib/modules/install-types'
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'post',
@@ -198,7 +199,7 @@ export type InstallEvent =
     }
   | { stage: 'fatal'; error: string; code?: string }
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   // ─────────────────────────────────────────────────────────────────────
   // Pre-stream phase: anything that could legitimately return a non-200
   // status (auth, validation, upstream API errors) runs here. Once we
@@ -541,3 +542,5 @@ export async function POST(request: NextRequest) {
     },
   })
 }
+
+export const POST = withApiLogging(handlePOST)

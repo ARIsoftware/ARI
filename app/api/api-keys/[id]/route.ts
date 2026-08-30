@@ -12,6 +12,7 @@ import {
 } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'patch',
@@ -49,7 +50,7 @@ registry.registerPath({
   },
 })
 
-export async function PATCH(
+async function handlePATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -102,7 +103,7 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
+async function handleDELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -142,3 +143,6 @@ export async function DELETE(
     return createErrorResponse('Failed to revoke API key', 500)
   }
 }
+
+export const PATCH = withApiLogging(handlePATCH)
+export const DELETE = withApiLogging(handleDELETE)

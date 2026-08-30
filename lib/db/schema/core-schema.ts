@@ -218,6 +218,7 @@ export const apiKeyUsageLogs = pgTable("api_key_usage_logs", {
 }, (table) => [
 	index("idx_api_key_usage_logs_key_created").using("btree", table.apiKeyId.asc().nullsLast().op("text_ops"), table.createdAt.desc().nullsFirst()),
 	index("idx_api_key_usage_logs_user_id").using("btree", table.userId.asc().nullsLast().op("text_ops")),
+	index("idx_api_key_usage_logs_user_created").using("btree", table.userId.asc().nullsLast().op("text_ops"), table.createdAt.asc().nullsLast()),
 	foreignKey({
 		columns: [table.apiKeyId],
 		foreignColumns: [apiKeys.id],

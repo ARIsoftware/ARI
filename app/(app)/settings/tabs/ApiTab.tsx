@@ -1,25 +1,25 @@
-"use client"
+'use client'
 
-import { useState, useEffect, useCallback } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { useState, useEffect, useCallback } from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from '@/components/ui/select'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from '@/components/ui/dialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,7 +30,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from '@/components/ui/alert-dialog'
 import {
   Key,
   Plus,
@@ -43,9 +43,9 @@ import {
   Globe,
   AlertTriangle,
   ExternalLink,
-} from "lucide-react"
-import type { ApiKey, ApiKeyUsageLog, ApiKeyCreateResponse } from "../types"
-import { HTTP_METHODS, NON_MODULE_TAGS, type OpenApiSpec } from "@/lib/openapi/types"
+} from 'lucide-react'
+import type { ApiKey, ApiKeyUsageLog, ApiKeyCreateResponse } from '../types'
+import { HTTP_METHODS, NON_MODULE_TAGS, type OpenApiSpec } from '@/lib/openapi/types'
 
 interface EndpointData {
   coreEndpoints: Array<{ fullPath: string; methods: string[] }>
@@ -73,26 +73,77 @@ export function ApiTab(): React.ReactElement {
   const [keys, setKeys] = useState<ApiKey[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
-  const [label, setLabel] = useState("")
-  const [expiry, setExpiry] = useState("never")
+  const [label, setLabel] = useState('')
+  const [expiry, setExpiry] = useState('never')
   const [showKeyDialog, setShowKeyDialog] = useState(false)
-  const [newRawKey, setNewRawKey] = useState("")
+  const [newRawKey, setNewRawKey] = useState('')
   const [copied, setCopied] = useState(false)
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
   const [logs, setLogs] = useState<Record<string, ApiKeyUsageLog[]>>({})
   const [logsLoading, setLogsLoading] = useState<string | null>(null)
   const [endpointsData, setEndpointsData] = useState<EndpointData | null>(null)
   const [endpointsLoading, setEndpointsLoading] = useState(false)
+  // "never" | a day count as a string — mirrors the Select's value type.
+  const [retentionValue, setRetentionValue] = useState('30')
+  const [retentionLoading, setRetentionLoading] = useState(true)
+  const [retentionSaving, setRetentionSaving] = useState(false)
+  const [retentionError, setRetentionError] = useState<string | null>(null)
+  // Offered windows come from the API (it owns RETENTION_DAY_OPTIONS); the
+  // seed list only covers the frame before the first fetch resolves.
+  const [retentionOptions, setRetentionOptions] = useState<number[]>([30, 60, 90, 360])
+
+  const fetchRetention = useCallback(async () => {
+    try {
+      const res = await fetch('/api/settings/api-logging')
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      setRetentionValue(data.retentionDays === null ? 'never' : String(data.retentionDays))
+      if (Array.isArray(data.options)) setRetentionOptions(data.options)
+      setRetentionError(null)
+    } catch (err) {
+      console.error('Failed to fetch log retention setting:', err)
+      // Surface the failure rather than leaving the seed value on screen —
+      // showing "30 days" when the stored setting might be "Never" asserts a
+      // retention window that isn't in effect.
+      setRetentionError("Couldn't load the current setting")
+    } finally {
+      setRetentionLoading(false)
+    }
+  }, [])
+
+  const handleRetentionChange = useCallback(
+    async (value: string) => {
+      const previous = retentionValue
+      setRetentionValue(value)
+      setRetentionSaving(true)
+      setRetentionError(null)
+      try {
+        const res = await fetch('/api/settings/api-logging', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ retentionDays: value === 'never' ? null : Number(value) }),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      } catch (err) {
+        console.error('Failed to save log retention setting:', err)
+        setRetentionValue(previous)
+        setRetentionError("Couldn't save — reverted")
+      } finally {
+        setRetentionSaving(false)
+      }
+    },
+    [retentionValue],
+  )
 
   const fetchKeys = useCallback(async () => {
     try {
-      const res = await fetch("/api/api-keys")
+      const res = await fetch('/api/api-keys')
       if (res.ok) {
         const data = await res.json()
         setKeys(data)
       }
     } catch (err) {
-      console.error("Failed to fetch API keys:", err)
+      console.error('Failed to fetch API keys:', err)
     } finally {
       setLoading(false)
     }
@@ -101,13 +152,13 @@ export function ApiTab(): React.ReactElement {
   const fetchEndpoints = useCallback(async () => {
     setEndpointsLoading(true)
     try {
-      const res = await fetch("/api/openapi.json")
+      const res = await fetch('/api/openapi.json')
       if (res.ok) {
         const spec = (await res.json()) as OpenApiSpec
         setEndpointsData(specToEndpoints(spec))
       }
     } catch (err) {
-      console.error("Failed to fetch endpoints:", err)
+      console.error('Failed to fetch endpoints:', err)
     } finally {
       setEndpointsLoading(false)
     }
@@ -116,7 +167,8 @@ export function ApiTab(): React.ReactElement {
   useEffect(() => {
     fetchKeys()
     fetchEndpoints()
-  }, [fetchKeys, fetchEndpoints])
+    fetchRetention()
+  }, [fetchKeys, fetchEndpoints, fetchRetention])
 
   async function fetchLogs(keyId: string) {
     setLogsLoading(keyId)
@@ -124,10 +176,10 @@ export function ApiTab(): React.ReactElement {
       const res = await fetch(`/api/api-keys/${keyId}/logs?limit=20`)
       if (res.ok) {
         const data = await res.json()
-        setLogs(prev => ({ ...prev, [keyId]: data }))
+        setLogs((prev) => ({ ...prev, [keyId]: data }))
       }
     } catch (err) {
-      console.error("Failed to fetch logs:", err)
+      console.error('Failed to fetch logs:', err)
     } finally {
       setLogsLoading(null)
     }
@@ -149,9 +201,9 @@ export function ApiTab(): React.ReactElement {
     setCreating(true)
 
     let expiresAt: string | null = null
-    if (expiry !== "never") {
+    if (expiry !== 'never') {
       const d = new Date()
-      if (expiry === "1h") {
+      if (expiry === '1h') {
         d.setHours(d.getHours() + 1)
       } else {
         const days = parseInt(expiry, 10)
@@ -161,9 +213,9 @@ export function ApiTab(): React.ReactElement {
     }
 
     try {
-      const res = await fetch("/api/api-keys", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/api-keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ label: label.trim(), expiresAt }),
       })
 
@@ -171,12 +223,12 @@ export function ApiTab(): React.ReactElement {
         const data: ApiKeyCreateResponse = await res.json()
         setNewRawKey(data.raw_key)
         setShowKeyDialog(true)
-        setLabel("")
-        setExpiry("never")
+        setLabel('')
+        setExpiry('never')
         await fetchKeys()
       }
     } catch (err) {
-      console.error("Failed to create API key:", err)
+      console.error('Failed to create API key:', err)
     } finally {
       setCreating(false)
     }
@@ -184,10 +236,10 @@ export function ApiTab(): React.ReactElement {
 
   async function handleRevoke(keyId: string) {
     try {
-      await fetch(`/api/api-keys/${keyId}`, { method: "DELETE" })
+      await fetch(`/api/api-keys/${keyId}`, { method: 'DELETE' })
       await fetchKeys()
     } catch (err) {
-      console.error("Failed to revoke API key:", err)
+      console.error('Failed to revoke API key:', err)
     }
   }
 
@@ -198,20 +250,20 @@ export function ApiTab(): React.ReactElement {
   }
 
   function formatDate(dateStr: string | null): string {
-    if (!dateStr) return "Never"
-    return new Date(dateStr).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
+    if (!dateStr) return 'Never'
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
     })
   }
 
   function formatDateTime(dateStr: string): string {
-    return new Date(dateStr).toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
+    return new Date(dateStr).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
     })
   }
 
@@ -224,16 +276,15 @@ export function ApiTab(): React.ReactElement {
     const d = new Date(dateStr)
     const msUntil = d.getTime() - Date.now()
     if (msUntil < 24 * 60 * 60 * 1000) {
-      return d.toLocaleString("en-US", {
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
+      return d.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
       })
     }
     return formatDate(dateStr)
   }
-
 
   return (
     <div className="space-y-6">
@@ -253,7 +304,9 @@ export function ApiTab(): React.ReactElement {
           </div>
           <div className="flex items-end gap-3 pt-2">
             <div className="flex-1">
-              <Label htmlFor="key-label" className="text-xs text-muted-foreground">Label</Label>
+              <Label htmlFor="key-label" className="text-xs text-muted-foreground">
+                Label
+              </Label>
               <Input
                 id="key-label"
                 placeholder="e.g. My Integration"
@@ -280,15 +333,58 @@ export function ApiTab(): React.ReactElement {
             </div>
             <Button onClick={handleCreate} disabled={creating || !label.trim()}>
               <Plus className="h-4 w-4 mr-2" />
-              {creating ? "Generating..." : "Generate Key"}
+              {creating ? 'Generating...' : 'Generate Key'}
             </Button>
+          </div>
+          <div className="flex items-center justify-between gap-4 pt-3 mt-3 border-t">
+            <div className="min-w-0">
+              <Label className="text-xs text-muted-foreground">
+                Keep activity &amp; request logs for
+              </Label>
+              <p className="text-xs text-muted-foreground/80 mt-0.5">
+                {retentionError ?? (
+                  <>
+                    Older entries are removed automatically. Cleanup runs periodically, so entries
+                    may persist a little past this window.
+                  </>
+                )}
+              </p>
+            </div>
+            <div className="w-[140px] shrink-0">
+              <Select
+                value={retentionValue}
+                onValueChange={handleRetentionChange}
+                disabled={retentionSaving || retentionLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {retentionOptions.map((days) => (
+                    <SelectItem key={days} value={String(days)}>
+                      {days} days
+                    </SelectItem>
+                  ))}
+                  {/* A stored window outside the offered list (DB edit, older
+                      options set) still needs an item, or the trigger renders
+                      blank while that window silently stays in effect. */}
+                  {retentionValue !== 'never' &&
+                    !retentionOptions.includes(Number(retentionValue)) && (
+                      <SelectItem value={retentionValue}>{retentionValue} days</SelectItem>
+                    )}
+                  <SelectItem value="never">Never</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-2">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading keys...</p>
           ) : keys.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No API keys yet. Generate one above to get started.</p>
+            <p className="text-sm text-muted-foreground">
+              No API keys yet. Generate one above to get started.
+            </p>
           ) : (
             <div className="space-y-2">
               {keys.map((key) => (
@@ -304,7 +400,9 @@ export function ApiTab(): React.ReactElement {
                           <span className="font-medium text-sm truncate">{key.label}</span>
                           <code className="text-xs text-muted-foreground">{key.key_prefix}...</code>
                           {isExpired(key.expires_at) && (
-                            <Badge variant="destructive" className="text-xs">Expired</Badge>
+                            <Badge variant="destructive" className="text-xs">
+                              Expired
+                            </Badge>
                           )}
                         </div>
                         <div className="flex items-center gap-4 text-xs text-muted-foreground mt-0.5">
@@ -333,12 +431,16 @@ export function ApiTab(): React.ReactElement {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Delete API Key</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This will permanently delete &quot;{key.label}&quot;. Any applications using this key will lose access. This cannot be undone.
+                              This will permanently delete &quot;{key.label}&quot;. Any applications
+                              using this key will lose access. This cannot be undone.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleRevoke(key.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                            <AlertDialogAction
+                              onClick={() => handleRevoke(key.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
                               Delete
                             </AlertDialogAction>
                           </AlertDialogFooter>
@@ -355,7 +457,9 @@ export function ApiTab(): React.ReactElement {
                   {/* Expanded logs */}
                   {expandedKey === key.id && (
                     <div className="border-t px-3 py-3 bg-muted/20">
-                      <p className="text-xs font-medium text-muted-foreground mb-3">Last 20 Requests</p>
+                      <p className="text-xs font-medium text-muted-foreground mb-3">
+                        Last 20 Requests
+                      </p>
                       {logsLoading === key.id ? (
                         <p className="text-xs text-muted-foreground">Loading logs...</p>
                       ) : !logs[key.id] || logs[key.id].length === 0 ? (
@@ -375,25 +479,37 @@ export function ApiTab(): React.ReactElement {
                             </thead>
                             <tbody>
                               {logs[key.id].map((log) => (
-                                <tr key={log.id} className="border-b border-border/50 hover:bg-muted/30">
-                                  <td className="py-1.5 pr-3 text-muted-foreground whitespace-nowrap">{formatDateTime(log.created_at)}</td>
+                                <tr
+                                  key={log.id}
+                                  className="border-b border-border/50 hover:bg-muted/30"
+                                >
+                                  <td className="py-1.5 pr-3 text-muted-foreground whitespace-nowrap">
+                                    {formatDateTime(log.created_at)}
+                                  </td>
                                   <td className="py-1.5 pr-3">
-                                    <Badge variant="secondary" className="text-xs font-mono">{log.method}</Badge>
+                                    <Badge variant="secondary" className="text-xs font-mono">
+                                      {log.method}
+                                    </Badge>
                                   </td>
                                   <td className="py-1.5 pr-3">
                                     <code className="text-xs">{log.endpoint}</code>
                                   </td>
                                   <td className="py-1.5 pr-3">
                                     <Badge
-                                      variant={log.status_code < 400 ? "secondary" : "destructive"}
+                                      variant={log.status_code < 400 ? 'secondary' : 'destructive'}
                                       className="text-xs"
                                     >
                                       {log.status_code}
                                     </Badge>
                                   </td>
-                                  <td className="py-1.5 pr-3 text-muted-foreground">{log.ip_address || "-"}</td>
-                                  <td className="py-1.5 text-muted-foreground max-w-[200px] truncate" title={log.user_agent || undefined}>
-                                    {log.user_agent || "-"}
+                                  <td className="py-1.5 pr-3 text-muted-foreground">
+                                    {log.ip_address || '-'}
+                                  </td>
+                                  <td
+                                    className="py-1.5 text-muted-foreground max-w-[200px] truncate"
+                                    title={log.user_agent || undefined}
+                                  >
+                                    {log.user_agent || '-'}
                                   </td>
                                 </tr>
                               ))}
@@ -407,7 +523,6 @@ export function ApiTab(): React.ReactElement {
               ))}
             </div>
           )}
-
         </CardContent>
       </Card>
 
@@ -448,16 +563,24 @@ export function ApiTab(): React.ReactElement {
                   </p>
                   <div className="space-y-2">
                     {endpointsData.moduleEndpoints.map((endpoint, i) => (
-                      <div key={i} className="flex items-center justify-between p-2 rounded bg-muted/30 border border-green-500/20">
+                      <div
+                        key={i}
+                        className="flex items-center justify-between p-2 rounded bg-muted/30 border border-green-500/20"
+                      >
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="bg-green-500/20 text-green-500 border-green-500/50 text-xs">
+                          <Badge
+                            variant="outline"
+                            className="bg-green-500/20 text-green-500 border-green-500/50 text-xs"
+                          >
                             {endpoint.moduleId}
                           </Badge>
                           <code className="text-xs font-mono">{endpoint.fullPath}</code>
                         </div>
                         <div className="flex items-center gap-1">
-                          {endpoint.methods.map(method => (
-                            <Badge key={method} variant="secondary" className="text-xs">{method}</Badge>
+                          {endpoint.methods.map((method) => (
+                            <Badge key={method} variant="secondary" className="text-xs">
+                              {method}
+                            </Badge>
                           ))}
                         </div>
                       </div>
@@ -475,16 +598,24 @@ export function ApiTab(): React.ReactElement {
                   </p>
                   <div className="space-y-2">
                     {endpointsData.coreEndpoints.map((endpoint, i) => (
-                      <div key={i} className="flex items-center justify-between p-2 rounded bg-muted/30 border border-blue-500/20">
+                      <div
+                        key={i}
+                        className="flex items-center justify-between p-2 rounded bg-muted/30 border border-blue-500/20"
+                      >
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="bg-blue-500/20 text-blue-500 border-blue-500/50 text-xs">
+                          <Badge
+                            variant="outline"
+                            className="bg-blue-500/20 text-blue-500 border-blue-500/50 text-xs"
+                          >
                             Core
                           </Badge>
                           <code className="text-xs font-mono">{endpoint.fullPath}</code>
                         </div>
                         <div className="flex items-center gap-1">
-                          {endpoint.methods.map(method => (
-                            <Badge key={method} variant="secondary" className="text-xs">{method}</Badge>
+                          {endpoint.methods.map((method) => (
+                            <Badge key={method} variant="secondary" className="text-xs">
+                              {method}
+                            </Badge>
                           ))}
                         </div>
                       </div>
@@ -511,18 +642,15 @@ export function ApiTab(): React.ReactElement {
               <code className="flex-1 text-sm bg-muted p-3 rounded-lg font-mono break-all select-all">
                 {newRawKey}
               </code>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => copyToClipboard(newRawKey)}
-              >
+              <Button variant="outline" size="sm" onClick={() => copyToClipboard(newRawKey)}>
                 {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
               </Button>
             </div>
             <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
               <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
               <p className="text-xs text-amber-900 dark:text-amber-200">
-                Store this key securely. It will not be shown again. If you lose it, you&apos;ll need to generate a new one.
+                Store this key securely. It will not be shown again. If you lose it, you&apos;ll
+                need to generate a new one.
               </p>
             </div>
             <div className="text-xs text-muted-foreground space-y-1">

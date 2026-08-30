@@ -92,8 +92,9 @@ export const BetterAuthResponseSchema = z.unknown().openapi('BetterAuthResponse'
 
 export const BootstrapStatusSchema = z.object({
   status: z.enum(['already_initialized', 'no_database', 'install_failed', 'no_users', 'installed', 'created', 'error']),
+  // Sanitised via safeErrorResponse — this endpoint is unauthenticated, so raw
+  // Postgres detail (including pgCode) stays in the server log only.
   error: z.string().optional(),
-  pgCode: z.string().optional(),
 }).openapi('BootstrapStatus')
 
 // ────────────────────────────────────────────────────────────
@@ -194,6 +195,12 @@ export const HealthCheckSchema = z.object({
     message: z.string().optional(),
   })),
 }).openapi('HealthCheck')
+
+export const ApiLoggingSettingsSchema = z.object({
+  retentionDays: z.number().int().positive().nullable(),
+  options: z.array(z.number().int().positive()),
+  default: z.number().int().positive(),
+}).openapi('ApiLoggingSettings')
 
 export const HealthScanCheckSchema = z.object({
   id: z.string(),

@@ -18,6 +18,7 @@ import {
 } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'get',
@@ -53,7 +54,7 @@ registry.registerPath({
  * GET /api/modules
  * Returns all enabled modules for the authenticated user
  */
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   const { user, withRLS } = await getAuthenticatedUser()
 
   // Validate authentication
@@ -87,7 +88,7 @@ export async function GET(request: NextRequest) {
  *
  * Body: { moduleId: string, enabled: boolean }
  */
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   const { user, withRLS } = await getAuthenticatedUser()
 
   // Validate authentication
@@ -150,3 +151,6 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+export const GET = withApiLogging(handleGET)
+export const POST = withApiLogging(handlePOST)

@@ -104,7 +104,14 @@ export function checkIpAllowed(allowedIps: string[] | null, requestIp: string | 
   return false
 }
 
-/** Fire-and-forget — caller should not await this */
+/**
+ * Record one API-key request.
+ *
+ * Returns a promise that always resolves (errors are logged, never thrown), so
+ * callers may either ignore it — the original fire-and-forget contract, still
+ * used by the module proxy — or await it. Awaiting matters inside `after()`,
+ * where an un-awaited promise can be cut off before the write lands.
+ */
 export function recordApiKeyUsage(params: {
   apiKeyId: string
   userId: string
@@ -113,9 +120,8 @@ export function recordApiKeyUsage(params: {
   statusCode: number
   ipAddress: string | null
   userAgent: string | null
-}): void {
-  // Fire-and-forget
-  withAdminDb(async (db) => {
+}): Promise<void> {
+  return withAdminDb(async (db) => {
     await db.insert(apiKeyUsageLogs).values({
       apiKeyId: params.apiKeyId,
       userId: params.userId,

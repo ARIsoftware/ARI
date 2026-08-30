@@ -7,6 +7,7 @@ import { requireAdmin } from "@/lib/api-helpers"
 import { ProjectDirResponseSchema } from "@/lib/openapi/app-schemas"
 import { registry } from "@/lib/openapi/registry"
 import { DEFAULT_SECURITY, ErrorResponseSchema } from "@/lib/openapi/common"
+import { withApiLogging } from '@/lib/api-logging'
 
 export const debugRole = "project-dir"
 
@@ -23,7 +24,7 @@ registry.registerPath({
   },
 })
 
-export async function GET() {
+async function handleGET() {
   const { user } = await getAuthenticatedUser()
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -55,3 +56,5 @@ export async function GET() {
     },
   })
 }
+
+export const GET = withApiLogging(handleGET)

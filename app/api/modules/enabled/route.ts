@@ -10,6 +10,7 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { ListEnabledModulesResponseSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'get',
@@ -25,7 +26,7 @@ registry.registerPath({
   },
 })
 
-export async function GET() {
+async function handleGET() {
   try {
     // Require authentication
     const { user } = await getAuthenticatedUser()
@@ -52,3 +53,5 @@ export async function GET() {
     )
   }
 }
+
+export const GET = withApiLogging(handleGET)

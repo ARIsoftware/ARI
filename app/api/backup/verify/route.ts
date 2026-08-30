@@ -7,6 +7,7 @@ import type { RoleCheck } from '@/app/(app)/settings/types'
 import { BackupVerifyResponseSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, UnauthorizedResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 export const debugRole = "backup-verify"
 
@@ -165,7 +166,7 @@ async function getRowCounts(tables: string[]): Promise<Record<string, number>> {
   return rowCounts
 }
 
-export async function GET(req: NextRequest) {
+async function handleGET(req: NextRequest) {
   try {
     // Authenticate user
     const { user } = await getAuthenticatedUser()
@@ -257,3 +258,5 @@ export async function GET(req: NextRequest) {
     )
   }
 }
+
+export const GET = withApiLogging(handleGET)

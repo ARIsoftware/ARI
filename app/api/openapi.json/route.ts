@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 export const debugRole = 'openapi-spec'
 
@@ -39,7 +40,7 @@ registry.registerPath({
   },
 })
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
+async function handleGET(request: NextRequest): Promise<NextResponse> {
   const { user } = await getAuthenticatedUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -61,3 +62,5 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const serverUrl = process.env.BETTER_AUTH_URL ?? new URL(request.url).origin
   return NextResponse.json({ ...cachedSpec, servers: [{ url: serverUrl }] })
 }
+
+export const GET = withApiLogging(handleGET)

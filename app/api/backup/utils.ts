@@ -23,13 +23,28 @@ export async function queryRows<T = Record<string, unknown>>(
   return result.rows as T[]
 }
 
-/** System/internal tables that should never appear in backups. */
+/**
+ * Tables that should never appear in backups.
+ *
+ * Two groups: PostGIS/system tables, and append-only telemetry. The telemetry
+ * tables are request-rate driven and can dwarf real content, inflating every
+ * backup and slowing the Backups screen's per-table COUNT(*) — and a restore
+ * wants your data, not a replay of who called which endpoint.
+ *
+ * Import does NOT consult this list, so backups taken before a table was added
+ * here still restore intact.
+ *
+ * Keep in sync with public.get_all_user_tables() in lib/db/setup.sql, which
+ * applies the same exclusions server-side.
+ */
 export const EXCLUDED_TABLES = new Set([
   'spatial_ref_sys',
   'schema_migrations',
   'pg_stat_statements',
   'geography_columns',
   'geometry_columns',
+  'activity_log',
+  'api_key_usage_logs',
 ])
 
 /** SHA-256 checksum of JSON-serialized data. Used during export. */

@@ -9,6 +9,7 @@ import {
 } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'get',
@@ -28,7 +29,7 @@ registry.registerPath({
   },
 })
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   try {
     const { user } = await getAuthenticatedUser()
     if (!user) return createErrorResponse('Unauthorized', 401)
@@ -45,3 +46,5 @@ export async function GET(request: NextRequest) {
     return createErrorResponse('Failed to list models', 500)
   }
 }
+
+export const GET = withApiLogging(handleGET)

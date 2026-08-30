@@ -4,6 +4,7 @@ import { getDbMode } from "@/lib/db/mode"
 import { DbModeResponseSchema } from "@/lib/openapi/app-schemas"
 import { registry } from "@/lib/openapi/registry"
 import { DEFAULT_SECURITY, ErrorResponseSchema } from "@/lib/openapi/common"
+import { withApiLogging } from '@/lib/api-logging'
 
 export const debugRole = "system-db-mode"
 
@@ -20,10 +21,12 @@ registry.registerPath({
   },
 })
 
-export async function GET() {
+async function handleGET() {
   const { user } = await getAuthenticatedUser()
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
   return NextResponse.json({ mode: getDbMode() })
 }
+
+export const GET = withApiLogging(handleGET)

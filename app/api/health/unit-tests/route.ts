@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 export const debugRole = 'unit-tests'
 
@@ -176,7 +177,7 @@ const EMPTY = (error: string): UnitTestReport => ({
 
 // ── Handler ─────────────────────────────────────────────────────────────────
 
-export async function GET() {
+async function handleGET() {
   const { user } = await getAuthenticatedUser()
   if (!user) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
@@ -203,3 +204,5 @@ export async function GET() {
     return NextResponse.json({ error: 'Failed to read unit-test report' }, { status: 500 })
   }
 }
+
+export const GET = withApiLogging(handleGET)

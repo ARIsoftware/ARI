@@ -18,6 +18,7 @@ import type { ThemeSettings, CustomTheme, ThemeColors, SidebarView } from '@/lib
 import { ThemeSettingsSchema, updateThemeSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 const THEME_MODULE_ID = 'theme-system'
 
@@ -121,7 +122,7 @@ const DEFAULT_THEME_SETTINGS: ThemeSettings = {
  * GET /api/theme
  * Returns user's theme settings
  */
-export async function GET() {
+async function handleGET() {
   const { user, withRLS } = await getAuthenticatedUser()
 
   if (!user || !withRLS) {
@@ -170,7 +171,7 @@ export async function GET() {
  * PUT /api/theme
  * Updates user's theme settings
  */
-export async function PUT(request: NextRequest) {
+async function handlePUT(request: NextRequest) {
   const { user, withRLS } = await getAuthenticatedUser()
 
   if (!user || !withRLS) {
@@ -246,3 +247,6 @@ export async function PUT(request: NextRequest) {
     )
   }
 }
+
+export const GET = withApiLogging(handleGET)
+export const PUT = withApiLogging(handlePUT)

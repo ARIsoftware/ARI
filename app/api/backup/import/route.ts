@@ -9,6 +9,7 @@ import { safeErrorResponse } from '@/lib/api-error'
 import { BackupImportRequestSchema, BackupImportResponseSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, UnauthorizedResponse } from '@/lib/openapi/common'
+import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
   method: 'post',
@@ -250,7 +251,7 @@ async function executeInTransaction(
   }
 }
 
-export async function POST(req: NextRequest) {
+async function handlePOST(req: NextRequest) {
   try {
     // Authenticate user
     const { user, withRLS } = await getAuthenticatedUser()
@@ -424,7 +425,7 @@ export async function POST(req: NextRequest) {
 }
 
 // Validation endpoint - separate from import
-export async function PUT(req: NextRequest) {
+async function handlePUT(req: NextRequest) {
   try {
     const { user, withRLS } = await getAuthenticatedUser()
 
@@ -460,3 +461,6 @@ export async function PUT(req: NextRequest) {
     )
   }
 }
+
+export const POST = withApiLogging(handlePOST)
+export const PUT = withApiLogging(handlePUT)
