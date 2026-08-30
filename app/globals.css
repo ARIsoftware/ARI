@@ -615,7 +615,8 @@
  * ============================================================ */
 
 .mini-sidebar [data-sidebar="menu-button"] > *:not(:first-child),
-.mini-sidebar [data-sidebar="group-label"] {
+.mini-sidebar [data-sidebar="group-label"],
+.mini-sidebar [data-sidebar="version"] {
   transition: opacity 150ms ease;
 }
 
@@ -627,6 +628,9 @@
 }
 
 .mini-sidebar[data-mini-expanded="false"] [data-sidebar="menu-button"] > *:not(:first-child),
-.mini-sidebar[data-mini-expanded="false"] [data-sidebar="group-label"] {
+.mini-sidebar[data-mini-expanded="false"] [data-sidebar="group-label"],
+/* The version stamp is wider than the rail — hidden while collapsed, fading in
+ * with the labels on hover rather than popping in. */
+.mini-sidebar[data-mini-expanded="false"] [data-sidebar="version"] {
   opacity: 0;
 }

@@ -432,11 +432,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     : undefined
   const submenuToShow = mobileSubmenuModule ?? (showMainMenu ? undefined : activeSubmenuModule)
 
-  // Version stamp shown at the bottom of the full menu (Default / Compressed /
-  // the Mini hover panel — the icon rail is too narrow for it).
+  // Version stamp pinned to the bottom of the full menu (Default / Compressed /
+  // the Mini hover panel). In Mini it stays mounted and is faded out by the
+  // .mini-sidebar rules while the rail is collapsed — same treatment as the row
+  // labels, so it transitions in with them rather than popping.
   const versionFooter = (
     <div
-      className="mt-auto px-4 py-2 text-[10px] text-muted-foreground/60 font-mono select-none"
+      data-sidebar="version"
+      className="mt-auto px-4 py-2 text-[10px] text-muted-foreground/60 font-mono select-none whitespace-nowrap"
       title={`commit ${process.env.NEXT_PUBLIC_ARI_COMMIT}`}
     >
       ARI {process.env.NEXT_PUBLIC_ARI_VERSION}
@@ -488,10 +491,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 showGroupLabels={false}
                 onItemClick={handleMainItemClick}
               />
-              {/* Too wide for the rail — only shown once expanded */}
-              {miniExpanded && versionFooter}
             </>
           )}
+          {/* Outside the ternary so it shows for module submenus too, matching
+              the full-menu branch below. Faded out while the rail is collapsed. */}
+          {versionFooter}
         </SidebarContent>
         <SidebarRail />
       </Sidebar>
