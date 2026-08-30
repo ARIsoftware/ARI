@@ -40,7 +40,8 @@
   "topBarIcon": {
     "icon": "Hand",
     "route": "/module-template",
-    "tooltip": "Module Template"
+    "tooltip": "Module Template",
+    "order": 20
   },
   "submenu": {
     "component": "./components/sidebar-submenu.tsx"

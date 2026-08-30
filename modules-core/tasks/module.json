@@ -49,6 +49,10 @@
   "submenu": {
     "component": "./components/sidebar-submenu.tsx"
   },
+  "topBarIcon": {
+    "component": "./components/top-bar-icon.tsx",
+    "order": 35
+  },
   "globalProvider": {
     "component": "./components/quick-add-task-sheet.tsx",
     "exportName": "QuickAddTaskProvider"

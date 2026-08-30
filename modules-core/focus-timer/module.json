@@ -8,6 +8,7 @@
   "enabled": true,
   "routes": [],
   "topBarIcon": {
-    "component": "./components/top-bar-icon.tsx"
+    "component": "./components/top-bar-icon.tsx",
+    "order": 10
   }
 }

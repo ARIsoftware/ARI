@@ -42,7 +42,8 @@
   "topBarIcon": {
     "icon": "Newspaper",
     "route": "/morning-brief",
-    "tooltip": "Morning Brief"
+    "tooltip": "Morning Brief",
+    "order": 30
   },
   "submenu": {
     "component": "./components/sidebar-submenu.tsx"

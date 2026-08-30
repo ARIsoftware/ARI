@@ -112,10 +112,14 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
     ...BUILTIN_ICONS.map(icon => ({ id: icon.id, type: "builtin" as const, builtinId: icon.id })),
   ]
 
-  // Sort icons by saved order (lower number = earlier position)
+  // Sort icons by saved order (lower number = earlier position).
+  // Icons the user hasn't positioned fall back to the module manifest's
+  // topBarIcon.order, then 50.
+  const defaultOrder = (icon: (typeof allIcons)[0]) =>
+    (icon.type === "module" ? icon.module.topBarIcon?.order : undefined) ?? 50
   const sortedIcons = [...allIcons].sort((a, b) => {
-    const orderA = iconOrder?.[a.id] ?? 50
-    const orderB = iconOrder?.[b.id] ?? 50
+    const orderA = iconOrder?.[a.id] ?? defaultOrder(a)
+    const orderB = iconOrder?.[b.id] ?? defaultOrder(b)
     return orderA - orderB
   })
 

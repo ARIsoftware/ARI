@@ -30,7 +30,8 @@
     "tables": ["music_playlist"]
   },
   "topBarIcon": {
-    "component": "./components/top-bar-icon.tsx"
+    "component": "./components/top-bar-icon.tsx",
+    "order": 33
   },
   "globalProvider": {
     "component": "./components/music-player-context.tsx",

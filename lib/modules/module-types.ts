@@ -88,6 +88,8 @@ export interface ModuleTopBarIcon {
   tooltip?: string
   /** Path to a custom component file (e.g., "./components/my-top-bar-icon.tsx") */
   component?: string
+  /** Default sort position in the top bar (lower = further left, default 50). A user's saved drag order overrides this. */
+  order?: number
 }
 
 /**

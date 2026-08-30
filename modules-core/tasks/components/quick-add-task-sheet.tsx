@@ -37,7 +37,9 @@ interface QuickAddTaskContextType {
   setOpen: (open: boolean) => void
 }
 
-const QuickAddTaskContext = createContext<QuickAddTaskContextType | null>(null)
+// Exported so components outside the tasks module (e.g. dashboards) can
+// read it with useContext and fall back gracefully when tasks is disabled.
+export const QuickAddTaskContext = createContext<QuickAddTaskContextType | null>(null)
 
 export function useQuickAddTask() {
   const context = useContext(QuickAddTaskContext)
@@ -390,7 +392,7 @@ export function QuickAddTaskProvider({ children }: { children: React.ReactNode }
           <SheetHeader className="mb-4">
             <SheetTitle className="flex items-center gap-2">
               <Plus className="w-5 h-5" />
-              Quick Add Task
+              Add Task
             </SheetTitle>
             <SheetDescription>
               Create a new task without leaving your current page.

@@ -29,7 +29,7 @@ const KEYBINDINGS: KeyBinding[] = [
   {
     id: "quick-add-task",
     keys: ["Ctrl", "⇧", "L"],
-    description: "Open quick add task panel",
+    description: "Open the add task panel",
   },
 ]
 

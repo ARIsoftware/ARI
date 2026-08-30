@@ -62,6 +62,7 @@ interface GeneratedManifest {
       route?: string
       tooltip?: string
       component?: string
+      order?: number
     }
     path: string
     sourceDir: string
