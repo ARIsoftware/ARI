@@ -5,10 +5,11 @@ import {
   incrementCompletionSchema,
   IncrementCompletionResponseSchema,
 } from '@/modules/tasks/lib/validation'
+import { visibleTo } from '@/modules/tasks/lib/task-query'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 import { tasks } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 
 registry.registerPath({
   method: 'post',
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
     const taskData = await withRLS((db) =>
       db.select({ completionCount: tasks.completionCount })
         .from(tasks)
-        .where(eq(tasks.id, taskId))
+        .where(and(eq(tasks.id, taskId), visibleTo(user.id)))
         .limit(1)
     )
 
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
           completionCount: newCount,
           updatedAt: new Date().toISOString()
         })
-        .where(eq(tasks.id, taskId))
+        .where(and(eq(tasks.id, taskId), visibleTo(user.id)))
     )
 
     return NextResponse.json({ success: true, completion_count: newCount })

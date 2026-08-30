@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   priority TEXT DEFAULT 'Medium',
   pinned BOOLEAN DEFAULT FALSE,
   completed BOOLEAN DEFAULT FALSE,
+  is_private BOOLEAN DEFAULT FALSE,
   deleted BOOLEAN DEFAULT FALSE,
   deleted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -52,6 +53,11 @@ ALTER TABLE tasks ADD COLUMN IF NOT EXISTS assigned_agent_id TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS deleted BOOLEAN DEFAULT FALSE;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
+-- Per-record privacy (multi-user): a masked task is visible only to its owner.
+-- Tasks stay a SHARED table; this flag carves single records out of the shared
+-- view. Only the owner may toggle it (enforced in the API).
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS is_private BOOLEAN DEFAULT FALSE;
+
 -- Completion timestamp: stamped when a task is marked complete, cleared when it
 -- is un-completed. Powers the Analytics page (completions-per-day, streaks). We
 -- backfill existing completed rows from updated_at so the history isn't empty on
@@ -84,9 +90,12 @@ CREATE INDEX IF NOT EXISTS idx_tasks_user_id_updated_at ON tasks(user_id, update
 
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 
+-- Shared table with per-record privacy: masked (is_private) rows are only
+-- visible/mutable by their owner. Defense-in-depth — the API applies the same
+-- predicate explicitly (the default role has BYPASSRLS).
 DROP POLICY IF EXISTS tasks_rls_select ON tasks;
 CREATE POLICY tasks_rls_select ON tasks FOR SELECT
-  USING (app.can_access_shared());
+  USING (app.can_access_shared() AND (is_private IS NOT TRUE OR user_id::text = (SELECT current_setting('app.current_user_id'))));
 
 DROP POLICY IF EXISTS tasks_rls_insert ON tasks;
 CREATE POLICY tasks_rls_insert ON tasks FOR INSERT
@@ -94,11 +103,11 @@ CREATE POLICY tasks_rls_insert ON tasks FOR INSERT
 
 DROP POLICY IF EXISTS tasks_rls_update ON tasks;
 CREATE POLICY tasks_rls_update ON tasks FOR UPDATE
-  USING (app.can_access_shared());
+  USING (app.can_access_shared() AND (is_private IS NOT TRUE OR user_id::text = (SELECT current_setting('app.current_user_id'))));
 
 DROP POLICY IF EXISTS tasks_rls_delete ON tasks;
 CREATE POLICY tasks_rls_delete ON tasks FOR DELETE
-  USING (app.can_access_shared());
+  USING (app.can_access_shared() AND (is_private IS NOT TRUE OR user_id::text = (SELECT current_setting('app.current_user_id'))));
 
 -- =============================================================================
 -- SUBTASKS

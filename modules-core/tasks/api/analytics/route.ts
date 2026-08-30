@@ -5,7 +5,7 @@ import { analyticsQuerySchema, AnalyticsResponseSchema } from '@/modules/tasks/l
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 import { tasks } from '@/lib/db/schema'
-import { notDeleted } from '@/modules/tasks/lib/task-query'
+import { notDeleted, visibleTo } from '@/modules/tasks/lib/task-query'
 import { eq, and, gte, lte, isNotNull } from 'drizzle-orm'
 
 registry.registerPath({
@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
         .where(
           and(
             notDeleted(),
+            visibleTo(user.id),
             gte(tasks.createdAt, startDate.toISOString()),
             lte(tasks.createdAt, endDate.toISOString())
           )
@@ -68,6 +69,7 @@ export async function GET(request: NextRequest) {
           and(
             eq(tasks.completed, true),
             notDeleted(),
+            visibleTo(user.id),
             isNotNull(tasks.completedAt),
             gte(tasks.completedAt, startDate.toISOString()),
             lte(tasks.completedAt, endDate.toISOString())

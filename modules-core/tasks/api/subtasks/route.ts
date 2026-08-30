@@ -14,7 +14,8 @@ import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 import type { DrizzleDb } from '@/lib/db'
 import { tasks, taskSubtasks } from '@/lib/db/schema'
-import { eq, asc, sql } from 'drizzle-orm'
+import { and, eq, asc, sql } from 'drizzle-orm'
+import { visibleTo, parentTaskVisibleTo } from '@/modules/tasks/lib/task-query'
 
 const MAX_SUBTASKS_PER_TASK = 100
 
@@ -103,7 +104,8 @@ async function lockParentTask(db: DrizzleDb, userId: string, taskId: string): Pr
   const rows = await db
     .select({ id: tasks.id })
     .from(tasks)
-    .where(eq(tasks.id, taskId))
+    // visibleTo: a task masked by another user cannot have subtasks touched
+    .where(and(eq(tasks.id, taskId), visibleTo(userId)))
     .for('update')
   return rows.length > 0
 }
@@ -116,7 +118,11 @@ async function lockParentTask(db: DrizzleDb, userId: string, taskId: string): Pr
  * transaction already holds (the POST path) is a no-op.
  */
 async function recountParent(db: DrizzleDb, userId: string, taskId: string) {
-  await lockParentTask(db, userId, taskId)
+  // Honour the lock result: if the parent is masked by another user we must not
+  // touch its counters or updated_at. lockParentTask already applies visibleTo.
+  const parentVisible = await lockParentTask(db, userId, taskId)
+  if (!parentVisible) return
+
   await db
     .update(tasks)
     .set({
@@ -124,7 +130,9 @@ async function recountParent(db: DrizzleDb, userId: string, taskId: string) {
       subtasksCompleted: sql<number>`(select (count(*) filter (where completed))::int from task_subtasks where task_id = ${taskId})`,
       updatedAt: new Date().toISOString(),
     })
-    .where(eq(tasks.id, taskId))
+    // visibleTo repeated here so the write carries the predicate itself, not
+    // just the preceding read — the API filter is the real tenant boundary.
+    .where(and(eq(tasks.id, taskId), visibleTo(userId)))
 }
 
 export async function GET(request: NextRequest) {
@@ -148,8 +156,8 @@ export async function GET(request: NextRequest) {
         .from(taskSubtasks)
         .where(
           task_id
-            ? eq(taskSubtasks.taskId, task_id)
-            : undefined
+            ? and(eq(taskSubtasks.taskId, task_id), parentTaskVisibleTo(user.id))
+            : parentTaskVisibleTo(user.id)
         )
         .orderBy(asc(taskSubtasks.orderIndex), asc(taskSubtasks.createdAt))
     )
@@ -246,7 +254,9 @@ export async function PUT(request: NextRequest) {
       const rows = await db
         .update(taskSubtasks)
         .set(updateData)
-        .where(eq(taskSubtasks.id, id))
+        // parentTaskVisibleTo: holding a subtask id must not be enough to edit
+        // a subtask whose parent task is masked by another user.
+        .where(and(eq(taskSubtasks.id, id), parentTaskVisibleTo(user.id)))
         .returning()
 
       if (rows.length === 0) return { ok: false as const }
@@ -285,7 +295,9 @@ export async function DELETE(request: NextRequest) {
     const result = await withRLS(async (db) => {
       const rows = await db
         .delete(taskSubtasks)
-        .where(eq(taskSubtasks.id, id))
+        // Same privacy predicate as PUT — a subtask of a task masked by another
+        // user must not be deletable just by knowing its id.
+        .where(and(eq(taskSubtasks.id, id), parentTaskVisibleTo(user.id)))
         .returning()
 
       if (rows.length === 0) return { ok: false as const }

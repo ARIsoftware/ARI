@@ -14,6 +14,9 @@ export const tasks = pgTable("tasks", {
 	priority: text().default('Medium'),
 	pinned: boolean().default(false),
 	completed: boolean().default(false),
+	// Per-record privacy: a masked task is visible only to its owner (user_id).
+	// Reads must add the visibleTo() predicate from lib/task-query.ts.
+	isPrivate: boolean("is_private").default(false),
 	deleted: boolean().default(false),
 	deletedAt: timestamp("deleted_at", { withTimezone: true, mode: 'string' }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),

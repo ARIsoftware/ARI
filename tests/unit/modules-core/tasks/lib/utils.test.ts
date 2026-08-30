@@ -22,6 +22,7 @@ import {
   deleteTask,
   toggleTaskCompletion,
   toggleTaskPin,
+  toggleTaskMask,
   createSubtask,
   updateSubtask,
   deleteSubtask,
@@ -277,6 +278,42 @@ describe('toggleTaskPin', () => {
   it('throws when fetch fails', async () => {
     mockFetch({ error: 'fail' }, false, 500)
     await expect(toggleTaskPin('task-1')).rejects.toThrow('fail')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// toggleTaskMask (per-record privacy)
+// ---------------------------------------------------------------------------
+describe('toggleTaskMask', () => {
+  it('flips is_private=false to true with a single PUT (no list pre-fetch)', async () => {
+    const toggled = makeTask({ id: 'task-1', is_private: true })
+    const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(toggled) })
+    vi.stubGlobal('fetch', fetchMock)
+    const result = await toggleTaskMask({ id: 'task-1', is_private: false })
+    expect(result.is_private).toBe(true)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).updates.is_private).toBe(true)
+  })
+
+  it('flips is_private=true back to false', async () => {
+    const toggled = makeTask({ id: 'task-1', is_private: false })
+    const fetchMock = vi.fn().mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(toggled) })
+    vi.stubGlobal('fetch', fetchMock)
+    const result = await toggleTaskMask({ id: 'task-1', is_private: true })
+    expect(result.is_private).toBe(false)
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).updates.is_private).toBe(false)
+  })
+
+  it('treats a missing is_private as shared and flips it to private', async () => {
+    const toggled = makeTask({ id: 'task-1', is_private: true })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(toggled) }))
+    const result = await toggleTaskMask({ id: 'task-1' })
+    expect(result.is_private).toBe(true)
+  })
+
+  it('throws when the update fails', async () => {
+    mockFetch({ error: 'fail' }, false, 500)
+    await expect(toggleTaskMask({ id: 'task-1', is_private: false })).rejects.toThrow('fail')
   })
 })
 

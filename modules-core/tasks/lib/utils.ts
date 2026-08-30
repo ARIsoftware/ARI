@@ -1,6 +1,6 @@
-import { type Task, type Subtask, type CreateTaskInput } from "@/modules/tasks/types"
-import { format } from "date-fns"
-import { incrementTaskCompletion } from "@/lib/fitness-stats"
+import { type Task, type Subtask, type CreateTaskInput } from '@/modules/tasks/types'
+import { format } from 'date-fns'
+import { incrementTaskCompletion } from '@/lib/fitness-stats'
 
 export type { Task, Subtask, CreateTaskInput }
 
@@ -10,7 +10,7 @@ export type { Task, Subtask, CreateTaskInput }
  * timezones east of UTC.
  */
 export function toDueDateString(date: Date | undefined): string | null {
-  return date ? format(date, "yyyy-MM-dd") : null
+  return date ? format(date, 'yyyy-MM-dd') : null
 }
 
 /** Dot color for an agent's status — shared by AssignedAgentBadge and the assignee picker. */
@@ -32,7 +32,7 @@ export async function recordTaskCompleted(id: string): Promise<void> {
   try {
     await incrementTaskCompletion(id)
   } catch (error) {
-    console.error("Failed to increment completion count:", error)
+    console.error('Failed to increment completion count:', error)
   }
 }
 
@@ -41,7 +41,7 @@ export async function getTasks(): Promise<Task[]> {
 
   if (!response.ok) {
     const error = await response.json()
-    console.error("Error fetching tasks:", error)
+    console.error('Error fetching tasks:', error)
     throw new Error(error.error || 'Failed to fetch tasks')
   }
 
@@ -59,7 +59,7 @@ export async function createTask(task: CreateTaskInput): Promise<Task> {
 
   if (!response.ok) {
     const error = await response.json()
-    console.error("Error creating task:", error)
+    console.error('Error creating task:', error)
     throw new Error(error.error || 'Failed to create task')
   }
 
@@ -77,7 +77,7 @@ export async function updateTask(id: string, updates: Partial<Task>): Promise<Ta
 
   if (!response.ok) {
     const error = await response.json()
-    console.error("Error updating task:", error)
+    console.error('Error updating task:', error)
     throw new Error(error.error || 'Failed to update task')
   }
 
@@ -91,7 +91,7 @@ export async function deleteTask(id: string): Promise<void> {
 
   if (!response.ok) {
     const error = await response.json()
-    console.error("Error deleting task:", error)
+    console.error('Error deleting task:', error)
     throw new Error(error.error || 'Failed to delete task')
   }
 }
@@ -101,7 +101,7 @@ export async function toggleTaskCompletion(id: string): Promise<Task> {
 
   if (!response.ok) {
     const error = await response.json()
-    console.error("Error fetching tasks:", error)
+    console.error('Error fetching tasks:', error)
     throw new Error(error.error || 'Failed to fetch tasks')
   }
 
@@ -113,7 +113,7 @@ export async function toggleTaskCompletion(id: string): Promise<Task> {
   }
 
   const newCompleted = !currentTask.completed
-  const newStatus = newCompleted ? "Completed" : "Pending"
+  const newStatus = newCompleted ? 'Completed' : 'Pending'
 
   const updatedTask = await updateTask(id, {
     completed: newCompleted,
@@ -132,7 +132,7 @@ export async function toggleTaskPin(id: string): Promise<Task> {
 
   if (!response.ok) {
     const error = await response.json()
-    console.error("Error fetching tasks:", error)
+    console.error('Error fetching tasks:', error)
     throw new Error(error.error || 'Failed to fetch tasks')
   }
 
@@ -148,6 +148,15 @@ export async function toggleTaskPin(id: string): Promise<Task> {
   })
 }
 
+// Takes the task object (not just the id): every call site already holds the
+// row, so flipping the bit directly avoids a full-list pre-fetch and the
+// read-modify-write race that comes with it.
+export async function toggleTaskMask(task: Pick<Task, 'id' | 'is_private'>): Promise<Task> {
+  return updateTask(task.id, {
+    is_private: !task.is_private,
+  })
+}
+
 export async function createSubtask(taskId: string, title: string): Promise<Subtask> {
   const response = await fetch('/api/modules/tasks/subtasks', {
     method: 'POST',
@@ -159,7 +168,7 @@ export async function createSubtask(taskId: string, title: string): Promise<Subt
 
   if (!response.ok) {
     const error = await response.json()
-    console.error("Error creating subtask:", error)
+    console.error('Error creating subtask:', error)
     throw new Error(error.error || 'Failed to create subtask')
   }
 
@@ -168,7 +177,7 @@ export async function createSubtask(taskId: string, title: string): Promise<Subt
 
 export async function updateSubtask(
   id: string,
-  updates: { title?: string; completed?: boolean; order_index?: number }
+  updates: { title?: string; completed?: boolean; order_index?: number },
 ): Promise<Subtask> {
   const response = await fetch('/api/modules/tasks/subtasks', {
     method: 'PUT',
@@ -180,7 +189,7 @@ export async function updateSubtask(
 
   if (!response.ok) {
     const error = await response.json()
-    console.error("Error updating subtask:", error)
+    console.error('Error updating subtask:', error)
     throw new Error(error.error || 'Failed to update subtask')
   }
 
@@ -194,7 +203,7 @@ export async function deleteSubtask(id: string): Promise<void> {
 
   if (!response.ok) {
     const error = await response.json()
-    console.error("Error deleting subtask:", error)
+    console.error('Error deleting subtask:', error)
     throw new Error(error.error || 'Failed to delete subtask')
   }
 }
@@ -213,13 +222,13 @@ export async function reorderTasks(taskIds: string[]): Promise<void> {
       },
       body: JSON.stringify({
         id: update.id,
-        updates: { order_index: update.order_index }
+        updates: { order_index: update.order_index },
       }),
     })
 
     if (!response.ok) {
       const error = await response.json()
-      console.error("Error updating task order:", error)
+      console.error('Error updating task order:', error)
       throw new Error(error.error || 'Failed to update task order')
     }
   }

@@ -31,6 +31,8 @@ export const createTaskSchema = z.object({
       z.null()
     ]).optional(),
     pinned: z.boolean().default(false),
+    // Per-record privacy: the creator owns the task, so they may create it masked
+    is_private: z.boolean().default(false),
     completed: z.boolean().default(false),
     impact: z.number().min(1).max(5).default(3).optional(),
     severity: z.number().min(1).max(5).default(3).optional(),
@@ -58,6 +60,8 @@ export const updateTaskSchema = z.object({
       z.null()
     ]).optional(),
     pinned: z.boolean().optional(),
+    // Per-record privacy: owner-only (the API rejects non-owner changes)
+    is_private: z.boolean().optional(),
     completed: z.boolean().optional(),
     deleted: z.boolean().optional(),
     impact: z.number().min(1).max(5).optional(),
@@ -85,6 +89,7 @@ export const TaskSchema = z.object({
   status: z.string().nullable(),
   priority: z.string().nullable(),
   pinned: z.boolean().nullable(),
+  is_private: z.boolean().nullable(),
   completed: z.boolean().nullable(),
   deleted: z.boolean().nullable(),
   deleted_at: z.string().nullable(),

@@ -6,7 +6,7 @@ import { hash as argon2Hash, verify as argon2Verify } from "@node-rs/argon2"
 import { pool } from "@/lib/db/pool"
 // Regenerated on every predev/prebuild — reflects the modules actually on
 // disk in this build (same pattern as middleware.ts).
-import moduleManifest from "@/lib/generated/module-manifest.json"
+import { isMultiUserInstall } from "@/lib/multi-user"
 import { getAriInstance, tryClaimFirstSigninPing } from "@/lib/telemetry/instance"
 import { sendTvConnect } from "@/lib/telemetry/send-tv-connect"
 import { logActivity } from "@/lib/activity-log"
@@ -156,9 +156,7 @@ export const auth = betterAuth({
           // not the per-user enabled flag: installing the module is the key
           // that unlocks multi-user. The module's own admin API inserts user
           // rows directly (not via Better Auth), so it is unaffected here.
-          const multiUserInstalled = moduleManifest.modules.some(
-            (m: { id: string }) => m.id === "ari-users"
-          )
+          const multiUserInstalled = isMultiUserInstall()
           if (pool && !multiUserInstalled) {
             let hasUsers = false
             try {

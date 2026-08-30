@@ -31,7 +31,7 @@ import { getUserTimeZone } from '@/modules/tasks/lib/server'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 import { tasks } from '@/lib/db/schema'
-import { notDeleted } from '@/modules/tasks/lib/task-query'
+import { notDeleted, visibleTo } from '@/modules/tasks/lib/task-query'
 import { and, eq, desc, isNotNull, count, sql } from 'drizzle-orm'
 
 const CHART_DAYS = 84 // ~12 weeks of daily bars
@@ -82,6 +82,7 @@ export async function GET() {
           and(
             eq(tasks.completed, true),
             notDeleted(),
+            visibleTo(user.id),
             isNotNull(tasks.completedAt),
           ),
         )
@@ -90,7 +91,7 @@ export async function GET() {
       const openAgg = await db
         .select({ c: count() })
         .from(tasks)
-        .where(and(eq(tasks.completed, false), notDeleted()))
+        .where(and(eq(tasks.completed, false), notDeleted(), visibleTo(user.id)))
 
       const overdueAgg = await db
         .select({ c: count() })
@@ -99,6 +100,7 @@ export async function GET() {
           and(
             eq(tasks.completed, false),
             notDeleted(),
+            visibleTo(user.id),
             sql`${tasks.dueDate} < ${today}`,
           ),
         )
@@ -106,7 +108,7 @@ export async function GET() {
       const totalAgg = await db
         .select({ c: count() })
         .from(tasks)
-        .where(notDeleted())
+        .where(and(notDeleted(), visibleTo(user.id)))
 
       return {
         completedRows: completed,

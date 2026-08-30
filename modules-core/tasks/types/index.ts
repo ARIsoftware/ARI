@@ -9,6 +9,10 @@ export type Task = {
   status: "Pending" | "In Progress" | "Completed"
   priority: "Low" | "Medium" | "High"
   pinned: boolean
+  // Per-record privacy (multi-user): a private task is visible only to its
+  // owner (user_id). Toggled via the eye icon; owner-only, API-enforced.
+  is_private?: boolean
+  user_id?: string
   completed: boolean
   // Soft delete: true means the task is hidden from normal views and lives in
   // the "Deleted" tab until it is permanently removed. deleted_at is stamped at

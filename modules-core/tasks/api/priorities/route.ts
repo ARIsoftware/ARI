@@ -13,7 +13,7 @@ import {
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 import { tasks } from '@/lib/db/schema'
-import { notDeleted } from '@/modules/tasks/lib/task-query'
+import { notDeleted, visibleTo } from '@/modules/tasks/lib/task-query'
 import { eq, desc, inArray, and } from 'drizzle-orm'
 
 // Force dynamic rendering - no caching
@@ -85,8 +85,8 @@ export async function GET(request: NextRequest) {
     // The radar never shows soft-deleted tasks. Optionally narrow to a
     // completion state on top of the not-deleted filter.
     const whereClause = parsed.data.completed
-      ? and(notDeleted(), eq(tasks.completed, parsed.data.completed === 'true'))
-      : notDeleted()
+      ? and(notDeleted(), visibleTo(user.id), eq(tasks.completed, parsed.data.completed === 'true'))
+      : and(notDeleted(), visibleTo(user.id))
 
     const data = await withRLS((db) => {
       let q = db
@@ -136,7 +136,7 @@ export async function PUT(request: NextRequest) {
           priorityScore: String(priorityScore),
           updatedAt: new Date().toISOString()
         })
-        .where(eq(tasks.id, taskId))
+        .where(and(eq(tasks.id, taskId), visibleTo(user.id)))
         .returning()
     )
 
@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
           strategicFit: tasks.strategicFit,
         })
         .from(tasks)
-        .where(inArray(tasks.id, taskIds))
+        .where(and(inArray(tasks.id, taskIds), visibleTo(user.id)))
 
       return Promise.all(
         rows.map(async (row) => {

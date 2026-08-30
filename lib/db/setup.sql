@@ -406,21 +406,30 @@ CREATE TABLE IF NOT EXISTS "tasks" (
   "assigned_agent_id" TEXT,
   PRIMARY KEY ("id")
 );
--- Additive upgrade for installs that predate this column.
+-- Additive upgrade for installs that predate these columns.
 ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "assigned_agent_id" TEXT;
+-- Per-record privacy. Defined here as well as in the tasks module's schema.sql
+-- because this file re-runs on EVERY boot while the module's schema only runs
+-- when the module is enabled — so the two policy sets must state the same
+-- predicate or boot silently reverts the module's privacy rules.
+ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "is_private" BOOLEAN DEFAULT FALSE;
 ALTER TABLE "tasks" ENABLE ROW LEVEL SECURITY;
+-- Shared table with per-record privacy: masked (is_private) rows are only
+-- visible/mutable by their owner. Defense-in-depth — the API applies the same
+-- predicate explicitly (the default role has BYPASSRLS).
+-- Keep in lockstep with modules-core/tasks/database/schema.sql.
 DROP POLICY IF EXISTS "tasks_rls_select" ON "tasks";
 CREATE POLICY "tasks_rls_select" ON "tasks" FOR SELECT TO public
-  USING (app.can_access_shared());
+  USING (app.can_access_shared() AND (is_private IS NOT TRUE OR user_id::text = (SELECT current_setting('app.current_user_id'))));
 DROP POLICY IF EXISTS "tasks_rls_insert" ON "tasks";
 CREATE POLICY "tasks_rls_insert" ON "tasks" FOR INSERT TO public
   WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
 DROP POLICY IF EXISTS "tasks_rls_update" ON "tasks";
 CREATE POLICY "tasks_rls_update" ON "tasks" FOR UPDATE TO public
-  USING (app.can_access_shared());
+  USING (app.can_access_shared() AND (is_private IS NOT TRUE OR user_id::text = (SELECT current_setting('app.current_user_id'))));
 DROP POLICY IF EXISTS "tasks_rls_delete" ON "tasks";
 CREATE POLICY "tasks_rls_delete" ON "tasks" FOR DELETE TO public
-  USING (app.can_access_shared());
+  USING (app.can_access_shared() AND (is_private IS NOT TRUE OR user_id::text = (SELECT current_setting('app.current_user_id'))));
 
 -- Table: quotes
 CREATE TABLE IF NOT EXISTS "quotes" (
