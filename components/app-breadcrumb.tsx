@@ -18,8 +18,8 @@ import {
  *
  *   /modules         -> "Modules"
  *   /settings        -> "Settings"
+ *   /dashboard       -> "Dashboard"
  *   /<module>[/...]  -> "Dashboard > <module display name>"
- *   /dashboard       -> "Dashboard > Dashboard"  (pre-existing quirk, preserved)
  *
  * It reads usePathname() so it re-renders on soft navigation even though the
  * server layout above it does not. The modules list is server-seeded via
@@ -31,9 +31,11 @@ export function AppBreadcrumb() {
 
   const segment = pathname.split("/").filter(Boolean)[0] ?? ""
 
-  // Static top-level pages inside the group render a single label.
-  if (segment === "modules" || segment === "settings") {
-    const label = segment === "modules" ? "Modules" : "Settings"
+  // Static top-level pages inside the group render a single label. Dashboard
+  // included — "Dashboard > Dashboard" would just repeat itself.
+  if (segment === "modules" || segment === "settings" || segment === "dashboard") {
+    const label =
+      segment === "modules" ? "Modules" : segment === "settings" ? "Settings" : "Dashboard"
     return (
       <Breadcrumb>
         <BreadcrumbList>
