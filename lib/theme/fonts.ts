@@ -69,6 +69,11 @@ export const FONTS: FontOption[] = [
     family: '"Hanken Grotesk", sans-serif',
   },
   {
+    id: 'space-grotesk',
+    name: 'Space Grotesk',
+    family: '"Space Grotesk", sans-serif',
+  },
+  {
     id: 'press-start-2p',
     name: 'Press Start 2P',
     family: '"Press Start 2P", monospace',
@@ -76,7 +81,7 @@ export const FONTS: FontOption[] = [
 ]
 
 // Default font ID
-export const DEFAULT_FONT_ID = 'overpass-mono'
+export const DEFAULT_FONT_ID = 'space-grotesk'
 
 // Helper to get a font by ID
 export function getFontById(id: string): FontOption | undefined {
