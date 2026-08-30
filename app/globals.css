@@ -474,6 +474,16 @@
   border-color: hsl(214 32% 91%);
 }
 
+/* Enabled pin / privacy-eye toggles are Sovereign blue (#00a9ff). The tasks
+ * components read `--task-toggle-accent` with a fallback to their normal
+ * primary tokens (see modules-core/tasks/components/task-row-actions.tsx), so
+ * a theme only has to define the token — no per-icon selectors, no coupling
+ * to lucide class names or fill attributes. HSL components, like every other
+ * theme token. */
+[data-theme="sovereign-day"] {
+  --task-toggle-accent: 200 100% 50%;
+}
+
 /* ============================================================
  * Mobile navigation menu (full-screen sheet)
  *
