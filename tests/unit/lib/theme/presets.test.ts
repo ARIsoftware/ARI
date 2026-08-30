@@ -120,7 +120,7 @@ describe('DEFAULT_THEME_ID', () => {
     expect(preset).toBeDefined()
   })
 
-  it('is "default"', () => {
-    expect(DEFAULT_THEME_ID).toBe('default')
+  it('is "sovereign-day"', () => {
+    expect(DEFAULT_THEME_ID).toBe('sovereign-day')
   })
 })

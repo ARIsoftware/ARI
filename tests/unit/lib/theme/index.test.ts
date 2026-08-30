@@ -42,7 +42,7 @@ describe('lib/theme/index — barrel exports', () => {
 
   it('re-exports DEFAULT_THEME_ID', () => {
     expect(typeof DEFAULT_THEME_ID).toBe('string')
-    expect(DEFAULT_THEME_ID).toBe('default')
+    expect(DEFAULT_THEME_ID).toBe('sovereign-day')
   })
 
   it('re-exports CSS_VAR_MAP with core color keys', () => {

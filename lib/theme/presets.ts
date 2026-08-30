@@ -680,6 +680,106 @@ export const THEME_PRESETS: ThemePreset[] = [
       radius: '0rem',
     },
   },
+  // 14. Sovereign - Deep navy with near-white text, matching the ARI website
+  {
+    id: 'sovereign',
+    name: 'Sovereign',
+    category: 'dark',
+    colors: {
+      background: '223 68% 14%',
+      foreground: '210 40% 98%',
+      // Cards are white surfaces floating on the navy background — see the
+      // [data-theme='sovereign'] .bg-card block in app/globals.css, which
+      // re-scopes foreground/muted/border/primary inside them so inherited
+      // text stays readable on white.
+      card: '0 0% 100%',
+      cardForeground: '223 68% 20%',
+      popover: '221 60% 17%',
+      popoverForeground: '210 40% 98%',
+      primary: '213 100% 97%',
+      primaryForeground: '223 68% 14%',
+      secondary: '220 42% 26%',
+      secondaryForeground: '210 40% 98%',
+      muted: '221 45% 21%',
+      mutedForeground: '224 24% 70%',
+      accent: '220 45% 24%',
+      accentForeground: '210 40% 98%',
+      destructive: '0 72% 55%',
+      destructiveForeground: '0 0% 100%',
+      border: '221 35% 26%',
+      input: '221 40% 20%',
+      ring: '213 94% 72%',
+      chart1: '213 94% 72%',
+      chart2: '152 60% 45%',
+      chart3: '220 60% 58%',
+      chart4: '199 89% 62%',
+      chart5: '250 60% 72%',
+      topbarBackground: '224 70% 11%',
+      topbarForeground: '210 40% 98%',
+      sidebarBackground: '224 70% 11%',
+      sidebarForeground: '210 40% 96%',
+      sidebarPrimary: '213 100% 97%',
+      sidebarPrimaryForeground: '223 68% 14%',
+      sidebarAccent: '220 45% 22%',
+      sidebarAccentForeground: '210 40% 98%',
+      sidebarBorder: '222 40% 20%',
+      sidebarRing: '213 94% 72%',
+      radius: '0.5rem',
+    },
+  },
+  // 15. Sovereign Day - Navy chrome around a white workspace with blue cards
+  {
+    id: 'sovereign-day',
+    name: 'Sovereign Day',
+    category: 'light',
+    colors: {
+      // White workspace: `--background` drives the main content area and the
+      // breadcrumb bar (the header element is `bg-background`).
+      background: '0 0% 100%',
+      foreground: '223 68% 20%',
+      // Cards are a near-white tint of the workspace with navy text — barely
+      // separated from the white page, so panels read as raised paper rather
+      // than as coloured blocks. app/globals.css paints their border a slightly
+      // darker tint of the same blue (`214 32% 91%`) so the edge stays visible
+      // against the white page without hardening into a grey rule.
+      card: '210 40% 98%',
+      cardForeground: '221 55% 22%',
+      popover: '0 0% 100%',
+      popoverForeground: '223 68% 20%',
+      primary: '220 70% 40%',
+      primaryForeground: '0 0% 100%',
+      secondary: '220 30% 94%',
+      secondaryForeground: '223 68% 20%',
+      muted: '220 30% 95%',
+      mutedForeground: '222 22% 45%',
+      accent: '220 45% 94%',
+      accentForeground: '223 68% 20%',
+      destructive: '0 72% 48%',
+      destructiveForeground: '0 0% 100%',
+      border: '220 22% 88%',
+      input: '220 22% 88%',
+      ring: '220 70% 40%',
+      chart1: '217 91% 50%',
+      chart2: '152 55% 35%',
+      chart3: '220 60% 42%',
+      chart4: '199 89% 38%',
+      chart5: '250 55% 55%',
+      // Chrome stays the navy of the Sovereign theme. `--topbar-background` is
+      // consumed by the announcement bar above the breadcrumbs, not by the
+      // breadcrumb header itself (that one is `bg-background`, i.e. white).
+      topbarBackground: '224 70% 11%',
+      topbarForeground: '210 40% 98%',
+      sidebarBackground: '224 70% 11%',
+      sidebarForeground: '210 40% 96%',
+      sidebarPrimary: '213 100% 97%',
+      sidebarPrimaryForeground: '223 68% 14%',
+      sidebarAccent: '220 45% 22%',
+      sidebarAccentForeground: '210 40% 98%',
+      sidebarBorder: '222 40% 20%',
+      sidebarRing: '213 94% 72%',
+      radius: '0.5rem',
+    },
+  },
 ]
 
 // Helper to get a theme by ID
@@ -687,5 +787,6 @@ export function getThemeById(id: string): ThemePreset | undefined {
   return THEME_PRESETS.find((theme) => theme.id === id)
 }
 
-// Default theme ID
-export const DEFAULT_THEME_ID = 'default'
+// Default theme ID — applied to new installs and any user without a saved
+// theme choice (existing saved choices in module_settings always win).
+export const DEFAULT_THEME_ID = 'sovereign-day'

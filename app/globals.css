@@ -313,6 +313,166 @@
   filter: grayscale(1);
 }
 
+/* Sovereign theme - white cards on the navy background.
+ *
+ * `--card` is white and `--card-foreground` is deep blue, but most card
+ * surfaces in the app are raw `bg-card` divs whose text simply inherits the
+ * global `--foreground` (near-white for the navy chrome) — that would be
+ * invisible on white. So inside any card surface we re-scope the tokens that
+ * descendants resolve against: text becomes blue, muted/border/input become
+ * light blue-greys, and `--primary` flips from near-white to blue so buttons
+ * inside a card stay visible. Because these are plain CSS variables, every
+ * Tailwind utility (`text-muted-foreground`, `bg-muted`, `border-border`, ...)
+ * inside the card picks them up with no component changes.
+ *
+ * `[class*="bg-card"]` rather than `.bg-card` so opacity variants such as
+ * `bg-card/50` are covered too. Popovers, dropdowns and dialogs are portaled
+ * to document.body, outside this scope, so they keep the dark navy treatment. */
+[data-theme="sovereign"] [class*="bg-card"],
+[data-theme="sovereign"] [class*="dark:bg-transparent"],
+[data-theme="sovereign"] [class*="border-border bg-transparent"] {
+  --background: 0 0% 100%;
+  --foreground: 223 68% 20%;
+  --card-foreground: 223 68% 20%;
+  --muted: 220 30% 95%;
+  --muted-foreground: 222 22% 45%;
+  --secondary: 220 30% 94%;
+  --secondary-foreground: 223 68% 20%;
+  --accent: 220 45% 94%;
+  --accent-foreground: 223 68% 20%;
+  --primary: 220 70% 40%;
+  --primary-foreground: 0 0% 100%;
+  --border: 220 22% 88%;
+  --input: 220 22% 88%;
+  --ring: 220 70% 40%;
+  --chart-1: 217 91% 50%;
+  --chart-2: 152 55% 35%;
+  --chart-3: 220 60% 42%;
+  --chart-4: 199 89% 38%;
+  --chart-5: 250 55% 55%;
+  color: hsl(var(--card-foreground));
+}
+
+/* Sovereign theme - pinned task rows.
+ *
+ * The tasks module paints a pinned row `bg-[hsl(var(--primary))]` and then
+ * overrides it for dark themes with `dark:bg-transparent dark:shadow-none
+ * dark:border-[hsl(var(--primary))]`, i.e. in any dark-category theme a pinned
+ * row drops back to the page background and is marked by a bright outline
+ * alone. Against Sovereign's white cards that reads as a hole punched in the
+ * list rather than a highlight, so pinned rows get the same white surface as
+ * every other card here and keep their emphasis through the blue border and a
+ * heavier shadow.
+ *
+ * `--primary` is re-scoped to blue by the rule above (pinned rows are in its
+ * selector list), so the module's own `dark:border-[hsl(var(--primary))]`
+ * resolves to the blue border on its own — only the background and shadow
+ * need restating. Both classes in the selector appear on that row and nowhere
+ * else in the codebase, and the whole thing is scoped to this theme, so the
+ * module stays untouched. */
+[data-theme="sovereign"] [class*="dark:bg-transparent"][class*="dark:shadow-none"] {
+  background-color: hsl(var(--card));
+  box-shadow:
+    0 1px 2px hsl(223 68% 6% / 0.4),
+    0 4px 12px hsl(223 68% 6% / 0.25);
+}
+
+/* Sovereign theme - inline subtask rows.
+ *
+ * In list view the tasks module renders subtasks *outside* the task card, as
+ * indented `border-border bg-transparent` rows sitting directly on the page
+ * background, so they stayed navy while their parent card turned white. Give
+ * them the same white surface (they are in the token re-scoping block above,
+ * so their text and border follow) and a light shadow so the indented group
+ * still reads as subordinate to the card above it.
+ *
+ * That class pair appears only on this row in the codebase. The card-view
+ * subtask panel is inside the card and needs nothing. */
+[data-theme="sovereign"] [class*="border-border bg-transparent"] {
+  background-color: hsl(var(--card));
+  box-shadow: 0 1px 2px hsl(223 68% 6% / 0.3);
+}
+
+
+/* ============================================================
+ * Sovereign Day theme - navy chrome around a white workspace
+ * ============================================================ */
+
+/* Cards are a near-white tint of the white workspace (`--card` is
+ * `210 40% 98%`), so they need none of the token re-scoping the Sovereign block
+ * above does — the root tokens are already the light-surface set. The only
+ * thing restated is the card's own edge.
+ *
+ * The card edge is `214 32% 91%`: the same cool blue family as the fill, four
+ * steps down in lightness. That is enough to draw the card's shape against the
+ * white page — where a fill only 2% off white cannot do it alone — while
+ * staying lighter than the workspace `--border` (`220 22% 88%`) used for
+ * structural chrome, so cards still read as the softest edge on the page.
+ *
+ * `border-color` is set on the card element itself rather than by re-pointing
+ * `--border`, which would also recolour separators, inputs and buttons *inside*
+ * the card. */
+[data-theme="sovereign-day"] [class*="bg-card"] {
+  border-color: hsl(214 32% 91%);
+}
+
+/* The list-view subtask row is rendered outside its task card as an indented
+ * `border-border bg-transparent` row sitting bare on the white page. Give it
+ * the same tinted surface and edge so the indented group reads as part of the
+ * card above it. */
+[data-theme="sovereign-day"] [class*="border-border bg-transparent"] {
+  background-color: hsl(var(--card));
+  border-color: hsl(214 32% 91%);
+}
+
+/* The dashboard rail's "View all tasks" button is a hardcoded near-white pill
+ * (`bg-[#f7fafc] text-black`) chosen for a dark panel; on this theme's white
+ * rail it disappears, so give it the workspace border to keep its shape. */
+[data-theme="sovereign-day"] [class*="bg-[#f7fafc]"] {
+  border: 1px solid hsl(var(--border));
+}
+
+/* Sidebar edge — the sidebar container carries a bare `border-r` with no colour
+ * of its own, so it falls through to the global `* { @apply border-border }`
+ * and picks up `--border`, which in this theme is the pale grey meant for the
+ * white workspace. Against the navy chrome that reads as a white seam running
+ * down the whole window, so point it at `--sidebar-border` instead. Scoped to
+ * the wrapper's own `.peer[data-side]`, which is the sidebar and not a Radix
+ * popper (those also carry `data-side`). */
+[data-theme="sovereign-day"] .peer[data-side] > div {
+  border-color: hsl(var(--sidebar-border));
+}
+
+/* Announcement bar edge — the bar above the breadcrumbs also carries the
+ * `.topbar` class (components/task-announcement.tsx), so it inherits
+ * `.topbar { border-bottom: 1px solid hsl(var(--border)) }`. That token is the
+ * pale grey for this theme's white workspace, which drew a white seam straight
+ * across the navy bar. Give it the same navy divider the sidebar edge uses.
+ *
+ * Matched on `h-[45px]`, which the announcement bar has and the breadcrumb
+ * header (`sticky top-0 ... h-16`) does not — the header sits on the white
+ * workspace, where the pale border is the right one and stays. */
+[data-theme="sovereign-day"] .topbar[class*="h-[45px]"] {
+  border-bottom-color: hsl(var(--sidebar-border));
+}
+
+/* Pinned task rows use the card colour like every other row.
+ *
+ * This is a light-category theme, so the tasks module takes its light branch
+ * for a pinned row — `bg-[hsl(var(--primary))]`, i.e. the bright workspace blue
+ * — which made pinned rows a different colour from the cards around them.
+ * Repaint them from `--card`, with the same edge as every other card.
+ *
+ * The row's title, meta line and badges are all painted with
+ * `--primary-foreground` (white, for the blue fill the module expected), so
+ * that token is re-pointed at the card's navy text colour for the row's
+ * subtree — otherwise the text would be white on near-white. Pinned rows keep
+ * their `shadow-lg` and filled pin icon, which is what distinguishes them. */
+[data-theme="sovereign-day"] [class*="dark:bg-transparent"][class*="dark:shadow-none"] {
+  --primary-foreground: var(--card-foreground);
+  background-color: hsl(var(--card));
+  border-color: hsl(214 32% 91%);
+}
 
 /* ============================================================
  * Mobile navigation menu (full-screen sheet)
