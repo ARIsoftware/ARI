@@ -11,7 +11,7 @@ https://ari.software
 
 ## Documentation
 
-Full documentationm installation instructions, guides, and module development resources:
+Full documentation, installation instructions, guides, and module development resources:
 
 https://ari.software/docs
 
