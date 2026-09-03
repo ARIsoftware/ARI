@@ -3,22 +3,27 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { requireAdmin } from '@/lib/api-helpers'
 import { isProductionSafeOperation } from '@/lib/admin-helpers'
 import { logActivity } from '@/lib/activity-log'
+import { getPoolClient } from '@/lib/db'
 import { logger } from '@/lib/logger'
 import { safeErrorResponse } from '@/lib/api-error'
-import { queryRows, EXCLUDED_TABLES, calculateChecksum, stripNul } from '../utils'
+import { EXCLUDED_TABLES } from '@/lib/backup/constants'
+import { BACKUP_VERSION, END_MARKER, assembleBackupFile, calculateChecksum } from '@/lib/backup/format'
+import { buildInsertStatements } from '@/lib/backup/serialize'
+import {
+  discoverSchema,
+  fetchTableRows,
+  type QueryFn,
+  type TableDefinition,
+} from '@/lib/backup/schema-discovery'
+import {
+  generateCreateTable,
+  generateForeignKeyStatements,
+  generateIndexStatements,
+} from '@/lib/backup/ddl'
 import { BackupExportRequestSchema, BackupExportResponseSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, UnauthorizedResponse } from '@/lib/openapi/common'
 import { withApiLogging } from '@/lib/api-logging'
-
-type ColumnInfo = {
-  column_name: string
-  data_type: string
-  is_nullable: string
-  column_default: string | null
-  character_maximum_length: number | null
-  ordinal_position?: number
-}
 
 export const debugRole = "backup-export"
 
@@ -38,314 +43,50 @@ registry.registerPath({
   },
 })
 
-async function discoverTables(): Promise<{ tables: string[], method: string, warnings: string[] }> {
-  const warnings: string[] = []
+interface GatheredData {
+  tables: TableDefinition[]
+  rows: Record<string, Record<string, unknown>[]>
+  errors: string[]
+  failedTables: string[]
+}
+
+/**
+ * Discover the schema and fetch every table's rows on ONE client inside a
+ * REPEATABLE READ read-only transaction: schema, constraints, and all rows
+ * share a single MVCC snapshot, so cross-table FK consistency of the dump is
+ * guaranteed even while the app is live.
+ */
+async function gatherSnapshot(): Promise<GatheredData> {
+  const client = await getPoolClient()
+  const query: QueryFn = async (sql, params) => (await client.query(sql, params)).rows
 
   try {
-    logger.info('Starting table discovery via direct SQL...')
+    await client.query('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY')
 
-    const result = await queryRows<{ table_name: string }>(`
-      SELECT table_name
-      FROM information_schema.tables
-      WHERE table_schema = 'public'
-        AND table_type = 'BASE TABLE'
-      ORDER BY table_name
-    `)
+    const tables = await discoverSchema(query, EXCLUDED_TABLES)
+    logger.info(`Discovered ${tables.length} tables via pg_catalog`)
 
-    const tables = result
-      .map(row => row.table_name)
-      .filter(name => name && !EXCLUDED_TABLES.has(name))
-
-    logger.info(`✅ Found ${tables.length} tables via direct SQL`)
-    return { tables, method: 'direct_sql', warnings }
-
-  } catch (error: unknown) {
-    logger.error('Critical error in table discovery:', error)
-    warnings.push(`Critical error during discovery: ${error instanceof Error ? error.message : String(error)}`)
-    return { tables: [], method: 'error', warnings }
-  }
-}
-
-// Validate table name against whitelist to prevent SQL injection
-function isValidTableName(tableName: string, validTables: string[]): boolean {
-  return validTables.includes(tableName) && /^[a-z_][a-z0-9_]*$/i.test(tableName)
-}
-
-// Discover all table schemas upfront in a single query
-async function discoverAllSchemas(tables: string[]): Promise<Record<string, ColumnInfo[]>> {
-  const allSchemas: Record<string, ColumnInfo[]> = {}
-
-  // Initialize empty arrays for all tables
-  for (const table of tables) {
-    allSchemas[table] = []
-  }
-
-  try {
-    logger.info('Discovering all table schemas via information_schema...')
-
-    const columns = await queryRows<{
-      table_name: string
-      column_name: string
-      data_type: string
-      is_nullable: string
-      column_default: string | null
-      character_maximum_length: number | null
-      ordinal_position: number
-    }>(`
-      SELECT table_name, column_name, data_type, is_nullable,
-             column_default, character_maximum_length, ordinal_position
-      FROM information_schema.columns
-      WHERE table_schema = 'public'
-      ORDER BY table_name, ordinal_position
-    `)
-
-    for (const row of columns) {
-      if (tables.includes(row.table_name)) {
-        if (!allSchemas[row.table_name]) {
-          allSchemas[row.table_name] = []
-        }
-        allSchemas[row.table_name].push({
-          column_name: row.column_name,
-          data_type: row.data_type,
-          is_nullable: row.is_nullable,
-          column_default: row.column_default,
-          character_maximum_length: row.character_maximum_length,
-          ordinal_position: row.ordinal_position
-        })
-      }
-    }
-
-    const tablesWithSchema = Object.entries(allSchemas).filter(([_, cols]) => cols.length > 0).length
-    logger.info(`Schema discovery complete: ${tablesWithSchema}/${tables.length} tables have schema`)
-    return allSchemas
-
-  } catch (error: unknown) {
-    logger.error('Critical error in schema discovery:', error)
-    return allSchemas
-  }
-}
-
-// Get schema for a single table (uses cached schemas or falls back to sample row)
-function getTableSchemaFromCache(
-  tableName: string,
-  cachedSchemas: Record<string, ColumnInfo[]>,
-  sampleData: Record<string, unknown>[] | null
-): ColumnInfo[] {
-  // First check cached schemas from bulk discovery
-  if (cachedSchemas[tableName] && cachedSchemas[tableName].length > 0) {
-    return cachedSchemas[tableName]
-  }
-
-  // Fallback: infer from sample data if available
-  if (sampleData && sampleData.length > 0) {
-    const sample = sampleData[0]
-    const schema = Object.entries(sample).map(([columnName, value], index) => {
-      let dataType = 'text'
-
-      if (value === null) {
-        dataType = 'text'
-      } else if (typeof value === 'boolean') {
-        dataType = 'boolean'
-      } else if (typeof value === 'number') {
-        dataType = Number.isInteger(value) ? 'integer' : 'numeric'
-      } else if (typeof value === 'string') {
-        if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
-          dataType = 'uuid'
-        } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
-          dataType = 'timestamp with time zone'
-        } else if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-          dataType = 'date'
-        } else {
-          dataType = 'text'
-        }
-      } else if (Array.isArray(value)) {
-        dataType = 'array'
-      } else if (typeof value === 'object') {
-        dataType = 'jsonb'
-      }
-
-      return {
-        column_name: columnName,
-        data_type: dataType,
-        is_nullable: 'YES',
-        column_default: columnName === 'id' ? 'gen_random_uuid()' :
-          (columnName.includes('created_at') || columnName.includes('updated_at') ? 'now()' : null),
-        character_maximum_length: null,
-        ordinal_position: index + 1
-      }
-    })
-
-    logger.info(`Inferred schema for ${tableName} from sample data: ${schema.length} columns`)
-    return schema
-  }
-
-  // No schema available
-  return []
-}
-
-// Discover all table constraints in two bulk queries (avoids N+1)
-async function discoverAllConstraints(tables: string[]): Promise<Record<string, { primaryKeys: string[], uniqueKeys: { name: string, columns: string[] }[], foreignKeys: never[] }>> {
-  const result: Record<string, { primaryKeys: string[], uniqueKeys: { name: string, columns: string[] }[], foreignKeys: never[] }> = {}
-  for (const t of tables) {
-    result[t] = { primaryKeys: ['id'], uniqueKeys: [], foreignKeys: [] }
-  }
-
-  try {
-    const allConstraints = await queryRows<{ table_name: string; constraint_name: string; constraint_type: string }>(`
-      SELECT table_name, constraint_name, constraint_type
-      FROM information_schema.table_constraints
-      WHERE table_schema = 'public'
-        AND constraint_type IN ('PRIMARY KEY', 'UNIQUE')
-    `)
-
-    const allKeyColumns = await queryRows<{ table_name: string; column_name: string; constraint_name: string }>(`
-      SELECT table_name, column_name, constraint_name
-      FROM information_schema.key_column_usage
-      WHERE table_schema = 'public'
-    `)
+    const rows: Record<string, Record<string, unknown>[]> = {}
+    const errors: string[] = []
+    const failedTables: string[] = []
 
     for (const table of tables) {
-      const constraints = allConstraints.filter(c => c.table_name === table)
-      const keyColumns = allKeyColumns.filter(k => k.table_name === table)
-
-      if (constraints.length === 0) continue
-
-      const primaryKeys = constraints
-        .filter(c => c.constraint_type === 'PRIMARY KEY')
-        .flatMap(c => keyColumns.filter(k => k.constraint_name === c.constraint_name).map(k => k.column_name))
-
-      const uniqueKeys = constraints
-        .filter(c => c.constraint_type === 'UNIQUE')
-        .map(c => ({
-          name: c.constraint_name,
-          columns: keyColumns.filter(k => k.constraint_name === c.constraint_name).map(k => k.column_name)
-        }))
-
-      result[table] = { primaryKeys: primaryKeys.length > 0 ? primaryKeys : ['id'], uniqueKeys, foreignKeys: [] }
-    }
-  } catch (error) {
-    logger.warn('Could not discover constraints:', error)
-  }
-
-  return result
-}
-
-// Convert PostgreSQL data type to CREATE TABLE format
-function mapDataType(dataType: string, isNullable: string, columnDefault: string | null, charMaxLength: number | null = null): string {
-  let sqlType = dataType.toUpperCase()
-
-  // Map common types
-  switch (dataType.toLowerCase()) {
-    case 'character varying':
-      sqlType = charMaxLength ? `VARCHAR(${charMaxLength})` : 'TEXT'
-      break
-    case 'timestamp with time zone':
-      sqlType = 'TIMESTAMPTZ'
-      break
-    case 'timestamp without time zone':
-      sqlType = 'TIMESTAMP'
-      break
-    case 'boolean':
-      sqlType = 'BOOLEAN'
-      break
-    case 'integer':
-      sqlType = 'INTEGER'
-      break
-    case 'bigint':
-      sqlType = 'BIGINT'
-      break
-    case 'smallint':
-      sqlType = 'SMALLINT'
-      break
-    case 'numeric':
-    case 'decimal':
-      sqlType = 'NUMERIC'
-      break
-    case 'double precision':
-      sqlType = 'DOUBLE PRECISION'
-      break
-    case 'real':
-      sqlType = 'REAL'
-      break
-    case 'uuid':
-      sqlType = 'UUID'
-      break
-    case 'date':
-      sqlType = 'DATE'
-      break
-    case 'time':
-    case 'time without time zone':
-      sqlType = 'TIME'
-      break
-    case 'text':
-      sqlType = 'TEXT'
-      break
-    case 'json':
-      sqlType = 'JSON'
-      break
-    case 'jsonb':
-      sqlType = 'JSONB'
-      break
-    case 'array':
-    case 'ARRAY':
-      sqlType = 'TEXT[]'
-      break
-  }
-
-  // Add constraints
-  if (isNullable === 'NO') {
-    sqlType += ' NOT NULL'
-  }
-
-  // Add defaults
-  if (columnDefault) {
-    if (columnDefault.includes('gen_random_uuid()')) {
-      sqlType += ' DEFAULT gen_random_uuid()'
-    } else if (columnDefault.includes('now()') || columnDefault.includes('CURRENT_TIMESTAMP')) {
-      sqlType += ' DEFAULT NOW()'
-    } else if (columnDefault === 'false' || columnDefault.includes('false')) {
-      sqlType += ' DEFAULT FALSE'
-    } else if (columnDefault === 'true' || columnDefault.includes('true')) {
-      sqlType += ' DEFAULT TRUE'
-    } else if (columnDefault.match(/^nextval\(/)) {
-      // Don't add serial defaults - they'll be handled by SERIAL type
-      return sqlType
-    } else if (!isNaN(Number(columnDefault.replace(/[()::]/g, '')))) {
-      sqlType += ` DEFAULT ${columnDefault.replace(/[()::]/g, '')}`
-    }
-  }
-
-  return sqlType
-}
-
-// Fetch all rows from a table using pagination
-async function fetchTableData(tableName: string, chunkSize: number = 1000): Promise<Record<string, unknown>[]> {
-  let offset = 0
-  let allData: Record<string, unknown>[] = []
-  let hasMore = true
-
-  while (hasMore) {
-    let rows: Record<string, unknown>[]
-    try {
-      // Try ordered query first
-      rows = await queryRows(
-        `SELECT * FROM "${tableName}" ORDER BY created_at ASC NULLS FIRST, id ASC NULLS FIRST LIMIT $1 OFFSET $2`,
-        [chunkSize, offset]
-      )
-    } catch {
-      // Fallback: some tables may not have created_at or id columns
-      rows = await queryRows(
-        `SELECT * FROM "${tableName}" LIMIT $1 OFFSET $2`,
-        [chunkSize, offset]
-      )
+      try {
+        rows[table.name] = await fetchTableRows(query, table)
+        logger.info(`Exported ${table.name}: ${rows[table.name].length} rows`)
+      } catch (tableError: unknown) {
+        const message = tableError instanceof Error ? tableError.message : String(tableError)
+        logger.error(`Error exporting table ${table.name}:`, tableError)
+        errors.push(`Error exporting ${table.name}: ${message}`)
+        failedTables.push(table.name)
+      }
     }
 
-    allData = allData.concat(rows)
-    hasMore = rows.length === chunkSize
-    offset += chunkSize
+    return { tables, rows, errors, failedTables }
+  } finally {
+    try { await client.query('ROLLBACK') } catch { /* read-only snapshot — nothing to undo */ }
+    try { client.release() } catch { /* ignore */ }
   }
-
-  return allData
 }
 
 async function handlePOST(req: NextRequest) {
@@ -375,62 +116,7 @@ async function handlePOST(req: NextRequest) {
 
     const force = req.nextUrl.searchParams.get('force') === 'true'
 
-    // Discover all tables
-    const { tables, method, warnings } = await discoverTables()
-    logger.info(`Exporting ${tables.length} tables using discovery method: ${method}`)
-
-    if (warnings.length > 0) {
-      logger.warn('Discovery warnings:', warnings)
-    }
-
-    // Schema and constraint discovery hit independent information_schema
-    // queries — run concurrently before the per-table fetch loop.
-    logger.info('Discovering all table schemas and constraints...')
-    const [cachedSchemas, tableConstraints] = await Promise.all([
-      discoverAllSchemas(tables),
-      discoverAllConstraints(tables),
-    ])
-    const tablesWithCachedSchema = Object.entries(cachedSchemas).filter(([_, cols]) => cols.length > 0).length
-    logger.info(`Cached schemas for ${tablesWithCachedSchema}/${tables.length} tables`)
-
-    const backupData: Record<string, Record<string, unknown>[]> = {}
-    const tableSchemas: Record<string, ColumnInfo[]> = {}
-    const checksums: Record<string, string> = {}
-    let totalRows = 0
-    const errors: string[] = [...warnings]
-    const failedTables: string[] = []
-
-    // Process each table
-    for (const table of tables) {
-      if (!isValidTableName(table, tables)) {
-        errors.push(`Skipping invalid table name: ${table}`)
-        failedTables.push(table)
-        continue
-      }
-
-      try {
-        const allData = await fetchTableData(table)
-
-        backupData[table] = allData
-        checksums[table] = calculateChecksum(allData)
-        totalRows += allData.length
-
-        const schema = getTableSchemaFromCache(table, cachedSchemas, allData)
-        if (schema.length > 0) {
-          logger.info(`Schema for ${table}: ${schema.length} columns`)
-        } else {
-          logger.warn(`No schema available for ${table} (empty table with no cached schema)`)
-        }
-        tableSchemas[table] = schema
-
-        logger.info(`Exported ${table}: ${allData.length} rows`)
-      } catch (tableError: unknown) {
-        logger.error(`Error exporting table ${table}:`, tableError)
-        const message = tableError instanceof Error ? tableError.message : String(tableError)
-        errors.push(`Error exporting ${table}: ${message}`)
-        failedTables.push(table)
-      }
-    }
+    const { tables, rows, errors, failedTables } = await gatherSnapshot()
 
     // Default behavior: fail loudly if any table errored. Users explicitly
     // opt into a partial backup with ?force=true after seeing the error.
@@ -447,207 +133,125 @@ async function handlePOST(req: NextRequest) {
       )
     }
 
-    // Create metadata with checksums and discovery method
+    const includedTables = tables.filter((t) => !failedTables.includes(t.name))
+    const warnings: string[] = []
+
+    // Serialize data + checksums (informational — integrity is proven by the
+    // file-level contentSha256 plus in-transaction row counts on import).
+    const checksums: Record<string, string> = {}
+    const rowCounts: Record<string, number> = {}
+    let totalRows = 0
+    const insertSections: string[] = []
+    for (const table of includedTables) {
+      const tableRows = rows[table.name] ?? []
+      checksums[table.name] = calculateChecksum(tableRows)
+      rowCounts[table.name] = tableRows.length
+      totalRows += tableRows.length
+
+      if (tableRows.length === 0) {
+        insertSections.push(`-- Table: ${table.name} (no data)\n`)
+        continue
+      }
+      const statements = buildInsertStatements(table.name, tableRows)
+      insertSections.push(
+        `-- Table: ${table.name} (${tableRows.length} rows, checksum: ${checksums[table.name]})\n` +
+        `DELETE FROM "${table.name}";\n` +
+        statements.join('\n') + '\n'
+      )
+    }
+
+    // DDL: exact catalog types, verbatim defaults, PK/UNIQUE/CHECK inline.
+    const ddlSections: string[] = []
+    for (const table of includedTables) {
+      const { sql, warnings: ddlWarnings } = generateCreateTable(table)
+      warnings.push(...ddlWarnings)
+      ddlSections.push(`-- Table: ${table.name}\nDROP TABLE IF EXISTS "${table.name}" CASCADE;\n${sql}\n`)
+    }
+
+    // Real indexes (verbatim from pg_indexes; constraint-backed ones excluded).
+    const indexStatements = includedTables.flatMap((table) => generateIndexStatements(table))
+
+    // Foreign keys land AFTER all data as single-line validating ALTERs.
+    const { statements: fkStatements, skipped: fkSkipped } = generateForeignKeyStatements(includedTables)
+    for (const skipped of fkSkipped) {
+      warnings.push(`Foreign key not exported: ${skipped}`)
+    }
+
+    // Sequence resets for identity/serial columns (defensive — none exist in
+    // the schema today, but a restored identity column restarts at 1 without
+    // this).
+    const sequenceResets: string[] = []
+    for (const table of includedTables) {
+      for (const column of table.columns) {
+        if (column.identity !== '' || (column.defaultExpr ?? '').includes('nextval')) {
+          sequenceResets.push(
+            `DO $$ BEGIN IF pg_get_serial_sequence('"${table.name}"', '${column.name}') IS NOT NULL THEN PERFORM setval(pg_get_serial_sequence('"${table.name}"', '${column.name}'), COALESCE((SELECT MAX("${column.name}") FROM "${table.name}"), 0) + 1, false); END IF; END $$;`
+          )
+        }
+      }
+    }
+
+    const timestamp = new Date().toISOString()
+
+    // Body = everything after the metadata line; exactly what contentSha256
+    // covers and what import parses.
+    let body = `\n-- Begin transaction for atomic import\nBEGIN;\n\n`
+    body += `-- Disable foreign key checks during data load\nSET session_replication_role = 'replica';\n\n`
+    body += `-- Create tables with discovered schemas\n\n`
+    body += ddlSections.join('\n')
+    body += `\n-- Insert data\n\n`
+    body += insertSections.join('\n')
+    if (indexStatements.length > 0) {
+      body += `\n-- Recreate indexes\n${indexStatements.join('\n')}\n`
+    }
+    if (fkStatements.length > 0) {
+      body += `\n-- Restore foreign keys (validated against the data above)\n${fkStatements.join('\n')}\n`
+    }
+    if (sequenceResets.length > 0) {
+      body += `\n-- Reset sequences\n${sequenceResets.join('\n')}\n`
+    }
+    body += `\n-- Re-enable foreign key checks\nSET session_replication_role = 'origin';\n\n`
+    body += `-- Commit transaction\nCOMMIT;\n\n`
+    body += `-- Expected row counts:\n`
+    for (const table of includedTables) {
+      body += `-- SELECT COUNT(*) as ${table.name.replace(/-/g, '_')}_count FROM "${table.name}"; -- Expected: ${rowCounts[table.name]}\n`
+    }
+    body += `\n${END_MARKER}\n`
+
     const metadata = {
-      version: '2.1',
-      timestamp: new Date().toISOString(),
+      version: BACKUP_VERSION,
+      timestamp,
       exportedBy: user.id,
-      discoveryMethod: method,
-      tables: Object.keys(backupData),
-      rowCounts: Object.fromEntries(
-        Object.entries(backupData).map(([k, v]) => [k, (v as unknown[]).length])
-      ),
+      discoveryMethod: 'pg_catalog',
+      tables: includedTables.map((t) => t.name),
+      rowCounts,
       totalRows,
       checksums,
       warnings: warnings.length > 0 ? warnings : undefined,
       errors: errors.length > 0 ? errors : undefined,
-      exportedFrom: 'ARI Backup System v2.1'
+      exportedFrom: `ARI Backup System v${BACKUP_VERSION}`,
     }
 
-    // Generate SQL content
-    let sqlContent = `-- ================================================================\n`
-    sqlContent += `-- ARI Database Backup v2.1\n`
-    sqlContent += `-- Generated: ${metadata.timestamp}\n`
-    sqlContent += `-- Exported by: ${metadata.exportedBy}\n`
-    sqlContent += `-- Discovery Method: ${metadata.discoveryMethod}\n`
-    sqlContent += `-- Total Tables: ${metadata.tables.length}\n`
-    sqlContent += `-- Total Rows: ${metadata.totalRows}\n`
+    let header = `-- ================================================================\n`
+    header += `-- ARI Database Backup v${BACKUP_VERSION}\n`
+    header += `-- Generated: ${timestamp}\n`
+    header += `-- Exported by: ${user.id}\n`
+    header += `-- Total Tables: ${includedTables.length}\n`
+    header += `-- Total Rows: ${totalRows}\n`
     if (warnings.length > 0) {
-      sqlContent += `-- Warnings: ${warnings.length}\n`
+      header += `-- Warnings: ${warnings.length}\n`
     }
-    sqlContent += `-- ================================================================\n\n`
+    header += `-- ================================================================\n\n`
 
-    sqlContent += `-- Backup Metadata (DO NOT MODIFY)\n`
-    sqlContent += `-- ${JSON.stringify(metadata)}\n\n`
-
-    // Add transaction wrapper
-    sqlContent += `-- Begin transaction for atomic import\n`
-    sqlContent += `BEGIN;\n\n`
-
-    sqlContent += `-- Disable foreign key checks temporarily\n`
-    sqlContent += `SET session_replication_role = 'replica';\n\n`
-
-    // Generate CREATE TABLE statements
-    sqlContent += `-- Create tables with discovered schemas\n\n`
-
-    for (const tableName of tables) {
-      const schema = tableSchemas[tableName]
-
-      // getTableSchemaFromCache already inferred a schema for any table with
-      // data, so an empty schema here means an empty table with no catalog rows.
-      if (!Array.isArray(schema) || schema.length === 0) {
-        logger.warn(`Empty table ${tableName} has no cached schema — included as comment only`)
-        sqlContent += `-- Table: ${tableName} (empty, no schema available)\n\n`
-        continue
-      }
-
-      const constraints = tableConstraints[tableName] || { primaryKeys: [], uniqueKeys: [] }
-
-      sqlContent += `-- Table: ${tableName}\n`
-      sqlContent += `DROP TABLE IF EXISTS "${tableName}" CASCADE;\n`
-      sqlContent += `CREATE TABLE "${tableName}" (\n`
-
-      const columns = schema.map((column) => {
-        return `  "${column.column_name}" ${mapDataType(column.data_type, column.is_nullable, column.column_default, column.character_maximum_length)}`
-      })
-
-      // Add primary key constraint
-      if (constraints.primaryKeys && constraints.primaryKeys.length > 0) {
-        const pkColumns = constraints.primaryKeys.map((col: string) => `"${col}"`).join(', ')
-        columns.push(`  PRIMARY KEY (${pkColumns})`)
-      }
-
-      // Add unique constraints
-      if (constraints.uniqueKeys && constraints.uniqueKeys.length > 0) {
-        constraints.uniqueKeys.forEach((uk: { name: string; columns: string[] }) => {
-          if (uk.columns && uk.columns.length > 0) {
-            const ukColumns = uk.columns.map((col: string) => `"${col}"`).join(', ')
-            columns.push(`  CONSTRAINT "${uk.name}" UNIQUE (${ukColumns})`)
-          }
-        })
-      }
-
-      sqlContent += columns.join(',\n')
-      sqlContent += `\n);\n\n`
-    }
-
-    // Add data inserts
-    sqlContent += `-- Insert data\n\n`
-
-    for (const [table, data] of Object.entries(backupData)) {
-      if (!Array.isArray(data) || data.length === 0) {
-        sqlContent += `-- Table: ${table} (no data)\n\n`
-        continue
-      }
-
-      sqlContent += `-- Table: ${table} (${data.length} rows, checksum: ${checksums[table]})\n`
-      sqlContent += `DELETE FROM "${table}";\n`
-
-      // Batch inserts for better performance
-      const batchSize = 100
-      for (let i = 0; i < data.length; i += batchSize) {
-        const batch = data.slice(i, Math.min(i + batchSize, data.length))
-
-        for (const row of batch) {
-          const columns = Object.keys(row).map(col => `"${col}"`).join(', ')
-          const values = Object.values(row).map((val: unknown) => {
-            if (val === null) return 'NULL'
-            if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE'
-            if (typeof val === 'number') return val
-            if (typeof val === 'string') return `'${stripNul(val).replace(/'/g, "''")}'`
-            if (val instanceof Date) return `'${val.toISOString()}'`
-            if (Array.isArray(val)) {
-              const escaped = val.map(v =>
-                typeof v === 'string'
-                  ? `"${stripNul(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
-                  : String(v)
-              )
-              return `'{${escaped.join(',')}}'`
-            }
-            // JSONB/JSON objects
-            if (typeof val === 'object') {
-              return `'${stripNul(JSON.stringify(val)).replace(/'/g, "''")}'::jsonb`
-            }
-            // Fallback: coerce to string for safety
-            return `'${stripNul(String(val)).replace(/'/g, "''")}'`
-          }).join(', ')
-
-          sqlContent += `INSERT INTO "${table}" (${columns}) VALUES (${values});\n`
-        }
-      }
-
-      sqlContent += `\n`
-    }
-
-    // Create indexes for performance
-    sqlContent += `-- Create indexes for better performance\n`
-    for (const [tableName, schema] of Object.entries(tableSchemas)) {
-      if (!Array.isArray(schema) || schema.length === 0) continue
-
-      const indexedColumns = new Set<string>()
-
-      schema.forEach(column => {
-        const colName = column.column_name
-        if (colName === 'id' || colName.endsWith('_id') || colName === 'user_id' ||
-            colName === 'created_at' || colName === 'updated_at' || colName === 'completed' ||
-            colName.includes('order') || colName.includes('index')) {
-          if (!indexedColumns.has(colName)) {
-            const safeIndexName = `idx_${tableName}_${colName}`.replace(/[^a-z0-9_]/gi, '_')
-            sqlContent += `CREATE INDEX IF NOT EXISTS ${safeIndexName} ON "${tableName}"("${colName}");\n`
-            indexedColumns.add(colName)
-          }
-        }
-      })
-    }
-    sqlContent += `\n`
-
-    // Reset sequences for any table/column that uses a sequence
-    sqlContent += `-- Reset sequences\n`
-    for (const [tableName, schema] of Object.entries(tableSchemas)) {
-      if (!Array.isArray(schema)) continue
-      for (const col of schema) {
-        const def = col.column_default as string | null
-        // Detect serial/identity columns by their default (nextval or identity)
-        if (def && (def.includes('nextval') || def.includes('identity'))) {
-          const colName = col.column_name
-          sqlContent += `DO $$ BEGIN IF pg_get_serial_sequence('"${tableName}"', '${colName}') IS NOT NULL THEN PERFORM setval(pg_get_serial_sequence('"${tableName}"', '${colName}'), COALESCE((SELECT MAX("${colName}") FROM "${tableName}"), 0) + 1, false); END IF; END $$;\n`
-        }
-      }
-    }
-    sqlContent += `\n`
-
-    // Re-enable constraints
-    sqlContent += `-- Re-enable foreign key checks\n`
-    sqlContent += `SET session_replication_role = 'origin';\n\n`
-
-    // Commit transaction
-    sqlContent += `-- Commit transaction\n`
-    sqlContent += `COMMIT;\n\n`
-
-    // Add verification queries
-    sqlContent += `-- Verification queries (run these to verify backup integrity)\n`
-    sqlContent += `-- Expected checksums:\n`
-    for (const [table, checksum] of Object.entries(checksums)) {
-      sqlContent += `-- ${table}: ${checksum}\n`
-    }
-    sqlContent += `\n`
-
-    for (const table of tables) {
-      if (backupData[table]) {
-        const count = backupData[table].length
-        sqlContent += `-- SELECT COUNT(*) as ${table.replace(/-/g, '_')}_count FROM "${table}"; -- Expected: ${count}\n`
-      }
-    }
-
-    sqlContent += `\n-- End of backup\n`
+    const sqlContent = assembleBackupFile(header, metadata, body)
 
     logActivity({
       userId: user.id,
       type: 'backup_exported',
       description: 'Exported database backup',
       metadata: {
-        tables: metadata.tables.length,
-        rows: metadata.totalRows,
+        tables: includedTables.length,
+        rows: totalRows,
         partial: failedTables.length > 0,
       },
     })
@@ -657,12 +261,12 @@ async function handlePOST(req: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/sql',
-        'Content-Disposition': `attachment; filename="database-backup-${new Date().toISOString().split('T')[0]}.sql"`,
+        'Content-Disposition': `attachment; filename="database-backup-${timestamp.split('T')[0]}.sql"`,
         'X-Backup-Metadata': JSON.stringify({
-          tables: metadata.tables.length,
-          rows: metadata.totalRows,
-          timestamp: metadata.timestamp,
-          discoveryMethod: method,
+          tables: includedTables.length,
+          rows: totalRows,
+          timestamp,
+          discoveryMethod: 'pg_catalog',
           warnings: warnings.length,
           errors: errors.length,
           failedTables: failedTables.length,
