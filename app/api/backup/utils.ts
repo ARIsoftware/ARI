@@ -3,9 +3,11 @@
  *
  * These routes use direct SQL via the pg pool for table/schema discovery.
  * No Supabase client dependency — works with any PostgreSQL backend.
+ *
+ * Pure backup logic (serialization, parsing, validation, DDL) lives in
+ * lib/backup/ where it sits inside the unit-test coverage ratchet.
  */
 
-import crypto from "crypto"
 import { pool } from "@/lib/db/pool"
 
 /**
@@ -26,19 +28,3 @@ export async function queryRows<T = Record<string, unknown>>(
 // Canonical home is lib/backup/constants.ts (client-safe, coverage-tested);
 // re-exported here for the routes that historically import from utils.
 export { EXCLUDED_TABLES } from '@/lib/backup/constants'
-
-/** SHA-256 checksum of JSON-serialized data. Used during export. */
-export function calculateChecksum(data: any): string {
-  const hash = crypto.createHash('sha256')
-  hash.update(JSON.stringify(data))
-  return hash.digest('hex')
-}
-
-/**
- * Strip NUL characters from a string. PostgreSQL rejects \u0000 in text
- * and JSONB columns, so any value containing NUL would produce a backup
- * that cannot be re-imported.
- */
-export function stripNul(s: string): string {
-  return s.replace(/\0/g, '')
-}

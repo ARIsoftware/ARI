@@ -576,10 +576,10 @@ pnpm typecheck       # tsc --noEmit
 
 Comprehensive database backup and restore system with dynamic table discovery. Managed via `/settings` > Backups tab.
 
-- **Export**: `/app/api/backup/export/route.ts` — auto-discovers all tables via `information_schema`, exports as executable SQL with checksums
-- **Import**: `/app/api/backup/import/route.ts` — restores from SQL backup with transaction rollback on error
-- **Verify**: `/app/api/backup/verify/route.ts` — preview what will be backed up before exporting
-- **Setup**: Backup RPC functions (`get_all_user_tables`, `get_all_table_columns`, `get_table_row_counts`, `exec_sql`) are installed automatically by `lib/db/setup.sql` during initial setup. Re-run that file if discovery ever fails on an existing install.
+- **Export**: `/app/api/backup/export/route.ts` — discovers schema from `pg_catalog` inside one REPEATABLE READ snapshot and writes format v3: one-line `E'...'`-escaped multi-row INSERTs, exact column types/defaults, PK/UNIQUE/CHECK inline, FKs as single-line `ALTER TABLE ... ADD CONSTRAINT` statements after the data, verbatim indexes, and a `contentSha256` in the metadata line covering every byte after it
+- **Import**: `/app/api/backup/import/route.ts` — quote-aware statement parser (legacy v2.1 backups with multi-line values restore correctly), dangerous-pattern scan over non-INSERT statements only (row data is never scanned as code), row-count integrity check inside the transaction before COMMIT (mismatch → full rollback + 500). Post-restore healing: module `__schema_installed_hash` values are invalidated in-transaction so module schemas (RLS/policies/FKs/indexes) reinstall on next authenticated load, and `reapplySchema()` runs after COMMIT for core
+- **Verify**: `/app/api/backup/verify/route.ts` — exact `COUNT(*)` previews plus a real missing/extra table diff against setup.sql + enabled module schemas
+- **Pure logic**: serialization/parsing/validation/DDL live in `lib/backup/` (inside the coverage ratchet, round-trip tested); routes are thin glue
 - **Health**: `/health` page includes backup system diagnostic tests
 
 ## Troubleshooting

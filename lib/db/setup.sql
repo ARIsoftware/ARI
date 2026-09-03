@@ -734,7 +734,8 @@ AS $$
   FROM information_schema.tables t
   WHERE t.table_schema = 'public'
     AND t.table_type = 'BASE TABLE'
-    -- Keep in sync with EXCLUDED_TABLES in app/api/backup/utils.ts.
+    -- Keep in sync with EXCLUDED_TABLES in lib/backup/constants.ts
+    -- (enforced by tests/unit/lib/backup/constants.test.ts).
     -- PostGIS/system tables, plus append-only telemetry that would otherwise
     -- dominate backup size without carrying user content.
     AND t.table_name NOT IN (
@@ -808,34 +809,9 @@ BEGIN
 END;
 $$;
 
--- Executes an arbitrary read-only SQL query and returns the result as JSON.
--- Used as a fallback by the backup discovery code. SECURITY DEFINER is safe
--- here because the function is only callable by the service role (Supabase
--- does not expose it to anon/authenticated by default).
+-- exec_sql (an arbitrary-SQL SECURITY DEFINER helper once used by backup
+-- discovery) has no callers anywhere in the codebase — the backup routes
+-- query the catalogs directly through the pool. Drop it from existing
+-- installs: an uncalled arbitrary-SQL definer function is pure attack
+-- surface.
 DROP FUNCTION IF EXISTS public.exec_sql(text);
-CREATE OR REPLACE FUNCTION public.exec_sql(query text)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_catalog
-AS $$
-DECLARE
-  result jsonb;
-BEGIN
-  EXECUTE 'SELECT COALESCE(jsonb_agg(row_to_json(r)), ''[]''::jsonb) FROM (' || query || ') r'
-    INTO result;
-  RETURN result;
-END;
-$$;
-
--- Restrict exec_sql to service role only (defense in depth).
--- The anon/authenticated REVOKE is wrapped in a DO/EXCEPTION block because
--- those roles exist only in Supabase modes; on plain Postgres the REVOKE
--- raises 42704 and aborts the install.
-REVOKE ALL ON FUNCTION public.exec_sql(text) FROM PUBLIC;
-DO $$
-BEGIN
-  REVOKE ALL ON FUNCTION public.exec_sql(text) FROM anon, authenticated;
-EXCEPTION
-  WHEN undefined_object OR undefined_function THEN NULL;
-END $$;

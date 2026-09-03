@@ -2,9 +2,9 @@
  * Retention for `api_key_usage_logs`.
  *
  * The table is append-only and driven by request rate, so without a bound it
- * grows forever — and it is included in every backup export
- * (`app/api/backup/utils.ts` excludes only PostGIS/system tables), so unbounded
- * growth inflates backups and slows the Backups screen's per-table COUNT(*).
+ * grows forever. Backups exclude it (`EXCLUDED_TABLES` in
+ * `lib/backup/constants.ts`), but unbounded growth still bloats the database
+ * itself, so it needs its own retention.
  *
  * Cleanup is opportunistic rather than scheduled: a sampled fraction of writes
  * also prunes. That keeps the whole feature working identically on localhost
