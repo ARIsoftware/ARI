@@ -66,7 +66,21 @@ interface ConstraintRow {
   type: string
   definition: string
   referenced_table: string | null
-  pk_columns: string[] | null
+  pk_columns: string[] | string | null
+}
+
+/** Normalize a Postgres array that the driver may hand back either parsed
+ *  (string[]) or raw ('{id,user_id}'), depending on the column's array type. */
+function toColumnArray(value: string[] | string | null): string[] | null {
+  if (Array.isArray(value)) return value
+  if (typeof value === 'string' && value.startsWith('{') && value.endsWith('}')) {
+    const inner = value.slice(1, -1)
+    if (!inner) return []
+    // Simple form is enough here: PK column names are identifiers (no commas
+    // or embedded quotes beyond optional wrapping).
+    return inner.split(',').map((s) => s.replace(/^"|"$/g, ''))
+  }
+  return null
 }
 interface IndexRow {
   table_name: string
@@ -113,7 +127,10 @@ export async function discoverSchema(
                THEN (SELECT relname FROM pg_class WHERE oid = con.confrelid)
              END AS referenced_table,
              CASE WHEN con.contype = 'p' THEN (
-               SELECT array_agg(a.attname ORDER BY k.ord)
+               -- attname is type "name"; cast to text so the aggregate is
+               -- text[], which node-pg parses into a JS array (it has no
+               -- parser for name[] and would hand back the raw '{id}' string).
+               SELECT array_agg(a.attname::text ORDER BY k.ord)
                FROM unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord)
                JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum
              ) END AS pk_columns
@@ -167,8 +184,9 @@ export async function discoverSchema(
       // the backup set (emit) or not (skip + report).
       referencedTable: type === 'f' ? (row.referenced_table ?? null) : null,
     })
-    if (type === 'p' && row.pk_columns) {
-      table.primaryKey = row.pk_columns
+    if (type === 'p') {
+      const pkColumns = toColumnArray(row.pk_columns)
+      if (pkColumns) table.primaryKey = pkColumns
     }
   }
 

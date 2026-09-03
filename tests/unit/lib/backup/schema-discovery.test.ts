@@ -86,6 +86,32 @@ describe('discoverSchema', () => {
     expect(tables.some((t) => t.name === 'not_in_set')).toBe(false)
   })
 
+  it('accepts pk_columns as a raw Postgres array literal (unparsed driver form)', async () => {
+    const query = (async (sql: string) => {
+      if (sql.includes('information_schema.tables')) return [{ table_name: 'documents' }]
+      if (sql.includes('pg_get_constraintdef'))
+        return [
+          { table_name: 'documents', name: 'documents_pkey', type: 'p', definition: 'PRIMARY KEY (id, user_id)', referenced_table: null, pk_columns: '{id,user_id}' },
+        ]
+      return []
+    }) as QueryFn
+    const tables = await discoverSchema(query, new Set())
+    expect(tables[0].primaryKey).toEqual(['id', 'user_id'])
+  })
+
+  it('ignores an unrecognizable pk_columns value instead of crashing', async () => {
+    const query = (async (sql: string) => {
+      if (sql.includes('information_schema.tables')) return [{ table_name: 'odd' }]
+      if (sql.includes('pg_get_constraintdef'))
+        return [
+          { table_name: 'odd', name: 'odd_pkey', type: 'p', definition: 'PRIMARY KEY (id)', referenced_table: null, pk_columns: 'not-an-array' },
+        ]
+      return []
+    }) as QueryFn
+    const tables = await discoverSchema(query, new Set())
+    expect(tables[0].primaryKey).toEqual([])
+  })
+
   it('leaves primaryKey empty for tables without a PK constraint', async () => {
     const query = (async (sql: string) => {
       if (sql.includes('information_schema.tables')) return [{ table_name: 'nopk' }]
