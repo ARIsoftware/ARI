@@ -3,6 +3,11 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { requireAdmin } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
 import { safeErrorResponse } from '@/lib/api-error'
+import { getExactRowCounts } from '@/lib/backup/row-counts'
+import { computeTableDiff, parseCreatedTables, type TableDiff } from '@/lib/backup/expected-tables'
+import { setupSql } from '@/lib/db/setup-sql'
+import { MODULE_SCHEMAS } from '@/lib/generated/module-schemas'
+import { getEnabledModules } from '@/lib/modules/module-registry'
 import { queryRows, EXCLUDED_TABLES } from '../utils'
 import type { RoleCheck } from '@/app/(app)/settings/types'
 import { BackupVerifyResponseSchema } from '@/lib/openapi/app-schemas'
@@ -126,45 +131,28 @@ async function testDiscovery() {
   return result
 }
 
-// Get row counts for tables using pg_class for fast approximate counts
-async function getRowCounts(tables: string[]): Promise<Record<string, number>> {
-  const rowCounts: Record<string, number> = {}
-
+// Compare the live table list against what setup.sql + module schemas are
+// expected to create. Best-effort: verify is a diagnostics endpoint and must
+// degrade gracefully rather than fail.
+async function computeExpectedTables(
+  liveTables: string[],
+  userId: string,
+): Promise<{ diff: TableDiff | null; warning: string | null }> {
   try {
-    const counts = await queryRows<{ table_name: string; row_count: number }>(`
-      SELECT c.relname as table_name, c.reltuples::bigint as row_count
-      FROM pg_class c
-      JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE n.nspname = 'public' AND c.relkind = 'r'
-    `)
-
-    for (const row of counts) {
-      if (tables.includes(row.table_name)) {
-        rowCounts[row.table_name] = Number(row.row_count)
+    const enabledIds = new Set((await getEnabledModules(userId)).map((m) => m.id))
+    const core = parseCreatedTables(setupSql).filter((t) => !EXCLUDED_TABLES.has(t))
+    const modules: Record<string, { tables: string[]; enabled: boolean }> = {}
+    for (const [id, sql] of Object.entries(MODULE_SCHEMAS)) {
+      modules[id] = {
+        tables: parseCreatedTables(sql).filter((t) => !EXCLUDED_TABLES.has(t)),
+        enabled: enabledIds.has(id),
       }
     }
-
-    if (Object.keys(rowCounts).length > 0) {
-      return rowCounts
-    }
+    return { diff: computeTableDiff({ live: liveTables, core, modules }), warning: null }
   } catch (error: unknown) {
-    logger.info('[Backup Verify] pg_class count not available, using fallback')
+    const message = error instanceof Error ? error.message : String(error)
+    return { diff: null, warning: `Could not compute expected tables: ${message}` }
   }
-
-  // Fallback: count individually
-  for (const table of tables) {
-    if (!/^[a-z_][a-z0-9_]*$/i.test(table)) continue
-    try {
-      const result = await queryRows<{ cnt: number }>(
-        `SELECT COUNT(*)::int AS cnt FROM "${table}"`
-      )
-      rowCounts[table] = result[0]?.cnt ?? 0
-    } catch {
-      rowCounts[table] = 0
-    }
-  }
-
-  return rowCounts
 }
 
 async function handleGET(req: NextRequest) {
@@ -211,19 +199,33 @@ async function handleGET(req: NextRequest) {
       warnings.push(`CRITICAL: ${roleCheck.message}`)
     }
 
-    // Get row counts for all tables
-    const rowCounts = discoveredTables.length > 0
-      ? await getRowCounts(discoveredTables)
-      : {}
+    // Exact row counts (never reltuples estimates — this screen previews what
+    // a backup will actually contain) plus the expected-table diff.
+    const [{ counts, failures }, expected] = await Promise.all([
+      discoveredTables.length > 0
+        ? getExactRowCounts(queryRows, discoveredTables)
+        : Promise.resolve({ counts: {} as Record<string, number>, failures: {} as Record<string, string> }),
+      computeExpectedTables(discoveredTables, user.id),
+    ])
+
+    for (const [table, reason] of Object.entries(failures)) {
+      warnings.push(`Table ${table} could not be counted: ${reason}`)
+    }
+    if (expected.warning) {
+      warnings.push(expected.warning)
+    }
+    if (expected.diff && expected.diff.missing.length > 0) {
+      warnings.push(`Missing expected tables: ${expected.diff.missing.join(', ')}`)
+    }
 
     // Build detailed table info
     const tableInfo: TableInfo[] = discoveredTables.map(tableName => ({
       name: tableName,
-      rowCount: rowCounts[tableName] || 0,
-      status: rowCounts[tableName] !== undefined ? 'accessible' : 'inaccessible'
+      rowCount: counts[tableName] ?? 0,
+      status: tableName in failures ? 'inaccessible' : 'accessible'
     }))
 
-    const totalRows = Object.values(rowCounts).reduce((sum, count) => sum + count, 0)
+    const totalRows = Object.values(counts).reduce((sum, count) => sum + count, 0)
 
     // Determine overall status
     const status = discoveredTables.length === 0 ? 'critical' :
@@ -236,12 +238,12 @@ async function handleGET(req: NextRequest) {
       status,
       discoveryMethod: primaryMethod,
       tablesFound: discoveredTables.length,
-      expectedTables: discoveredTables.length,
+      expectedTables: expected.diff?.expectedCount ?? discoveredTables.length,
       totalRows,
       tables: tableInfo,
       warnings,
-      missingTables: [],
-      extraTables: [],
+      missingTables: expected.diff?.missing ?? [],
+      extraTables: expected.diff?.extra ?? [],
       discoveryResults,
       roleCheck,
       timestamp: new Date().toISOString()
