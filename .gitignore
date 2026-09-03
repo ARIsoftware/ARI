@@ -150,3 +150,6 @@ supabase/.env
 # ARI local CLI (tracked; runtime state ignored)
 .ari/*
 !.ari/cli.js
+
+# Local database dumps
+/backups/
