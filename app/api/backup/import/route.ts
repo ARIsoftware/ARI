@@ -6,6 +6,7 @@ import { logActivity } from '@/lib/activity-log'
 import { getPoolClient } from '@/lib/db'
 import { logger } from '@/lib/logger'
 import { safeErrorResponse } from '@/lib/api-error'
+import { MAX_BACKUP_FILE_BYTES, MAX_BACKUP_FILE_LABEL } from '@/lib/backup/constants'
 import { BackupImportRequestSchema, BackupImportResponseSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, UnauthorizedResponse } from '@/lib/openapi/common'
@@ -270,7 +271,7 @@ async function handlePOST(req: NextRequest) {
     // Check if operation is safe in production
     if (!isProductionSafeOperation()) {
       return NextResponse.json(
-        { error: "Backup operations disabled in production. Set ALLOW_BACKUP_OPERATIONS=true to enable." },
+        { error: "Backup operations are disabled because ALLOW_BACKUP_OPERATIONS=false. Unset it or set it to true to re-enable." },
         { status: 403 }
       )
     }
@@ -286,10 +287,10 @@ async function handlePOST(req: NextRequest) {
       )
     }
 
-    // Check file size (max 200MB — export has no limit, so import should be generous)
-    if (file.size > 200 * 1024 * 1024) {
+    // Shared cap with the Settings client (export has no limit, so import stays generous)
+    if (file.size > MAX_BACKUP_FILE_BYTES) {
       return NextResponse.json(
-        { error: "File too large. Maximum size is 200MB" },
+        { error: `File too large. Maximum size is ${MAX_BACKUP_FILE_LABEL}` },
         { status: 400 }
       )
     }
@@ -456,7 +457,7 @@ async function handlePUT(req: NextRequest) {
 
   } catch (error: unknown) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Validation failed' },
+      { error: safeErrorResponse(error) },
       { status: 500 }
     )
   }

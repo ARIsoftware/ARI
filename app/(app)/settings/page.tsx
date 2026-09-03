@@ -6,6 +6,7 @@ import { authClient } from "@/lib/auth-client"
 import { useAuth } from "@/components/providers"
 import { useCurrentUser } from "@/hooks/use-users"
 import { hasPermission } from "@/lib/permissions"
+import { MAX_BACKUP_FILE_BYTES, MAX_BACKUP_FILE_LABEL } from "@/lib/backup/constants"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
@@ -351,8 +352,8 @@ function SettingsPageContent(): React.ReactElement {
       return
     }
 
-    if (selectedFile.size > 50 * 1024 * 1024) {
-      setMessage({ type: "error", text: "File too large. Maximum size is 50MB." })
+    if (selectedFile.size > MAX_BACKUP_FILE_BYTES) {
+      setMessage({ type: "error", text: `File too large. Maximum size is ${MAX_BACKUP_FILE_LABEL}.` })
       return
     }
 

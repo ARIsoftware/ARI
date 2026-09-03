@@ -155,7 +155,6 @@ All table definitions are centralized in `/lib/db/schema/schema.ts` using Drizzl
 - **`module_settings`**: Per-user module preferences (JSONB)
 - **`module_migrations`**: Module migration tracking
 - **`user_preferences`**: User settings
-- **`backup_metadata`**: Backup system metadata
 - **`user`**, **`session`**, **`account`**, **`verification`**: Better Auth system tables
 
 ### Security Implementation
@@ -575,7 +574,7 @@ pnpm typecheck       # tsc --noEmit
 
 ## Backup System
 
-Comprehensive database backup and restore system with dynamic table discovery. Managed via `/settings` > Backups tab or the backup-manager module.
+Comprehensive database backup and restore system with dynamic table discovery. Managed via `/settings` > Backups tab.
 
 - **Export**: `/app/api/backup/export/route.ts` — auto-discovers all tables via `information_schema`, exports as executable SQL with checksums
 - **Import**: `/app/api/backup/import/route.ts` — restores from SQL backup with transaction rollback on error

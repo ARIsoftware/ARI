@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { requireAdmin } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
+import { safeErrorResponse } from '@/lib/api-error'
 import { queryRows, EXCLUDED_TABLES } from '../utils'
 import type { RoleCheck } from '@/app/(app)/settings/types'
 import { BackupVerifyResponseSchema } from '@/lib/openapi/app-schemas'
@@ -251,7 +252,7 @@ async function handleGET(req: NextRequest) {
     return NextResponse.json(
       {
         status: 'error',
-        error: error instanceof Error ? error.message : 'Failed to verify backup system',
+        error: safeErrorResponse(error),
         timestamp: new Date().toISOString()
       },
       { status: 500 }

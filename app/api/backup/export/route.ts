@@ -368,7 +368,7 @@ async function handlePOST(req: NextRequest) {
     // Check if operation is safe in production
     if (!isProductionSafeOperation()) {
       return NextResponse.json(
-        { error: "Backup operations disabled in production. Set ALLOW_BACKUP_OPERATIONS=true to enable." },
+        { error: "Backup operations are disabled because ALLOW_BACKUP_OPERATIONS=false. Unset it or set it to true to re-enable." },
         { status: 403 }
       )
     }
@@ -491,55 +491,14 @@ async function handlePOST(req: NextRequest) {
     sqlContent += `-- Create tables with discovered schemas\n\n`
 
     for (const tableName of tables) {
-      let schema = tableSchemas[tableName]
+      const schema = tableSchemas[tableName]
 
-      // If schema is empty, try to infer from backup data
+      // getTableSchemaFromCache already inferred a schema for any table with
+      // data, so an empty schema here means an empty table with no catalog rows.
       if (!Array.isArray(schema) || schema.length === 0) {
-        logger.warn(`No schema found for ${tableName}, inferring from data...`)
-        const tableData = backupData[tableName]
-
-        if (tableData && tableData.length > 0) {
-          const sampleRow = tableData[0]
-          schema = Object.entries(sampleRow).map(([columnName, value], index) => {
-            let dataType = 'text'
-
-            if (value === null) {
-              dataType = 'text'
-            } else if (typeof value === 'boolean') {
-              dataType = 'boolean'
-            } else if (typeof value === 'number') {
-              dataType = Number.isInteger(value) ? 'integer' : 'numeric'
-            } else if (typeof value === 'string') {
-              if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
-                dataType = 'uuid'
-              } else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
-                dataType = 'timestamp with time zone'
-              } else if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-                dataType = 'date'
-              } else {
-                dataType = 'text'
-              }
-            } else if (Array.isArray(value)) {
-              dataType = 'array'
-            } else if (typeof value === 'object') {
-              dataType = 'jsonb'
-            }
-
-            return {
-              column_name: columnName,
-              data_type: dataType,
-              is_nullable: 'YES',
-              column_default: columnName === 'id' ? 'gen_random_uuid()' : (columnName.includes('created_at') || columnName.includes('updated_at') ? 'now()' : null),
-              character_maximum_length: null
-            }
-          })
-
-          logger.info(`Inferred schema for ${tableName} from data: ${schema.length} columns`)
-        } else {
-          logger.warn(`Empty table ${tableName} has no cached schema — included as comment only`)
-          sqlContent += `-- Table: ${tableName} (empty, no schema available)\n\n`
-          continue
-        }
+        logger.warn(`Empty table ${tableName} has no cached schema — included as comment only`)
+        sqlContent += `-- Table: ${tableName} (empty, no schema available)\n\n`
+        continue
       }
 
       const constraints = tableConstraints[tableName] || { primaryKeys: [], uniqueKeys: [] }
