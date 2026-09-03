@@ -31,7 +31,7 @@ import {
   type NotificationSettings,
   type BackupStats,
   type BackupMessage,
-  type ImportProgress,
+  type ImportFailure,
   type ValidationResult,
   type VerificationResult,
   type ExportFailure,
@@ -123,7 +123,7 @@ function SettingsPageContent(): React.ReactElement {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [backupStats, setBackupStats] = useState<BackupStats | null>(null)
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null)
-  const [importProgress, setImportProgress] = useState<ImportProgress | null>(null)
+  const [importFailure, setImportFailure] = useState<ImportFailure | null>(null)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
   const [exportFailure, setExportFailure] = useState<ExportFailure | null>(null)
@@ -346,11 +346,16 @@ function SettingsPageContent(): React.ReactElement {
     }
   }
 
+  // Two-phase flow: PUT validates the file (uploading it once), the confirm
+  // dialog shows the result, then POST uploads it again to execute. The double
+  // upload is deliberate — server-side stashing between requests would break
+  // on serverless/multi-instance deployments, and backup files are small.
   async function handleImportClick(): Promise<void> {
     if (!selectedFile) {
       setMessage({ type: "error", text: "Please select a file to import" })
       return
     }
+    setImportFailure(null)
 
     if (selectedFile.size > MAX_BACKUP_FILE_BYTES) {
       setMessage({ type: "error", text: `File too large. Maximum size is ${MAX_BACKUP_FILE_LABEL}.` })
@@ -400,7 +405,7 @@ function SettingsPageContent(): React.ReactElement {
     try {
       setImportLoading(true)
       setMessage(null)
-      setImportProgress({ current: 0, total: 100 })
+      setImportFailure(null)
 
       if (!selectedFile) {
         throw new Error("No file selected")
@@ -417,15 +422,18 @@ function SettingsPageContent(): React.ReactElement {
       if (!response.ok) {
         const error = await response.json()
         if (error.rollback) {
-          throw new Error(`Import failed and was rolled back: ${error.details?.[0] || error.error}`)
+          // Statement failure or integrity mismatch — nothing was committed.
+          setImportFailure({ details: error.details || [] })
+          setMessage({ type: "error", text: error.error || "Import failed — all changes were rolled back." })
+          return
         }
         throw new Error(error.error || "Import failed")
       }
 
       const result = await response.json()
 
-      setImportProgress({ current: 100, total: 100 })
-
+      // Success now always means the in-transaction integrity check passed
+      // (or the backup carried no row-count metadata to check against).
       let resultMessage = result.message
       if (result.stats) {
         resultMessage += ` (Duration: ${result.stats.duration}, Tables: ${result.stats.tablesCreated}, Records: ${result.stats.recordsImported})`
@@ -434,12 +442,15 @@ function SettingsPageContent(): React.ReactElement {
           resultMessage += ` Warning: ${result.stats.warnings.length} validation warnings.`
         }
       }
-
-      if (result.integrityCheck !== "passed") {
-        resultMessage += ` Data integrity check: ${result.integrityCheck.failures?.length || 0} issues detected.`
+      if (result.integrity?.verified) {
+        resultMessage += ` Integrity verified across ${result.integrity.tablesChecked} tables.`
       }
 
-      const messageType = result.integrityCheck === "passed" ? "success" : "error"
+      let messageType: BackupMessage["type"] = "success"
+      if (result.postRestore && result.postRestore.coreSchemaReapplied === false) {
+        messageType = "warning"
+        resultMessage += " Core schema re-apply failed; it will retry on the next app start."
+      }
       setMessage({ type: messageType, text: resultMessage })
 
       setSelectedFile(null)
@@ -453,7 +464,6 @@ function SettingsPageContent(): React.ReactElement {
       setMessage({ type: "error", text: errorMessage })
     } finally {
       setImportLoading(false)
-      setImportProgress(null)
     }
   }
 
@@ -640,7 +650,7 @@ function SettingsPageContent(): React.ReactElement {
                     message={message}
                     verificationResult={verificationResult}
                     backupStats={backupStats}
-                    importProgress={importProgress}
+                    importFailure={importFailure}
                     showConfirmDialog={showConfirmDialog}
                     validationResult={validationResult}
                     selectedFile={selectedFile}

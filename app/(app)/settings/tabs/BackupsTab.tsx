@@ -4,17 +4,16 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { AlertCircle, CheckCircle2, Download, Eye, Loader2, Upload } from "lucide-react"
-import type { BackupStats, BackupMessage, ImportProgress, ValidationResult, VerificationResult, ExportFailure, DbMode } from "../types"
+import type { BackupStats, BackupMessage, ImportFailure, ValidationResult, VerificationResult, ExportFailure, DbMode } from "../types"
 
 interface BackupsTabProps {
   message: BackupMessage | null
   verificationResult: VerificationResult | null
   backupStats: BackupStats | null
-  importProgress: ImportProgress | null
+  importFailure: ImportFailure | null
   showConfirmDialog: boolean
   validationResult: ValidationResult | null
   selectedFile: File | null
@@ -97,7 +96,7 @@ export function BackupsTab({
   message,
   verificationResult,
   backupStats,
-  importProgress,
+  importFailure,
   showConfirmDialog,
   validationResult,
   selectedFile,
@@ -235,19 +234,52 @@ export function BackupsTab({
         </Card>
       )}
 
-      {importProgress && (
+      {importLoading && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Import Progress</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Restoring database
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Processing records...</span>
-                <span>{importProgress.current} / {importProgress.total}</span>
+            <p className="text-sm text-muted-foreground">
+              Restoring in a single transaction — do not close this tab. You may need to sign in
+              again afterwards.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {importFailure && (
+        <Card className="border-red-500">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2 text-red-600">
+              <AlertCircle className="h-5 w-5" />
+              Import failed — all changes were rolled back
+            </CardTitle>
+            <CardDescription>
+              The restore did not commit. Your existing data is untouched.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {importFailure.details.length > 0 && (
+              <div>
+                <p className="font-medium text-sm">Details:</p>
+                <ul className="list-disc list-inside text-xs text-muted-foreground font-mono space-y-1">
+                  {importFailure.details.slice(0, 10).map((detail, idx) => (
+                    <li key={idx} className="break-all">{detail}</li>
+                  ))}
+                  {importFailure.details.length > 10 && (
+                    <li>... and {importFailure.details.length - 10} more</li>
+                  )}
+                </ul>
               </div>
-              <Progress value={(importProgress.current / importProgress.total) * 100} />
-            </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              If rows changed between export and import (counts mismatch), re-export and try again.
+              For orphaned-row failures, fix the data in the source database and re-export.
+            </p>
           </CardContent>
         </Card>
       )}
@@ -282,7 +314,10 @@ export function BackupsTab({
                   {validationResult.valid && (
                     <div className="flex items-center gap-2 text-green-600 text-sm">
                       <CheckCircle2 className="h-4 w-4" />
-                      <span>SQL file passed all validation checks</span>
+                      <span>
+                        SQL file passed all validation checks
+                        {validationResult.checksumVerified ? " (content checksum verified)" : ""}
+                      </span>
                     </div>
                   )}
 

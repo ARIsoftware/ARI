@@ -44,9 +44,8 @@ export interface BackupMessage {
   text: string
 }
 
-export interface ImportProgress {
-  current: number
-  total: number
+export interface ImportFailure {
+  details: string[]
 }
 
 export interface ValidationResult {
@@ -54,6 +53,8 @@ export interface ValidationResult {
   errors: string[]
   warnings: string[]
   metadata?: Record<string, unknown>
+  /** v3 backups only: the file's contentSha256 matched its bytes. */
+  checksumVerified?: boolean
 }
 
 export interface RoleCheck {
