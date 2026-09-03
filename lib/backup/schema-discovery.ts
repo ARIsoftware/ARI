@@ -210,6 +210,12 @@ export async function fetchTableRows(
   query: QueryFn,
   table: TableDefinition,
 ): Promise<Record<string, unknown>[]> {
+  // Guard the interpolation point: a table whose name the backup format
+  // cannot round-trip (e.g. hyphenated) fails HERE with a clear message, so
+  // the export route files it under failedTables and ?force=true can skip it.
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(table.name)) {
+    throw new Error(`table name cannot be safely exported: ${table.name}`)
+  }
   const orderBy = table.primaryKey.length
     ? ` ORDER BY ${table.primaryKey.map((c) => `"${c.replace(/"/g, '""')}"`).join(', ')}`
     : ''

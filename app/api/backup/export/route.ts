@@ -7,7 +7,7 @@ import { getPoolClient } from '@/lib/db'
 import { logger } from '@/lib/logger'
 import { safeErrorResponse } from '@/lib/api-error'
 import { EXCLUDED_TABLES } from '@/lib/backup/constants'
-import { BACKUP_VERSION, END_MARKER, assembleBackupFile, calculateChecksum } from '@/lib/backup/format'
+import { BACKUP_VERSION, END_MARKER, assembleBackupFile } from '@/lib/backup/format'
 import { buildInsertStatements } from '@/lib/backup/serialize'
 import {
   discoverSchema,
@@ -45,7 +45,9 @@ registry.registerPath({
 
 interface GatheredData {
   tables: TableDefinition[]
-  rows: Record<string, Record<string, unknown>[]>
+  /** tableName → complete serialized insert section (comment + DELETE + INSERTs). */
+  insertSections: Record<string, string>
+  rowCounts: Record<string, number>
   errors: string[]
   failedTables: string[]
 }
@@ -55,6 +57,12 @@ interface GatheredData {
  * REPEATABLE READ read-only transaction: schema, constraints, and all rows
  * share a single MVCC snapshot, so cross-table FK consistency of the dump is
  * guaranteed even while the app is live.
+ *
+ * Each table is fetched under a SAVEPOINT (one failing table must not abort
+ * the snapshot and cascade 25P02 onto every later table — that would make
+ * ?force=true silently drop most of the database) and serialized immediately,
+ * inside the same per-table error handling, so serialization failures land in
+ * failedTables too and the rows are released before the next table loads.
  */
 async function gatherSnapshot(): Promise<GatheredData> {
   const client = await getPoolClient()
@@ -66,15 +74,35 @@ async function gatherSnapshot(): Promise<GatheredData> {
     const tables = await discoverSchema(query, EXCLUDED_TABLES)
     logger.info(`Discovered ${tables.length} tables via pg_catalog`)
 
-    const rows: Record<string, Record<string, unknown>[]> = {}
+    const insertSections: Record<string, string> = {}
+    const rowCounts: Record<string, number> = {}
     const errors: string[] = []
     const failedTables: string[] = []
 
     for (const table of tables) {
+      await client.query('SAVEPOINT table_export')
       try {
-        rows[table.name] = await fetchTableRows(query, table)
-        logger.info(`Exported ${table.name}: ${rows[table.name].length} rows`)
+        const tableRows = await fetchTableRows(query, table)
+        rowCounts[table.name] = tableRows.length
+
+        if (tableRows.length === 0) {
+          insertSections[table.name] = `-- Table: ${table.name} (no data)\n`
+        } else {
+          const columnTypes = Object.fromEntries(table.columns.map((c) => [c.name, c.dataType]))
+          const statements = buildInsertStatements(table.name, tableRows, {
+            columnTypes,
+            // GENERATED ALWAYS AS IDENTITY rejects explicit values without
+            // this, even under session_replication_role='replica'.
+            overridingSystemValue: table.columns.some((c) => c.identity === 'a'),
+          })
+          insertSections[table.name] =
+            `-- Table: ${table.name} (${tableRows.length} rows)\n` +
+            `DELETE FROM "${table.name}";\n` +
+            statements.join('\n') + '\n'
+        }
+        logger.info(`Exported ${table.name}: ${rowCounts[table.name]} rows`)
       } catch (tableError: unknown) {
+        try { await client.query('ROLLBACK TO SAVEPOINT table_export') } catch { /* ignore */ }
         const message = tableError instanceof Error ? tableError.message : String(tableError)
         logger.error(`Error exporting table ${table.name}:`, tableError)
         errors.push(`Error exporting ${table.name}: ${message}`)
@@ -82,7 +110,7 @@ async function gatherSnapshot(): Promise<GatheredData> {
       }
     }
 
-    return { tables, rows, errors, failedTables }
+    return { tables, insertSections, rowCounts, errors, failedTables }
   } finally {
     try { await client.query('ROLLBACK') } catch { /* read-only snapshot — nothing to undo */ }
     try { client.release() } catch { /* ignore */ }
@@ -116,7 +144,7 @@ async function handlePOST(req: NextRequest) {
 
     const force = req.nextUrl.searchParams.get('force') === 'true'
 
-    const { tables, rows, errors, failedTables } = await gatherSnapshot()
+    const { tables, insertSections, rowCounts, errors, failedTables } = await gatherSnapshot()
 
     // Default behavior: fail loudly if any table errored. Users explicitly
     // opt into a partial backup with ?force=true after seeing the error.
@@ -135,30 +163,7 @@ async function handlePOST(req: NextRequest) {
 
     const includedTables = tables.filter((t) => !failedTables.includes(t.name))
     const warnings: string[] = []
-
-    // Serialize data + checksums (informational — integrity is proven by the
-    // file-level contentSha256 plus in-transaction row counts on import).
-    const checksums: Record<string, string> = {}
-    const rowCounts: Record<string, number> = {}
-    let totalRows = 0
-    const insertSections: string[] = []
-    for (const table of includedTables) {
-      const tableRows = rows[table.name] ?? []
-      checksums[table.name] = calculateChecksum(tableRows)
-      rowCounts[table.name] = tableRows.length
-      totalRows += tableRows.length
-
-      if (tableRows.length === 0) {
-        insertSections.push(`-- Table: ${table.name} (no data)\n`)
-        continue
-      }
-      const statements = buildInsertStatements(table.name, tableRows)
-      insertSections.push(
-        `-- Table: ${table.name} (${tableRows.length} rows, checksum: ${checksums[table.name]})\n` +
-        `DELETE FROM "${table.name}";\n` +
-        statements.join('\n') + '\n'
-      )
-    }
+    const totalRows = includedTables.reduce((sum, t) => sum + (rowCounts[t.name] ?? 0), 0)
 
     // DDL: exact catalog types, verbatim defaults, PK/UNIQUE/CHECK inline.
     const ddlSections: string[] = []
@@ -194,30 +199,37 @@ async function handlePOST(req: NextRequest) {
     const timestamp = new Date().toISOString()
 
     // Body = everything after the metadata line; exactly what contentSha256
-    // covers and what import parses.
-    let body = `\n-- Begin transaction for atomic import\nBEGIN;\n\n`
-    body += `-- Disable foreign key checks during data load\nSET session_replication_role = 'replica';\n\n`
-    body += `-- Create tables with discovered schemas\n\n`
-    body += ddlSections.join('\n')
-    body += `\n-- Insert data\n\n`
-    body += insertSections.join('\n')
+    // covers and what import parses. Built as parts joined once to keep peak
+    // memory near 2x the file size instead of 3-4x.
+    const bodyParts: string[] = [
+      `\n-- Begin transaction for atomic import\nBEGIN;\n\n`,
+      `-- Disable foreign key checks during data load\nSET session_replication_role = 'replica';\n\n`,
+      `-- Create tables with discovered schemas\n\n`,
+      ddlSections.join('\n'),
+      `\n-- Insert data\n\n`,
+      includedTables.map((t) => insertSections[t.name] ?? '').join('\n'),
+    ]
     if (indexStatements.length > 0) {
-      body += `\n-- Recreate indexes\n${indexStatements.join('\n')}\n`
+      bodyParts.push(`\n-- Recreate indexes\n${indexStatements.join('\n')}\n`)
     }
     if (fkStatements.length > 0) {
-      body += `\n-- Restore foreign keys (validated against the data above)\n${fkStatements.join('\n')}\n`
+      bodyParts.push(`\n-- Restore foreign keys (validated against the data above)\n${fkStatements.join('\n')}\n`)
     }
     if (sequenceResets.length > 0) {
-      body += `\n-- Reset sequences\n${sequenceResets.join('\n')}\n`
+      bodyParts.push(`\n-- Reset sequences\n${sequenceResets.join('\n')}\n`)
     }
-    body += `\n-- Re-enable foreign key checks\nSET session_replication_role = 'origin';\n\n`
-    body += `-- Commit transaction\nCOMMIT;\n\n`
-    body += `-- Expected row counts:\n`
+    bodyParts.push(`\n-- Re-enable foreign key checks\nSET session_replication_role = 'origin';\n\n`)
+    bodyParts.push(`-- Commit transaction\nCOMMIT;\n\n`)
+    bodyParts.push(`-- Expected row counts:\n`)
     for (const table of includedTables) {
-      body += `-- SELECT COUNT(*) as ${table.name.replace(/-/g, '_')}_count FROM "${table.name}"; -- Expected: ${rowCounts[table.name]}\n`
+      bodyParts.push(`-- SELECT COUNT(*) as ${table.name.replace(/-/g, '_')}_count FROM "${table.name}"; -- Expected: ${rowCounts[table.name]}\n`)
     }
-    body += `\n${END_MARKER}\n`
+    bodyParts.push(`\n${END_MARKER}\n`)
+    const body = bodyParts.join('')
 
+    // No per-table checksums: they were documented as never verified and
+    // cost a second JSON serialization of every table. contentSha256 (whole
+    // executable body) + in-transaction row counts are the integrity story.
     const metadata = {
       version: BACKUP_VERSION,
       timestamp,
@@ -226,7 +238,6 @@ async function handlePOST(req: NextRequest) {
       tables: includedTables.map((t) => t.name),
       rowCounts,
       totalRows,
-      checksums,
       warnings: warnings.length > 0 ? warnings : undefined,
       errors: errors.length > 0 ? errors : undefined,
       exportedFrom: `ARI Backup System v${BACKUP_VERSION}`,

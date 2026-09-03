@@ -155,6 +155,18 @@ describe('fetchTableRows', () => {
     expect(captured).toBe('SELECT * FROM "session" ORDER BY "createdAt"')
   })
 
+  it('rejects table names the backup format cannot round-trip, before any SQL runs', async () => {
+    let queried = false
+    const query = (async () => {
+      queried = true
+      return []
+    }) as QueryFn
+    await expect(fetchTableRows(query, table('my-table', ['id']))).rejects.toThrow(
+      'table name cannot be safely exported'
+    )
+    expect(queried).toBe(false)
+  })
+
   it('omits ORDER BY when the table has no primary key', async () => {
     let captured = ''
     const query = (async (sql: string) => {

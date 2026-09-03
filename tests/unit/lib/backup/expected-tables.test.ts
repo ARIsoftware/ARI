@@ -50,10 +50,24 @@ describe('computeTableDiff', () => {
     expect(diff.extra).toEqual(['mystery_table'])
   })
 
-  it('counts expected tables as core plus enabled modules only', () => {
+  it('counts expected tables as core plus enabled modules only when no leftovers exist', () => {
     const diff = computeTableDiff(input)
     // tasks, user, module_settings, fitness_days, chat_threads
     expect(diff.expectedCount).toBe(5)
+  })
+
+  it('counts present disabled-module leftovers in the denominator so found/expected agrees', () => {
+    const live = ['tasks', 'user', 'module_settings', 'fitness_days', 'chat_threads', 'spy_caches']
+    const diff = computeTableDiff({ ...input, live })
+    // The 5 expected plus the live-but-disabled spy_caches — matches tablesFound
+    expect(diff.expectedCount).toBe(6)
+    expect(diff.expectedCount).toBe(live.length)
+    expect(diff.missing).toEqual([])
+    expect(diff.extra).toEqual([])
+    // An ABSENT disabled-module table is neither missing nor expected
+    const without = computeTableDiff({ ...input, live: live.filter((t) => t !== 'spy_caches') })
+    expect(without.expectedCount).toBe(5)
+    expect(without.missing).toEqual([])
   })
 
   it('reports a clean bill when live matches expectations', () => {

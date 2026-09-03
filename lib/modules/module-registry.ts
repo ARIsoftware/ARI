@@ -13,6 +13,7 @@ import { withAdminDb } from '@/lib/db'
 import { moduleSettings as moduleSettingsTable } from '@/lib/db/schema'
 import { eq, and, sql } from 'drizzle-orm'
 import { loadModules } from './module-loader'
+import { SCHEMA_INSTALLED_HASH_KEY } from './schema-hash-key'
 import { runModuleSchemaInstall } from './schema-installer'
 import type { ModuleMetadata } from './module-types'
 
@@ -28,7 +29,6 @@ import type { ModuleMetadata } from './module-types'
  * - `__schema_installed_at`: diagnostic-only ISO timestamp of the last
  *   successful install. Not used by the gate.
  */
-const SCHEMA_INSTALLED_HASH_KEY = '__schema_installed_hash'
 const SCHEMA_INSTALLED_AT_KEY = '__schema_installed_at'
 
 function moduleHasTables(module: ModuleMetadata): boolean {

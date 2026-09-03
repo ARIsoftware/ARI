@@ -91,7 +91,9 @@ export function splitSqlStatements(content: string): SplitResult {
       continue
     }
 
-    // Block comment, with nesting (Postgres nests block comments).
+    // Block comment, with nesting (Postgres nests block comments). Replaced
+    // by a single space so `a/*c*/b` does not splice into `ab` — Postgres
+    // treats a comment as whitespace.
     if (ch === '/' && content[i + 1] === '*') {
       let depth = 1
       i += 2
@@ -106,6 +108,7 @@ export function splitSqlStatements(content: string): SplitResult {
           i++
         }
       }
+      buf += ' '
       continue
     }
 

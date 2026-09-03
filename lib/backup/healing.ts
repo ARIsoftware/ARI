@@ -20,12 +20,14 @@
  * separately via reapplySchema() after COMMIT — see runPostRestoreHealing.
  */
 
+import { SCHEMA_INSTALLED_HASH_KEY } from '@/lib/modules/schema-hash-key'
+
 /** Single-line, self-guarding SQL that tolerates backups predating module_settings. */
 export function buildModuleHashInvalidationSql(): string {
   return (
     "DO $$ BEGIN IF to_regclass('public.module_settings') IS NOT NULL THEN " +
-    "UPDATE module_settings SET settings = settings - '__schema_installed_hash' " +
-    "WHERE settings ? '__schema_installed_hash'; END IF; END $$"
+    `UPDATE module_settings SET settings = settings - '${SCHEMA_INSTALLED_HASH_KEY}' ` +
+    `WHERE settings ? '${SCHEMA_INSTALLED_HASH_KEY}'; END IF; END $$`
   )
 }
 

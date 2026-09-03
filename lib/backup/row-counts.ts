@@ -22,18 +22,23 @@ export async function getExactRowCounts(query: QueryFn, tables: string[]): Promi
   const counts: Record<string, number> = {}
   const failures: Record<string, string> = {}
 
-  for (const table of tables) {
-    if (!SAFE_TABLE_NAME.test(table)) {
-      failures[table] = 'invalid table name'
-      continue
-    }
-    try {
-      const rows = await query<{ cnt: number }>(`SELECT COUNT(*)::int AS cnt FROM "${table}"`)
-      counts[table] = rows[0]?.cnt ?? 0
-    } catch (error) {
-      failures[table] = error instanceof Error ? error.message : String(error)
-    }
-  }
+  // Counts run concurrently — the pg pool queues excess queries, so this is
+  // bounded by pool size while cutting the Preview action's wall-clock from
+  // one round-trip per table to roughly one pool-batch.
+  await Promise.all(
+    tables.map(async (table) => {
+      if (!SAFE_TABLE_NAME.test(table)) {
+        failures[table] = 'invalid table name'
+        return
+      }
+      try {
+        const rows = await query<{ cnt: number }>(`SELECT COUNT(*)::int AS cnt FROM "${table}"`)
+        counts[table] = rows[0]?.cnt ?? 0
+      } catch (error) {
+        failures[table] = error instanceof Error ? error.message : String(error)
+      }
+    }),
+  )
 
   return { counts, failures }
 }

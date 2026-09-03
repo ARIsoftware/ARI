@@ -44,7 +44,9 @@ export interface TableDiff {
   /** Live tables no known source creates — genuinely unknown. Disabled-module
    *  leftovers are NOT extra (their data legitimately persists while disabled). */
   extra: string[]
-  /** |core ∪ enabled modules' tables| */
+  /** |core ∪ enabled modules' tables ∪ known leftovers present live|. Known
+   *  disabled-module tables that exist count in the denominator so the UI's
+   *  "found / expected" fraction agrees on healthy installs. */
   expectedCount: number
 }
 
@@ -61,6 +63,12 @@ export function computeTableDiff(input: TableDiffInput): TableDiff {
   const live = new Set(input.live)
   const missing = [...expected].filter((t) => !live.has(t)).sort()
   const extra = input.live.filter((t) => !allKnown.has(t)).sort()
+
+  // Present leftovers from disabled modules are legitimate — count them as
+  // expected (they are live and known), never as missing when absent.
+  for (const table of input.live) {
+    if (allKnown.has(table)) expected.add(table)
+  }
 
   return { missing, extra, expectedCount: expected.size }
 }

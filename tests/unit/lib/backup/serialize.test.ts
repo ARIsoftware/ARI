@@ -117,6 +117,56 @@ describe('serializeValue', () => {
   })
 })
 
+describe('serializeValue with column types', () => {
+  it('serializes jsonb/json columns as JSON text regardless of the parsed JS shape', () => {
+    // node-pg JSON.parses jsonb — a stored [] arrives as a JS array and must
+    // NOT become ARRAY[...]::text[] (42804 on restore), and scalars must be
+    // re-encoded as JSON.
+    expect(serializeValue([], 'jsonb')).toBe("E'[]'")
+    expect(serializeValue([{ id: 1, name: "o'brien" }], 'jsonb')).toBe(
+      escapeStringLiteral(JSON.stringify([{ id: 1, name: "o'brien" }]))
+    )
+    expect(serializeValue('hello', 'jsonb')).toBe('E\'"hello"\'')
+    expect(serializeValue(false, 'jsonb')).toBe("E'false'")
+    expect(serializeValue(42, 'json')).toBe("E'42'")
+    expect(serializeValue({ a: 1 }, 'jsonb')).toBe('E\'{"a":1}\'')
+    expect(serializeValue(null, 'jsonb')).toBe('NULL')
+  })
+
+  it('serializes DATE columns from local components (no UTC shift)', () => {
+    // node-pg parses a DATE into a Date at LOCAL midnight; toISOString()
+    // would move it a day on any non-UTC machine.
+    const localMidnight = new Date(2026, 2, 10)
+    expect(serializeValue(localMidnight, 'date')).toBe("E'2026-03-10'")
+  })
+
+  it('serializes timestamp-without-time-zone columns as local wall-clock', () => {
+    const local = new Date(2026, 2, 10, 14, 30, 5, 78)
+    expect(serializeValue(local, 'timestamp without time zone')).toBe("E'2026-03-10 14:30:05.078'")
+    expect(serializeValue(local, 'timestamp without time zone')).not.toContain('Z')
+  })
+
+  it('keeps timestamptz as ISO', () => {
+    const d = new Date('2026-01-02T03:04:05.678Z')
+    expect(serializeValue(d, 'timestamp with time zone')).toBe("E'2026-01-02T03:04:05.678Z'")
+    expect(serializeValue(d)).toBe("E'2026-01-02T03:04:05.678Z'")
+  })
+
+  it('casts empty typed arrays to their own column type', () => {
+    expect(serializeValue([], 'integer[]')).toBe('ARRAY[]::integer[]')
+    expect(serializeValue([], 'text[]')).toBe('ARRAY[]::text[]')
+    expect(serializeValue([], 'character varying(50)[]')).toBe('ARRAY[]::character varying(50)[]')
+    // Unusable cast type falls back to text[] (correct for all current columns)
+    expect(serializeValue([], 'weird; DROP TABLE x[]')).toBe('ARRAY[]::text[]')
+    expect(serializeArray([], 'uuid[]')).toBe('ARRAY[]::uuid[]')
+  })
+
+  it('routes non-empty typed arrays through serializeArray with the cast type', () => {
+    expect(serializeValue(['a'], 'text[]')).toBe("ARRAY[E'a']")
+    expect(serializeValue([1, 2], 'integer[]')).toBe('ARRAY[1,2]')
+  })
+})
+
 describe('serializeArray', () => {
   it('serializes an empty array with an explicit text[] cast', () => {
     expect(serializeArray([])).toBe('ARRAY[]::text[]')
@@ -212,6 +262,22 @@ describe('buildInsertStatements', () => {
     expect(() => buildInsertStatements('1abc', [{ id: '1' }])).toThrow(BackupSerializeError)
     expect(() => buildInsertStatements('a;b', [{ id: '1' }])).toThrow(BackupSerializeError)
     expect(() => buildInsertStatements('tasks', [{ 'bad col': '1' }])).toThrow(BackupSerializeError)
+  })
+
+  it('applies columnTypes per column', () => {
+    const rows = [{ id: '1', attachments: [], due: new Date(2026, 5, 15) }]
+    const out = buildInsertStatements('tasks', rows, {
+      columnTypes: { attachments: 'jsonb', due: 'date' },
+    })
+    expect(out[0]).toBe('INSERT INTO "tasks" ("id", "attachments", "due") VALUES (E\'1\', E\'[]\', E\'2026-06-15\');')
+  })
+
+  it('emits OVERRIDING SYSTEM VALUE when requested (GENERATED ALWAYS identity)', () => {
+    const rows = [{ id: 1, name: 'a' }]
+    const out = buildInsertStatements('seq_table', rows, { overridingSystemValue: true })
+    expect(out[0]).toBe('INSERT INTO "seq_table" ("id", "name") OVERRIDING SYSTEM VALUE VALUES (1, E\'a\');')
+    // And never when not requested
+    expect(buildInsertStatements('seq_table', rows)[0]).not.toContain('OVERRIDING')
   })
 
   it('always emits single-line INSERT statements ending in a semicolon', () => {

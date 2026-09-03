@@ -59,6 +59,11 @@ describe('splitSqlStatements', () => {
     expect(result.statements).toEqual(['SELECT 1', 'SELECT 2'])
   })
 
+  it('replaces a mid-statement block comment with whitespace instead of splicing tokens', () => {
+    const result = splitSqlStatements('SELECT a/*c*/b FROM t;')
+    expect(result.statements).toEqual(['SELECT a b FROM t'])
+  })
+
   it('treats -- inside a literal as content, not a comment', () => {
     const sql = "INSERT INTO t (a) VALUES ('before -- not a comment after');"
     const result = splitSqlStatements(sql)

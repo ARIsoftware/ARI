@@ -56,6 +56,8 @@ interface IntegrityResult {
   verified: boolean
   tablesChecked: number
   rowsVerified: number
+  /** Non-fatal integrity notes (legacy backups only). */
+  warnings: string[]
 }
 
 type TransactionResult =
@@ -72,6 +74,7 @@ async function executeInTransaction(
   statements: string[],
   postRestoreStatements: string[],
   expectedRowCounts: Record<string, number> | null,
+  strictIntegrity: boolean,
   onProgress?: (current: number, total: number) => void
 ): Promise<TransactionResult> {
   let client
@@ -110,7 +113,7 @@ async function executeInTransaction(
 
     // In-transaction integrity check: every table in the backup's metadata
     // must hold exactly the row count the backup promises.
-    const integrity: IntegrityResult = { verified: false, tablesChecked: 0, rowsVerified: 0 }
+    const integrity: IntegrityResult = { verified: false, tablesChecked: 0, rowsVerified: 0, warnings: [] }
     if (expectedRowCounts) {
       const failures: string[] = []
       let rowsVerified = 0
@@ -119,6 +122,9 @@ async function executeInTransaction(
           failures.push(`${table}: invalid table name in backup metadata`)
           continue
         }
+        // SAVEPOINT so a failed COUNT (missing table) doesn't abort the
+        // transaction and cascade 25P02 noise onto every later COUNT.
+        await client.query('SAVEPOINT integrity_probe')
         try {
           const result = await client.query(`SELECT COUNT(*)::int AS cnt FROM "${table}"`)
           const actualCount = result.rows[0]?.cnt ?? 0
@@ -128,9 +134,18 @@ async function executeInTransaction(
             rowsVerified += actualCount
           }
         } catch (error: unknown) {
-          // A missing table after restore is an integrity failure, not a pass.
+          try { await client.query('ROLLBACK TO SAVEPOINT integrity_probe') } catch { /* ignore */ }
           const message = error instanceof Error ? error.message : String(error)
-          failures.push(`${table}: could not verify (${message})`)
+          if (strictIntegrity) {
+            // v3 backups carry DDL for every metadata table — a missing one
+            // is a real integrity failure.
+            failures.push(`${table}: could not verify (${message})`)
+          } else {
+            // Legacy v2.1 backups could list tables in rowCounts that the
+            // file carries no DDL for ("empty, no schema available") — a
+            // missing table there must not brick an otherwise-good restore.
+            integrity.warnings.push(`${table}: not verifiable (${message})`)
+          }
         }
       }
       if (failures.length > 0) {
@@ -138,7 +153,7 @@ async function executeInTransaction(
         return { success: false, errors: failures, integrityFailure: true }
       }
       integrity.verified = true
-      integrity.tablesChecked = Object.keys(expectedRowCounts).length
+      integrity.tablesChecked = Object.keys(expectedRowCounts).length - integrity.warnings.length
       integrity.rowsVerified = rowsVerified
     }
 
@@ -222,6 +237,18 @@ async function handlePOST(req: NextRequest) {
     }
 
     const content = await file.text()
+
+    // Detect in-transit truncation deterministically: the decoded text must
+    // re-encode to exactly the byte count the browser reported for the file.
+    if (Buffer.byteLength(content, 'utf8') !== file.size) {
+      return NextResponse.json(
+        {
+          error: `Upload appears truncated in transit (received ${Buffer.byteLength(content, 'utf8')} of ${file.size} bytes). Please retry; if this recurs with large backups, the server or a proxy is cutting the request body short.`,
+        },
+        { status: 400 }
+      )
+    }
+
     const parsed = parseBackup(content)
     const validation = validateBackup(content, parsed)
 
@@ -253,6 +280,9 @@ async function handlePOST(req: NextRequest) {
       // trip the integrity check.
       [buildModuleHashInvalidationSql()],
       validation.metadata?.rowCounts ?? null,
+      // v3 backups carry DDL for every metadata table, so a missing table is
+      // a hard failure; legacy files get the lenient path (see executor).
+      parseFloat(validation.metadata?.version ?? '0') >= 3,
       (current, total) => {
         const progress = Math.floor((current / total) * 100)
         if (progress > lastProgress + 5) {
@@ -309,7 +339,7 @@ async function handlePOST(req: NextRequest) {
         insertStatements: parsed.inserts.length,
         recordsImported: result.integrity.verified ? result.integrity.rowsVerified : parsed.inserts.length,
         indexesCreated: parsed.indexes.length,
-        warnings: validation.warnings
+        warnings: [...validation.warnings, ...result.integrity.warnings]
       },
       // Success now always means the in-transaction check passed (or the
       // backup carried no row-count metadata to check against). The legacy
@@ -377,6 +407,20 @@ async function handlePUT(req: NextRequest) {
     }
 
     const content = await file.text()
+
+    // Same in-transit truncation guard as POST, so the problem is diagnosed
+    // at validation time with a precise message instead of a checksum error.
+    if (Buffer.byteLength(content, 'utf8') !== file.size) {
+      return NextResponse.json({
+        valid: false,
+        errors: [
+          `Upload appears truncated in transit (received ${Buffer.byteLength(content, 'utf8')} of ${file.size} bytes). Please retry; if this recurs with large backups, the server or a proxy is cutting the request body short.`,
+        ],
+        warnings: [],
+        metadata: null,
+      })
+    }
+
     const parsed = parseBackup(content)
     const validation = validateBackup(content, parsed)
 
