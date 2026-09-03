@@ -4,9 +4,13 @@ import { requireAdmin } from '@/lib/api-helpers'
 import { isProductionSafeOperation } from '@/lib/admin-helpers'
 import { logActivity } from '@/lib/activity-log'
 import { getPoolClient } from '@/lib/db'
+import { reapplySchema } from '@/lib/db/ensure-schema'
 import { logger } from '@/lib/logger'
 import { safeErrorResponse } from '@/lib/api-error'
 import { MAX_BACKUP_FILE_BYTES, MAX_BACKUP_FILE_LABEL } from '@/lib/backup/constants'
+import { parseBackup, type ParsedBackup } from '@/lib/backup/parse'
+import { validateBackup } from '@/lib/backup/validate'
+import { buildModuleHashInvalidationSql, runPostRestoreHealing } from '@/lib/backup/healing'
 import { BackupImportRequestSchema, BackupImportResponseSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, UnauthorizedResponse } from '@/lib/openapi/common'
@@ -16,7 +20,7 @@ registry.registerPath({
   method: 'post',
   path: '/api/backup/import',
   operationId: 'importBackup',
-  summary: 'Restore from a SQL backup file (transactional; rolls back on error)',
+  summary: 'Restore from a SQL backup file (transactional; rolls back on error or integrity mismatch)',
   tags: ['app'],
   security: DEFAULT_SECURITY,
   request: { body: { content: { 'application/json': { schema: BackupImportRequestSchema } } } },
@@ -45,190 +49,99 @@ registry.registerPath({
   },
 })
 
-// Validate SQL file structure and content
-async function validateSQLFile(content: string): Promise<{
-  isValid: boolean
-  errors: string[]
-  warnings: string[]
-  metadata?: any
-}> {
-  const errors: string[] = []
-  const warnings: string[] = []
+const SAFE_TABLE_NAME = /^[a-z_][a-z0-9_]*$/i
 
-  // Check basic structure
-  if (!content.includes('ARI Database Backup')) {
-    errors.push('Not a valid ARI backup file')
-  }
-
-  // Extract and validate metadata
-  const metadataMatch = content.match(/-- ({.*?})\n/)
-  let metadata: any = null
-
-  if (metadataMatch) {
-    try {
-      metadata = JSON.parse(metadataMatch[1])
-
-      // Validate metadata structure
-      if (!metadata.version || !metadata.timestamp || !metadata.tables) {
-        errors.push('Invalid backup metadata structure')
-      }
-
-      // Check version compatibility
-      const version = parseFloat(metadata.version)
-      if (isNaN(version) || version < 1.0) {
-        warnings.push(`Old or invalid backup version (${metadata.version}), some features may not work`)
-      }
-
-    } catch (e) {
-      errors.push('Could not parse backup metadata')
-    }
-  } else {
-    warnings.push('No metadata found in backup file')
-  }
-
-  // Check for dangerous SQL patterns
-  const dangerousPatterns = [
-    { pattern: /DROP\s+DATABASE/i, name: 'DROP DATABASE' },
-    { pattern: /DROP\s+SCHEMA/i, name: 'DROP SCHEMA' },
-    { pattern: /DROP\s+ROLE/i, name: 'DROP ROLE' },
-    { pattern: /ALTER\s+USER/i, name: 'ALTER USER' },
-    { pattern: /ALTER\s+DATABASE/i, name: 'ALTER DATABASE' },
-    { pattern: /CREATE\s+USER/i, name: 'CREATE USER' },
-    { pattern: /CREATE\s+ROLE/i, name: 'CREATE ROLE' },
-    { pattern: /CREATE\s+FUNCTION/i, name: 'CREATE FUNCTION' },
-    { pattern: /GRANT\s+SUPER/i, name: 'GRANT SUPER' },
-    { pattern: /CREATE\s+EXTENSION/i, name: 'CREATE EXTENSION' },
-    { pattern: /\bTRUNCATE\b/i, name: 'TRUNCATE' },
-    { pattern: /\bCOPY\s+(TO|FROM)\b/i, name: 'COPY TO/FROM' },
-  ]
-
-  for (const { pattern, name } of dangerousPatterns) {
-    if (pattern.test(content)) {
-      errors.push(`Potentially dangerous SQL pattern detected: ${name}`)
-    }
-  }
-
-  // Check for required sections
-  if (!content.includes('CREATE TABLE') && !content.includes('INSERT INTO')) {
-    errors.push('Backup file must contain table definitions or data')
-  }
-
-  // Validate SQL syntax basics
-  const openParens = (content.match(/\(/g) || []).length
-  const closeParens = (content.match(/\)/g) || []).length
-  if (Math.abs(openParens - closeParens) > 10) {
-    warnings.push('Possible syntax error: unbalanced parentheses')
-  }
-
-  return {
-    isValid: errors.length === 0,
-    errors,
-    warnings,
-    metadata
-  }
+interface IntegrityResult {
+  /** true when row counts were checked against metadata and all matched. */
+  verified: boolean
+  tablesChecked: number
+  rowsVerified: number
 }
 
-// Parse SQL statements safely
-function parseSQLStatements(content: string): {
-  drops: string[]
-  creates: string[]
-  inserts: string[]
-  indexes: string[]
-  deletes: string[]
-  other: string[]
-} {
-  const lines = content.split('\n')
-  const drops: string[] = []
-  const creates: string[] = []
-  const inserts: string[] = []
-  const indexes: string[] = []
-  const deletes: string[] = []
-  const other: string[] = []
+type TransactionResult =
+  | { success: true; integrity: IntegrityResult }
+  | { success: false; errors: string[]; integrityFailure: boolean }
 
-  let currentStatement = ''
-
-  for (const line of lines) {
-    // Skip comments and empty lines
-    if (line.trim().startsWith('--') || line.trim() === '') continue
-
-    currentStatement += line + '\n'
-
-    // Check if statement is complete (ends with semicolon)
-    if (line.trim().endsWith(';')) {
-      const statement = currentStatement.trim()
-      const upper = statement.toUpperCase()
-
-      // Skip transaction control and SET statements (we manage our own transaction)
-      if (upper.startsWith('BEGIN') || upper.startsWith('COMMIT') ||
-          upper.startsWith('ROLLBACK') || upper.startsWith('SET') ||
-          upper.startsWith('SELECT')) {
-        currentStatement = ''
-        continue
-      }
-
-      if (upper.startsWith('DROP TABLE')) {
-        drops.push(statement)
-      } else if (upper.startsWith('CREATE TABLE')) {
-        creates.push(statement)
-      } else if (upper.startsWith('INSERT INTO')) {
-        inserts.push(statement)
-      } else if (upper.startsWith('CREATE INDEX')) {
-        indexes.push(statement)
-      } else if (upper.startsWith('DELETE FROM')) {
-        deletes.push(statement)
-      } else {
-        other.push(statement)
-      }
-
-      currentStatement = ''
-    }
-  }
-
-  return { drops, creates, inserts, indexes, deletes, other }
-}
-
-// Execute all SQL statements in a real database transaction via PG pool
+/**
+ * Execute the restore in one transaction. The integrity row-count check runs
+ * INSIDE the transaction, before COMMIT — a mismatch (or a table whose COUNT
+ * fails) rolls everything back. Nothing is committed unless the restored data
+ * matches the backup's own metadata.
+ */
 async function executeInTransaction(
   statements: string[],
+  postRestoreStatements: string[],
+  expectedRowCounts: Record<string, number> | null,
   onProgress?: (current: number, total: number) => void
-): Promise<{ success: boolean; errors: string[] }> {
-  const errors: string[] = []
+): Promise<TransactionResult> {
   let client
-
   try {
     client = await getPoolClient()
   } catch (err) {
     return {
       success: false,
       errors: [`Failed to acquire DB connection: ${(err as Error).message}`],
+      integrityFailure: false,
     }
   }
 
   try {
     await client.query('BEGIN')
-    // Disable FK checks for the duration of the import
+    // Disable FK triggers for the duration of the data load. FK constraints
+    // themselves arrive as validating ALTER TABLE ADD CONSTRAINT statements
+    // after the data, so integrity is still enforced.
     await client.query("SET LOCAL session_replication_role = 'replica'")
 
+    const all = [...statements, ...postRestoreStatements]
     let processed = 0
-    const total = statements.length
 
-    for (const statement of statements) {
+    for (const statement of all) {
       try {
         await client.query(statement)
         processed++
-        if (onProgress) {
-          onProgress(processed, total)
-        }
+        onProgress?.(processed, all.length)
       } catch (error: unknown) {
         const preview = statement.substring(0, 120).replace(/\n/g, ' ')
-        errors.push(`Failed: ${preview}... — ${error instanceof Error ? error.message : String(error)}`)
-        // Rollback the entire transaction
+        const message = error instanceof Error ? error.message : String(error)
         try { await client.query('ROLLBACK') } catch { /* ignore rollback errors */ }
-        return { success: false, errors }
+        return { success: false, errors: [`Failed: ${preview}... — ${message}`], integrityFailure: false }
       }
     }
 
-    // Re-enable FK checks and commit
+    // In-transaction integrity check: every table in the backup's metadata
+    // must hold exactly the row count the backup promises.
+    const integrity: IntegrityResult = { verified: false, tablesChecked: 0, rowsVerified: 0 }
+    if (expectedRowCounts) {
+      const failures: string[] = []
+      let rowsVerified = 0
+      for (const [table, expectedCount] of Object.entries(expectedRowCounts)) {
+        if (!SAFE_TABLE_NAME.test(table)) {
+          failures.push(`${table}: invalid table name in backup metadata`)
+          continue
+        }
+        try {
+          const result = await client.query(`SELECT COUNT(*)::int AS cnt FROM "${table}"`)
+          const actualCount = result.rows[0]?.cnt ?? 0
+          if (actualCount !== expectedCount) {
+            failures.push(`${table}: expected ${expectedCount} rows, got ${actualCount}`)
+          } else {
+            rowsVerified += actualCount
+          }
+        } catch (error: unknown) {
+          // A missing table after restore is an integrity failure, not a pass.
+          const message = error instanceof Error ? error.message : String(error)
+          failures.push(`${table}: could not verify (${message})`)
+        }
+      }
+      if (failures.length > 0) {
+        try { await client.query('ROLLBACK') } catch { /* ignore rollback errors */ }
+        return { success: false, errors: failures, integrityFailure: true }
+      }
+      integrity.verified = true
+      integrity.tablesChecked = Object.keys(expectedRowCounts).length
+      integrity.rowsVerified = rowsVerified
+    }
+
     await client.query("SET LOCAL session_replication_role = 'origin'")
     await client.query('COMMIT')
 
@@ -241,15 +154,28 @@ async function executeInTransaction(
           AND NOT EXISTS (SELECT 1 FROM "user" WHERE "role" = 'admin')`)
     } catch { /* pre-multi-user backup may lack the column until next boot */ }
 
-    return { success: true, errors: [] }
+    return { success: true, integrity }
 
   } catch (error: unknown) {
     try { await client.query('ROLLBACK') } catch { /* ignore */ }
-    errors.push(`Transaction failed: ${error instanceof Error ? error.message : String(error)}`)
-    return { success: false, errors }
+    const message = error instanceof Error ? error.message : String(error)
+    return { success: false, errors: [`Transaction failed: ${message}`], integrityFailure: false }
   } finally {
     try { client.release() } catch { /* ignore */ }
   }
+}
+
+function orderedStatements(parsed: ParsedBackup): string[] {
+  // drops → creates → deletes → inserts → indexes → other (FK ALTERs and
+  // DO-blocks last, when all referenced rows exist)
+  return [
+    ...parsed.drops,
+    ...parsed.creates,
+    ...parsed.deletes,
+    ...parsed.inserts,
+    ...parsed.indexes,
+    ...parsed.other,
+  ]
 }
 
 async function handlePOST(req: NextRequest) {
@@ -295,9 +221,9 @@ async function handlePOST(req: NextRequest) {
       )
     }
 
-    // Read and validate file content
     const content = await file.text()
-    const validation = await validateSQLFile(content)
+    const parsed = parseBackup(content)
+    const validation = validateBackup(content, parsed)
 
     if (!validation.isValid) {
       return NextResponse.json(
@@ -309,27 +235,24 @@ async function handlePOST(req: NextRequest) {
       )
     }
 
-    // Parse SQL statements
-    const { drops, creates, inserts, indexes, deletes, other } = parseSQLStatements(content)
+    logger.info(
+      `Parsed SQL: ${parsed.drops.length} drops, ${parsed.creates.length} creates, ` +
+      `${parsed.inserts.length} insert statements, ${parsed.indexes.length} indexes, ` +
+      `${parsed.deletes.length} deletes, ${parsed.other.length} other`
+    )
 
-    logger.info(`Parsed SQL: ${drops.length} drops, ${creates.length} creates, ${inserts.length} inserts, ${indexes.length} indexes, ${deletes.length} deletes, ${other.length} other`)
-
-    // Build execution order: drops → creates → deletes → inserts → indexes → other
-    const allStatements = [
-      ...drops,
-      ...creates,
-      ...deletes,
-      ...inserts,
-      ...indexes,
-      ...other,
-    ]
-
-    // Execute import in a real PG transaction
     const startTime = Date.now()
     let lastProgress = 0
 
     const result = await executeInTransaction(
-      allStatements,
+      orderedStatements(parsed),
+      // Inside the same transaction: invalidate module schema hashes so the
+      // module registry reinstalls each enabled module's idempotent schema
+      // (RLS policies, triggers, FKs, indexes) on the next authenticated
+      // load. Changes JSONB values only — never row counts, so it cannot
+      // trip the integrity check.
+      [buildModuleHashInvalidationSql()],
+      validation.metadata?.rowCounts ?? null,
       (current, total) => {
         const progress = Math.floor((current / total) * 100)
         if (progress > lastProgress + 5) {
@@ -342,6 +265,25 @@ async function handlePOST(req: NextRequest) {
     const duration = Date.now() - startTime
 
     if (!result.success) {
+      logActivity({
+        userId: user.id,
+        type: 'backup_import_failed',
+        description: result.integrityFailure
+          ? 'Backup restore rolled back: integrity verification failed'
+          : 'Backup restore rolled back: statement failed',
+        metadata: { failureClass: result.integrityFailure ? 'integrity' : 'execution' },
+      })
+      if (result.integrityFailure) {
+        return NextResponse.json(
+          {
+            error: "Integrity verification failed — all changes have been rolled back",
+            details: result.errors,
+            rollback: true,
+            integrityCheck: { verified: false, failures: result.errors },
+          },
+          { status: 500 }
+        )
+      }
       return NextResponse.json(
         {
           error: "Import failed — all changes have been rolled back",
@@ -352,51 +294,32 @@ async function handlePOST(req: NextRequest) {
       )
     }
 
-    // Verify data integrity via row counts (lightweight and reliable)
-    const SAFE_TABLE_NAME = /^[a-z_][a-z0-9_]*$/i
-    const integrityCheck = { passed: true, failures: [] as string[] }
-    if (validation.metadata?.rowCounts) {
-      try {
-        const verifyClient = await getPoolClient()
-        try {
-          for (const [table, expectedCount] of Object.entries(validation.metadata.rowCounts)) {
-            // Validate table name to prevent SQL injection from crafted backup files
-            if (!SAFE_TABLE_NAME.test(table)) {
-              integrityCheck.failures.push(`${table}: invalid table name, skipped`)
-              continue
-            }
-            try {
-              const result = await verifyClient.query(`SELECT COUNT(*)::int AS cnt FROM "${table}"`)
-              const actualCount = result.rows[0]?.cnt ?? 0
-              if (actualCount !== expectedCount) {
-                integrityCheck.passed = false
-                integrityCheck.failures.push(`${table}: expected ${expectedCount} rows, got ${actualCount}`)
-              }
-            } catch {
-              logger.warn(`Could not verify table ${table}`)
-            }
-          }
-        } finally {
-          verifyClient.release()
-        }
-      } catch (error) {
-        logger.warn('Could not verify row counts:', error)
-      }
-    }
+    // Core-schema healing after COMMIT: restore RLS policies, functions, and
+    // any columns/tables the (possibly older) backup was missing. Module
+    // schemas heal lazily via the hash invalidation above.
+    const postRestore = await runPostRestoreHealing(reapplySchema)
 
-    // Prepare response
     const response = {
       success: true,
       message: "Database imported successfully",
       stats: {
         duration: `${(duration / 1000).toFixed(2)}s`,
-        tablesDropped: drops.length,
-        tablesCreated: creates.length,
-        recordsImported: inserts.length,
-        indexesCreated: indexes.length,
+        tablesDropped: parsed.drops.length,
+        tablesCreated: parsed.creates.length,
+        insertStatements: parsed.inserts.length,
+        recordsImported: result.integrity.verified ? result.integrity.rowsVerified : parsed.inserts.length,
+        indexesCreated: parsed.indexes.length,
         warnings: validation.warnings
       },
-      integrityCheck: integrityCheck.passed ? 'passed' : integrityCheck,
+      // Success now always means the in-transaction check passed (or the
+      // backup carried no row-count metadata to check against). The legacy
+      // string form is kept for older clients; `integrity` carries detail.
+      integrityCheck: 'passed',
+      integrity: result.integrity,
+      postRestore: {
+        moduleSchemasInvalidated: true,
+        coreSchemaReapplied: postRestore.coreSchemaReapplied,
+      },
     }
 
     // Best-effort: a restore from a pre-activity_log backup leaves the table
@@ -408,9 +331,10 @@ async function handlePOST(req: NextRequest) {
       type: 'backup_imported',
       description: 'Imported database backup (full restore)',
       metadata: {
-        tablesCreated: creates.length,
-        recordsImported: inserts.length,
-        integrityCheck: integrityCheck.passed ? 'passed' : 'failed',
+        tablesCreated: parsed.creates.length,
+        recordsImported: response.stats.recordsImported,
+        integrityVerified: result.integrity.verified,
+        coreSchemaReapplied: postRestore.coreSchemaReapplied,
       },
     })
 
@@ -445,14 +369,31 @@ async function handlePUT(req: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 })
     }
 
+    if (file.size > MAX_BACKUP_FILE_BYTES) {
+      return NextResponse.json(
+        { error: `File too large. Maximum size is ${MAX_BACKUP_FILE_LABEL}` },
+        { status: 400 }
+      )
+    }
+
     const content = await file.text()
-    const validation = await validateSQLFile(content)
+    const parsed = parseBackup(content)
+    const validation = validateBackup(content, parsed)
 
     return NextResponse.json({
       valid: validation.isValid,
       errors: validation.errors,
       warnings: validation.warnings,
-      metadata: validation.metadata
+      metadata: validation.metadata,
+      checksumVerified: validation.checksumVerified,
+      statementCounts: {
+        drops: parsed.drops.length,
+        creates: parsed.creates.length,
+        deletes: parsed.deletes.length,
+        inserts: parsed.inserts.length,
+        indexes: parsed.indexes.length,
+        other: parsed.other.length,
+      },
     })
 
   } catch (error: unknown) {
