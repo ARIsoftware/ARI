@@ -5,10 +5,16 @@
   "description": "ChatGPT-style conversational interface using any LLM provider configured in Settings → Integrations (OpenAI, Anthropic, Gemini, OpenRouter).",
   "version": "1.0.0",
   "author": "ARI",
-  "icon": "MessageSquare",
+  "icon": "MessageCircle",
   "enabled": false,
   "fullscreen": false,
   "menuPriority": 4,
+  "topBarIcon": {
+    "icon": "MessageCircle",
+    "route": "/chat",
+    "tooltip": "Open Chat",
+    "order": 1
+  },
   "permissions": {
     "database": true,
     "api": true,
@@ -18,7 +24,7 @@
     {
       "path": "/chat",
       "label": "Chat",
-      "icon": "MessageSquare",
+      "icon": "MessageCircle",
       "sidebarPosition": "main"
     }
   ],
