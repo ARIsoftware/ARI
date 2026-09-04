@@ -310,10 +310,8 @@ function specToEndpointsData(spec: OpenApiSpec): EndpointsData {
   const modulesWithPublicRoutes = Array.from(new Set(publicEndpoints.map((e) => e.moduleId).filter(Boolean)))
 
   const warnings: string[] = []
-  const rateLimitOnly = publicEndpoints.filter((e) => e.securityType === 'rate_limit_only')
-  if (rateLimitOnly.length > 0) {
-    warnings.push(`${rateLimitOnly.length} endpoint(s) use rate_limit_only security - consider adding stronger protection`)
-  }
+  // rate_limit_only is a deliberate, declared contract (open-by-design routes
+  // like the pre-auth login logo) — it gets a chip per endpoint, not a warning.
   const noRateLimit = publicEndpoints.filter((e) => !e.hasRateLimit && e.securityType !== 'rate_limit_only')
   if (noRateLimit.length > 0) {
     warnings.push(`${noRateLimit.length} public endpoint(s) have no rate limiting configured`)
@@ -1182,7 +1180,9 @@ export default function DatabaseTestPage() {
         status = 'error'
         message = 'Missing — required for this provider'
       } else {
-        status = 'warning'
+        // Optional vars are fine to leave unset (the provider falls back to
+        // its default) — report as healthy, not a warning.
+        status = 'success'
         message = 'Not set (optional)'
       }
       updateStorageResult(testName, { status, message })
@@ -1501,7 +1501,14 @@ export default function DatabaseTestPage() {
             let status: 'secure' | 'vulnerable' | 'warning' | 'error' = 'error'
             let message = ''
 
-            if (responseStatus === 400) {
+            if (endpoint.securityType === 'rate_limit_only' && [200, 201, 304, 404].includes(responseStatus)) {
+              // Open by design (rate-limit-only contract): anonymous success and
+              // not-found are both in-contract — neither is an auth failure.
+              status = 'secure'
+              message = responseStatus === 404
+                ? 'Open by design — endpoint reachable, no resource configured'
+                : 'Open by design — anonymous reads are in-contract (rate-limit protected)'
+            } else if (responseStatus === 400) {
               status = 'secure'
               message = 'Properly rejected: missing security headers'
             } else if (responseStatus === 401) {

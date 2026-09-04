@@ -34,6 +34,10 @@ const RATE_LIMIT_PER_MINUTE = 120
 // page then hides the slot). The logo lives inline in the DB, independent of the
 // storage provider.
 export const isPublic = true
+// Security contract for the /health public-endpoint tester (via the generated
+// manifest): open by design — anonymous 200/404 responses are in-contract, the
+// per-IP rate limit above is the only guard.
+export const publicSecurity = 'rate_limit_only'
 export const dynamic = 'force-dynamic'
 
 // Short cache for the unversioned URL (the sign-in page): the browser revalidates

@@ -364,6 +364,10 @@ function detectRouteMetadata(filePath) {
     const roleMatch = content.match(/export\s+const\s+debugRole\s*=\s*['"]([^'"]+)['"]/);
     if (roleMatch) meta.debugRole = roleMatch[1];
     if (/export\s+const\s+isPublic\s*=\s*true\b/.test(content)) meta.isPublic = true;
+    // Optional security contract (same vocabulary as module.json security.type,
+    // e.g. 'rate_limit_only') — consumed by /health's public-endpoint tester.
+    const secMatch = content.match(/export\s+const\s+publicSecurity\s*=\s*['"]([^'"]+)['"]/);
+    if (secMatch) meta.publicSecurity = secMatch[1];
     if (/\bcheckRateLimit\b/.test(content)) meta.hasRateLimit = true;
     // Matches both requireAuthIfUsersExist and its stricter admin-only sibling
     // requireAdminIfUsersExist — either one gates the route once a user exists.
@@ -407,6 +411,7 @@ function discoverCoreApiRoutes() {
         methods: methods.length > 0 ? methods : ['unknown'],
         ...(metadata.debugRole ? { debugRole: metadata.debugRole } : {}),
         ...(metadata.isPublic ? { isPublic: true } : {}),
+        ...(metadata.publicSecurity ? { publicSecurity: metadata.publicSecurity } : {}),
         ...(metadata.hasRateLimit ? { hasRateLimit: true } : {}),
         ...(metadata.requiresAuthIfUsers ? { requiresAuthIfUsers: true } : {}),
       };
@@ -542,7 +547,7 @@ function generateManifest(moduleMap, moduleApiMap) {
         fullPath: route.fullPath,
         methods: route.methods,
         security: {
-          type: 'core',
+          type: route.publicSecurity || 'core',
           ...(route.hasRateLimit ? { rateLimit: true } : {}),
           ...(route.requiresAuthIfUsers ? { requiresAuthIfUsers: true } : {}),
         },
