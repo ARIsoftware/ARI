@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { requireAdmin } from '@/lib/api-helpers'
 import { logger } from '@/lib/logger'
@@ -155,7 +155,7 @@ async function computeExpectedTables(
   }
 }
 
-async function handleGET(req: NextRequest) {
+async function handleGET() {
   try {
     // Authenticate user
     const { user } = await getAuthenticatedUser()
