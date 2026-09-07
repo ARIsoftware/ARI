@@ -29,6 +29,12 @@ if (process.env.VERCEL_URL) {
   trustedOrigins.push(`https://${process.env.VERCEL_URL}`)
 }
 
+// Add the Vercel production domain (covers deployments where NEXT_PUBLIC_APP_URL
+// isn't set yet, e.g. the first boot after a Deploy Button install)
+if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+  trustedOrigins.push(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`)
+}
+
 // Only add localhost origins in development
 if (process.env.NODE_ENV !== 'production') {
   trustedOrigins.push(

@@ -10,12 +10,14 @@
  * to run `pnpm run generate-module-registry` manually.
  */
 
+import { isVercel } from './lib/deployment'
+
 export async function register() {
   // Only run in Node.js runtime (not Edge)
   if (process.env.NEXT_RUNTIME === 'nodejs' || !process.env.NEXT_RUNTIME) {
     // Only auto-generate in development — in production (Vercel), the filesystem
     // is read-only and prebuild already generated the registry at build time.
-    if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    if (process.env.NODE_ENV !== 'production' && !isVercel()) {
       console.log('🔄 Auto-generating module registry...')
 
       try {

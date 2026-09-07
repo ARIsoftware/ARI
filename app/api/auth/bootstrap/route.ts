@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth"
 import { setupSql } from "@/lib/db/setup-sql"
 import { upsertEnvVars } from "@/lib/env-file"
 import { checkRateLimit, getClientIp, isSameOriginRequest } from "@/lib/modules/public-route-security"
+import { isVercel } from "@/lib/deployment"
 import { getPgCode } from "@/lib/db/postgres-error"
 import { safeErrorResponse } from "@/lib/api-error"
 import { BootstrapStatusSchema } from "@/lib/openapi/app-schemas"
@@ -44,6 +45,15 @@ const BOOTSTRAP_LOCK_KEY = 9173451
 // (read-only FS, permissions) must never block the bootstrap response.
 async function clearFirstRunAdminCredentials(): Promise<void> {
   try {
+    // On Vercel the credentials live in the project's env vars, not a file —
+    // there's nothing writable to clear. Drop them from this lambda's env
+    // (best-effort) and rely on bootstrap ignoring them once a user exists.
+    // The user may delete ARI_FIRST_RUN_ADMIN_* in the Vercel dashboard.
+    if (isVercel()) {
+      delete process.env.ARI_FIRST_RUN_ADMIN_EMAIL
+      delete process.env.ARI_FIRST_RUN_ADMIN_PASSWORD
+      return
+    }
     const envPath = path.join(process.cwd(), ".env.local")
     let content = ""
     try {

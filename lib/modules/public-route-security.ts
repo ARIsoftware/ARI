@@ -4,8 +4,8 @@
  * Primitives that public (unauthenticated) API routes use to enforce their own
  * security: in-memory sliding-window rate limiting, same-origin checking, and
  * client-IP extraction. Each public route imports what it needs and applies it
- * directly — see app/api/auth/bootstrap, app/api/onboarding/save-env, and
- * app/api/download-env.
+ * directly — see app/api/auth/bootstrap, app/api/download-env, and
+ * app/api/setup/vercel-configure.
  */
 
 import { NextRequest } from 'next/server'

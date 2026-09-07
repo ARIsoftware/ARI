@@ -53,6 +53,10 @@ function writeFallback(reason) {
 try {
   if (process.env.ARI_SKIP_TEST_REPORT === '1') {
     console.log('[test-report] Skipped (ARI_SKIP_TEST_REPORT=1) — leaving any existing report as-is.')
+  } else if (process.env.VERCEL) {
+    // Vercel builds (including zero-config Deploy Button installs) shouldn't
+    // spend build minutes running the test suite — CI already covers it.
+    console.log('[test-report] Skipped (Vercel build) — leaving any existing report as-is.')
   } else {
     fs.mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true })
 

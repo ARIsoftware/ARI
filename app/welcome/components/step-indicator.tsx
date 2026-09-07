@@ -7,6 +7,7 @@ interface StepIndicatorProps {
   currentStep: string
   onStepClick: (step: string) => void
   showSupabaseStep?: boolean
+  deploymentTarget?: "local" | "vercel"
 }
 
 const BASE_STEPS = [
@@ -20,6 +21,12 @@ const STEPS_WITH_SUPABASE = [
   { id: "personal", label: "Personal" },
   { id: "supabase", label: "Supabase" },
   { id: "download", label: "Save" },
+]
+
+const STEPS_VERCEL = [
+  { id: "account", label: "Account" },
+  { id: "personal", label: "Personal" },
+  { id: "vercel-deploy", label: "Deploy" },
 ]
 
 // Icon components that accept className for dynamic sizing
@@ -76,12 +83,13 @@ const STEP_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
   supabase: SupabaseIcon,
   resend: ResendIcon,
   vercel: VercelIcon,
+  "vercel-deploy": VercelIcon,
   download: DownloadIcon,
   install: Database,
 }
 
-export function StepIndicator({ currentStep, onStepClick, showSupabaseStep }: StepIndicatorProps) {
-  const steps = showSupabaseStep ? STEPS_WITH_SUPABASE : BASE_STEPS
+export function StepIndicator({ currentStep, onStepClick, showSupabaseStep, deploymentTarget }: StepIndicatorProps) {
+  const steps = deploymentTarget === "vercel" ? STEPS_VERCEL : showSupabaseStep ? STEPS_WITH_SUPABASE : BASE_STEPS
   return (
     <div className="mb-8 flex items-center justify-between">
       {steps.map((step, index) => {

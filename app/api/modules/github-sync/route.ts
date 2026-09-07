@@ -13,6 +13,7 @@ import {
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema } from '@/lib/openapi/common'
 import { withApiLogging } from '@/lib/api-logging'
+import { isVercel as isVercelDeployment } from '@/lib/deployment'
 
 registry.registerPath({
   method: 'get',
@@ -70,7 +71,7 @@ async function handlePOST(request: NextRequest) {
     // Validate moduleDir is within expected directories
     const resolvedDir = path.resolve(moduleDir)
     const cwd = process.cwd()
-    const isVercel = !!process.env.VERCEL
+    const isVercel = isVercelDeployment()
     const isInModulesDir = resolvedDir.startsWith(path.join(cwd, 'modules-core')) || resolvedDir.startsWith(path.join(cwd, 'modules-custom'))
     const isInTmp = isVercel && resolvedDir.startsWith('/tmp/ari-modules/')
 
@@ -102,7 +103,7 @@ async function handleGET() {
   }
 
   const config = getGitHubConfig()
-  const isVercel = !!process.env.VERCEL
+  const isVercel = isVercelDeployment()
   return NextResponse.json({
     configured: !!config,
     isVercel,

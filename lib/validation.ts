@@ -4,7 +4,7 @@ import { z } from 'zod'
 
 // ─── Welcome / Profile shared schemas ────────────────────────────────────
 // Used by /welcome (account + personal tabs), /settings (workspace identity),
-// /api/user-preferences, /api/download-env, /api/onboarding/save-env.
+// /api/user-preferences, /api/download-env, /api/setup/vercel-configure.
 
 // Forbidden in any .env.local value — a newline here would inject a new env var
 // into the file. All other chars (quotes, $, backticks, unicode) survive
@@ -92,6 +92,16 @@ export type WelcomeEnvFieldsInput = z.infer<typeof welcomeEnvFieldsSchema>
 export const welcomeEnvSaveRequestSchema = welcomeEnvFieldsSchema.extend({
   localSupabaseDetected: z.boolean().optional(), // backward compat
   dbMode: z.enum(['postgres', 'supabaselocal', 'supabasecloud']).optional(),
+})
+
+// Body for /api/setup/vercel-configure — the Vercel branch of the /welcome
+// wizard. The token is used once server-side and never stored or logged.
+export const vercelConfigureRequestSchema = z.object({
+  vercelToken: envSafeString(300).min(1, 'Vercel access token is required'),
+  databaseUrl: envSafeString(2000).optional(),
+  betterAuthSecret: envSafeString(200).optional(),
+  adminEmail: welcomeEmailSchema,
+  adminPassword: adminPasswordSchema,
 })
 
 // Return the first validation error message from a Zod schema, or null if the

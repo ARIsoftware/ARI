@@ -12,6 +12,7 @@ import {
 import { registry } from "@/lib/openapi/registry"
 import { DEFAULT_SECURITY, ErrorResponseSchema } from "@/lib/openapi/common"
 import { withApiLogging } from '@/lib/api-logging'
+import { isVercel } from "@/lib/deployment"
 
 registry.registerPath({
   method: 'get',
@@ -56,6 +57,15 @@ async function handleGET() {
   // GitHub sync config lives in .env.local (system-wide) — admin only.
   const denied = requireAdmin(user, "Admin access required")
   if (denied) return denied
+
+  // On Vercel there is no .env.local — config lives in the project's env vars.
+  if (isVercel()) {
+    return NextResponse.json({
+      hasToken: !!process.env.GITHUB_TOKEN,
+      repoOwner: process.env.VERCEL_GIT_REPO_OWNER || process.env.GITHUB_REPO_OWNER || "",
+      repoName: process.env.VERCEL_GIT_REPO_SLUG || process.env.GITHUB_REPO_NAME || "",
+    })
+  }
 
   const envPath = path.join(process.cwd(), ".env.local")
   let envContent = ""
@@ -108,6 +118,18 @@ async function handlePOST(request: NextRequest) {
   // Writes GITHUB_TOKEN and repo config to .env.local (system-wide) — admin only.
   const denied = requireAdmin(user, "Admin access required")
   if (denied) return denied
+
+  // Vercel's filesystem is read-only — the token must be set as a project
+  // env var in the dashboard (owner/repo/branch come from VERCEL_GIT_* free).
+  if (isVercel()) {
+    return NextResponse.json(
+      {
+        error:
+          "On Vercel, set GITHUB_TOKEN in your Vercel project's Settings → Environment Variables and redeploy. Repository owner and name are detected automatically from the linked Git repository.",
+      },
+      { status: 400 }
+    )
+  }
 
   let body: {
     githubToken?: string

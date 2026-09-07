@@ -9,6 +9,13 @@ Engineered for those who want complete command over the software that runs their
 https://ari.software
 
 
+## Deploy to Vercel
+
+One-click deploy — no configuration needed up front. After the first deploy opens, ARI's welcome installer walks you through connecting a Postgres database (Neon, Supabase, or any hosted Postgres) and creating your admin account. Configuration is stored securely in your Vercel project's environment variables.
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FARIsoftware%2FARI&project-name=ari&repository-name=ari)
+
+
 ## Documentation
 
 Full documentation, installation instructions, guides, and module development resources:

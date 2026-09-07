@@ -9,6 +9,7 @@ import { user as userTable } from "@/lib/db/schema/core-schema"
 import { eq } from "drizzle-orm"
 import { resolvePermissions, type PermissionMap, type UserRole } from "@/lib/permissions"
 import { getPgCode } from "@/lib/db/postgres-error"
+import { isSetupComplete } from "@/lib/env-registry"
 
 const NULL_AUTH = { user: null, session: null, withRLS: null }
 
@@ -140,8 +141,8 @@ async function getAuthenticatedUserImpl() {
     return NULL_AUTH
   }
 
-  // Also skip if critical env vars are missing (indicates build-time execution)
-  if (!process.env.DATABASE_URL || !process.env.BETTER_AUTH_SECRET) {
+  // Also skip if required config is missing (setup mode / build-time execution)
+  if (!isSetupComplete()) {
     return NULL_AUTH
   }
 
@@ -264,7 +265,7 @@ export type UsersCheckResult =
   | { status: "has-users" }
 
 export async function checkUsersExist(): Promise<UsersCheckResult> {
-  if (!process.env.DATABASE_URL || !process.env.BETTER_AUTH_SECRET) return { status: "no-env" }
+  if (!isSetupComplete()) return { status: "no-env" }
   if (!pool) return { status: "no-pool" }
   try {
     const result = await pool.query('SELECT EXISTS(SELECT 1 FROM public."user") AS has_users')

@@ -560,7 +560,26 @@ pnpm typecheck       # tsc --noEmit
 
 ## Deployment
 
-### Vercel Deployment
+### Vercel Deployment (Deploy Button)
+
+The README carries a zero-prompt Deploy Button (`https://vercel.com/new/clone?repository-url=...` with no `env` param). The flow:
+
+1. One-click deploy — the app builds and boots with **no env vars at all** (the prebuild test-report step is skipped when `VERCEL` is set; the DB pool is null-safe).
+2. First visit lands on `/welcome` (middleware setup mode: `isSetupComplete()` from `lib/env-registry.ts` is false). The wizard fetches `GET /api/setup/status` and branches to the Vercel step order (`account` → `personal` → `vercel-deploy`).
+3. The `vercel-deploy` step collects a Postgres `DATABASE_URL`, an auto-generated `BETTER_AUTH_SECRET`, and a **Vercel access token**. `POST /api/setup/vercel-configure` pre-checks the DB connection, then uses the token to write the project's env vars via the Vercel REST API (`POST /v10/projects/{id}/env?upsert=true`, sensitive types from the registry) and trigger a production redeploy (`POST /v13/deployments?forceNew=1`). The token is used in that single request and never stored, logged, or returned.
+4. The wizard polls `/api/setup/status` until the new deployment answers `setupComplete: true`, then sends the user to `/sign-in`, where the existing bootstrap creates the admin from `ARI_FIRST_RUN_ADMIN_EMAIL/PASSWORD` (written as env vars; safe to delete in the dashboard afterwards — they're ignored once a user exists).
+
+Key building blocks:
+
+- `lib/deployment.ts` — `getDeploymentTarget()` / `isVercel()` / `getVercelInfo()`. **Never check `process.env.VERCEL` directly in app code**; call these helpers.
+- `lib/env-registry.ts` — canonical env-var registry; `isSetupComplete()` / `getMissingRequiredConfig()` are the single source of truth for setup mode (middleware + auth-helpers use them).
+- `lib/vercel/api.ts` — server-only Vercel REST client (token verification, team-aware project resolution, env upsert, redeploy).
+- Env-file writers (`/api/download-env`, `/api/settings/github` POST) return 400 on Vercel (read-only filesystem); bootstrap's cred-strip skips file I/O on Vercel.
+- Never overwrite an existing `BETTER_AUTH_SECRET` — it derives the AES key for stored API keys (`lib/crypto.ts`).
+
+Notes: preview deployments share the production `DATABASE_URL` (env target `production`+`preview`); filesystem storage doesn't persist on Vercel (configure `ARI_STORAGE_PROVIDER`, see Settings → Storage); module installs on Vercel additionally need `GITHUB_TOKEN` set in the dashboard (owner/repo/branch come from `VERCEL_GIT_*`).
+
+### Manual Vercel Deployment
 1. Connect GitHub repository
 2. Set environment variables in Vercel dashboard
 3. Deploy with automatic builds on push

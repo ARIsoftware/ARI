@@ -4,6 +4,7 @@ import { DEFAULT_BUCKET_CONFIG } from './types'
 import { LocalFilesystemProvider } from './local'
 import { S3StorageProvider } from './s3'
 import type { StorageConfig } from './config'
+import { isVercel } from '@/lib/deployment'
 
 export * from './types'
 export { sanitizeFilename, sanitizeBucketName, validateStoredFilename } from './sanitize'
@@ -90,7 +91,7 @@ export function getStorageProvider(config: StorageConfig | string = 'filesystem'
 /** Returns true if running on Vercel with local filesystem storage (which won't persist) */
 export function isStorageUnavailable(config: StorageConfig | string = 'filesystem'): boolean {
   const providerType = typeof config === 'string' ? config : config.provider
-  return !!process.env.VERCEL && providerType === 'filesystem'
+  return isVercel() && providerType === 'filesystem'
 }
 
 // Bucket config registry

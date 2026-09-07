@@ -4,8 +4,8 @@ import type { NextRequest } from 'next/server'
 // Import the generated module manifest to get public routes
 // This is regenerated on build/dev via generate-module-registry script
 import moduleManifest from '@/lib/generated/module-manifest.json'
+import { isSetupComplete } from '@/lib/env-registry'
 
-const isSetupComplete = !!process.env.DATABASE_URL && !!process.env.BETTER_AUTH_SECRET
 const isDev = process.env.NODE_ENV !== 'production'
 
 // Content Security Policy — computed once at startup
@@ -84,10 +84,10 @@ const publicRoutes = [...staticPublicRoutes, ...modulePublicRoutes]
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
-  // SETUP MODE: If DATABASE_URL is not configured, redirect to welcome wizard
-  // Only allow /welcome and /api/auth (for post-setup login)
-  if (!isSetupComplete) {
-    const setupApiRoutes = ["/api/download-env", "/api/project-dir"]
+  // SETUP MODE: If required config is missing, redirect to welcome wizard
+  // Only allow /welcome, the setup APIs, and /api/auth (for post-setup login)
+  if (!isSetupComplete()) {
+    const setupApiRoutes = ["/api/download-env", "/api/setup/status", "/api/setup/vercel-configure"]
     const isSetupAllowed = pathname === "/welcome" ||
                            pathname.startsWith("/welcome/") ||
                            pathname === "/setup-error" ||

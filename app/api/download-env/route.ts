@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { writeFile, copyFile, access } from "fs/promises"
 import path from "path"
 import { requireAdminIfUsersExist } from "@/lib/auth-helpers"
+import { isVercel } from "@/lib/deployment"
 import { checkRateLimit, getClientIp, isSameOriginRequest } from "@/lib/modules/public-route-security"
 import { welcomeEnvSaveRequestSchema, flattenZodErrors } from "@/lib/validation"
 import { renderEnvFile } from "@/lib/env-file"
@@ -27,6 +28,15 @@ registry.registerPath({
 })
 
 export async function POST(request: NextRequest) {
+  // Vercel's filesystem is read-only — config is saved to the project's env
+  // vars via /api/setup/vercel-configure instead.
+  if (isVercel()) {
+    return NextResponse.json(
+      { error: "This deployment stores configuration in Vercel environment variables, not .env.local. Use the Vercel setup step in the welcome wizard." },
+      { status: 400 }
+    )
+  }
+
   if (!checkRateLimit(`download-env:${getClientIp(request)}`, 3)) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Please try again later." },

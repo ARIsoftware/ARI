@@ -17,6 +17,7 @@ import {
   Check,
   X,
   ArrowRight,
+  Loader2,
 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { StepIndicator } from "./components/step-indicator"
@@ -74,18 +75,20 @@ interface OnboardingData {
   vercelSetupComplete: boolean
 }
 
-// Generate a cryptographically secure random string for BETTER_AUTH_SECRET
+// Generate a cryptographically secure random string for BETTER_AUTH_SECRET.
+// Returns '' when window.crypto is unavailable so callers can gate on it —
+// an all-zeros fallback secret would be silently insecure.
 const generateAuthSecret = () => {
+  if (typeof window === 'undefined' || !window.crypto) return ''
   const array = new Uint8Array(32)
-  if (typeof window !== 'undefined' && window.crypto) {
-    window.crypto.getRandomValues(array)
-  }
+  window.crypto.getRandomValues(array)
   return btoa(String.fromCharCode(...array))
 }
 
 // Disabled steps: "supabase", "resend", "vercel", "github" — may be restored in the future
 const STEP_ORDER_LOCAL = ["account", "personal", "download"]
 const STEP_ORDER_CLOUD = ["account", "personal", "supabase", "download"]
+const STEP_ORDER_VERCEL = ["account", "personal", "vercel-deploy"]
 
 export default function WelcomePage() {
   const [completedLines, setCompletedLines] = useState<string[]>([])
@@ -99,6 +102,15 @@ export default function WelcomePage() {
   const [currentTab, setCurrentTab] = useState("account")
   const [dbMode, setDbMode] = useState<"postgres" | "supabaselocal" | "supabasecloud">("postgres")
   const [selectedOS, setSelectedOS] = useState<"mac" | "windows" | "linux" | null>(null)
+  const [deploymentTarget, setDeploymentTarget] = useState<"local" | "vercel">("local")
+  const [missingConfig, setMissingConfig] = useState<string[]>([])
+
+  // Vercel deploy flow state
+  const [vercelToken, setVercelToken] = useState("")
+  const [vercelDeployStatus, setVercelDeployStatus] = useState<
+    'idle' | 'submitting' | 'deploying' | 'complete' | 'error'
+  >('idle')
+  const [vercelDeployError, setVercelDeployError] = useState<string | null>(null)
 
   const [formData, setFormData] = useState<OnboardingData>({
     supabaseUrl: "",
@@ -137,6 +149,14 @@ export default function WelcomePage() {
     if (sessionStorage.getItem('ari:welcome:saved') === '1') {
       setEnvSaveStatus('saved')
       setCurrentTab('download')
+      setShowOnboarding(true)
+    }
+    // Same idea for the Vercel flow: a reload during the redeploy wait should
+    // land back on the progress panel, not step 1.
+    if (sessionStorage.getItem('ari:welcome:vercel-deploying') === '1') {
+      setDeploymentTarget('vercel')
+      setVercelDeployStatus('deploying')
+      setCurrentTab('vercel-deploy')
       setShowOnboarding(true)
     }
   }, [])
@@ -205,6 +225,10 @@ export default function WelcomePage() {
   }
 
   const isAdminConfigured = !!(formData.adminEmail || profileData.email) && !!formData.adminPassword
+  // Full credential validity (incl. the confirm-password match) — required to
+  // leave the Account step by ANY route, so a typo'd password can never reach
+  // the Save/Deploy steps via a step-indicator click.
+  const adminCredsValid = isAdminConfigured && formData.adminPassword === adminConfirmPassword
 
   const handleAdminContinue = () => {
     const effectiveEmail = formData.adminEmail || profileData.email
@@ -352,19 +376,43 @@ export default function WelcomePage() {
     }
   }, [])
 
-  useEffect(() => {
-    fetch("/api/project-dir")
-      .then((res) => res.json())
-      .then((data) => {
-        setProjectDir(data.dir)
-        if (data.envFileExists) setEnvFileExists(true)
+  const [statusLoadFailed, setStatusLoadFailed] = useState(false)
 
-        // Use ARI_DB_MODE from server (auto-detected for legacy installs)
-        if (data.dbMode) {
-          setDbMode(data.dbMode)
-        }
-      })
-      .catch(() => setProjectDir(null))
+  const loadSetupStatus = async () => {
+    try {
+      const res = await fetch("/api/setup/status", { cache: 'no-store' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      setStatusLoadFailed(false)
+      if (typeof data.projectDir === 'string') setProjectDir(data.projectDir)
+      if (data.deploymentTarget === 'vercel') setDeploymentTarget('vercel')
+      if (Array.isArray(data.missing)) setMissingConfig(data.missing)
+
+      // Use ARI_DB_MODE from server (auto-detected for legacy installs)
+      if (data.dbMode) {
+        setDbMode(data.dbMode)
+      }
+
+      // A Vercel install that's already configured (e.g. a reload after the
+      // deploy-wait poll timed out but the build then finished) jumps straight
+      // to the "setup complete" panel instead of restarting the wizard.
+      if (data.setupComplete && data.deploymentTarget === 'vercel') {
+        sessionStorage.removeItem('ari:welcome:vercel-deploying')
+        setVercelDeployStatus('complete')
+        setCurrentTab('vercel-deploy')
+        setShowOnboarding(true)
+      }
+    } catch {
+      // Without the status the wizard can't tell local from Vercel — surface a
+      // retry instead of silently defaulting to the local flow, which is a
+      // dead end on Vercel (its Save endpoint 400s there).
+      setStatusLoadFailed(true)
+    }
+  }
+
+  useEffect(() => {
+    void loadSetupStatus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const allLines = [...completedLines]
@@ -396,7 +444,6 @@ export default function WelcomePage() {
   )
 
   const [projectDir, setProjectDir] = useState<string | null>(null)
-  const [envFileExists, setEnvFileExists] = useState(false)
   const [envSaveStatus, setEnvSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [envSaveError, setEnvSaveError] = useState<string | null>(null)
   const [envSavedPath, setEnvSavedPath] = useState<string | null>(null)
@@ -441,12 +488,103 @@ export default function WelcomePage() {
     }
   }
 
+  // Vercel flow: send config + token to the server, which writes the project's
+  // env vars via the Vercel API and triggers a production redeploy. The token
+  // is used for that one request and discarded — never persisted anywhere.
+  const needsDatabaseUrl = missingConfig.includes('DATABASE_URL')
+  const needsAuthSecret = missingConfig.includes('BETTER_AUTH_SECRET')
+  const isVercelDeployReady =
+    adminCredsValid &&
+    !!vercelToken.trim() &&
+    (!needsDatabaseUrl || !!formData.databaseUrl.trim()) &&
+    (!needsAuthSecret || !!formData.betterAuthSecret)
+
+  const handleVercelConfigure = async () => {
+    try {
+      setVercelDeployStatus('submitting')
+      setVercelDeployError(null)
+      const res = await fetch('/api/setup/vercel-configure', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vercelToken: vercelToken.trim(),
+          ...(formData.databaseUrl.trim() ? { databaseUrl: formData.databaseUrl.trim() } : {}),
+          ...(needsAuthSecret ? { betterAuthSecret: formData.betterAuthSecret } : {}),
+          adminEmail: formData.adminEmail || profileData.email,
+          adminPassword: formData.adminPassword,
+        }),
+      })
+      const rawBody = await res.text()
+      let data: Record<string, unknown> = {}
+      try {
+        data = rawBody ? JSON.parse(rawBody) : {}
+      } catch {
+        // non-JSON body
+      }
+      if (!res.ok || !data.success) {
+        const details = Array.isArray(data.details) ? data.details : []
+        const first = details[0] as { path?: string; message?: string } | undefined
+        const detail = first?.message ? `${first.path || 'value'}: ${first.message}` : null
+        throw new Error(
+          detail ||
+            (typeof data.error === 'string' ? data.error : null) ||
+            rawBody.slice(0, 200) ||
+            `HTTP ${res.status}`,
+        )
+      }
+      setVercelToken('')
+      // Survive reloads while the redeploy runs (the poll can take minutes).
+      sessionStorage.setItem('ari:welcome:vercel-deploying', '1')
+      setVercelDeployStatus('deploying')
+    } catch (err) {
+      setVercelDeployStatus('error')
+      setVercelDeployError(err instanceof Error ? err.message : 'Failed to configure Vercel')
+    }
+  }
+
+  // While the new deployment builds, poll setup status on this origin. The old
+  // deployment keeps answering setupComplete:false; the first true means the
+  // production alias flipped to the configured deployment.
+  useEffect(() => {
+    if (vercelDeployStatus !== 'deploying') return
+    const startedAt = Date.now()
+    const DEPLOY_TIMEOUT_MS = 7 * 60 * 1000
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/setup/status', { cache: 'no-store' })
+        const data = await res.json()
+        if (data.setupComplete) {
+          clearInterval(interval)
+          sessionStorage.removeItem('ari:welcome:vercel-deploying')
+          setVercelDeployStatus('complete')
+          return
+        }
+      } catch {
+        // transient network error — keep polling
+      }
+      if (Date.now() - startedAt > DEPLOY_TIMEOUT_MS) {
+        clearInterval(interval)
+        sessionStorage.removeItem('ari:welcome:vercel-deploying')
+        setVercelDeployStatus('error')
+        setVercelDeployError(
+          'The deployment is taking longer than expected. Check its status in your Vercel dashboard — once it finishes, reload this page.',
+        )
+      }
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [vercelDeployStatus])
+
   const handleContinue = () => {
     setShowOnboarding(true)
   }
 
-  const showSupabaseStep = dbMode === "supabasecloud"
-  const stepOrder = showSupabaseStep ? STEP_ORDER_CLOUD : STEP_ORDER_LOCAL
+  const showSupabaseStep = deploymentTarget !== 'vercel' && dbMode === "supabasecloud"
+  const stepOrder =
+    deploymentTarget === 'vercel'
+      ? STEP_ORDER_VERCEL
+      : showSupabaseStep
+        ? STEP_ORDER_CLOUD
+        : STEP_ORDER_LOCAL
 
   const goToPreviousStep = () => {
     const idx = stepOrder.indexOf(currentTab)
@@ -527,18 +665,36 @@ export default function WelcomePage() {
             </p>
           </div>
 
+          {/* Setup-status load failure — without it the wizard can't tell local from Vercel */}
+          {statusLoadFailed && (
+            <Alert className="mb-6 bg-red-50 border-red-200">
+              <AlertCircle className="w-4 h-4 text-red-600" />
+              <AlertTitle className="text-red-800">Couldn&apos;t load setup status</AlertTitle>
+              <AlertDescription className="text-red-700">
+                The wizard needs it to pick the right installation flow.{' '}
+                <button onClick={() => void loadSetupStatus()} className="font-medium underline hover:no-underline">
+                  Retry
+                </button>
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Step Indicator */}
           <StepIndicator currentStep={currentTab} onStepClick={(step) => {
             // Block navigation past Account tab unless admin fields are filled
             const targetIdx = stepOrder.indexOf(step)
             const accountIdx = stepOrder.indexOf("account")
-            if (targetIdx > accountIdx && !isAdminConfigured) {
-              setAdminStepError("Email and password are required to continue.")
+            if (targetIdx > accountIdx && !adminCredsValid) {
+              setAdminStepError(
+                isAdminConfigured
+                  ? "Passwords do not match."
+                  : "Email and password are required to continue."
+              )
               setCurrentTab("account")
               return
             }
             setCurrentTab(step)
-          }} showSupabaseStep={showSupabaseStep} />
+          }} showSupabaseStep={showSupabaseStep} deploymentTarget={deploymentTarget} />
 
           {/* Content Card */}
           <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
@@ -758,7 +914,9 @@ export default function WelcomePage() {
                       <h2 className="text-2xl font-semibold text-zinc-900">Admin Account</h2>
                     </div>
                     <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
-                      Set up your sign-in credentials. These will be saved to your environment file and used to create your admin account on first run.
+                      Set up your sign-in credentials. {deploymentTarget === 'vercel'
+                        ? 'These are stored securely in your Vercel project and used to create your admin account on first sign-in.'
+                        : 'These will be saved to your environment file and used to create your admin account on first run.'}
                     </p>
                   </div>
 
@@ -1718,6 +1876,241 @@ export default function WelcomePage() {
                     </div>
                   </div>
                 </div>
+                </div>
+              )}
+
+              {/* Vercel Deploy Tab (Vercel installs only — replaces the Save step) */}
+              {currentTab === "vercel-deploy" && (
+                <div>
+                  {/* Header section with gradient background */}
+                  <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
+                    <h2 className="text-2xl font-semibold text-zinc-900">Deploy</h2>
+                    <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
+                      You&apos;re running on Vercel. Your configuration will be stored securely in your Vercel project&apos;s environment variables, then ARI redeploys itself so the new settings take effect.
+                    </p>
+                  </div>
+
+                  {/* Content section */}
+                  <div className="space-y-6" style={{ padding: '25px' }}>
+
+                  {(vercelDeployStatus === 'deploying' || vercelDeployStatus === 'complete') ? (
+                    /* Progress panel — shown after configuration is submitted */
+                    <div className="space-y-6">
+                      <div className="rounded-lg border border-blue-200 bg-blue-50 p-5 space-y-3">
+                        <h3 className="text-base font-semibold text-blue-900">
+                          {vercelDeployStatus === 'complete' ? 'Setup complete' : 'Finishing ARI installation...'}
+                        </h3>
+                        <div className="space-y-2 text-sm text-blue-800">
+                          <div className="flex items-center gap-2">
+                            <Check className="w-4 h-4 text-green-600" />
+                            Configuration saved to Vercel
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Check className="w-4 h-4 text-green-600" />
+                            Production redeploy triggered
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {vercelDeployStatus === 'complete' ? (
+                              <Check className="w-4 h-4 text-green-600" />
+                            ) : (
+                              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                            )}
+                            {vercelDeployStatus === 'complete'
+                              ? 'New deployment is live'
+                              : 'Waiting for the new deployment to go live (usually 1–3 minutes)...'}
+                          </div>
+                        </div>
+                        {vercelDeployStatus === 'complete' ? (
+                          <p className="text-sm text-blue-800">
+                            Sign in with the admin email and password you chose — your account and database tables are created automatically on first sign-in.
+                          </p>
+                        ) : (
+                          <p className="text-sm text-blue-800">
+                            Keep this tab open — you&apos;ll be able to sign in the moment the deployment is ready. You can watch the build in your{' '}
+                            <a href="https://vercel.com/dashboard" target="_blank" rel="noopener noreferrer" className="font-medium underline hover:no-underline">Vercel dashboard</a>.
+                          </p>
+                        )}
+                      </div>
+
+                      {vercelDeployStatus === 'complete' && (
+                        <Button
+                          onClick={() => {
+                            // Clear any stale bootstrap cache from earlier visits
+                            // (e.g. a 'no_database' result from before the redeploy).
+                            sessionStorage.removeItem('ari:bootstrap')
+                            window.location.href = '/sign-in'
+                          }}
+                          className="w-full rounded-lg bg-blue-600 hover:bg-blue-500 text-white"
+                        >
+                          Sign in to ARI
+                          <ArrowRight className="w-4 h-4 ml-2" />
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    /* Configuration form */
+                    <>
+                      {/* Step 1: Database */}
+                      <div className="flex items-center gap-3">
+                        <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
+                          1
+                        </div>
+                        <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Database</h3>
+                      </div>
+
+                      {needsDatabaseUrl ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor="vercel-database-url" className="text-sm font-medium text-gray-900">Postgres Connection String</Label>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs max-w-xs">Any hosted Postgres works — Neon, Supabase, Railway, RDS. Copy the connection string from your provider&apos;s dashboard.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <Input
+                            id="vercel-database-url"
+                            value={formData.databaseUrl}
+                            onChange={(e) => setFormData(prev => ({ ...prev, databaseUrl: e.target.value }))}
+                            placeholder="postgresql://user:password@host:5432/postgres"
+                            className="text-sm"
+                            style={{ fontFamily: 'Geist Mono, monospace' }}
+                          />
+                          <p className="text-xs text-zinc-500">
+                            Need a free Postgres database? Try{' '}
+                            <a href="https://neon.tech" target="_blank" rel="noopener noreferrer" className="font-medium text-zinc-900 hover:underline">Neon</a>{' '}or{' '}
+                            <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="font-medium text-zinc-900 hover:underline">Supabase</a> — create a project and copy its connection string.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-sm text-gray-900">
+                          <Check className="w-4 h-4 text-green-500" />
+                          Database already configured in your Vercel project
+                        </div>
+                      )}
+
+                      {/* Step 2: Auth secret */}
+                      <div className="flex items-center gap-3">
+                        <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
+                          2
+                        </div>
+                        <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Authentication Secret</h3>
+                      </div>
+
+                      {needsAuthSecret ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Label htmlFor="vercel-auth-secret" className="text-sm font-medium text-gray-900">Auth Secret</Label>
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs max-w-xs">Used to sign authentication sessions and encrypt stored API keys. Generated for you — it&apos;s saved as a write-only Vercel environment variable.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <div className="flex gap-2">
+                            <Input
+                              id="vercel-auth-secret"
+                              value={formData.betterAuthSecret}
+                              placeholder="Generating..."
+                              className="text-sm flex-1"
+                              style={{ fontFamily: 'Geist Mono, monospace' }}
+                              readOnly
+                            />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setFormData(prev => ({ ...prev, betterAuthSecret: generateAuthSecret() }))}
+                              className="border-zinc-200"
+                            >
+                              Regenerate
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-sm text-gray-900">
+                          <Check className="w-4 h-4 text-green-500" />
+                          Auth secret already configured in your Vercel project
+                        </div>
+                      )}
+
+                      {/* Step 3: Vercel access token */}
+                      <div className="flex items-center gap-3">
+                        <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
+                          3
+                        </div>
+                        <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Vercel Access Token</h3>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="vercel-token" className="text-sm font-medium text-gray-900">Access Token</Label>
+                        <Input
+                          id="vercel-token"
+                          type="password"
+                          value={vercelToken}
+                          onChange={(e) => setVercelToken(e.target.value)}
+                          placeholder="Paste your Vercel access token"
+                          className="text-sm"
+                          autoComplete="off"
+                        />
+                        <p className="text-xs text-zinc-500">
+                          Create one at{' '}
+                          <a href="https://vercel.com/account/tokens" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
+                            vercel.com/account/tokens
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                          {' '}with access to this project. ARI uses it once — to save your configuration and trigger a redeploy — and never stores it. You can delete the token afterwards.
+                        </p>
+                      </div>
+
+                      {vercelDeployStatus === 'error' && vercelDeployError && (
+                        <Alert className="bg-red-50 border-red-200">
+                          <AlertCircle className="w-4 h-4 text-red-600" />
+                          <AlertTitle className="text-red-800">Deployment setup failed</AlertTitle>
+                          <AlertDescription className="text-red-700">{vercelDeployError}</AlertDescription>
+                        </Alert>
+                      )}
+
+                      <Button
+                        onClick={handleVercelConfigure}
+                        disabled={!isVercelDeployReady || vercelDeployStatus === 'submitting'}
+                        className="w-full rounded-lg bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        {vercelDeployStatus === 'submitting' ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Saving configuration...
+                          </>
+                        ) : vercelDeployStatus === 'error' ? (
+                          <>Try Again</>
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4 mr-2" />
+                            Configure &amp; Deploy
+                          </>
+                        )}
+                      </Button>
+                    </>
+                  )}
+
+                  {/* Footer */}
+                  {vercelDeployStatus !== 'deploying' && vercelDeployStatus !== 'complete' && (
+                    <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
+                      <button
+                        onClick={goToPreviousStep}
+                        className="inline-flex items-center justify-center px-4 py-2 text-base font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
+                        style={{ borderRadius: '6px' }}
+                      >
+                        Back
+                      </button>
+                    </div>
+                  )}
+                  </div>
                 </div>
               )}
 

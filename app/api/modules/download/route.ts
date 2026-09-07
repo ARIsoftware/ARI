@@ -18,6 +18,7 @@ import { downloadModuleSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema } from '@/lib/openapi/common'
 import { TARGET_EXISTS_CODE, type ConflictType } from '@/lib/modules/install-types'
+import { isVercel as isVercelDeployment } from '@/lib/deployment'
 import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
@@ -238,7 +239,7 @@ async function handlePOST(request: NextRequest) {
   // come from prior GitHub commits — a fresh re-install can't be reliably
   // distinguished from a redeploy and the GitHub-sync flow already gates
   // persistence there.
-  if (!force && !process.env.VERCEL) {
+  if (!force && !isVercelDeployment()) {
     const customPath = join(process.cwd(), 'modules-custom', moduleName)
     if (await stat(customPath).then(() => true).catch(() => false)) {
       return conflictResponse('custom_exists', moduleName)
@@ -312,7 +313,7 @@ async function handlePOST(request: NextRequest) {
       // ── 1. Extract ────────────────────────────────────────────────
       emit({ stage: 'extract', status: 'start' })
 
-      const isVercel = !!process.env.VERCEL
+      const isVercel = isVercelDeployment()
       const tempExtractDir = join(tmpdir(), `ari-module-extract-${moduleName}-${Date.now()}`)
       const targetDir = isVercel
         ? join(tmpdir(), 'ari-modules', moduleName)

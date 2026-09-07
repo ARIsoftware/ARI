@@ -108,13 +108,32 @@ export const BackupImportResponseSchema = z.unknown().openapi('BackupImportRespo
 export const BackupVerifyResponseSchema = z.unknown().openapi('BackupVerifyResponse')
 
 // ────────────────────────────────────────────────────────────
-// /api/download-env, /api/onboarding/save-env
+// /api/download-env
 // ────────────────────────────────────────────────────────────
 
 export const SaveEnvSuccessSchema = z.object({
   success: z.literal(true),
   path: z.string(),
 }).openapi('SaveEnvSuccess')
+
+// ────────────────────────────────────────────────────────────
+// /api/setup/status, /api/setup/vercel-configure
+// ────────────────────────────────────────────────────────────
+
+export const SetupStatusSchema = z.object({
+  setupComplete: z.boolean(),
+  deploymentTarget: z.enum(['local', 'vercel']),
+  dbMode: z.enum(['postgres', 'supabaselocal', 'supabasecloud']),
+  // Detail fields are present only while setup is incomplete.
+  missing: z.array(z.string()).optional(),
+  projectDir: z.string().optional(),
+}).openapi('SetupStatus')
+
+export const VercelConfigureSuccessSchema = z.object({
+  success: z.literal(true),
+  productionUrl: z.string().nullable(),
+  deploymentId: z.string(),
+}).openapi('VercelConfigureSuccess')
 
 // ────────────────────────────────────────────────────────────
 // /api/health/* (auth-config, module-status, rls-test, root)
