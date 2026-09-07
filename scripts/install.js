@@ -10,14 +10,17 @@
  * Called by install.sh after Homebrew + Node.js are bootstrapped.
  */
 
-const { execSync, exec: execCb, spawn } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+import { execSync, exec as execCb, spawn } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import readline from 'readline';
+import os from 'os';
+import crypto from 'crypto';
+import https from 'https';
+import { createRequire } from 'module';
 
+const cjsRequire = createRequire(import.meta.url);
 const ARI_BRANCH = process.env.ARI_BRANCH || 'main';
-const readline = require('readline');
-const os = require('os');
-const crypto = require('crypto');
 
 // Local-dev Postgres password used on Windows. EDB's installer leaves the
 // postgres superuser with no usable password unless we pass one via --override
@@ -195,7 +198,6 @@ function findWindowsArchAsset(release, namePattern) {
 
 function httpGetJson(url, headers = {}) {
   return new Promise((resolve, reject) => {
-    const https = require('https');
     https.get(url, { headers: { 'User-Agent': 'ari-installer', ...headers } }, (res) => {
       // Follow redirects
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
@@ -217,7 +219,6 @@ function httpGetJson(url, headers = {}) {
 
 function httpDownload(url, destPath) {
   return new Promise((resolve, reject) => {
-    const https = require('https');
     https.get(url, { headers: { 'User-Agent': 'ari-installer' } }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         return resolve(httpDownload(res.headers.location, destPath));
@@ -1134,7 +1135,7 @@ async function runSetupSql(targetDir, databaseUrl) {
   if (!fs.existsSync(setupSqlPath)) return false;
 
   try {
-    const pg = require(path.join(targetDir, 'node_modules', 'pg'));
+    const pg = cjsRequire(path.join(targetDir, 'node_modules', 'pg'));
     const sql = fs.readFileSync(setupSqlPath, 'utf8');
     const client = new pg.Client({ connectionString: databaseUrl, ssl: false });
     await client.connect();
@@ -1216,7 +1217,6 @@ function printWindowsAuthRecovery() {
 }
 
 function writeInstallerEnvFile(targetDir, { dbMode, dbUrl }) {
-  const crypto = require('crypto');
   const secret = crypto.randomBytes(32).toString('base64');
   const lines = [
     '# ARI Environment Configuration',

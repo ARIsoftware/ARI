@@ -16,8 +16,8 @@ import { fileURLToPath } from 'node:url'
 import { MODULE_API_ROUTES } from '@/lib/generated/module-api-registry'
 import { buildSpec } from '@/lib/openapi/build-spec'
 
-const __filename = fileURLToPath(import.meta.url)
-const REPO_ROOT = path.resolve(path.dirname(__filename), '..')
+const selfPath = fileURLToPath(import.meta.url)
+const REPO_ROOT = path.resolve(path.dirname(selfPath), '..')
 const OUTPUT_PATH = path.join(REPO_ROOT, 'lib', 'generated', 'openapi.json')
 const APP_API_ROOT = path.join(REPO_ROOT, 'app', 'api')
 

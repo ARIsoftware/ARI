@@ -29,9 +29,9 @@
  * content (atomic rename means corruption is impossible). MVP-acceptable.
  */
 
-const fs = require('fs');
-const path = require('path');
-const { satisfies, rangeAnchor } = require('./lib/semver-range.js');
+import fs from 'fs';
+import path from 'path';
+import { satisfies, rangeAnchor } from './lib/semver-range.js';
 
 // Kept in sync with lib/modules/npm-installer.ts:29-32.
 const MAX_DEPS_PER_MODULE = 25;
@@ -51,7 +51,7 @@ function emptyResult(extra) {
   };
 }
 
-function reconcileCustomModuleDeps(root) {
+export function reconcileCustomModuleDeps(root) {
   if (process.env.VERCEL) return emptyResult({ skipped: 'vercel' });
 
   const pkgPath = path.join(root, 'package.json');
@@ -203,5 +203,3 @@ function collectModuleDeps(customDir) {
 
   return { declared, invalid, conflicts };
 }
-
-module.exports = { reconcileCustomModuleDeps };

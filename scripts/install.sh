@@ -183,6 +183,13 @@ else
   exit 1
 fi
 
+# ESM installers need an .mjs extension to run from /tmp (no package.json
+# there to declare the module type); older CJS installers keep .js.
+if grep -qE '^(import|export) ' "$INSTALL_JS"; then
+  mv "$INSTALL_JS" "${INSTALL_JS%.js}.mjs"
+  INSTALL_JS="${INSTALL_JS%.js}.mjs"
+fi
+
 echo ""
 node "$INSTALL_JS"
 EXIT_CODE=$?

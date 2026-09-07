@@ -5,14 +5,17 @@
  * Usage: ./ari start | stop | status | update
  */
 
-const { execSync, spawn, spawnSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-const readline = require('readline');
-const os = require('os');
-const { reconcileCustomModuleDeps } = require('../scripts/reconcile-module-deps.js');
+import { execSync, spawn, spawnSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import readline from 'readline';
+import os from 'os';
+import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
+import { reconcileCustomModuleDeps } from '../scripts/reconcile-module-deps.js';
 
-const ROOT = path.resolve(__dirname, '..');
+const cjsRequire = createRequire(import.meta.url);
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ENV_FILE = path.join(ROOT, '.env.supabase.local');
 const PGWEB_PID_FILE = path.join(ROOT, '.ari', 'pgweb.pid');
 const PGWEB_PORT = 5050;
@@ -843,7 +846,7 @@ async function doctor() {
 
   let ariVersion = '';
   try {
-    ariVersion = require(path.join(ROOT, 'package.json')).version || '';
+    ariVersion = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version || '';
   } catch {}
   const ariCommit = run('git rev-parse --short HEAD') || '';
   const ariVersionStr = ariVersion + (ariCommit ? '+' + ariCommit : '');
@@ -924,7 +927,7 @@ async function doctor() {
   const dbUrl = getDatabaseUrl();
   if (dbUrl) {
     try {
-      const pg = require(path.join(ROOT, 'node_modules', 'pg'));
+      const pg = cjsRequire(path.join(ROOT, 'node_modules', 'pg'));
       const client = new pg.Client({ connectionString: dbUrl, ssl: false, connectionTimeoutMillis: 3000 });
       await client.connect();
       const r = await client.query('SELECT 1 AS ok');

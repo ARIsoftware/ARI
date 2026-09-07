@@ -23,8 +23,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const __filename = fileURLToPath(import.meta.url)
-const REPO_ROOT = path.resolve(path.dirname(__filename), '..')
+const selfPath = fileURLToPath(import.meta.url)
+const REPO_ROOT = path.resolve(path.dirname(selfPath), '..')
 const OUTPUT_PATH = path.join(REPO_ROOT, 'lib', 'generated', 'test-report.json')
 const VITEST_ENTRY = path.join(REPO_ROOT, 'node_modules', 'vitest', 'vitest.mjs')
 

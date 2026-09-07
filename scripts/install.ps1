@@ -178,6 +178,15 @@
             return
         }
 
+        # ESM installers need an .mjs extension to run from TEMP (no
+        # package.json there to declare the module type); older CJS
+        # installers keep .js.
+        if (Select-String -Path $installJs -Pattern '^(import|export) ' -Quiet) {
+            $installMjs = [System.IO.Path]::ChangeExtension($installJs, ".mjs")
+            Move-Item $installJs $installMjs -Force
+            $installJs = $installMjs
+        }
+
         Write-Host ""
 
         $env:ARI_PLATFORM = "win32"

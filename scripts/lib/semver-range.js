@@ -18,7 +18,7 @@
  * before doing anything destructive").
  */
 
-function parseVersion(s) {
+export function parseVersion(s) {
   if (typeof s !== 'string') return null
   // Strip leading "v" and any pre-release/build suffix for comparison
   const cleaned = s.replace(/^v/, '').split(/[-+]/)[0]
@@ -46,7 +46,7 @@ function cmp(a, b) {
  * @returns {boolean | null} true if range is satisfied, false if not,
  *                            null if range form is not recognized.
  */
-function satisfies(version, range) {
+export function satisfies(version, range) {
   if (typeof range !== 'string') return null
   const v = parseVersion(version)
   if (!v) return null
@@ -93,12 +93,10 @@ function satisfies(version, range) {
  * stores `"three": "^0.184.0"` in package.json and we need the "0.184.0"
  * part to compare. Returns null if no version is embedded.
  */
-function rangeAnchor(range) {
+export function rangeAnchor(range) {
   if (typeof range !== 'string') return null
   const r = range.trim()
   if (!r || r === '*' || r === 'x' || r === 'latest') return null
   const stripped = r.replace(/^[\^~]|^>=\s*/, '')
   return parseVersion(stripped) ? stripped : null
 }
-
-module.exports = { satisfies, parseVersion, rangeAnchor }

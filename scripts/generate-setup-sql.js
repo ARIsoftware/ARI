@@ -11,14 +11,15 @@
  * Idempotent: skips writing if the output is byte-identical.
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath, pathToFileURL } from 'url';
 
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SQL_PATH = path.join(ROOT, 'lib', 'db', 'setup.sql');
 const TS_PATH = path.join(ROOT, 'lib', 'db', 'setup-sql.ts');
 
-function generateSetupSql() {
+export default function generateSetupSql() {
   let sql;
   try {
     sql = fs.readFileSync(SQL_PATH, 'utf-8');
@@ -55,8 +56,6 @@ function generateSetupSql() {
   console.log(`✅ setup-sql.ts regenerated from setup.sql (${sql.length} chars)`);
 }
 
-if (require.main === module) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   generateSetupSql();
 }
-
-module.exports = generateSetupSql;

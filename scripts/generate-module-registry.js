@@ -11,10 +11,11 @@
  * Run this before build: node scripts/generate-module-registry.js
  */
 
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-const { satisfies, rangeAnchor } = require('./lib/semver-range');
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import { satisfies, rangeAnchor } from './lib/semver-range.js';
+import generateSetupSql from './generate-setup-sql.js';
 
 /**
  * Compute the SHA-256 hash of a module's database/schema.sql, hex-encoded.
@@ -1176,7 +1177,7 @@ function main() {
   // Mirror lib/db/setup.sql into lib/db/setup-sql.ts so /welcome's bootstrap
   // route always runs the canonical schema (no manual sync, no drift).
   console.log('📝 Generating setup-sql.ts...');
-  require('./generate-setup-sql.js')();
+  generateSetupSql();
 
   console.log('');
   console.log('Registered modules:');

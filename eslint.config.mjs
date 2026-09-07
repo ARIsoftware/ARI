@@ -50,9 +50,9 @@ const eslintConfig = [
     },
   },
   {
-    // CommonJS by design (package.json has no "type": "module"). require() is
-    // correct here -- rewriting to ESM would break the installer / build tooling.
-    files: ['scripts/**', 'tailwind.config.ts'],
+    // Tailwind v3 loads this config via jiti, where require() works regardless
+    // of the package "type"; scripts/** are real ESM and are linted as such.
+    files: ['tailwind.config.ts'],
     rules: {
       '@typescript-eslint/no-require-imports': 'off',
     },
