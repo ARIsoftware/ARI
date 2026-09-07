@@ -59,8 +59,21 @@ export async function hashPassword(password: string): Promise<string> {
   })
 }
 
+// When BETTER_AUTH_SECRET is unset (a zero-env Vercel Deploy Button build, or
+// any unconfigured first boot), better-auth would otherwise fall back to its
+// built-in default secret and THROW in production ("You are using the default
+// secret") — the throw becomes an unhandled promise rejection that crashes the
+// build. We pass an explicit setup-mode placeholder instead: it's safe because
+// auth is never exercised while unconfigured (middleware redirects everything
+// to /welcome and getAuthenticatedUser returns NULL_AUTH via isSetupComplete),
+// and once the real secret is set the redeploy uses it.
+const authSecret =
+  process.env.BETTER_AUTH_SECRET ||
+  "ari-setup-mode-placeholder-not-for-production-do-not-use"
+
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+  secret: authSecret,
   database: pool as any, // Will be null during build, but auth-helpers catches this
   trustedOrigins,
   emailAndPassword: {
