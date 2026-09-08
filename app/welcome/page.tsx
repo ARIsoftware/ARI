@@ -1,12 +1,12 @@
-"use client"
+'use client'
 
-import { useEffect, useMemo, useRef, useState } from "react"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   AlertCircle,
   Save,
@@ -18,19 +18,25 @@ import {
   X,
   ArrowRight,
   Loader2,
-} from "lucide-react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { StepIndicator } from "./components/step-indicator"
-import { CodeBlock } from "./components/code-block"
-import { renderEnvFile } from "@/lib/env-file"
+} from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { StepIndicator } from './components/step-indicator'
+import { CodeBlock } from './components/code-block'
+import { renderEnvFile } from '@/lib/env-file'
 import {
   welcomeEmailSchema,
   adminPasswordSchema,
   profileFieldSchemas,
   firstZodError,
   type ProfileFieldName,
-} from "@/lib/validation"
-import { useUserPreferences, toProfileForm } from "@/hooks/use-user-preferences"
+} from '@/lib/validation'
+import { useUserPreferences, toProfileForm } from '@/hooks/use-user-preferences'
 
 // Common timezones (shared with settings page)
 const COMMON_TIMEZONES = [
@@ -86,27 +92,53 @@ const generateAuthSecret = () => {
 }
 
 // Disabled steps: "supabase", "resend", "vercel", "github" — may be restored in the future
-const STEP_ORDER_LOCAL = ["account", "personal", "download"]
-const STEP_ORDER_CLOUD = ["account", "personal", "supabase", "download"]
-const STEP_ORDER_VERCEL = ["account", "personal", "vercel-deploy"]
+const STEP_ORDER_LOCAL = ['account', 'personal', 'download']
+const STEP_ORDER_CLOUD = ['account', 'personal', 'supabase', 'download']
+const STEP_ORDER_VERCEL = ['account', 'personal', 'vercel-deploy']
+
+// Read a wizard POST response, returning the parsed body on success or throwing
+// the most specific error message available. The server can return non-JSON on
+// hard errors (dev error pages, proxy failures), so fall back to raw text.
+// Shared by the local (.env.local) and Vercel setup submit handlers.
+async function readApiResultOrThrow(res: Response): Promise<Record<string, unknown>> {
+  const rawBody = await res.text()
+  let data: Record<string, unknown> = {}
+  try {
+    data = rawBody ? JSON.parse(rawBody) : {}
+  } catch {
+    // non-JSON body
+  }
+  if (!res.ok || !data.success) {
+    const details = Array.isArray(data.details) ? data.details : []
+    const first = details[0] as { path?: string; message?: string } | undefined
+    const detail = first?.message ? `${first.path || 'value'}: ${first.message}` : null
+    throw new Error(
+      detail ||
+        (typeof data.error === 'string' ? data.error : null) ||
+        rawBody.slice(0, 200) ||
+        `HTTP ${res.status}`,
+    )
+  }
+  return data
+}
 
 export default function WelcomePage() {
   const [completedLines, setCompletedLines] = useState<string[]>([])
-  const [currentLineText, setCurrentLineText] = useState("")
+  const [currentLineText, setCurrentLineText] = useState('')
   const [currentLineIndex, setCurrentLineIndex] = useState(-1)
   const [isTyping, setIsTyping] = useState(false)
   const [showContinue, setShowContinue] = useState(false)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const animationTimeouts = useRef<NodeJS.Timeout[]>([])
 
-  const [currentTab, setCurrentTab] = useState("account")
-  const [dbMode, setDbMode] = useState<"postgres" | "supabaselocal" | "supabasecloud">("postgres")
-  const [selectedOS, setSelectedOS] = useState<"mac" | "windows" | "linux" | null>(null)
-  const [deploymentTarget, setDeploymentTarget] = useState<"local" | "vercel">("local")
+  const [currentTab, setCurrentTab] = useState('account')
+  const [dbMode, setDbMode] = useState<'postgres' | 'supabaselocal' | 'supabasecloud'>('postgres')
+  const [selectedOS, setSelectedOS] = useState<'mac' | 'windows' | 'linux' | null>(null)
+  const [deploymentTarget, setDeploymentTarget] = useState<'local' | 'vercel'>('local')
   const [missingConfig, setMissingConfig] = useState<string[]>([])
 
   // Vercel deploy flow state
-  const [vercelToken, setVercelToken] = useState("")
+  const [vercelToken, setVercelToken] = useState('')
   const [vercelDeployStatus, setVercelDeployStatus] = useState<
     'idle' | 'submitting' | 'deploying' | 'complete' | 'timeout' | 'error'
   >('idle')
@@ -118,15 +150,15 @@ export default function WelcomePage() {
   const [vercelProductionUrl, setVercelProductionUrl] = useState<string | null>(null)
 
   const [formData, setFormData] = useState<OnboardingData>({
-    supabaseUrl: "",
-    supabaseAnonKey: "",
-    supabaseSecretKey: "",
-    databaseUrl: "",
-    betterAuthSecret: "",
-    adminEmail: "",
-    adminPassword: "",
-    resendApiKey: "",
-    resendWebhookSecret: "",
+    supabaseUrl: '',
+    supabaseAnonKey: '',
+    supabaseSecretKey: '',
+    databaseUrl: '',
+    betterAuthSecret: '',
+    adminEmail: '',
+    adminPassword: '',
+    resendApiKey: '',
+    resendWebhookSecret: '',
     vercelSetupComplete: false,
   })
 
@@ -143,8 +175,8 @@ export default function WelcomePage() {
   })
   const [profileSaved, setProfileSaved] = useState(false)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
-  const [adminConfirmPassword, setAdminConfirmPassword] = useState("")
-  const [adminStepError, setAdminStepError] = useState("")
+  const [adminConfirmPassword, setAdminConfirmPassword] = useState('')
+  const [adminStepError, setAdminStepError] = useState('')
   const [profileErrors, setProfileErrors] = useState<Partial<Record<ProfileFieldName, string>>>({})
 
   // Rehydrate the post-save state across the Fast Refresh reload that fires
@@ -173,7 +205,7 @@ export default function WelcomePage() {
   useEffect(() => {
     if (currentTab !== 'personal') return
     if (formData.adminEmail && !profileData.email) {
-      setProfileData(prev => ({ ...prev, email: formData.adminEmail }))
+      setProfileData((prev) => ({ ...prev, email: formData.adminEmail }))
     }
   }, [currentTab, formData.adminEmail, profileData.email])
 
@@ -183,7 +215,7 @@ export default function WelcomePage() {
   useEffect(() => {
     if (profilePopulated.current || !profilePrefs) return
     const merged = toProfileForm(profilePrefs)
-    const hasData = Object.values(merged).some(v => v && v !== 'UTC')
+    const hasData = Object.values(merged).some((v) => v && v !== 'UTC')
     if (hasData) setProfileData(merged)
     profilePopulated.current = true
   }, [profilePrefs])
@@ -195,7 +227,7 @@ export default function WelcomePage() {
   }
 
   const clearProfileError = (field: ProfileFieldName) => {
-    setProfileErrors(prev => {
+    setProfileErrors((prev) => {
       if (!prev[field]) return prev
       const { [field]: _removed, ...rest } = prev
       return rest
@@ -203,7 +235,7 @@ export default function WelcomePage() {
   }
 
   const handleProfileChange = (field: string, value: string) => {
-    setProfileData(prev => ({ ...prev, [field]: value }))
+    setProfileData((prev) => ({ ...prev, [field]: value }))
     setProfileSaved(false)
     if (field in profileFieldSchemas) {
       clearProfileError(field as ProfileFieldName)
@@ -213,7 +245,7 @@ export default function WelcomePage() {
   const handleProfileBlur = (field: ProfileFieldName) => {
     const err = validateProfileField(field, profileData[field] ?? '')
     if (err) {
-      setProfileErrors(prev => ({ ...prev, [field]: err }))
+      setProfileErrors((prev) => ({ ...prev, [field]: err }))
     } else {
       clearProfileError(field)
     }
@@ -248,15 +280,15 @@ export default function WelcomePage() {
       return
     }
     if (formData.adminPassword !== adminConfirmPassword) {
-      setAdminStepError("Passwords do not match.")
+      setAdminStepError('Passwords do not match.')
       return
     }
     // Normalize to match what the server-side schema does (trim + lowercase).
     const normalized = effectiveEmail ? effectiveEmail.trim().toLowerCase() : ''
     if (normalized && normalized !== formData.adminEmail) {
-      setFormData(prev => ({ ...prev, adminEmail: normalized }))
+      setFormData((prev) => ({ ...prev, adminEmail: normalized }))
     }
-    setAdminStepError("")
+    setAdminStepError('')
     goToNextStep()
   }
 
@@ -269,17 +301,20 @@ export default function WelcomePage() {
         const s = v.trim()
         return s === '' ? null : s
       }
-      localStorage.setItem('ari_welcome_profile', JSON.stringify({
-        name: clean(profileData.name),
-        email: clean(profileData.email),
-        title: clean(profileData.title),
-        company_name: clean(profileData.company_name),
-        country: clean(profileData.country),
-        city: clean(profileData.city),
-        linkedin_url: clean(profileData.linkedin_url),
-        timezone: profileData.timezone,
-        _savedAt: Date.now(),
-      }))
+      localStorage.setItem(
+        'ari_welcome_profile',
+        JSON.stringify({
+          name: clean(profileData.name),
+          email: clean(profileData.email),
+          title: clean(profileData.title),
+          company_name: clean(profileData.company_name),
+          country: clean(profileData.country),
+          city: clean(profileData.city),
+          linkedin_url: clean(profileData.linkedin_url),
+          timezone: profileData.timezone,
+          _savedAt: Date.now(),
+        }),
+      )
       setProfileSaved(true)
       return true
     } catch (error) {
@@ -293,37 +328,37 @@ export default function WelcomePage() {
   // Generate BETTER_AUTH_SECRET on mount
   useEffect(() => {
     if (!formData.betterAuthSecret) {
-      setFormData(prev => ({ ...prev, betterAuthSecret: generateAuthSecret() }))
+      setFormData((prev) => ({ ...prev, betterAuthSecret: generateAuthSecret() }))
     }
   }, [])
 
   const sequence = [
-    { delay: 1300, text: "Hello." },
-    { delay: 1300, text: "I am very happy that we can meet." },
-    { delay: 1300, text: "I am ARI. I am software." },
-    { delay: 1300, text: "However, I am not like other software." },
-    { delay: 1300, text: "I am free. Free to grow. Ever expandable. No limits." },
-    { delay: 1300, text: "I am open source." },
-    { delay: 1300, text: "I am yours." },
+    { delay: 1300, text: 'Hello.' },
+    { delay: 1300, text: 'I am very happy that we can meet.' },
+    { delay: 1300, text: 'I am ARI. I am software.' },
+    { delay: 1300, text: 'However, I am not like other software.' },
+    { delay: 1300, text: 'I am free. Free to grow. Ever expandable. No limits.' },
+    { delay: 1300, text: 'I am open source.' },
+    { delay: 1300, text: 'I am yours.' },
   ]
 
   const skipAnimation = () => {
     animationTimeouts.current.forEach(clearTimeout)
     animationTimeouts.current = []
-    setCompletedLines(sequence.map(s => s.text))
-    setCurrentLineText("")
+    setCompletedLines(sequence.map((s) => s.text))
+    setCurrentLineText('')
     setIsTyping(false)
     setShowContinue(true)
   }
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !showOnboarding) {
+      if (e.key === 'Escape' && !showOnboarding) {
         skipAnimation()
       }
     }
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [showOnboarding])
 
   useEffect(() => {
@@ -343,14 +378,14 @@ export default function WelcomePage() {
         if (nextLineIndex < sequence.length) {
           const timeout = setTimeout(() => {
             setCompletedLines((prev) => [...prev, text])
-            setCurrentLineText("")
+            setCurrentLineText('')
             startNextLine(nextLineIndex)
           }, sequence[nextLineIndex].delay)
           timeouts.push(timeout)
         } else {
           const timeout = setTimeout(() => {
             setCompletedLines((prev) => [...prev, text])
-            setCurrentLineText("")
+            setCurrentLineText('')
 
             // Show continue button after matching delay
             const continueTimeout = setTimeout(() => {
@@ -385,7 +420,7 @@ export default function WelcomePage() {
 
   const loadSetupStatus = async () => {
     try {
-      const res = await fetch("/api/setup/status", { cache: 'no-store' })
+      const res = await fetch('/api/setup/status', { cache: 'no-store' })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       setStatusLoadFailed(false)
@@ -443,10 +478,7 @@ export default function WelcomePage() {
     [formData],
   )
 
-  const envFileContent = useMemo(
-    () => renderEnvFile(envFields, { dbMode }),
-    [envFields, dbMode],
-  )
+  const envFileContent = useMemo(() => renderEnvFile(envFields, { dbMode }), [envFields, dbMode])
 
   const [projectDir, setProjectDir] = useState<string | null>(null)
   const [envSaveStatus, setEnvSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -457,31 +489,12 @@ export default function WelcomePage() {
     try {
       setEnvSaveStatus('saving')
       setEnvSaveError(null)
-      const res = await fetch("/api/download-env", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/download-env', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...envFields, dbMode }),
       })
-      // Server can return non-JSON on hard errors (dev-mode error pages, proxy
-      // failures, etc.) — fall back to raw text so the user gets something useful.
-      const rawBody = await res.text()
-      let data: Record<string, unknown> = {}
-      try {
-        data = rawBody ? JSON.parse(rawBody) : {}
-      } catch {
-        // non-JSON body
-      }
-      if (!res.ok || !data.success) {
-        const details = Array.isArray(data.details) ? data.details : []
-        const first = details[0] as { path?: string; message?: string } | undefined
-        const detail = first?.message ? `${first.path || 'value'}: ${first.message}` : null
-        throw new Error(
-          detail ||
-            (typeof data.error === 'string' ? data.error : null) ||
-            rawBody.slice(0, 200) ||
-            `HTTP ${res.status}`,
-        )
-      }
+      const data = await readApiResultOrThrow(res)
       setEnvSavedPath(typeof data.path === 'string' ? data.path : null)
       setEnvSaveStatus('saved')
       // Persist so the wizard rehydrates to this state after Next.js's
@@ -489,7 +502,7 @@ export default function WelcomePage() {
       sessionStorage.setItem('ari:welcome:saved', '1')
     } catch (err) {
       setEnvSaveStatus('error')
-      setEnvSaveError(err instanceof Error ? err.message : "Failed to save .env.local")
+      setEnvSaveError(err instanceof Error ? err.message : 'Failed to save .env.local')
     }
   }
 
@@ -519,24 +532,7 @@ export default function WelcomePage() {
           adminPassword: formData.adminPassword,
         }),
       })
-      const rawBody = await res.text()
-      let data: Record<string, unknown> = {}
-      try {
-        data = rawBody ? JSON.parse(rawBody) : {}
-      } catch {
-        // non-JSON body
-      }
-      if (!res.ok || !data.success) {
-        const details = Array.isArray(data.details) ? data.details : []
-        const first = details[0] as { path?: string; message?: string } | undefined
-        const detail = first?.message ? `${first.path || 'value'}: ${first.message}` : null
-        throw new Error(
-          detail ||
-            (typeof data.error === 'string' ? data.error : null) ||
-            rawBody.slice(0, 200) ||
-            `HTTP ${res.status}`,
-        )
-      }
+      const data = await readApiResultOrThrow(res)
       setVercelToken('')
       // Rendered into https:// links — accept only a bare hostname, so a
       // tampered value can't smuggle a path, credentials (user@host), port
@@ -598,7 +594,7 @@ export default function WelcomePage() {
     setShowOnboarding(true)
   }
 
-  const showSupabaseStep = deploymentTarget !== 'vercel' && dbMode === "supabasecloud"
+  const showSupabaseStep = deploymentTarget !== 'vercel' && dbMode === 'supabasecloud'
   const stepOrder =
     deploymentTarget === 'vercel'
       ? STEP_ORDER_VERCEL
@@ -616,18 +612,19 @@ export default function WelcomePage() {
     if (idx < stepOrder.length - 1) setCurrentTab(stepOrder[idx + 1])
   }
 
-
   const isDatabaseConfigured = dbMode !== 'supabasecloud' || !!formData.databaseUrl
-  const isSupabaseApiConfigured = dbMode !== 'supabasecloud' || (!!formData.supabaseUrl && !!formData.supabaseSecretKey)
-  const isSupabaseComplete = isDatabaseConfigured && isSupabaseApiConfigured && (!!formData.supabaseAnonKey || dbMode !== 'supabasecloud') && formData.betterAuthSecret
+  const isSupabaseApiConfigured =
+    dbMode !== 'supabasecloud' || (!!formData.supabaseUrl && !!formData.supabaseSecretKey)
+  const isSupabaseComplete =
+    isDatabaseConfigured &&
+    isSupabaseApiConfigured &&
+    (!!formData.supabaseAnonKey || dbMode !== 'supabasecloud') &&
+    formData.betterAuthSecret
 
   // Intro/typing animation screen
   if (!showOnboarding) {
     return (
-      <div
-        className="min-h-screen bg-white"
-        style={{ padding: '70px 0 0 70px' }}
-      >
+      <div className="min-h-screen bg-white" style={{ padding: '70px 0 0 70px' }}>
         {/* Typed lines */}
         <div>
           {allLines.map((line, index) => {
@@ -637,13 +634,15 @@ export default function WelcomePage() {
             return (
               <p
                 key={index}
-                className={isFirstLine ? "text-6xl font-bold text-black" : "text-black"}
-                style={isFirstLine ? { marginBottom: '32px' } : { marginTop: '45px', fontSize: '1.8rem', fontWeight: 300 }}
+                className={isFirstLine ? 'text-6xl font-bold text-black' : 'text-black'}
+                style={
+                  isFirstLine
+                    ? { marginBottom: '32px' }
+                    : { marginTop: '45px', fontSize: '1.8rem', fontWeight: 300 }
+                }
               >
                 {line}
-                {isCurrentLine && (
-                  <span className="animate-blink">|</span>
-                )}
+                {isCurrentLine && <span className="animate-blink">|</span>}
               </p>
             )
           })}
@@ -677,11 +676,25 @@ export default function WelcomePage() {
         <div style={{ width: '864px', maxWidth: '100%' }}>
           {/* Header */}
           <div className="mb-10">
-            <h1 className="text-4xl font-light tracking-tight text-zinc-900 mb-3">
-              Configure ARI
-            </h1>
-            <p className="text-black" style={{ lineHeight: '26px', fontSize: '16px', fontWeight: 300 }}>
-              Welcome to ARI. Engineered for those who want complete command over the software that runs their life. The first AI-enabled No Code workspace that can be completely customized to your workflow and grows with you. Build entirely new modules in minutes. Where mastery, modularity, and AI work in your favour so you can do your best work and live your best life. <a href="https://ari.software/docs" target="_blank" rel="noopener noreferrer" className="underline" style={{ fontWeight: 500 }}>Need Help?</a>
+            <h1 className="text-4xl font-light tracking-tight text-zinc-900 mb-3">Configure ARI</h1>
+            <p
+              className="text-black"
+              style={{ lineHeight: '26px', fontSize: '16px', fontWeight: 300 }}
+            >
+              Welcome to ARI. Engineered for those who want complete command over the software that
+              runs their life. The first AI-enabled No Code workspace that can be completely
+              customized to your workflow and grows with you. Build entirely new modules in minutes.
+              Where mastery, modularity, and AI work in your favour so you can do your best work and
+              live your best life.{' '}
+              <a
+                href="https://ari.software/docs"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+                style={{ fontWeight: 500 }}
+              >
+                Need Help?
+              </a>
             </p>
           </div>
 
@@ -692,7 +705,10 @@ export default function WelcomePage() {
               <AlertTitle className="text-red-800">Couldn&apos;t load setup status</AlertTitle>
               <AlertDescription className="text-red-700">
                 The wizard needs it to pick the right installation flow.{' '}
-                <button onClick={() => void loadSetupStatus()} className="font-medium underline hover:no-underline">
+                <button
+                  onClick={() => void loadSetupStatus()}
+                  className="font-medium underline hover:no-underline"
+                >
                   Retry
                 </button>
               </AlertDescription>
@@ -700,733 +716,943 @@ export default function WelcomePage() {
           )}
 
           {/* Step Indicator */}
-          <StepIndicator currentStep={currentTab} onStepClick={(step) => {
-            // Block navigation past Account tab unless admin fields are filled
-            const targetIdx = stepOrder.indexOf(step)
-            const accountIdx = stepOrder.indexOf("account")
-            if (targetIdx > accountIdx && !adminCredsValid) {
-              setAdminStepError(
-                isAdminConfigured
-                  ? "Passwords do not match."
-                  : "Email and password are required to continue."
-              )
-              setCurrentTab("account")
-              return
-            }
-            setCurrentTab(step)
-          }} showSupabaseStep={showSupabaseStep} deploymentTarget={deploymentTarget} />
+          <StepIndicator
+            currentStep={currentTab}
+            onStepClick={(step) => {
+              // Block navigation past Account tab unless admin fields are filled
+              const targetIdx = stepOrder.indexOf(step)
+              const accountIdx = stepOrder.indexOf('account')
+              if (targetIdx > accountIdx && !adminCredsValid) {
+                setAdminStepError(
+                  isAdminConfigured
+                    ? 'Passwords do not match.'
+                    : 'Email and password are required to continue.',
+                )
+                setCurrentTab('account')
+                return
+              }
+              setCurrentTab(step)
+            }}
+            showSupabaseStep={showSupabaseStep}
+            deploymentTarget={deploymentTarget}
+          />
 
           {/* Content Card */}
           <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm overflow-hidden">
-              {/* Personal Profile Tab */}
-              {currentTab === "personal" && (
-                <div>
-                  {/* Header section with gradient background */}
-                  <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <div className="flex items-center gap-2.5">
-                      <h2 className="text-2xl font-semibold text-zinc-900">Your Profile</h2>
+            {/* Personal Profile Tab */}
+            {currentTab === 'personal' && (
+              <div>
+                {/* Header section with gradient background */}
+                <div
+                  className="border-b border-zinc-100"
+                  style={{
+                    padding: '25px',
+                    background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)',
+                  }}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="text-2xl font-semibold text-zinc-900">Your Profile</h2>
+                  </div>
+                  <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
+                    Tell us a bit about yourself. This information is stored securely in your
+                    database and can be updated anytime in Settings.
+                  </p>
+                </div>
+
+                {/* Content section */}
+                <div style={{ padding: '25px' }}>
+                  <div className="space-y-5">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="welcome-name" className="text-zinc-900 font-medium">
+                          Name
+                        </Label>
+                        <Input
+                          id="welcome-name"
+                          value={profileData.name}
+                          onChange={(e) => handleProfileChange('name', e.target.value)}
+                          onBlur={() => handleProfileBlur('name')}
+                          placeholder="Your full name"
+                          className="border-zinc-200"
+                          maxLength={255}
+                          aria-invalid={!!profileErrors.name}
+                        />
+                        {profileErrors.name && (
+                          <p className="text-xs text-red-600">{profileErrors.name}</p>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="welcome-email" className="text-zinc-900 font-medium">
+                          Email
+                        </Label>
+                        <Input
+                          id="welcome-email"
+                          type="email"
+                          value={profileData.email}
+                          onChange={(e) => handleProfileChange('email', e.target.value)}
+                          onBlur={() => handleProfileBlur('email')}
+                          placeholder="your@email.com"
+                          className="border-zinc-200"
+                          maxLength={254}
+                          aria-invalid={!!profileErrors.email}
+                        />
+                        {profileErrors.email && (
+                          <p className="text-xs text-red-600">{profileErrors.email}</p>
+                        )}
+                      </div>
                     </div>
-                    <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
-                      Tell us a bit about yourself. This information is stored securely in your database and can be updated anytime in Settings.
-                    </p>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="welcome-title" className="text-zinc-900 font-medium">
+                        Title
+                      </Label>
+                      <Input
+                        id="welcome-title"
+                        value={profileData.title}
+                        onChange={(e) => handleProfileChange('title', e.target.value)}
+                        onBlur={() => handleProfileBlur('title')}
+                        placeholder="Your job title"
+                        className="border-zinc-200"
+                        maxLength={255}
+                        aria-invalid={!!profileErrors.title}
+                      />
+                      {profileErrors.title && (
+                        <p className="text-xs text-red-600">{profileErrors.title}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="welcome-company" className="text-zinc-900 font-medium">
+                        Company Name
+                      </Label>
+                      <Input
+                        id="welcome-company"
+                        value={profileData.company_name}
+                        onChange={(e) => handleProfileChange('company_name', e.target.value)}
+                        onBlur={() => handleProfileBlur('company_name')}
+                        placeholder="Your company name"
+                        className="border-zinc-200"
+                        maxLength={255}
+                        aria-invalid={!!profileErrors.company_name}
+                      />
+                      {profileErrors.company_name && (
+                        <p className="text-xs text-red-600">{profileErrors.company_name}</p>
+                      )}
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="welcome-country" className="text-zinc-900 font-medium">
+                          Country
+                        </Label>
+                        <Input
+                          id="welcome-country"
+                          value={profileData.country}
+                          onChange={(e) => handleProfileChange('country', e.target.value)}
+                          onBlur={() => handleProfileBlur('country')}
+                          placeholder="Your country"
+                          className="border-zinc-200"
+                          maxLength={100}
+                          aria-invalid={!!profileErrors.country}
+                        />
+                        {profileErrors.country && (
+                          <p className="text-xs text-red-600">{profileErrors.country}</p>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="welcome-city" className="text-zinc-900 font-medium">
+                          City
+                        </Label>
+                        <Input
+                          id="welcome-city"
+                          value={profileData.city}
+                          onChange={(e) => handleProfileChange('city', e.target.value)}
+                          onBlur={() => handleProfileBlur('city')}
+                          placeholder="Your city"
+                          className="border-zinc-200"
+                          maxLength={100}
+                          aria-invalid={!!profileErrors.city}
+                        />
+                        {profileErrors.city && (
+                          <p className="text-xs text-red-600">{profileErrors.city}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="welcome-linkedin" className="text-zinc-900 font-medium">
+                        LinkedIn URL
+                      </Label>
+                      <Input
+                        id="welcome-linkedin"
+                        type="url"
+                        value={profileData.linkedin_url}
+                        onChange={(e) => handleProfileChange('linkedin_url', e.target.value)}
+                        onBlur={() => handleProfileBlur('linkedin_url')}
+                        placeholder="https://linkedin.com/in/yourprofile"
+                        className="border-zinc-200"
+                        maxLength={500}
+                        aria-invalid={!!profileErrors.linkedin_url}
+                      />
+                      {profileErrors.linkedin_url && (
+                        <p className="text-xs text-red-600">{profileErrors.linkedin_url}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="welcome-timezone" className="text-zinc-900 font-medium">
+                          Timezone
+                        </Label>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Info className="h-4 w-4 text-zinc-400 hover:text-zinc-600" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-xs max-w-xs">
+                                Your timezone is used for scheduling features like automatic
+                                backups.
+                              </p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <Select
+                        value={profileData.timezone}
+                        onValueChange={(value) => handleProfileChange('timezone', value)}
+                      >
+                        <SelectTrigger id="welcome-timezone" className="border-zinc-200">
+                          <SelectValue placeholder="Select timezone" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {COMMON_TIMEZONES.map((tz) => (
+                            <SelectItem key={tz.value} value={tz.value}>
+                              {tz.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
-                  {/* Content section */}
-                  <div style={{ padding: '25px' }}>
-                    <div className="space-y-5">
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="welcome-name" className="text-zinc-900 font-medium">Name</Label>
-                          <Input
-                            id="welcome-name"
-                            value={profileData.name}
-                            onChange={(e) => handleProfileChange('name', e.target.value)}
-                            onBlur={() => handleProfileBlur('name')}
-                            placeholder="Your full name"
-                            className="border-zinc-200"
-                            maxLength={255}
-                            aria-invalid={!!profileErrors.name}
-                          />
-                          {profileErrors.name && (
-                            <p className="text-xs text-red-600">{profileErrors.name}</p>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="welcome-email" className="text-zinc-900 font-medium">Email</Label>
-                          <Input
-                            id="welcome-email"
-                            type="email"
-                            value={profileData.email}
-                            onChange={(e) => handleProfileChange('email', e.target.value)}
-                            onBlur={() => handleProfileBlur('email')}
-                            placeholder="your@email.com"
-                            className="border-zinc-200"
-                            maxLength={254}
-                            aria-invalid={!!profileErrors.email}
-                          />
-                          {profileErrors.email && (
-                            <p className="text-xs text-red-600">{profileErrors.email}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="welcome-title" className="text-zinc-900 font-medium">Title</Label>
-                        <Input
-                          id="welcome-title"
-                          value={profileData.title}
-                          onChange={(e) => handleProfileChange('title', e.target.value)}
-                          onBlur={() => handleProfileBlur('title')}
-                          placeholder="Your job title"
-                          className="border-zinc-200"
-                          maxLength={255}
-                          aria-invalid={!!profileErrors.title}
-                        />
-                        {profileErrors.title && (
-                          <p className="text-xs text-red-600">{profileErrors.title}</p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="welcome-company" className="text-zinc-900 font-medium">Company Name</Label>
-                        <Input
-                          id="welcome-company"
-                          value={profileData.company_name}
-                          onChange={(e) => handleProfileChange('company_name', e.target.value)}
-                          onBlur={() => handleProfileBlur('company_name')}
-                          placeholder="Your company name"
-                          className="border-zinc-200"
-                          maxLength={255}
-                          aria-invalid={!!profileErrors.company_name}
-                        />
-                        {profileErrors.company_name && (
-                          <p className="text-xs text-red-600">{profileErrors.company_name}</p>
-                        )}
-                      </div>
-
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="welcome-country" className="text-zinc-900 font-medium">Country</Label>
-                          <Input
-                            id="welcome-country"
-                            value={profileData.country}
-                            onChange={(e) => handleProfileChange('country', e.target.value)}
-                            onBlur={() => handleProfileBlur('country')}
-                            placeholder="Your country"
-                            className="border-zinc-200"
-                            maxLength={100}
-                            aria-invalid={!!profileErrors.country}
-                          />
-                          {profileErrors.country && (
-                            <p className="text-xs text-red-600">{profileErrors.country}</p>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="welcome-city" className="text-zinc-900 font-medium">City</Label>
-                          <Input
-                            id="welcome-city"
-                            value={profileData.city}
-                            onChange={(e) => handleProfileChange('city', e.target.value)}
-                            onBlur={() => handleProfileBlur('city')}
-                            placeholder="Your city"
-                            className="border-zinc-200"
-                            maxLength={100}
-                            aria-invalid={!!profileErrors.city}
-                          />
-                          {profileErrors.city && (
-                            <p className="text-xs text-red-600">{profileErrors.city}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="welcome-linkedin" className="text-zinc-900 font-medium">LinkedIn URL</Label>
-                        <Input
-                          id="welcome-linkedin"
-                          type="url"
-                          value={profileData.linkedin_url}
-                          onChange={(e) => handleProfileChange('linkedin_url', e.target.value)}
-                          onBlur={() => handleProfileBlur('linkedin_url')}
-                          placeholder="https://linkedin.com/in/yourprofile"
-                          className="border-zinc-200"
-                          maxLength={500}
-                          aria-invalid={!!profileErrors.linkedin_url}
-                        />
-                        {profileErrors.linkedin_url && (
-                          <p className="text-xs text-red-600">{profileErrors.linkedin_url}</p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Label htmlFor="welcome-timezone" className="text-zinc-900 font-medium">Timezone</Label>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger>
-                                <Info className="h-4 w-4 text-zinc-400 hover:text-zinc-600" />
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p className="text-xs max-w-xs">Your timezone is used for scheduling features like automatic backups.</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                        <Select
-                          value={profileData.timezone}
-                          onValueChange={(value) => handleProfileChange('timezone', value)}
-                        >
-                          <SelectTrigger id="welcome-timezone" className="border-zinc-200">
-                            <SelectValue placeholder="Select timezone" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {COMMON_TIMEZONES.map((tz) => (
-                              <SelectItem key={tz.value} value={tz.value}>
-                                {tz.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                  {/* Footer */}
+                  <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
+                    <div>
+                      {profileSaved && (
+                        <span className="flex items-center gap-1 text-sm text-green-600">
+                          <Check className="h-4 w-4" />
+                          Saved
+                        </span>
+                      )}
                     </div>
-
-                    {/* Footer */}
-                    <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
-                      <div>
-                        {profileSaved && (
-                          <span className="flex items-center gap-1 text-sm text-green-600">
-                            <Check className="h-4 w-4" />
-                            Saved
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={goToNextStep}
-                          className="inline-flex items-center justify-center px-4 py-2 text-base font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
-                          style={{ borderRadius: '6px' }}
-                        >
-                          Skip this step
-                        </button>
-                        <button
-                          disabled={isSavingProfile}
-                          onClick={async () => {
-                            const saved = await handleProfileSave()
-                            if (saved) goToNextStep()
-                          }}
-                          className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
-                          style={{ borderRadius: '6px' }}
-                        >
-                          {isSavingProfile ? 'Saving...' : 'Save & Continue'}
-                          {!isSavingProfile && <ArrowRight className="w-4 h-4" />}
-                        </button>
-                      </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={goToNextStep}
+                        className="inline-flex items-center justify-center px-4 py-2 text-base font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                        style={{ borderRadius: '6px' }}
+                      >
+                        Skip this step
+                      </button>
+                      <button
+                        disabled={isSavingProfile}
+                        onClick={async () => {
+                          const saved = await handleProfileSave()
+                          if (saved) goToNextStep()
+                        }}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
+                        style={{ borderRadius: '6px' }}
+                      >
+                        {isSavingProfile ? 'Saving...' : 'Save & Continue'}
+                        {!isSavingProfile && <ArrowRight className="w-4 h-4" />}
+                      </button>
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Account Tab */}
-              {currentTab === "account" && (
-                <div>
-                  {/* Header section with gradient background */}
-                  <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <div className="flex items-center gap-2.5">
-                      <h2 className="text-2xl font-semibold text-zinc-900">Admin Account</h2>
+            {/* Account Tab */}
+            {currentTab === 'account' && (
+              <div>
+                {/* Header section with gradient background */}
+                <div
+                  className="border-b border-zinc-100"
+                  style={{
+                    padding: '25px',
+                    background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)',
+                  }}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="text-2xl font-semibold text-zinc-900">Admin Account</h2>
+                  </div>
+                  <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
+                    Set up your sign-in credentials.{' '}
+                    {deploymentTarget === 'vercel'
+                      ? 'These are stored securely in your Vercel project and used to create your admin account on first sign-in.'
+                      : 'These will be saved to your environment file and used to create your admin account on first run.'}
+                  </p>
+                </div>
+
+                {/* Content section */}
+                <div style={{ padding: '25px' }}>
+                  <div className="space-y-5">
+                    <div className="space-y-2">
+                      <Label htmlFor="admin-email" className="text-zinc-900 font-medium">
+                        Email
+                      </Label>
+                      <Input
+                        id="admin-email"
+                        type="email"
+                        value={formData.adminEmail || profileData.email}
+                        onChange={(e) =>
+                          setFormData((prev) => ({ ...prev, adminEmail: e.target.value }))
+                        }
+                        placeholder="admin@example.com"
+                        className="border-zinc-200"
+                        maxLength={254}
+                        autoComplete="email"
+                      />
+                      <p className="text-xs text-zinc-500">
+                        This will be your sign-in email address.
+                      </p>
                     </div>
-                    <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
-                      Set up your sign-in credentials. {deploymentTarget === 'vercel'
-                        ? 'These are stored securely in your Vercel project and used to create your admin account on first sign-in.'
-                        : 'These will be saved to your environment file and used to create your admin account on first run.'}
-                    </p>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="admin-password" className="text-zinc-900 font-medium">
+                        Password
+                      </Label>
+                      <Input
+                        id="admin-password"
+                        type="password"
+                        value={formData.adminPassword}
+                        onChange={(e) => {
+                          setFormData((prev) => ({ ...prev, adminPassword: e.target.value }))
+                          setAdminStepError('')
+                        }}
+                        placeholder="Enter a strong password"
+                        className="border-zinc-200"
+                        minLength={18}
+                        maxLength={256}
+                        autoComplete="new-password"
+                      />
+                      <p className="text-xs text-zinc-500">
+                        18–256 characters. Any printable characters allowed (letters, digits,
+                        symbols, emoji).
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="admin-confirm-password" className="text-zinc-900 font-medium">
+                        Confirm Password
+                      </Label>
+                      <Input
+                        id="admin-confirm-password"
+                        type="password"
+                        value={adminConfirmPassword}
+                        onChange={(e) => {
+                          setAdminConfirmPassword(e.target.value)
+                          setAdminStepError('')
+                        }}
+                        placeholder="Confirm your password"
+                        className="border-zinc-200"
+                        maxLength={256}
+                        autoComplete="new-password"
+                      />
+                    </div>
+
+                    {adminStepError && (
+                      <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>{adminStepError}</AlertDescription>
+                      </Alert>
+                    )}
                   </div>
 
-                  {/* Content section */}
-                  <div style={{ padding: '25px' }}>
-                    <div className="space-y-5">
-                      <div className="space-y-2">
-                        <Label htmlFor="admin-email" className="text-zinc-900 font-medium">Email</Label>
-                        <Input
-                          id="admin-email"
-                          type="email"
-                          value={formData.adminEmail || profileData.email}
-                          onChange={(e) => setFormData(prev => ({ ...prev, adminEmail: e.target.value }))}
-                          placeholder="admin@example.com"
-                          className="border-zinc-200"
-                          maxLength={254}
-                          autoComplete="email"
-                        />
-                        <p className="text-xs text-zinc-500">This will be your sign-in email address.</p>
-                      </div>
+                  {/* Footer */}
+                  <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
+                    <button
+                      onClick={goToPreviousStep}
+                      className="inline-flex items-center justify-center px-4 py-2 text-base font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
+                      style={{ borderRadius: '6px' }}
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={handleAdminContinue}
+                      className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                      style={{ borderRadius: '6px' }}
+                    >
+                      Save & Continue
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
-                      <div className="space-y-2">
-                        <Label htmlFor="admin-password" className="text-zinc-900 font-medium">Password</Label>
-                        <Input
-                          id="admin-password"
-                          type="password"
-                          value={formData.adminPassword}
-                          onChange={(e) => {
-                            setFormData(prev => ({ ...prev, adminPassword: e.target.value }))
-                            setAdminStepError("")
-                          }}
-                          placeholder="Enter a strong password"
-                          className="border-zinc-200"
-                          minLength={18}
-                          maxLength={256}
-                          autoComplete="new-password"
-                        />
-                        <p className="text-xs text-zinc-500">18–256 characters. Any printable characters allowed (letters, digits, symbols, emoji).</p>
-                      </div>
+            {/* Local Environment Tab (hidden from step flow - install script handles this) */}
+            {currentTab === 'local-env' && (
+              <div>
+                {/* Header section with gradient background */}
+                <div
+                  className="border-b border-zinc-100"
+                  style={{
+                    padding: '25px',
+                    background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)',
+                  }}
+                >
+                  <h2 className="text-2xl font-semibold text-zinc-900">Local Environment Setup</h2>
+                  <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
+                    Set up your local development environment. Select your operating system below to
+                    see the required tools and installation instructions.
+                  </p>
+                </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="admin-confirm-password" className="text-zinc-900 font-medium">Confirm Password</Label>
-                        <Input
-                          id="admin-confirm-password"
-                          type="password"
-                          value={adminConfirmPassword}
-                          onChange={(e) => {
-                            setAdminConfirmPassword(e.target.value)
-                            setAdminStepError("")
-                          }}
-                          placeholder="Confirm your password"
-                          className="border-zinc-200"
-                          maxLength={256}
-                          autoComplete="new-password"
-                        />
-                      </div>
-
-                      {adminStepError && (
-                        <Alert variant="destructive">
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertDescription>{adminStepError}</AlertDescription>
-                        </Alert>
-                      )}
-
-                    </div>
-
-                    {/* Footer */}
-                    <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
+                {/* Content section */}
+                <div style={{ padding: '25px' }}>
+                  {/* OS Selector */}
+                  <div className="space-y-4 mb-6">
+                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.1rem' }}>
+                      Select your operating system
+                    </h3>
+                    <div className="flex gap-3">
                       <button
-                        onClick={goToPreviousStep}
-                        className="inline-flex items-center justify-center px-4 py-2 text-base font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
-                        style={{ borderRadius: '6px' }}
+                        onClick={() => setSelectedOS('mac')}
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
+                          selectedOS === 'mac'
+                            ? 'border-zinc-900 bg-zinc-900 text-white'
+                            : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300'
+                        }`}
                       >
-                        Back
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                          <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
+                        </svg>
+                        <span className="font-medium">Mac</span>
                       </button>
                       <button
-                        onClick={handleAdminContinue}
+                        onClick={() => setSelectedOS('windows')}
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
+                          selectedOS === 'windows'
+                            ? 'border-zinc-900 bg-zinc-900 text-white'
+                            : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300'
+                        }`}
+                      >
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                          <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801" />
+                        </svg>
+                        <span className="font-medium">Windows</span>
+                      </button>
+                      <button
+                        onClick={() => setSelectedOS('linux')}
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
+                          selectedOS === 'linux'
+                            ? 'border-zinc-900 bg-zinc-900 text-white'
+                            : 'border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300'
+                        }`}
+                      >
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                          <path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.132 1.884 1.071.771-.06 1.592-.536 2.257-1.306.631-.765 1.683-1.084 2.378-1.503.348-.199.629-.469.649-.853.023-.4-.2-.811-.714-1.376v-.097l-.003-.003c-.17-.2-.25-.535-.338-.926-.085-.401-.182-.786-.492-1.046h-.003c-.059-.054-.123-.067-.188-.135a.357.357 0 00-.19-.064c.431-1.278.264-2.55-.173-3.694-.533-1.41-1.465-2.638-2.175-3.483-.796-1.005-1.576-1.957-1.56-3.368.026-2.152.236-6.133-3.544-6.139zm.529 3.405h.013c.213 0 .396.062.584.198.19.135.33.332.438.533.105.259.158.459.166.724 0-.02.006-.04.006-.06v.105a.086.086 0 01-.004-.021l-.004-.024a1.807 1.807 0 01-.15.706.953.953 0 01-.213.335.71.71 0 00-.088-.042c-.104-.045-.198-.064-.284-.133a1.312 1.312 0 00-.22-.066c.05-.06.146-.133.183-.198.053-.128.082-.264.088-.402v-.02a1.21 1.21 0 00-.061-.4c-.045-.134-.101-.2-.183-.333-.084-.066-.167-.132-.267-.132h-.016c-.093 0-.176.03-.262.132a.8.8 0 00-.205.334 1.18 1.18 0 00-.09.4v.019c.002.089.008.179.02.267-.193-.067-.438-.135-.607-.202a1.635 1.635 0 01-.018-.2v-.02a1.772 1.772 0 01.15-.768c.082-.22.232-.406.43-.533a.985.985 0 01.594-.2zm-2.962.059h.036c.142 0 .27.048.399.135.146.129.264.288.344.465.09.199.14.4.153.667v.004c.007.134.006.2-.002.266v.08c-.03.007-.056.018-.083.024-.152.055-.274.135-.393.2.012-.09.013-.18.003-.267v-.015c-.012-.133-.04-.2-.082-.333a.613.613 0 00-.166-.267.248.248 0 00-.183-.064h-.021c-.071.006-.13.04-.186.132a.552.552 0 00-.12.27.944.944 0 00-.023.33v.015c.012.135.037.2.08.334.046.134.098.2.166.268.01.009.02.018.034.024-.07.057-.117.07-.176.136a.304.304 0 01-.131.068 2.62 2.62 0 01-.275-.402 1.772 1.772 0 01-.155-.667 1.759 1.759 0 01.08-.668 1.43 1.43 0 01.283-.535c.128-.133.26-.2.418-.2zm1.37 1.706c.332 0 .733.065 1.216.399.293.2.523.269 1.052.468h.003c.255.136.405.266.478.399v-.131a.571.571 0 01.016.47c-.123.31-.516.643-1.063.842v.002c-.268.135-.501.333-.775.465-.276.135-.588.292-1.012.267a1.139 1.139 0 01-.448-.067 3.566 3.566 0 01-.322-.198c-.195-.135-.363-.332-.612-.465v-.005h-.005c-.4-.246-.616-.512-.686-.71-.07-.268-.005-.47.193-.6.224-.135.38-.271.483-.336.104-.074.143-.102.176-.131h.002v-.003c.169-.202.436-.47.839-.601.139-.036.294-.065.466-.065zm2.8 2.142c.358 1.417 1.196 3.475 1.735 4.473.286.534.855 1.659 1.102 3.024.156-.005.33.018.513.064.646-1.671-.546-3.467-1.089-3.966-.22-.2-.232-.335-.123-.335.59.534 1.365 1.572 1.646 2.757.13.535.16 1.104.021 1.67.067.028.135.06.205.067 1.032.534 1.413.938 1.23 1.537v-.002c-.06-.135-.12-.2-.283-.334-.152-.135-.34-.2-.545-.266a1.98 1.98 0 00-.617-.133c-.001.398-.1.666-.164.97-.064.271-.093.47-.082.668.042-.002.084-.001.124-.001.455 0 .914.2 1.161.533-.24-.065-.42-.065-.663-.065-.536 0-.97.134-1.25.2-.028.001-.053.003-.078.003-.294 0-.584-.202-.829-.602-.372-.6-.602-1.202-.849-2.005-.246-.8-.416-1.67-.537-2.204a8.776 8.776 0 01-.168-2.069c-.006-.467.015-1.003.093-1.47.078-.465.203-.87.39-1.139.186-.269.42-.399.69-.399.27 0 .54.13.726.399.185.269.311.674.39 1.139.077.467.098 1.003.092 1.47a8.776 8.776 0 01-.168 2.069c-.12.534-.29 1.404-.537 2.204-.247.803-.477 1.405-.849 2.005-.245.4-.535.602-.829.602-.025 0-.05-.002-.078-.003-.28-.066-.714-.2-1.25-.2-.243 0-.423 0-.663.065.247-.333.706-.533 1.161-.533.04 0 .082-.001.124.001.011-.198-.018-.397-.082-.668-.064-.304-.163-.572-.164-.97a1.98 1.98 0 00-.617.133c-.205.066-.393.131-.545.266-.163.134-.224.199-.283.334v.002c-.183-.599.198-1.003 1.23-1.537.07-.007.138-.039.205-.067a3.015 3.015 0 01.021-1.67c.281-1.185 1.056-2.223 1.646-2.757.109 0 .097.135-.123.335-.543.499-1.735 2.295-1.089 3.966.183-.046.357-.069.513-.064.247-1.365.816-2.49 1.102-3.024.539-.998 1.377-3.056 1.735-4.473z" />
+                        </svg>
+                        <span className="font-medium">Linux</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Mac Instructions */}
+                  {selectedOS === 'mac' && (
+                    <div className="space-y-0">
+                      {/* Step 1: Homebrew */}
+                      <div className="flex gap-5">
+                        <div className="flex flex-col items-center">
+                          <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">
+                            1
+                          </div>
+                          <div className="flex-1 w-px bg-zinc-200 my-4" />
+                        </div>
+                        <div className="flex-1 pt-1 pb-8">
+                          <h3 className="mb-4 font-semibold text-zinc-900 text-xl">
+                            Install Homebrew (Package Manager)
+                          </h3>
+                          <p className="mb-4 text-base text-zinc-600">Open Terminal and run:</p>
+                          <CodeBlock
+                            language="bash"
+                            code={`/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`}
+                          />
+                          <div className="mt-4 px-4 py-3 bg-zinc-100 rounded-lg">
+                            <p className="text-sm text-zinc-600">
+                              After installation, follow the on-screen instructions to add Homebrew
+                              to your PATH.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Step 2: Git */}
+                      <div className="flex gap-5">
+                        <div className="flex flex-col items-center">
+                          <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">
+                            2
+                          </div>
+                          <div className="flex-1 w-px bg-zinc-200 my-4" />
+                        </div>
+                        <div className="flex-1 pt-1 pb-8">
+                          <h3 className="mb-4 font-semibold text-zinc-900 text-xl">Install Git</h3>
+                          <CodeBlock language="bash" code="brew install git" />
+                        </div>
+                      </div>
+
+                      {/* Step 3: Node.js */}
+                      <div className="flex gap-5">
+                        <div className="flex flex-col items-center">
+                          <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">
+                            3
+                          </div>
+                          <div className="flex-1 w-px bg-zinc-200 my-4" />
+                        </div>
+                        <div className="flex-1 pt-1 pb-8">
+                          <h3 className="mb-4 font-semibold text-zinc-900 text-xl">
+                            Install Node.js (v18+)
+                          </h3>
+                          <CodeBlock language="bash" code="brew install node" />
+                          <p className="mt-4 text-sm text-zinc-600">
+                            Verify installation:{' '}
+                            <code className="rounded bg-zinc-100 px-2 py-1 text-sm font-mono text-zinc-700">
+                              node --version
+                            </code>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Step 4: pnpm */}
+                      <div className="flex gap-5">
+                        <div className="flex flex-col items-center">
+                          <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">
+                            4
+                          </div>
+                          <div className="flex-1 w-px bg-zinc-200 my-4" />
+                        </div>
+                        <div className="flex-1 pt-1 pb-8">
+                          <h3 className="mb-4 font-semibold text-zinc-900 text-xl">
+                            Install pnpm (Package Manager)
+                          </h3>
+                          <CodeBlock language="bash" code="brew install pnpm" />
+                        </div>
+                      </div>
+
+                      {/* Step 5: Vercel CLI */}
+                      <div className="flex gap-5">
+                        <div className="flex flex-col items-center">
+                          <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">
+                            5
+                          </div>
+                          <div className="flex-1 w-px bg-zinc-200 my-4" />
+                        </div>
+                        <div className="flex-1 pt-1 pb-8">
+                          <h3 className="mb-4 font-semibold text-zinc-900 text-xl">
+                            Install Vercel CLI
+                          </h3>
+                          <p className="mb-4 text-base text-zinc-600">For deploying to Vercel:</p>
+                          <CodeBlock language="bash" code="npm install -g vercel" />
+                        </div>
+                      </div>
+
+                      {/* Step 6: Supabase CLI */}
+                      <div className="flex gap-5">
+                        <div className="flex flex-col items-center">
+                          <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">
+                            6
+                          </div>
+                        </div>
+                        <div className="flex-1 pt-1">
+                          <h3 className="mb-4 font-semibold text-zinc-900 text-xl">
+                            Install Supabase CLI
+                          </h3>
+                          <p className="mb-4 text-base text-zinc-600">For database management:</p>
+                          <CodeBlock language="bash" code="brew install supabase/tap/supabase" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Windows Instructions */}
+                  {selectedOS === 'windows' && (
+                    <div className="space-y-0">
+                      {/* Step 1: Git */}
+                      <div className="flex gap-5">
+                        <div className="flex flex-col items-center">
+                          <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">
+                            1
+                          </div>
+                          <div className="flex-1 w-px bg-zinc-200 my-4" />
+                        </div>
+                        <div className="flex-1 pt-1 pb-8">
+                          <h3 className="mb-4 font-semibold text-zinc-900 text-xl">
+                            Install Git for Windows
+                          </h3>
+                          <p className="mb-4 text-base text-zinc-600">
+                            Download from{' '}
+                            <a
+                              href="https://git-scm.com/download/win"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline"
+                            >
+                              git-scm.com
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>{' '}
+                            and run the installer with default options.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Step 2: Node.js */}
+                      <div className="flex gap-5">
+                        <div className="flex flex-col items-center">
+                          <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">
+                            2
+                          </div>
+                          <div className="flex-1 w-px bg-zinc-200 my-4" />
+                        </div>
+                        <div className="flex-1 pt-1 pb-8">
+                          <h3 className="mb-4 font-semibold text-zinc-900 text-xl">
+                            Install Node.js (v18+)
+                          </h3>
+                          <p className="mb-4 text-base text-zinc-600">
+                            Download the LTS version from{' '}
+                            <a
+                              href="https://nodejs.org"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline"
+                            >
+                              nodejs.org
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>{' '}
+                            and run the installer with default options.
+                          </p>
+                          <p className="text-sm text-zinc-600">
+                            Verify installation:{' '}
+                            <code className="rounded bg-zinc-100 px-2 py-1 text-sm font-mono text-zinc-700">
+                              node --version
+                            </code>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Step 3: pnpm */}
+                      <div className="flex gap-5">
+                        <div className="flex flex-col items-center">
+                          <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">
+                            3
+                          </div>
+                          <div className="flex-1 w-px bg-zinc-200 my-4" />
+                        </div>
+                        <div className="flex-1 pt-1 pb-8">
+                          <h3 className="mb-4 font-semibold text-zinc-900 text-xl">Install pnpm</h3>
+                          <p className="mb-4 text-base text-zinc-600">Open PowerShell and run:</p>
+                          <CodeBlock language="bash" code="npm install -g pnpm" />
+                        </div>
+                      </div>
+
+                      {/* Step 4: Vercel CLI */}
+                      <div className="flex gap-5">
+                        <div className="flex flex-col items-center">
+                          <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">
+                            4
+                          </div>
+                          <div className="flex-1 w-px bg-zinc-200 my-4" />
+                        </div>
+                        <div className="flex-1 pt-1 pb-8">
+                          <h3 className="mb-4 font-semibold text-zinc-900 text-xl">
+                            Install Vercel CLI
+                          </h3>
+                          <p className="mb-4 text-base text-zinc-600">For deploying to Vercel:</p>
+                          <CodeBlock language="bash" code="npm install -g vercel" />
+                        </div>
+                      </div>
+
+                      {/* Step 5: Supabase CLI */}
+                      <div className="flex gap-5">
+                        <div className="flex flex-col items-center">
+                          <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">
+                            5
+                          </div>
+                        </div>
+                        <div className="flex-1 pt-1">
+                          <h3 className="mb-4 font-semibold text-zinc-900 text-xl">
+                            Install Supabase CLI
+                          </h3>
+                          <p className="mb-4 text-base text-zinc-600">For database management:</p>
+                          <CodeBlock language="bash" code="npm install -g supabase" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Linux Instructions */}
+                  {selectedOS === 'linux' && (
+                    <div className="space-y-0">
+                      {/* Step 1: Git */}
+                      <div className="flex gap-5">
+                        <div className="flex flex-col items-center">
+                          <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">
+                            1
+                          </div>
+                          <div className="flex-1 w-px bg-zinc-200 my-4" />
+                        </div>
+                        <div className="flex-1 pt-1 pb-8">
+                          <h3 className="mb-4 font-semibold text-zinc-900 text-xl">Install Git</h3>
+                          <p className="mb-4 text-base text-zinc-600">Use your package manager:</p>
+                          <div className="space-y-4">
+                            <div>
+                              <p className="text-sm font-medium text-zinc-500 mb-2">
+                                Ubuntu/Debian:
+                              </p>
+                              <CodeBlock
+                                language="bash"
+                                code="sudo apt update && sudo apt install git"
+                              />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-zinc-500 mb-2">Fedora:</p>
+                              <CodeBlock language="bash" code="sudo dnf install git" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Step 2: Node.js via nvm */}
+                      <div className="flex gap-5">
+                        <div className="flex flex-col items-center">
+                          <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">
+                            2
+                          </div>
+                          <div className="flex-1 w-px bg-zinc-200 my-4" />
+                        </div>
+                        <div className="flex-1 pt-1 pb-8">
+                          <h3 className="mb-4 font-semibold text-zinc-900 text-xl">
+                            Install Node.js (v18+) via nvm
+                          </h3>
+                          <p className="mb-4 text-base text-zinc-600">
+                            We recommend using nvm (Node Version Manager):
+                          </p>
+                          <div className="space-y-4">
+                            <div>
+                              <p className="text-sm font-medium text-zinc-500 mb-2">Install nvm:</p>
+                              <CodeBlock
+                                language="bash"
+                                code={`curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash`}
+                              />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-zinc-500 mb-2">
+                                Restart terminal, then install Node.js:
+                              </p>
+                              <CodeBlock
+                                language="bash"
+                                code={`nvm install --lts\nnvm use --lts`}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Step 3: pnpm */}
+                      <div className="flex gap-5">
+                        <div className="flex flex-col items-center">
+                          <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">
+                            3
+                          </div>
+                          <div className="flex-1 w-px bg-zinc-200 my-4" />
+                        </div>
+                        <div className="flex-1 pt-1 pb-8">
+                          <h3 className="mb-4 font-semibold text-zinc-900 text-xl">Install pnpm</h3>
+                          <CodeBlock language="bash" code="npm install -g pnpm" />
+                        </div>
+                      </div>
+
+                      {/* Step 4: Vercel CLI */}
+                      <div className="flex gap-5">
+                        <div className="flex flex-col items-center">
+                          <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">
+                            4
+                          </div>
+                          <div className="flex-1 w-px bg-zinc-200 my-4" />
+                        </div>
+                        <div className="flex-1 pt-1 pb-8">
+                          <h3 className="mb-4 font-semibold text-zinc-900 text-xl">
+                            Install Vercel CLI
+                          </h3>
+                          <p className="mb-4 text-base text-zinc-600">For deploying to Vercel:</p>
+                          <CodeBlock language="bash" code="npm install -g vercel" />
+                        </div>
+                      </div>
+
+                      {/* Step 5: Supabase CLI */}
+                      <div className="flex gap-5">
+                        <div className="flex flex-col items-center">
+                          <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">
+                            5
+                          </div>
+                        </div>
+                        <div className="flex-1 pt-1">
+                          <h3 className="mb-4 font-semibold text-zinc-900 text-xl">
+                            Install Supabase CLI
+                          </h3>
+                          <p className="mb-4 text-base text-zinc-600">For database management:</p>
+                          <CodeBlock language="bash" code="npm install -g supabase" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* No OS selected message */}
+                  {!selectedOS && (
+                    <div
+                      className="rounded-xl p-8 text-center"
+                      style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}
+                    >
+                      <p className="text-zinc-500">
+                        Select your operating system above to see installation instructions.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Footer */}
+                  <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
+                    <div />
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={goToNextStep}
+                        className="inline-flex items-center justify-center px-4 py-2 text-base font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
+                        style={{ borderRadius: '6px' }}
+                      >
+                        Skip this step
+                      </button>
+                      <button
+                        onClick={goToNextStep}
                         className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
                         style={{ borderRadius: '6px' }}
                       >
-                        Save & Continue
+                        I&apos;ve completed this step
                         <ArrowRight className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Local Environment Tab (hidden from step flow - install script handles this) */}
-              {currentTab === "local-env" && (
-                <div>
-                  {/* Header section with gradient background */}
-                  <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <h2 className="text-2xl font-semibold text-zinc-900">Local Environment Setup</h2>
-                    <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
-                      Set up your local development environment. Select your operating system below to see the required tools and installation instructions.
-                    </p>
+            {/* Supabase Tab */}
+            {currentTab === 'supabase' && (
+              <div>
+                {/* Header section with gradient background */}
+                <div
+                  className="border-b border-zinc-100"
+                  style={{
+                    padding: '25px',
+                    background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)',
+                  }}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="text-2xl font-semibold text-zinc-900">
+                      Supabase Cloud Database
+                    </h2>
                   </div>
-
-                  {/* Content section */}
-                  <div style={{ padding: '25px' }}>
-                    {/* OS Selector */}
-                    <div className="space-y-4 mb-6">
-                      <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.1rem' }}>Select your operating system</h3>
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => setSelectedOS("mac")}
-                          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
-                            selectedOS === "mac"
-                              ? "border-zinc-900 bg-zinc-900 text-white"
-                              : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300"
-                          }`}
-                        >
-                          <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                            <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-                          </svg>
-                          <span className="font-medium">Mac</span>
-                        </button>
-                        <button
-                          onClick={() => setSelectedOS("windows")}
-                          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
-                            selectedOS === "windows"
-                              ? "border-zinc-900 bg-zinc-900 text-white"
-                              : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300"
-                          }`}
-                        >
-                          <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                            <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/>
-                          </svg>
-                          <span className="font-medium">Windows</span>
-                        </button>
-                        <button
-                          onClick={() => setSelectedOS("linux")}
-                          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
-                            selectedOS === "linux"
-                              ? "border-zinc-900 bg-zinc-900 text-white"
-                              : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300"
-                          }`}
-                        >
-                          <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                            <path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.132 1.884 1.071.771-.06 1.592-.536 2.257-1.306.631-.765 1.683-1.084 2.378-1.503.348-.199.629-.469.649-.853.023-.4-.2-.811-.714-1.376v-.097l-.003-.003c-.17-.2-.25-.535-.338-.926-.085-.401-.182-.786-.492-1.046h-.003c-.059-.054-.123-.067-.188-.135a.357.357 0 00-.19-.064c.431-1.278.264-2.55-.173-3.694-.533-1.41-1.465-2.638-2.175-3.483-.796-1.005-1.576-1.957-1.56-3.368.026-2.152.236-6.133-3.544-6.139zm.529 3.405h.013c.213 0 .396.062.584.198.19.135.33.332.438.533.105.259.158.459.166.724 0-.02.006-.04.006-.06v.105a.086.086 0 01-.004-.021l-.004-.024a1.807 1.807 0 01-.15.706.953.953 0 01-.213.335.71.71 0 00-.088-.042c-.104-.045-.198-.064-.284-.133a1.312 1.312 0 00-.22-.066c.05-.06.146-.133.183-.198.053-.128.082-.264.088-.402v-.02a1.21 1.21 0 00-.061-.4c-.045-.134-.101-.2-.183-.333-.084-.066-.167-.132-.267-.132h-.016c-.093 0-.176.03-.262.132a.8.8 0 00-.205.334 1.18 1.18 0 00-.09.4v.019c.002.089.008.179.02.267-.193-.067-.438-.135-.607-.202a1.635 1.635 0 01-.018-.2v-.02a1.772 1.772 0 01.15-.768c.082-.22.232-.406.43-.533a.985.985 0 01.594-.2zm-2.962.059h.036c.142 0 .27.048.399.135.146.129.264.288.344.465.09.199.14.4.153.667v.004c.007.134.006.2-.002.266v.08c-.03.007-.056.018-.083.024-.152.055-.274.135-.393.2.012-.09.013-.18.003-.267v-.015c-.012-.133-.04-.2-.082-.333a.613.613 0 00-.166-.267.248.248 0 00-.183-.064h-.021c-.071.006-.13.04-.186.132a.552.552 0 00-.12.27.944.944 0 00-.023.33v.015c.012.135.037.2.08.334.046.134.098.2.166.268.01.009.02.018.034.024-.07.057-.117.07-.176.136a.304.304 0 01-.131.068 2.62 2.62 0 01-.275-.402 1.772 1.772 0 01-.155-.667 1.759 1.759 0 01.08-.668 1.43 1.43 0 01.283-.535c.128-.133.26-.2.418-.2zm1.37 1.706c.332 0 .733.065 1.216.399.293.2.523.269 1.052.468h.003c.255.136.405.266.478.399v-.131a.571.571 0 01.016.47c-.123.31-.516.643-1.063.842v.002c-.268.135-.501.333-.775.465-.276.135-.588.292-1.012.267a1.139 1.139 0 01-.448-.067 3.566 3.566 0 01-.322-.198c-.195-.135-.363-.332-.612-.465v-.005h-.005c-.4-.246-.616-.512-.686-.71-.07-.268-.005-.47.193-.6.224-.135.38-.271.483-.336.104-.074.143-.102.176-.131h.002v-.003c.169-.202.436-.47.839-.601.139-.036.294-.065.466-.065zm2.8 2.142c.358 1.417 1.196 3.475 1.735 4.473.286.534.855 1.659 1.102 3.024.156-.005.33.018.513.064.646-1.671-.546-3.467-1.089-3.966-.22-.2-.232-.335-.123-.335.59.534 1.365 1.572 1.646 2.757.13.535.16 1.104.021 1.67.067.028.135.06.205.067 1.032.534 1.413.938 1.23 1.537v-.002c-.06-.135-.12-.2-.283-.334-.152-.135-.34-.2-.545-.266a1.98 1.98 0 00-.617-.133c-.001.398-.1.666-.164.97-.064.271-.093.47-.082.668.042-.002.084-.001.124-.001.455 0 .914.2 1.161.533-.24-.065-.42-.065-.663-.065-.536 0-.97.134-1.25.2-.028.001-.053.003-.078.003-.294 0-.584-.202-.829-.602-.372-.6-.602-1.202-.849-2.005-.246-.8-.416-1.67-.537-2.204a8.776 8.776 0 01-.168-2.069c-.006-.467.015-1.003.093-1.47.078-.465.203-.87.39-1.139.186-.269.42-.399.69-.399.27 0 .54.13.726.399.185.269.311.674.39 1.139.077.467.098 1.003.092 1.47a8.776 8.776 0 01-.168 2.069c-.12.534-.29 1.404-.537 2.204-.247.803-.477 1.405-.849 2.005-.245.4-.535.602-.829.602-.025 0-.05-.002-.078-.003-.28-.066-.714-.2-1.25-.2-.243 0-.423 0-.663.065.247-.333.706-.533 1.161-.533.04 0 .082-.001.124.001.011-.198-.018-.397-.082-.668-.064-.304-.163-.572-.164-.97a1.98 1.98 0 00-.617.133c-.205.066-.393.131-.545.266-.163.134-.224.199-.283.334v.002c-.183-.599.198-1.003 1.23-1.537.07-.007.138-.039.205-.067a3.015 3.015 0 01.021-1.67c.281-1.185 1.056-2.223 1.646-2.757.109 0 .097.135-.123.335-.543.499-1.735 2.295-1.089 3.966.183-.046.357-.069.513-.064.247-1.365.816-2.49 1.102-3.024.539-.998 1.377-3.056 1.735-4.473z"/>
-                          </svg>
-                          <span className="font-medium">Linux</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Mac Instructions */}
-                    {selectedOS === "mac" && (
-                      <div className="space-y-0">
-                        {/* Step 1: Homebrew */}
-                        <div className="flex gap-5">
-                          <div className="flex flex-col items-center">
-                            <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">1</div>
-                            <div className="flex-1 w-px bg-zinc-200 my-4" />
-                          </div>
-                          <div className="flex-1 pt-1 pb-8">
-                            <h3 className="mb-4 font-semibold text-zinc-900 text-xl">Install Homebrew (Package Manager)</h3>
-                            <p className="mb-4 text-base text-zinc-600">Open Terminal and run:</p>
-                            <CodeBlock
-                              language="bash"
-                              code={`/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`}
-                            />
-                            <div className="mt-4 px-4 py-3 bg-zinc-100 rounded-lg">
-                              <p className="text-sm text-zinc-600">After installation, follow the on-screen instructions to add Homebrew to your PATH.</p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Step 2: Git */}
-                        <div className="flex gap-5">
-                          <div className="flex flex-col items-center">
-                            <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">2</div>
-                            <div className="flex-1 w-px bg-zinc-200 my-4" />
-                          </div>
-                          <div className="flex-1 pt-1 pb-8">
-                            <h3 className="mb-4 font-semibold text-zinc-900 text-xl">Install Git</h3>
-                            <CodeBlock language="bash" code="brew install git" />
-                          </div>
-                        </div>
-
-                        {/* Step 3: Node.js */}
-                        <div className="flex gap-5">
-                          <div className="flex flex-col items-center">
-                            <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">3</div>
-                            <div className="flex-1 w-px bg-zinc-200 my-4" />
-                          </div>
-                          <div className="flex-1 pt-1 pb-8">
-                            <h3 className="mb-4 font-semibold text-zinc-900 text-xl">Install Node.js (v18+)</h3>
-                            <CodeBlock language="bash" code="brew install node" />
-                            <p className="mt-4 text-sm text-zinc-600">Verify installation: <code className="rounded bg-zinc-100 px-2 py-1 text-sm font-mono text-zinc-700">node --version</code></p>
-                          </div>
-                        </div>
-
-                        {/* Step 4: pnpm */}
-                        <div className="flex gap-5">
-                          <div className="flex flex-col items-center">
-                            <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">4</div>
-                            <div className="flex-1 w-px bg-zinc-200 my-4" />
-                          </div>
-                          <div className="flex-1 pt-1 pb-8">
-                            <h3 className="mb-4 font-semibold text-zinc-900 text-xl">Install pnpm (Package Manager)</h3>
-                            <CodeBlock language="bash" code="brew install pnpm" />
-                          </div>
-                        </div>
-
-                        {/* Step 5: Vercel CLI */}
-                        <div className="flex gap-5">
-                          <div className="flex flex-col items-center">
-                            <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">5</div>
-                            <div className="flex-1 w-px bg-zinc-200 my-4" />
-                          </div>
-                          <div className="flex-1 pt-1 pb-8">
-                            <h3 className="mb-4 font-semibold text-zinc-900 text-xl">Install Vercel CLI</h3>
-                            <p className="mb-4 text-base text-zinc-600">For deploying to Vercel:</p>
-                            <CodeBlock language="bash" code="npm install -g vercel" />
-                          </div>
-                        </div>
-
-                        {/* Step 6: Supabase CLI */}
-                        <div className="flex gap-5">
-                          <div className="flex flex-col items-center">
-                            <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">6</div>
-                          </div>
-                          <div className="flex-1 pt-1">
-                            <h3 className="mb-4 font-semibold text-zinc-900 text-xl">Install Supabase CLI</h3>
-                            <p className="mb-4 text-base text-zinc-600">For database management:</p>
-                            <CodeBlock language="bash" code="brew install supabase/tap/supabase" />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Windows Instructions */}
-                    {selectedOS === "windows" && (
-                      <div className="space-y-0">
-                        {/* Step 1: Git */}
-                        <div className="flex gap-5">
-                          <div className="flex flex-col items-center">
-                            <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">1</div>
-                            <div className="flex-1 w-px bg-zinc-200 my-4" />
-                          </div>
-                          <div className="flex-1 pt-1 pb-8">
-                            <h3 className="mb-4 font-semibold text-zinc-900 text-xl">Install Git for Windows</h3>
-                            <p className="mb-4 text-base text-zinc-600">
-                              Download from <a href="https://git-scm.com/download/win" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
-                                git-scm.com
-                                <ExternalLink className="h-3.5 w-3.5" />
-                              </a> and run the installer with default options.
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Step 2: Node.js */}
-                        <div className="flex gap-5">
-                          <div className="flex flex-col items-center">
-                            <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">2</div>
-                            <div className="flex-1 w-px bg-zinc-200 my-4" />
-                          </div>
-                          <div className="flex-1 pt-1 pb-8">
-                            <h3 className="mb-4 font-semibold text-zinc-900 text-xl">Install Node.js (v18+)</h3>
-                            <p className="mb-4 text-base text-zinc-600">
-                              Download the LTS version from <a href="https://nodejs.org" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
-                                nodejs.org
-                                <ExternalLink className="h-3.5 w-3.5" />
-                              </a> and run the installer with default options.
-                            </p>
-                            <p className="text-sm text-zinc-600">Verify installation: <code className="rounded bg-zinc-100 px-2 py-1 text-sm font-mono text-zinc-700">node --version</code></p>
-                          </div>
-                        </div>
-
-                        {/* Step 3: pnpm */}
-                        <div className="flex gap-5">
-                          <div className="flex flex-col items-center">
-                            <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">3</div>
-                            <div className="flex-1 w-px bg-zinc-200 my-4" />
-                          </div>
-                          <div className="flex-1 pt-1 pb-8">
-                            <h3 className="mb-4 font-semibold text-zinc-900 text-xl">Install pnpm</h3>
-                            <p className="mb-4 text-base text-zinc-600">Open PowerShell and run:</p>
-                            <CodeBlock language="bash" code="npm install -g pnpm" />
-                          </div>
-                        </div>
-
-                        {/* Step 4: Vercel CLI */}
-                        <div className="flex gap-5">
-                          <div className="flex flex-col items-center">
-                            <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">4</div>
-                            <div className="flex-1 w-px bg-zinc-200 my-4" />
-                          </div>
-                          <div className="flex-1 pt-1 pb-8">
-                            <h3 className="mb-4 font-semibold text-zinc-900 text-xl">Install Vercel CLI</h3>
-                            <p className="mb-4 text-base text-zinc-600">For deploying to Vercel:</p>
-                            <CodeBlock language="bash" code="npm install -g vercel" />
-                          </div>
-                        </div>
-
-                        {/* Step 5: Supabase CLI */}
-                        <div className="flex gap-5">
-                          <div className="flex flex-col items-center">
-                            <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">5</div>
-                          </div>
-                          <div className="flex-1 pt-1">
-                            <h3 className="mb-4 font-semibold text-zinc-900 text-xl">Install Supabase CLI</h3>
-                            <p className="mb-4 text-base text-zinc-600">For database management:</p>
-                            <CodeBlock language="bash" code="npm install -g supabase" />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Linux Instructions */}
-                    {selectedOS === "linux" && (
-                      <div className="space-y-0">
-                        {/* Step 1: Git */}
-                        <div className="flex gap-5">
-                          <div className="flex flex-col items-center">
-                            <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">1</div>
-                            <div className="flex-1 w-px bg-zinc-200 my-4" />
-                          </div>
-                          <div className="flex-1 pt-1 pb-8">
-                            <h3 className="mb-4 font-semibold text-zinc-900 text-xl">Install Git</h3>
-                            <p className="mb-4 text-base text-zinc-600">Use your package manager:</p>
-                            <div className="space-y-4">
-                              <div>
-                                <p className="text-sm font-medium text-zinc-500 mb-2">Ubuntu/Debian:</p>
-                                <CodeBlock language="bash" code="sudo apt update && sudo apt install git" />
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium text-zinc-500 mb-2">Fedora:</p>
-                                <CodeBlock language="bash" code="sudo dnf install git" />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Step 2: Node.js via nvm */}
-                        <div className="flex gap-5">
-                          <div className="flex flex-col items-center">
-                            <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">2</div>
-                            <div className="flex-1 w-px bg-zinc-200 my-4" />
-                          </div>
-                          <div className="flex-1 pt-1 pb-8">
-                            <h3 className="mb-4 font-semibold text-zinc-900 text-xl">Install Node.js (v18+) via nvm</h3>
-                            <p className="mb-4 text-base text-zinc-600">We recommend using nvm (Node Version Manager):</p>
-                            <div className="space-y-4">
-                              <div>
-                                <p className="text-sm font-medium text-zinc-500 mb-2">Install nvm:</p>
-                                <CodeBlock language="bash" code={`curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash`} />
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium text-zinc-500 mb-2">Restart terminal, then install Node.js:</p>
-                                <CodeBlock language="bash" code={`nvm install --lts\nnvm use --lts`} />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Step 3: pnpm */}
-                        <div className="flex gap-5">
-                          <div className="flex flex-col items-center">
-                            <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">3</div>
-                            <div className="flex-1 w-px bg-zinc-200 my-4" />
-                          </div>
-                          <div className="flex-1 pt-1 pb-8">
-                            <h3 className="mb-4 font-semibold text-zinc-900 text-xl">Install pnpm</h3>
-                            <CodeBlock language="bash" code="npm install -g pnpm" />
-                          </div>
-                        </div>
-
-                        {/* Step 4: Vercel CLI */}
-                        <div className="flex gap-5">
-                          <div className="flex flex-col items-center">
-                            <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">4</div>
-                            <div className="flex-1 w-px bg-zinc-200 my-4" />
-                          </div>
-                          <div className="flex-1 pt-1 pb-8">
-                            <h3 className="mb-4 font-semibold text-zinc-900 text-xl">Install Vercel CLI</h3>
-                            <p className="mb-4 text-base text-zinc-600">For deploying to Vercel:</p>
-                            <CodeBlock language="bash" code="npm install -g vercel" />
-                          </div>
-                        </div>
-
-                        {/* Step 5: Supabase CLI */}
-                        <div className="flex gap-5">
-                          <div className="flex flex-col items-center">
-                            <div className="flex w-11 h-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-white text-base font-semibold">5</div>
-                          </div>
-                          <div className="flex-1 pt-1">
-                            <h3 className="mb-4 font-semibold text-zinc-900 text-xl">Install Supabase CLI</h3>
-                            <p className="mb-4 text-base text-zinc-600">For database management:</p>
-                            <CodeBlock language="bash" code="npm install -g supabase" />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* No OS selected message */}
-                    {!selectedOS && (
-                      <div className="rounded-xl p-8 text-center" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
-                        <p className="text-zinc-500">Select your operating system above to see installation instructions.</p>
-                      </div>
-                    )}
-
-                    {/* Footer */}
-                    <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
-                      <div />
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={goToNextStep}
-                          className="inline-flex items-center justify-center px-4 py-2 text-base font-medium bg-zinc-900 text-white hover:bg-zinc-800 transition-colors"
-                          style={{ borderRadius: '6px' }}
-                        >
-                          Skip this step
-                        </button>
-                        <button
-                          onClick={goToNextStep}
-                          className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors"
-                          style={{ borderRadius: '6px' }}
-                        >
-                          I&apos;ve completed this step
-                          <ArrowRight className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
+                    Configure your Supabase.com database connection. You&apos;ll need API keys and
+                    the database connection string, and we&apos;ll generate a secure Better Auth
+                    secret for you. Authentication is handled by Better Auth in every mode &mdash;
+                    Supabase Auth is not used. Supabase offers a free tier; check their website for
+                    details.
+                  </p>
                 </div>
-              )}
 
-              {/* Supabase Tab */}
-              {currentTab === "supabase" && (
-                <div>
-                  {/* Header section with gradient background */}
-                  <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <div className="flex items-center gap-2.5">
-                      <h2 className="text-2xl font-semibold text-zinc-900">Supabase Cloud Database</h2>
-                    </div>
-                    <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
-                      Configure your Supabase.com database connection. You&apos;ll need API keys and the database connection string, and we&apos;ll generate a secure Better Auth secret for you. Authentication is handled by Better Auth in every mode &mdash; Supabase Auth is not used. Supabase offers a free tier; check their website for details.
-                    </p>
-                  </div>
-
-                  {/* Content section */}
-                  <div className="space-y-6" style={{ padding: '25px' }}>
+                {/* Content section */}
+                <div className="space-y-6" style={{ padding: '25px' }}>
                   {/* Step 1 */}
                   <div className="flex items-center gap-3">
                     <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       1
                     </div>
-                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Create a FREE Supabase account</h3>
+                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>
+                      Create a FREE Supabase account
+                    </h3>
                   </div>
 
-                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
+                  <div
+                    className="rounded-xl p-4"
+                    style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}
+                  >
                     <ol className="space-y-2.5">
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span
+                          className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+                          style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}
+                        >
                           1
                         </span>
                         <span className="text-black">
-                          Go to <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
+                          Go to{' '}
+                          <a
+                            href="https://supabase.com"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline"
+                          >
                             supabase.com
                             <ExternalLink className="h-3 w-3" />
-                          </a> and create a free account
+                          </a>{' '}
+                          and create a free account
                         </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span
+                          className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+                          style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}
+                        >
                           2
                         </span>
                         <span className="text-black">Create a new project (free tier)</span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span
+                          className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+                          style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}
+                        >
                           3
                         </span>
-                        <span className="text-black">Ensure <strong className="text-zinc-700">Enable Data API</strong> is turned on in your project settings</span>
+                        <span className="text-black">
+                          Ensure <strong className="text-zinc-700">Enable Data API</strong> is
+                          turned on in your project settings
+                        </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span
+                          className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+                          style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}
+                        >
                           4
                         </span>
                         <span className="text-black">
-                          Go to <a href="https://supabase.com/dashboard/project/_/settings/api-keys" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
+                          Go to{' '}
+                          <a
+                            href="https://supabase.com/dashboard/project/_/settings/api-keys"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline"
+                          >
                             Project Settings &rarr; API Keys
                             <ExternalLink className="h-3 w-3" />
                           </a>
                         </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span
+                          className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+                          style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}
+                        >
                           5
                         </span>
                         <span className="text-black">Copy each key below</span>
@@ -1438,20 +1664,26 @@ export default function WelcomePage() {
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Label htmlFor="supabaseUrl" className="text-sm font-medium text-gray-900">Project URL</Label>
+                        <Label htmlFor="supabaseUrl" className="text-sm font-medium text-gray-900">
+                          Project URL
+                        </Label>
                         <Tooltip>
                           <TooltipTrigger>
                             <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p className="text-xs max-w-xs">Your Supabase project URL (e.g., https://xxxxx.supabase.co)</p>
+                            <p className="text-xs max-w-xs">
+                              Your Supabase project URL (e.g., https://xxxxx.supabase.co)
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
                       <Input
                         id="supabaseUrl"
                         value={formData.supabaseUrl}
-                        onChange={(e) => setFormData(prev => ({ ...prev, supabaseUrl: e.target.value }))}
+                        onChange={(e) =>
+                          setFormData((prev) => ({ ...prev, supabaseUrl: e.target.value }))
+                        }
                         placeholder="https://xxxxx.supabase.co"
                         className="text-sm"
                         style={{ fontFamily: 'Geist Mono, monospace' }}
@@ -1460,20 +1692,30 @@ export default function WelcomePage() {
 
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Label htmlFor="supabaseAnonKey" className="text-sm font-medium text-gray-900">Publishable Key</Label>
+                        <Label
+                          htmlFor="supabaseAnonKey"
+                          className="text-sm font-medium text-gray-900"
+                        >
+                          Publishable Key
+                        </Label>
                         <Tooltip>
                           <TooltipTrigger>
                             <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p className="text-xs max-w-xs">The &quot;Publishable key&quot; from your Supabase API Keys page. Safe to use in browser.</p>
+                            <p className="text-xs max-w-xs">
+                              The &quot;Publishable key&quot; from your Supabase API Keys page. Safe
+                              to use in browser.
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
                       <Input
                         id="supabaseAnonKey"
                         value={formData.supabaseAnonKey}
-                        onChange={(e) => setFormData(prev => ({ ...prev, supabaseAnonKey: e.target.value }))}
+                        onChange={(e) =>
+                          setFormData((prev) => ({ ...prev, supabaseAnonKey: e.target.value }))
+                        }
                         placeholder="sb_publishable_ ..."
                         className="text-sm"
                         style={{ fontFamily: 'Geist Mono, monospace' }}
@@ -1482,20 +1724,30 @@ export default function WelcomePage() {
 
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Label htmlFor="supabaseSecretKey" className="text-sm font-medium text-gray-900">Secret Key</Label>
+                        <Label
+                          htmlFor="supabaseSecretKey"
+                          className="text-sm font-medium text-gray-900"
+                        >
+                          Secret Key
+                        </Label>
                         <Tooltip>
                           <TooltipTrigger>
                             <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p className="text-xs max-w-xs">The &quot;Secret key&quot; from your Supabase API Keys page. Server-side only — keep this secret!</p>
+                            <p className="text-xs max-w-xs">
+                              The &quot;Secret key&quot; from your Supabase API Keys page.
+                              Server-side only — keep this secret!
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
                       <Input
                         id="supabaseSecretKey"
                         value={formData.supabaseSecretKey}
-                        onChange={(e) => setFormData(prev => ({ ...prev, supabaseSecretKey: e.target.value }))}
+                        onChange={(e) =>
+                          setFormData((prev) => ({ ...prev, supabaseSecretKey: e.target.value }))
+                        }
                         placeholder="sb_secret_ ..."
                         className="text-sm"
                         style={{ fontFamily: 'Geist Mono, monospace' }}
@@ -1508,39 +1760,76 @@ export default function WelcomePage() {
                     <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       2
                     </div>
-                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Get your Database Connection String</h3>
+                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>
+                      Get your Database Connection String
+                    </h3>
                   </div>
 
-                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
+                  <div
+                    className="rounded-xl p-4"
+                    style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}
+                  >
                     <ol className="space-y-2.5">
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span
+                          className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+                          style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}
+                        >
                           1
                         </span>
                         <span className="text-black">
-                          Go to <a href="https://supabase.com/dashboard/project/_/settings/database" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
+                          Go to{' '}
+                          <a
+                            href="https://supabase.com/dashboard/project/_/settings/database"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline"
+                          >
                             Project Settings &rarr; Database
                             <ExternalLink className="h-3 w-3" />
                           </a>
                         </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span
+                          className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+                          style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}
+                        >
                           2
                         </span>
-                        <span className="text-black">Scroll to <strong className="text-zinc-700">Connection string</strong> section</span>
+                        <span className="text-black">
+                          Scroll to <strong className="text-zinc-700">Connection string</strong>{' '}
+                          section
+                        </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span
+                          className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+                          style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}
+                        >
                           3
                         </span>
-                        <span className="text-black">Set Connection to <strong className="text-zinc-700">Transaction Pooler</strong>, enable <strong className="text-zinc-700">Use IPv4 connection</strong>, and select type <strong className="text-zinc-700">URI</strong></span>
+                        <span className="text-black">
+                          Set Connection to{' '}
+                          <strong className="text-zinc-700">Transaction Pooler</strong>, enable{' '}
+                          <strong className="text-zinc-700">Use IPv4 connection</strong>, and select
+                          type <strong className="text-zinc-700">URI</strong>
+                        </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span
+                          className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+                          style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}
+                        >
                           4
                         </span>
-                        <span className="text-black">Replace <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">[YOUR-PASSWORD]</code> with your database password</span>
+                        <span className="text-black">
+                          Replace{' '}
+                          <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">
+                            [YOUR-PASSWORD]
+                          </code>{' '}
+                          with your database password
+                        </span>
                       </li>
                     </ol>
                   </div>
@@ -1548,26 +1837,34 @@ export default function WelcomePage() {
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Label htmlFor="databaseUrl" className="text-sm font-medium text-gray-900">Database Connection String</Label>
+                        <Label htmlFor="databaseUrl" className="text-sm font-medium text-gray-900">
+                          Database Connection String
+                        </Label>
                         <Tooltip>
                           <TooltipTrigger>
                             <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p className="text-xs max-w-xs">PostgreSQL connection string used by the authentication system. Make sure to include your password!</p>
+                            <p className="text-xs max-w-xs">
+                              PostgreSQL connection string used by the authentication system. Make
+                              sure to include your password!
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
                       <Input
                         id="databaseUrl"
                         value={formData.databaseUrl}
-                        onChange={(e) => setFormData(prev => ({ ...prev, databaseUrl: e.target.value }))}
+                        onChange={(e) =>
+                          setFormData((prev) => ({ ...prev, databaseUrl: e.target.value }))
+                        }
                         placeholder="postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres"
                         className="text-sm"
                         style={{ fontFamily: 'Geist Mono, monospace' }}
                       />
                       <p className="text-xs text-gray-500">
-                        This is different from the API keys above. It&apos;s used for direct database access.
+                        This is different from the API keys above. It&apos;s used for direct
+                        database access.
                       </p>
                     </div>
                   </div>
@@ -1577,28 +1874,39 @@ export default function WelcomePage() {
                     <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       3
                     </div>
-                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Authentication Secret</h3>
+                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>
+                      Authentication Secret
+                    </h3>
                   </div>
 
                   <Alert className="bg-blue-50 border-blue-200">
                     <Shield className="w-4 h-4 text-blue-600" />
                     <AlertTitle className="text-blue-800">Auto-generated for you</AlertTitle>
                     <AlertDescription className="text-blue-700">
-                      This secret is used to sign authentication sessions. We&apos;ve generated a secure random value for you.
-                      You can regenerate it if needed, but make sure to use the same value across all environments.
+                      This secret is used to sign authentication sessions. We&apos;ve generated a
+                      secure random value for you. You can regenerate it if needed, but make sure to
+                      use the same value across all environments.
                     </AlertDescription>
                   </Alert>
 
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <Label htmlFor="betterAuthSecret" className="text-sm font-medium text-gray-900">Auth Secret</Label>
+                        <Label
+                          htmlFor="betterAuthSecret"
+                          className="text-sm font-medium text-gray-900"
+                        >
+                          Auth Secret
+                        </Label>
                         <Tooltip>
                           <TooltipTrigger>
                             <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p className="text-xs max-w-xs">Used to sign and verify authentication sessions. Keep this secret and consistent across deployments!</p>
+                            <p className="text-xs max-w-xs">
+                              Used to sign and verify authentication sessions. Keep this secret and
+                              consistent across deployments!
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
@@ -1606,7 +1914,9 @@ export default function WelcomePage() {
                         <Input
                           id="betterAuthSecret"
                           value={formData.betterAuthSecret}
-                          onChange={(e) => setFormData(prev => ({ ...prev, betterAuthSecret: e.target.value }))}
+                          onChange={(e) =>
+                            setFormData((prev) => ({ ...prev, betterAuthSecret: e.target.value }))
+                          }
                           placeholder="Generating..."
                           className="text-sm flex-1"
                           style={{ fontFamily: 'Geist Mono, monospace' }}
@@ -1615,7 +1925,12 @@ export default function WelcomePage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setFormData(prev => ({ ...prev, betterAuthSecret: generateAuthSecret() }))}
+                          onClick={() =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              betterAuthSecret: generateAuthSecret(),
+                            }))
+                          }
                           className="border-zinc-200"
                         >
                           Regenerate
@@ -1629,8 +1944,17 @@ export default function WelcomePage() {
                     <Shield className="w-4 h-4 text-red-600" />
                     <AlertTitle className="text-red-800">Important: Database Backups</AlertTitle>
                     <AlertDescription className="text-red-700">
-                      Supabase free tier does not include automated daily backups. You are responsible for setting up your own backup solution.
-                      Learn more about <a href="https://supabase.com/docs/guides/platform/backups" target="_blank" rel="noopener noreferrer" className="font-medium underline hover:no-underline">Supabase backups</a>.
+                      Supabase free tier does not include automated daily backups. You are
+                      responsible for setting up your own backup solution. Learn more about{' '}
+                      <a
+                        href="https://supabase.com/docs/guides/platform/backups"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium underline hover:no-underline"
+                      >
+                        Supabase backups
+                      </a>
+                      .
                     </AlertDescription>
                   </Alert>
 
@@ -1650,50 +1974,83 @@ export default function WelcomePage() {
                         className="inline-flex items-center justify-center gap-2 px-4 py-2 text-base font-medium bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
                         style={{ borderRadius: '6px' }}
                       >
-                        {isSupabaseComplete ? <>I&apos;ve completed this step <ArrowRight className="w-4 h-4" /></> : 'Fill in all fields above to continue'}
+                        {isSupabaseComplete ? (
+                          <>
+                            I&apos;ve completed this step <ArrowRight className="w-4 h-4" />
+                          </>
+                        ) : (
+                          'Fill in all fields above to continue'
+                        )}
                       </button>
                     </div>
                   </div>
                 </div>
-                </div>
-              )}
+              </div>
+            )}
 
-              {/* Resend Tab */}
-              {currentTab === "resend" && (
-                <div>
-                  {/* Header section with gradient background */}
-                  <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <div className="flex items-center gap-2.5">
-                      <h2 className="text-2xl font-semibold text-zinc-900">Resend Configuration</h2>
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-600 text-white">FREE</span>
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-600 text-white">OPTIONAL</span>
-                    </div>
-                    <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
-                      Enable email sending in ARI. Resend lets you send transactional emails and track their delivery status in real-time. Resend offers a free tier. Please check their website for details.
-                    </p>
+            {/* Resend Tab */}
+            {currentTab === 'resend' && (
+              <div>
+                {/* Header section with gradient background */}
+                <div
+                  className="border-b border-zinc-100"
+                  style={{
+                    padding: '25px',
+                    background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)',
+                  }}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="text-2xl font-semibold text-zinc-900">Resend Configuration</h2>
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-600 text-white">
+                      FREE
+                    </span>
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-600 text-white">
+                      OPTIONAL
+                    </span>
                   </div>
+                  <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
+                    Enable email sending in ARI. Resend lets you send transactional emails and track
+                    their delivery status in real-time. Resend offers a free tier. Please check
+                    their website for details.
+                  </p>
+                </div>
 
-                  {/* Content section */}
-                  <div className="space-y-6" style={{ padding: '25px' }}>
+                {/* Content section */}
+                <div className="space-y-6" style={{ padding: '25px' }}>
                   {/* Step 1: Create Account */}
                   <div className="flex items-center gap-3">
                     <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       1
                     </div>
-                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Create a free Resend account</h3>
+                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>
+                      Create a free Resend account
+                    </h3>
                   </div>
 
-                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
+                  <div
+                    className="rounded-xl p-4"
+                    style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}
+                  >
                     <ol className="space-y-2.5">
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span
+                          className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+                          style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}
+                        >
                           1
                         </span>
                         <span className="text-black">
-                          Go to <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
+                          Go to{' '}
+                          <a
+                            href="https://resend.com"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline"
+                          >
                             Resend.com
                             <ExternalLink className="h-3 w-3" />
-                          </a> and create a free account
+                          </a>{' '}
+                          and create a free account
                         </span>
                       </li>
                     </ol>
@@ -1704,53 +2061,79 @@ export default function WelcomePage() {
                     <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       2
                     </div>
-                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Get your Resend API Key</h3>
+                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>
+                      Get your Resend API Key
+                    </h3>
                   </div>
 
-                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
+                  <div
+                    className="rounded-xl p-4"
+                    style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}
+                  >
                     <ol className="space-y-2.5">
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span
+                          className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+                          style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}
+                        >
                           1
                         </span>
                         <span className="text-black">
-                          Go to <a href="https://resend.com/api-keys" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
+                          Go to{' '}
+                          <a
+                            href="https://resend.com/api-keys"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline"
+                          >
                             Resend Dashboard &rarr; API Keys
                             <ExternalLink className="h-3 w-3" />
-                          </a> (3,000 emails/month free)
+                          </a>{' '}
+                          (3,000 emails/month free)
                         </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span
+                          className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+                          style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}
+                        >
                           2
                         </span>
-                        <span className="text-black">Click <strong className="text-zinc-700">Create API Key</strong> and copy the key</span>
+                        <span className="text-black">
+                          Click <strong className="text-zinc-700">Create API Key</strong> and copy
+                          the key
+                        </span>
                       </li>
                     </ol>
                   </div>
 
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <Label htmlFor="resendApiKey" className="text-sm font-medium text-gray-900">Resend API Key</Label>
+                      <Label htmlFor="resendApiKey" className="text-sm font-medium text-gray-900">
+                        Resend API Key
+                      </Label>
                       <Tooltip>
                         <TooltipTrigger>
                           <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p className="text-xs max-w-xs">Your Resend API key for sending emails (starts with re_)</p>
+                          <p className="text-xs max-w-xs">
+                            Your Resend API key for sending emails (starts with re_)
+                          </p>
                         </TooltipContent>
                       </Tooltip>
                     </div>
                     <Input
                       id="resendApiKey"
                       value={formData.resendApiKey}
-                      onChange={(e) => setFormData(prev => ({ ...prev, resendApiKey: e.target.value }))}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, resendApiKey: e.target.value }))
+                      }
                       placeholder="re_..."
                       className="text-sm"
                       style={{ fontFamily: 'Geist Mono, monospace' }}
                     />
                   </div>
-
 
                   {/* Footer */}
                   <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
@@ -1780,32 +2163,43 @@ export default function WelcomePage() {
                     </div>
                   </div>
                 </div>
-                </div>
-              )}
+              </div>
+            )}
 
-              {/* Vercel Tab */}
-              {currentTab === "vercel" && (
-                <div>
-                  {/* Header section with gradient background */}
-                  <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <div className="flex items-center gap-2.5">
-                      <h2 className="text-2xl font-semibold text-zinc-900">Vercel Deployment</h2>
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-600 text-white">FREE</span>
-                    </div>
-                    <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
-                      Deploy your app to the cloud with Vercel. You can skip this for local development only. Vercel offers a free tier. Please check their website for details.
-                    </p>
+            {/* Vercel Tab */}
+            {currentTab === 'vercel' && (
+              <div>
+                {/* Header section with gradient background */}
+                <div
+                  className="border-b border-zinc-100"
+                  style={{
+                    padding: '25px',
+                    background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)',
+                  }}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="text-2xl font-semibold text-zinc-900">Vercel Deployment</h2>
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-green-600 text-white">
+                      FREE
+                    </span>
                   </div>
+                  <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
+                    Deploy your app to the cloud with Vercel. You can skip this for local
+                    development only. Vercel offers a free tier. Please check their website for
+                    details.
+                  </p>
+                </div>
 
-                  {/* Content section */}
-                  <div className="space-y-6" style={{ padding: '25px' }}>
+                {/* Content section */}
+                <div className="space-y-6" style={{ padding: '25px' }}>
                   <Alert className="bg-gray-50 border-gray-200">
                     <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4">
                       <path d="M24 22.525H0l12-21.05 12 21.05z" />
                     </svg>
                     <AlertTitle className="text-gray-800">Optional</AlertTitle>
                     <AlertDescription className="text-gray-700">
-                      Vercel deployment is optional. Skip this step if you only want to run ARI locally.
+                      Vercel deployment is optional. Skip this step if you only want to run ARI
+                      locally.
                     </AlertDescription>
                   </Alert>
 
@@ -1814,52 +2208,98 @@ export default function WelcomePage() {
                     <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                       1
                     </div>
-                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Create a FREE Vercel Hobby account</h3>
+                    <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>
+                      Create a FREE Vercel Hobby account
+                    </h3>
                   </div>
 
-                  <div className="rounded-xl p-4" style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}>
+                  <div
+                    className="rounded-xl p-4"
+                    style={{ backgroundColor: 'rgba(244, 244, 245, 0.5)' }}
+                  >
                     <ol className="space-y-2.5">
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span
+                          className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+                          style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}
+                        >
                           1
                         </span>
                         <span className="text-black">
-                          Go to <a href="https://vercel.com/signup" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
+                          Go to{' '}
+                          <a
+                            href="https://vercel.com/signup"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline"
+                          >
                             vercel.com/signup
                             <ExternalLink className="h-3 w-3" />
-                          </a> and create a free account
+                          </a>{' '}
+                          and create a free account
                         </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span
+                          className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+                          style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}
+                        >
                           2
                         </span>
                         <span className="text-black">
-                          Run <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">vercel login</code> in your terminal
+                          Run{' '}
+                          <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">
+                            vercel login
+                          </code>{' '}
+                          in your terminal
                         </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span
+                          className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+                          style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}
+                        >
                           3
                         </span>
                         <span className="text-black">
-                          Run <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">vercel link</code> to connect your project
+                          Run{' '}
+                          <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">
+                            vercel link
+                          </code>{' '}
+                          to connect your project
                         </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span
+                          className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+                          style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}
+                        >
                           4
                         </span>
-                        <span className="text-black">Add environment variables: From your dashboard, select your project. Select the Settings tab. Go to the Environment Variables section and copy your variables from .env.local to Vercel.</span>
+                        <span className="text-black">
+                          Add environment variables: From your dashboard, select your project.
+                          Select the Settings tab. Go to the Environment Variables section and copy
+                          your variables from .env.local to Vercel.
+                        </span>
                       </li>
                       <li className="flex items-start gap-3 text-sm">
-                        <span className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium" style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}>
+                        <span
+                          className="flex w-6 h-6 shrink-0 items-center justify-center rounded-full text-xs font-medium"
+                          style={{ backgroundColor: 'rgba(24, 24, 27, 0.1)', color: '#18181b' }}
+                        >
                           5
                         </span>
                         <span className="text-black">
-                          To deploy every commit automatically, connect your Git Repository: <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">vercel git connect</code>
-                          {" "}
-                          <a href="https://vercel.com/docs/git" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
+                          To deploy every commit automatically, connect your Git Repository:{' '}
+                          <code className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-mono text-zinc-700">
+                            vercel git connect
+                          </code>{' '}
+                          <a
+                            href="https://vercel.com/docs/git"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline"
+                          >
                             Learn more
                             <ExternalLink className="h-3 w-3" />
                           </a>
@@ -1896,24 +2336,33 @@ export default function WelcomePage() {
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Vercel Deploy Tab (Vercel installs only — replaces the Save step) */}
+            {currentTab === 'vercel-deploy' && (
+              <div>
+                {/* Header section with gradient background */}
+                <div
+                  className="border-b border-zinc-100"
+                  style={{
+                    padding: '25px',
+                    background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)',
+                  }}
+                >
+                  <h2 className="text-2xl font-semibold text-zinc-900">Deploy</h2>
+                  <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
+                    You&apos;re running on Vercel. Your configuration will be stored securely in
+                    your Vercel project&apos;s environment variables, then ARI redeploys itself so
+                    the new settings take effect.
+                  </p>
                 </div>
-              )}
 
-              {/* Vercel Deploy Tab (Vercel installs only — replaces the Save step) */}
-              {currentTab === "vercel-deploy" && (
-                <div>
-                  {/* Header section with gradient background */}
-                  <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <h2 className="text-2xl font-semibold text-zinc-900">Deploy</h2>
-                    <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
-                      You&apos;re running on Vercel. Your configuration will be stored securely in your Vercel project&apos;s environment variables, then ARI redeploys itself so the new settings take effect.
-                    </p>
-                  </div>
-
-                  {/* Content section */}
-                  <div className="space-y-6" style={{ padding: '25px' }}>
-
-                  {(vercelDeployStatus === 'deploying' || vercelDeployStatus === 'complete' || vercelDeployStatus === 'timeout') ? (
+                {/* Content section */}
+                <div className="space-y-6" style={{ padding: '25px' }}>
+                  {vercelDeployStatus === 'deploying' ||
+                  vercelDeployStatus === 'complete' ||
+                  vercelDeployStatus === 'timeout' ? (
                     /* Progress panel — shown after configuration is submitted */
                     <div className="space-y-6">
                       <div className="rounded-lg border border-blue-200 bg-blue-50 p-5 space-y-3">
@@ -1950,16 +2399,31 @@ export default function WelcomePage() {
                         </div>
                         {vercelDeployStatus === 'complete' ? (
                           <p className="text-sm text-blue-800">
-                            Sign in with the admin email and password you chose — your account and database tables are created automatically on first sign-in.
+                            Sign in with the admin email and password you chose — your account and
+                            database tables are created automatically on first sign-in.
                           </p>
                         ) : vercelDeployStatus === 'timeout' ? (
                           <p className="text-sm text-blue-800">
-                            Your configuration was saved and the build is still running — nothing needs to be resubmitted. Watch it finish in your{' '}
-                            <a href="https://vercel.com/dashboard" target="_blank" rel="noopener noreferrer" className="font-medium underline hover:no-underline">Vercel dashboard</a>
+                            Your configuration was saved and the build is still running — nothing
+                            needs to be resubmitted. Watch it finish in your{' '}
+                            <a
+                              href="https://vercel.com/dashboard"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium underline hover:no-underline"
+                            >
+                              Vercel dashboard
+                            </a>
                             {vercelProductionUrl ? (
                               <>
                                 , then continue at{' '}
-                                <a href={`https://${vercelProductionUrl}/welcome`} className="font-medium underline hover:no-underline">{vercelProductionUrl}/welcome</a>.
+                                <a
+                                  href={`https://${vercelProductionUrl}/welcome`}
+                                  className="font-medium underline hover:no-underline"
+                                >
+                                  {vercelProductionUrl}/welcome
+                                </a>
+                                .
                               </>
                             ) : (
                               <>, then reload this page.</>
@@ -1967,14 +2431,31 @@ export default function WelcomePage() {
                           </p>
                         ) : (
                           <p className="text-sm text-blue-800">
-                            Keep this tab open — you&apos;ll be able to sign in the moment the deployment is ready. You can watch the build in your{' '}
-                            <a href="https://vercel.com/dashboard" target="_blank" rel="noopener noreferrer" className="font-medium underline hover:no-underline">Vercel dashboard</a>.
+                            Keep this tab open — you&apos;ll be able to sign in the moment the
+                            deployment is ready. You can watch the build in your{' '}
+                            <a
+                              href="https://vercel.com/dashboard"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium underline hover:no-underline"
+                            >
+                              Vercel dashboard
+                            </a>
+                            .
                           </p>
                         )}
                         {vercelDeployStatus === 'deploying' && vercelPollIsOffsite && (
                           <p className="text-sm text-blue-800">
-                            You&apos;re viewing a preview URL, so this page can&apos;t detect when the production deployment goes live. Once the build finishes, continue at{' '}
-                            <a href={`https://${vercelProductionUrl}/welcome`} className="font-medium underline hover:no-underline">{vercelProductionUrl}/welcome</a>.
+                            You&apos;re viewing a preview URL, so this page can&apos;t detect when
+                            the production deployment goes live. Once the build finishes, continue
+                            at{' '}
+                            <a
+                              href={`https://${vercelProductionUrl}/welcome`}
+                              className="font-medium underline hover:no-underline"
+                            >
+                              {vercelProductionUrl}/welcome
+                            </a>
+                            .
                           </p>
                         )}
                       </div>
@@ -2002,34 +2483,62 @@ export default function WelcomePage() {
                         <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                           1
                         </div>
-                        <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Database</h3>
+                        <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>
+                          Database
+                        </h3>
                       </div>
 
                       {needsDatabaseUrl ? (
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
-                            <Label htmlFor="vercel-database-url" className="text-sm font-medium text-gray-900">Postgres Connection String</Label>
+                            <Label
+                              htmlFor="vercel-database-url"
+                              className="text-sm font-medium text-gray-900"
+                            >
+                              Postgres Connection String
+                            </Label>
                             <Tooltip>
                               <TooltipTrigger>
                                 <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p className="text-xs max-w-xs">Any hosted Postgres works — Neon, Supabase, Railway, RDS. Copy the connection string from your provider&apos;s dashboard.</p>
+                                <p className="text-xs max-w-xs">
+                                  Any hosted Postgres works — Neon, Supabase, Railway, RDS. Copy the
+                                  connection string from your provider&apos;s dashboard.
+                                </p>
                               </TooltipContent>
                             </Tooltip>
                           </div>
                           <Input
                             id="vercel-database-url"
                             value={formData.databaseUrl}
-                            onChange={(e) => setFormData(prev => ({ ...prev, databaseUrl: e.target.value }))}
+                            onChange={(e) =>
+                              setFormData((prev) => ({ ...prev, databaseUrl: e.target.value }))
+                            }
                             placeholder="postgresql://user:password@host:5432/postgres"
                             className="text-sm"
                             style={{ fontFamily: 'Geist Mono, monospace' }}
                           />
                           <p className="text-xs text-zinc-500">
                             Need a free Postgres database? Try{' '}
-                            <a href="https://neon.tech" target="_blank" rel="noopener noreferrer" className="font-medium text-zinc-900 hover:underline">Neon</a>{' '}or{' '}
-                            <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="font-medium text-zinc-900 hover:underline">Supabase</a> — create a project and copy its connection string.
+                            <a
+                              href="https://neon.tech"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium text-zinc-900 hover:underline"
+                            >
+                              Neon
+                            </a>{' '}
+                            or{' '}
+                            <a
+                              href="https://supabase.com"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium text-zinc-900 hover:underline"
+                            >
+                              Supabase
+                            </a>{' '}
+                            — create a project and copy its connection string.
                           </p>
                         </div>
                       ) : (
@@ -2044,19 +2553,30 @@ export default function WelcomePage() {
                         <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                           2
                         </div>
-                        <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Authentication Secret</h3>
+                        <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>
+                          Authentication Secret
+                        </h3>
                       </div>
 
                       {needsAuthSecret ? (
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
-                            <Label htmlFor="vercel-auth-secret" className="text-sm font-medium text-gray-900">Auth Secret</Label>
+                            <Label
+                              htmlFor="vercel-auth-secret"
+                              className="text-sm font-medium text-gray-900"
+                            >
+                              Auth Secret
+                            </Label>
                             <Tooltip>
                               <TooltipTrigger>
                                 <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p className="text-xs max-w-xs">Used to sign authentication sessions and encrypt stored API keys. Generated for you — it&apos;s saved as a write-only Vercel environment variable.</p>
+                                <p className="text-xs max-w-xs">
+                                  Used to sign authentication sessions and encrypt stored API keys.
+                                  Generated for you — it&apos;s saved as a write-only Vercel
+                                  environment variable.
+                                </p>
                               </TooltipContent>
                             </Tooltip>
                           </div>
@@ -2072,7 +2592,12 @@ export default function WelcomePage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => setFormData(prev => ({ ...prev, betterAuthSecret: generateAuthSecret() }))}
+                              onClick={() =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  betterAuthSecret: generateAuthSecret(),
+                                }))
+                              }
                               className="border-zinc-200"
                             >
                               Regenerate
@@ -2091,11 +2616,15 @@ export default function WelcomePage() {
                         <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
                           3
                         </div>
-                        <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>Vercel Access Token</h3>
+                        <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>
+                          Vercel Access Token
+                        </h3>
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="vercel-token" className="text-sm font-medium text-gray-900">Access Token</Label>
+                        <Label htmlFor="vercel-token" className="text-sm font-medium text-gray-900">
+                          Access Token
+                        </Label>
                         <Input
                           id="vercel-token"
                           type="password"
@@ -2107,11 +2636,18 @@ export default function WelcomePage() {
                         />
                         <p className="text-xs text-zinc-500">
                           Create one at{' '}
-                          <a href="https://vercel.com/account/tokens" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline">
+                          <a
+                            href="https://vercel.com/account/tokens"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline"
+                          >
                             vercel.com/account/tokens
                             <ExternalLink className="h-3 w-3" />
-                          </a>
-                          {' '}with access to this project. ARI uses it once — to save your configuration and trigger a redeploy — and never stores it. You can delete the token afterwards.
+                          </a>{' '}
+                          with access to this project. ARI uses it once — to save your configuration
+                          and trigger a redeploy — and never stores it. You can delete the token
+                          afterwards.
                         </p>
                       </div>
 
@@ -2119,7 +2655,9 @@ export default function WelcomePage() {
                         <Alert className="bg-red-50 border-red-200">
                           <AlertCircle className="w-4 h-4 text-red-600" />
                           <AlertTitle className="text-red-800">Deployment setup failed</AlertTitle>
-                          <AlertDescription className="text-red-700">{vercelDeployError}</AlertDescription>
+                          <AlertDescription className="text-red-700">
+                            {vercelDeployError}
+                          </AlertDescription>
                         </Alert>
                       )}
 
@@ -2146,90 +2684,122 @@ export default function WelcomePage() {
                   )}
 
                   {/* Footer */}
-                  {vercelDeployStatus !== 'deploying' && vercelDeployStatus !== 'complete' && vercelDeployStatus !== 'timeout' && (
-                    <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
-                      <button
-                        onClick={goToPreviousStep}
-                        className="inline-flex items-center justify-center px-4 py-2 text-base font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
-                        style={{ borderRadius: '6px' }}
-                      >
-                        Back
-                      </button>
-                    </div>
-                  )}
-                  </div>
+                  {vercelDeployStatus !== 'deploying' &&
+                    vercelDeployStatus !== 'complete' &&
+                    vercelDeployStatus !== 'timeout' && (
+                      <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
+                        <button
+                          onClick={goToPreviousStep}
+                          className="inline-flex items-center justify-center px-4 py-2 text-base font-medium text-zinc-900 bg-white border border-zinc-200 hover:bg-zinc-50 transition-colors"
+                          style={{ borderRadius: '6px' }}
+                        >
+                          Back
+                        </button>
+                      </div>
+                    )}
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Download Tab */}
-              {currentTab === "download" && (
-                <div>
-                  {/* Header section with gradient background */}
-                  <div className="border-b border-zinc-100" style={{ padding: '25px', background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)' }}>
-                    <h2 className="text-2xl font-semibold text-zinc-900">Save</h2>
-                    <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
-                      Your environment configuration is ready. Review the contents below, then save it to <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-sm font-mono">{projectDir ? `${projectDir}/.env.local` : "~/ARI/.env.local"}</code>
-                    </p>
-                  </div>
+            {/* Download Tab */}
+            {currentTab === 'download' && (
+              <div>
+                {/* Header section with gradient background */}
+                <div
+                  className="border-b border-zinc-100"
+                  style={{
+                    padding: '25px',
+                    background: 'linear-gradient(to right, rgba(244, 244, 245, 0.5), transparent)',
+                  }}
+                >
+                  <h2 className="text-2xl font-semibold text-zinc-900">Save</h2>
+                  <p className="mt-3 text-base text-black" style={{ lineHeight: '1.7' }}>
+                    Your environment configuration is ready. Review the contents below, then save it
+                    to{' '}
+                    <code className="bg-zinc-100 px-1.5 py-0.5 rounded text-sm font-mono">
+                      {projectDir ? `${projectDir}/.env.local` : '~/ARI/.env.local'}
+                    </code>
+                  </p>
+                </div>
 
-                  {/* Content section */}
-                  <div className="space-y-6" style={{ padding: '25px' }}>
-
+                {/* Content section */}
+                <div className="space-y-6" style={{ padding: '25px' }}>
                   {/* Configuration Summary */}
                   <div className="space-y-2">
                     <h3 className="text-base font-semibold text-gray-900">Configuration Summary</h3>
                     <div className="space-y-1 text-sm">
                       {/* Required configurations */}
                       <div className="flex items-center gap-2">
-                        {isDatabaseConfigured ?
-                          <Check className="w-4 h-4 text-green-500" /> :
+                        {isDatabaseConfigured ? (
+                          <Check className="w-4 h-4 text-green-500" />
+                        ) : (
                           <X className="w-4 h-4 text-red-500" />
-                        }
-                        <span className={!isDatabaseConfigured ? "text-red-600" : "text-gray-900"}>
-                          Database: {dbMode === "postgres" ? "Local PostgreSQL" : dbMode === "supabaselocal" ? "Local Supabase" : formData.databaseUrl ? "Configured" : "Required - please complete"}
+                        )}
+                        <span className={!isDatabaseConfigured ? 'text-red-600' : 'text-gray-900'}>
+                          Database:{' '}
+                          {dbMode === 'postgres'
+                            ? 'Local PostgreSQL'
+                            : dbMode === 'supabaselocal'
+                              ? 'Local Supabase'
+                              : formData.databaseUrl
+                                ? 'Configured'
+                                : 'Required - please complete'}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        {formData.betterAuthSecret ?
-                          <Check className="w-4 h-4 text-green-500" /> :
+                        {formData.betterAuthSecret ? (
+                          <Check className="w-4 h-4 text-green-500" />
+                        ) : (
                           <X className="w-4 h-4 text-red-500" />
-                        }
-                        <span className={!formData.betterAuthSecret ? "text-red-600" : "text-gray-900"}>
-                          Auth Secret: {formData.betterAuthSecret ? "Generated" : "Required"}
+                        )}
+                        <span
+                          className={!formData.betterAuthSecret ? 'text-red-600' : 'text-gray-900'}
+                        >
+                          Auth Secret: {formData.betterAuthSecret ? 'Generated' : 'Required'}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        {isSupabaseApiConfigured ?
-                          <Check className="w-4 h-4 text-green-500" /> :
+                        {isSupabaseApiConfigured ? (
+                          <Check className="w-4 h-4 text-green-500" />
+                        ) : (
                           <X className="w-4 h-4 text-red-500" />
-                        }
-                        <span className={!isSupabaseApiConfigured ? "text-red-600" : "text-gray-900"}>
-                          Supabase API: {dbMode !== "supabasecloud" ? (dbMode === "postgres" ? "Not required" : "Local Supabase") : (formData.supabaseUrl && formData.supabaseSecretKey) ? "Configured" : "Required - please complete"}
+                        )}
+                        <span
+                          className={!isSupabaseApiConfigured ? 'text-red-600' : 'text-gray-900'}
+                        >
+                          Supabase API:{' '}
+                          {dbMode !== 'supabasecloud'
+                            ? dbMode === 'postgres'
+                              ? 'Not required'
+                              : 'Local Supabase'
+                            : formData.supabaseUrl && formData.supabaseSecretKey
+                              ? 'Configured'
+                              : 'Required - please complete'}
                         </span>
                       </div>
                       {/* Optional configurations */}
                       <div className="flex items-center gap-2">
-                        {isAdminConfigured ?
-                          <Check className="w-4 h-4 text-green-500" /> :
+                        {isAdminConfigured ? (
+                          <Check className="w-4 h-4 text-green-500" />
+                        ) : (
                           <X className="w-4 h-4 text-red-500" />
-                        }
-                        <span className={isAdminConfigured ? "text-gray-900" : "text-red-600"}>
-                          Admin Account: {isAdminConfigured ? "Configured" : "Skipped"}
+                        )}
+                        <span className={isAdminConfigured ? 'text-gray-900' : 'text-red-600'}>
+                          Admin Account: {isAdminConfigured ? 'Configured' : 'Skipped'}
                         </span>
                       </div>
                     </div>
                   </div>
 
                   {/* .env.local preview */}
-                  <CodeBlock
-                    language="env"
-                    code={envFileContent}
-                  />
+                  <CodeBlock language="env" code={envFileContent} />
 
                   {/* Save button */}
                   <Button
                     onClick={handleSaveEnvFile}
-                    disabled={!isSupabaseComplete || !isAdminConfigured || envSaveStatus === 'saving'}
+                    disabled={
+                      !isSupabaseComplete || !isAdminConfigured || envSaveStatus === 'saving'
+                    }
                     className="w-full rounded-lg bg-green-600 hover:bg-green-700 text-white"
                   >
                     {envSaveStatus === 'saving' ? (
@@ -2237,7 +2807,7 @@ export default function WelcomePage() {
                     ) : envSaveStatus === 'saved' ? (
                       <>
                         <Check className="w-4 h-4 mr-2" />
-                        Saved to {envSavedPath || ".env.local"}
+                        Saved to {envSavedPath || '.env.local'}
                       </>
                     ) : (
                       <>
@@ -2252,7 +2822,9 @@ export default function WelcomePage() {
                       <AlertCircle className="w-4 h-4 text-red-600" />
                       <AlertTitle className="text-red-800">Could not save file</AlertTitle>
                       <AlertDescription className="text-red-700">
-                        {envSaveError}. Copy the contents above and manually create <code className="bg-red-100 px-1 rounded text-xs">.env.local</code> in your project directory.
+                        {envSaveError}. Copy the contents above and manually create{' '}
+                        <code className="bg-red-100 px-1 rounded text-xs">.env.local</code> in your
+                        project directory.
                       </AlertDescription>
                     </Alert>
                   )}
@@ -2262,21 +2834,30 @@ export default function WelcomePage() {
                     <CheckCircle className="w-4 h-4 text-green-600" />
                     <AlertTitle className="text-green-800">What is .env.local?</AlertTitle>
                     <AlertDescription className="text-green-700">
-                      The <strong>.env.local</strong> file stores your environment variables (API keys, database credentials, secrets) for local development.
-                      This file is automatically ignored by Git, keeping your sensitive data private.
+                      The <strong>.env.local</strong> file stores your environment variables (API
+                      keys, database credentials, secrets) for local development. This file is
+                      automatically ignored by Git, keeping your sensitive data private.
                     </AlertDescription>
                   </Alert>
 
                   {envSaveStatus === 'saved' && (
                     <div className="rounded-lg border border-blue-200 bg-blue-50 p-5">
-                      <h3 className="text-base font-semibold text-blue-900 mb-2">Setup almost complete</h3>
+                      <h3 className="text-base font-semibold text-blue-900 mb-2">
+                        Setup almost complete
+                      </h3>
                       <p className="text-sm text-blue-800 mb-3">
-                        Restart your dev server to load the new environment variables, then visit{" "}
-                        <code className="bg-blue-100 px-1.5 py-0.5 rounded text-xs font-mono">/sign-in</code>.
-                        Your admin account and database tables will be created automatically on first sign-in.
+                        Restart your dev server to load the new environment variables, then visit{' '}
+                        <code className="bg-blue-100 px-1.5 py-0.5 rounded text-xs font-mono">
+                          /sign-in
+                        </code>
+                        . Your admin account and database tables will be created automatically on
+                        first sign-in.
                       </p>
                       <div className="mb-3">
-                        <CodeBlock language="bash" code={`# In your terminal:\n# 1. Stop the dev server with Ctrl+C and then press Enter\n# 2. Start it again:\n./ari start`} />
+                        <CodeBlock
+                          language="bash"
+                          code={`# In your terminal:\n# 1. Stop the dev server with Ctrl+C and then press Enter\n# 2. Start it again:\n./ari start`}
+                        />
                       </div>
                     </div>
                   )}
@@ -2311,9 +2892,8 @@ export default function WelcomePage() {
                     </button>
                   </div>
                 </div>
-                </div>
-              )}
-
+              </div>
+            )}
           </div>
         </div>
       </div>

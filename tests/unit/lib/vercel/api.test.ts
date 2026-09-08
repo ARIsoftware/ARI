@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { VercelInfo } from '@/lib/deployment'
 import {
   resolveProject,
-  upsertEnvVars,
+  upsertVercelEnvVars,
   triggerRedeploy,
   buildVercelEnvPlan,
   listEnvKeys,
@@ -197,7 +197,7 @@ describe('listEnvKeys', () => {
   })
 })
 
-describe('upsertEnvVars', () => {
+describe('upsertVercelEnvVars', () => {
   const vars = buildVercelEnvPlan({
     databaseUrl: 'postgres://x',
     betterAuthSecret: 's3cret',
@@ -209,7 +209,7 @@ describe('upsertEnvVars', () => {
 
   it('POSTs the array body with upsert=true', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(201, { created: [], failed: [] }))
-    await upsertEnvVars(TOKEN, PROJECT, vars)
+    await upsertVercelEnvVars(TOKEN, PROJECT, vars)
     const [url, init] = fetchMock.mock.calls[0]
     expect(String(url)).toContain('/v10/projects/prj_1/env')
     expect(String(url)).toContain('upsert=true')
@@ -219,7 +219,7 @@ describe('upsertEnvVars', () => {
 
   it('appends teamId for team projects', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(201, { created: [] }))
-    await upsertEnvVars(TOKEN, { ...PROJECT, teamId: 'team_a' }, vars)
+    await upsertVercelEnvVars(TOKEN, { ...PROJECT, teamId: 'team_a' }, vars)
     expect(String(fetchMock.mock.calls[0][0])).toContain('teamId=team_a')
   })
 
@@ -230,7 +230,7 @@ describe('upsertEnvVars', () => {
         failed: [{ error: { key: 'DATABASE_URL', message: 'bad' } }],
       }),
     )
-    const err = await upsertEnvVars(TOKEN, PROJECT, vars).catch((e) => e)
+    const err = await upsertVercelEnvVars(TOKEN, PROJECT, vars).catch((e) => e)
     expect(err).toBeInstanceOf(VercelApiError)
     expect(err.message).toContain('DATABASE_URL')
     expect(err.message).not.toContain(TOKEN)
@@ -238,7 +238,7 @@ describe('upsertEnvVars', () => {
 
   it('throws on a non-ok response', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(400, { error: { message: 'invalid target' } }))
-    const err = await upsertEnvVars(TOKEN, PROJECT, vars).catch((e) => e)
+    const err = await upsertVercelEnvVars(TOKEN, PROJECT, vars).catch((e) => e)
     expect(err).toBeInstanceOf(VercelApiError)
     expect(err.message).toContain('invalid target')
   })

@@ -13,7 +13,7 @@ import {
   listEnvKeys,
   resolveProject,
   triggerRedeploy,
-  upsertEnvVars,
+  upsertVercelEnvVars,
   VercelApiError,
 } from '@/lib/vercel/api'
 import { sslConfigFor } from '@/lib/db/pool'
@@ -212,7 +212,7 @@ export async function POST(request: NextRequest) {
       },
       existingKeys,
     )
-    await upsertEnvVars(vercelToken, project, plan)
+    await upsertVercelEnvVars(vercelToken, project, plan)
     const deployment = await triggerRedeploy(vercelToken, project, info)
 
     return NextResponse.json({
