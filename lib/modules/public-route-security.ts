@@ -64,12 +64,28 @@ function isDirectAddressHost(hostname: string): boolean {
 }
 
 /**
+ * Custom header ARI's own frontend attaches to setup-endpoint POSTs. A
+ * cross-origin page — DNS-rebinding included — cannot attach a custom header
+ * without a CORS preflight, and these routes never answer preflights with
+ * Access-Control-Allow-* — so the browser blocks the real request. Its
+ * presence therefore proves a same-origin browser context, independent of
+ * what hostname the install is reached through (ari.local, a NAS name,
+ * Tailscale MagicDNS, ...). Non-browser clients can always set any header,
+ * but they could always forge Origin too — this gate is CSRF/rebinding
+ * defense, never network authentication.
+ */
+export const ARI_REQUEST_HEADER = 'x-ari-request'
+
+/**
  * Same-origin gate for public-during-setup endpoints.
  *
- * Trusted origins are ONLY:
- *  - the configured app URLs (NEXT_PUBLIC_APP_URL / BETTER_AUTH_URL),
- *  - Vercel's own system hostnames (server-side env, not client-influenced),
- *  - the request's own origin when its host is a literal IP / localhost.
+ * A request passes when EITHER:
+ *  - it carries the ARI_REQUEST_HEADER custom header (see above — the
+ *    deployment-agnostic path; ARI's own wizard/sign-in fetches send it), or
+ *  - its Origin/Referer matches a trusted origin: the configured app URLs
+ *    (NEXT_PUBLIC_APP_URL / BETTER_AUTH_URL), Vercel's own system hostnames
+ *    (server-side env, not client-influenced), or the request's own origin
+ *    when its host is a literal IP / localhost.
  *
  * The request's Host header is deliberately NOT trusted for DNS names:
  * deriving the trusted origin from the request itself made the check
@@ -78,6 +94,8 @@ function isDirectAddressHost(hostname: string): boolean {
  * and could drive `.env.local` writes during the first-run window.
  */
 export function isSameOriginRequest(request: NextRequest): boolean {
+  if (request.headers.get(ARI_REQUEST_HEADER) === '1') return true
+
   const trusted = new Set<string>()
   if (isDirectAddressHost(request.nextUrl.hostname)) {
     trusted.add(request.nextUrl.origin)
@@ -125,16 +143,27 @@ export function isSameOriginRequest(request: NextRequest): boolean {
  * limits already account for it.
  */
 export function getClientIp(request: NextRequest): string {
-  const proxyHeadersTrusted = isVercel() || process.env.ARI_TRUST_PROXY === '1'
+  const trustProxy = process.env.ARI_TRUST_PROXY === '1'
+  const onVercel = isVercel()
 
-  if (proxyHeadersTrusted) {
-    const forwardedFor = request.headers.get('x-forwarded-for')
-    if (forwardedFor) {
-      return forwardedFor.split(',')[0].trim()
-    }
+  if (onVercel || trustProxy) {
+    // X-Real-IP first: reverse proxies conventionally OVERWRITE it (nginx
+    // `proxy_set_header X-Real-IP $remote_addr`), so it can't carry a
+    // client-forged value through a trusted proxy. Vercel sets it too.
     const realIp = request.headers.get('x-real-ip')
     if (realIp) {
-      return realIp
+      return realIp.trim()
+    }
+    const forwardedFor = request.headers.get('x-forwarded-for')
+    if (forwardedFor) {
+      const hops = forwardedFor.split(',').map((h) => h.trim())
+      // Vercel sanitizes the whole header (client-sent values are stripped),
+      // so the FIRST entry is the true client. A generic reverse proxy
+      // usually APPENDS ($proxy_add_x_forwarded_for), leaving any
+      // client-forged entries on the LEFT — only the RIGHTMOST hop (added
+      // by the proxy we trust) is reliable there. Taking the leftmost under
+      // an appending proxy would hand attackers a fresh bucket per request.
+      return onVercel ? hops[0] : hops[hops.length - 1]
     }
   }
 

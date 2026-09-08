@@ -24,12 +24,14 @@ function makeRequest(options: {
   requestUrl?: string
   xForwardedFor?: string
   xRealIp?: string
+  ariRequestHeader?: boolean
 }) {
   const headers = new Map<string, string>()
   if (options.origin) headers.set('origin', options.origin)
   if (options.referer) headers.set('referer', options.referer)
   if (options.xForwardedFor) headers.set('x-forwarded-for', options.xForwardedFor)
   if (options.xRealIp) headers.set('x-real-ip', options.xRealIp)
+  if (options.ariRequestHeader) headers.set('x-ari-request', '1')
 
   const url = options.requestUrl ?? 'http://localhost:3000/api/test'
 
@@ -242,6 +244,29 @@ describe('isSameOriginRequest', () => {
     expect(isSameOriginRequest(req)).toBe(false)
   })
 
+  it('accepts the x-ari-request custom header regardless of hostname (DNS-name installs)', () => {
+    delete process.env.NEXT_PUBLIC_APP_URL
+    delete process.env.BETTER_AUTH_URL
+    // ari.local isn't configured anywhere, but the custom header proves a
+    // same-origin browser context (cross-origin pages can't send it without
+    // a CORS preflight these routes never approve).
+    const req = makeRequest({
+      requestUrl: 'http://ari.local:3000/api/test',
+      ariRequestHeader: true,
+    })
+    expect(isSameOriginRequest(req)).toBe(true)
+  })
+
+  it('still rejects a DNS-name origin without the custom header', () => {
+    delete process.env.NEXT_PUBLIC_APP_URL
+    delete process.env.BETTER_AUTH_URL
+    const req = makeRequest({
+      requestUrl: 'http://ari.local:3000/api/test',
+      origin: 'http://ari.local:3000',
+    })
+    expect(isSameOriginRequest(req)).toBe(false)
+  })
+
   it('trusts Vercel system hostnames during the zero-env setup window', () => {
     delete process.env.NEXT_PUBLIC_APP_URL
     delete process.env.BETTER_AUTH_URL
@@ -285,28 +310,35 @@ describe('getClientIp', () => {
     expect(getClientIp(req)).toBe('direct')
   })
 
-  it('honors x-forwarded-for (first value) when ARI_TRUST_PROXY=1', () => {
+  it('takes the RIGHTMOST x-forwarded-for hop when ARI_TRUST_PROXY=1 (appending proxies leave forged values on the left)', () => {
     process.env.ARI_TRUST_PROXY = '1'
+    // Attacker sent "1.2.3.4"; nginx appended the real client IP last.
     const req = makeRequest({ xForwardedFor: '1.2.3.4, 5.6.7.8, 9.10.11.12' })
-    expect(getClientIp(req)).toBe('1.2.3.4')
+    expect(getClientIp(req)).toBe('9.10.11.12')
   })
 
   it('trims whitespace around IPs when the proxy is trusted', () => {
     process.env.ARI_TRUST_PROXY = '1'
-    const req = makeRequest({ xForwardedFor: '  192.168.1.1 , 10.0.0.1' })
-    expect(getClientIp(req)).toBe('192.168.1.1')
+    const req = makeRequest({ xForwardedFor: '  192.168.1.1 , 10.0.0.1  ' })
+    expect(getClientIp(req)).toBe('10.0.0.1')
   })
 
-  it('falls back to x-real-ip when trusted and x-forwarded-for is absent', () => {
+  it('prefers x-real-ip over x-forwarded-for when trusted (overwrite semantics beat append)', () => {
+    process.env.ARI_TRUST_PROXY = '1'
+    const req = makeRequest({ xForwardedFor: 'spoofed, 5.6.7.8', xRealIp: '10.0.0.1' })
+    expect(getClientIp(req)).toBe('10.0.0.1')
+  })
+
+  it('uses x-real-ip when trusted and x-forwarded-for is absent', () => {
     process.env.ARI_TRUST_PROXY = '1'
     const req = makeRequest({ xRealIp: '10.0.0.1' })
     expect(getClientIp(req)).toBe('10.0.0.1')
   })
 
-  it('honors headers on Vercel (platform overwrites x-forwarded-for)', () => {
+  it('takes the LEFTMOST x-forwarded-for hop on Vercel (platform sanitizes the header, client is first)', () => {
     process.env.VERCEL = '1'
     process.env.VERCEL_ENV = 'production'
-    const req = makeRequest({ xForwardedFor: '203.0.113.1' })
+    const req = makeRequest({ xForwardedFor: '203.0.113.1, 76.76.21.21' })
     expect(getClientIp(req)).toBe('203.0.113.1')
   })
 

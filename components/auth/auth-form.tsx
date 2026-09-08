@@ -52,7 +52,15 @@ export function AuthForm({ mode }: AuthFormProps) {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 3000)
 
-    fetch('/api/auth/bootstrap', { method: 'POST', signal: controller.signal })
+    // x-ari-request marks this as ARI's own same-origin fetch — cross-origin
+    // pages can't send custom headers without a CORS preflight (which these
+    // routes never approve), so the server's CSRF gate accepts it regardless
+    // of which hostname the install is reached through.
+    fetch('/api/auth/bootstrap', {
+      method: 'POST',
+      headers: { 'x-ari-request': '1' },
+      signal: controller.signal,
+    })
       .then(res => res.json())
       .then(data => {
         if (controller.signal.aborted) return

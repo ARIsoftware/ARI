@@ -80,7 +80,19 @@ async function clearFirstRunAdminCredentials(): Promise<void> {
 }
 
 export async function POST(request: NextRequest) {
-  if (!checkRateLimit(`bootstrap:${getClientIp(request)}`, 3)) {
+  // Initialized short-circuit FIRST: the sign-in page fires this POST on
+  // every fresh browser session, so on a healthy install the request must
+  // never consume rate-limit budget (a shared 'direct' bucket would 429 the
+  // 4th new session in a minute and bounce real users to /setup-error).
+  // Costs nothing security-wise: it's a module-level flag, no input touched.
+  if (initialized) {
+    return NextResponse.json({ status: "already_initialized" })
+  }
+
+  // 10/min (was 3): with no per-client identity on direct installs the
+  // bucket is shared, and concurrent first-visit sessions are normal. The
+  // expensive path stays bounded (advisory lock serializes schema work).
+  if (!checkRateLimit(`bootstrap:${getClientIp(request)}`, 10)) {
     return NextResponse.json(
       { error: "Rate limit exceeded. Please try again later." },
       { status: 429 }
@@ -92,10 +104,6 @@ export async function POST(request: NextRequest) {
       { error: "Cross-origin request rejected" },
       { status: 403 }
     )
-  }
-
-  if (initialized) {
-    return NextResponse.json({ status: "already_initialized" })
   }
 
   if (!pool) {

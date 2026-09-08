@@ -42,6 +42,22 @@ registry.registerPath({
   },
 })
 
+// Short-TTL memo around the users-table probe. The deploy-wait poll hits this
+// route every 5s unauthenticated; with an unreachable database each probe can
+// hang for the pool's 15s connection timeout, stacking concurrent dials. The
+// gate's answer cannot meaningfully change within a few seconds.
+const USERS_CHECK_TTL_MS = 10_000
+let usersCheckCache: { at: number; result: Awaited<ReturnType<typeof checkUsersExistInDb>> } | null =
+  null
+async function checkUsersExistInDbCached() {
+  if (usersCheckCache && Date.now() - usersCheckCache.at < USERS_CHECK_TTL_MS) {
+    return usersCheckCache.result
+  }
+  const result = await checkUsersExistInDb()
+  usersCheckCache = { at: Date.now(), result }
+  return result
+}
+
 async function handleGET(request: NextRequest) {
   if (!checkRateLimit(`setup-status:${getClientIp(request)}`, 30)) {
     return NextResponse.json(
@@ -61,10 +77,14 @@ async function handleGET(request: NextRequest) {
   //  - has-users: admin only. In setup mode getAuthenticatedUser returns
   //    NULL_AUTH, so an established install that re-entered setup mode
   //    (botched .env.local edit) discloses nothing to anonymous callers.
-  //  - db-error: fail closed.
+  //  - db-error: split decision (below) — `missing` is wizard-critical and
+  //    low-sensitivity (documented var NAMES), so an unreachable database
+  //    during first-run setup (Docker down, paused Neon, typo'd URL) must
+  //    not blank the wizard; projectDir (absolute path) stays withheld
+  //    because users may exist but be unknowable.
   // Denied callers still get the base fields; the cross-deployment poll only
   // needs setupComplete.
-  const usersState = (await checkUsersExistInDb()).status
+  const usersState = (await checkUsersExistInDbCached()).status
   let canSeeDetail = false
   if (usersState === 'no-users' || usersState === 'no-table' || usersState === 'no-pool') {
     canSeeDetail = true
@@ -72,6 +92,7 @@ async function handleGET(request: NextRequest) {
     const { user } = await getAuthenticatedUser()
     canSeeDetail = user?.role === 'admin'
   }
+  const canSeeMissing = canSeeDetail || (usersState === 'db-error' && !setupComplete)
 
   // dbMode is always included (it's not sensitive, and the wizard needs it to
   // pick the right step order even for a signed-in admin revisiting /welcome).
@@ -82,7 +103,7 @@ async function handleGET(request: NextRequest) {
     setupComplete,
     deploymentTarget,
     dbMode: getDbMode(),
-    ...(!setupComplete && canSeeDetail ? { missing: getMissingRequiredConfig() } : {}),
+    ...(!setupComplete && canSeeMissing ? { missing: getMissingRequiredConfig() } : {}),
     // Filesystem paths are only meaningful (and only safe to reveal) on
     // local installs, where the wizard shows where .env.local will land.
     ...(deploymentTarget === 'local' && canSeeDetail ? { projectDir: process.cwd() } : {}),

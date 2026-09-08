@@ -492,7 +492,9 @@ export default function WelcomePage() {
       setEnvSaveError(null)
       const res = await fetch('/api/download-env', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // x-ari-request: same-origin proof for the CSRF gate — custom headers
+        // can't cross origins without a CORS preflight these routes reject.
+        headers: { 'Content-Type': 'application/json', 'x-ari-request': '1' },
         body: JSON.stringify({ ...envFields, dbMode }),
       })
       const data = await readApiResultOrThrow(res)
@@ -524,7 +526,7 @@ export default function WelcomePage() {
       setVercelDeployError(null)
       const res = await fetch('/api/setup/vercel-configure', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-ari-request': '1' },
         body: JSON.stringify({
           vercelToken: vercelToken.trim(),
           ...(githubToken.trim() ? { githubToken: githubToken.trim() } : {}),
