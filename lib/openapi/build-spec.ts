@@ -44,6 +44,10 @@ export function buildSpec() {
       version: (pkg as { version?: string }).version ?? '0.0.0',
       description:
         'Internal API for the ARI application. All endpoints require authentication via either an ARI API key (header `x-api-key`) or a Better Auth session cookie. Generated from Zod schemas — see `/settings?tab=api` to manage API keys.',
+      license: {
+        name: 'Business Source License 1.1',
+        url: 'https://github.com/ARIsoftware/ARI/blob/main/LICENSE',
+      },
     },
     servers: [
       { url: process.env.BETTER_AUTH_URL ?? 'http://localhost:3000' },

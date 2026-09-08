@@ -1,0 +1,8 @@
+extends:
+  - recommended
+
+rules:
+  # Redirect-only (302) and deprecated (410-only) endpoints legitimately have no 2xx response.
+  operation-2xx-response: off
+  # ARI is self-hosted; the default server URL is the local instance when BETTER_AUTH_URL is unset.
+  no-server-example.com: off
