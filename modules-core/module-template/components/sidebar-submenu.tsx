@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import type { ModuleSubmenuProps } from '@/lib/modules/submenu-types'
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -25,7 +24,10 @@ const menuItems = [
   },
 ]
 
-export default function ModuleTemplateSubmenu({ moduleId, module }: ModuleSubmenuProps) {
+// Submenus receive ModuleSubmenuProps ({ moduleId, module: manifest }) from
+// '@/lib/modules/submenu-types' — declare the props parameter when you need
+// manifest data; this demo is static.
+export default function ModuleTemplateSubmenu() {
   const pathname = usePathname()
 
   return (

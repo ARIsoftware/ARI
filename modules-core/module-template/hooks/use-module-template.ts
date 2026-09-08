@@ -107,7 +107,7 @@ export function useDeleteModuleTemplateEntry() {
       const previous = queryClient.getQueryData<ModuleTemplateEntry[]>(ENTRIES_KEY)
 
       queryClient.setQueryData<ModuleTemplateEntry[]>(ENTRIES_KEY, (old = []) =>
-        old.filter(e => e.id !== deletedId)
+        old.filter((e) => e.id !== deletedId),
       )
 
       return { previous }

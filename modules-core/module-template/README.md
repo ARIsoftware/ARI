@@ -6,12 +6,18 @@
 ## Overview
 
 This is a fully-featured example module demonstrating all capabilities of the ARI module system:
-- ✅ Main page with authentication
-- ✅ API routes with validation
-- ✅ Database schema with RLS
-- ✅ Dashboard widget
-- ✅ Settings panel
+- ✅ Main page with authentication + onboarding pattern
+- ✅ API routes with Zod validation and OpenAPI registration
+- ✅ Database schema with RLS (per-user model, with shared-model instructions)
+- ✅ Dashboard widget **and** stat card
+- ✅ Settings panel + standalone settings page
+- ✅ Sidebar submenu + top bar icon
+- ✅ Global provider (app-wide React context)
+- ✅ AI provider selection + working `/generate` route
+- ✅ File storage (upload route, hooks, example component)
+- ✅ Public webhook example (`api/webhook/route.ts.example`)
 - ✅ TypeScript types
+- ✅ Example unit tests (in `tests/unit/modules-core/module-template/`)
 - ✅ Comprehensive documentation
 
 ## Features Demonstrated
@@ -22,11 +28,13 @@ This is a fully-featured example module demonstrating all capabilities of the AR
 - Follows ARI's design patterns
 
 ### 2. **API Routes**
-- GET endpoint for fetching data
-- POST endpoint for creating data
-- Authentication validation
-- Zod schema validation
-- Proper error handling
+- Full CRUD (`api/data`), settings (`api/settings`), AI generation (`api/generate`), file upload (`api/upload`)
+- Authentication validation via `getAuthenticatedUser()`
+- Zod schema validation (schemas in `lib/validation.ts`, tagged `.openapi()`)
+- One `registry.registerPath()` per verb so every endpoint appears in `/api-docs`, `/settings?tab=api`, and `/health`
+- Proper error handling with the shared `{ error, details? }` envelope
+- **Do NOT wrap module routes in `withApiLogging`** — that wrapper is for core `app/api/` routes only; the module dispatcher already logs API-key usage
+- Every modules-core route is statically checked by `tests/unit/route-security-scan.test.ts`: it must authenticate (or be declared in `publicRoutes`), per-user tables must filter by `user_id`, and inserts must stamp `userId: user.id`
 
 ### 3. **Database Integration**
 - Custom table: `module_template_entries`
@@ -34,10 +42,13 @@ This is a fully-featured example module demonstrating all capabilities of the AR
 - User-specific data isolation at application level
 - Table defined in `/lib/db/schema/schema.ts`
 
-### 4. **Dashboard Widget**
-- Displays count of user's entries
-- Follows ARI's card design system
-- Handles loading states
+### 4. **Dashboard Widget & Stat Card**
+- `components/widget.tsx` — larger content-area widget (`dashboard.widgetComponents`)
+- `components/stat-card.tsx` — small Quick Overview metric tile (`dashboard.statCards`)
+- Both require `"dashboard.widgets": true` in the manifest, share the module's
+  TanStack Query cache, and handle loading/error states
+- Note: the dashboard deliberately excludes `module-template` from rendering
+  (it's a developer demo) — these files are reference implementations
 
 ### 5. **Settings Panel**
 - Toggle settings
@@ -45,6 +56,10 @@ This is a fully-featured example module demonstrating all capabilities of the AR
 - Proper state management
 - Save/load functionality
 - **AI Provider picker** via the shared `AiProviderCard` (see below)
+- Rendered by the module's own `app/settings/page.tsx` (linked from the
+  sidebar submenu). There is no framework settings registry — a
+  `settings.panel` key in `module.json` is ignored, so wire the panel into a
+  page yourself as this module does.
 
 ### 5a. **AI Provider Selection (shared `AiProviderCard`)**
 - The settings panel renders `AiProviderCard` from `@/components/ai-provider-card`
@@ -71,7 +86,38 @@ in `.env.local` (`filesystem` is the default if unset). Provider credentials
 (`ARI_S3_*`, `ARI_R2_*`, `ARI_SUPABASE_S3_*`) also live in `.env.local`. Modules
 do not configure storage themselves — `getStorageProvider(readStorageConfig())`
 returns the right backend automatically. If your module needs provider-aware
-behavior, read `process.env.ARI_STORAGE_PROVIDER` directly.
+behavior, read `process.env.ARI_STORAGE_PROVIDER` directly. (A `storage` block
+in `module.json` is inert metadata — enforce size/type limits in your route,
+as `api/upload/route.ts` does.)
+
+### 7. **Sidebar Submenu & Top Bar Icon**
+- `components/sidebar-submenu.tsx` (manifest `submenu.component`) — sliding
+  submenu shown when the sidebar item is clicked; uses `next/link` soft
+  navigation so the query cache survives
+- `topBarIcon` in `module.json` — declarative form (`icon` + `route` +
+  `tooltip`, optional `order`, lower = further left). For an interactive icon
+  (like tasks/notepad/focus-timer/music-player), use the alternative
+  `topBarIcon.component` form pointing at a custom client component
+
+### 8. **Global Provider (app-wide context)**
+- `components/global-provider.tsx` (manifest `globalProvider`) wraps the whole
+  app in a React context provider — for state that must outlive the module's
+  own pages (e.g. music keeps playing while browsing other routes)
+- Receives `{ children, isAuthenticated }`; only mounts for users who have the
+  module enabled. The manifest path must exist — a missing file fails the build.
+
+### 9. **Public Webhook (example)**
+- `api/webhook/route.ts.example` shows an unauthenticated endpoint with HMAC
+  signature verification + rate limiting, and the `publicRoutes` manifest
+  declaration it requires. The `.example` suffix keeps it out of the route
+  scan — rename to `route.ts` to activate.
+
+### 10. **Unit Tests**
+- Example tests in `tests/unit/modules-core/module-template/lib/utils.test.ts`
+- Tests always live centrally under `tests/unit/modules-core/<module-id>/`,
+  mirroring source paths — never inside the module folder
+- Every core module's `lib/**` is inside the ratcheted coverage scope
+  (module-template itself is excluded as a scaffold)
 
 ## Multi-User: Per-User vs Shared Data
 
@@ -102,13 +148,23 @@ both are marked with inline comments. Leave INSERT stamping the owner.
 use `requirePermission(user, 'manage_modules')` or `requireAdmin(user)` from
 `@/lib/api-helpers` after the auth check — see `docs/MODULES.md`.
 
+**Per-record privacy on shared tables:** a shared table may carry an
+`is_private BOOLEAN DEFAULT FALSE` column so a record's owner can carve it out
+of the shared view. Every read **and** write must AND in
+`(is_private IS NOT TRUE OR user_id = user.id)`, only the owner may flip the
+flag, and paths that miss a masked record must 404 (never 403). The reference
+implementation is the tasks module — see
+`modules-core/tasks/lib/task-query.ts` (`visibleTo()`), which centralizes the
+predicate so no endpoint can forget it.
+
 ## Installation
 
-This module is already installed in the `/modules` directory. To use it:
+This module ships with ARI. To use it:
 
-1. **Enable the module** in Settings → Features
-2. **Apply database migrations** (see below)
-3. **Navigate to** `/module-template` to see it in action
+1. **Enable the module** on the `/modules` page (Modules in the sidebar)
+2. **Navigate to** `/module-template` to see it in action
+
+The database table is created automatically on enable — see below.
 
 ## Database Setup
 
@@ -129,32 +185,56 @@ To ship a schema change in a module update, edit `schema.sql` additively (`ALTER
 ## File Structure
 
 ```
-modules/module-template/
+modules-core/module-template/
 ├── module.json                 # Module manifest (required)
 ├── README.md                   # This file
+├── .gitignore                  # Module-local ignore rules
 │
 ├── app/                        # Module pages (Next.js App Router)
-│   └── page.tsx               # Main module page at /module-template
+│   ├── page.tsx               # Main module page at /module-template (default export!)
+│   └── settings/
+│       └── page.tsx           # Standalone settings page at /module-template/settings
 │
 ├── components/                 # Module components
-│   ├── widget.tsx             # Dashboard widget
-│   └── settings-panel.tsx     # Settings UI
+│   ├── widget.tsx             # Dashboard widget (dashboard.widgetComponents)
+│   ├── stat-card.tsx          # Dashboard stat card (dashboard.statCards)
+│   ├── settings-panel.tsx     # Settings UI (rendered by app/settings/page.tsx)
+│   ├── sidebar-submenu.tsx    # Sidebar submenu (submenu.component)
+│   ├── global-provider.tsx    # App-wide context provider (globalProvider)
+│   ├── file-upload-example.tsx        # File storage UI example
+│   └── unsaved-changes-dialog-example.tsx  # Unsaved-changes dialog pattern
 │
-├── api/                        # Module API routes
-│   └── data/
-│       └── route.ts           # API handlers at /api/modules-core/module-template/data
+├── api/                        # API routes at /api/modules/module-template/*
+│   ├── data/route.ts          # CRUD reference (GET/POST/PUT/DELETE)
+│   ├── settings/route.ts      # Settings GET + JSONB-merge PUT
+│   ├── generate/route.ts      # AI generation via the selected provider
+│   ├── upload/route.ts        # File upload via the storage system
+│   └── webhook/route.ts.example  # Public webhook pattern (inert until renamed)
+│
+├── hooks/                      # TanStack Query hooks
+│   └── use-module-template.ts # CRUD + settings + storage hooks
 │
 ├── lib/                        # Module utilities
-│   └── utils.ts               # Helper functions
+│   ├── validation.ts          # Zod schemas (+ .openapi() tags) — required home
+│   ├── utils.ts               # Pure helper functions
+│   ├── provider-keys.ts       # AI provider credential resolution
+│   └── llm-clients.ts         # Minimal multi-provider LLM client
 │
 ├── database/                   # Database schemas
-│   ├── schema.sql             # Auto-run on every module enable (idempotent)
-│   ├── schema.ts              # Drizzle ORM definitions (runtime source of truth)
+│   ├── schema.sql             # Auto-run on enable + on hash change (idempotent)
+│   ├── schema.ts              # Drizzle ORM definitions (auto-barrelled)
 │   └── uninstall.sql          # MANUAL ONLY — never auto-runs
 │
 └── types/                      # TypeScript types
     └── index.ts               # Module type definitions
+
+tests/unit/modules-core/module-template/   # Unit tests live HERE, not in the module
+└── lib/utils.test.ts
 ```
+
+Optional conventions not used by this template: `database/relations.ts`
+(Drizzle relations, auto-barrelled — see knowledge-manager) and a module-root
+`styles.css` imported from `app/page.tsx` (see morning-brief, timezones).
 
 ## Usage Examples
 
@@ -264,10 +344,13 @@ api/
 
 ### Adding Database Tables
 
-1. Add SQL to `database/schema.sql`
-2. List table name in `module.json` under `database.tables`
-3. Create migration file if updating existing module
-4. Users apply migration via Settings → Features
+1. Add idempotent SQL to `database/schema.sql` (`CREATE TABLE IF NOT EXISTS`,
+   `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`)
+2. Mirror it in `database/schema.ts` (Drizzle)
+3. List the table name in `module.json` under `database.tables`
+4. Run `pnpm generate-module-registry` — the new schema hash triggers an
+   automatic re-run of `schema.sql` for every user on their next load. There
+   are no migration files (`database.migrations` is a legacy no-op field).
 
 ### Adding npm Packages
 
@@ -308,8 +391,8 @@ pnpm dev
 ### Making Changes
 
 1. **Code changes**: Hot-reload automatically
-2. **Manifest changes**: Require page refresh
-3. **Database changes**: Create migration file
+2. **Manifest changes**: Run `pnpm generate-module-registry` (or restart dev — it runs on `predev`)
+3. **Database changes**: Edit `schema.sql` additively + regenerate the registry (hash-based auto-reapply)
 
 ### Debugging
 
@@ -363,10 +446,11 @@ Check terminal for:
 - Clear `.next` folder: `rm -rf .next && pnpm dev`
 
 ### Database Errors
-- Ensure migrations are applied
+- Ensure the module has been enabled at least once (schema auto-applies on enable)
+- Check the server log for a schema-install error — one broken statement in
+  `schema.sql` blocks the whole file until fixed
 - Check RLS policies are enabled
-- Verify Supabase connection
-- Check user authentication
+- Verify the database is running and check user authentication
 
 ### Widget Not Appearing
 - Check `dashboard.widgets: true` in manifest

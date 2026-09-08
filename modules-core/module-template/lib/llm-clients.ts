@@ -128,5 +128,11 @@ async function callGemini(opts: CallLLMOptions): Promise<{ text: string }> {
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
   }
   const parts = json.candidates?.[0]?.content?.parts ?? []
-  return { text: parts.map((p) => p.text ?? '').join('').trim() || '(no reply)' }
+  return {
+    text:
+      parts
+        .map((p) => p.text ?? '')
+        .join('')
+        .trim() || '(no reply)',
+  }
 }

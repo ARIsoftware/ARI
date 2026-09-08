@@ -340,9 +340,10 @@ changes would be overwritten on the next dev/build run.
 | `dependencies` | `object` | `{ modules?: string[], coreFeatures?: string[] }` — declares what this module reads from. **Informational only — not enforced**: nothing prevents disabling a dependency, so your module must degrade gracefully (gate fetches with `useModuleEnabled('<id>')` and show a notice; a disabled dependency's API returns 403). |
 | `database` | `object` | `{ tables: string[] }` — table names the module's `schema.sql` creates. Used for diagnostics; a `tables` list without a `schema.sql` logs a warning. |
 | `dashboard` | `object` | Dashboard configuration: `widgets` (boolean), `statCards` (small Quick Overview cards), `widgetComponents` (larger content-area widgets) — component paths relative to module root |
-| `settings` | `object` | Settings panel configuration |
+| `settings` | `object` | **Inert — no code reads it.** There is no framework settings registry; render your settings panel from your own `app/settings/page.tsx` (see module-template). |
 | `submenu` | `object` | `{ component: "./components/..." }` — custom sliding submenu shown when the module's sidebar item is clicked |
-| `topBarIcon` | `object` | Top bar icon shortcut: `icon`/`route`/`tooltip`, or `component` for a fully custom top-bar component |
+| `topBarIcon` | `object` | Top bar icon shortcut: `icon`/`route`/`tooltip`/`order`, or `component` for a fully custom top-bar component |
+| `globalProvider` | `object` | `{ component: "./components/...", exportName?: string }` — wraps the whole app in a React context provider (see [Global Provider](#global-provider) below) |
 | `publicRoutes` | `array` | Unauthenticated API routes with mandatory security config — see [section 7.5](#75-public-routes) |
 | `npmDependencies` | `object` | npm packages the module imports at runtime. Auto-installed during marketplace install. See [npm Dependencies](#npm-dependencies) below. |
 
@@ -470,11 +471,33 @@ Modules can add a quick access icon to the global top navigation bar:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `icon` | `string` | **Required.** Lucide icon name (e.g., "Zap", "Bell", "CheckSquare") |
-| `route` | `string` | **Required.** Route to navigate to when clicked (e.g., "/tasks") |
+| `icon` | `string` | Lucide icon name (e.g., "Zap", "Bell", "CheckSquare") |
+| `route` | `string` | Route to navigate to when clicked (e.g., "/tasks") |
 | `tooltip` | `string` | Optional tooltip text displayed on hover |
+| `order` | `number` | Optional default sort position (lower = further left, default 50). The user's saved drag order overrides it. |
+| `component` | `string` | Alternative to `icon`+`route`: path to a fully custom client component rendered in the top bar (used by tasks, notepad, focus-timer, music-player). Loaded with `next/dynamic` + `ssr: false`. **A missing file fails the build.** |
+
+Either `component`, or both `icon` and `route`, must be provided.
 
 **Note**: Top bar icons appear to the left of system icons (Command, Settings, etc.) and are only shown for enabled modules. The icon uses the same [Lucide icon library](https://lucide.dev) as sidebar icons.
+
+### Global Provider
+
+A module can wrap the entire authenticated app in a React context provider — for state that must outlive the module's own pages (the music player keeps audio playing while the user browses other routes; tasks mounts its global Quick Add sheet this way):
+
+```json
+{
+  "globalProvider": {
+    "component": "./components/global-provider.tsx",
+    "exportName": "MyModuleProvider"
+  }
+}
+```
+
+- The component receives `{ children, isAuthenticated }` and must render `{children}`.
+- `exportName` defaults to `"default"`.
+- Providers are **statically imported** into the generated `MODULE_PROVIDERS` registry (no lazy-load waterfall), so a **missing component path fails the build**. They only *mount* for users who have the module enabled, but the code is in the shared bundle — keep providers small and lazy-load heavy pieces.
+- Reference implementation: `modules-core/module-template/components/global-provider.tsx`.
 
 ---
 
@@ -681,8 +704,8 @@ mkdir -p modules-core/[module-id]/{app,api/data,api/settings,components,lib,type
 - [ ] Configure `permissions` (database, api, dashboard)
 - [ ] Configure `routes` array with path, label, icon, position
 - [ ] Configure `database.tables` array
-- [ ] Add `dashboard.widgets` if needed
-- [ ] Add `settings.panel` path if needed
+- [ ] Add `dashboard.widgets` (+ `statCards`/`widgetComponents`) if needed
+- [ ] Add an `app/settings/page.tsx` + submenu link if the module has settings UI (a `settings.panel` manifest key is inert)
 
 ### Phase 3: Core Files
 
@@ -1074,7 +1097,7 @@ Closes #[issue-number]
 - [ ] Settings API in api/settings/route.ts (if needed)
 - [ ] Main page in app/page.tsx (default export)
 - [ ] Widget in components/widget.tsx (named + default export)
-- [ ] Settings panel in components/settings-panel.tsx (named + default export)
+- [ ] Settings panel in components/settings-panel.tsx, rendered by an app/settings/page.tsx sub-page
 - [ ] README.md created
 - [ ] Module registry regenerated
 - [ ] Old imports updated

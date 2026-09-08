@@ -22,6 +22,15 @@
  * `requirePermission(user, 'manage_modules')` / `requireAdmin(user)` from
  * `@/lib/api-helpers` — see docs/MODULES.md.
  *
+ * LOGGING — do NOT wrap module routes in `withApiLogging`. That wrapper (and
+ * the build-time coverage check) applies to core `app/api/` routes only; the
+ * module dispatcher already records API-key usage for every module route.
+ *
+ * SECURITY SCAN — `tests/unit/route-security-scan.test.ts` statically checks
+ * every modules-core route: it must authenticate (or be declared in
+ * module.json `publicRoutes`), per-user tables must filter by `user_id`, and
+ * inserts must stamp `userId: user.id`. Keep this file passing as you adapt it.
+ *
  * Endpoints:
  * - GET    /api/modules/module-template/data       - List entries (paginated)
  * - POST   /api/modules/module-template/data       - Create new entry
@@ -166,7 +175,7 @@ export async function GET(request: NextRequest) {
       return createErrorResponse('Unauthorized - Valid authentication required', 401)
     }
 
-const entries = await withRLS((db) =>
+    const entries = await withRLS((db) =>
       db
         .select()
         .from(moduleTemplateEntries)
@@ -232,7 +241,7 @@ export async function PUT(request: NextRequest) {
 
     const { id, message } = validation.data
 
-const data = await withRLS((db) =>
+    const data = await withRLS((db) =>
       db
         .update(moduleTemplateEntries)
         .set({ message, updatedAt: new Date().toISOString() })
@@ -266,7 +275,7 @@ export async function DELETE(request: NextRequest) {
       return createErrorResponse('Unauthorized - Valid authentication required', 401)
     }
 
-await withRLS((db) =>
+    await withRLS((db) =>
       db
         .delete(moduleTemplateEntries)
         // PER-USER boundary: you can only delete your own row. For a shared

@@ -1,7 +1,6 @@
 /**
  * Module Template Module - Settings Panel
  *
- * This component appears in Settings → Features when the module is enabled.
  * It demonstrates:
  * - TanStack Query for settings management
  * - Form controls (toggle, input, select)
@@ -10,21 +9,17 @@
  *
  * IMPORTANT: Settings panel MUST be a client component.
  *
- * Integration: This panel is registered in module.json under
- * "settings.panel": "./components/settings-panel.tsx"
+ * Integration: rendered by this module's own settings page
+ * (app/settings/page.tsx, reached via the sidebar submenu). There is no
+ * framework-level settings registry — a `settings.panel` key in module.json
+ * is ignored, so wire your panel into a page yourself like this module does.
  */
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -81,9 +76,13 @@ export function ModuleTemplateSettingsPanel() {
   const [settings, setSettings] = useState<ModuleTemplateSettings>(DEFAULT_SETTINGS)
   const [saved, setSaved] = useState(false)
 
+  // Hydrate the form from saved settings once. Guarded so background refetches
+  // (e.g. after the mutation's onSettled invalidate) don't stomp in-progress edits.
+  const hydrated = useRef(false)
   useEffect(() => {
-    if (savedSettings) {
+    if (savedSettings && !hydrated.current) {
       setSettings({ ...DEFAULT_SETTINGS, ...savedSettings })
+      hydrated.current = true
     }
   }, [savedSettings])
 
@@ -114,9 +113,9 @@ export function ModuleTemplateSettingsPanel() {
    */
   const updateSetting = <K extends keyof ModuleTemplateSettings>(
     key: K,
-    value: ModuleTemplateSettings[K]
+    value: ModuleTemplateSettings[K],
   ) => {
-    setSettings(prev => ({ ...prev, [key]: value }))
+    setSettings((prev) => ({ ...prev, [key]: value }))
   }
 
   // Loading state
@@ -138,7 +137,7 @@ export function ModuleTemplateSettingsPanel() {
         onChange={(id) => updateSetting('selectedAiProvider', id)}
         models={settings.aiProviderModels}
         onModelChange={(id, model) =>
-          setSettings(prev => ({
+          setSettings((prev) => ({
             ...prev,
             aiProviderModels: { ...prev.aiProviderModels, [id]: model },
           }))
@@ -151,124 +150,114 @@ export function ModuleTemplateSettingsPanel() {
       <Card>
         <CardHeader>
           <CardTitle>Module Settings</CardTitle>
-          <CardDescription>
-            Customize how the Module Template module works for you
-          </CardDescription>
+          <CardDescription>Customize how the Module Template module works for you</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-4">
             <h4 className="text-sm font-medium text-muted-foreground">Features</h4>
 
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Enable Notifications</Label>
-              <div className="text-sm text-muted-foreground">
-                Receive notifications for new entries
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Enable Notifications</Label>
+                <div className="text-sm text-muted-foreground">
+                  Receive notifications for new entries
+                </div>
               </div>
+              <Switch
+                checked={settings.enableNotifications}
+                onCheckedChange={(checked) => updateSetting('enableNotifications', checked)}
+              />
             </div>
-            <Switch
-              checked={settings.enableNotifications}
-              onCheckedChange={(checked) =>
-                updateSetting('enableNotifications', checked)
-              }
-            />
-          </div>
 
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Show in Dashboard</Label>
-              <div className="text-sm text-muted-foreground">
-                Display widget on main dashboard
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Show in Dashboard</Label>
+                <div className="text-sm text-muted-foreground">
+                  Display widget on main dashboard
+                </div>
               </div>
+              <Switch
+                checked={settings.showInDashboard}
+                onCheckedChange={(checked) => updateSetting('showInDashboard', checked)}
+              />
             </div>
-            <Switch
-              checked={settings.showInDashboard}
-              onCheckedChange={(checked) =>
-                updateSetting('showInDashboard', checked)
-              }
-            />
-          </div>
-        </div>
-
-        {/* Section 2: Text Settings */}
-        <div className="space-y-4">
-          <h4 className="text-sm font-medium text-muted-foreground">Customization</h4>
-
-          <div className="space-y-2">
-            <Label htmlFor="defaultMessage">Default Message</Label>
-            <Input
-              id="defaultMessage"
-              value={settings.defaultMessage}
-              onChange={(e) => updateSetting('defaultMessage', e.target.value)}
-              placeholder="Enter default message"
-            />
-            <p className="text-xs text-muted-foreground">
-              This message will be used as placeholder text
-            </p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="displayName">Display Name</Label>
-            <Input
-              id="displayName"
-              value={settings.userDisplayName}
-              onChange={(e) => updateSetting('userDisplayName', e.target.value)}
-              placeholder="Enter your display name"
-            />
-            <p className="text-xs text-muted-foreground">
-              Optional: How you want to be addressed in the module
-            </p>
-          </div>
-        </div>
+          {/* Section 2: Text Settings */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium text-muted-foreground">Customization</h4>
 
-        {/* Section 3: Dropdown Settings */}
-        <div className="space-y-4">
-          <h4 className="text-sm font-medium text-muted-foreground">Preferences</h4>
+            <div className="space-y-2">
+              <Label htmlFor="defaultMessage">Default Message</Label>
+              <Input
+                id="defaultMessage"
+                value={settings.defaultMessage}
+                onChange={(e) => updateSetting('defaultMessage', e.target.value)}
+                placeholder="Enter default message"
+              />
+              <p className="text-xs text-muted-foreground">
+                This message will be used as placeholder text
+              </p>
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="theme">Theme</Label>
-            <Select
-              value={settings.theme}
-              onValueChange={(value: 'light' | 'dark' | 'auto') =>
-                updateSetting('theme', value)
-              }
-            >
-              <SelectTrigger id="theme">
-                <SelectValue placeholder="Select theme" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="light">Light</SelectItem>
-                <SelectItem value="dark">Dark</SelectItem>
-                <SelectItem value="auto">Auto (System)</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Choose your preferred color theme
-            </p>
+            <div className="space-y-2">
+              <Label htmlFor="displayName">Display Name</Label>
+              <Input
+                id="displayName"
+                value={settings.userDisplayName}
+                onChange={(e) => updateSetting('userDisplayName', e.target.value)}
+                placeholder="Enter your display name"
+              />
+              <p className="text-xs text-muted-foreground">
+                Optional: How you want to be addressed in the module
+              </p>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="refreshInterval">Refresh Interval</Label>
-            <Select
-              value={settings.refreshInterval}
-              onValueChange={(value: '30' | '60' | '120') =>
-                updateSetting('refreshInterval', value)
-              }
-            >
-              <SelectTrigger id="refreshInterval">
-                <SelectValue placeholder="Select interval" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="30">30 seconds</SelectItem>
-                <SelectItem value="60">1 minute</SelectItem>
-                <SelectItem value="120">2 minutes</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              How often to refresh data in the dashboard widget
-            </p>
+          {/* Section 3: Dropdown Settings */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium text-muted-foreground">Preferences</h4>
+
+            <div className="space-y-2">
+              <Label htmlFor="theme">Theme</Label>
+              <Select
+                value={settings.theme}
+                onValueChange={(value: 'light' | 'dark' | 'auto') => updateSetting('theme', value)}
+              >
+                <SelectTrigger id="theme">
+                  <SelectValue placeholder="Select theme" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="light">Light</SelectItem>
+                  <SelectItem value="dark">Dark</SelectItem>
+                  <SelectItem value="auto">Auto (System)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Choose your preferred color theme</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="refreshInterval">Refresh Interval</Label>
+              <Select
+                value={settings.refreshInterval}
+                onValueChange={(value: '30' | '60' | '120') =>
+                  updateSetting('refreshInterval', value)
+                }
+              >
+                <SelectTrigger id="refreshInterval">
+                  <SelectValue placeholder="Select interval" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="30">30 seconds</SelectItem>
+                  <SelectItem value="60">1 minute</SelectItem>
+                  <SelectItem value="120">2 minutes</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                How often to refresh data in the dashboard widget
+              </p>
+            </div>
           </div>
-        </div>
 
           <div className="flex items-center gap-2 pt-4 border-t">
             <Button onClick={handleSave} disabled={updateSettings.isPending}>
@@ -290,11 +279,7 @@ export function ModuleTemplateSettingsPanel() {
               )}
             </Button>
 
-            {saved && (
-              <span className="text-sm text-green-600">
-                Settings saved successfully
-              </span>
-            )}
+            {saved && <span className="text-sm text-green-600">Settings saved successfully</span>}
           </div>
 
           <div className="pt-4 border-t">
@@ -303,8 +288,12 @@ export function ModuleTemplateSettingsPanel() {
                 Developer Information
               </summary>
               <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                <p>• Settings stored in: <code>module_settings.settings</code> (JSONB)</p>
-                <p>• API endpoint: <code>/api/modules/module-template/settings</code></p>
+                <p>
+                  • Settings stored in: <code>module_settings.settings</code> (JSONB)
+                </p>
+                <p>
+                  • API endpoint: <code>/api/modules/module-template/settings</code>
+                </p>
                 <p>• User-specific: Each user has their own settings</p>
                 <p>• Default values: Defined in DEFAULT_SETTINGS constant</p>
                 <p>• Auth: Better Auth cookies (no Authorization header needed)</p>

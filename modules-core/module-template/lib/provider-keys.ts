@@ -31,8 +31,10 @@ async function readIntegrationsSettings(userId: string): Promise<Record<string, 
     db
       .select({ settings: moduleSettings.settings })
       .from(moduleSettings)
-      .where(and(eq(moduleSettings.userId, userId), eq(moduleSettings.moduleId, INTEGRATIONS_MODULE_ID)))
-      .limit(1)
+      .where(
+        and(eq(moduleSettings.userId, userId), eq(moduleSettings.moduleId, INTEGRATIONS_MODULE_ID)),
+      )
+      .limit(1),
   )
   return (rows[0]?.settings ?? {}) as Record<string, unknown>
 }

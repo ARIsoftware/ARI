@@ -50,10 +50,30 @@ import type { ModuleTemplateEntry } from '../types'
 // `max` mirrors the server Zod schema in api/settings/route.ts (defense-in-depth).
 type QuestionField = 'sampleQuestion1' | 'sampleQuestion2' | 'sampleQuestion3'
 const QUESTION_MAX = 500
-const QUESTIONS: Array<{ field: QuestionField; label: string; placeholder: string; required: boolean }> = [
-  { field: 'sampleQuestion1', label: 'Sample Question 1 *', placeholder: 'Your answer here...', required: true },
-  { field: 'sampleQuestion2', label: 'Sample Question 2', placeholder: 'Optional answer...', required: false },
-  { field: 'sampleQuestion3', label: 'Sample Question 3', placeholder: 'Optional answer...', required: false },
+const QUESTIONS: Array<{
+  field: QuestionField
+  label: string
+  placeholder: string
+  required: boolean
+}> = [
+  {
+    field: 'sampleQuestion1',
+    label: 'Sample Question 1 *',
+    placeholder: 'Your answer here...',
+    required: true,
+  },
+  {
+    field: 'sampleQuestion2',
+    label: 'Sample Question 2',
+    placeholder: 'Optional answer...',
+    required: false,
+  },
+  {
+    field: 'sampleQuestion3',
+    label: 'Sample Question 3',
+    placeholder: 'Optional answer...',
+    required: false,
+  },
 ]
 const EMPTY_ANSWERS: Record<QuestionField, string> = {
   sampleQuestion1: '',
@@ -109,9 +129,12 @@ export default function ModuleTemplatePage() {
     }
   }, [settings])
 
-  useEffect(() => () => {
-    if (transitionTimer.current) clearTimeout(transitionTimer.current)
-  }, [])
+  useEffect(
+    () => () => {
+      if (transitionTimer.current) clearTimeout(transitionTimer.current)
+    },
+    [],
+  )
 
   // Load random quote when quotes module is enabled
   useEffect(() => {
@@ -125,7 +148,9 @@ export default function ModuleTemplatePage() {
         }
       })
       .catch(() => {})
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [quotesEnabled, quotesLoading])
 
   // Mirrors the server Zod schema in api/settings/route.ts. Server is still the
@@ -292,8 +317,8 @@ export default function ModuleTemplatePage() {
             </div>
             <CardTitle className="text-2xl">Welcome to Module Template</CardTitle>
             <CardDescription>
-              This is a sample onboarding screen. Use this pattern when your module needs
-              to collect initial configuration from the user before they can use it.
+              This is a sample onboarding screen. Use this pattern when your module needs to collect
+              initial configuration from the user before they can use it.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -315,7 +340,9 @@ export default function ModuleTemplatePage() {
                     className={cn(error && 'border-red-500 focus-visible:ring-red-500')}
                   />
                   {error && (
-                    <p id={errorId} className="text-xs text-destructive">{error}</p>
+                    <p id={errorId} className="text-xs text-destructive">
+                      {error}
+                    </p>
                   )}
                 </div>
               )
@@ -373,9 +400,7 @@ export default function ModuleTemplatePage() {
         <div>
           <h1 className="text-4xl font-medium">Module Template</h1>
           {quotesEnabled && randomQuote && (
-            <p className="text-sm text-muted-foreground mt-1">
-              {randomQuote.quote}
-            </p>
+            <p className="text-sm text-muted-foreground mt-1">{randomQuote.quote}</p>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -399,9 +424,7 @@ export default function ModuleTemplatePage() {
       <Card>
         <CardHeader>
           <CardTitle>Module Statistics</CardTitle>
-          <CardDescription>
-            Your interaction with this module
-          </CardDescription>
+          <CardDescription>Your interaction with this module</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -425,9 +448,7 @@ export default function ModuleTemplatePage() {
       <Card>
         <CardHeader>
           <CardTitle>Create New Entry</CardTitle>
-          <CardDescription>
-            Add a new message to demonstrate API integration
-          </CardDescription>
+          <CardDescription>Add a new message to demonstrate API integration</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleCreateEntry} className="flex gap-2">
@@ -502,9 +523,7 @@ export default function ModuleTemplatePage() {
       <Card>
         <CardHeader>
           <CardTitle>Your Entries</CardTitle>
-          <CardDescription>
-            Messages stored in the module_template_entries table
-          </CardDescription>
+          <CardDescription>Messages stored in the module_template_entries table</CardDescription>
         </CardHeader>
         <CardContent>
           {entries.length === 0 ? (
@@ -547,17 +566,27 @@ export default function ModuleTemplatePage() {
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-2">
           <p>
-            <strong>This is a template module.</strong> Use it as a reference when building your own modules.
+            <strong>This is a template module.</strong> Use it as a reference when building your own
+            modules.
           </p>
           <ul className="list-disc list-inside space-y-1 ml-2">
-            <li>Data Fetching: Uses TanStack Query hooks from <code>@/lib/hooks/use-module-template</code></li>
+            <li>
+              Data Fetching: Uses TanStack Query hooks from{' '}
+              <code>@/modules/module-template/hooks/use-module-template</code>
+            </li>
             <li>API Calls: Authentication handled via cookies (Better Auth)</li>
-            <li>Database: Uses Drizzle ORM with <code>withRLS()</code> helper</li>
-            <li>UI Components: Uses Shadcn/ui components from <code>@/components/ui</code></li>
-            <li>TypeScript: Fully typed with custom types from <code>../types</code></li>
+            <li>
+              Database: Uses Drizzle ORM with <code>withRLS()</code> helper
+            </li>
+            <li>
+              UI Components: Uses Shadcn/ui components from <code>@/components/ui</code>
+            </li>
+            <li>
+              TypeScript: Fully typed with custom types from <code>../types</code>
+            </li>
           </ul>
           <p className="pt-2">
-            See <code>/modules/module-template/README.md</code> for complete documentation.
+            See <code>modules-core/module-template/README.md</code> for complete documentation.
           </p>
         </CardContent>
       </Card>

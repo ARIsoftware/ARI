@@ -59,7 +59,7 @@ export function validateMessage(message: string): { valid: boolean; error?: stri
  */
 export function sortEntriesByDate(
   entries: ModuleTemplateEntry[],
-  order: 'asc' | 'desc' = 'desc'
+  order: 'asc' | 'desc' = 'desc',
 ): ModuleTemplateEntry[] {
   return [...entries].sort((a, b) => {
     const dateA = new Date(a.created_at).getTime()
@@ -77,16 +77,14 @@ export function sortEntriesByDate(
  */
 export function filterEntries(
   entries: ModuleTemplateEntry[],
-  query: string
+  query: string,
 ): ModuleTemplateEntry[] {
   if (!query || query.trim().length === 0) {
     return entries
   }
 
   const lowerQuery = query.toLowerCase()
-  return entries.filter(entry =>
-    entry.message.toLowerCase().includes(lowerQuery)
-  )
+  return entries.filter((entry) => entry.message.toLowerCase().includes(lowerQuery))
 }
 
 /**
@@ -103,12 +101,13 @@ export function getEntryStats(entries: ModuleTemplateEntry[]) {
 
   return {
     total: entries.length,
-    today: entries.filter(e => new Date(e.created_at) >= today).length,
-    thisWeek: entries.filter(e => new Date(e.created_at) >= thisWeek).length,
-    thisMonth: entries.filter(e => new Date(e.created_at) >= thisMonth).length,
-    averageLength: entries.length > 0
-      ? Math.round(entries.reduce((sum, e) => sum + e.message.length, 0) / entries.length)
-      : 0
+    today: entries.filter((e) => new Date(e.created_at) >= today).length,
+    thisWeek: entries.filter((e) => new Date(e.created_at) >= thisWeek).length,
+    thisMonth: entries.filter((e) => new Date(e.created_at) >= thisMonth).length,
+    averageLength:
+      entries.length > 0
+        ? Math.round(entries.reduce((sum, e) => sum + e.message.length, 0) / entries.length)
+        : 0,
   }
 }
 
@@ -148,7 +147,7 @@ export function isCreatedToday(entry: ModuleTemplateEntry): boolean {
  */
 export const DEBUG = process.env.NODE_ENV === 'development'
 
-export function log(...args: any[]) {
+export function log(...args: unknown[]) {
   if (DEBUG) {
     console.log('[module-template]', ...args)
   }

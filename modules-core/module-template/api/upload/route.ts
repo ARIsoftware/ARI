@@ -17,12 +17,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { createErrorResponse } from '@/lib/api-helpers'
 import { getStorageProvider, sanitizeFilename, readStorageConfig } from '@/lib/storage'
-import {
-  UploadFormSchema,
-  UploadResponseSchema,
-} from '@/modules/module-template/lib/validation'
+import { UploadFormSchema, UploadResponseSchema } from '@/modules/module-template/lib/validation'
 import { registry } from '@/lib/openapi/registry'
-import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+import {
+  DEFAULT_SECURITY,
+  ErrorResponseSchema,
+  InternalServerErrorResponse,
+} from '@/lib/openapi/common'
 
 const BUCKET = 'module-template'
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
@@ -37,9 +38,18 @@ registry.registerPath({
   security: DEFAULT_SECURITY,
   request: { body: { content: { 'multipart/form-data': { schema: UploadFormSchema } } } },
   responses: {
-    201: { description: 'Uploaded file metadata', content: { 'application/json': { schema: UploadResponseSchema } } },
-    400: { description: 'No file, file too large, or disallowed content type', content: { 'application/json': { schema: ErrorResponseSchema } } },
-    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    201: {
+      description: 'Uploaded file metadata',
+      content: { 'application/json': { schema: UploadResponseSchema } },
+    },
+    400: {
+      description: 'No file, file too large, or disallowed content type',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    401: {
+      description: 'Unauthorized',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
     500: InternalServerErrorResponse,
   },
 })
@@ -62,11 +72,17 @@ export async function POST(request: NextRequest) {
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      return createErrorResponse(`File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB`, 400)
+      return createErrorResponse(
+        `File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB`,
+        400,
+      )
     }
 
     if (!ALLOWED_TYPES.includes(file.type)) {
-      return createErrorResponse(`File type "${file.type}" is not allowed. Accepted: ${ALLOWED_TYPES.join(', ')}`, 400)
+      return createErrorResponse(
+        `File type "${file.type}" is not allowed. Accepted: ${ALLOWED_TYPES.join(', ')}`,
+        400,
+      )
     }
 
     const storage = getStorageProvider(storageConfig)
@@ -86,7 +102,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ path: result.path, name: result.name }, { status: 201 })
   } catch (error) {
-    console.error('POST /api/modules/module-template/upload error:', error instanceof Error ? error.message : error)
+    console.error(
+      'POST /api/modules/module-template/upload error:',
+      error instanceof Error ? error.message : error,
+    )
     return createErrorResponse('Internal server error', 500)
   }
 }

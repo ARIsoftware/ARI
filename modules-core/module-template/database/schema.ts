@@ -1,5 +1,5 @@
-import { pgTable, index, pgPolicy, uuid, text, timestamp, varchar } from "drizzle-orm/pg-core"
-import { sql } from "drizzle-orm"
+import { pgTable, index, pgPolicy, uuid, text, timestamp, varchar } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
 
 // ─── Drizzle Quick Reference ───────────────────────────────────────────
 // This schema demonstrates the basics. For modules with richer data models,
@@ -46,18 +46,56 @@ import { sql } from "drizzle-orm"
 //   This is an alternative to manually defining types in types/index.ts.
 // ────────────────────────────────────────────────────────────────────────
 
-export const moduleTemplateEntries = pgTable("module_template_entries", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	userId: text("user_id").notNull(),
-	message: varchar({ length: 500 }).notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
-}, (table) => [
-	index("idx_module_template_entries_created_at").using("btree", table.createdAt.desc().nullsFirst().op("timestamptz_ops")),
-	index("idx_module_template_entries_user_created").using("btree", table.userId.asc().nullsLast().op("text_ops"), table.createdAt.desc().nullsFirst().op("timestamptz_ops")),
-	index("idx_module_template_entries_user_id").using("btree", table.userId.asc().nullsLast().op("text_ops")),
-	pgPolicy("module_template_entries_rls_select", { as: "permissive", for: "select", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
-	pgPolicy("module_template_entries_rls_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(user_id = (select current_setting('app.current_user_id')))` }),
-	pgPolicy("module_template_entries_rls_update", { as: "permissive", for: "update", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
-	pgPolicy("module_template_entries_rls_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`(user_id = (select current_setting('app.current_user_id')))` }),
-]);
+export const moduleTemplateEntries = pgTable(
+  'module_template_entries',
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    userId: text('user_id').notNull(),
+    message: varchar({ length: 500 }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('idx_module_template_entries_created_at').using(
+      'btree',
+      table.createdAt.desc().nullsFirst().op('timestamptz_ops'),
+    ),
+    index('idx_module_template_entries_user_created').using(
+      'btree',
+      table.userId.asc().nullsLast().op('text_ops'),
+      table.createdAt.desc().nullsFirst().op('timestamptz_ops'),
+    ),
+    index('idx_module_template_entries_user_id').using(
+      'btree',
+      table.userId.asc().nullsLast().op('text_ops'),
+    ),
+    pgPolicy('module_template_entries_rls_select', {
+      as: 'permissive',
+      for: 'select',
+      to: ['public'],
+      using: sql`(user_id = (select current_setting('app.current_user_id')))`,
+    }),
+    pgPolicy('module_template_entries_rls_insert', {
+      as: 'permissive',
+      for: 'insert',
+      to: ['public'],
+      withCheck: sql`(user_id = (select current_setting('app.current_user_id')))`,
+    }),
+    pgPolicy('module_template_entries_rls_update', {
+      as: 'permissive',
+      for: 'update',
+      to: ['public'],
+      using: sql`(user_id = (select current_setting('app.current_user_id')))`,
+    }),
+    pgPolicy('module_template_entries_rls_delete', {
+      as: 'permissive',
+      for: 'delete',
+      to: ['public'],
+      using: sql`(user_id = (select current_setting('app.current_user_id')))`,
+    }),
+  ],
+)

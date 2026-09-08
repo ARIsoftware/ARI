@@ -17,6 +17,7 @@
 
 'use client'
 
+import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Package, Loader2, AlertCircle } from 'lucide-react'
@@ -65,9 +66,7 @@ export function ModuleTemplateWidget() {
           <AlertCircle className="h-4 w-4 text-destructive" />
         </CardHeader>
         <CardContent>
-          <div className="text-xs text-destructive">
-            Failed to load data
-          </div>
+          <div className="text-xs text-destructive">Failed to load data</div>
           <Button
             variant="ghost"
             size="sm"
@@ -99,9 +98,7 @@ export function ModuleTemplateWidget() {
         {lastEntry?.message && (
           <div className="mt-3 pt-3 border-t">
             <p className="text-xs text-muted-foreground mb-1">Latest entry:</p>
-            <p className="text-sm font-medium line-clamp-2">
-              {lastEntry.message}
-            </p>
+            <p className="text-sm font-medium line-clamp-2">{lastEntry.message}</p>
             {lastEntry.created_at && (
               <p className="text-xs text-muted-foreground mt-1">
                 {new Date(lastEntry.created_at).toLocaleDateString()}
@@ -110,15 +107,13 @@ export function ModuleTemplateWidget() {
           </div>
         )}
 
-        {/* Action button */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full mt-3 text-xs"
-          onClick={() => window.location.href = '/module-template'}
-        >
-          <Package className="w-3 h-3 mr-1" />
-          View Module
+        {/* Action button — Link (soft nav), not window.location (hard reload),
+            so the shared TanStack Query cache survives the navigation */}
+        <Button variant="ghost" size="sm" className="w-full mt-3 text-xs" asChild>
+          <Link href="/module-template">
+            <Package className="w-3 h-3 mr-1" />
+            View Module
+          </Link>
         </Button>
       </CardContent>
     </Card>

@@ -24,11 +24,11 @@ export type { AiProviderId }
  * Maps directly to database schema
  */
 export interface ModuleTemplateEntry {
-  id: string              // UUID primary key
-  user_id: string         // Foreign key to auth.users
-  message: string         // Entry message content
-  created_at: string      // ISO timestamp
-  updated_at?: string     // Optional ISO timestamp
+  id: string // UUID primary key
+  user_id: string // Foreign key to auth.users
+  message: string // Entry message content
+  created_at: string // ISO timestamp
+  updated_at?: string // Optional ISO timestamp
 }
 
 /**

@@ -37,17 +37,26 @@ export function FileUploadExample() {
     const file = fileList[0]
 
     if (!ALLOWED_TYPES.includes(file.type)) {
-      toast({ variant: 'destructive', title: 'Invalid file type', description: `Accepted: ${ALLOWED_TYPES.join(', ')}` })
+      toast({
+        variant: 'destructive',
+        title: 'Invalid file type',
+        description: `Accepted: ${ALLOWED_TYPES.join(', ')}`,
+      })
       return
     }
     if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-      toast({ variant: 'destructive', title: 'File too large', description: `Maximum size is ${MAX_SIZE_MB}MB` })
+      toast({
+        variant: 'destructive',
+        title: 'File too large',
+        description: `Maximum size is ${MAX_SIZE_MB}MB`,
+      })
       return
     }
 
     uploadFile.mutate(file, {
       onSuccess: () => toast({ title: 'File uploaded' }),
-      onError: (err) => toast({ variant: 'destructive', title: 'Upload failed', description: err.message }),
+      onError: (err) =>
+        toast({ variant: 'destructive', title: 'Upload failed', description: err.message }),
     })
   }
 
@@ -72,9 +81,14 @@ export function FileUploadExample() {
         {/* Drop zone */}
         <div
           className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${
-            dragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+            dragOver
+              ? 'border-primary bg-primary/5'
+              : 'border-muted-foreground/25 hover:border-muted-foreground/50'
           }`}
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+          onDragOver={(e) => {
+            e.preventDefault()
+            setDragOver(true)
+          }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
@@ -91,9 +105,7 @@ export function FileUploadExample() {
           ) : (
             <>
               <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">
-                Drop a file here or click to browse
-              </p>
+              <p className="text-sm text-muted-foreground">Drop a file here or click to browse</p>
               <p className="text-xs text-muted-foreground mt-1">
                 JPEG, PNG, WebP up to {MAX_SIZE_MB}MB
               </p>
@@ -109,7 +121,10 @@ export function FileUploadExample() {
         ) : files.length > 0 ? (
           <div className="space-y-2">
             {files.map((file) => (
-              <div key={file.name} className="flex items-center justify-between rounded-lg border p-3">
+              <div
+                key={file.name}
+                className="flex items-center justify-between rounded-lg border p-3"
+              >
                 <div className="flex items-center gap-3 min-w-0">
                   {file.contentType.startsWith('image/') ? (
                     <ImageIcon className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -124,9 +139,16 @@ export function FileUploadExample() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => deleteFile.mutate(file.name, {
-                    onError: (err) => toast({ variant: 'destructive', title: 'Delete failed', description: err.message }),
-                  })}
+                  onClick={() =>
+                    deleteFile.mutate(file.name, {
+                      onError: (err) =>
+                        toast({
+                          variant: 'destructive',
+                          title: 'Delete failed',
+                          description: err.message,
+                        }),
+                    })
+                  }
                   disabled={deleteFile.isPending}
                 >
                   <Trash2 className="h-4 w-4" />

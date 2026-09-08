@@ -32,10 +32,8 @@
   "npmDependencies": {},
   "dashboard": {
     "widgets": true,
+    "statCards": ["./components/stat-card.tsx"],
     "widgetComponents": ["./components/widget.tsx"]
-  },
-  "settings": {
-    "panel": "./components/settings-panel.tsx"
   },
   "topBarIcon": {
     "icon": "Hand",
@@ -45,5 +43,9 @@
   },
   "submenu": {
     "component": "./components/sidebar-submenu.tsx"
+  },
+  "globalProvider": {
+    "component": "./components/global-provider.tsx",
+    "exportName": "ModuleTemplateProvider"
   }
 }
