@@ -15,7 +15,7 @@ All routes require authentication via Better Auth session cookies, except:
 - `/database-error`, `/robots.txt`, `/manifest.json`
 - Module-declared public routes — sourced at build time from each module's `module.json` and from core routes that `export const isPublic = true`
 
-The middleware at `/middleware.ts` validates the session cookie before allowing access. API routes return `401 Unauthorized`; page routes redirect to `/sign-in`. API routes may alternatively authenticate via an API key header — full validation still happens server-side in `getAuthenticatedUser()`.
+The proxy at `/proxy.ts` (Next.js 16 renamed the `middleware` convention to `proxy`) validates the session cookie before allowing access. API routes return `401 Unauthorized`; page routes redirect to `/sign-in`. API routes may alternatively authenticate via an API key header — full validation still happens server-side in `getAuthenticatedUser()`.
 
 **Public routes are fixed at build time.** The list is compiled into `lib/generated/module-manifest.json` by the registry generator, so a module cannot make one of its routes public at runtime — the declaration must pass through the generator. Public routes skip both authentication *and* the module-enabled check (there is no user context), so each handler must enforce its own security using the primitives in `lib/modules/public-route-security.ts` (`checkRateLimit`, `isSameOriginRequest`, `getClientIp`). The `security` block a public route declares in `module.json` is metadata that documents the intent — the framework enforces nothing on its behalf.
 
@@ -159,7 +159,7 @@ The module loader never scans the filesystem at runtime — it reads the pre-gen
 
 ## Security Headers
 
-Set in `/middleware.ts`:
+Set in `/proxy.ts`:
 
 | Header | Value |
 |--------|-------|

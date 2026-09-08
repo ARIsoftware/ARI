@@ -82,7 +82,7 @@ export async function getAuthenticatedUser() {
 - Exposes `useAuth()` hook for accessing auth context (user, session, isLoading)
 - Note: Does NOT provide direct database access - use API routes instead
 
-##### `/middleware.ts`
+##### `/proxy.ts`
 - Protects routes requiring authentication via `auth.api.getSession()`
 - Redirects unauthenticated users to `/sign-in`
 - Sets security headers (CSP, HSTS, X-Frame-Options, etc.)
@@ -375,7 +375,7 @@ Module-specific schemas live in `modules-{core,custom}/<id>/database/schema.sql`
   /modules/            # Module system infrastructure
   /generated/          # Auto-generated module registry
 
-/middleware.ts          # Route protection & security headers
+/proxy.ts               # Route protection & security headers (Next 16 proxy convention)
 
 /modules-core           # Core modules (self-contained features)
   /[module-id]/         # Each module folder

@@ -915,7 +915,7 @@ import type { Item } from '@/modules/module-id/types'
 
 #### Step 5.6.3: Verify Auth Protection
 
-- [ ] Routes are protected by default — `middleware.ts` protects everything not in a public list, so module routes never need adding to `protectedRoutes`
+- [ ] Routes are protected by default — `proxy.ts` protects everything not in a public list, so module routes never need adding to `protectedRoutes`
 - [ ] Test that unauthenticated users are redirected to `/sign-in`
 
 #### Step 5.6.4: Regenerate + Verify

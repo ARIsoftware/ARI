@@ -81,7 +81,7 @@ const modulePublicRoutes: string[] = (moduleManifest.publicRoutes || []).map(
 
 const publicRoutes = [...staticPublicRoutes, ...modulePublicRoutes]
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
   // SETUP MODE: If required config is missing, redirect to welcome wizard
@@ -103,7 +103,7 @@ export async function middleware(req: NextRequest) {
 
   // NOTE: ARI intentionally does not implement IP allowlisting here. Request
   // headers (X-Forwarded-For, etc.) are client-controlled and trivially spoofed
-  // or omitted, so any middleware-level IP check can be bypassed and only
+  // or omitted, so any proxy-level IP check can be bypassed and only
   // creates false confidence. Restrict access at the network edge instead —
   // see docs/SECURITY.md.
 
@@ -161,15 +161,10 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Node runtime so middleware sees env vars loaded by next.config.mjs's dotenv
-  // override (e.g. DATABASE_URL from .env.supabase.local). Edge runtime only
-  // exposes vars from Next's standard .env files, which would make
-  // isSetupComplete falsely false and cause a /sign-in ↔ /welcome redirect loop.
-  runtime: 'nodejs',
   matcher: [
     // Skip Next.js internals and all static files, unless found in search params
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     // Always run for API routes
     "/(api|trpc)(.*)",
-  ],
+  ]
 }
