@@ -13,6 +13,12 @@ import { ErrorResponseSchema } from '@/lib/openapi/common'
 // no secrets; the detail fields (missing-var names, projectDir) are additionally
 // gated below — anonymous callers only see them while no user can authenticate.
 export const isPublic = true
+// Security contract for the /health public-endpoint tester: open by design.
+// This is a rate-limited read that the wizard MUST reach unauthenticated before
+// any user exists (and the cross-deployment poll runs anonymously), so a
+// header-less 200 is in-contract — the per-IP rate limit is the guard, and the
+// only detail fields are admin-gated above. Same contract as branding/login-logo.
+export const publicSecurity = 'rate_limit_only'
 // The poll must always see the current deployment's env, never a cached body.
 export const dynamic = 'force-dynamic'
 
