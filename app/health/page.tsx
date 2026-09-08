@@ -806,10 +806,25 @@ export default function DatabaseTestPage() {
             continue
           }
           probeJobs.push(
-            fetch(r.fullPath, { method: 'HEAD' })
+            fetch(r.fullPath, { method: 'HEAD', redirect: 'manual' })
               .then((response): ApiRouteTest => {
-                // 200 = ok, 401 = auth wall reached, 405 = method-only endpoint
-                const success = response.status === 200 || response.status === 401 || response.status === 405
+                // Reachable = the route's handler answered the probe:
+                // 200 = ok, 401 = auth wall, 405 = method-only endpoint,
+                // 400 = validation error (probe sends no params/body),
+                // JSON 404 = app-level "no data yet" (Next's route-not-found 404 is HTML),
+                // opaqueredirect = endpoint that 30x-redirects (e.g. OAuth connect).
+                if (response.type === 'opaqueredirect') {
+                  return {
+                    module: moduleId,
+                    route: r.fullPath,
+                    status: 'accessible',
+                    message: 'redirect — route reachable',
+                  }
+                }
+                const isJson = (response.headers.get('content-type') ?? '').includes('application/json')
+                const success =
+                  [200, 400, 401, 405].includes(response.status) ||
+                  (response.status === 404 && isJson)
                 return {
                   module: moduleId,
                   route: r.fullPath,
