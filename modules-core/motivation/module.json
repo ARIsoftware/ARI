@@ -6,7 +6,7 @@
   "version": "1.0.0",
   "author": "ARI",
   "icon": "Flame",
-  "enabled": false,
+  "enabled": true,
   "fullscreen": false,
   "menuPriority": 50,
   "permissions": {

@@ -6,7 +6,7 @@
   "version": "1.0.0",
   "author": "ARI",
   "icon": "Globe",
-  "enabled": false,
+  "enabled": true,
   "fullscreen": false,
   "menuPriority": 10,
   "permissions": {
