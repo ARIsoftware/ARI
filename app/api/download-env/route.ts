@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     // No existing file to back up
   }
 
-  await writeFile(envPath, content, "utf-8")
+  await writeFile(envPath, content, { encoding: "utf-8", mode: 0o600 })
 
   return NextResponse.json({ success: true, path: envPath })
 }

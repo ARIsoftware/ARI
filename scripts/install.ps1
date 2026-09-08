@@ -153,6 +153,13 @@
         # extension when run from TEMP — there's no package.json there to
         # declare module type. Older branches only have a CJS scripts/install.js.
         if (-not $env:ARI_BRANCH) { $env:ARI_BRANCH = "main" }
+        # ARI_BRANCH goes into a URL and a git command — allow only branch-name
+        # characters, and reject dot segments (../../other/repo would traverse
+        # the raw.githubusercontent path onto a different repository).
+        if ($env:ARI_BRANCH -notmatch '^[A-Za-z0-9][A-Za-z0-9._/-]*$' -or $env:ARI_BRANCH -like '*..*') {
+            Write-Err "Invalid ARI_BRANCH: '$($env:ARI_BRANCH)'"
+            return
+        }
         $installMjsUrl = "https://raw.githubusercontent.com/ARIsoftware/ARI/$($env:ARI_BRANCH)/scripts/install.mjs"
         $installJsUrl = "https://raw.githubusercontent.com/ARIsoftware/ARI/$($env:ARI_BRANCH)/scripts/install.js"
         $scriptDir = $null

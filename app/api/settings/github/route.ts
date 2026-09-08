@@ -148,6 +148,18 @@ async function handlePOST(request: NextRequest) {
   const repoName = typeof body.githubRepoName === "string" ? body.githubRepoName.trim() : ""
   const clearToken = body.clearToken === true
 
+  // lib/env-file.ts contract: callers MUST pre-reject values containing
+  // \r, \n, or \x00 — formatEnvValue escapes quotes but not newlines, and
+  // line-oriented .env consumers (the ari CLI, --env-file loaders) would
+  // otherwise ingest an injected extra line as a real variable.
+  const envUnsafe = /[\x00\r\n]/
+  if (envUnsafe.test(rawToken) || envUnsafe.test(repoOwner) || envUnsafe.test(repoName)) {
+    return NextResponse.json(
+      { error: "Values must not contain newlines or control characters" },
+      { status: 400 }
+    )
+  }
+
   // Token semantics:
   //   - clearToken=true → explicitly remove the token from .env.local
   //   - non-empty string → set/replace the token
@@ -186,7 +198,7 @@ async function handlePOST(request: NextRequest) {
   }
 
   const updated = upsertEnvVars(existing, updates)
-  await writeFile(envPath, updated, "utf-8")
+  await writeFile(envPath, updated, { encoding: "utf-8", mode: 0o600 })
 
   // Update current process so the values take effect immediately (without a restart).
   if (nextToken === "CLEAR") {

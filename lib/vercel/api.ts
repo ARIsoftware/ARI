@@ -35,6 +35,9 @@ async function vercelFetch(
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
+    // Never follow redirects with a bearer token attached — api.vercel.com
+    // doesn't redirect these endpoints, so any redirect is unexpected.
+    redirect: 'error',
     ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
   })
 }
@@ -64,7 +67,7 @@ export interface ResolvedProject {
  * we discover by listing the token's teams and retrying.
  */
 export async function resolveProject(token: string, projectId: string): Promise<ResolvedProject> {
-  const direct = await vercelFetch(`/v9/projects/${projectId}`, token)
+  const direct = await vercelFetch(`/v9/projects/${encodeURIComponent(projectId)}`, token)
   if (direct.ok) {
     const project = (await direct.json()) as { id: string; name: string }
     return { projectId: project.id, projectName: project.name, teamId: null }
@@ -81,7 +84,7 @@ export async function resolveProject(token: string, projectId: string): Promise<
   const { teams = [] } = (await teamsResponse.json()) as { teams?: Array<{ id: string }> }
 
   for (const team of teams) {
-    const attempt = await vercelFetch(`/v9/projects/${projectId}`, token, { teamId: team.id })
+    const attempt = await vercelFetch(`/v9/projects/${encodeURIComponent(projectId)}`, token, { teamId: team.id })
     if (attempt.ok) {
       const project = (await attempt.json()) as { id: string; name: string }
       return { projectId: project.id, projectName: project.name, teamId: team.id }
@@ -186,7 +189,7 @@ export async function upsertEnvVars(
   project: ResolvedProject,
   vars: VercelEnvVar[],
 ): Promise<void> {
-  const response = await vercelFetch(`/v10/projects/${project.projectId}/env?upsert=true`, token, {
+  const response = await vercelFetch(`/v10/projects/${encodeURIComponent(project.projectId)}/env?upsert=true`, token, {
     method: 'POST',
     body: vars,
     teamId: project.teamId,
@@ -219,7 +222,7 @@ export async function upsertEnvVars(
  * configured, or the production redeploy boots without it and setup wedges.
  */
 export async function listEnvKeys(token: string, project: ResolvedProject): Promise<Set<string>> {
-  const response = await vercelFetch(`/v9/projects/${project.projectId}/env`, token, {
+  const response = await vercelFetch(`/v9/projects/${encodeURIComponent(project.projectId)}/env`, token, {
     teamId: project.teamId,
   })
   if (!response.ok) {

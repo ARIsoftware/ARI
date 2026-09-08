@@ -24,15 +24,21 @@
   ])
 
   const BRANCH = process.env.ARI_BRANCH || 'main'
+  // Branch names only: dot segments would traverse the raw.githubusercontent
+  // path onto a different repository and execute someone else's code.
+  if (!/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(BRANCH) || BRANCH.includes('..')) {
+    console.error(`Invalid ARI_BRANCH: '${BRANCH}'`)
+    process.exit(1)
+  }
   const MJS_URL = `https://raw.githubusercontent.com/ARIsoftware/ARI/${BRANCH}/scripts/install.mjs`
 
-  function runInstaller(file, cleanup) {
+  function runInstaller(file, cleanupDir) {
     const result = spawnSync(process.execPath, [file, ...process.argv.slice(2)], {
       stdio: 'inherit',
     })
-    if (cleanup) {
+    if (cleanupDir) {
       try {
-        fs.unlinkSync(file)
+        fs.rmSync(cleanupDir, { recursive: true, force: true })
       } catch {
         /* best-effort temp cleanup */
       }
@@ -69,22 +75,27 @@
     })
   }
 
-  // Prefer a local install.mjs: next to this script (repo checkout) or under
-  // the current directory's scripts/ (launcher run from a checkout).
-  const candidates = [
-    path.join(path.dirname(process.argv[1] || '.'), 'install.mjs'),
-    path.join(process.cwd(), 'scripts', 'install.mjs'),
-  ]
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) runInstaller(candidate, false)
-  }
+  // Prefer a local install.mjs sitting NEXT TO THIS SCRIPT (a real checkout).
+  // Deliberately no process.cwd() guessing — running the installer from an
+  // arbitrary directory must never execute an installer file planted there.
+  const sibling = path.join(path.dirname(process.argv[1] || '.'), 'install.mjs')
+  if (fs.existsSync(sibling)) runInstaller(sibling, null)
 
-  const tmpMjs = path.join(os.tmpdir(), `ari-install-${process.pid}.mjs`)
+  // Private 0700 scratch dir (mkdtemp): a predictable pid-based /tmp name
+  // could be pre-created or symlinked by another local user and swapped
+  // between download and exec.
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ari-install-'))
+  const tmpMjs = path.join(workDir, 'install.mjs')
   try {
     await download(MJS_URL, tmpMjs, 3)
   } catch (err) {
     console.error(`Failed to download the ARI installer (${MJS_URL}): ${err.message}`)
+    try {
+      fs.rmSync(workDir, { recursive: true, force: true })
+    } catch {
+      /* best-effort */
+    }
     process.exit(1)
   }
-  runInstaller(tmpMjs, true)
+  runInstaller(tmpMjs, workDir)
 })()

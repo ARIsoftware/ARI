@@ -156,6 +156,7 @@ The module loader never scans the filesystem at runtime — it reads the pre-gen
   - `/two-factor/verify-totp` — 5 attempts per minute
   - `/get-session` — 500 req/minute (read-only, cookie-cached)
 - **Session storage.** HTTP-only cookies (not `localStorage`); `Secure` flag in production.
+- **Client IP for rate limiting.** Proxy headers (`X-Forwarded-For`, `X-Real-IP`) are client-forgeable, so ARI's public-route rate limiter ignores them unless something trustworthy set them: the Vercel platform (which overwrites `X-Forwarded-For`), or a reverse proxy you control — declare it by setting `ARI_TRUST_PROXY=1`. Without a trusted header source there is no per-client identity available to the app, so direct clients share one rate-limit bucket; use edge/network controls for per-IP enforcement (see IP restriction above). Note that Better Auth's own sign-in limiter reads `X-Forwarded-For` independently — behind a proxy, make sure the proxy overwrites (not appends to) that header.
 
 ## Security Headers
 

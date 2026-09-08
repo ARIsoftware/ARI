@@ -84,6 +84,20 @@ const publicRoutes = [...staticPublicRoutes, ...modulePublicRoutes]
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
+  // Block the sign-up endpoint UNCONDITIONALLY — only the server-side
+  // bootstrap may create accounts. This MUST run before the setup-mode
+  // branch below: that branch allowlists all of /api/auth and returns early,
+  // and an instance in setup mode with a reachable database (DATABASE_URL
+  // set, BETTER_AUTH_SECRET missing) would otherwise let an anonymous caller
+  // claim the first account — which setup.sql's boot-time backfill then
+  // promotes to admin.
+  if (pathname.startsWith('/api/auth/sign-up')) {
+    return withSecurityHeaders(new NextResponse(JSON.stringify({ error: 'Sign-up is disabled' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+  }
+
   // SETUP MODE: If required config is missing, redirect to welcome wizard
   // Only allow /welcome, the setup APIs, and /api/auth (for post-setup login)
   if (!isSetupComplete()) {
@@ -106,14 +120,6 @@ export async function proxy(req: NextRequest) {
   // or omitted, so any proxy-level IP check can be bypassed and only
   // creates false confidence. Restrict access at the network edge instead —
   // see docs/SECURITY.md.
-
-  // Block sign-up endpoint — only server-side bootstrap can create accounts
-  if (pathname.startsWith('/api/auth/sign-up')) {
-    return withSecurityHeaders(new NextResponse(JSON.stringify({ error: 'Sign-up is disabled' }), {
-      status: 403,
-      headers: { 'Content-Type': 'application/json' },
-    }))
-  }
 
   // NORMAL MODE: Setup complete, existing auth logic below
   const response = withSecurityHeaders(NextResponse.next({ request: req }))

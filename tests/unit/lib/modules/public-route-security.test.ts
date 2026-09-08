@@ -39,8 +39,24 @@ function makeRequest(options: {
     },
     nextUrl: {
       origin: new URL(url).origin,
+      hostname: new URL(url).hostname,
     },
   } as any
+}
+
+// Vercel/system env vars that influence origin trust and proxy-header trust.
+const TRUST_ENV_VARS = [
+  'VERCEL',
+  'VERCEL_ENV',
+  'VERCEL_URL',
+  'VERCEL_BRANCH_URL',
+  'VERCEL_PROJECT_PRODUCTION_URL',
+  'ARI_TRUST_PROXY',
+  'ARI_DEPLOYMENT_TARGET',
+] as const
+
+function clearTrustEnv() {
+  for (const k of TRUST_ENV_VARS) delete process.env[k]
 }
 
 // ── checkRateLimit ────────────────────────────────────────────────────────────
@@ -103,9 +119,17 @@ describe('checkRateLimit', () => {
 describe('isSameOriginRequest', () => {
   const savedEnv = { ...process.env }
 
+  beforeEach(() => {
+    clearTrustEnv()
+  })
+
   afterEach(() => {
     process.env.NEXT_PUBLIC_APP_URL = savedEnv.NEXT_PUBLIC_APP_URL
     process.env.BETTER_AUTH_URL = savedEnv.BETTER_AUTH_URL
+    for (const k of TRUST_ENV_VARS) {
+      if (savedEnv[k] === undefined) delete process.env[k]
+      else process.env[k] = savedEnv[k]
+    }
   })
 
   it('returns true when origin matches nextUrl.origin', () => {
@@ -195,34 +219,101 @@ describe('isSameOriginRequest', () => {
     })
     expect(isSameOriginRequest(req)).toBe(false)
   })
+
+  it('trusts the request origin for LAN IP-literal hosts', () => {
+    delete process.env.NEXT_PUBLIC_APP_URL
+    delete process.env.BETTER_AUTH_URL
+    const req = makeRequest({
+      requestUrl: 'http://192.168.1.50:3000/api/test',
+      origin: 'http://192.168.1.50:3000',
+    })
+    expect(isSameOriginRequest(req)).toBe(true)
+  })
+
+  it('does NOT trust a DNS-name Host that is not configured (DNS-rebinding defense)', () => {
+    delete process.env.NEXT_PUBLIC_APP_URL
+    delete process.env.BETTER_AUTH_URL
+    // Rebinding: browser resolved rebind.attacker.com to 127.0.0.1 and sends
+    // matching Host + Origin. The self-derived origin must not be trusted.
+    const req = makeRequest({
+      requestUrl: 'http://rebind.attacker.com:3000/api/test',
+      origin: 'http://rebind.attacker.com:3000',
+    })
+    expect(isSameOriginRequest(req)).toBe(false)
+  })
+
+  it('trusts Vercel system hostnames during the zero-env setup window', () => {
+    delete process.env.NEXT_PUBLIC_APP_URL
+    delete process.env.BETTER_AUTH_URL
+    process.env.VERCEL_URL = 'ari-abc123.vercel.app'
+    const req = makeRequest({
+      requestUrl: 'https://ari-abc123.vercel.app/api/test',
+      origin: 'https://ari-abc123.vercel.app',
+    })
+    expect(isSameOriginRequest(req)).toBe(true)
+  })
 })
 
 // ── getClientIp ───────────────────────────────────────────────────────────────
 
 describe('getClientIp', () => {
-  it('returns first IP from x-forwarded-for when multiple are present', () => {
+  const savedEnv = { ...process.env }
+
+  beforeEach(() => {
+    clearTrustEnv()
+  })
+
+  afterEach(() => {
+    for (const k of TRUST_ENV_VARS) {
+      if (savedEnv[k] === undefined) delete process.env[k]
+      else process.env[k] = savedEnv[k]
+    }
+  })
+
+  it('IGNORES x-forwarded-for without a trusted proxy (spoofing defense)', () => {
+    const req = makeRequest({ xForwardedFor: '1.2.3.4, 5.6.7.8' })
+    expect(getClientIp(req)).toBe('direct')
+  })
+
+  it('IGNORES x-real-ip without a trusted proxy', () => {
+    const req = makeRequest({ xRealIp: '10.0.0.1' })
+    expect(getClientIp(req)).toBe('direct')
+  })
+
+  it('returns the shared "direct" bucket when no headers are present', () => {
+    const req = makeRequest({})
+    expect(getClientIp(req)).toBe('direct')
+  })
+
+  it('honors x-forwarded-for (first value) when ARI_TRUST_PROXY=1', () => {
+    process.env.ARI_TRUST_PROXY = '1'
     const req = makeRequest({ xForwardedFor: '1.2.3.4, 5.6.7.8, 9.10.11.12' })
     expect(getClientIp(req)).toBe('1.2.3.4')
   })
 
-  it('returns IP from x-forwarded-for when single', () => {
-    const req = makeRequest({ xForwardedFor: '203.0.113.1' })
-    expect(getClientIp(req)).toBe('203.0.113.1')
+  it('trims whitespace around IPs when the proxy is trusted', () => {
+    process.env.ARI_TRUST_PROXY = '1'
+    const req = makeRequest({ xForwardedFor: '  192.168.1.1 , 10.0.0.1' })
+    expect(getClientIp(req)).toBe('192.168.1.1')
   })
 
-  it('falls back to x-real-ip when x-forwarded-for is absent', () => {
+  it('falls back to x-real-ip when trusted and x-forwarded-for is absent', () => {
+    process.env.ARI_TRUST_PROXY = '1'
     const req = makeRequest({ xRealIp: '10.0.0.1' })
     expect(getClientIp(req)).toBe('10.0.0.1')
   })
 
-  it('returns "unknown" when neither header is present', () => {
-    const req = makeRequest({})
-    expect(getClientIp(req)).toBe('unknown')
+  it('honors headers on Vercel (platform overwrites x-forwarded-for)', () => {
+    process.env.VERCEL = '1'
+    process.env.VERCEL_ENV = 'production'
+    const req = makeRequest({ xForwardedFor: '203.0.113.1' })
+    expect(getClientIp(req)).toBe('203.0.113.1')
   })
 
-  it('trims whitespace around IPs in x-forwarded-for', () => {
-    const req = makeRequest({ xForwardedFor: '  192.168.1.1 , 10.0.0.1' })
-    expect(getClientIp(req)).toBe('192.168.1.1')
+  it('still returns "direct" when trusted but no headers arrive', () => {
+    process.env.ARI_TRUST_PROXY = '1'
+    const req = makeRequest({})
+    expect(getClientIp(req)).toBe('direct')
   })
 })
 

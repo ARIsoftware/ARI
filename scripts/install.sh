@@ -135,7 +135,7 @@ install_node() {
   elif [[ "$ARI_PLATFORM" == "linux" ]]; then
     case "$ARI_PKG_MGR" in
       apt)
-        curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+        curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo bash -
         sudo apt-get install -y nodejs
         ;;
       dnf)    sudo dnf install -y nodejs ;;
@@ -165,34 +165,55 @@ fi
 
 # ── Hand off to the Node installer ──────────────────────────────────────────
 # The installer is ESM (scripts/install.mjs) and must keep its .mjs extension
-# when run from /tmp — there's no package.json there to declare module type.
-# Older branches only have a CJS scripts/install.js; fall back to that.
-INSTALL_DIR_FILE="/tmp/ari-install-dir-$$"
-export ARI_INSTALL_DIR_FILE="$INSTALL_DIR_FILE"
+# when run from the temp dir — there's no package.json there to declare module
+# type. Older branches only have a CJS scripts/install.js; fall back to that.
+
+# ARI_BRANCH goes into a URL and a git command — allow only branch-name
+# characters, and reject dot segments (../../other/repo would traverse the
+# raw.githubusercontent path onto a different repository) and leading dashes.
 ARI_BRANCH="${ARI_BRANCH:-main}"
+if ! [[ "$ARI_BRANCH" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] || [[ "$ARI_BRANCH" == *..* ]]; then
+  err "Invalid ARI_BRANCH: '$ARI_BRANCH'"
+  exit 1
+fi
 export ARI_BRANCH
+
+# Private 0700 scratch dir: predictable /tmp/ari-install-$$ names let another
+# local user pre-create or symlink the path and swap contents between the
+# download and the exec (mktemp names are unguessable and the dir is 0700).
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/ari-install.XXXXXX")" || { err "mktemp failed"; exit 1; }
+trap 'rm -rf "$WORK_DIR"' EXIT
+
+INSTALL_DIR_FILE="$WORK_DIR/install-dir"
+export ARI_INSTALL_DIR_FILE="$INSTALL_DIR_FILE"
 INSTALL_MJS_URL="https://raw.githubusercontent.com/ARIsoftware/ARI/${ARI_BRANCH}/scripts/install.mjs"
 INSTALL_JS_URL="https://raw.githubusercontent.com/ARIsoftware/ARI/${ARI_BRANCH}/scripts/install.js"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd 2>/dev/null)" || SCRIPT_DIR=""
+# Local fallback only for a real on-disk checkout (BASH_SOURCE set). When the
+# one-liner pipes this script into bash, $0 is "bash" and dirname would
+# resolve to the CURRENT DIRECTORY — executing whatever installer file happens
+# to sit there is an attacker-planted-file hazard, so no cwd guessing.
+SCRIPT_DIR=""
+if [[ -n "${BASH_SOURCE[0]:-}" && -f "${BASH_SOURCE[0]:-}" ]]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd 2>/dev/null)" || SCRIPT_DIR=""
+fi
 LOCAL_MJS="${SCRIPT_DIR:+$SCRIPT_DIR/install.mjs}"
 LOCAL_JS="${SCRIPT_DIR:+$SCRIPT_DIR/install.js}"
 
-INSTALL_JS="/tmp/ari-install-$$.mjs"
+INSTALL_JS="$WORK_DIR/ari-install.mjs"
 if curl -fsSL "$INSTALL_MJS_URL" -o "$INSTALL_JS" 2>/dev/null; then
   : # Downloaded the ESM installer
-elif [[ -f "$LOCAL_MJS" ]]; then
+elif [[ -n "$LOCAL_MJS" && -f "$LOCAL_MJS" ]]; then
   cp "$LOCAL_MJS" "$INSTALL_JS"
 else
   # Legacy fallback: branch predates install.mjs — fetch the CJS installer.
   rm -f "$INSTALL_JS"
-  INSTALL_JS="/tmp/ari-install-$$.js"
+  INSTALL_JS="$WORK_DIR/ari-install.js"
   if curl -fsSL "$INSTALL_JS_URL" -o "$INSTALL_JS" 2>/dev/null; then
     : # Downloaded successfully
-  elif [[ -f "$LOCAL_JS" ]]; then
+  elif [[ -n "$LOCAL_JS" && -f "$LOCAL_JS" ]]; then
     cp "$LOCAL_JS" "$INSTALL_JS"
   else
     err "Failed to download the installer and no local copy found."
-    rm -f "$INSTALL_JS"
     exit 1
   fi
   # Safety net: if the .js turns out to be ESM, give it the .mjs extension.
@@ -203,17 +224,16 @@ else
 fi
 
 echo ""
-node "$INSTALL_JS"
-EXIT_CODE=$?
+# `|| EXIT_CODE=$?` keeps set -e from killing the script here, so the cleanup
+# trap and the cd-into-install-dir logic below always run.
+EXIT_CODE=0
+node "$INSTALL_JS" || EXIT_CODE=$?
 
-# Read install directory written by install.js
+# Read install directory written by the installer
 INSTALL_DIR=""
 if [[ -f "$INSTALL_DIR_FILE" ]]; then
   INSTALL_DIR="$(cat "$INSTALL_DIR_FILE")"
-  rm -f "$INSTALL_DIR_FILE"
 fi
-
-rm -f "$INSTALL_JS"
 
 # On success, switch into the install directory and start a fresh shell
 if [[ $EXIT_CODE -eq 0 ]] && [[ -n "$INSTALL_DIR" ]] && [[ -d "$INSTALL_DIR" ]]; then

@@ -21,6 +21,13 @@ import { createRequire } from 'module';
 
 const cjsRequire = createRequire(import.meta.url);
 const ARI_BRANCH = process.env.ARI_BRANCH || 'main';
+// Branch names only — this value reaches a URL and a `git clone` shell string.
+// Dot segments would traverse raw.githubusercontent onto another repository;
+// shell metacharacters or a leading dash would inject into git's argv.
+if (!/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(ARI_BRANCH) || ARI_BRANCH.includes('..')) {
+  console.error(`Invalid ARI_BRANCH: '${ARI_BRANCH}'`);
+  process.exit(1);
+}
 
 // Local-dev Postgres password used on Windows. EDB's installer leaves the
 // postgres superuser with no usable password unless we pass one via --override
@@ -35,15 +42,29 @@ const ARI_BRANCH = process.env.ARI_BRANCH || 'main';
 // the default install dir's .env.local lets us recover that value without
 // requiring the user to set an env var manually.
 const DEFAULT_INSTALL_DIR = path.join(os.homedir(), 'ARI');
+// The password is interpolated into a shell command on Windows (winget
+// --override) and echoed into recovery instructions, so the two INHERITED
+// sources (env var, value parsed back out of an existing .env.local) must be
+// constrained to shell-inert characters — a value like `x" & evil & "` would
+// otherwise break out of the quoted --override string. Freshly generated
+// passwords already match this alphabet. Anything else → generate fresh.
+const SAFE_PG_PASSWORD_RE = /^[A-Za-z0-9_-]{8,64}$/;
 const POSTGRES_PASSWORD = (() => {
-  if (process.env.ARI_POSTGRES_PASSWORD) return process.env.ARI_POSTGRES_PASSWORD;
-  const envPath = path.join(DEFAULT_INSTALL_DIR, '.env.local');
-  if (fs.existsSync(envPath)) {
-    try {
-      const m = fs.readFileSync(envPath, 'utf8')
-        .match(/^DATABASE_URL=postgresql:\/\/postgres:([^@]+)@/m);
-      if (m) return decodeURIComponent(m[1]);
-    } catch { /* fall through to fresh */ }
+  const inherited = (() => {
+    if (process.env.ARI_POSTGRES_PASSWORD) return process.env.ARI_POSTGRES_PASSWORD;
+    const envPath = path.join(DEFAULT_INSTALL_DIR, '.env.local');
+    if (fs.existsSync(envPath)) {
+      try {
+        const m = fs.readFileSync(envPath, 'utf8')
+          .match(/^DATABASE_URL=postgresql:\/\/postgres:([^@]+)@/m);
+        if (m) return decodeURIComponent(m[1]);
+      } catch { /* fall through to fresh */ }
+    }
+    return null;
+  })();
+  if (inherited) {
+    if (SAFE_PG_PASSWORD_RE.test(inherited)) return inherited;
+    console.warn('  Ignoring inherited Postgres password (unsupported characters); generating a fresh one.');
   }
   return crypto.randomBytes(12).toString('base64').replace(/[+/=]/g, '');
 })();
@@ -196,12 +217,28 @@ function findWindowsArchAsset(release, namePattern) {
   return null;
 }
 
-function httpGetJson(url, headers = {}) {
+// Downloads are limited to GitHub-owned hosts: release JSON and binaries only
+// ever come from api.github.com / github.com / *.githubusercontent.com, so a
+// redirect must never be able to point the installer anywhere else.
+const ALLOWED_DOWNLOAD_HOSTS = /^(api\.github\.com|github\.com|codeload\.github\.com|([a-z0-9-]+\.)*githubusercontent\.com)$/i;
+
+function assertAllowedDownloadUrl(url) {
+  const parsed = new URL(url);
+  if (parsed.protocol !== 'https:' || !ALLOWED_DOWNLOAD_HOSTS.test(parsed.hostname)) {
+    throw new Error(`Refusing to download from unexpected host: ${parsed.hostname}`);
+  }
+}
+
+function httpGetJson(url, headers = {}, redirectsLeft = 3) {
+  assertAllowedDownloadUrl(url);
   return new Promise((resolve, reject) => {
     https.get(url, { headers: { 'User-Agent': 'ari-installer', ...headers } }, (res) => {
-      // Follow redirects
+      // Follow redirects (bounded, same host allowlist re-applied)
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return resolve(httpGetJson(res.headers.location, headers));
+        res.resume();
+        if (redirectsLeft <= 0) return reject(new Error(`Too many redirects for ${url}`));
+        try { return resolve(httpGetJson(res.headers.location, headers, redirectsLeft - 1)); }
+        catch (e) { return reject(e); }
       }
       if (res.statusCode !== 200) {
         return reject(new Error(`GET ${url} returned ${res.statusCode}`));
@@ -217,11 +254,15 @@ function httpGetJson(url, headers = {}) {
   });
 }
 
-function httpDownload(url, destPath) {
+function httpDownload(url, destPath, redirectsLeft = 3) {
+  assertAllowedDownloadUrl(url);
   return new Promise((resolve, reject) => {
     https.get(url, { headers: { 'User-Agent': 'ari-installer' } }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return resolve(httpDownload(res.headers.location, destPath));
+        res.resume();
+        if (redirectsLeft <= 0) return reject(new Error(`Too many redirects for ${url}`));
+        try { return resolve(httpDownload(res.headers.location, destPath, redirectsLeft - 1)); }
+        catch (e) { return reject(e); }
       }
       if (res.statusCode !== 200) {
         return reject(new Error(`GET ${url} returned ${res.statusCode}`));
@@ -234,6 +275,33 @@ function httpDownload(url, destPath) {
   });
 }
 
+/**
+ * Verify a downloaded release asset against the release's checksums file when
+ * one is published (supabase/cli and pgweb both ship one). Hard-fails on a
+ * mismatch; quietly continues when the release has no checksums asset.
+ */
+async function verifyReleaseChecksum(release, assetName, filePath) {
+  const checksumAsset = (release.assets || []).find((a) => /checksums?(\.[a-z0-9]+)?\.txt$/i.test(a.name || ''));
+  if (!checksumAsset || !checksumAsset.browser_download_url) return;
+  let listing;
+  try {
+    const tmp = filePath + '.checksums';
+    await httpDownload(checksumAsset.browser_download_url, tmp);
+    listing = fs.readFileSync(tmp, 'utf8');
+    fs.unlinkSync(tmp);
+  } catch {
+    return; // can't fetch the listing — no verification possible, keep legacy behavior
+  }
+  const line = listing.split('\n').find((l) => l.trim().endsWith(assetName));
+  const expected = line ? line.trim().split(/\s+/)[0].toLowerCase() : null;
+  if (!expected || !/^[0-9a-f]{64}$/.test(expected)) return;
+  const actual = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
+  if (actual !== expected) {
+    try { fs.unlinkSync(filePath); } catch {}
+    throw new Error(`Checksum mismatch for ${assetName} — download discarded.`);
+  }
+}
+
 async function installPgwebWindows() {
   const binDir = getWindowsAriBinDir();
   fs.mkdirSync(binDir, { recursive: true });
@@ -242,8 +310,9 @@ async function installPgwebWindows() {
   const asset = findWindowsArchAsset(release, '^pgweb_windows_{arch}\\.zip$');
   if (!asset) throw new Error('pgweb release has no Windows zip asset for this architecture');
 
-  const zipPath = path.join(os.tmpdir(), `pgweb-${process.pid}.zip`);
+  const zipPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ari-pgweb-')), asset.name);
   await httpDownload(asset.browser_download_url, zipPath);
+  await verifyReleaseChecksum(release, asset.name, zipPath);
 
   // Expand-Archive ships with PowerShell 5.1+ (Win10+).
   execSync(
@@ -306,8 +375,9 @@ async function installSupabaseCliWindows() {
   const asset = findWindowsArchAsset(release, '^supabase_.*windows_{arch}\\.tar\\.gz$');
   if (!asset) throw new Error('supabase/cli release has no Windows tar.gz asset for this architecture');
 
-  const tarPath = path.join(os.tmpdir(), `supabase-${process.pid}.tar.gz`);
+  const tarPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ari-supabase-')), asset.name);
   await httpDownload(asset.browser_download_url, tarPath);
+  await verifyReleaseChecksum(release, asset.name, tarPath);
 
   // Windows 10 1803+ ships bsdtar as tar.exe in System32; -xzf handles tar.gz.
   execSync(`tar -xzf "${tarPath}" -C "${binDir}"`, { stdio: 'pipe' });
@@ -495,7 +565,15 @@ function showStepHeader(current, total, title) {
 // ── Platform Detection ──────────────────────────────────────────────────────
 
 const PLATFORM = process.env.ARI_PLATFORM || os.platform();   // darwin | linux | win32
-const PKG_MGR  = process.env.ARI_PKG_MGR  || (PLATFORM === 'darwin' ? 'brew' : 'npm');
+// Allowlisted: PKG_MGR is interpolated into shell commands (`command -v ${PKG_MGR}`)
+// and used as an object key — an arbitrary env value must not reach either.
+const ALLOWED_PKG_MGRS = ['brew', 'apt', 'dnf', 'pacman', 'zypper', 'npm', 'winget', 'unknown'];
+const PKG_MGR = (() => {
+  const requested = process.env.ARI_PKG_MGR;
+  if (requested && ALLOWED_PKG_MGRS.includes(requested)) return requested;
+  if (requested) console.warn(`  Ignoring unsupported ARI_PKG_MGR: '${requested}'`);
+  return PLATFORM === 'darwin' ? 'brew' : 'npm';
+})();
 
 function platformLabel() {
   if (PLATFORM === 'darwin') return 'macOS';
@@ -695,7 +773,7 @@ const TOOLS = [
     installCmds: {
       darwin: 'brew install node',
       linux: {
-        apt: 'curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - && sudo apt-get install -y nodejs',
+        apt: 'curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo bash - && sudo apt-get install -y nodejs',
         dnf: 'sudo dnf install -y nodejs',
         pacman: 'sudo pacman -S --noconfirm nodejs npm',
         zypper: 'sudo zypper install -y nodejs',
@@ -988,7 +1066,10 @@ async function installTools() {
         console.log(`  ${dim(err.message.split('\n').slice(0, 12).join('\n  '))}`);
         console.log('');
         console.log(`  ${dim('You can try running this manually:')}`);
-        console.log(`  ${DIM_BLUE}${cmd}${RESET}`);
+        // Redacted: the Windows Postgres command embeds the superuser password,
+        // and this output lands in the PowerShell transcript that the docs tell
+        // users to share when reporting issues.
+        console.log(`  ${DIM_BLUE}${cmd.split(POSTGRES_PASSWORD).join('***')}${RESET}`);
         results.push({ ...tool, status: 'failed', version: null });
       }
     }
@@ -996,6 +1077,11 @@ async function installTools() {
 
   return results;
 }
+
+// Shell-active characters that must never appear in a path we interpolate
+// into an exec'd command string (even inside double quotes, sh expands $(...)
+// and backticks).
+const SHELL_UNSAFE_PATH_RE = /["'`$\\;|&<>\n\r]/;
 
 // ── Setup ARI ───────────────────────────────────────────────────────
 
@@ -1016,6 +1102,14 @@ async function cloneAndSetup() {
 
   // Resolve to absolute path
   targetDir = path.resolve(targetDir);
+
+  // The path is interpolated into shell strings (git clone "..."); inside
+  // double quotes sh still expands $(...) and backticks, so reject shell-
+  // active characters outright — they're pathological in an install path.
+  if (SHELL_UNSAFE_PATH_RE.test(targetDir)) {
+    console.log(`  ${SYM_CROSS} ${red('Install path contains unsupported characters. Skipping clone.')}`);
+    return { cloned: false, dir: null };
+  }
 
   // Check if target exists
   if (fs.existsSync(targetDir)) {
@@ -1047,6 +1141,10 @@ async function cloneAndSetup() {
         return { cloned: false, dir: null };
       }
       targetDir = custom.startsWith('~') ? path.join(os.homedir(), custom.slice(1)) : path.resolve(custom);
+      if (SHELL_UNSAFE_PATH_RE.test(targetDir)) {
+        console.log(`  ${SYM_CROSS} ${red('Install path contains unsupported characters. Skipping clone.')}`);
+        return { cloned: false, dir: null };
+      }
     }
   }
 
@@ -1126,7 +1224,8 @@ function generateEnvFile(targetDir, supabaseVars) {
     .map(([key, value]) => key + '=' + value)
     .join('\n') + '\n';
 
-  fs.writeFileSync(envPath, envContent);
+  fs.writeFileSync(envPath, envContent, { mode: 0o600 });
+  try { fs.chmodSync(envPath, 0o600); } catch { /* overwrite keeps old mode otherwise */ }
   return { databaseUrl: supabaseVars.DB_URL };
 }
 
@@ -1152,7 +1251,19 @@ async function runSetupSql(targetDir, databaseUrl) {
       if (winExe) candidates.push(`"${winExe}"`);
     }
     for (const psql of candidates) {
-      const psqlResult = run(`${psql} "${databaseUrl}" -f "${setupSqlPath}"`);
+      // Password via PGPASSWORD, not argv — command lines are visible in
+      // process listings. URL parse failure falls back to the original string.
+      let psqlUrl = databaseUrl;
+      let psqlEnv = process.env;
+      try {
+        const u = new URL(databaseUrl);
+        if (u.password) {
+          psqlEnv = { ...process.env, PGPASSWORD: decodeURIComponent(u.password) };
+          u.password = '';
+          psqlUrl = u.toString();
+        }
+      } catch { /* keep originals */ }
+      const psqlResult = run(`${psql} "${psqlUrl}" -f "${setupSqlPath}"`, { env: psqlEnv });
       if (psqlResult !== null) return true;
     }
     throw err;
@@ -1243,7 +1354,9 @@ function writeInstallerEnvFile(targetDir, { dbMode, dbUrl }) {
     '',
   );
 
-  fs.writeFileSync(path.join(targetDir, '.env.local'), lines.join('\n'));
+  const envLocalPath = path.join(targetDir, '.env.local');
+  fs.writeFileSync(envLocalPath, lines.join('\n'), { mode: 0o600 });
+  try { fs.chmodSync(envLocalPath, 0o600); } catch { /* overwrite keeps old mode otherwise */ }
 }
 
 async function chooseDatabaseMode() {

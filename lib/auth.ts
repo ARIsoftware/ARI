@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto"
 import { betterAuth } from "better-auth"
 import { APIError, createAuthMiddleware } from "better-auth/api"
 import { nextCookies } from "better-auth/next-js"
@@ -63,13 +64,15 @@ export async function hashPassword(password: string): Promise<string> {
 // any unconfigured first boot), better-auth would otherwise fall back to its
 // built-in default secret and THROW in production ("You are using the default
 // secret") — the throw becomes an unhandled promise rejection that crashes the
-// build. We pass an explicit setup-mode placeholder instead: it's safe because
-// auth is never exercised while unconfigured (middleware redirects everything
-// to /welcome and getAuthenticatedUser returns NULL_AUTH via isSetupComplete),
-// and once the real secret is set the redeploy uses it.
+// build. We pass a setup-mode placeholder instead. It MUST be random per
+// process, never a constant: Better Auth's endpoints stay reachable in setup
+// mode and its cookie cache validates the session_data cookie purely by HMAC
+// against this secret — a public constant would let anyone mint valid signed
+// session cookies for an instance whose real secret went missing. Random
+// means any such cookies die with the process, and once the real secret is
+// configured the restart/redeploy uses it.
 const authSecret =
-  process.env.BETTER_AUTH_SECRET ||
-  "ari-setup-mode-placeholder-not-for-production-do-not-use"
+  process.env.BETTER_AUTH_SECRET || randomBytes(32).toString("base64")
 
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",

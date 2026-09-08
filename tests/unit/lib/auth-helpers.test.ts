@@ -75,7 +75,7 @@ vi.mock('@/lib/db/ensure-schema', () => ({
 // logic via checkUsersExist and requireAuthIfUsersExist which use the pool
 // directly, and we test getAuthenticatedUser at the module level.
 
-import { checkUsersExist, requireAuthIfUsersExist, requireAdminIfUsersExist, getAuthenticatedUser } from '@/lib/auth-helpers'
+import { checkUsersExist, checkUsersExistInDb, requireAuthIfUsersExist, requireAdminIfUsersExist, getAuthenticatedUser } from '@/lib/auth-helpers'
 import { withUserContext } from '@/lib/db'
 
 // ─── checkUsersExist ──────────────────────────────────────────────────────
@@ -131,6 +131,33 @@ describe('checkUsersExist — DB results', () => {
   })
 })
 
+// ─── checkUsersExistInDb ──────────────────────────────────────────────────
+
+describe('checkUsersExistInDb — skips the isSetupComplete short-circuit', () => {
+  beforeEach(() => {
+    mockPoolQuery.mockReset()
+    process.env.DATABASE_URL = 'postgresql://localhost:5432/test'
+  })
+
+  it('queries the DB even when setup is incomplete (BETTER_AUTH_SECRET missing)', async () => {
+    const orig = process.env.BETTER_AUTH_SECRET
+    delete process.env.BETTER_AUTH_SECRET
+    mockPoolQuery.mockResolvedValue({ rows: [{ has_users: true }] })
+    // checkUsersExist would say no-env here; the direct check must see the DB.
+    expect((await checkUsersExistInDb()).status).toBe('has-users')
+    process.env.BETTER_AUTH_SECRET = orig
+  })
+
+  it('returns no-users / no-table / db-error from the same query paths', async () => {
+    mockPoolQuery.mockResolvedValue({ rows: [{ has_users: false }] })
+    expect((await checkUsersExistInDb()).status).toBe('no-users')
+    mockPoolQuery.mockRejectedValue({ code: '42P01' })
+    expect((await checkUsersExistInDb()).status).toBe('no-table')
+    mockPoolQuery.mockRejectedValue(new Error('down'))
+    expect((await checkUsersExistInDb()).status).toBe('db-error')
+  })
+})
+
 // ─── requireAuthIfUsersExist ──────────────────────────────────────────────
 
 describe('requireAuthIfUsersExist', () => {
@@ -156,10 +183,11 @@ describe('requireAuthIfUsersExist', () => {
     expect(res).toBeNull()
   })
 
-  it('returns null when status is no-table', async () => {
+  it('returns 503 when status is no-table (fail closed — wiped DB on a configured install)', async () => {
     mockPoolQuery.mockRejectedValue({ code: '42P01' })
     const res = await requireAuthIfUsersExist(new Headers())
-    expect(res).toBeNull()
+    expect(res).not.toBeNull()
+    expect(res!.status).toBe(503)
   })
 
   it('returns null when status is no-env', async () => {
@@ -212,10 +240,11 @@ describe('requireAdminIfUsersExist', () => {
     expect(res).toBeNull()
   })
 
-  it('returns null when status is no-table (pre-setup)', async () => {
+  it('returns 503 when status is no-table (fail closed — wiped DB on a configured install)', async () => {
     mockPoolQuery.mockRejectedValue({ code: '42P01' })
     const res = await requireAdminIfUsersExist(new Headers())
-    expect(res).toBeNull()
+    expect(res).not.toBeNull()
+    expect(res!.status).toBe(503)
   })
 
   it('returns 401 when users exist but there is no session', async () => {

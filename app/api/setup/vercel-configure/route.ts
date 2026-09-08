@@ -66,12 +66,16 @@ registry.registerPath({
 // ssl comes from the same helper the real pool uses (lib/db/pool.ts), so the
 // preflight can't pass under a policy the redeployed app won't apply.
 async function testDatabaseConnection(databaseUrl: string): Promise<string | null> {
-  const client = new Client({
-    connectionString: databaseUrl,
-    connectionTimeoutMillis: 8000,
-    ssl: sslConfigFor(databaseUrl),
-  })
+  // Constructor inside the try: a connection string that throws at parse time
+  // must land in the classified-error path below, not escape to the generic
+  // outer 500 handler.
+  let client: Client | null = null
   try {
+    client = new Client({
+      connectionString: databaseUrl,
+      connectionTimeoutMillis: 8000,
+      ssl: sslConfigFor(databaseUrl),
+    })
     await client.connect()
     await client.query('SELECT 1')
     return null
@@ -84,7 +88,7 @@ async function testDatabaseConnection(databaseUrl: string): Promise<string | nul
     return `${explanation.title}. ${explanation.summary}`
   } finally {
     try {
-      await client.end()
+      await client?.end()
     } catch {
       /* connection never opened */
     }

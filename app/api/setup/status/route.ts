@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDeploymentTarget } from '@/lib/deployment'
 import { getMissingRequiredConfig, isSetupComplete } from '@/lib/env-registry'
 import { getDbMode } from '@/lib/db/mode'
-import { requireAdminIfUsersExist } from '@/lib/auth-helpers'
+import { checkUsersExistInDb, getAuthenticatedUser } from '@/lib/auth-helpers'
 import { checkRateLimit, getClientIp } from '@/lib/modules/public-route-security'
 import { SetupStatusSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
@@ -52,14 +52,25 @@ export async function GET(request: NextRequest) {
   const deploymentTarget = getDeploymentTarget()
   const setupComplete = isSetupComplete()
 
-  // Detail gate: during genuine first-run setup nobody CAN authenticate
-  // (no env / no users), so requireAdminIfUsersExist allows the wizard through.
-  // Once users exist, missing-var names and the absolute project path are
-  // admin-only — an established install that re-enters setup mode (e.g. a
-  // botched .env.local edit) must not disclose them to anonymous callers.
+  // Detail gate. checkUsersExistInDb queries the user table DIRECTLY (no
+  // isSetupComplete short-circuit — that shortcut would report no-env for an
+  // established install whose env broke, silently reopening the disclosure):
+  //  - no-users / no-table / no-pool: nobody CAN authenticate → genuine
+  //    first-run window, the wizard gets the detail it needs.
+  //  - has-users: admin only. In setup mode getAuthenticatedUser returns
+  //    NULL_AUTH, so an established install that re-entered setup mode
+  //    (botched .env.local edit) discloses nothing to anonymous callers.
+  //  - db-error: fail closed.
   // Denied callers still get the base fields; the cross-deployment poll only
   // needs setupComplete.
-  const canSeeDetail = (await requireAdminIfUsersExist(request.headers)) === null
+  const usersState = (await checkUsersExistInDb()).status
+  let canSeeDetail = false
+  if (usersState === 'no-users' || usersState === 'no-table' || usersState === 'no-pool') {
+    canSeeDetail = true
+  } else if (usersState === 'has-users') {
+    const { user } = await getAuthenticatedUser()
+    canSeeDetail = user?.role === 'admin'
+  }
 
   // dbMode is always included (it's not sensitive, and the wizard needs it to
   // pick the right step order even for a signed-in admin revisiting /welcome).

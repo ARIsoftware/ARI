@@ -538,7 +538,12 @@ export default function WelcomePage() {
         )
       }
       setVercelToken('')
-      if (typeof data.productionUrl === 'string') setVercelProductionUrl(data.productionUrl)
+      // Rendered into https:// links — accept only a bare hostname, so a
+      // tampered value can't smuggle a path, credentials (user@host), port
+      // tricks, or a different URL shape into those hrefs.
+      if (typeof data.productionUrl === 'string' && /^[a-z0-9.-]+$/i.test(data.productionUrl)) {
+        setVercelProductionUrl(data.productionUrl)
+      }
       // Survive reloads while the redeploy runs (the poll can take minutes).
       sessionStorage.setItem('ari:welcome:vercel-deploying', '1')
       setVercelDeployStatus('deploying')

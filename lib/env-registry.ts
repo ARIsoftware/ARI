@@ -84,6 +84,14 @@ export const ENV_REGISTRY: readonly EnvVarSpec[] = [
       'Epoch-ms stamp written with the one-shot admin credentials on Vercel; bootstrap ignores stamped credentials older than 24h',
   },
   {
+    key: 'ARI_TRUST_PROXY',
+    required: false,
+    sensitive: false,
+    group: 'app',
+    description:
+      'Set to 1 when ARI runs behind a reverse proxy you control — rate limiting then trusts X-Forwarded-For for the client IP (otherwise forgeable proxy headers are ignored)',
+  },
+  {
     key: 'GITHUB_TOKEN',
     required: false,
     sensitive: true,

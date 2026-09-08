@@ -67,7 +67,7 @@ async function clearFirstRunAdminCredentials(): Promise<void> {
       ARI_FIRST_RUN_ADMIN_PASSWORD: null,
     })
     if (updated !== content) {
-      await writeFile(envPath, updated, "utf-8")
+      await writeFile(envPath, updated, { encoding: "utf-8", mode: 0o600 })
     }
     delete process.env.ARI_FIRST_RUN_ADMIN_EMAIL
     delete process.env.ARI_FIRST_RUN_ADMIN_PASSWORD

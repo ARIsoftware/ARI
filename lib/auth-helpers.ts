@@ -264,8 +264,14 @@ export type UsersCheckResult =
   | { status: "no-users" }
   | { status: "has-users" }
 
-export async function checkUsersExist(): Promise<UsersCheckResult> {
-  if (!isSetupComplete()) return { status: "no-env" }
+/**
+ * Queries the user table directly, WITHOUT the isSetupComplete() short-circuit.
+ * Use this when the answer matters even in setup mode — e.g. /api/setup/status
+ * must distinguish "first-run, nobody can authenticate" from "established
+ * install whose env broke" (users exist, DB reachable), which checkUsersExist()
+ * cannot see because it returns no-env before ever touching the database.
+ */
+export async function checkUsersExistInDb(): Promise<UsersCheckResult> {
   if (!pool) return { status: "no-pool" }
   try {
     const result = await pool.query('SELECT EXISTS(SELECT 1 FROM public."user") AS has_users')
@@ -277,13 +283,24 @@ export async function checkUsersExist(): Promise<UsersCheckResult> {
   }
 }
 
+export async function checkUsersExist(): Promise<UsersCheckResult> {
+  if (!isSetupComplete()) return { status: "no-env" }
+  return checkUsersExistInDb()
+}
+
 /**
  * Guard for routes that should be public during setup but require auth after.
  * Returns null if access is allowed, or a 401/503 NextResponse if denied.
  */
 export async function requireAuthIfUsersExist(requestHeaders: Headers): Promise<NextResponse | null> {
   const check = await checkUsersExist()
-  if (check.status === "db-error") {
+  // Fail CLOSED whenever users are unknowable on a configured install:
+  // db-error (DB down), no-pool (env present but pool never built), and
+  // no-table (schema missing — a wiped/restored database on a configured
+  // install must NOT reopen the anonymous window; the public bootstrap
+  // recreates the schema before these routes are needed again). Only no-env
+  // (genuine setup mode) and no-users (pre-bootstrap first run) stay open.
+  if (check.status === "db-error" || check.status === "no-pool" || check.status === "no-table") {
     return NextResponse.json({ error: "Service unavailable" }, { status: 503 })
   }
   if (check.status !== "has-users") return null
@@ -304,7 +321,8 @@ export async function requireAuthIfUsersExist(requestHeaders: Headers): Promise<
  */
 export async function requireAdminIfUsersExist(requestHeaders: Headers): Promise<NextResponse | null> {
   const check = await checkUsersExist()
-  if (check.status === "db-error") {
+  // Same fail-closed rule as requireAuthIfUsersExist above.
+  if (check.status === "db-error" || check.status === "no-pool" || check.status === "no-table") {
     return NextResponse.json({ error: "Service unavailable" }, { status: 503 })
   }
   if (check.status !== "has-users") return null
