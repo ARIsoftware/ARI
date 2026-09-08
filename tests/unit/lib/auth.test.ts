@@ -15,6 +15,7 @@
 process.env.DATABASE_URL = 'postgresql://localhost:5432/test'
 process.env.BETTER_AUTH_SECRET = 'test-secret-auth'
 
+import { withBootstrapUserCreate } from '@/lib/auth-bootstrap-gate'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── better-auth mock ──────────────────────────────────────────────────────────
@@ -202,6 +203,13 @@ describe('trustedOrigins', () => {
 
 // ─── databaseHooks.user.create.before ─────────────────────────────────────────
 
+describe('databaseHooks.user.create.before — bootstrap gate backstop', () => {
+  it('rejects ALL user creation when the bootstrap gate is closed (sign-up backstop)', async () => {
+    const user = { id: 'u-gate', email: 'gate@x.com', name: 'G' }
+    await expect(userCreateBefore()(user)).rejects.toThrow(/first-run bootstrap/)
+  })
+})
+
 describe('databaseHooks.user.create.before — single-user gate', () => {
   beforeEach(() => {
     // Reset manifest to empty (no ari-users) for most tests
@@ -212,7 +220,7 @@ describe('databaseHooks.user.create.before — single-user gate', () => {
     // Set manifest to include ari-users — multiUserInstalled = true → skip pool.query
     manifestHolder.modules = [{ id: 'ari-users' }]
     const user = { id: 'u1', email: 'u@x.com', name: 'U' }
-    const result = await userCreateBefore()(user)
+    const result = await withBootstrapUserCreate(() => userCreateBefore()(user))
     expect(result).toEqual({ data: user })
     // pool.query should NOT have been called (gate bypassed)
     expect(mockPoolQuery).not.toHaveBeenCalled()
@@ -223,7 +231,7 @@ describe('databaseHooks.user.create.before — single-user gate', () => {
     manifestHolder.modules = [{ id: 'other-module' }, { id: 'another-module' }]
     mockPoolQuery.mockResolvedValue({ rows: [{ count: '0' }] })
     const user = { id: 'u1b', email: 'u1b@x.com', name: 'U1b' }
-    const result = await userCreateBefore()(user)
+    const result = await withBootstrapUserCreate(() => userCreateBefore()(user))
     expect(result).toEqual({ data: user })
   })
 
@@ -231,7 +239,7 @@ describe('databaseHooks.user.create.before — single-user gate', () => {
     manifestHolder.modules = []
     mockPoolQuery.mockResolvedValue({ rows: [{ count: '0' }] })
     const user = { id: 'u2', email: 'u2@x.com', name: 'U2' }
-    const result = await userCreateBefore()(user)
+    const result = await withBootstrapUserCreate(() => userCreateBefore()(user))
     expect(result).toEqual({ data: user })
   })
 
@@ -239,14 +247,14 @@ describe('databaseHooks.user.create.before — single-user gate', () => {
     manifestHolder.modules = []
     mockPoolQuery.mockResolvedValue({ rows: [{ count: '1' }] })
     const user = { id: 'u3', email: 'u3@x.com', name: 'U3' }
-    await expect(userCreateBefore()(user)).rejects.toThrow(/single-user/)
+    await expect(withBootstrapUserCreate(() => userCreateBefore()(user))).rejects.toThrow(/single-user/)
   })
 
   it('throws an APIError (not a plain Error) when single-user gate fires', async () => {
     manifestHolder.modules = []
     mockPoolQuery.mockResolvedValue({ rows: [{ count: '5' }] })
     try {
-      await userCreateBefore()({ id: 'u4', email: 'u4@x.com' })
+      await withBootstrapUserCreate(() => userCreateBefore()({ id: 'u4', email: 'u4@x.com' }))
       expect.fail('should have thrown')
     } catch (err) {
       expect(err).toBeInstanceOf(APIError)
@@ -259,7 +267,7 @@ describe('databaseHooks.user.create.before — single-user gate', () => {
     mockPoolQuery.mockRejectedValue(new Error('DB down'))
     const user = { id: 'u5', email: 'u5@x.com', name: 'U5' }
     // The catch block swallows the error and creation proceeds
-    const result = await userCreateBefore()(user)
+    const result = await withBootstrapUserCreate(() => userCreateBefore()(user))
     expect(result).toEqual({ data: user })
   })
 })

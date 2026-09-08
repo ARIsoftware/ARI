@@ -46,14 +46,29 @@
     process.exit(result.status === null ? 1 : result.status)
   }
 
+  // The downloaded file is EXECUTED, so every hop — including redirects —
+  // must stay on GitHub-owned https hosts (same allowlist as install.mjs).
+  function assertAllowedUrl(url) {
+    const parsed = new URL(url)
+    const allowed = /^(api\.github\.com|github\.com|codeload\.github\.com|([a-z0-9-]+\.)*githubusercontent\.com)$/i
+    if (parsed.protocol !== 'https:' || !allowed.test(parsed.hostname)) {
+      throw new Error(`Refusing to download from unexpected host: ${parsed.hostname}`)
+    }
+  }
+
   function download(url, dest, redirectsLeft) {
+    assertAllowedUrl(url)
     return new Promise((resolve, reject) => {
       https
         .get(url, { headers: { 'User-Agent': 'ari-installer-shim' } }, (res) => {
           if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
             res.resume()
             if (redirectsLeft <= 0) return reject(new Error('Too many redirects'))
-            return resolve(download(res.headers.location, dest, redirectsLeft - 1))
+            try {
+              return resolve(download(res.headers.location, dest, redirectsLeft - 1))
+            } catch (e) {
+              return reject(e)
+            }
           }
           if (res.statusCode !== 200) {
             res.resume()
@@ -78,8 +93,13 @@
   // Prefer a local install.mjs sitting NEXT TO THIS SCRIPT (a real checkout).
   // Deliberately no process.cwd() guessing — running the installer from an
   // arbitrary directory must never execute an installer file planted there.
-  const sibling = path.join(path.dirname(process.argv[1] || '.'), 'install.mjs')
-  if (fs.existsSync(sibling)) runInstaller(sibling, null)
+  // That includes the stdin-pipe case (`curl … | node`): argv[1] is absent
+  // there, dirname would resolve to '.', and the "sibling" would be a file
+  // in the current directory — skip the local path entirely and download.
+  if (process.argv[1]) {
+    const sibling = path.join(path.dirname(process.argv[1]), 'install.mjs')
+    if (fs.existsSync(sibling)) runInstaller(sibling, null)
+  }
 
   // Private 0700 scratch dir (mkdtemp): a predictable pid-based /tmp name
   // could be pre-created or symlinked by another local user and swapped

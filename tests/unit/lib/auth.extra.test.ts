@@ -11,6 +11,7 @@
 process.env.DATABASE_URL = 'postgresql://localhost:5432/test'
 process.env.BETTER_AUTH_SECRET = 'test-secret-auth'
 
+import { withBootstrapUserCreate } from '@/lib/auth-bootstrap-gate'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const capturedConfigHolder = vi.hoisted(() => ({ cfg: {} as Record<string, any> }))
@@ -95,7 +96,7 @@ describe('user.create.before — empty rows (extra)', () => {
     // rows = [] → rows[0]?.count = undefined → ?? "0" → hasUsers = false
     mockPoolQueryExtra.mockResolvedValue({ rows: [] })
     const user = { id: 'u-extra', email: 'e@x.com', name: 'E' }
-    const result = await userCreateBefore()(user)
+    const result = await withBootstrapUserCreate(() => userCreateBefore()(user))
     expect(result).toEqual({ data: user })
   })
 })

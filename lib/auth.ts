@@ -8,6 +8,7 @@ import { pool } from "@/lib/db/pool"
 // Regenerated on every predev/prebuild — reflects the modules actually on
 // disk in this build (same pattern as middleware.ts).
 import { isMultiUserInstall } from "@/lib/multi-user"
+import { isBootstrapUserCreateAllowed } from "@/lib/auth-bootstrap-gate"
 import { getAriInstance, tryClaimFirstSigninPing } from "@/lib/telemetry/instance"
 import { sendTvConnect } from "@/lib/telemetry/send-tv-connect"
 import { logActivity } from "@/lib/activity-log"
@@ -172,6 +173,20 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (user) => {
+          // Auth-layer backstop for the anonymous→admin boundary: HTTP
+          // sign-up is blocked in proxy.ts, but that is one string match in
+          // middleware. ALL Better Auth user creation is therefore rejected
+          // here unless the first-run bootstrap opened the gate around its
+          // server-side signUpEmail call — nothing else legitimately creates
+          // users through Better Auth (the Users module inserts rows
+          // directly via its own admin-gated API).
+          if (!isBootstrapUserCreateAllowed()) {
+            throw new APIError("FORBIDDEN", {
+              message:
+                "Accounts are created by the first-run bootstrap or the Users module.",
+            })
+          }
+
           // Single-user cap: without the Users module installed (its code
           // present in this build), ARI is single-user — only the first
           // account may ever be created. The check is on module PRESENCE,

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDeploymentTarget } from '@/lib/deployment'
-import { getMissingRequiredConfig, isSetupComplete } from '@/lib/env-registry'
+import { ENV_REGISTRY, getMissingRequiredConfig, isSetupComplete } from '@/lib/env-registry'
 import { getDbMode } from '@/lib/db/mode'
 import { checkUsersExistInDb, getAuthenticatedUser } from '@/lib/auth-helpers'
 import { checkRateLimit, getClientIp } from '@/lib/modules/public-route-security'
@@ -85,14 +85,28 @@ async function handleGET(request: NextRequest) {
   // Denied callers still get the base fields; the cross-deployment poll only
   // needs setupComplete.
   const usersState = (await checkUsersExistInDbCached()).status
+  const missingVars = setupComplete ? [] : getMissingRequiredConfig()
+  let isAdminCaller = false
   let canSeeDetail = false
   if (usersState === 'no-users' || usersState === 'no-table' || usersState === 'no-pool') {
     canSeeDetail = true
   } else if (usersState === 'has-users') {
     const { user } = await getAuthenticatedUser()
-    canSeeDetail = user?.role === 'admin'
+    isAdminCaller = user?.role === 'admin'
+    canSeeDetail = isAdminCaller
   }
   const canSeeMissing = canSeeDetail || (usersState === 'db-error' && !setupComplete)
+
+  // projectDir (absolute path, typically containing the OS username) gets a
+  // stricter rule than `missing`: anonymous callers see it only when the
+  // install is demonstrably NOT an established one — the DB is affirmatively
+  // empty (no-users), or NOTHING required is configured (a truly fresh
+  // wizard run). An install that lost just DATABASE_URL (no-pool with
+  // BETTER_AUTH_SECRET still present) looks like a broken established
+  // install, so the path is withheld; its Save step shows a placeholder.
+  const requiredCount = ENV_REGISTRY.filter((s) => s.required).length
+  const fullyUnconfigured = !setupComplete && missingVars.length >= requiredCount
+  const canSeeProjectDir = isAdminCaller || usersState === 'no-users' || fullyUnconfigured
 
   // dbMode is always included (it's not sensitive, and the wizard needs it to
   // pick the right step order even for a signed-in admin revisiting /welcome).
@@ -103,10 +117,10 @@ async function handleGET(request: NextRequest) {
     setupComplete,
     deploymentTarget,
     dbMode: getDbMode(),
-    ...(!setupComplete && canSeeMissing ? { missing: getMissingRequiredConfig() } : {}),
+    ...(!setupComplete && canSeeMissing ? { missing: missingVars } : {}),
     // Filesystem paths are only meaningful (and only safe to reveal) on
     // local installs, where the wizard shows where .env.local will land.
-    ...(deploymentTarget === 'local' && canSeeDetail ? { projectDir: process.cwd() } : {}),
+    ...(deploymentTarget === 'local' && canSeeProjectDir ? { projectDir: process.cwd() } : {}),
   }
 
   return NextResponse.json(body, { headers: { 'Cache-Control': 'no-store' } })

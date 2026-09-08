@@ -1,16 +1,23 @@
 // Shared .env.local helpers — server writes and client preview both render
-// through these so the output stays identical. Callers MUST pre-reject values
-// containing `\r`, `\n`, or `\x00`; `formatEnvValue` quotes and escapes
-// everything else, but a newline in a value would still break the file.
+// through these so the output stays identical. Callers SHOULD still reject
+// values containing `\r`, `\n`, or `\x00` for a clean error message, but
+// `formatEnvValue` is the choke point: it strips those bytes itself, so a
+// caller that forgets validation can never emit a value that injects an
+// extra line into the file (line-oriented consumers like the ari CLI or
+// --env-file loaders would ingest an injected `KEY=...` line as real).
 
 import type { DbMode } from '@/lib/db/mode'
 
 // Raw values without spaces, `#`, or quotes are written bare; anything else
-// is double-quote-wrapped with `"` and `\` escaped.
+// is double-quote-wrapped with `"` and `\` escaped. Control bytes that would
+// break the line-oriented format are stripped, not escaped — this module is
+// also imported client-side for the live preview, so it must sanitize
+// rather than throw.
 export function formatEnvValue(value: string): string {
-  if (value === "") return ""
-  if (/^[A-Za-z0-9_\-./:@]+$/.test(value)) return value
-  const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
+  const sanitized = value.replace(/[\x00\r\n]/g, "")
+  if (sanitized === "") return ""
+  if (/^[A-Za-z0-9_\-./:@]+$/.test(sanitized)) return sanitized
+  const escaped = sanitized.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
   return `"${escaped}"`
 }
 

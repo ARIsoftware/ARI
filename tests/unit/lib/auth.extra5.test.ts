@@ -11,6 +11,7 @@
 process.env.DATABASE_URL = 'postgresql://localhost:5432/test'
 process.env.BETTER_AUTH_SECRET = 'test-secret-auth'
 
+import { withBootstrapUserCreate } from '@/lib/auth-bootstrap-gate'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const capturedConfigHolder5 = vi.hoisted(() => ({ cfg: {} as Record<string, any> }))
@@ -94,7 +95,7 @@ describe('user.create.before — pool=null (extra5)', () => {
   it('passes through without checking user count when pool is null', async () => {
     const user = { id: 'u-e5', email: 'e5@x.com', name: 'E5' }
     // pool=null → if (pool && !multiUserInstalled) false → skip count check
-    const result = await userCreateBefore5()(user)
+    const result = await withBootstrapUserCreate(() => userCreateBefore5()(user))
     expect(result).toEqual({ data: user })
   })
 })

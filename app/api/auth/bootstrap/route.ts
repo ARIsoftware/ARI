@@ -3,6 +3,7 @@ import { readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { pool } from "@/lib/db/pool"
 import { auth } from "@/lib/auth"
+import { withBootstrapUserCreate } from "@/lib/auth-bootstrap-gate"
 import { setupSql } from "@/lib/db/setup-sql"
 import { upsertEnvVars } from "@/lib/env-file"
 import { checkRateLimit, getClientIp, isSameOriginRequest } from "@/lib/modules/public-route-security"
@@ -173,13 +174,17 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      const response = await auth.api.signUpEmail({
-        body: {
-          email,
-          password,
-          name: email.split("@")[0],
-        },
-      })
+      // withBootstrapUserCreate opens the auth-layer gate: lib/auth.ts
+      // rejects every other Better Auth user-creation path outright.
+      const response = await withBootstrapUserCreate(() =>
+        auth.api.signUpEmail({
+          body: {
+            email,
+            password,
+            name: email.split("@")[0],
+          },
+        })
+      )
 
       if (!response) {
         return NextResponse.json({ status: "error" }, { status: 500 })

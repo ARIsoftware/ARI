@@ -4,6 +4,8 @@ import path from "path"
 import { getAuthenticatedUser } from "@/lib/auth-helpers"
 import { requireAdmin } from "@/lib/api-helpers"
 import { upsertEnvVars } from "@/lib/env-file"
+import { z } from "zod"
+import { envSafeString, flattenZodErrors } from "@/lib/validation"
 import {
   SettingsGithubStatusSchema,
   settingsGithubBodySchema,
@@ -143,22 +145,28 @@ async function handlePOST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
   }
 
-  const rawToken = typeof body.githubToken === "string" ? body.githubToken : ""
-  const repoOwner = typeof body.githubRepoOwner === "string" ? body.githubRepoOwner.trim() : ""
-  const repoName = typeof body.githubRepoName === "string" ? body.githubRepoName.trim() : ""
-  const clearToken = body.clearToken === true
-
-  // lib/env-file.ts contract: callers MUST pre-reject values containing
-  // \r, \n, or \x00 — formatEnvValue escapes quotes but not newlines, and
-  // line-oriented .env consumers (the ari CLI, --env-file loaders) would
-  // otherwise ingest an injected extra line as a real variable.
-  const envUnsafe = /[\x00\r\n]/
-  if (envUnsafe.test(rawToken) || envUnsafe.test(repoOwner) || envUnsafe.test(repoName)) {
+  // The shared env-file safety contract (envSafeString rejects \x00/\r/\n and
+  // caps length) — the same validator the other .env.local writers use, so
+  // future tightening of the contract reaches this route too.
+  const parsedBody = z
+    .object({
+      githubToken: envSafeString(500).optional(),
+      githubRepoOwner: envSafeString(200).optional(),
+      githubRepoName: envSafeString(200).optional(),
+      clearToken: z.boolean().optional(),
+    })
+    .safeParse(body)
+  if (!parsedBody.success) {
     return NextResponse.json(
-      { error: "Values must not contain newlines or control characters" },
+      { error: "Invalid input", details: flattenZodErrors(parsedBody.error) },
       { status: 400 }
     )
   }
+
+  const rawToken = parsedBody.data.githubToken ?? ""
+  const repoOwner = (parsedBody.data.githubRepoOwner ?? "").trim()
+  const repoName = (parsedBody.data.githubRepoName ?? "").trim()
+  const clearToken = parsedBody.data.clearToken === true
 
   // Token semantics:
   //   - clearToken=true → explicitly remove the token from .env.local

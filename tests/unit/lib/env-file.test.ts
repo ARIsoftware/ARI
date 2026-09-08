@@ -253,3 +253,17 @@ describe('renderEnvFile', () => {
     expect(result).toContain('DATABASE_URL=postgresql://localhost:5432/ari')
   })
 })
+
+// ── formatEnvValue — control-byte choke point ─────────────────────────────────
+
+describe('formatEnvValue — strips line-breaking control bytes', () => {
+  it('strips \\n, \\r, and \\x00 so a value can never inject an extra env line', () => {
+    expect(formatEnvValue('abc\nINJECTED=1')).toBe('"abcINJECTED=1"')
+    expect(formatEnvValue('abc\r\ndef')).toBe('abcdef')
+    expect(formatEnvValue('a\x00b')).toBe('ab')
+  })
+
+  it('returns empty string when the value is only control bytes', () => {
+    expect(formatEnvValue('\n\r\x00')).toBe('')
+  })
+})

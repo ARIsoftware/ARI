@@ -235,9 +235,13 @@ if [[ -f "$INSTALL_DIR_FILE" ]]; then
   INSTALL_DIR="$(cat "$INSTALL_DIR_FILE")"
 fi
 
-# On success, switch into the install directory and start a fresh shell
+# On success, switch into the install directory and start a fresh shell.
+# Explicit cleanup before the exec: bash does not run EXIT traps across a
+# successful exec, so relying on the trap alone leaks WORK_DIR on the most
+# common (successful) path.
 if [[ $EXIT_CODE -eq 0 ]] && [[ -n "$INSTALL_DIR" ]] && [[ -d "$INSTALL_DIR" ]]; then
   unset ARI_PLATFORM ARI_PKG_MGR ARI_INSTALL_DIR_FILE
+  rm -rf "$WORK_DIR"
   cd "$INSTALL_DIR" || true
   exec "${SHELL:-bash}" -l
 fi
