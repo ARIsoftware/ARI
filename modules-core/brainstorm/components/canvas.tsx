@@ -10,6 +10,7 @@ import {
   MiniMap,
   ReactFlow,
   ReactFlowProvider,
+  useReactFlow,
   addEdge,
   applyEdgeChanges,
   applyNodeChanges,
@@ -199,6 +200,8 @@ interface CanvasInnerProps {
 
 function CanvasInner({ board }: CanvasInnerProps) {
   const { toast } = useToast()
+  const { screenToFlowPosition } = useReactFlow()
+  const wrapperRef = useRef<HTMLDivElement>(null)
   const saveBoard = useSaveBrainstormBoard(board.id)
   const [dirty, setDirty] = useState(false)
   const [locked, setLocked] = useState(false)
@@ -341,17 +344,29 @@ function CanvasInner({ board }: CanvasInnerProps) {
 
   const handleAddNode = () => {
     const id = crypto.randomUUID()
-    const x = 100 + Math.random() * 400
-    const y = 100 + Math.random() * 300
-    setNodes((cur) => [
-      ...cur,
-      {
-        id,
-        type: 'idea',
-        position: { x, y },
-        data: { text: '', color: 'slate' as BrainstormColor, index: 0, onChange: updateNodeText, onCycleColor: cycleNodeColor, onDelete: deleteNode, onAddChild: addChildNode },
-      },
-    ])
+    // Place at the center of the visible viewport so the card is never off-screen,
+    // regardless of pan/zoom. Half the card size keeps it visually centered.
+    const rect = wrapperRef.current?.getBoundingClientRect()
+    const center = rect
+      ? screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 })
+      : { x: 300, y: 250 }
+    setNodes((cur) => {
+      const pos = { x: center.x - 85, y: center.y - 18 }
+      // Cascade up-right until the spot is free (tolerance so near-misses count as occupied)
+      while (cur.some((n) => Math.abs(n.position.x - pos.x) < 10 && Math.abs(n.position.y - pos.y) < 10)) {
+        pos.x += 24
+        pos.y -= 24
+      }
+      return [
+        ...cur,
+        {
+          id,
+          type: 'idea',
+          position: pos,
+          data: { text: '', color: 'slate' as BrainstormColor, index: 0, onChange: updateNodeText, onCycleColor: cycleNodeColor, onDelete: deleteNode, onAddChild: addChildNode },
+        },
+      ]
+    })
     setDirty(true)
   }
 
@@ -413,7 +428,7 @@ function CanvasInner({ board }: CanvasInnerProps) {
   }
 
   return (
-    <div className="relative h-[calc(100vh-220px)] min-h-[500px] w-full border rounded-lg overflow-hidden bg-background">
+    <div ref={wrapperRef} className="relative h-[calc(100vh-220px)] min-h-[500px] w-full border rounded-lg overflow-hidden bg-background">
       <div className="absolute top-3 left-3 z-10 flex gap-2">
         <Button size="sm" onClick={handleAddNode} disabled={locked}>
           <Plus className="w-4 h-4 mr-1" /> Add idea
