@@ -2197,6 +2197,24 @@ export default function DatabaseTestPage() {
         const response = await fetch(test.fullPath)
         if (!response.ok) {
           const err = await response.json().catch(() => ({}))
+          // A structured JSON 404 means the route ran (auth + logic) and
+          // deliberately reported an empty state (e.g. health-data before any
+          // import). That's a healthy module with no data — not a failure.
+          // A missing route 404s with an HTML body instead (no err.error).
+          if (response.status === 404 && err.error) {
+            phase3Summaries.set(test.moduleId, {
+              rowCount: 0,
+              source: test.fullPath,
+              hasUserScoping: false,
+              allOwnedByCurrentUser: null,
+            })
+            updateTestResult(test.name, {
+              status: 'success',
+              message: `No data yet — API responded correctly (${err.error})`,
+              data: { count: 0, source: test.fullPath },
+            })
+            return
+          }
           throw new Error(err.error || `HTTP ${response.status}`)
         }
         const data = await response.json()
