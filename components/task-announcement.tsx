@@ -67,11 +67,11 @@ const bgStyle: React.CSSProperties = customColor !== '#000000' ? { backgroundCol
 const bgClass = customColor === '#000000' ? 'bg-topbar text-topbar-foreground' : ''
 
 const BUILTIN_ICONS = [
-  { id: "icon-theme", label: "Theme" },
-  { id: "icon-command", label: "Command" },
-  { id: "icon-settings", label: "Settings" },
-  { id: "icon-modules", label: "Modules" },
-  { id: "icon-logout", label: "Logout" },
+  { id: "icon-command", label: "Command", order: 30 },
+  { id: "icon-theme", label: "Theme", order: 60 },
+  { id: "icon-settings", label: "Settings", order: 70 },
+  { id: "icon-modules", label: "Modules", order: 80 },
+  { id: "icon-logout", label: "Logout", order: 90 },
 ] as const
 
 // Sortable wrapper for top bar icons in drag mode
@@ -109,14 +109,14 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
   // Build all icons list with their IDs
   const allIcons = [
     ...moduleIcons.map(m => ({ id: `module-${m.id}`, type: "module" as const, module: m })),
-    ...BUILTIN_ICONS.map(icon => ({ id: icon.id, type: "builtin" as const, builtinId: icon.id })),
+    ...BUILTIN_ICONS.map(icon => ({ id: icon.id, type: "builtin" as const, builtinId: icon.id, order: icon.order })),
   ]
 
   // Sort icons by saved order (lower number = earlier position).
   // Icons the user hasn't positioned fall back to the module manifest's
-  // topBarIcon.order, then 50.
+  // topBarIcon.order (builtins carry their own default), then 50.
   const defaultOrder = (icon: (typeof allIcons)[0]) =>
-    (icon.type === "module" ? icon.module.topBarIcon?.order : undefined) ?? 50
+    (icon.type === "module" ? icon.module.topBarIcon?.order : icon.order) ?? 50
   const sortedIcons = [...allIcons].sort((a, b) => {
     const orderA = iconOrder?.[a.id] ?? defaultOrder(a)
     const orderB = iconOrder?.[b.id] ?? defaultOrder(b)

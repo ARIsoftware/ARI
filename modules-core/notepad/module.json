@@ -15,6 +15,7 @@
     }
   ],
   "topBarIcon": {
-    "component": "./components/notepad-top-bar-icon.tsx"
+    "component": "./components/notepad-top-bar-icon.tsx",
+    "order": 20
   }
 }

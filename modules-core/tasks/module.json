@@ -51,7 +51,7 @@
   },
   "topBarIcon": {
     "component": "./components/top-bar-icon.tsx",
-    "order": 35
+    "order": 10
   },
   "globalProvider": {
     "component": "./components/quick-add-task-sheet.tsx",

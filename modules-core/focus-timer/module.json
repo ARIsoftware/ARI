@@ -9,6 +9,6 @@
   "routes": [],
   "topBarIcon": {
     "component": "./components/top-bar-icon.tsx",
-    "order": 10
+    "order": 40
   }
 }
