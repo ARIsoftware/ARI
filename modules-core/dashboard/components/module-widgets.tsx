@@ -90,6 +90,18 @@ export function MorningBriefWidget() {
 }
 
 /**
+ * The Tasks module's Total Tasks stat card (registry index 0). Renders
+ * nothing when the module is disabled.
+ */
+export function TasksStatCard() {
+  const { modules } = useModules()
+  const enabled = modules.some((m) => m.id === 'tasks' && m.dashboard?.widgets)
+  const loader = MODULE_DASHBOARD_STAT_CARDS['tasks']?.[0]
+  if (!enabled || !loader) return null
+  return <DynamicWidget loader={loader} />
+}
+
+/**
  * The Tasks module's Task Activity chart widget. The registry lists tasks
  * widgets as [dashboard-activity-widget, dashboard-radar-widget] — index 0
  * is Activity.

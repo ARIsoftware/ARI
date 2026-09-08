@@ -11,14 +11,13 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, rectSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { useModules } from '@/lib/modules/module-hooks'
 import { useDragDropMode } from '@/components/drag-drop-mode-context'
 import {
   MODULE_DASHBOARD_STAT_CARDS,
   MODULE_DASHBOARD_WIDGETS,
 } from '@/lib/generated/module-dashboard-registry'
+import { SystemStatusCard } from '@/modules/dashboard/components/system-status-card'
 
 // Dynamic ESM imports have an unknown module shape; resolveComponent probes for `default` or any exported function.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -123,27 +122,6 @@ function SortableItem({
   )
 }
 
-// --- System Status card (always shown) ---
-
-function SystemStatusCard() {
-  return (
-    <Card className="rounded-[0.8rem] hover:shadow-md transition-shadow h-full">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">System Status</CardTitle>
-        <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-medium">Online</div>
-        <p className="text-xs text-muted-foreground">all systems operational</p>
-        <Badge variant="secondary" className="mt-2 text-xs">
-          <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
-          Healthy
-        </Badge>
-      </CardContent>
-    </Card>
-  )
-}
-
 const SYSTEM_STATUS_KEY = '__system-status__'
 
 // --- Stat cards with sorting + dynamic grid ---
@@ -211,7 +189,11 @@ export function DashboardStatCards() {
 
   const content = sortedLoaders.map(({ key, loader }) => {
     const card =
-      key === SYSTEM_STATUS_KEY ? <SystemStatusCard /> : <DynamicWidget loader={loader!} />
+      key === SYSTEM_STATUS_KEY ? (
+        <SystemStatusCard className="rounded-[0.8rem] h-full" />
+      ) : (
+        <DynamicWidget loader={loader!} />
+      )
 
     if (isDragMode) {
       return (

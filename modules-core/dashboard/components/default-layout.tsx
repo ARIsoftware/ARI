@@ -12,7 +12,9 @@ import {
   ModuleWidgets,
   MorningBriefWidget,
   TaskActivityWidget,
+  TasksStatCard,
 } from '@/modules/dashboard/components/module-widgets'
+import { SystemStatusCard } from '@/modules/dashboard/components/system-status-card'
 import { QuickAddTaskContext } from '@/modules/tasks/components/quick-add-task-sheet'
 
 const FALLBACK_BRIEF_MESSAGE = 'Everything is structured and ready — steady focus, as always.'
@@ -148,6 +150,12 @@ export function DefaultDashboardLayout() {
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
           {/* Left column */}
           <div className="space-y-6 lg:col-span-3">
+            {/* The Tasks module's Total Tasks stat card */}
+            <TasksStatCard />
+
+            {/* System health at a glance — badge links to /health */}
+            <SystemStatusCard className="rounded-lg" />
+
             {/* Dashboard cards from every other enabled module (portfolio, ...) */}
             <ModuleWidgets />
           </div>
