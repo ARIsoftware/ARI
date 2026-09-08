@@ -4,6 +4,7 @@ import { getMissingRequiredConfig, isSetupComplete } from '@/lib/env-registry'
 import { getDbMode } from '@/lib/db/mode'
 import { checkUsersExistInDb, getAuthenticatedUser } from '@/lib/auth-helpers'
 import { checkRateLimit, getClientIp } from '@/lib/modules/public-route-security'
+import { withApiLogging } from '@/lib/api-logging'
 import { SetupStatusSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { ErrorResponseSchema } from '@/lib/openapi/common'
@@ -41,7 +42,7 @@ registry.registerPath({
   },
 })
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   if (!checkRateLimit(`setup-status:${getClientIp(request)}`, 30)) {
     return NextResponse.json(
       { error: 'Rate limit exceeded. Please try again later.' },
@@ -89,3 +90,5 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(body, { headers: { 'Cache-Control': 'no-store' } })
 }
+
+export const GET = withApiLogging(handleGET)
