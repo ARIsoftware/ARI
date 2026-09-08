@@ -130,6 +130,7 @@ export function buildVercelEnvPlan(
   fields: {
     databaseUrl?: string
     betterAuthSecret?: string
+    githubToken?: string
     adminEmail: string
     adminPassword: string
     productionUrl: string
@@ -157,6 +158,14 @@ export function buildVercelEnvPlan(
       key: 'BETTER_AUTH_SECRET',
       value: fields.betterAuthSecret,
       type: typeFor('BETTER_AUTH_SECRET'),
+      target,
+    })
+  }
+  if (fields.githubToken) {
+    plan.push({
+      key: 'GITHUB_TOKEN',
+      value: fields.githubToken,
+      type: typeFor('GITHUB_TOKEN'),
       target,
     })
   }

@@ -1469,7 +1469,13 @@ export default function ModulesPage() {
                               }
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              Set <code className="px-1 py-0.5 bg-muted rounded text-[11px]">GITHUB_TOKEN</code> and repo details in your environment variables to enable.{' '}
+                              {installSuccess?.vercel
+                                ? 'Just set '
+                                : 'Set '}
+                              <code className="px-1 py-0.5 bg-muted rounded text-[11px]">GITHUB_TOKEN</code>
+                              {installSuccess?.vercel
+                                ? ' in your Vercel environment variables to enable — your repository is detected automatically.'
+                                : ' and your repository details in Settings → Git to enable.'}{' '}
                               <a
                                 href="https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens"
                                 target="_blank"
@@ -1807,16 +1813,17 @@ export default function ModulesPage() {
                 <AlertDialogDescription asChild>
                   <div className="space-y-3">
                     <p>
-                      Module installation on Vercel requires a GitHub token. Without it, modules cannot be installed because Vercel&apos;s filesystem is read-only.
+                      Because Vercel&apos;s filesystem is read-only, ARI installs modules by committing them to your GitHub repository — and for that it needs a GitHub token.
                     </p>
                     <p>
-                      To enable module installation, add these environment variables in your Vercel project settings:
+                      Good news: it&apos;s just one environment variable. Add it in your Vercel project&apos;s Settings → Environment Variables, then redeploy:
                     </p>
-                    <div className="rounded-md bg-muted p-3 space-y-1 text-xs font-mono">
+                    <div className="rounded-md bg-muted p-3 text-xs font-mono">
                       <p>GITHUB_TOKEN</p>
-                      <p>GITHUB_REPO_OWNER</p>
-                      <p>GITHUB_REPO_NAME</p>
                     </div>
+                    <p>
+                      Your repository&apos;s owner and name are detected automatically from the Git repository linked to your Vercel project — no need to configure them.
+                    </p>
                     <p>
                       <a
                         href="https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens"

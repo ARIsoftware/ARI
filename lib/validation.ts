@@ -100,6 +100,7 @@ export const vercelConfigureRequestSchema = z.object({
   vercelToken: envSafeString(300).min(1, 'Vercel access token is required'),
   databaseUrl: envSafeString(2000).optional(),
   betterAuthSecret: envSafeString(200).optional(),
+  githubToken: envSafeString(300).optional(),
   adminEmail: welcomeEmailSchema,
   adminPassword: adminPasswordSchema,
 })

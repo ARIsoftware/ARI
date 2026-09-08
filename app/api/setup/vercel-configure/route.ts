@@ -203,6 +203,7 @@ export async function POST(request: NextRequest) {
       {
         databaseUrl: parsed.data.databaseUrl,
         betterAuthSecret,
+        githubToken: parsed.data.githubToken,
         adminEmail,
         adminPassword,
         productionUrl: info.productionUrl,

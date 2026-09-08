@@ -139,6 +139,7 @@ export default function WelcomePage() {
 
   // Vercel deploy flow state
   const [vercelToken, setVercelToken] = useState('')
+  const [githubToken, setGithubToken] = useState('')
   const [vercelDeployStatus, setVercelDeployStatus] = useState<
     'idle' | 'submitting' | 'deploying' | 'complete' | 'timeout' | 'error'
   >('idle')
@@ -526,6 +527,7 @@ export default function WelcomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           vercelToken: vercelToken.trim(),
+          ...(githubToken.trim() ? { githubToken: githubToken.trim() } : {}),
           ...(formData.databaseUrl.trim() ? { databaseUrl: formData.databaseUrl.trim() } : {}),
           ...(needsAuthSecret ? { betterAuthSecret: formData.betterAuthSecret } : {}),
           adminEmail: formData.adminEmail || profileData.email,
@@ -534,6 +536,7 @@ export default function WelcomePage() {
       })
       const data = await readApiResultOrThrow(res)
       setVercelToken('')
+      setGithubToken('')
       // Rendered into https:// links — accept only a bare hostname, so a
       // tampered value can't smuggle a path, credentials (user@host), port
       // tricks, or a different URL shape into those hrefs.
@@ -2648,6 +2651,53 @@ export default function WelcomePage() {
                           with access to this project. ARI uses it once — to save your configuration
                           and trigger a redeploy — and never stores it. You can delete the token
                           afterwards.
+                        </p>
+                      </div>
+
+                      {/* Step 4: GitHub token (optional — enables module installs) */}
+                      <div className="flex items-center gap-3">
+                        <div className="flex w-10 h-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white">
+                          4
+                        </div>
+                        <h3 className="font-semibold text-zinc-900" style={{ fontSize: '1.2rem' }}>
+                          GitHub Token{' '}
+                          <span className="text-sm font-normal text-zinc-500">(optional)</span>
+                        </h3>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="github-token" className="text-sm font-medium text-gray-900">
+                          GitHub Token
+                        </Label>
+                        <Input
+                          id="github-token"
+                          type="password"
+                          value={githubToken}
+                          onChange={(e) => setGithubToken(e.target.value)}
+                          placeholder="Paste a GitHub token (optional)"
+                          className="text-sm"
+                          autoComplete="off"
+                        />
+                        <p className="text-xs text-zinc-500">
+                          Lets you install new modules from the Modules page. Vercel&apos;s
+                          filesystem is read-only, so ARI installs modules by committing them to
+                          your GitHub repository — your repo is detected automatically. Create a
+                          fine-grained token at{' '}
+                          <a
+                            href="https://github.com/settings/personal-access-tokens/new"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 font-medium text-zinc-900 hover:underline"
+                          >
+                            github.com/settings/personal-access-tokens
+                            <ExternalLink className="h-3 w-3" />
+                          </a>{' '}
+                          scoped to your ARI repository with &quot;Contents: Read and write&quot;
+                          permission. Skip this now and you can add it anytime as a{' '}
+                          <code className="rounded bg-zinc-100 px-1 py-0.5 font-mono text-[11px]">
+                            GITHUB_TOKEN
+                          </code>{' '}
+                          environment variable in Vercel.
                         </p>
                       </div>
 

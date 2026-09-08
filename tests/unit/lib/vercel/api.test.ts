@@ -153,7 +153,18 @@ describe('buildVercelEnvPlan', () => {
     const keys = buildVercelEnvPlan(base).map((v) => v.key)
     expect(keys).not.toContain('DATABASE_URL')
     expect(keys).not.toContain('BETTER_AUTH_SECRET')
+    expect(keys).not.toContain('GITHUB_TOKEN')
     expect(keys).toContain('ARI_FIRST_RUN_ADMIN_EMAIL')
+  })
+
+  it('includes GITHUB_TOKEN as sensitive when provided', () => {
+    const plan = buildVercelEnvPlan({ ...base, githubToken: 'ghp_abc' })
+    const entry = plan.find((v) => v.key === 'GITHUB_TOKEN')
+    expect(entry).toMatchObject({
+      value: 'ghp_abc',
+      type: 'sensitive',
+      target: ['production', 'preview'],
+    })
   })
 
   it('never clobbers derived keys the project already has', () => {
