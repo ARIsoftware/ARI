@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { VercelInfo } from '@/lib/deployment'
 import {
-  verifyToken,
   resolveProject,
   upsertEnvVars,
   triggerRedeploy,
@@ -51,29 +50,26 @@ function vercelInfo(overrides: Partial<VercelInfo['git']> = {}): VercelInfo {
 
 const PROJECT: ResolvedProject = { projectId: 'prj_1', projectName: 'ari', teamId: null }
 
-describe('verifyToken', () => {
-  it('returns true on 200 and sends the bearer header', async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(200, { user: {} }))
-    await expect(verifyToken(TOKEN)).resolves.toBe(true)
-    const [url, init] = fetchMock.mock.calls[0]
-    expect(url).toBe('https://api.vercel.com/v2/user')
-    expect(init.headers.Authorization).toBe(`Bearer ${TOKEN}`)
-  })
-
-  it('returns false on 403', async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(403, { error: { message: 'forbidden' } }))
-    await expect(verifyToken(TOKEN)).resolves.toBe(false)
-  })
-})
-
 describe('resolveProject', () => {
-  it('resolves directly for personal tokens', async () => {
+  it('resolves directly for personal tokens and sends the bearer header', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(200, { id: 'prj_1', name: 'ari' }))
     await expect(resolveProject(TOKEN, 'prj_1')).resolves.toEqual({
       projectId: 'prj_1',
       projectName: 'ari',
       teamId: null,
     })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toBe('https://api.vercel.com/v9/projects/prj_1')
+    expect(init.headers.Authorization).toBe(`Bearer ${TOKEN}`)
+  })
+
+  it('rethrows a 401 (invalid token) without falling back to team discovery', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(401, { error: { message: 'not authorized' } }))
+    const err = await resolveProject(TOKEN, 'prj_1').catch((e) => e)
+    expect(err).toBeInstanceOf(VercelApiError)
+    expect(err.status).toBe(401)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(err.message).not.toContain(TOKEN)
   })
 
   it('falls back to team discovery on 403 and finds the owning team', async () => {
@@ -127,6 +123,7 @@ describe('buildVercelEnvPlan', () => {
     adminEmail: 'admin@example.com',
     adminPassword: 'a-very-long-password',
     productionUrl: 'my-ari.vercel.app',
+    issuedAt: '1700000000000',
   }
 
   it('includes all vars with registry-driven types and prod+preview targets', () => {
@@ -147,6 +144,8 @@ describe('buildVercelEnvPlan', () => {
     })
     expect(byKey.BETTER_AUTH_URL.value).toBe('https://my-ari.vercel.app')
     expect(byKey.ARI_DB_MODE).toMatchObject({ type: 'plain', value: 'postgres' })
+    // Stamps the one-shot credentials so bootstrap can expire them.
+    expect(byKey.ARI_FIRST_RUN_ISSUED_AT).toMatchObject({ type: 'plain', value: '1700000000000' })
     for (const v of plan) expect(v.target).toEqual(['production', 'preview'])
   })
 
@@ -168,13 +167,25 @@ describe('buildVercelEnvPlan', () => {
 })
 
 describe('listEnvKeys', () => {
-  it('returns the set of stored env-var names', async () => {
+  it('returns only names stored for the production target', async () => {
     fetchMock.mockResolvedValueOnce(
-      jsonResponse(200, { envs: [{ key: 'DATABASE_URL' }, { key: 'BETTER_AUTH_SECRET' }, {}] }),
+      jsonResponse(200, {
+        envs: [
+          { key: 'DATABASE_URL', target: ['production', 'preview'] },
+          // Development-only var must NOT count as configured — treating it as
+          // present would omit it from the production write plan and wedge setup.
+          { key: 'BETTER_AUTH_SECRET', target: ['development'] },
+          // Legacy string-shaped target.
+          { key: 'ARI_DB_MODE', target: 'production' },
+          // No target at all — not production, excluded.
+          { key: 'ORPHAN' },
+          {},
+        ],
+      }),
     )
     const keys = await listEnvKeys(TOKEN, PROJECT)
     expect(String(fetchMock.mock.calls[0][0])).toContain('/v9/projects/prj_1/env')
-    expect(keys).toEqual(new Set(['DATABASE_URL', 'BETTER_AUTH_SECRET']))
+    expect(keys).toEqual(new Set(['DATABASE_URL', 'ARI_DB_MODE']))
   })
 
   it('throws with Vercel detail on failure', async () => {
@@ -193,6 +204,7 @@ describe('upsertEnvVars', () => {
     adminEmail: 'admin@example.com',
     adminPassword: 'a-very-long-password',
     productionUrl: 'my-ari.vercel.app',
+    issuedAt: '1700000000000',
   })
 
   it('POSTs the array body with upsert=true', async () => {

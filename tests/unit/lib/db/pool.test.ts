@@ -276,3 +276,20 @@ describe('pool — globalThis caching in non-production mode', () => {
     delete (globalThis as any).__ariPgPool
   })
 })
+
+// ── sslConfigFor ───────────────────────────────────────────────────────────────
+
+describe('sslConfigFor', () => {
+  it('disables ssl for loopback hosts', async () => {
+    const { sslConfigFor } = await loadPool({})
+    expect(sslConfigFor('postgresql://postgres:x@127.0.0.1:5432/postgres')).toBe(false)
+    expect(sslConfigFor('postgresql://postgres:x@localhost:5432/postgres')).toBe(false)
+  })
+
+  it('uses rejectUnauthorized:false for remote hosts', async () => {
+    const { sslConfigFor } = await loadPool({})
+    expect(sslConfigFor('postgresql://u:p@db.example.com:5432/postgres')).toEqual({
+      rejectUnauthorized: false,
+    })
+  })
+})

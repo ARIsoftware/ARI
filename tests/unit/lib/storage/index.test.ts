@@ -40,6 +40,7 @@ vi.mock('@/lib/storage/sanitize', () => ({
 
 afterEach(() => {
   delete process.env.VERCEL
+  delete process.env.VERCEL_ENV
 })
 
 // Load a fresh copy of the module (clears the module-level cache)
@@ -297,24 +298,28 @@ describe('isStorageUnavailable', () => {
 
   it('returns true on Vercel with filesystem provider', async () => {
     process.env.VERCEL = '1'
+    process.env.VERCEL_ENV = 'production'
     const { isStorageUnavailable } = await loadModule()
     expect(isStorageUnavailable('filesystem')).toBe(true)
   })
 
   it('returns false on Vercel with s3 provider', async () => {
     process.env.VERCEL = '1'
+    process.env.VERCEL_ENV = 'production'
     const { isStorageUnavailable } = await loadModule()
     expect(isStorageUnavailable('s3')).toBe(false)
   })
 
   it('returns true on Vercel with filesystem config object', async () => {
     process.env.VERCEL = '1'
+    process.env.VERCEL_ENV = 'production'
     const { isStorageUnavailable } = await loadModule()
     expect(isStorageUnavailable({ provider: 'filesystem' })).toBe(true)
   })
 
   it('returns false on Vercel with s3 config object', async () => {
     process.env.VERCEL = '1'
+    process.env.VERCEL_ENV = 'production'
     const { isStorageUnavailable } = await loadModule()
     expect(isStorageUnavailable({ provider: 's3' } as any)).toBe(false)
   })

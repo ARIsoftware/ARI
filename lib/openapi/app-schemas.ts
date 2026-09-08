@@ -124,7 +124,10 @@ export const SetupStatusSchema = z.object({
   setupComplete: z.boolean(),
   deploymentTarget: z.enum(['local', 'vercel']),
   dbMode: z.enum(['postgres', 'supabaselocal', 'supabasecloud']),
-  // Detail fields are present only while setup is incomplete.
+  // Detail fields are gated: anonymous callers see them only while no user can
+  // authenticate (first-run setup); afterwards they're admin-only. `missing`
+  // additionally appears only while setup is incomplete; `projectDir` only on
+  // local installs (present even post-setup for the Save step's real path).
   missing: z.array(z.string()).optional(),
   projectDir: z.string().optional(),
 }).openapi('SetupStatus')

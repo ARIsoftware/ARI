@@ -14,7 +14,7 @@
     "predev": "node scripts/generate-module-registry.js && tsx scripts/generate-openapi.ts && node scripts/generate-test-report.mjs",
     "dev": "next dev",
     "start": "next start",
-    "setup": "node scripts/install.js",
+    "setup": "node scripts/install.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

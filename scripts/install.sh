@@ -163,31 +163,43 @@ else
   install_node
 fi
 
-# ── Hand off to install.js ───────────────────────────────────────────────────
-INSTALL_JS="/tmp/ari-install-$$.js"
+# ── Hand off to the Node installer ──────────────────────────────────────────
+# The installer is ESM (scripts/install.mjs) and must keep its .mjs extension
+# when run from /tmp — there's no package.json there to declare module type.
+# Older branches only have a CJS scripts/install.js; fall back to that.
 INSTALL_DIR_FILE="/tmp/ari-install-dir-$$"
 export ARI_INSTALL_DIR_FILE="$INSTALL_DIR_FILE"
 ARI_BRANCH="${ARI_BRANCH:-main}"
 export ARI_BRANCH
-INSTALL_URL="https://raw.githubusercontent.com/ARIsoftware/ARI/${ARI_BRANCH}/scripts/install.js"
+INSTALL_MJS_URL="https://raw.githubusercontent.com/ARIsoftware/ARI/${ARI_BRANCH}/scripts/install.mjs"
+INSTALL_JS_URL="https://raw.githubusercontent.com/ARIsoftware/ARI/${ARI_BRANCH}/scripts/install.js"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd 2>/dev/null)" || SCRIPT_DIR=""
+LOCAL_MJS="${SCRIPT_DIR:+$SCRIPT_DIR/install.mjs}"
 LOCAL_JS="${SCRIPT_DIR:+$SCRIPT_DIR/install.js}"
 
-if curl -fsSL "$INSTALL_URL" -o "$INSTALL_JS" 2>/dev/null; then
-  : # Downloaded successfully
-elif [[ -f "$LOCAL_JS" ]]; then
-  cp "$LOCAL_JS" "$INSTALL_JS"
+INSTALL_JS="/tmp/ari-install-$$.mjs"
+if curl -fsSL "$INSTALL_MJS_URL" -o "$INSTALL_JS" 2>/dev/null; then
+  : # Downloaded the ESM installer
+elif [[ -f "$LOCAL_MJS" ]]; then
+  cp "$LOCAL_MJS" "$INSTALL_JS"
 else
-  err "Failed to download install.js and no local copy found."
+  # Legacy fallback: branch predates install.mjs — fetch the CJS installer.
   rm -f "$INSTALL_JS"
-  exit 1
-fi
-
-# ESM installers need an .mjs extension to run from /tmp (no package.json
-# there to declare the module type); older CJS installers keep .js.
-if grep -qE '^(import|export) ' "$INSTALL_JS"; then
-  mv "$INSTALL_JS" "${INSTALL_JS%.js}.mjs"
-  INSTALL_JS="${INSTALL_JS%.js}.mjs"
+  INSTALL_JS="/tmp/ari-install-$$.js"
+  if curl -fsSL "$INSTALL_JS_URL" -o "$INSTALL_JS" 2>/dev/null; then
+    : # Downloaded successfully
+  elif [[ -f "$LOCAL_JS" ]]; then
+    cp "$LOCAL_JS" "$INSTALL_JS"
+  else
+    err "Failed to download the installer and no local copy found."
+    rm -f "$INSTALL_JS"
+    exit 1
+  fi
+  # Safety net: if the .js turns out to be ESM, give it the .mjs extension.
+  if grep -qE '^(import|export) ' "$INSTALL_JS"; then
+    mv "$INSTALL_JS" "${INSTALL_JS%.js}.mjs"
+    INSTALL_JS="${INSTALL_JS%.js}.mjs"
+  fi
 fi
 
 echo ""

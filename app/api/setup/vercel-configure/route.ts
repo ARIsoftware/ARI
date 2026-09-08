@@ -14,9 +14,9 @@ import {
   resolveProject,
   triggerRedeploy,
   upsertEnvVars,
-  verifyToken,
   VercelApiError,
 } from '@/lib/vercel/api'
+import { sslConfigFor } from '@/lib/db/pool'
 import { isSetupComplete } from '@/lib/env-registry'
 import { classifyBootstrapError } from '@/lib/setup-error-dictionary'
 import { getPgCode } from '@/lib/db/postgres-error'
@@ -63,15 +63,13 @@ registry.registerPath({
 
 // Pre-flight the connection string before anything is written to Vercel, so a
 // typo'd DATABASE_URL fails here instead of after a redeploy. One-off client;
-// ssl handling mirrors lib/db/pool.ts.
+// ssl comes from the same helper the real pool uses (lib/db/pool.ts), so the
+// preflight can't pass under a policy the redeployed app won't apply.
 async function testDatabaseConnection(databaseUrl: string): Promise<string | null> {
   const client = new Client({
     connectionString: databaseUrl,
     connectionTimeoutMillis: 8000,
-    ssl:
-      databaseUrl.includes('127.0.0.1') || databaseUrl.includes('localhost')
-        ? false
-        : { rejectUnauthorized: false },
+    ssl: sslConfigFor(databaseUrl),
   })
   try {
     await client.connect()
@@ -163,15 +161,9 @@ export async function POST(request: NextRequest) {
     // connection test) must only run for a caller holding a valid Vercel token
     // with access to this project — otherwise this public-during-setup route
     // would be an SSRF/port-scan oracle for arbitrary databaseUrl values.
-    if (!(await verifyToken(vercelToken))) {
-      return NextResponse.json(
-        {
-          error:
-            'Vercel rejected the access token. Create a new token at vercel.com/account/tokens and try again.',
-        },
-        { status: 400 },
-      )
-    }
+    // resolveProject is that gate (an invalid token fails its first request).
+    // No separate /v2/user pre-check: team-scoped tokens can't call /v2/user
+    // at all, so it rejected valid tokens; resolveProject is team-aware.
     const project = await resolveProject(vercelToken, info.projectId)
 
     // Presence is checked against the PROJECT's stored env vars (the source of
@@ -210,6 +202,9 @@ export async function POST(request: NextRequest) {
         adminEmail,
         adminPassword,
         productionUrl: info.productionUrl,
+        // Stamps the one-shot admin credentials so bootstrap can expire them —
+        // they can't be deleted from the project env after use (no stored token).
+        issuedAt: String(Date.now()),
       },
       existingKeys,
     )
@@ -225,6 +220,16 @@ export async function POST(request: NextRequest) {
     // VercelApiError messages carry only Vercel's response detail — never the
     // request (and never the token). Anything else stays generic over the wire.
     if (error instanceof VercelApiError) {
+      // 401 = the token itself doesn't authenticate; give the actionable message.
+      if (error.status === 401) {
+        return NextResponse.json(
+          {
+            error:
+              'Vercel rejected the access token. Create a new token at vercel.com/account/tokens (with access to the account or team that owns this project) and try again.',
+          },
+          { status: 400 },
+        )
+      }
       const status = error.status >= 400 && error.status < 500 ? 400 : 502
       return NextResponse.json({ error: error.message }, { status })
     }

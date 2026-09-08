@@ -37,10 +37,22 @@ describe('getDeploymentTarget', () => {
     expect(isVercel()).toBe(false)
   })
 
-  it('detects vercel from VERCEL=1', () => {
+  it('detects vercel from VERCEL=1 with a deployed VERCEL_ENV', () => {
     process.env.VERCEL = '1'
+    process.env.VERCEL_ENV = 'production'
     expect(getDeploymentTarget()).toBe('vercel')
     expect(isVercel()).toBe(true)
+
+    process.env.VERCEL_ENV = 'preview'
+    expect(getDeploymentTarget()).toBe('vercel')
+  })
+
+  it('stays local on VERCEL=1 alone or with VERCEL_ENV=development (vercel env pull artifacts)', () => {
+    process.env.VERCEL = '1'
+    expect(getDeploymentTarget()).toBe('local')
+
+    process.env.VERCEL_ENV = 'development'
+    expect(getDeploymentTarget()).toBe('local')
   })
 
   it('stays local on VERCEL_ENV/VERCEL_PROJECT_ID alone (vercel env pull artifacts)', () => {
@@ -57,6 +69,7 @@ describe('getDeploymentTarget', () => {
   it('explicit ARI_DEPLOYMENT_TARGET=local overrides Vercel system vars', () => {
     process.env.ARI_DEPLOYMENT_TARGET = 'local'
     process.env.VERCEL = '1'
+    process.env.VERCEL_ENV = 'production'
     expect(getDeploymentTarget()).toBe('local')
   })
 
@@ -64,6 +77,7 @@ describe('getDeploymentTarget', () => {
     process.env.ARI_DEPLOYMENT_TARGET = 'docker'
     expect(getDeploymentTarget()).toBe('local')
     process.env.VERCEL = '1'
+    process.env.VERCEL_ENV = 'production'
     expect(getDeploymentTarget()).toBe('vercel')
   })
 })
@@ -75,6 +89,7 @@ describe('getVercelInfo', () => {
 
   it('returns nulls for unset fields on Vercel', () => {
     process.env.VERCEL = '1'
+    process.env.VERCEL_ENV = 'preview'
     const info = getVercelInfo()
     expect(info).not.toBeNull()
     expect(info!.projectId).toBeNull()

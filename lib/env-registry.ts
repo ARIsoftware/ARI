@@ -76,6 +76,14 @@ export const ENV_REGISTRY: readonly EnvVarSpec[] = [
       'One-shot password for the initial admin account (consumed by /api/auth/bootstrap)',
   },
   {
+    key: 'ARI_FIRST_RUN_ISSUED_AT',
+    required: false,
+    sensitive: false,
+    group: 'first-run',
+    description:
+      'Epoch-ms stamp written with the one-shot admin credentials on Vercel; bootstrap ignores stamped credentials older than 24h',
+  },
+  {
     key: 'GITHUB_TOKEN',
     required: false,
     sensitive: true,

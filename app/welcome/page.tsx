@@ -108,9 +108,14 @@ export default function WelcomePage() {
   // Vercel deploy flow state
   const [vercelToken, setVercelToken] = useState("")
   const [vercelDeployStatus, setVercelDeployStatus] = useState<
-    'idle' | 'submitting' | 'deploying' | 'complete' | 'error'
+    'idle' | 'submitting' | 'deploying' | 'complete' | 'timeout' | 'error'
   >('idle')
   const [vercelDeployError, setVercelDeployError] = useState<string | null>(null)
+  // Production domain returned by /api/setup/vercel-configure. When this tab
+  // is NOT on that domain (preview / deployment-specific URL), the poll below
+  // can never observe the alias flip — the UI links to the production /welcome
+  // instead of pretending it can detect completion here.
+  const [vercelProductionUrl, setVercelProductionUrl] = useState<string | null>(null)
 
   const [formData, setFormData] = useState<OnboardingData>({
     supabaseUrl: "",
@@ -533,6 +538,7 @@ export default function WelcomePage() {
         )
       }
       setVercelToken('')
+      if (typeof data.productionUrl === 'string') setVercelProductionUrl(data.productionUrl)
       // Survive reloads while the redeploy runs (the poll can take minutes).
       sessionStorage.setItem('ari:welcome:vercel-deploying', '1')
       setVercelDeployStatus('deploying')
@@ -548,7 +554,9 @@ export default function WelcomePage() {
   useEffect(() => {
     if (vercelDeployStatus !== 'deploying') return
     const startedAt = Date.now()
-    const DEPLOY_TIMEOUT_MS = 7 * 60 * 1000
+    // Generous: a cold build of this dependency tree can take well over the
+    // old 7 minutes; a false "failed" here tempts a duplicate redeploy.
+    const DEPLOY_TIMEOUT_MS = 15 * 60 * 1000
     const interval = setInterval(async () => {
       try {
         const res = await fetch('/api/setup/status', { cache: 'no-store' })
@@ -565,14 +573,21 @@ export default function WelcomePage() {
       if (Date.now() - startedAt > DEPLOY_TIMEOUT_MS) {
         clearInterval(interval)
         sessionStorage.removeItem('ari:welcome:vercel-deploying')
-        setVercelDeployStatus('error')
-        setVercelDeployError(
-          'The deployment is taking longer than expected. Check its status in your Vercel dashboard — once it finishes, reload this page.',
-        )
+        // NOT 'error': the config was saved and the build may simply still be
+        // running — the error panel's Try Again would queue a duplicate
+        // production deploy. 'timeout' keeps the progress panel with guidance.
+        setVercelDeployStatus('timeout')
       }
     }, 5000)
     return () => clearInterval(interval)
   }, [vercelDeployStatus])
+
+  // True when this tab is not on the production domain — the setup-status poll
+  // above can then never see the alias flip (this origin's env is frozen).
+  const vercelPollIsOffsite =
+    !!vercelProductionUrl &&
+    typeof window !== 'undefined' &&
+    window.location.host.toLowerCase() !== vercelProductionUrl.toLowerCase()
 
   const handleContinue = () => {
     setShowOnboarding(true)
@@ -1893,12 +1908,16 @@ export default function WelcomePage() {
                   {/* Content section */}
                   <div className="space-y-6" style={{ padding: '25px' }}>
 
-                  {(vercelDeployStatus === 'deploying' || vercelDeployStatus === 'complete') ? (
+                  {(vercelDeployStatus === 'deploying' || vercelDeployStatus === 'complete' || vercelDeployStatus === 'timeout') ? (
                     /* Progress panel — shown after configuration is submitted */
                     <div className="space-y-6">
                       <div className="rounded-lg border border-blue-200 bg-blue-50 p-5 space-y-3">
                         <h3 className="text-base font-semibold text-blue-900">
-                          {vercelDeployStatus === 'complete' ? 'Setup complete' : 'Finishing ARI installation...'}
+                          {vercelDeployStatus === 'complete'
+                            ? 'Setup complete'
+                            : vercelDeployStatus === 'timeout'
+                              ? 'Still building...'
+                              : 'Finishing ARI installation...'}
                         </h3>
                         <div className="space-y-2 text-sm text-blue-800">
                           <div className="flex items-center gap-2">
@@ -1912,22 +1931,45 @@ export default function WelcomePage() {
                           <div className="flex items-center gap-2">
                             {vercelDeployStatus === 'complete' ? (
                               <Check className="w-4 h-4 text-green-600" />
+                            ) : vercelDeployStatus === 'timeout' ? (
+                              <AlertCircle className="w-4 h-4 text-blue-600" />
                             ) : (
                               <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
                             )}
                             {vercelDeployStatus === 'complete'
                               ? 'New deployment is live'
-                              : 'Waiting for the new deployment to go live (usually 1–3 minutes)...'}
+                              : vercelDeployStatus === 'timeout'
+                                ? 'The build is taking longer than usual'
+                                : 'Waiting for the new deployment to go live (usually 1–3 minutes)...'}
                           </div>
                         </div>
                         {vercelDeployStatus === 'complete' ? (
                           <p className="text-sm text-blue-800">
                             Sign in with the admin email and password you chose — your account and database tables are created automatically on first sign-in.
                           </p>
+                        ) : vercelDeployStatus === 'timeout' ? (
+                          <p className="text-sm text-blue-800">
+                            Your configuration was saved and the build is still running — nothing needs to be resubmitted. Watch it finish in your{' '}
+                            <a href="https://vercel.com/dashboard" target="_blank" rel="noopener noreferrer" className="font-medium underline hover:no-underline">Vercel dashboard</a>
+                            {vercelProductionUrl ? (
+                              <>
+                                , then continue at{' '}
+                                <a href={`https://${vercelProductionUrl}/welcome`} className="font-medium underline hover:no-underline">{vercelProductionUrl}/welcome</a>.
+                              </>
+                            ) : (
+                              <>, then reload this page.</>
+                            )}
+                          </p>
                         ) : (
                           <p className="text-sm text-blue-800">
                             Keep this tab open — you&apos;ll be able to sign in the moment the deployment is ready. You can watch the build in your{' '}
                             <a href="https://vercel.com/dashboard" target="_blank" rel="noopener noreferrer" className="font-medium underline hover:no-underline">Vercel dashboard</a>.
+                          </p>
+                        )}
+                        {vercelDeployStatus === 'deploying' && vercelPollIsOffsite && (
+                          <p className="text-sm text-blue-800">
+                            You&apos;re viewing a preview URL, so this page can&apos;t detect when the production deployment goes live. Once the build finishes, continue at{' '}
+                            <a href={`https://${vercelProductionUrl}/welcome`} className="font-medium underline hover:no-underline">{vercelProductionUrl}/welcome</a>.
                           </p>
                         )}
                       </div>
@@ -2099,7 +2141,7 @@ export default function WelcomePage() {
                   )}
 
                   {/* Footer */}
-                  {vercelDeployStatus !== 'deploying' && vercelDeployStatus !== 'complete' && (
+                  {vercelDeployStatus !== 'deploying' && vercelDeployStatus !== 'complete' && vercelDeployStatus !== 'timeout' && (
                     <div className="mt-8 flex items-center justify-between border-t border-zinc-200 pt-6">
                       <button
                         onClick={goToPreviousStep}

@@ -5,6 +5,18 @@ declare global {
   var __ariPgPool: Pool | null | undefined
 }
 
+/**
+ * SSL config for a Postgres connection string. The single source of truth —
+ * every one-off Client that pre-flights a connection string (e.g. the /welcome
+ * Vercel setup's DB test) must use this too, so "preflight passes but the
+ * redeployed app's pool fails TLS" cannot happen by drift.
+ */
+export function sslConfigFor(databaseUrl: string): false | { rejectUnauthorized: false } {
+  return databaseUrl.includes("127.0.0.1") || databaseUrl.includes("localhost")
+    ? false
+    : { rejectUnauthorized: false }
+}
+
 function createPool(): Pool | null {
   if (!process.env.DATABASE_URL) {
     return null
@@ -30,9 +42,7 @@ function createPool(): Pool | null {
     // "Connection terminated unexpectedly".
     keepAlive: true,
     keepAliveInitialDelayMillis: 10000,
-    ssl: process.env.DATABASE_URL?.includes("127.0.0.1") || process.env.DATABASE_URL?.includes("localhost")
-      ? false
-      : { rejectUnauthorized: false },
+    ssl: sslConfigFor(process.env.DATABASE_URL),
   })
 
   p.on("error", (err) => {

@@ -52,6 +52,7 @@ async function clearFirstRunAdminCredentials(): Promise<void> {
     if (isVercel()) {
       delete process.env.ARI_FIRST_RUN_ADMIN_EMAIL
       delete process.env.ARI_FIRST_RUN_ADMIN_PASSWORD
+      delete process.env.ARI_FIRST_RUN_ISSUED_AT
       return
     }
     const envPath = path.join(process.cwd(), ".env.local")
@@ -141,6 +142,26 @@ export async function POST(request: NextRequest) {
     if (!email || !password) {
       // Schema is present but no admin to create. Caller decides UX.
       return NextResponse.json({ status: schemaPresent ? "no_users" : "installed" })
+    }
+
+    // On Vercel the one-shot credentials can't be deleted after use (the
+    // project env isn't writable without a token), so wizard-stamped
+    // credentials expire instead: /welcome writes ARI_FIRST_RUN_ISSUED_AT and
+    // anything older than the TTL is ignored — pointing DATABASE_URL at a
+    // fresh database months later must not silently re-create an admin with
+    // the original setup password. Credentials WITHOUT a stamp (set by hand
+    // for a manual Vercel deployment) keep the documented behavior; the docs
+    // advise deleting them after first sign-in.
+    const issuedAtRaw = process.env.ARI_FIRST_RUN_ISSUED_AT
+    if (isVercel() && issuedAtRaw) {
+      const FIRST_RUN_CREDENTIAL_TTL_MS = 24 * 60 * 60 * 1000
+      const issuedAt = Number(issuedAtRaw)
+      if (!Number.isFinite(issuedAt) || Date.now() - issuedAt > FIRST_RUN_CREDENTIAL_TTL_MS) {
+        console.warn(
+          "Bootstrap: ignoring expired ARI_FIRST_RUN_ADMIN_* credentials (stamped more than 24h ago). Delete them in the Vercel dashboard; set fresh values to bootstrap a new admin.",
+        )
+        return NextResponse.json({ status: schemaPresent ? "no_users" : "installed" })
+      }
     }
 
     try {

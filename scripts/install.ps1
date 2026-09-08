@@ -149,9 +149,12 @@
         }
         if ($needInstall) { Install-NodeJS }
 
-        $installJs = Join-Path $env:TEMP "ari-install-$PID.js"
+        # The installer is ESM (scripts/install.mjs) and must keep its .mjs
+        # extension when run from TEMP — there's no package.json there to
+        # declare module type. Older branches only have a CJS scripts/install.js.
         if (-not $env:ARI_BRANCH) { $env:ARI_BRANCH = "main" }
-        $installUrl = "https://raw.githubusercontent.com/ARIsoftware/ARI/$($env:ARI_BRANCH)/scripts/install.js"
+        $installMjsUrl = "https://raw.githubusercontent.com/ARIsoftware/ARI/$($env:ARI_BRANCH)/scripts/install.mjs"
+        $installJsUrl = "https://raw.githubusercontent.com/ARIsoftware/ARI/$($env:ARI_BRANCH)/scripts/install.js"
         $scriptDir = $null
         try {
             if ($MyInvocation.MyCommand.Path) {
@@ -160,31 +163,44 @@
         } catch {
             $scriptDir = $null
         }
+        $localMjs = if ($scriptDir) { Join-Path $scriptDir "install.mjs" } else { $null }
         $localJs = if ($scriptDir) { Join-Path $scriptDir "install.js" } else { $null }
 
+        $installJs = Join-Path $env:TEMP "ari-install-$PID.mjs"
         $downloaded = $false
         try {
-            Invoke-WebRequest -Uri $installUrl -OutFile $installJs -UseBasicParsing -ErrorAction Stop
+            Invoke-WebRequest -Uri $installMjsUrl -OutFile $installJs -UseBasicParsing -ErrorAction Stop
             $downloaded = $true
         } catch {
-            if ($localJs -and (Test-Path $localJs)) {
-                Copy-Item $localJs $installJs
+            if ($localMjs -and (Test-Path $localMjs)) {
+                Copy-Item $localMjs $installJs
                 $downloaded = $true
             }
         }
 
         if (-not $downloaded) {
-            Write-Err "Failed to download install.js and no local copy found."
-            return
+            # Legacy fallback: branch predates install.mjs — fetch the CJS installer.
+            $installJs = Join-Path $env:TEMP "ari-install-$PID.js"
+            try {
+                Invoke-WebRequest -Uri $installJsUrl -OutFile $installJs -UseBasicParsing -ErrorAction Stop
+                $downloaded = $true
+            } catch {
+                if ($localJs -and (Test-Path $localJs)) {
+                    Copy-Item $localJs $installJs
+                    $downloaded = $true
+                }
+            }
+            # Safety net: if the .js turns out to be ESM, give it the .mjs extension.
+            if ($downloaded -and (Select-String -Path $installJs -Pattern '^(import|export) ' -Quiet)) {
+                $installMjs = [System.IO.Path]::ChangeExtension($installJs, ".mjs")
+                Move-Item $installJs $installMjs -Force
+                $installJs = $installMjs
+            }
         }
 
-        # ESM installers need an .mjs extension to run from TEMP (no
-        # package.json there to declare the module type); older CJS
-        # installers keep .js.
-        if (Select-String -Path $installJs -Pattern '^(import|export) ' -Quiet) {
-            $installMjs = [System.IO.Path]::ChangeExtension($installJs, ".mjs")
-            Move-Item $installJs $installMjs -Force
-            $installJs = $installMjs
+        if (-not $downloaded) {
+            Write-Err "Failed to download the installer and no local copy found."
+            return
         }
 
         Write-Host ""

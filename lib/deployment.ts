@@ -19,10 +19,17 @@ export function getDeploymentTarget(): DeploymentTarget {
     return explicit
   }
 
-  // Only VERCEL itself — always set at build and runtime on Vercel. Broader
-  // checks (VERCEL_ENV, VERCEL_PROJECT_ID) misfire on local machines that
-  // pulled a Vercel env file.
-  if (process.env.VERCEL) {
+  // VERCEL alone is NOT enough: `vercel env pull` writes VERCEL="1" into the
+  // local .env file, so a lone VERCEL check misfires on local machines. Real
+  // Vercel builds and lambdas always run with VERCEL_ENV=production|preview,
+  // while a pulled development-target env file carries VERCEL_ENV=development
+  // (and `vercel dev` is a local workflow by definition). A deliberately
+  // pulled production env file can still misfire — that's what the explicit
+  // ARI_DEPLOYMENT_TARGET=local override above is for.
+  if (
+    process.env.VERCEL &&
+    (process.env.VERCEL_ENV === 'production' || process.env.VERCEL_ENV === 'preview')
+  ) {
     return 'vercel'
   }
 

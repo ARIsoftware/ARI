@@ -2,14 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getDeploymentTarget } from '@/lib/deployment'
 import { getMissingRequiredConfig, isSetupComplete } from '@/lib/env-registry'
 import { getDbMode } from '@/lib/db/mode'
+import { requireAdminIfUsersExist } from '@/lib/auth-helpers'
 import { checkRateLimit, getClientIp } from '@/lib/modules/public-route-security'
 import { SetupStatusSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { ErrorResponseSchema } from '@/lib/openapi/common'
 
 // Public: the /welcome wizard needs this before any user exists, and the
-// post-configure deployment poll runs unauthenticated. Exposes no secrets —
-// booleans plus required-var NAMES, and detail only while setup is incomplete.
+// post-configure deployment poll runs unauthenticated. The base fields expose
+// no secrets; the detail fields (missing-var names, projectDir) are additionally
+// gated below — anonymous callers only see them while no user can authenticate.
 export const isPublic = true
 // The poll must always see the current deployment's env, never a cached body.
 export const dynamic = 'force-dynamic'
@@ -42,20 +44,31 @@ export async function GET(request: NextRequest) {
   }
 
   const deploymentTarget = getDeploymentTarget()
+  const setupComplete = isSetupComplete()
+
+  // Detail gate: during genuine first-run setup nobody CAN authenticate
+  // (no env / no users), so requireAdminIfUsersExist allows the wizard through.
+  // Once users exist, missing-var names and the absolute project path are
+  // admin-only — an established install that re-enters setup mode (e.g. a
+  // botched .env.local edit) must not disclose them to anonymous callers.
+  // Denied callers still get the base fields; the cross-deployment poll only
+  // needs setupComplete.
+  const canSeeDetail = (await requireAdminIfUsersExist(request.headers)) === null
+
   // dbMode is always included (it's not sensitive, and the wizard needs it to
-  // pick the right step order even for a signed-in admin revisiting /welcome);
-  // missing/projectDir stay setup-only.
-  const body = isSetupComplete()
-    ? { setupComplete: true, deploymentTarget, dbMode: getDbMode() }
-    : {
-        setupComplete: false,
-        deploymentTarget,
-        dbMode: getDbMode(),
-        missing: getMissingRequiredConfig(),
-        // Filesystem paths are only meaningful (and only safe to reveal) on
-        // local installs, where the wizard shows where .env.local will land.
-        ...(deploymentTarget === 'local' ? { projectDir: process.cwd() } : {}),
-      }
+  // pick the right step order even for a signed-in admin revisiting /welcome).
+  // projectDir is included whenever the caller may see detail — a configured
+  // install's Save step (admin regenerating .env.local) still needs the real
+  // path, not a placeholder.
+  const body = {
+    setupComplete,
+    deploymentTarget,
+    dbMode: getDbMode(),
+    ...(!setupComplete && canSeeDetail ? { missing: getMissingRequiredConfig() } : {}),
+    // Filesystem paths are only meaningful (and only safe to reveal) on
+    // local installs, where the wizard shows where .env.local will land.
+    ...(deploymentTarget === 'local' && canSeeDetail ? { projectDir: process.cwd() } : {}),
+  }
 
   return NextResponse.json(body, { headers: { 'Cache-Control': 'no-store' } })
 }

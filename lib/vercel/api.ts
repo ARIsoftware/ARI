@@ -51,12 +51,6 @@ async function responseError(response: Response, context: string): Promise<Verce
   return new VercelApiError(`${context}: ${response.status} ${detail}`, response.status)
 }
 
-/** True when the token authenticates against the Vercel API at all. */
-export async function verifyToken(token: string): Promise<boolean> {
-  const response = await vercelFetch('/v2/user', token)
-  return response.ok
-}
-
 export interface ResolvedProject {
   projectId: string
   projectName: string
@@ -120,6 +114,12 @@ export interface VercelEnvVar {
  * keep its values: derived defaults (app URLs, DB mode) are only written when
  * the key isn't already set, so a custom domain or DB mode is never clobbered.
  * DATABASE_URL/BETTER_AUTH_SECRET are caller-decided — included iff provided.
+ *
+ * `issuedAt` (epoch ms as a string) is stamped alongside the one-shot admin
+ * credentials: Vercel env vars can't be deleted after bootstrap (no stored
+ * token), so /api/auth/bootstrap refuses stamped credentials older than its
+ * TTL instead — a fresh database months later must not silently re-create an
+ * admin with the original setup password.
  */
 export function buildVercelEnvPlan(
   fields: {
@@ -128,6 +128,7 @@ export function buildVercelEnvPlan(
     adminEmail: string
     adminPassword: string
     productionUrl: string
+    issuedAt: string
   },
   existingKeys: Set<string> = new Set(),
 ): VercelEnvVar[] {
@@ -162,6 +163,7 @@ export function buildVercelEnvPlan(
       type: typeFor('ARI_FIRST_RUN_ADMIN_PASSWORD'),
       target,
     },
+    { key: 'ARI_FIRST_RUN_ISSUED_AT', value: fields.issuedAt, type: 'plain', target },
   )
   const derived: Array<[string, string]> = [
     ['NEXT_PUBLIC_APP_URL', appUrl],
@@ -208,9 +210,13 @@ export async function upsertEnvVars(
 }
 
 /**
- * Names of the env vars already stored on the project. Values are not returned
- * (sensitive vars are write-only anyway) — presence is all callers need to
- * avoid clobbering existing configuration.
+ * Names of the env vars already stored on the project **for the production
+ * target**. Values are not returned (sensitive vars are write-only anyway) —
+ * presence is all callers need to avoid clobbering existing configuration.
+ *
+ * Target-filtered on purpose: a var stored only for the development target
+ * (e.g. added by hand with just "Development" checked) must NOT count as
+ * configured, or the production redeploy boots without it and setup wedges.
  */
 export async function listEnvKeys(token: string, project: ResolvedProject): Promise<Set<string>> {
   const response = await vercelFetch(`/v9/projects/${project.projectId}/env`, token, {
@@ -219,8 +225,18 @@ export async function listEnvKeys(token: string, project: ResolvedProject): Prom
   if (!response.ok) {
     throw await responseError(response, 'Could not read the project’s environment variables')
   }
-  const result = (await response.json()) as { envs?: Array<{ key?: string }> }
-  return new Set((result.envs ?? []).map((e) => e.key).filter((k): k is string => !!k))
+  const result = (await response.json()) as {
+    envs?: Array<{ key?: string; target?: string | string[] }>
+  }
+  return new Set(
+    (result.envs ?? [])
+      .filter((e) => {
+        const targets = Array.isArray(e.target) ? e.target : e.target ? [e.target] : []
+        return targets.includes('production')
+      })
+      .map((e) => e.key)
+      .filter((k): k is string => !!k),
+  )
 }
 
 export interface TriggeredDeployment {
