@@ -1,0 +1,78 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 480 220"
+  preserveAspectRatio="xMidYMid meet"
+  role="img"
+  aria-label="ARI terminal: ari tour"
+>
+  <style>
+    <![CDATA[
+    .ari-mono {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 13px;
+      font-weight: 500;
+      dominant-baseline: alphabetic;
+      text-rendering: geometricPrecision;
+    }
+    .ari-title {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      fill: rgba(255,255,255,0.55);
+    }
+    .ari-text     { fill: rgba(255,255,255,0.90); }
+    .ari-muted    { fill: rgba(255,255,255,0.55); }
+    .ari-dim      { fill: rgba(255,255,255,0.45); }
+    .ari-amber    { fill: #fbbf24; }
+    .ari-green    { fill: #34d399; }
+
+    .ari-line { opacity: 0; animation: ariFadeIn 0.45s ease-out forwards; }
+    .ari-line--2 { animation-delay: 1.25s; }
+    .ari-line--3 { animation-delay: 1.95s; }
+
+    @keyframes ariFadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .ari-line {
+        opacity: 1 !important;
+        animation: none !important;
+        transform: none !important;
+      }
+      .ari-typed-char { opacity: 1 !important; }
+    }
+    ]]>
+  </style>
+
+  <!-- Terminal window -->
+  <rect x="0.5" y="0.5" width="479" height="219" rx="16" ry="16"
+        fill="#212121" stroke="rgba(255,255,255,0.10)" stroke-width="1" />
+
+  <!-- Title bar -->
+  <g>
+    <circle cx="24" cy="28" r="6" fill="rgba(255,255,255,0.22)" />
+    <circle cx="42" cy="28" r="6" fill="rgba(255,255,255,0.22)" />
+    <circle cx="60" cy="28" r="6" fill="rgba(255,255,255,0.22)" />
+    <text x="92" y="32" class="ari-title">ari ~ dashboard</text>
+    <line x1="0" y1="56" x2="480" y2="56" stroke="rgba(255,255,255,0.08)" stroke-width="1" />
+  </g>
+
+  <!-- Body -->
+  <g class="ari-mono">
+    <text x="24" y="92" class="ari-amber">$</text>
+      <text class="ari-text ari-typed-char" x="38.0" y="92" opacity="0">a<animate attributeName="opacity" from="0" to="1" begin="0.20s" dur="0.001s" fill="freeze"/></text>
+      <text class="ari-text ari-typed-char" x="45.8" y="92" opacity="0">r<animate attributeName="opacity" from="0" to="1" begin="0.28s" dur="0.001s" fill="freeze"/></text>
+      <text class="ari-text ari-typed-char" x="53.6" y="92" opacity="0">i<animate attributeName="opacity" from="0" to="1" begin="0.36s" dur="0.001s" fill="freeze"/></text>
+      <text class="ari-text ari-typed-char" x="69.2" y="92" opacity="0">t<animate attributeName="opacity" from="0" to="1" begin="0.52s" dur="0.001s" fill="freeze"/></text>
+      <text class="ari-text ari-typed-char" x="77.0" y="92" opacity="0">o<animate attributeName="opacity" from="0" to="1" begin="0.60s" dur="0.001s" fill="freeze"/></text>
+      <text class="ari-text ari-typed-char" x="84.8" y="92" opacity="0">u<animate attributeName="opacity" from="0" to="1" begin="0.68s" dur="0.001s" fill="freeze"/></text>
+      <text class="ari-text ari-typed-char" x="92.6" y="92" opacity="0">r<animate attributeName="opacity" from="0" to="1" begin="0.76s" dur="0.001s" fill="freeze"/></text>
+
+    <text x="24" y="124" class="ari-line ari-line--2">
+      <tspan class="ari-green">✓</tspan><tspan class="ari-muted" dx="6">All modules loaded</tspan>
+    </text>
+    <text x="24" y="156" class="ari-line ari-line--3">
+      <tspan class="ari-amber">ARI:</tspan><tspan class="ari-text" dx="6">Ready for a quick tour?</tspan>
+    </text>
+  </g>
+</svg>

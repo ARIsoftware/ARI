@@ -7,6 +7,7 @@ import { TaskAnnouncement } from "@/components/task-announcement"
 import { MainContentWrapper } from "@/components/main-content-wrapper"
 import { AppBreadcrumb } from "@/components/app-breadcrumb"
 import { UpdateNoticeDialog } from "@/components/update-notice-dialog"
+import { DashboardOnboarding } from "@/components/dashboard-onboarding"
 import { ScrollToTopOnNavigate } from "@/components/scroll-to-top-on-navigate"
 
 /**
@@ -39,6 +40,7 @@ export default async function AppLayout({
     <div className="min-h-screen bg-background">
       <ScrollToTopOnNavigate />
       <UpdateNoticeDialog />
+      <DashboardOnboarding />
       <TaskAnnouncement />
       <SidebarProvider>
         <AppSidebar />

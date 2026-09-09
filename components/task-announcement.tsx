@@ -192,6 +192,7 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
                 size="icon"
                 className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 hover:text-topbar-foreground ${dragItemClass}`}
                 onClick={isDragMode ? undefined : () => setCommandPaletteOpen(true)}
+                data-tour="command-icon"
               >
                 <Command className="h-5 w-5" />
               </Button>
@@ -228,6 +229,7 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
                 size="icon"
                 className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 hover:text-topbar-foreground ${dragItemClass}`}
                 onClick={isDragMode ? undefined : () => router.push("/modules")}
+                data-tour="modules-icon"
               >
                 <Package className="h-5 w-5" />
               </Button>
@@ -508,7 +510,7 @@ export function TaskAnnouncement() {
       <span className={`text-topbar-foreground font-medium ${dmSans.className}`}>
         {customMessage ?? "ARI"}
       </span>
-      <div className="flex-1 flex justify-end">
+      <div className="flex-1 flex justify-end" data-tour="quick-icons">
         <TopBarIcons />
       </div>
     </div>
