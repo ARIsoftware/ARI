@@ -2453,6 +2453,11 @@ cat modules-custom/my-module/module.json | jq .
 rm -rf .next && pnpm dev
 ```
 
+> Note: `pnpm dev` runs `scripts/dev-cache-guard.mjs` automatically and clears
+> `.next/dev` itself whenever git history shows a module-graph-shaping change
+> (entrypoint renames, dependency updates). Set `ARI_SKIP_CACHE_GUARD=1` to
+> disable that behavior.
+
 ### API Routes Returning 404
 
 **Check:**

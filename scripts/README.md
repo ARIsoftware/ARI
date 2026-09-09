@@ -1,5 +1,41 @@
 # Build Scripts
 
+## dev-cache-guard.mjs
+
+**Clears a stale Turbopack persistent dev cache (`.next/dev`) before `next dev` starts.**
+
+### Problem
+
+Turbopack's persistent dev cache (on by default since Next 16.1) does not invalidate
+when a convention entrypoint is renamed. When `middleware.ts` became `proxy.ts`, any
+existing install that pulled the change kept serving a compiled chunk pointing at the
+removed file — every request failed with `MODULE_UNPARSABLE` and the dev server leaked
+memory until it crashed (see [vercel/next.js#94915](https://github.com/vercel/next.js/issues/94915)).
+
+### Solution
+
+Runs first in the `predev` hook, so it executes before every `pnpm dev` (including
+`./ari start`). Two checks:
+
+1. **Stale-entrypoint shim** — if `.next/dev/server/middleware.js` still references
+   `[project]/middleware.ts` and no `middleware.ts` exists, the cache is cleared.
+2. **Git-aware guard** — the git HEAD the cache was last used at is stamped in
+   `.ari/cache-guard.json` (gitignored). When HEAD has moved, the cache is cleared
+   only if the diff touches a module-graph-shaping root file (`proxy.ts`,
+   `middleware.ts`, `instrumentation.ts`, `next.config.mjs`, `package.json`,
+   `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `tsconfig.json`). A missing stamp
+   triggers a one-time reset.
+
+The script never fails the caller, skips entirely while another dev server holds
+`.next/dev/lock`, and only runs the shim check on installs without git history.
+
+**Escape hatch:** `ARI_SKIP_CACHE_GUARD=1` skips it entirely.
+
+**Manually:**
+```bash
+pnpm dev-cache-guard
+```
+
 ## generate-module-registry.js
 
 **Auto-generates the module pages registry for dynamic routing.**

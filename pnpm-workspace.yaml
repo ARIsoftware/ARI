@@ -1,3 +1,7 @@
+# predev carries the module registry, OpenAPI spec, and the Turbopack cache
+# guard — pin pre/post scripts on regardless of any user-level .npmrc.
+enablePrePostScripts: true
+
 allowBuilds:
   core-js: true
   esbuild: true
