@@ -68,6 +68,40 @@ See `docs/MODULES.md` §2 ("External Registration Points: None").
 
 If a module needs custom CSS (animations, keyframes, one-off rules that can't be expressed with Tailwind utility classes), put the CSS file inside the module folder — for example `modules-custom/<id>/styles.css` — and import it from the module's `app/page.tsx`. **Do not add the CSS to `app/globals.css`.** Theme-aware colors should still use semantic Tailwind tokens (`bg-background`, `text-foreground`, etc.) — see the Theming section below.
 
+## npm Dependencies: Prefer What's Already Installed
+
+**Before adding ANY new npm package, check whether ARI already ships one that covers the need** — read the root `package.json` `dependencies` (read-only; never edit it). Reusing an installed package avoids version conflicts (the module installer aborts the install if an `npmDependencies` entry clashes with a root dependency), keeps installs fast, and keeps the bundle small.
+
+Common needs already covered by a fresh ARI install (non-exhaustive — always check `package.json` for the current list):
+
+| Need | Use what's installed |
+|---|---|
+| Animation / transitions | `framer-motion`; `tailwindcss-animate` utility classes for simple cases |
+| Charts / graphs | `recharts` — via ARI's `@/components/ui/chart` wrapper |
+| Date/time formatting & math | `date-fns` |
+| Icons | `lucide-react` |
+| Drag and drop / sortable lists | `@dnd-kit/core` + `@dnd-kit/sortable` |
+| Dialogs, dropdowns, tooltips, toasts, tabs, etc. | shadcn/ui components in `components/ui/` (Radix under the hood) |
+| Command palette / searchable menus | `cmdk` |
+| Drawers / bottom sheets | `vaul` |
+| Carousels | `embla-carousel-react` |
+| Validation | `zod` |
+| File upload UI | `react-dropzone` |
+| Calendars / date pickers | `react-day-picker` |
+| Resizable panels | `react-resizable-panels` |
+| Flow / node diagrams | `@xyflow/react` |
+| 3D | `three` + `@react-three/fiber` + `@react-three/drei` |
+| Confetti / celebration effects | `canvas-confetti` |
+| QR codes | `qrcode.react` |
+| UUIDs | `uuid` (or `crypto.randomUUID()`) |
+| Conditional class names | `clsx` + `tailwind-merge` via `cn()` from `@/lib/utils` |
+
+Rules:
+
+1. **Check `package.json` first.** If an installed package covers the need — even if it isn't the package you'd reach for by default — use it. Do not add a functional duplicate of something already installed (e.g. no `dayjs`/`moment` alongside `date-fns`, no `animate.css` alongside `framer-motion`, no `react-icons` alongside `lucide-react`, no chart library alongside `recharts`).
+2. **A new package is fine when nothing installed is genuinely suitable** (missing capability, not just unfamiliarity). Briefly tell the user what you're adding and why the existing option doesn't fit.
+3. **Declare new packages in `module.json` under `npmDependencies`** — never by editing `package.json` directly. Prefer well-maintained, actively published packages.
+
 ## Postgres & Supabase Skills
 
 This project includes Supabase guidance for Claude in `.claude/skills/`. When creating database schemas, use the `supabase-postgres-best-practices` skill to look up PostgreSQL best practices for data types, indexes, constraints, and table design. For Codex, rely on the documented schema conventions in this prompt and the repo docs instead. These references help ensure database tables follow PostgreSQL conventions and best practices.
@@ -145,7 +179,7 @@ Analyze all provided v0 code and extract:
 2. Check which components exist in `components/ui/` directory (use `ls components/ui/`)
 3. Report any missing components to the user
 4. With user approval, install missing components: `npx shadcn@latest add [component1] [component2] ...`
-5. Check for non-standard npm package imports and install with `pnpm install` if needed
+5. Check for non-standard npm package imports. Before installing anything new, apply the "npm Dependencies: Prefer What's Already Installed" rules — if the v0 code imports a package that duplicates one ARI already has (e.g. a different animation, date, icon, or chart library), rewrite the import to use the installed equivalent instead of installing the duplicate. Only install genuinely new capabilities, declared in `module.json` `npmDependencies`
 6. Note: if v0 imports `recharts` directly, prefer ARI's existing `@/components/ui/chart` wrapper
 
 ### Code Restructuring Rules
@@ -406,7 +440,7 @@ If the user wants their module to contribute cards or widgets to the main Dashbo
 - Wrap content in Shadcn `<Card>` components to match dashboard styling
 - Include a "View All" or navigation button linking to the module's main page
 - See `modules-core/tasks/components/dashboard-stat-card.tsx` as a stat card reference
-- See `modules-core/morning-brief/components/dashboard-widget.tsx` or `modules-core/module-template/components/widget.tsx` as a widget reference
+- See `modules-core/todays-brief/components/dashboard-widget.tsx` or `modules-core/module-template/components/widget.tsx` as a widget reference
 
 After creating dashboard components, run `pnpm generate-module-registry` to register them in the auto-generated dashboard registry.
 
@@ -997,6 +1031,7 @@ Before marking complete, verify:
 - [ ] **If v0 import used**: All event handlers wired to real mutations
 - [ ] **If v0 import used**: All missing shadcn components installed (no import errors)
 - [ ] **If v0 import used**: Any non-standard npm dependencies installed
+- [ ] **No duplicate dependencies added** — checked root `package.json` first; every need covered by an installed package uses that package (see "npm Dependencies: Prefer What's Already Installed"); any genuinely new package is declared in `module.json` `npmDependencies`
 - [ ] **If v0 import used**: v0 layout wrappers removed (no extra html/body wrappers)
 - [ ] **If v0 import used**: Component has default export and 'use client' directive
 - [ ] **If file storage needed**: Module uses `/api/storage/upload` or a module-specific wrapper using `getStorageProvider(readStorageConfig())`
