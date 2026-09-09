@@ -1,0 +1,33 @@
+{
+  "id": "timeline",
+  "group": "Overview",
+  "name": "Timeline",
+  "description": "A horizontal timeline of your events from Sep 1 to Dec 31, 2026, with a live today marker and faded past events.",
+  "version": "1.0.0",
+  "author": "User",
+  "icon": "CalendarRange",
+  "enabled": false,
+  "fullscreen": false,
+  "menuPriority": 5,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": false
+  },
+  "routes": [
+    {
+      "path": "/timeline",
+      "label": "Timeline",
+      "icon": "CalendarRange",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": ["quotes"],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": ["timeline_events"]
+  },
+  "npmDependencies": {}
+}
