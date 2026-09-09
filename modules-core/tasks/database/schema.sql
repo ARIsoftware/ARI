@@ -199,8 +199,8 @@ BEGIN
 
   INSERT INTO tasks (user_id, title, assignees, status, priority, impact, severity, timeliness, effort, strategic_fit, priority_score, order_index)
   VALUES
-    (my_user_id, 'Finalize Pitch Deck Draft', '{}'::TEXT[], 'Pending', 'High', 5, 3, 2, 4, 5, 4.9, 0),
-    (my_user_id, 'Build MVP Landing Page', '{}'::TEXT[], 'Pending', 'High', 5, 4, 3, 4, 5, 6.1, 1),
-    (my_user_id, 'Customer Discovery Interviews', '{}'::TEXT[], 'Pending', 'Low', 3, 2, 1, 5, 2, 1.9, 2);
+    (my_user_id, 'Finalize Pitch Deck Draft (Sample Task)', '{}'::TEXT[], 'Pending', 'High', 5, 3, 2, 4, 5, 4.9, 0),
+    (my_user_id, 'Build MVP Landing Page (Sample Task)', '{}'::TEXT[], 'Pending', 'High', 5, 4, 3, 4, 5, 6.1, 1),
+    (my_user_id, 'Customer Discovery Interviews (Sample Task)', '{}'::TEXT[], 'Pending', 'Low', 3, 2, 1, 5, 2, 1.9, 2);
 
 END $$;
