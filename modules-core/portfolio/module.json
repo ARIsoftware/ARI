@@ -1,0 +1,39 @@
+{
+  "id": "portfolio",
+  "group": "Modules",
+  "name": "Portfolio",
+  "description": "Track stock tickers and view live prices fetched from Yahoo Finance (2-minute cache)",
+  "version": "1.0.0",
+  "author": "ARI",
+  "icon": "LineChart",
+  "enabled": true,
+  "fullscreen": false,
+  "menuPriority": 10,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": true
+  },
+  "routes": [
+    {
+      "path": "/portfolio",
+      "label": "Portfolio",
+      "icon": "LineChart",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": ["quotes"],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": ["portfolio_tickers"]
+  },
+  "dashboard": {
+    "widgets": true,
+    "widgetComponents": ["./components/dashboard-widget.tsx"]
+  },
+  "submenu": {
+    "component": "./components/sidebar-submenu.tsx"
+  }
+}
