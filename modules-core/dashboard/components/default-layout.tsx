@@ -188,7 +188,7 @@ export function DefaultDashboardLayout() {
                     <li key={task.id}>
                       <button
                         type="button"
-                        className="block w-full truncate py-3.5 text-left font-medium text-foreground hover:underline"
+                        className="block w-full truncate py-3.5 pr-3 text-left font-medium text-foreground hover:underline"
                         onClick={() => router.push(`/tasks/edit/${task.id}`)}
                       >
                         {task.title}
