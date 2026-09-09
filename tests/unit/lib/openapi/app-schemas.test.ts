@@ -672,7 +672,12 @@ describe('SettingsProviderModelsSchema', () => {
 
 describe('SettingsGithubStatusSchema', () => {
   it('accepts valid status', () => {
-    pass(SettingsGithubStatusSchema, { hasToken: true, repoOwner: 'me', repoName: 'ari' })
+    pass(SettingsGithubStatusSchema, {
+      hasToken: true,
+      repoOwner: 'me',
+      repoName: 'ari',
+      isVercel: false,
+    })
   })
 })
 

@@ -66,6 +66,7 @@ async function handleGET() {
       hasToken: !!process.env.GITHUB_TOKEN,
       repoOwner: process.env.VERCEL_GIT_REPO_OWNER || process.env.GITHUB_REPO_OWNER || "",
       repoName: process.env.VERCEL_GIT_REPO_SLUG || process.env.GITHUB_REPO_NAME || "",
+      isVercel: true,
     })
   }
 
@@ -83,6 +84,7 @@ async function handleGET() {
     hasToken: !!fileVars.GITHUB_TOKEN,
     repoOwner: fileVars.GITHUB_REPO_OWNER ?? "",
     repoName: fileVars.GITHUB_REPO_NAME ?? "",
+    isVercel: false,
   })
 }
 

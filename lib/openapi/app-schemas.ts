@@ -415,6 +415,7 @@ export const SettingsGithubStatusSchema = z.object({
   hasToken: z.boolean(),
   repoOwner: z.string(),
   repoName: z.string(),
+  isVercel: z.boolean(),
 }).openapi('SettingsGithubStatus')
 
 export const settingsGithubBodySchema = z.object({

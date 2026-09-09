@@ -19,6 +19,7 @@ export function GitTab(): React.ReactElement {
   const [githubRepoName, setGithubRepoName] = useState("")
   const [clearTokenOnSave, setClearTokenOnSave] = useState(false)
   const [tokenDirty, setTokenDirty] = useState(false)
+  const [isVercelDeployment, setIsVercelDeployment] = useState(false)
 
   const TOKEN_MASK = "••••••••••••••"
 
@@ -30,6 +31,7 @@ export function GitTab(): React.ReactElement {
         setHasToken(!!data.hasToken)
         setGithubRepoOwner(data.repoOwner ?? "")
         setGithubRepoName(data.repoName ?? "")
+        setIsVercelDeployment(!!data.isVercel)
       }
     } catch (err) {
       console.error("Failed to load GitHub config:", err)
@@ -90,6 +92,151 @@ export function GitTab(): React.ReactElement {
     } finally {
       setSaving(false)
     }
+  }
+
+  // Shared between the localhost and Vercel layouts — creating the PAT is identical.
+  const tokenInstructions = (
+    <div className="rounded-xl border p-4 space-y-3">
+      <p className="text-sm font-semibold">How to create the token:</p>
+      <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground leading-relaxed">
+        <li>
+          Go to{" "}
+          <a
+            href="https://github.com/settings/tokens?type=beta"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:underline"
+          >
+            github.com/settings/tokens
+          </a>{" "}
+          and click <strong className="text-foreground">Generate new token</strong>
+        </li>
+        <li>
+          Set <strong className="text-foreground">Token name</strong> to something like{" "}
+          <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">ARI Module Sync</code>
+        </li>
+        <li>
+          Set <strong className="text-foreground">Expiration</strong> to your preference (or no expiration)
+        </li>
+        <li>
+          Under <strong className="text-foreground">Repository access</strong>, select{" "}
+          <strong className="text-foreground">Only select repositories</strong> and choose your ARI repo
+        </li>
+        <li>
+          Click <strong className="text-foreground">Repository permissions</strong>, find{" "}
+          <strong className="text-foreground">Contents</strong>, and set it to{" "}
+          <strong className="text-foreground">Read and write</strong>
+        </li>
+        <li>
+          Click <strong className="text-foreground">Generate token</strong> and copy it
+        </li>
+      </ol>
+    </div>
+  )
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="py-8">
+            <p className="text-sm text-muted-foreground">Loading GitHub configuration...</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (isVercelDeployment) {
+    return (
+      <div className="space-y-6">
+        {/* Linked repository (auto-detected on Vercel) */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <GitBranch className="h-5 w-5" />
+              Your Linked Repository
+            </CardTitle>
+            <CardDescription>
+              This deployment is connected to the Git repository linked in your Vercel project. The
+              repository owner and name are detected automatically — there is nothing to configure here.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-xl border p-4 space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Repository Owner</p>
+                  <p className="font-mono text-sm">{githubRepoOwner || "Not detected"}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Repository Name</p>
+                  <p className="font-mono text-sm">{githubRepoName || "Not detected"}</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Enable GitHub Sync via Vercel env vars */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <GitBranch className="h-5 w-5" />
+              Enable GitHub Sync <span className="text-sm font-normal text-muted-foreground">(optional)</span>
+            </CardTitle>
+            <CardDescription>
+              When you install new modules from the Module Library, ARI commits them to your repository so
+              Vercel can rebuild with them included. To enable this, create a Personal Access Token and add
+              it to your Vercel project&apos;s environment variables.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div
+              className={`rounded-xl border p-4 ${hasToken ? "border-green-600/40 bg-green-500/5" : ""}`}
+            >
+              <p className="text-sm">
+                <strong className="text-foreground">Status:</strong>{" "}
+                {hasToken ? (
+                  <span className="text-green-600">
+                    GITHUB_TOKEN is set — GitHub Sync is enabled.
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    GITHUB_TOKEN is not set — module installs that need to write to your repository will
+                    fail until you add it.
+                  </span>
+                )}
+              </p>
+            </div>
+
+            {tokenInstructions}
+
+            <div className="rounded-xl border p-4 space-y-3">
+              <p className="text-sm font-semibold">Add the token to Vercel:</p>
+              <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground leading-relaxed">
+                <li>
+                  Open your Vercel project and go to{" "}
+                  <strong className="text-foreground">Settings → Environment Variables</strong>
+                </li>
+                <li>
+                  Add a variable named{" "}
+                  <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">GITHUB_TOKEN</code>{" "}
+                  with the token as its value (all environments)
+                </li>
+                <li>
+                  <strong className="text-foreground">Redeploy</strong> the project so the new variable
+                  takes effect
+                </li>
+              </ol>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Vercel&apos;s filesystem is read-only, so the token can&apos;t be saved from this page —
+                it must live in the project&apos;s environment variables.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -176,43 +323,7 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* How to create the token */}
-          <div className="rounded-xl border p-4 space-y-3">
-            <p className="text-sm font-semibold">How to create the token:</p>
-            <ol className="list-decimal list-inside space-y-2 text-sm text-muted-foreground leading-relaxed">
-              <li>
-                Go to{" "}
-                <a
-                  href="https://github.com/settings/tokens?type=beta"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
-                >
-                  github.com/settings/tokens
-                </a>{" "}
-                and click <strong className="text-foreground">Generate new token</strong>
-              </li>
-              <li>
-                Set <strong className="text-foreground">Token name</strong> to something like{" "}
-                <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">ARI Module Sync</code>
-              </li>
-              <li>
-                Set <strong className="text-foreground">Expiration</strong> to your preference (or no expiration)
-              </li>
-              <li>
-                Under <strong className="text-foreground">Repository access</strong>, select{" "}
-                <strong className="text-foreground">Only select repositories</strong> and choose your ARI repo
-              </li>
-              <li>
-                Click <strong className="text-foreground">Repository permissions</strong>, find{" "}
-                <strong className="text-foreground">Contents</strong>, and set it to{" "}
-                <strong className="text-foreground">Read and write</strong>
-              </li>
-              <li>
-                Click <strong className="text-foreground">Generate token</strong> and copy it
-              </li>
-            </ol>
-          </div>
+          {tokenInstructions}
 
           {/* Fields */}
           <div className="space-y-4">
