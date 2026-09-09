@@ -7,17 +7,23 @@
  * kept a compiled middleware.js hardwired to the removed `[project]/middleware.ts`,
  * so every request failed with MODULE_UNPARSABLE and the dev server leaked memory
  * until it OOMed (see vercel/next.js#94915). The upstream cache never invalidates
- * on convention-entrypoint renames, so any `git pull` that reshapes the module
- * graph can leave an existing install broken until `.next/dev` is deleted.
+ * on convention-entrypoint renames, so any update that reshapes the module graph
+ * can leave an existing install broken until `.next/dev` is deleted.
  *
  * What it does, in order (runs first in `predev`, i.e. before every `next dev`):
  *   1. Targeted shim: if the compiled middleware chunk still references
  *      `[project]/middleware.ts` and no middleware.ts exists, clear the cache.
- *      (Heals installs without git; remove once the f5ed7e9 window has passed.)
- *   2. Generic guard: remember the git HEAD the cache was last used at in
- *      .ari/cache-guard.json. When HEAD has moved, clear the cache only if the
- *      diff touches a module-graph-shaping root file (entrypoints, next config,
- *      dependency files). No stamp at all means pre-guard history — clear once.
+ *      (Remove once the f5ed7e9 window has passed.)
+ *   2. Generic guard: hash the module-graph-shaping root files (convention
+ *      entrypoints, next config, dependency files) into .ari/cache-guard.json.
+ *      When any of them changed since the cache was last used — however the
+ *      change arrived: git pull, module install, hand edit — clear the cache.
+ *      package.json is hashed with its `version` field stripped so routine
+ *      release bumps don't throw away a healthy multi-GB cache.
+ *
+ * Deliberately git-free: content hashes see uncommitted changes, work in
+ * archive installs without history, and don't care whether the checkout lives
+ * inside some outer repository.
  *
  * IMPORTANT: this script must NEVER fail the caller — `predev` chains with `&&`,
  * so any error here would block `pnpm dev`. Everything is wrapped; on any
@@ -26,7 +32,8 @@
  * Set ARI_SKIP_CACHE_GUARD=1 to skip entirely.
  */
 
-import { execSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -36,6 +43,7 @@ const DEV_CACHE_DIR = path.join(ROOT, '.next', 'dev')
 const LOCK_PATH = path.join(DEV_CACHE_DIR, 'lock')
 const COMPILED_MIDDLEWARE = path.join(DEV_CACHE_DIR, 'server', 'middleware.js')
 const STAMP_PATH = path.join(ROOT, '.ari', 'cache-guard.json')
+const GUARD_VERSION = 2
 
 /**
  * Root files whose changes reshape the module graph in ways Turbopack's
@@ -44,7 +52,7 @@ const STAMP_PATH = path.join(ROOT, '.ari', 'cache-guard.json')
  * hash-invalidate correctly and are deliberately not listed. Exact
  * root-relative paths — a module's nested package.json doesn't belong here.
  */
-const GRAPH_SHAPING_FILES = new Set([
+export const GRAPH_SHAPING_FILES = [
   'proxy.ts',
   'middleware.ts',
   'instrumentation.ts',
@@ -54,12 +62,32 @@ const GRAPH_SHAPING_FILES = new Set([
   'pnpm-lock.yaml',
   'pnpm-workspace.yaml',
   'tsconfig.json',
-])
+]
 
-/** First graph-shaping path in the changed set, or null. Pure — unit tested. */
-export function isGraphShaping(changedPaths) {
-  for (const p of changedPaths) {
-    if (GRAPH_SHAPING_FILES.has(p)) return p
+/**
+ * package.json content with the `version` field removed, so version-only
+ * release bumps (about half this repo's package.json commits) don't count as
+ * graph-shaping. Unparseable input is returned as-is — a malformed file still
+ * hashes deterministically. Pure — unit tested.
+ */
+export function normalizePackageJson(source) {
+  try {
+    const parsed = JSON.parse(source)
+    if (parsed && typeof parsed === 'object') delete parsed.version
+    return JSON.stringify(parsed)
+  } catch {
+    return source
+  }
+}
+
+/**
+ * First filename whose hash differs between two stamp hash maps (a file
+ * appearing or disappearing counts), or null when they match. Pure — unit
+ * tested.
+ */
+export function firstChangedFile(oldHashes, newHashes) {
+  for (const name of GRAPH_SHAPING_FILES) {
+    if ((oldHashes?.[name] ?? null) !== (newHashes?.[name] ?? null)) return name
   }
   return null
 }
@@ -75,48 +103,79 @@ export function isStaleMiddlewareShim(compiledSource, middlewareTsExists) {
   return !middlewareTsExists && compiledSource.includes('[project]/middleware.ts')
 }
 
-/** Run a git command in ROOT; null on any failure (no git, no repo, bad SHA). */
-function git(args) {
-  try {
-    return execSync(`git ${args}`, {
-      cwd: ROOT,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim()
-  } catch {
-    return null
+/** Hash map for every graph-shaping file currently on disk (absent = omitted). */
+function computeGraphHashes() {
+  const hashes = {}
+  for (const name of GRAPH_SHAPING_FILES) {
+    let content
+    try {
+      content = fs.readFileSync(path.join(ROOT, name), 'utf8')
+    } catch {
+      continue
+    }
+    if (name === 'package.json') content = normalizePackageJson(content)
+    hashes[name] = crypto.createHash('sha256').update(content).digest('hex')
   }
+  return hashes
 }
 
-/** True when .next/dev/lock names a process that is still alive. */
+/**
+ * True when .next/dev/lock names a live process that plausibly is a dev
+ * server. Next deliberately leaves the lock behind on unclean exits (the OOM
+ * crash this guard exists for), so a bare pid-alive probe would wedge the
+ * guard forever once the OS recycles the pid — hence the process-name check.
+ * EPERM means the pid exists but belongs to another user: treat as alive.
+ */
 function devServerAlive() {
+  let pid
   try {
-    const { pid } = JSON.parse(fs.readFileSync(LOCK_PATH, 'utf8'))
-    if (!pid) return false
-    process.kill(pid, 0)
-    return true
+    pid = JSON.parse(fs.readFileSync(LOCK_PATH, 'utf8')).pid
   } catch {
     return false
+  }
+  if (!Number.isInteger(pid) || pid <= 0) return false
+  try {
+    process.kill(pid, 0)
+  } catch (err) {
+    return err.code === 'EPERM'
+  }
+  try {
+    const comm =
+      process.platform === 'win32'
+        ? execFileSync('tasklist', ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'], {
+            encoding: 'utf8',
+          })
+        : execFileSync('ps', ['-p', String(pid), '-o', 'comm='], { encoding: 'utf8' })
+    return /node|next/i.test(comm)
+  } catch {
+    return true // pid is alive but uninspectable — err on the safe side
   }
 }
 
 function readStamp() {
   try {
     const stamp = JSON.parse(fs.readFileSync(STAMP_PATH, 'utf8'))
-    return typeof stamp?.head === 'string' && stamp.head ? stamp : null
+    if (stamp?.guardVersion !== GUARD_VERSION) return null
+    return stamp.hashes && typeof stamp.hashes === 'object' ? stamp : null
   } catch {
     return null
   }
 }
 
-function writeStamp(head) {
+/** Atomic (tmp + rename) so an interrupted write can't leave a corrupt stamp. */
+function writeStamp(hashes) {
   try {
     fs.mkdirSync(path.dirname(STAMP_PATH), { recursive: true })
+    const tmp = STAMP_PATH + '.tmp'
     fs.writeFileSync(
-      STAMP_PATH,
-      JSON.stringify({ head, updatedAt: new Date().toISOString(), guardVersion: 1 }, null, 2) +
-        '\n',
+      tmp,
+      JSON.stringify(
+        { guardVersion: GUARD_VERSION, updatedAt: new Date().toISOString(), hashes },
+        null,
+        2,
+      ) + '\n',
     )
+    fs.renameSync(tmp, STAMP_PATH)
   } catch (err) {
     console.warn(`[cache-guard] Could not write ${STAMP_PATH}: ${err.message}`)
   }
@@ -144,12 +203,12 @@ export default function devCacheGuard() {
       return
     }
 
-    const head = git('rev-parse HEAD')
+    const hashes = computeGraphHashes()
 
     if (!fs.existsSync(DEV_CACHE_DIR)) {
-      // Nothing to clear, but record the baseline so the NEXT run compares
-      // against the HEAD this fresh cache is about to be built at.
-      if (head) writeStamp(head)
+      // Nothing to clear, but record the baseline the fresh cache is about to
+      // be built against.
+      writeStamp(hashes)
       return
     }
 
@@ -167,40 +226,33 @@ export default function devCacheGuard() {
       const source = fs.readFileSync(COMPILED_MIDDLEWARE, 'utf8')
       const middlewareTsExists = fs.existsSync(path.join(ROOT, 'middleware.ts'))
       if (isStaleMiddlewareShim(source, middlewareTsExists)) {
-        clearDevCache(
-          'compiled middleware references the removed middleware.ts (proxy.ts migration)',
-        )
-        if (head) writeStamp(head)
+        // Stamp only after a successful delete — a failed delete must be
+        // retried next start, not recorded as done.
+        if (
+          clearDevCache(
+            'compiled middleware references the removed middleware.ts (proxy.ts migration)',
+          )
+        ) {
+          writeStamp(hashes)
+        }
         return
       }
     }
 
-    if (!head) {
-      // No git (zip install): the shim above is all we can safely do — clearing
-      // on every start here would throw away a healthy cache each boot.
-      console.log('[cache-guard] No git history available — stale-entrypoint check only.')
-      return
-    }
-
     const stamp = readStamp()
-    if (stamp?.head === head) return
-
     if (!stamp) {
-      clearDevCache('no previous git state recorded — one-time reset')
-      writeStamp(head)
+      // No baseline to compare against (fresh guard rollout, deleted or
+      // corrupt stamp). The shim above already catches the known breakage —
+      // don't throw away a possibly healthy cache; just start tracking.
+      writeStamp(hashes)
       return
     }
 
-    // --no-renames so a rename lists both its old and new path.
-    const diff = git(`diff --name-only --no-renames ${stamp.head} ${head}`)
-    if (diff === null) {
-      // Old SHA unreachable (gc, shallow clone, force-push) — err safe.
-      clearDevCache(`previous git state ${stamp.head.slice(0, 7)} is unreachable`)
-    } else {
-      const hit = isGraphShaping(diff.split('\n').filter(Boolean))
-      if (hit) clearDevCache(`${hit} changed since the cache was last used`)
+    const changed = firstChangedFile(stamp.hashes, hashes)
+    if (!changed) return
+    if (clearDevCache(`${changed} changed since the cache was last used`)) {
+      writeStamp(hashes)
     }
-    writeStamp(head)
   } catch (err) {
     console.warn(`[cache-guard] Skipped due to error: ${err.message}`)
   }

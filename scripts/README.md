@@ -19,15 +19,19 @@ Runs first in the `predev` hook, so it executes before every `pnpm dev` (includi
 
 1. **Stale-entrypoint shim** — if `.next/dev/server/middleware.js` still references
    `[project]/middleware.ts` and no `middleware.ts` exists, the cache is cleared.
-2. **Git-aware guard** — the git HEAD the cache was last used at is stamped in
-   `.ari/cache-guard.json` (gitignored). When HEAD has moved, the cache is cleared
-   only if the diff touches a module-graph-shaping root file (`proxy.ts`,
-   `middleware.ts`, `instrumentation.ts`, `next.config.mjs`, `package.json`,
-   `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `tsconfig.json`). A missing stamp
-   triggers a one-time reset.
+2. **Content-hash guard** — the module-graph-shaping root files (`proxy.ts`,
+   `middleware.ts`, `instrumentation.ts`, `instrumentation-client.ts`,
+   `next.config.mjs`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`,
+   `tsconfig.json`) are hashed into `.ari/cache-guard.json` (gitignored). When any
+   of them changed since the cache was last used — via `git pull`, a module
+   install, or a hand edit — the cache is cleared. `package.json` is hashed with
+   its `version` field stripped, so release bumps don't cost a recompile. A
+   missing stamp just starts tracking; it never clears on its own.
 
-The script never fails the caller, skips entirely while another dev server holds
-`.next/dev/lock`, and only runs the shim check on installs without git history.
+The script never fails the caller and skips entirely while another dev server
+holds `.next/dev/lock` (pid liveness plus a process-name check, so a lock left
+behind by a crash can't wedge the guard). It is deliberately git-free — content
+hashes see uncommitted changes and work in archive installs without history.
 
 **Escape hatch:** `ARI_SKIP_CACHE_GUARD=1` skips it entirely.
 

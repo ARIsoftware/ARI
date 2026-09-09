@@ -2453,10 +2453,11 @@ cat modules-custom/my-module/module.json | jq .
 rm -rf .next && pnpm dev
 ```
 
-> Note: `pnpm dev` runs `scripts/dev-cache-guard.mjs` automatically and clears
-> `.next/dev` itself whenever git history shows a module-graph-shaping change
-> (entrypoint renames, dependency updates). Set `ARI_SKIP_CACHE_GUARD=1` to
-> disable that behavior.
+> Note: `pnpm dev` runs `scripts/dev-cache-guard.mjs` automatically, but it only
+> watches root-level graph-shaping files (`proxy.ts`, `next.config.mjs`,
+> dependency files, etc.). Module additions and changes are invisible to it — for
+> stale-module cache errors, `rm -rf .next` above is still the fix. Set
+> `ARI_SKIP_CACHE_GUARD=1` to disable the guard.
 
 ### API Routes Returning 404
 

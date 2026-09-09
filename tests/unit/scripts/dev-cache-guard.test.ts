@@ -1,36 +1,66 @@
 import { describe, expect, it } from 'vitest'
-// Relative import: the guard lives in scripts/ (outside the @/ alias scope) and
-// is plain ESM JS — tsconfig allowJs resolves it.
-import { isGraphShaping, isStaleMiddlewareShim } from '../../../scripts/dev-cache-guard.mjs'
+import {
+  GRAPH_SHAPING_FILES,
+  firstChangedFile,
+  isStaleMiddlewareShim,
+  normalizePackageJson,
+} from '@/scripts/dev-cache-guard.mjs'
 
-describe('isGraphShaping', () => {
-  it('fires for convention entrypoints at the repo root', () => {
-    expect(isGraphShaping(['proxy.ts'])).toBe('proxy.ts')
-    expect(isGraphShaping(['middleware.ts'])).toBe('middleware.ts')
-    expect(isGraphShaping(['instrumentation.ts'])).toBe('instrumentation.ts')
+describe('GRAPH_SHAPING_FILES', () => {
+  it('contains only exact root-relative paths', () => {
+    for (const name of GRAPH_SHAPING_FILES) {
+      expect(name).not.toContain('/')
+    }
+    expect(GRAPH_SHAPING_FILES).toContain('proxy.ts')
+    expect(GRAPH_SHAPING_FILES).toContain('middleware.ts')
+    expect(GRAPH_SHAPING_FILES).toContain('pnpm-lock.yaml')
+  })
+})
+
+describe('normalizePackageJson', () => {
+  it('strips the version field so release bumps hash identically', () => {
+    const a = normalizePackageJson('{"name":"ari","version":"2.0.5","type":"module"}')
+    const b = normalizePackageJson('{"name":"ari","version":"2.0.6","type":"module"}')
+    expect(a).toBe(b)
   })
 
-  it('fires for dependency and config files', () => {
-    expect(isGraphShaping(['pnpm-lock.yaml'])).toBe('pnpm-lock.yaml')
-    expect(isGraphShaping(['package.json'])).toBe('package.json')
-    expect(isGraphShaping(['next.config.mjs'])).toBe('next.config.mjs')
-    expect(isGraphShaping(['tsconfig.json'])).toBe('tsconfig.json')
+  it('still distinguishes genuinely graph-shaping edits', () => {
+    const a = normalizePackageJson('{"name":"ari","version":"2.0.5","type":"module"}')
+    const b = normalizePackageJson('{"name":"ari","version":"2.0.5","type":"commonjs"}')
+    expect(a).not.toBe(b)
   })
 
-  it('returns the first hit among mixed paths', () => {
-    expect(isGraphShaping(['README.md', 'proxy.ts', 'package.json'])).toBe('proxy.ts')
+  it('returns malformed input as-is instead of throwing', () => {
+    expect(normalizePackageJson('not json {')).toBe('not json {')
+  })
+})
+
+describe('firstChangedFile', () => {
+  const base = { 'proxy.ts': 'aaa', 'package.json': 'bbb' }
+
+  it('returns null when hashes match', () => {
+    expect(firstChangedFile(base, { ...base })).toBeNull()
   })
 
-  it('ignores ordinary source and docs changes', () => {
-    expect(isGraphShaping(['README.md'])).toBeNull()
-    expect(isGraphShaping(['app/page.tsx'])).toBeNull()
-    expect(isGraphShaping(['lib/auth-helpers.ts'])).toBeNull()
-    expect(isGraphShaping([])).toBeNull()
+  it('reports a changed file', () => {
+    expect(firstChangedFile(base, { ...base, 'package.json': 'ccc' })).toBe('package.json')
   })
 
-  it('only matches exact root-relative paths, never nested files', () => {
-    expect(isGraphShaping(['modules-core/foo/package.json'])).toBeNull()
-    expect(isGraphShaping(['docs/tsconfig.json'])).toBeNull()
+  it('reports a file that disappeared (entrypoint rename)', () => {
+    expect(firstChangedFile(base, { 'package.json': 'bbb' })).toBe('proxy.ts')
+  })
+
+  it('reports a file that appeared', () => {
+    expect(firstChangedFile(base, { ...base, 'middleware.ts': 'ddd' })).toBe('middleware.ts')
+  })
+
+  it('ignores keys outside the graph-shaping list', () => {
+    expect(firstChangedFile(base, { ...base, 'README.md': 'zzz' })).toBeNull()
+  })
+
+  it('tolerates missing maps', () => {
+    expect(firstChangedFile(undefined, base)).toBe('proxy.ts')
+    expect(firstChangedFile(base, undefined)).toBe('proxy.ts')
   })
 })
 
