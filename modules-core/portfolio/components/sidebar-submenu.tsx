@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import type { ModuleSubmenuProps } from '@/lib/modules/submenu-types'
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -25,7 +24,7 @@ const menuItems = [
   },
 ]
 
-export default function PortfolioSubmenu(_props: ModuleSubmenuProps) {
+export default function PortfolioSubmenu() {
   const pathname = usePathname()
 
   return (

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -384,27 +384,46 @@ function EditTickerDialog({
   onClose: () => void
   otherSymbols: string[]
 }) {
+  return (
+    <Dialog open={ticker !== null} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit ticker</DialogTitle>
+          <DialogDescription>Update the symbol or number of shares.</DialogDescription>
+        </DialogHeader>
+        {ticker && (
+          // Keyed by ticker so the form remounts with fresh state per edit —
+          // no populate-on-open effect needed.
+          <EditTickerForm
+            key={ticker.id}
+            ticker={ticker}
+            onClose={onClose}
+            otherSymbols={otherSymbols}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function EditTickerForm({
+  ticker,
+  onClose,
+  otherSymbols,
+}: {
+  ticker: PortfolioTicker
+  onClose: () => void
+  otherSymbols: string[]
+}) {
   const { toast } = useToast()
   const updateTicker = useUpdateTicker()
-  const [symbol, setSymbol] = useState('')
-  const [shares, setShares] = useState('')
+  const [symbol, setSymbol] = useState(ticker.symbol)
+  const [shares, setShares] = useState(ticker.shares ?? '')
   const [symbolError, setSymbolError] = useState<string | null>(null)
   const [sharesError, setSharesError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (ticker) {
-      setSymbol(ticker.symbol)
-      setShares(ticker.shares ?? '')
-      setSymbolError(null)
-      setSharesError(null)
-    }
-  }, [ticker])
-
-  const open = ticker !== null
-
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!ticker) return
 
     const normalized = normalizeSymbol(symbol)
     if (!normalized) {
@@ -460,63 +479,50 @@ function EditTickerDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Edit ticker</DialogTitle>
-          <DialogDescription>Update the symbol or number of shares.</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSave} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="edit-symbol">Symbol</Label>
-            <Input
-              id="edit-symbol"
-              value={symbol}
-              maxLength={10}
-              autoCapitalize="characters"
-              onChange={(e) => {
-                setSymbol(e.target.value)
-                if (symbolError) setSymbolError(null)
-              }}
-              disabled={updateTicker.isPending}
-              className={symbolError ? 'border-red-500 focus-visible:ring-red-500' : ''}
-            />
-            {symbolError && <p className="text-xs text-red-500">{symbolError}</p>}
-          </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="edit-shares">Shares</Label>
-            <Input
-              id="edit-shares"
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="any"
-              value={shares}
-              placeholder="Optional"
-              onChange={(e) => {
-                setShares(e.target.value)
-                if (sharesError) setSharesError(null)
-              }}
-              disabled={updateTicker.isPending}
-              className={sharesError ? 'border-red-500 focus-visible:ring-red-500' : ''}
-            />
-            {sharesError && <p className="text-xs text-red-500">{sharesError}</p>}
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={updateTicker.isPending}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={updateTicker.isPending}>
-              {updateTicker.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <form onSubmit={handleSave} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <Label htmlFor="edit-symbol">Symbol</Label>
+        <Input
+          id="edit-symbol"
+          value={symbol}
+          maxLength={10}
+          autoCapitalize="characters"
+          onChange={(e) => {
+            setSymbol(e.target.value)
+            if (symbolError) setSymbolError(null)
+          }}
+          disabled={updateTicker.isPending}
+          className={symbolError ? 'border-red-500 focus-visible:ring-red-500' : ''}
+        />
+        {symbolError && <p className="text-xs text-red-500">{symbolError}</p>}
+      </div>
+      <div className="flex flex-col gap-1">
+        <Label htmlFor="edit-shares">Shares</Label>
+        <Input
+          id="edit-shares"
+          type="number"
+          inputMode="decimal"
+          min={0}
+          step="any"
+          value={shares}
+          placeholder="Optional"
+          onChange={(e) => {
+            setShares(e.target.value)
+            if (sharesError) setSharesError(null)
+          }}
+          disabled={updateTicker.isPending}
+          className={sharesError ? 'border-red-500 focus-visible:ring-red-500' : ''}
+        />
+        {sharesError && <p className="text-xs text-red-500">{sharesError}</p>}
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onClose} disabled={updateTicker.isPending}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={updateTicker.isPending}>
+          {updateTicker.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
+        </Button>
+      </DialogFooter>
+    </form>
   )
 }

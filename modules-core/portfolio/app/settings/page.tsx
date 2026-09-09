@@ -6,7 +6,6 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -20,21 +19,15 @@ export default function PortfolioSettingsPage() {
   const { data: settings, isLoading } = usePortfolioSettings()
   const updateSettings = useUpdatePortfolioSettings()
 
-  const [showDashboardWidget, setShowDashboardWidget] = useState(true)
-
-  useEffect(() => {
-    if (settings) {
-      setShowDashboardWidget(settings.showDashboardWidget ?? true)
-    }
-  }, [settings])
+  // Derived directly from the query — the mutation hook already applies the
+  // toggle optimistically to the cache and rolls it back on error.
+  const showDashboardWidget = settings?.showDashboardWidget ?? true
 
   const handleToggleHoldings = (checked: boolean) => {
-    setShowDashboardWidget(checked)
     updateSettings.mutate(
       { showDashboardWidget: checked },
       {
         onError: (err) => {
-          setShowDashboardWidget(!checked)
           toast({
             variant: 'destructive',
             title: 'Failed to save setting',
