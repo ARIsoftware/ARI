@@ -1,14 +1,11 @@
 /**
- * Board of Advisors - ElevenLabs error decoding
+ * Today's Brief - ElevenLabs error decoding
  *
  * ElevenLabs returns HTTP 401 for several distinct conditions — an invalid key,
  * a restricted key missing the endpoint permission, AND an exhausted credit
  * quota — so the status code alone can't tell them apart. It does, however, put
  * a machine-readable reason in the JSON body (`detail.status` / `detail.message`),
  * which we surface so the user knows exactly what to fix.
- *
- * Mirrors modules-core/todays-brief/lib/elevenlabs.ts so the module stays
- * self-contained.
  */
 export function describeElevenLabsError(status: number, rawBody: string): string {
   let detailStatus: string | undefined

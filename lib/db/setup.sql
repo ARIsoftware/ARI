@@ -266,6 +266,25 @@ ALTER TABLE "module_migrations" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "module_migrations_rls_deny" ON "module_migrations";
 CREATE POLICY "module_migrations_rls_deny" ON "module_migrations" FOR ALL TO public USING (false);
 
+-- Module rename: morning-brief -> todays-brief (2026-09). Carries each user's
+-- module_settings row (enabled state + settings JSONB, incl. the schema-install
+-- hash) and any module_migrations rows to the new id so the rename needs no
+-- reconfiguration. Runs before any authenticated load can bootstrap a fresh
+-- empty row under the new id. No-op once migrated (or on fresh installs).
+UPDATE "module_settings" SET "module_id" = 'todays-brief'
+WHERE "module_id" = 'morning-brief'
+  AND NOT EXISTS (
+    SELECT 1 FROM "module_settings" ms2
+    WHERE ms2."user_id" = "module_settings"."user_id" AND ms2."module_id" = 'todays-brief'
+  );
+UPDATE "module_migrations" SET "module_id" = 'todays-brief'
+WHERE "module_id" = 'morning-brief'
+  AND NOT EXISTS (
+    SELECT 1 FROM "module_migrations" mm2
+    WHERE mm2."module_id" = 'todays-brief'
+      AND mm2."migration_name" = "module_migrations"."migration_name"
+  );
+
 -- ================================================================
 -- API KEY TABLES
 -- ================================================================

@@ -34,7 +34,7 @@ function useOptionalJson<T>(key: string, url: string, enabled: boolean, staleTim
 
 /**
  * First name for the greeting: user_preferences.name first, then the account's
- * first_name/name from /api/users/me — same precedence as Morning Brief.
+ * first_name/name from /api/users/me — same precedence as Today's Brief.
  */
 function useFirstName() {
   return useQuery({
@@ -94,39 +94,39 @@ export function useDefaultLayoutData() {
 
   const tasksEnabled = enabledModules.has('tasks')
   const quotesEnabled = enabledModules.has('quotes')
-  const morningBriefEnabled = enabledModules.has('morning-brief')
+  const todaysBriefEnabled = enabledModules.has('todays-brief')
 
   const firstNameQuery = useFirstName()
   const weatherQuery = useOptionalJson<BriefWeather>(
     'dashboard-weather',
-    '/api/modules/morning-brief/weather',
-    morningBriefEnabled,
+    '/api/modules/todays-brief/weather',
+    todaysBriefEnabled,
     30 * 60 * 1000,
   )
   const greetingQuery = useOptionalJson<BriefGreeting>(
     'dashboard-brief-greeting',
-    '/api/modules/morning-brief/greeting',
-    morningBriefEnabled,
+    '/api/modules/todays-brief/greeting',
+    todaysBriefEnabled,
     60 * 60 * 1000,
   )
   const quoteQuery = useDashboardQuote(quotesEnabled)
   const prioritiesQuery = useTopPriorities(tasksEnabled)
   const tasksQuery = useTasksList(tasksEnabled)
 
-  // Listen is only offered when a voice provider is selected in Morning Brief
+  // Listen is only offered when a voice provider is selected in Today's Brief
   // AND that provider's API key is still configured — same gate as the Morning
   // Brief page itself (a stale selection after key removal stays hidden).
   const voiceSettingsQuery = useOptionalJson<BriefVoiceSettings>(
     'dashboard-voice-settings',
-    '/api/modules/morning-brief/settings',
-    morningBriefEnabled,
+    '/api/modules/todays-brief/settings',
+    todaysBriefEnabled,
     5 * 60 * 1000,
   )
   const { data: providerKeys = {} } = useApiKeysStatus()
   const voiceProvider =
     AI_VOICE_PROVIDERS.find((p) => p.id === voiceSettingsQuery.data?.selectedVoiceProvider) ?? null
   const listenReady =
-    morningBriefEnabled &&
+    todaysBriefEnabled &&
     !!voiceProvider &&
     (providerKeys[voiceProvider.primaryEnvKey]?.configured ?? false)
 
@@ -150,7 +150,7 @@ export function useDefaultLayoutData() {
 export type ListenState = 'idle' | 'loading' | 'playing'
 
 /**
- * "Listen" button behavior: read the brief aloud via the Morning Brief TTS
+ * "Listen" button behavior: read the brief aloud via the Today's Brief TTS
  * endpoint (ElevenLabs). The page only renders the button when `listenReady`
  * says a voice provider is configured — there is no browser-speech fallback.
  * The synthesized clip is cached per text so replaying doesn't re-hit (and
@@ -194,7 +194,7 @@ export function useListenBrief(text: string) {
       const controller = new AbortController()
       abortRef.current = controller
       try {
-        const res = await fetch('/api/modules/morning-brief/tts', {
+        const res = await fetch('/api/modules/todays-brief/tts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text }),

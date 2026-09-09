@@ -21,7 +21,7 @@ export interface CuratedVoice {
 
 /**
  * A fixed set of ElevenLabs premade voices, tagged by sex. Rachel matches
- * Morning Brief's default. These are stock voice ids available on every
+ * Today's Brief's default. These are stock voice ids available on every
  * ElevenLabs account; DEFAULT_VOICE_ID is the always-safe fallback.
  */
 export const CURATED_VOICES: CuratedVoice[] = [
@@ -37,7 +37,7 @@ export const CURATED_VOICES: CuratedVoice[] = [
   { id: 'nPczCjzI2devNBz1zQrb', name: 'Brian', sex: 'male' },
 ]
 
-/** ElevenLabs "Rachel" — the same stable default Morning Brief falls back to. */
+/** ElevenLabs "Rachel" — the same stable default Today's Brief falls back to. */
 export const DEFAULT_VOICE_ID = '21m00Tcm4TlvDq8ikWAM'
 
 /** Deterministic, non-negative hash of a string (stable across runs). */

@@ -234,7 +234,7 @@ tests/unit/modules-core/module-template/   # Unit tests live HERE, not in the mo
 
 Optional conventions not used by this template: `database/relations.ts`
 (Drizzle relations, auto-barrelled — see knowledge-manager) and a module-root
-`styles.css` imported from `app/page.tsx` (see morning-brief, timezones).
+`styles.css` imported from `app/page.tsx` (see todays-brief, timezones).
 
 ## Usage Examples
 

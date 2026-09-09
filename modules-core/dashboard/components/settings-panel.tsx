@@ -12,7 +12,7 @@ const LAYOUT_OPTIONS: { id: DashboardLayout; name: string; description: string }
   {
     id: 'default',
     name: 'Default',
-    description: 'Clean three-column layout with the Morning Brief front and center.',
+    description: "Clean three-column layout with Today's Brief front and center.",
   },
   {
     id: 'boxy',

@@ -1,0 +1,51 @@
+{
+  "id": "todays-brief",
+  "group": "Overview",
+  "name": "Today's Brief",
+  "description": "A one-page printable daily brief, written like a secretary: a personal greeting, a motivational message, your top 5 priority tasks, and today's Google Calendar meetings.",
+  "version": "1.0.0",
+  "author": "ARI",
+  "icon": "Newspaper",
+  "enabled": true,
+  "fullscreen": false,
+  "menuPriority": 1,
+  "permissions": {
+    "database": true,
+    "api": true,
+    "dashboard": true
+  },
+  "routes": [
+    {
+      "path": "/todays-brief",
+      "label": "Today's Brief",
+      "icon": "Newspaper",
+      "sidebarPosition": "main"
+    }
+  ],
+  "dependencies": {
+    "modules": [],
+    "coreFeatures": []
+  },
+  "database": {
+    "tables": ["todays_brief_google_tokens", "todays_brief_ical_subscriptions", "todays_brief_greetings"]
+  },
+  "npmDependencies": {
+    "ical-expander": "^3.2.0"
+  },
+  "dashboard": {
+    "widgets": true,
+    "widgetComponents": ["./components/dashboard-widget.tsx"]
+  },
+  "settings": {
+    "panel": "./components/settings-panel.tsx"
+  },
+  "topBarIcon": {
+    "icon": "Newspaper",
+    "route": "/todays-brief",
+    "tooltip": "Today's Brief",
+    "order": 30
+  },
+  "submenu": {
+    "component": "./components/sidebar-submenu.tsx"
+  }
+}

@@ -12,7 +12,7 @@ import {
 // module-template is a developer demo and never belongs on a real dashboard.
 const EXCLUDED_MODULES = new Set([
   'tasks',
-  'morning-brief',
+  'todays-brief',
   'agents',
   'brainstorm',
   'module-template',
@@ -73,13 +73,13 @@ function collectLoaders(
 }
 
 /**
- * The Morning Brief module's own dashboard widget, loaded from the generated
+ * The Today's Brief module's own dashboard widget, loaded from the generated
  * registry. Renders nothing when the module is disabled.
  */
-export function MorningBriefWidget() {
+export function TodaysBriefWidget() {
   const { modules } = useModules()
-  const enabled = modules.some((m) => m.id === 'morning-brief' && m.dashboard?.widgets)
-  const loader = MODULE_DASHBOARD_WIDGETS['morning-brief']?.[0]
+  const enabled = modules.some((m) => m.id === 'todays-brief' && m.dashboard?.widgets)
+  const loader = MODULE_DASHBOARD_WIDGETS['todays-brief']?.[0]
   if (!enabled || !loader) return null
   // Hide the widget's own Listen button — the Default layout has one in its header.
   return (

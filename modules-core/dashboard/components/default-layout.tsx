@@ -10,7 +10,7 @@ import { BarChart3, Loader2, Plus, Square, Volume2 } from 'lucide-react'
 import { useDefaultLayoutData, useListenBrief } from '@/modules/dashboard/hooks/use-default-layout'
 import {
   ModuleWidgets,
-  MorningBriefWidget,
+  TodaysBriefWidget,
   TaskActivityWidget,
   TasksStatCard,
 } from '@/modules/dashboard/components/module-widgets'
@@ -162,8 +162,8 @@ export function DefaultDashboardLayout() {
 
           {/* Middle column */}
           <div className="space-y-6 lg:col-span-6">
-            {/* The Morning Brief module's own dashboard widget */}
-            <MorningBriefWidget />
+            {/* The Today's Brief module's own dashboard widget */}
+            <TodaysBriefWidget />
 
             {/* The Tasks module's activity chart widget */}
             <TaskActivityWidget />

@@ -1,5 +1,5 @@
 /**
- * Board of Advisors - AI provider credential resolution
+ * Today's Brief - AI provider credential resolution
  *
  * Resolves the API key (or base URL) and model for any provider in
  * `@/lib/ai-providers`. Resolution order, per provider:
@@ -7,7 +7,7 @@
  *      decrypted on the fly if it's a stored secret.
  *   2. The matching `process.env` value.
  *
- * Mirrors modules-core/todays-brief/lib/provider-keys.ts so the module stays
+ * Mirrors modules-core/module-template/lib/provider-keys.ts so the module stays
  * self-contained and automatically picks up any provider added to AI_PROVIDERS.
  */
 import { withAdminDb } from '@/lib/db'

@@ -22,7 +22,7 @@ const cspHeader = [
   "form-action 'self'",
   "base-uri 'self'",
   "object-src 'none'",
-  // blob: for synthesized TTS audio (e.g. Morning Brief read-aloud); the Google
+  // blob: for synthesized TTS audio (e.g. Today's Brief read-aloud); the Google
   // Storage host serves ElevenLabs' premade voice preview clips; data: for
   // small embedded UI sound effects (e.g. the Tasks module's tactile clips).
   "media-src 'self' blob: data: https://storage.googleapis.com"
