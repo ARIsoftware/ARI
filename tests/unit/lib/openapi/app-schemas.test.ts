@@ -30,6 +30,7 @@ import {
   HealthModuleStatusSchema,
   HealthStorageFilesystemSchema,
   HealthRlsTestSchema,
+  HealthRlsTablesSchema,
   HealthMultiUserSchema,
   HealthCheckSchema,
   LicenseStatusSchema,
@@ -366,6 +367,48 @@ describe('HealthRlsTestSchema', () => {
   })
   it('accepts unauthenticated', () => {
     pass(HealthRlsTestSchema, { authenticated: false })
+  })
+})
+
+// ─── HealthRlsTablesSchema ───────────────────────────────────────────────────
+
+describe('HealthRlsTablesSchema', () => {
+  const validTable = {
+    table: 'tasks',
+    module: 'core',
+    rlsEnabled: true,
+    rlsForced: false,
+    policyCount: 4,
+    status: 'ok',
+  }
+  const validSummary = { total: 1, ok: 1, noPolicies: 0, disabled: 0, system: 0 }
+
+  it('accepts a full report', () => {
+    pass(HealthRlsTablesSchema, {
+      bypassRls: true,
+      enforced: false,
+      tables: [validTable],
+      summary: validSummary,
+      note: 'defense-in-depth only',
+    })
+  })
+  it('accepts null bypassRls and an empty table list', () => {
+    pass(HealthRlsTablesSchema, {
+      bypassRls: null,
+      enforced: false,
+      tables: [],
+      summary: { total: 0, ok: 0, noPolicies: 0, disabled: 0, system: 0 },
+      note: 'n/a',
+    })
+  })
+  it('rejects an unknown table status', () => {
+    fail(HealthRlsTablesSchema, {
+      bypassRls: false,
+      enforced: true,
+      tables: [{ ...validTable, status: 'bogus' }],
+      summary: validSummary,
+      note: '',
+    })
   })
 })
 

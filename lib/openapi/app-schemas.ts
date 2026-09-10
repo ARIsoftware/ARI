@@ -200,6 +200,27 @@ export const HealthRlsTestSchema = z.object({
   error: z.string().optional(),
 }).openapi('HealthRlsTestResult')
 
+export const HealthRlsTablesSchema = z.object({
+  bypassRls: z.boolean().nullable(),
+  enforced: z.boolean(),
+  tables: z.array(z.object({
+    table: z.string(),
+    module: z.string(),
+    rlsEnabled: z.boolean(),
+    rlsForced: z.boolean(),
+    policyCount: z.number().int(),
+    status: z.enum(['ok', 'no_policies', 'disabled', 'system']),
+  })),
+  summary: z.object({
+    total: z.number().int(),
+    ok: z.number().int(),
+    noPolicies: z.number().int(),
+    disabled: z.number().int(),
+    system: z.number().int(),
+  }),
+  note: z.string(),
+}).openapi('HealthRlsTables')
+
 export const HealthMultiUserSchema = z.object({
   ok: z.boolean(),
   columnsPresent: z.boolean(),

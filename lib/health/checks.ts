@@ -15,6 +15,7 @@ import * as path from 'path'
 import { randomBytes } from 'crypto'
 import { and, eq } from 'drizzle-orm'
 import { pool } from '@/lib/db/pool'
+import { MODULE_SCHEMAS } from '@/lib/generated/module-schemas'
 import { withUserContext, type DrizzleDb } from '@/lib/db'
 import { moduleSettings } from '@/lib/db/schema'
 import { getModules } from '@/lib/modules/module-registry'
@@ -463,5 +464,127 @@ export async function runRlsTest(userId: string, withRLS: WithRLS): Promise<RlsT
         console.error('[Debug RLS] Failed to clean up sentinel row:', cleanupError)
       }
     }
+  }
+}
+
+// ── Per-table RLS coverage ──────────────────────────────────────────────────
+
+/**
+ * Better Auth system tables. They are intentionally queried on the privileged
+ * connection before any user context exists (sign-in must read `user` by
+ * email), so absent RLS is by design rather than a coverage gap.
+ */
+const AUTH_SYSTEM_TABLES = new Set(['user', 'session', 'account', 'twoFactor', 'verification'])
+
+export type RlsTableStatus = 'ok' | 'no_policies' | 'disabled' | 'system'
+
+export interface RlsTableRow {
+  table: string
+  /** Owning module id, or 'core' for setup.sql / unattributed tables. */
+  module: string
+  rlsEnabled: boolean
+  rlsForced: boolean
+  policyCount: number
+  status: RlsTableStatus
+}
+
+export interface RlsTablesPayload {
+  bypassRls: boolean | null
+  /** True only when the connection role does NOT bypass RLS. */
+  enforced: boolean
+  tables: RlsTableRow[]
+  summary: { total: number; ok: number; noPolicies: number; disabled: number; system: number }
+  note: string
+}
+
+/**
+ * Maps table name → owning module id by scanning each module's inlined
+ * schema.sql for CREATE TABLE statements. Tables not claimed by any module
+ * fall back to 'core' (setup.sql or hand-created).
+ */
+export function buildTableModuleMap(schemas: Record<string, string>): Map<string, string> {
+  const map = new Map<string, string>()
+  for (const [moduleId, sql] of Object.entries(schemas)) {
+    for (const match of sql.matchAll(
+      /CREATE TABLE IF NOT EXISTS\s+"?([A-Za-z_][A-Za-z0-9_]*)"?/gi
+    )) {
+      // First claimant wins — modules-custom overrides shadow core copies of
+      // the same table name, but both declare identical CREATE statements.
+      if (!map.has(match[1])) map.set(match[1], moduleId)
+    }
+  }
+  return map
+}
+
+/**
+ * Per-table RLS audit over every ordinary table in `public`: is RLS enabled,
+ * is it FORCEd (applies to the table owner too), and how many policies exist.
+ *
+ * Two states matter more than "disabled": a table with RLS enabled but zero
+ * policies becomes deny-all the moment ARI stops connecting as a BYPASSRLS
+ * role, and a table with RLS off becomes readable by every authenticated user.
+ * This check is the pre-flight audit for DB-level RLS enforcement.
+ *
+ * Returns `null` when no pool is configured.
+ */
+export async function checkRlsTables(): Promise<RlsTablesPayload | null> {
+  if (!pool) return null
+
+  const { rows } = await pool.query<{
+    table_name: string
+    rls_enabled: boolean
+    rls_forced: boolean
+    policy_count: number
+  }>(
+    `SELECT c.relname AS table_name,
+            c.relrowsecurity AS rls_enabled,
+            c.relforcerowsecurity AS rls_forced,
+            count(p.polname)::int AS policy_count
+       FROM pg_class c
+       LEFT JOIN pg_policy p ON p.polrelid = c.oid
+      WHERE c.relkind = 'r'
+        AND c.relnamespace = 'public'::regnamespace
+      GROUP BY c.relname, c.relrowsecurity, c.relforcerowsecurity
+      ORDER BY c.relname`
+  )
+
+  const moduleByTable = buildTableModuleMap(MODULE_SCHEMAS)
+  const bypassRls = await connectionBypassesRls()
+
+  const tables: RlsTableRow[] = rows.map((r) => {
+    const status: RlsTableStatus = AUTH_SYSTEM_TABLES.has(r.table_name)
+      ? 'system'
+      : !r.rls_enabled
+        ? 'disabled'
+        : r.policy_count === 0
+          ? 'no_policies'
+          : 'ok'
+    return {
+      table: r.table_name,
+      module: moduleByTable.get(r.table_name) ?? 'core',
+      rlsEnabled: r.rls_enabled,
+      rlsForced: r.rls_forced,
+      policyCount: r.policy_count,
+      status,
+    }
+  })
+
+  const summary = {
+    total: tables.length,
+    ok: tables.filter((t) => t.status === 'ok').length,
+    noPolicies: tables.filter((t) => t.status === 'no_policies').length,
+    disabled: tables.filter((t) => t.status === 'disabled').length,
+    system: tables.filter((t) => t.status === 'system').length,
+  }
+
+  return {
+    bypassRls,
+    enforced: bypassRls === false,
+    tables,
+    summary,
+    note:
+      bypassRls === false
+        ? 'Connection role does not bypass RLS — the policies below are actively enforced at the database level'
+        : 'Connection role bypasses RLS (documented default) — policies below are defense-in-depth only; the table shows what WOULD be enforced if ARI switched to a non-bypass role',
   }
 }

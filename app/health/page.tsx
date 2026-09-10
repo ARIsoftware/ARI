@@ -225,6 +225,54 @@ function UnitTestFileRow({ file }: { file: UnitTestFileEntry }) {
   )
 }
 
+// Shape returned by /api/health/rls-tables (per-table RLS coverage audit).
+interface RlsTableRow {
+  table: string
+  module: string
+  rlsEnabled: boolean
+  rlsForced: boolean
+  policyCount: number
+  status: 'ok' | 'no_policies' | 'disabled' | 'system'
+}
+interface RlsTablesReport {
+  bypassRls: boolean | null
+  enforced: boolean
+  tables: RlsTableRow[]
+  summary: { total: number; ok: number; noPolicies: number; disabled: number; system: number }
+  note: string
+}
+
+// Severity order for the RLS table listing — problem rows surface first.
+const RLS_STATUS_ORDER: Record<RlsTableRow['status'], number> = {
+  no_policies: 0,
+  disabled: 1,
+  ok: 2,
+  system: 3,
+}
+
+const RLS_STATUS_META: Record<RlsTableRow['status'], { label: string; className: string; hint: string }> = {
+  ok: {
+    label: 'Protected',
+    className: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400',
+    hint: 'RLS enabled with at least one policy',
+  },
+  no_policies: {
+    label: 'No policies',
+    className: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
+    hint: 'RLS enabled but zero policies — deny-all the moment enforcement is switched on',
+  },
+  disabled: {
+    label: 'RLS disabled',
+    className: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400',
+    hint: 'No row security — under enforcement this table is open to every authenticated user',
+  },
+  system: {
+    label: 'Auth system',
+    className: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+    hint: 'Better Auth table — intentionally accessed on the privileged connection before user context exists',
+  },
+}
+
 interface SecurityTestResult {
   endpoint: string
   method: string
@@ -2518,6 +2566,29 @@ export default function DatabaseTestPage() {
     })()
   }
 
+  // Per-table RLS audit — fetched lazily the first time the RLS tab is opened
+  // (wired to the Tabs onValueChange below), same pattern as the unit tests tab.
+  const [rlsTables, setRlsTables] = useState<RlsTablesReport | null>(null)
+  const [rlsTablesLoading, setRlsTablesLoading] = useState(false)
+  const [rlsTablesError, setRlsTablesError] = useState<string | null>(null)
+  const rlsTablesRequested = useRef(false)
+  const loadRlsTables = () => {
+    if (rlsTablesRequested.current) return
+    rlsTablesRequested.current = true
+    setRlsTablesLoading(true)
+    ;(async () => {
+      try {
+        const res = await fetch(route('health-rls-tables'))
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        setRlsTables((await res.json()) as RlsTablesReport)
+      } catch (e) {
+        setRlsTablesError(errMsg(e))
+      } finally {
+        setRlsTablesLoading(false)
+      }
+    })()
+  }
+
   // Calculate database summary
   const databaseSummary = {
     total: testResults.length,
@@ -2644,8 +2715,8 @@ export default function DatabaseTestPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="database" className="w-full" onValueChange={(v) => { if (v === 'unittests') loadUnitTests() }}>
-        <TabsList className="grid w-full grid-cols-8 h-[50px] mb-8">
+      <Tabs defaultValue="database" className="w-full" onValueChange={(v) => { if (v === 'unittests') loadUnitTests(); if (v === 'rls') loadRlsTables() }}>
+        <TabsList className="grid w-full grid-cols-9 h-[50px] mb-8">
           <TabsTrigger value="database" className="flex h-full items-center gap-2">
             <DatabaseIcon className="h-4 w-4" />
             Database
@@ -2657,6 +2728,10 @@ export default function DatabaseTestPage() {
           <TabsTrigger value="security" className="flex h-full items-center gap-2">
             <Shield className="h-4 w-4" />
             Security
+          </TabsTrigger>
+          <TabsTrigger value="rls" className="flex h-full items-center gap-2">
+            <Lock className="h-4 w-4" />
+            RLS
           </TabsTrigger>
           <TabsTrigger value="authconfig" className="flex h-full items-center gap-2">
             <Key className="h-4 w-4" />
@@ -2774,6 +2849,151 @@ export default function DatabaseTestPage() {
             </div>
           </CardContent>
         </Card>
+        </TabsContent>
+
+        {/* RLS Coverage Tab */}
+        <TabsContent value="rls" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-2xl flex items-center gap-2">
+                <Lock className="h-6 w-6" />
+                Row Level Security
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                Per-table RLS coverage across every table in the public schema
+              </p>
+            </CardHeader>
+            <CardContent>
+              {rlsTablesLoading && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-8 justify-center">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Scanning table catalog...
+                </div>
+              )}
+
+              {rlsTablesError && (
+                <div className="p-3 bg-red-50 dark:bg-red-950 rounded text-sm text-red-600 dark:text-red-400">
+                  Failed to load RLS report: {rlsTablesError}
+                </div>
+              )}
+
+              {rlsTables && (
+                <div className="space-y-6">
+                  {/* Enforcement banner */}
+                  <div className={`flex items-start gap-3 rounded-lg border p-4 ${
+                    rlsTables.enforced
+                      ? 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950'
+                      : 'border-yellow-200 dark:border-yellow-900 bg-yellow-50 dark:bg-yellow-950'
+                  }`}>
+                    {rlsTables.enforced ? (
+                      <ShieldCheck className="h-5 w-5 mt-0.5 text-green-600 dark:text-green-400 shrink-0" />
+                    ) : (
+                      <ShieldAlert className="h-5 w-5 mt-0.5 text-yellow-600 dark:text-yellow-400 shrink-0" />
+                    )}
+                    <div>
+                      <p className={`text-sm font-medium ${
+                        rlsTables.enforced
+                          ? 'text-green-700 dark:text-green-400'
+                          : 'text-yellow-700 dark:text-yellow-400'
+                      }`}>
+                        {rlsTables.enforced
+                          ? 'RLS enforced at the database level'
+                          : 'RLS not enforced — connection role bypasses row security'}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">{rlsTables.note}</p>
+                    </div>
+                  </div>
+
+                  {/* Summary */}
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div className="rounded-lg border px-4 py-3">
+                      <div className="text-2xl font-bold">{rlsTables.summary.total}</div>
+                      <p className="text-xs text-muted-foreground">Tables</p>
+                    </div>
+                    <div className="rounded-lg border px-4 py-3">
+                      <div className="text-2xl font-bold text-green-500">{rlsTables.summary.ok}</div>
+                      <p className="text-xs text-muted-foreground">Protected</p>
+                    </div>
+                    <div className="rounded-lg border px-4 py-3">
+                      <div className="text-2xl font-bold text-red-500">{rlsTables.summary.noPolicies}</div>
+                      <p className="text-xs text-muted-foreground">No Policies</p>
+                    </div>
+                    <div className="rounded-lg border px-4 py-3">
+                      <div className="text-2xl font-bold text-yellow-500">{rlsTables.summary.disabled}</div>
+                      <p className="text-xs text-muted-foreground">RLS Disabled</p>
+                    </div>
+                    <div className="rounded-lg border px-4 py-3">
+                      <div className="text-2xl font-bold text-gray-400">{rlsTables.summary.system}</div>
+                      <p className="text-xs text-muted-foreground">Auth System</p>
+                    </div>
+                  </div>
+
+                  {/* Per-table listing, problem rows first */}
+                  <div className="rounded-lg border overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/50 text-left">
+                          <th className="px-4 py-2.5 font-medium">Table</th>
+                          <th className="px-4 py-2.5 font-medium">Module</th>
+                          <th className="px-4 py-2.5 font-medium text-center">RLS</th>
+                          <th className="px-4 py-2.5 font-medium text-center">Forced</th>
+                          <th className="px-4 py-2.5 font-medium text-center">Policies</th>
+                          <th className="px-4 py-2.5 font-medium">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...rlsTables.tables]
+                          .sort((a, b) =>
+                            RLS_STATUS_ORDER[a.status] - RLS_STATUS_ORDER[b.status] ||
+                            a.table.localeCompare(b.table)
+                          )
+                          .map((t) => {
+                            const meta = RLS_STATUS_META[t.status]
+                            return (
+                              <tr key={t.table} className="border-b last:border-b-0">
+                                <td className="px-4 py-2 font-mono text-xs">{t.table}</td>
+                                <td className="px-4 py-2 text-xs text-muted-foreground">{t.module}</td>
+                                <td className="px-4 py-2 text-center">
+                                  {t.rlsEnabled
+                                    ? <CheckCircle2 className="h-4 w-4 text-green-500 inline" />
+                                    : <XCircle className="h-4 w-4 text-yellow-500 inline" />}
+                                </td>
+                                <td className="px-4 py-2 text-center">
+                                  {t.rlsForced
+                                    ? <CheckCircle2 className="h-4 w-4 text-green-500 inline" />
+                                    : <CircleSlash className="h-4 w-4 text-gray-400 inline" />}
+                                </td>
+                                <td className="px-4 py-2 text-center tabular-nums">{t.policyCount}</td>
+                                <td className="px-4 py-2">
+                                  <span
+                                    className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${meta.className}`}
+                                    title={meta.hint}
+                                  >
+                                    {meta.label}
+                                  </span>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Legend */}
+                  <div className="space-y-1.5">
+                    {(Object.keys(RLS_STATUS_META) as Array<RlsTableRow['status']>).map((s) => (
+                      <div key={s} className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span className={`inline-block rounded px-2 py-0.5 font-medium shrink-0 ${RLS_STATUS_META[s].className}`}>
+                          {RLS_STATUS_META[s].label}
+                        </span>
+                        {RLS_STATUS_META[s].hint}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Security Tests Tab */}

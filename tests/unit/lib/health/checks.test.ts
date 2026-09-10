@@ -54,6 +54,13 @@ vi.mock('@/lib/ai-providers', () => ({
 
 vi.mock('@/lib/constants', () => ({ INTEGRATIONS_MODULE_ID: 'integrations' }))
 
+const schemasHolder = vi.hoisted(() => ({ schemas: {} as Record<string, string> }))
+vi.mock('@/lib/generated/module-schemas', () => ({
+  get MODULE_SCHEMAS() {
+    return schemasHolder.schemas
+  },
+}))
+
 const storageHolder = vi.hoisted(() => ({
   config: { provider: 'filesystem' } as any,
   basePath: '/tmp/ari-storage',
@@ -97,11 +104,13 @@ function queryableImpl(result: unknown): any {
 }
 
 import {
+  buildTableModuleMap,
   checkAiProviders,
   checkAuthConfig,
   checkDatabase,
   checkModuleStatus,
   checkMultiUser,
+  checkRlsTables,
   checkStorageFilesystem,
   connectionBypassesRls,
   runRlsTest,
@@ -118,6 +127,7 @@ function makeWithRLS(results: unknown[]) {
 beforeEach(() => {
   poolHolder.pool = null
   dbHolder.userContextResults = []
+  schemasHolder.schemas = {}
   registryHolder.modules = []
   providersHolder.providers = []
   storageHolder.config = { provider: 'filesystem' }
@@ -640,5 +650,100 @@ describe('runRlsTest', () => {
     await expect(runRlsTest('user-1', withRLS)).rejects.toThrow('select failed')
     // cleanup still ran for the inserted row
     expect(withRLS).toHaveBeenCalledTimes(4)
+  })
+})
+
+// ── buildTableModuleMap ────────────────────────────────────────────────────
+
+describe('buildTableModuleMap', () => {
+  it('maps quoted and unquoted CREATE TABLE names to their module', () => {
+    const map = buildTableModuleMap({
+      tasks: 'CREATE TABLE IF NOT EXISTS "tasks" (id UUID);',
+      agents: 'create table if not exists agents (id TEXT);\nCREATE TABLE IF NOT EXISTS agent_runs (id TEXT);',
+    })
+    expect(map.get('tasks')).toBe('tasks')
+    expect(map.get('agents')).toBe('agents')
+    expect(map.get('agent_runs')).toBe('agents')
+  })
+
+  it('keeps the first claimant when two modules declare the same table', () => {
+    const map = buildTableModuleMap({
+      first: 'CREATE TABLE IF NOT EXISTS shared_tbl (id TEXT);',
+      second: 'CREATE TABLE IF NOT EXISTS shared_tbl (id TEXT);',
+    })
+    expect(map.get('shared_tbl')).toBe('first')
+  })
+
+  it('ignores SQL without CREATE TABLE statements', () => {
+    expect(buildTableModuleMap({ empty: 'ALTER TABLE x ADD COLUMN y TEXT;' }).size).toBe(0)
+  })
+})
+
+// ── checkRlsTables ─────────────────────────────────────────────────────────
+
+describe('checkRlsTables', () => {
+  /** pool.query stub that serves the catalog scan and the pg_roles bypass probe. */
+  function rlsTablesPool(catalogRows: unknown[], bypass: boolean | null) {
+    return {
+      query: vi.fn(async (sql: string) => {
+        if (sql.includes('pg_roles')) return { rows: bypass === null ? [] : [{ bypass }] }
+        return { rows: catalogRows }
+      }),
+    }
+  }
+
+  it('returns null with no pool', async () => {
+    poolHolder.pool = null
+    expect(await checkRlsTables()).toBeNull()
+  })
+
+  it('classifies tables and attributes them to modules', async () => {
+    schemasHolder.schemas = { agents: 'CREATE TABLE IF NOT EXISTS agents (id TEXT);' }
+    poolHolder.pool = rlsTablesPool(
+      [
+        { table_name: 'agents', rls_enabled: true, rls_forced: false, policy_count: 4 },
+        { table_name: 'tasks', rls_enabled: true, rls_forced: true, policy_count: 0 },
+        { table_name: 'quotes', rls_enabled: false, rls_forced: false, policy_count: 0 },
+        { table_name: 'user', rls_enabled: false, rls_forced: false, policy_count: 0 },
+      ],
+      true
+    )
+
+    const result = await checkRlsTables()
+
+    expect(result).not.toBeNull()
+    expect(result!.tables).toEqual([
+      { table: 'agents', module: 'agents', rlsEnabled: true, rlsForced: false, policyCount: 4, status: 'ok' },
+      { table: 'tasks', module: 'core', rlsEnabled: true, rlsForced: true, policyCount: 0, status: 'no_policies' },
+      { table: 'quotes', module: 'core', rlsEnabled: false, rlsForced: false, policyCount: 0, status: 'disabled' },
+      { table: 'user', module: 'core', rlsEnabled: false, rlsForced: false, policyCount: 0, status: 'system' },
+    ])
+    expect(result!.summary).toEqual({ total: 4, ok: 1, noPolicies: 1, disabled: 1, system: 1 })
+    expect(result!.bypassRls).toBe(true)
+    expect(result!.enforced).toBe(false)
+    expect(result!.note).toContain('bypasses RLS')
+  })
+
+  it('reports enforcement when the role does not bypass RLS', async () => {
+    poolHolder.pool = rlsTablesPool(
+      [{ table_name: 'tasks', rls_enabled: true, rls_forced: true, policy_count: 2 }],
+      false
+    )
+
+    const result = await checkRlsTables()
+
+    expect(result!.enforced).toBe(true)
+    expect(result!.bypassRls).toBe(false)
+    expect(result!.note).toContain('actively enforced')
+  })
+
+  it('treats an unknown bypass state as not enforced', async () => {
+    poolHolder.pool = rlsTablesPool([], null)
+
+    const result = await checkRlsTables()
+
+    expect(result!.bypassRls).toBeNull()
+    expect(result!.enforced).toBe(false)
+    expect(result!.summary.total).toBe(0)
   })
 })
