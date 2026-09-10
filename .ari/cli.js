@@ -116,7 +116,11 @@ function logReconcileResult(result, log) {
     log('  ' + GREEN + '✔' + RESET + ` Synced ${result.added.length} custom-module dep(s): ${names}`);
   }
   for (const c of result.conflicts) {
-    log('  ' + YELLOW + '⚠' + RESET + ` ${c.name}: module wants ${c.declared}, package.json has ${c.existing}`);
+    // `block` is set only on root-vs-module conflicts. Naming it matters when
+    // it isn't `dependencies` — otherwise "package.json has ^0.170.0" sends the
+    // user looking in the wrong section.
+    const where = c.block && c.block !== 'dependencies' ? `package.json ${c.block}` : 'package.json';
+    log('  ' + YELLOW + '⚠' + RESET + ` ${c.name}: module wants ${c.declared}, ${where} has ${c.existing}`);
     log('  ' + DIM + '  Source(s): ' + c.sources.join(', ') + RESET);
   }
   for (const inv of result.invalid) {
@@ -370,12 +374,28 @@ function start(opts = {}) {
   // ~1s pnpm install that follows.
   if (quiet) startSpinner('Starting ARI');
 
+  // Sync custom-module npmDependencies into package.json before pnpm install,
+  // so a module dropped into modules-custom/ by hand (not via /modules) works
+  // after a plain restart. Never aborts start — conflicts/errors are warnings.
+  // Buffer the output rather than predicting whether there will be any: the
+  // spinner has to stop before the first line is printed, and measuring what
+  // was actually emitted can't drift from logReconcileResult's own rules.
+  const depResult = reconcileCustomModuleDeps(ROOT);
+  const depLines = [];
+  logReconcileResult(depResult, (msg) => depLines.push(msg));
+  if (depLines.length > 0) {
+    stopSpinner();
+    for (const line of depLines) console.log(line);
+    if (quiet) startSpinner('Starting ARI');
+  }
+
   // Keep node_modules in sync with package.json so new/updated modules don't
   // crash the dev server with "Module not found". --prefer-offline keeps this
   // working without internet when everything is already in the pnpm store. On
   // failure we warn and continue — Turbopack will surface any genuinely
   // missing dep clearly enough that blocking startup would be worse.
   if (!quiet) console.log('  Installing dependencies...');
+  let installOk = true;
   try {
     const out = execSync('pnpm install --prefer-offline', {
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -389,10 +409,25 @@ function start(opts = {}) {
       console.log('  ' + GREEN + '✔' + RESET + ' ' + label);
     }
   } catch {
+    installOk = false;
     stopSpinner();
     console.log('  ' + YELLOW + '⚠' + RESET + ' pnpm install failed — continuing with existing node_modules');
     console.log('  ' + DIM + 'Likely offline or registry unreachable. If the dev server hits a' + RESET);
     console.log('  ' + DIM + '"Module not found" error, run `pnpm install` manually.' + RESET);
+    if (quiet) startSpinner('Starting ARI');
+  }
+
+  // Only advise committing after the install actually regenerated the lockfile.
+  // package.json committed without a matching pnpm-lock.yaml fails CI's
+  // `pnpm install --frozen-lockfile`.
+  if (depResult.changed) {
+    stopSpinner();
+    if (installOk) {
+      console.log('  ' + DIM + 'package.json updated — commit it with pnpm-lock.yaml to keep `./ari update` clean.' + RESET);
+    } else {
+      console.log('  ' + YELLOW + '⚠' + RESET + ' package.json gained module deps but pnpm-lock.yaml was not updated.');
+      console.log('  ' + DIM + 'Run `pnpm install` before committing, or CI will fail on --frozen-lockfile.' + RESET);
+    }
     if (quiet) startSpinner('Starting ARI');
   }
 

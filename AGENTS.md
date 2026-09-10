@@ -416,7 +416,7 @@ Modules can add quick access icons to the global top navigation bar by configuri
 }
 ```
 
-Modules can declare runtime npm packages in `module.json` under `npmDependencies` (same shape as `package.json` `dependencies`). When the user installs the module from `/modules`, the install API auto-runs `pnpm add` for them locally (or merges them into root `package.json` + commits via GitHub on Vercel). Version conflicts with existing root deps abort the install safely. See `/docs/MODULES.md` for full behavior.
+Modules can declare runtime npm packages in `module.json` under `npmDependencies` (same shape as `package.json` `dependencies`). When the user installs the module from `/modules`, the install API auto-runs `pnpm add` for them locally (or merges them into root `package.json` + commits via GitHub on Vercel). Version conflicts with existing root deps abort the install safely. For modules added to `modules-custom/` by hand (not via `/modules`), `./ari start` syncs their `npmDependencies` into root `package.json` automatically before installing (conflicts warn, never block startup); `./ari fix-deps` runs the same sync explicitly. See `/docs/MODULES.md` for full behavior.
 
 For full module documentation, see `/docs/MODULES.md`.
 

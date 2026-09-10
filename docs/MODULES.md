@@ -382,6 +382,17 @@ If a declared dependency conflicts with an incompatible version already in root 
 - **Install time**: package names are checked against the npm spec regex; version specifiers containing `git:`, `http:`, `file:`, `link:`, `workspace:`, `npm:`, or `..` are rejected. Cap of 25 entries per module.
 - **Build time**: `scripts/generate-module-registry.js` (runs on `predev` and `prebuild`) cross-references each module's declared `npmDependencies` against root `package.json` and warns on mismatches. Warnings only — the build still succeeds, so a dev server stays up while the user re-installs via /modules.
 
+**Manually added modules (not installed via /modules):**
+
+A module copied into `modules-custom/` by hand (git clone, shared folder) never went through the marketplace install, so its `npmDependencies` are not yet in root `package.json`. `./ari start` syncs them automatically before its dependency install, so a plain restart is enough. `./ari fix-deps` runs the same sync explicitly.
+
+Because it runs on every boot, this path is deliberately conservative:
+
+- A package already recorded in **any** root block (`dependencies`, `devDependencies`, `optionalDependencies`, `peerDependencies`) counts as present and is left alone. It is never copied into `dependencies`, which would leave one package in two blocks at two ranges. This is why a module declaring `@types/three` does not add a runtime dependency when the host already carries it as a devDependency.
+- Version conflicts never abort startup (the marketplace install does abort) — they print a warning naming the block that already holds the package, and the fix is left to you.
+- Range forms the bundled checker cannot parse (`>1.0.0`, `1.x`, `^1 || ^2`, `>=1.0.0 <2.0.0`) are assumed satisfied rather than reported, so valid ranges don't produce a warning on every start.
+- Dot-prefixed directories are skipped, matching the module scanner — renaming a module to `.old-thing` shelves its dependencies too.
+
 **Unsupported (v1):**
 
 - `devDependencies` / `peerDependencies` — not modeled. Modules ship type imports for compile-time use only, so the host project's existing `@types/*` install is responsible.
