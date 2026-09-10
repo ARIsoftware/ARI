@@ -29,6 +29,7 @@ import {
   ProviderStatusSchema,
   ProvidersResponseSchema,
 } from '@/modules-core/chat/lib/validation'
+import { MODEL_ID_MAX_LENGTH } from '@/lib/ai-providers'
 
 const VALID_UUID = '123e4567-e89b-12d3-a456-426614174000'
 const VALID_UUID2 = '223e4567-e89b-12d3-a456-426614174001'
@@ -68,7 +69,9 @@ describe('createConversationSchema', () => {
     const r = createConversationSchema.safeParse({ ...valid, provider: 'grok' })
     expect(r.success).toBe(false)
     if (!r.success) {
-      expect(r.error.issues[0].message).toBe('Provider must be one of: openai, anthropic, gemini, openrouter')
+      expect(r.error.issues[0].message).toBe(
+        'Provider must be one of: openai, anthropic, gemini, openrouter',
+      )
     }
   })
 
@@ -77,21 +80,31 @@ describe('createConversationSchema', () => {
   })
 
   it('accepts a title at exactly 200 chars but rejects 201', () => {
-    expect(createConversationSchema.safeParse({ ...valid, title: 'a'.repeat(200) }).success).toBe(true)
-    expect(createConversationSchema.safeParse({ ...valid, title: 'a'.repeat(201) }).success).toBe(false)
+    expect(createConversationSchema.safeParse({ ...valid, title: 'a'.repeat(200) }).success).toBe(
+      true,
+    )
+    expect(createConversationSchema.safeParse({ ...valid, title: 'a'.repeat(201) }).success).toBe(
+      false,
+    )
   })
 
   it('rejects a title with angle brackets (safeText)', () => {
     expect(createConversationSchema.safeParse({ ...valid, title: '<script>' }).success).toBe(false)
   })
 
-  it('rejects an empty model and one over 128 chars', () => {
+  it('rejects an empty model and one over the shared cap', () => {
     expect(createConversationSchema.safeParse({ ...valid, model: '' }).success).toBe(false)
-    expect(createConversationSchema.safeParse({ ...valid, model: 'm'.repeat(129) }).success).toBe(false)
+    expect(
+      createConversationSchema.safeParse({ ...valid, model: 'm'.repeat(MODEL_ID_MAX_LENGTH + 1) })
+        .success,
+    ).toBe(false)
   })
 
-  it('accepts a model at exactly 128 chars', () => {
-    expect(createConversationSchema.safeParse({ ...valid, model: 'm'.repeat(128) }).success).toBe(true)
+  it('accepts a model at exactly the shared cap', () => {
+    expect(
+      createConversationSchema.safeParse({ ...valid, model: 'm'.repeat(MODEL_ID_MAX_LENGTH) })
+        .success,
+    ).toBe(true)
   })
 
   it('rejects a missing model', () => {
@@ -137,9 +150,15 @@ describe('ChatAttachmentSchema', () => {
   })
 
   it('enforces the 512-char filename/original_name caps', () => {
-    expect(ChatAttachmentSchema.safeParse({ ...valid, filename: 'f'.repeat(512) }).success).toBe(true)
-    expect(ChatAttachmentSchema.safeParse({ ...valid, filename: 'f'.repeat(513) }).success).toBe(false)
-    expect(ChatAttachmentSchema.safeParse({ ...valid, original_name: 'o'.repeat(513) }).success).toBe(false)
+    expect(ChatAttachmentSchema.safeParse({ ...valid, filename: 'f'.repeat(512) }).success).toBe(
+      true,
+    )
+    expect(ChatAttachmentSchema.safeParse({ ...valid, filename: 'f'.repeat(513) }).success).toBe(
+      false,
+    )
+    expect(
+      ChatAttachmentSchema.safeParse({ ...valid, original_name: 'o'.repeat(513) }).success,
+    ).toBe(false)
   })
 
   it('enforces the 128-char mime and 64-char bucket caps', () => {
@@ -158,7 +177,11 @@ describe('ChatAttachmentSchema', () => {
 
 describe('SendAttachmentSchema', () => {
   it('accepts a valid upload_id and strips extra client-supplied fields', () => {
-    const r = SendAttachmentSchema.safeParse({ upload_id: VALID_UUID, bucket: 'evil', filename: 'x' })
+    const r = SendAttachmentSchema.safeParse({
+      upload_id: VALID_UUID,
+      bucket: 'evil',
+      filename: 'x',
+    })
     expect(r.success).toBe(true)
     if (r.success) expect(r.data).toEqual({ upload_id: VALID_UUID })
   })
@@ -199,15 +222,24 @@ describe('chatListQuerySchema', () => {
   })
 
   it('coerces valid string values', () => {
-    expect(chatListQuerySchema.parse({ limit: '25', offset: '5' })).toEqual({ limit: 25, offset: 5 })
+    expect(chatListQuerySchema.parse({ limit: '25', offset: '5' })).toEqual({
+      limit: 25,
+      offset: 5,
+    })
   })
 
   it('falls back on NaN values', () => {
-    expect(chatListQuerySchema.parse({ limit: 'abc', offset: 'xyz' })).toEqual({ limit: 1000, offset: 0 })
+    expect(chatListQuerySchema.parse({ limit: 'abc', offset: 'xyz' })).toEqual({
+      limit: 1000,
+      offset: 0,
+    })
   })
 
   it('falls back on out-of-range values', () => {
-    expect(chatListQuerySchema.parse({ limit: '0', offset: '-1' })).toEqual({ limit: 1000, offset: 0 })
+    expect(chatListQuerySchema.parse({ limit: '0', offset: '-1' })).toEqual({
+      limit: 1000,
+      offset: 0,
+    })
     expect(chatListQuerySchema.parse({ limit: '1001' })).toEqual({ limit: 1000, offset: 0 })
   })
 
@@ -265,18 +297,28 @@ describe('ChatMessageSchema', () => {
   })
 
   it('rejects invalid attachment entries', () => {
-    expect(ChatMessageSchema.safeParse({ ...message, attachments: [{ upload_id: 'x' }] }).success).toBe(false)
+    expect(
+      ChatMessageSchema.safeParse({ ...message, attachments: [{ upload_id: 'x' }] }).success,
+    ).toBe(false)
   })
 })
 
 describe('conversation response schemas', () => {
   it('ChatConversationListResponseSchema accepts a valid page', () => {
-    const r = ChatConversationListResponseSchema.safeParse({ conversations: [conversation], count: 1, total: 3 })
+    const r = ChatConversationListResponseSchema.safeParse({
+      conversations: [conversation],
+      count: 1,
+      total: 3,
+    })
     expect(r.success).toBe(true)
   })
 
   it('ChatConversationListResponseSchema rejects negative totals', () => {
-    const r = ChatConversationListResponseSchema.safeParse({ conversations: [], count: 0, total: -1 })
+    const r = ChatConversationListResponseSchema.safeParse({
+      conversations: [],
+      count: 0,
+      total: -1,
+    })
     expect(r.success).toBe(false)
   })
 
@@ -290,8 +332,12 @@ describe('conversation response schemas', () => {
   })
 
   it('ChatDeleteResponseSchema requires success: true', () => {
-    expect(ChatDeleteResponseSchema.safeParse({ success: true, message: 'Deleted' }).success).toBe(true)
-    expect(ChatDeleteResponseSchema.safeParse({ success: false, message: 'Nope' }).success).toBe(false)
+    expect(ChatDeleteResponseSchema.safeParse({ success: true, message: 'Deleted' }).success).toBe(
+      true,
+    )
+    expect(ChatDeleteResponseSchema.safeParse({ success: false, message: 'Nope' }).success).toBe(
+      false,
+    )
   })
 })
 
@@ -320,7 +366,9 @@ describe('upload schemas', () => {
   })
 
   it('ChatUploadListResponseSchema accepts a valid page', () => {
-    expect(ChatUploadListResponseSchema.safeParse({ uploads: [upload], count: 1, total: 1 }).success).toBe(true)
+    expect(
+      ChatUploadListResponseSchema.safeParse({ uploads: [upload], count: 1, total: 1 }).success,
+    ).toBe(true)
   })
 
   it('ChatUploadSingleResponseSchema accepts a valid wrapper', () => {
@@ -329,7 +377,9 @@ describe('upload schemas', () => {
 
   it('UploadFormSchema accepts any file with an optional conversation_id', () => {
     expect(UploadFormSchema.safeParse({ file: 'binary' }).success).toBe(true)
-    expect(UploadFormSchema.safeParse({ file: 'binary', conversation_id: VALID_UUID }).success).toBe(true)
+    expect(
+      UploadFormSchema.safeParse({ file: 'binary', conversation_id: VALID_UUID }).success,
+    ).toBe(true)
   })
 
   it('UploadFormSchema rejects a non-UUID conversation_id', () => {
@@ -361,8 +411,10 @@ describe('ChatSettingsSchema', () => {
     expect(ChatSettingsSchema.safeParse({ defaultProvider: 'grok' }).success).toBe(false)
   })
 
-  it('rejects a defaultModel over 128 chars', () => {
-    expect(ChatSettingsSchema.safeParse({ defaultModel: 'm'.repeat(129) }).success).toBe(false)
+  it('rejects a defaultModel over the shared cap', () => {
+    expect(
+      ChatSettingsSchema.safeParse({ defaultModel: 'm'.repeat(MODEL_ID_MAX_LENGTH + 1) }).success,
+    ).toBe(false)
   })
 
   it('rejects a non-boolean onboardingCompleted', () => {
@@ -393,7 +445,9 @@ describe('ProviderStatusSchema / ProvidersResponseSchema', () => {
   })
 
   it('accepts a string configuredModel', () => {
-    expect(ProviderStatusSchema.safeParse({ ...status, configuredModel: 'gemini-pro' }).success).toBe(true)
+    expect(
+      ProviderStatusSchema.safeParse({ ...status, configuredModel: 'gemini-pro' }).success,
+    ).toBe(true)
   })
 
   it('rejects an unknown provider id', () => {
