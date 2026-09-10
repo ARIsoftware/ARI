@@ -24,7 +24,7 @@ const KEYBINDINGS: KeyBinding[] = [
   {
     id: "drag-drop-mode",
     keys: ["Ctrl", "⇧", "D"],
-    description: "Enter drag-and-drop mode to reorder sidebar modules",
+    description: "Enter drag-and-drop mode on the Dashboard to rearrange the interface",
   },
   {
     id: "quick-add-task",
