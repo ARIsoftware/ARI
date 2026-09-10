@@ -125,9 +125,7 @@ export function DashboardOnboarding() {
           align: 'center' as const,
           title: 'Everything is a module',
           description:
-            'Every feature in ARI is a module, and they all live here in the sidebar. Press ' +
-            modKey +
-            'D to drag groups into your preferred order.',
+            "Every feature in ARI is a module, and they all live here in the sidebar. ARI's AI integration lets you customize any module or build your own modules in minutes.",
         },
       },
       {
@@ -137,7 +135,7 @@ export function DashboardOnboarding() {
           align: 'start' as const,
           title: 'Quick actions',
           description:
-            'One-click access to your most-used tools — plus themes, settings, and sign out. Modules can add their own icons here too.',
+            'One-click access to your most-used tools - plus themes, settings, and sign out. Modules can add their own icons here too.',
         },
       },
       {
@@ -155,7 +153,7 @@ export function DashboardOnboarding() {
         popover: {
           title: 'The Module Library',
           description:
-            'Discover, install, and manage modules that extend ARI — or build your very own. This is where ARI grows with you.',
+            'Discover, install, and manage modules that extend ARI - or build your very own. This is where ARI grows with you.',
         },
       },
       {
@@ -163,7 +161,7 @@ export function DashboardOnboarding() {
         popover: {
           title: 'Settings',
           description:
-            'Fine-tune ARI here — your profile, themes, integrations, backups, and per-module options all live in Settings.',
+            'Configure ARI here - your profile, themes, AI providers, API access, account security, and more.',
         },
       },
       {
@@ -172,7 +170,7 @@ export function DashboardOnboarding() {
           // driver.js renders description as HTML, so the docs link works here;
           // link styling lives under .ari-tour in globals.css.
           description:
-            'That’s the lay of the land. Make ARI yours — install modules, pick a theme, and arrange the dashboard the way you like it. Want to go deeper? <a href="https://ari.software/docs" target="_blank" rel="noopener noreferrer">Read the ARI docs</a> to learn how to use and manage ARI — and even create your own modules.',
+            'That’s the lay of the land. Make ARI yours - install modules, pick a theme, and arrange the dashboard the way you like it. Want to go deeper? <a href="https://ari.software/docs" target="_blank" rel="noopener noreferrer">Read the ARI docs</a> to learn how to use and manage ARI - and even create your own modules.',
         },
       },
     ]
@@ -226,10 +224,15 @@ export function DashboardOnboarding() {
         </div>
         <DialogHeader>
           <DialogTitle className="text-xl">Welcome to ARI</DialogTitle>
-          <DialogDescription className="pt-2 text-[15px] font-normal leading-6">
-            This dashboard is your home base — every widget on it comes from a module, and
-            everything can be rearranged, themed, and extended. Take a 60-second tour to see how it
-            all fits together.
+          <DialogDescription className="space-y-3 pt-2 text-[15px] font-normal leading-6">
+            <span className="block">
+              ARI is designed for those who want complete command over the software that runs their
+              life. ARI can be completely customized to your workflow and grows with you.
+            </span>
+            <span className="block">
+              ARI is where mastery, modularity, and AI work in your favour so you can do your best
+              work and live your best life.
+            </span>
           </DialogDescription>
         </DialogHeader>
         <div className="flex items-center justify-end pt-2">
