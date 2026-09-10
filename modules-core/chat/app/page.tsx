@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { AlertTriangle, Loader2, RefreshCw, Settings, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -33,14 +32,6 @@ export default function ChatPage() {
   const createConversation = useCreateConversation()
 
   const [activeId, setActiveId] = useState<string | null>(null)
-
-  // The model pill renders into the global breadcrumb top bar via portal, so
-  // it sits at the bar's right edge no matter what other bars (task
-  // announcement, themes) are stacked above it.
-  const [topBarEl, setTopBarEl] = useState<HTMLElement | null>(null)
-  useEffect(() => {
-    setTopBarEl(document.querySelector<HTMLElement>('header.topbar'))
-  }, [])
 
   // Once we have conversations, default-select the most recent.
   useEffect(() => {
@@ -157,33 +148,31 @@ export default function ChatPage() {
 
   const configuredCount = providers.filter((p) => p.configured).length
 
+  // Model/config pill rendered inside the welcome composer's footer, next to
+  // the send button (active conversations show provider/model in their header).
   const modelPill = (
     <Link
       href="/chat/settings"
-      className="group ml-auto hidden shrink-0 items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-xs shadow-sm transition-colors hover:border-accent/40 hover:bg-accent/5 sm:flex"
+      className="group flex min-w-0 shrink items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-xs shadow-sm transition-colors hover:border-accent/40 hover:bg-accent/5"
     >
       {activeProvider ? (
         <>
-          <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-          <span className="font-medium">{PROVIDER_LABELS[activeProvider.id] ?? activeProvider.id}</span>
-          <span className="font-mono text-muted-foreground">{activeProvider.model}</span>
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+          <span className="whitespace-nowrap font-medium">{PROVIDER_LABELS[activeProvider.id] ?? activeProvider.id}</span>
+          <span className="hidden truncate font-mono text-muted-foreground sm:inline">{activeProvider.model}</span>
         </>
       ) : (
         <>
-          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
-          <span className="text-muted-foreground">No provider configured</span>
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/40" />
+          <span className="whitespace-nowrap text-muted-foreground">No provider configured</span>
         </>
       )}
-      <Settings className="h-3 w-3 text-muted-foreground transition-colors group-hover:text-foreground" />
+      <Settings className="h-3 w-3 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
     </Link>
   )
 
   return (
     <div className="relative flex flex-col h-[calc(100vh-4rem)] min-h-[600px]">
-      {topBarEl
-        ? createPortal(modelPill, topBarEl)
-        : <div className="absolute right-4 top-3 z-10">{modelPill}</div>}
-
       {configuredCount === 0 && (
         <div className="px-6 pt-4">
           <Alert>
@@ -210,6 +199,7 @@ export default function ChatPage() {
           conversationId={activeId}
           onCreateConversation={createConversationForSend}
           onActivate={setActiveId}
+          composerAccessory={modelPill}
         />
       </div>
     </div>

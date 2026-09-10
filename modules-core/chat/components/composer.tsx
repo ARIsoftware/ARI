@@ -14,6 +14,8 @@ interface ComposerProps {
   conversationId: string | null
   onSend: (content: string, attachments: ChatAttachment[]) => void
   isSending: boolean
+  /** Optional element rendered in the footer, left of the send button (e.g. the model pill). */
+  accessory?: React.ReactNode
 }
 
 const MAX_MESSAGE_LENGTH = 50000
@@ -30,7 +32,7 @@ function uploadToAttachment(upload: ChatUpload): ChatAttachment {
   }
 }
 
-export function Composer({ conversationId, onSend, isSending }: ComposerProps) {
+export function Composer({ conversationId, onSend, isSending, accessory }: ComposerProps) {
   const [text, setText] = useState('')
   const [attachments, setAttachments] = useState<ChatAttachment[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -160,7 +162,8 @@ export function Composer({ conversationId, onSend, isSending }: ComposerProps) {
             {uploadFile.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
           </Button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            {accessory}
             {nearLimit && (
               <span className={cn('text-[10px] text-muted-foreground', charCount >= MAX_MESSAGE_LENGTH && 'text-destructive')}>
                 {charCount.toLocaleString()} / {MAX_MESSAGE_LENGTH.toLocaleString()}

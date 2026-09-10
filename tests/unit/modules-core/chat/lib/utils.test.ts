@@ -8,6 +8,9 @@ import {
   CHAT_BUCKET,
   UUID_RE,
   chatProviderMeta,
+  chatToRegistryId,
+  registryToChatId,
+  CHAT_REGISTRY_IDS,
   PROVIDER_LABELS,
   PROVIDER_DEFAULT_MODELS,
   isImageMime,
@@ -89,6 +92,49 @@ describe('chatProviderMeta', () => {
 
   it('throws for an unknown provider', () => {
     expect(() => chatProviderMeta('bogus' as ChatProvider)).toThrow('Unknown chat provider: bogus')
+  })
+})
+
+// ─── chatToRegistryId / registryToChatId / CHAT_REGISTRY_IDS ──────────────────
+
+describe('chatToRegistryId', () => {
+  it('maps each chat provider to its registry id', () => {
+    expect(chatToRegistryId('openai')).toBe('openai')
+    expect(chatToRegistryId('anthropic')).toBe('claude')
+    expect(chatToRegistryId('gemini')).toBe('gemini')
+    expect(chatToRegistryId('openrouter')).toBe('openrouter')
+  })
+
+  it('throws for an unknown provider', () => {
+    expect(() => chatToRegistryId('bogus' as ChatProvider)).toThrow('Unknown chat provider: bogus')
+  })
+})
+
+describe('registryToChatId', () => {
+  it('maps registry ids back to chat providers', () => {
+    expect(registryToChatId('openai')).toBe('openai')
+    expect(registryToChatId('claude')).toBe('anthropic')
+    expect(registryToChatId('gemini')).toBe('gemini')
+    expect(registryToChatId('openrouter')).toBe('openrouter')
+  })
+
+  it('returns null for registry providers Chat does not implement', () => {
+    expect(registryToChatId('mistral')).toBeNull()
+    expect(registryToChatId('ollama')).toBeNull()
+  })
+})
+
+describe('CHAT_REGISTRY_IDS', () => {
+  it('lists exactly the registry ids Chat implements', () => {
+    expect(CHAT_REGISTRY_IDS).toEqual(['openai', 'claude', 'gemini', 'openrouter'])
+  })
+
+  it('round-trips through registryToChatId', () => {
+    for (const id of CHAT_REGISTRY_IDS) {
+      const chatId = registryToChatId(id)
+      expect(chatId).not.toBeNull()
+      expect(chatToRegistryId(chatId!)).toBe(id)
+    }
   })
 })
 

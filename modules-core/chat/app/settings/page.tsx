@@ -1,61 +1,70 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Check, ExternalLink, Loader2, Plug, Settings as SettingsIcon } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { AiProviderCard } from '@/components/ai-provider-card'
 import {
   useChatProviders,
   useChatSettings,
   useUpdateChatSettings,
 } from '@/modules/chat/hooks/use-chat'
 import { useRandomQuote } from '@/modules/chat/hooks/use-quote'
-import { cn } from '@/lib/utils'
-import type { ChatProvider } from '@/modules/chat/types'
-
-const MAX_MODEL_LEN = 128
+import { CHAT_REGISTRY_IDS, chatToRegistryId, registryToChatId } from '@/modules/chat/lib/utils'
+import type { AiProviderId } from '@/lib/ai-providers'
 
 export default function ChatSettingsPage() {
   const { toast } = useToast()
   const randomQuote = useRandomQuote()
 
-  const { data: providers = [], isLoading: providersLoading } = useChatProviders()
-  const { data: settings, isLoading: settingsLoading } = useChatSettings()
+  const { data: settings, isLoading } = useChatSettings()
+  const { data: providers, isLoading: providersLoading } = useChatProviders()
   const updateSettings = useUpdateChatSettings()
 
-  const [selectedProvider, setSelectedProvider] = useState<ChatProvider | null>(null)
-  const [modelValue, setModelValue] = useState('')
-  const [modelError, setModelError] = useState<string | null>(null)
-
-  const configuredProviders = useMemo(() => providers.filter((p) => p.configured), [providers])
-
+  // Selection and model edits are stored as user overrides on top of the
+  // server-derived defaults below; `undefined` = untouched, so the defaults
+  // show through and background refetches can never stomp in-progress edits.
+  const [selectedOverride, setSelectedOverride] = useState<AiProviderId | null>()
+  const [modelEdits, setModelEdits] = useState<Partial<Record<AiProviderId, string>>>({})
+  const [saved, setSaved] = useState(false)
+  // "Saved!" flash timer: cleared on each new save (so back-to-back saves
+  // don't cut the flash short) and on unmount (no setState after unmount).
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
-    if (settings) {
-      const provider = settings.defaultProvider ?? configuredProviders[0]?.id ?? null
-      setSelectedProvider(provider ?? null)
-      const matched = providers.find((p) => p.id === provider)
-      setModelValue(
-        settings.defaultModel ?? matched?.configuredModel ?? matched?.defaultModel ?? ''
-      )
+    return () => {
+      if (savedTimer.current) clearTimeout(savedTimer.current)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings?.defaultProvider, settings?.defaultModel, configuredProviders.length])
+  }, [])
+
+  // Default selection derived from saved settings + provider status. Mirrors
+  // the chat page's runtime pick exactly: the saved default only counts while
+  // that provider is still configured, otherwise the first configured
+  // provider — the one new chats will actually use. Matching against the
+  // providers list also shrugs off an out-of-range stored defaultProvider
+  // (hand-edited row, restored backup) instead of crashing on the
+  // chat→registry id mapping.
+  const derived = useMemo(() => {
+    const configured = (providers ?? []).filter((p) => p.configured)
+    const savedProvider = configured.find((p) => p.id === settings?.defaultProvider)
+    const effective = savedProvider ?? configured[0]
+    if (!effective) return { selected: null, models: {} }
+    const registryId = chatToRegistryId(effective.id)
+    return {
+      selected: registryId,
+      // Only pair the saved model with the provider it was saved for —
+      // applied to a different provider it would 400 on every send.
+      models:
+        savedProvider && settings?.defaultModel ? { [registryId]: settings.defaultModel } : {},
+    }
+  }, [settings, providers])
+
+  const selected = selectedOverride === undefined ? derived.selected : selectedOverride
+  const models = { ...derived.models, ...modelEdits }
 
   const handleSave = () => {
-    if (!selectedProvider) {
+    const chatId = selected ? registryToChatId(selected) : null
+    if (!chatId) {
       toast({
         variant: 'destructive',
         title: 'Pick a provider',
@@ -64,181 +73,59 @@ export default function ChatSettingsPage() {
       return
     }
 
-    const trimmed = modelValue.trim()
-    if (!trimmed) {
-      setModelError('Model name is required')
-      return
-    }
-    if (trimmed.length > MAX_MODEL_LEN) {
-      setModelError(`Model name must be ${MAX_MODEL_LEN} characters or fewer`)
-      return
-    }
-    setModelError(null)
-
+    setSaved(false)
     updateSettings.mutate(
-      { defaultProvider: selectedProvider, defaultModel: trimmed },
+      // Blank model = fall back to the global model from Integrations, then
+      // the provider default (same semantics as the main chat page).
+      { defaultProvider: chatId, defaultModel: (models[selected!] ?? '').trim() },
       {
-        onSuccess: () => toast({ title: 'Saved', description: 'Chat preferences updated.' }),
-        onError: (err) => toast({
-          variant: 'destructive',
-          title: 'Failed to save',
-          description: err instanceof Error ? err.message : 'Please try again.',
-        }),
+        onSuccess: () => {
+          setSaved(true)
+          if (savedTimer.current) clearTimeout(savedTimer.current)
+          savedTimer.current = setTimeout(() => setSaved(false), 3000)
+        },
+        onError: (err) =>
+          toast({
+            variant: 'destructive',
+            title: 'Failed to save',
+            description: err instanceof Error ? err.message : 'Please try again.',
+          }),
       },
     )
   }
-
-  const handlePickProvider = (id: ChatProvider) => {
-    setSelectedProvider(id)
-    const next = providers.find((p) => p.id === id)
-    if (next) setModelValue(next.configuredModel ?? next.defaultModel)
-  }
-
-  const selectedMeta = providers.find((p) => p.id === selectedProvider)
 
   return (
     <div className="p-6 max-w-3xl space-y-6">
       <div>
         <h1 className="text-3xl font-medium">Chat settings</h1>
-        {randomQuote && (
-          <p className="text-sm text-[#aa2020] mt-1">{randomQuote.quote}</p>
-        )}
+        {randomQuote && <p className="text-sm text-[#aa2020] mt-1">{randomQuote.quote}</p>}
         <p className="text-sm text-muted-foreground mt-2">
           Pick which provider new chats use by default. API keys are managed in
-          <Link href="/settings?tab=integrations" className="underline hover:text-foreground ml-1">Settings → Integrations</Link>.
+          <Link href="/settings?tab=integrations" className="underline hover:text-foreground ml-1">
+            Settings → Integrations
+          </Link>
+          .
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Plug className="w-5 h-5 text-indigo-500" />
-            Configured providers
-          </CardTitle>
-          <CardDescription>
-            Only providers with an API key set are available. Configure more keys in Integrations.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {providersLoading || settingsLoading ? (
-            <>
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-16 w-full" />
-            </>
-          ) : providers.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No providers found.</p>
-          ) : (
-            providers.map((provider) => {
-              const isSelected = selectedProvider === provider.id
-              return (
-                <button
-                  key={provider.id}
-                  type="button"
-                  disabled={!provider.configured}
-                  onClick={() => provider.configured && handlePickProvider(provider.id)}
-                  className={cn(
-                    'w-full text-left rounded-xl border p-4 transition-colors',
-                    provider.configured ? 'hover:border-primary cursor-pointer' : 'opacity-60 cursor-not-allowed',
-                    isSelected && 'border-primary bg-primary/5',
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">{provider.name}</p>
-                      <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                        Default model: {provider.configuredModel ?? provider.defaultModel}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {provider.configured ? (
-                        <Badge variant="secondary">Key configured</Badge>
-                      ) : (
-                        <Badge variant="outline">No key</Badge>
-                      )}
-                      {isSelected && (
-                        <span className="rounded-full bg-primary text-primary-foreground p-1">
-                          <Check className="w-3 h-3" />
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              )
-            })
-          )}
-
-          <div className="pt-2">
-            <Button asChild variant="outline" size="sm">
-              <Link href="/settings?tab=integrations">
-                Manage API keys
-                <ExternalLink className="w-3 h-3 ml-2 opacity-60" />
-              </Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <SettingsIcon className="w-5 h-5 text-slate-500" />
-            Default model
-          </CardTitle>
-          <CardDescription>
-            The model new chats start with. You can override per-chat later (coming soon).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Provider</Label>
-            <Select
-              value={selectedProvider ?? undefined}
-              onValueChange={(v) => handlePickProvider(v as ChatProvider)}
-              disabled={configuredProviders.length === 0}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Pick a provider" />
-              </SelectTrigger>
-              <SelectContent>
-                {configuredProviders.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="model">Model name</Label>
-            <Input
-              id="model"
-              value={modelValue}
-              maxLength={MAX_MODEL_LEN}
-              onChange={(e) => {
-                setModelValue(e.target.value)
-                if (modelError) setModelError(null)
-              }}
-              placeholder={selectedMeta?.defaultModel ?? 'e.g. gpt-5'}
-              disabled={!selectedProvider}
-              aria-invalid={!!modelError}
-              className={cn(modelError && 'border-red-500 focus-visible:ring-red-500')}
-            />
-            {modelError ? (
-              <p className="text-xs text-red-500">{modelError}</p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Default if blank: {selectedMeta?.configuredModel ?? selectedMeta?.defaultModel ?? '—'}
-              </p>
-            )}
-          </div>
-
-          <div className="pt-2">
-            <Button onClick={handleSave} disabled={updateSettings.isPending || !selectedProvider}>
-              {updateSettings.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              Save preferences
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      {isLoading || providersLoading ? (
+        <div className="space-y-3">
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+        </div>
+      ) : (
+        <AiProviderCard
+          value={selected}
+          onChange={setSelectedOverride}
+          models={models}
+          onModelChange={(id, model) => setModelEdits((prev) => ({ ...prev, [id]: model }))}
+          allowedProviders={CHAT_REGISTRY_IDS}
+          onSave={handleSave}
+          isSaving={updateSettings.isPending}
+          justSaved={saved}
+        />
+      )}
     </div>
   )
 }

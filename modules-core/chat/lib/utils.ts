@@ -26,6 +26,24 @@ export function chatProviderMeta(provider: ChatProvider) {
   return meta
 }
 
+/** Registry id for a chat provider (e.g. 'anthropic' → 'claude'). */
+export function chatToRegistryId(provider: ChatProvider): AiProviderId {
+  const id = CHAT_TO_REGISTRY_ID[provider]
+  if (!id) throw new Error(`Unknown chat provider: ${provider}`)
+  return id
+}
+
+/** Chat provider for a registry id, or null when Chat doesn't implement it. */
+export function registryToChatId(id: AiProviderId): ChatProvider | null {
+  const entry = (Object.entries(CHAT_TO_REGISTRY_ID) as [ChatProvider, AiProviderId][]).find(
+    ([, registryId]) => registryId === id
+  )
+  return entry?.[0] ?? null
+}
+
+/** The registry ids Chat implements — feeds AiProviderCard's allowedProviders. */
+export const CHAT_REGISTRY_IDS: AiProviderId[] = Object.values(CHAT_TO_REGISTRY_ID)
+
 // Display labels are a chat-specific override (e.g. "Anthropic Claude" rather
 // than the registry's "Claude"); the drift-prone config (env keys, default
 // models) is derived from the registry above.

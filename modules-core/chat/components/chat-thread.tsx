@@ -21,6 +21,8 @@ interface ChatThreadProps {
   conversationId: string | null
   onCreateConversation?: () => Promise<ChatConversation>
   onActivate?: (id: string) => void
+  /** Rendered inside the welcome composer's footer (e.g. the model/config pill). */
+  composerAccessory?: React.ReactNode
 }
 
 interface StreamingMessage {
@@ -36,9 +38,10 @@ const SUGGESTIONS = [
   { title: 'Write some code', sub: 'a debounce function in TypeScript', prompt: 'Write a debounce function in TypeScript, with comments.' },
 ]
 
-const FOOTER_NOTE = 'ARI Chat can make mistakes. Check important info.'
+const FOOTER_NOTE =
+  'AI-generated information may contain errors. Use appropriate judgment and verify critical details.'
 
-export function ChatThread({ conversationId, onCreateConversation, onActivate }: ChatThreadProps) {
+export function ChatThread({ conversationId, onCreateConversation, onActivate, composerAccessory }: ChatThreadProps) {
   const queryClient = useQueryClient()
   const { data, isLoading, isError, refetch } = useChatConversationDetail(conversationId)
   const conversation = data?.conversation
@@ -185,7 +188,12 @@ export function ChatThread({ conversationId, onCreateConversation, onActivate }:
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">What can I help with?</h2>
           </div>
 
-          <Composer conversationId={conversationId} onSend={handleSend} isSending={isSending} />
+          <Composer
+            conversationId={conversationId}
+            onSend={handleSend}
+            isSending={isSending}
+            accessory={composerAccessory}
+          />
           <p className="mt-2 text-center text-[11px] text-muted-foreground">{FOOTER_NOTE}</p>
 
           {error && (

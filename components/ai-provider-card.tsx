@@ -111,6 +111,12 @@ export interface AiProviderCardProps {
   /** Called when the user edits the per-module model for a provider. */
   onModelChange?: (id: AiProviderId, model: string) => void
   /**
+   * Restrict the "Language models" section to this set of provider ids — for
+   * hosts that only implement some providers (e.g. Chat). Omit to offer every
+   * configured registry provider.
+   */
+  allowedProviders?: AiProviderId[]
+  /**
    * Optional. When provided, an embedded Save button is rendered. Omit it when
    * the host page has its own page-level Save that persists settings.
    */
@@ -452,6 +458,7 @@ export function AiProviderCard({
   onVoiceChange,
   models,
   onModelChange,
+  allowedProviders,
   onSave,
   isSaving = false,
   justSaved = false,
@@ -460,8 +467,12 @@ export function AiProviderCard({
   const isConfigured = (envKey: string) => providerKeys[envKey]?.configured ?? false
 
   // Only providers with an API key configured are offered for selection;
-  // unconfigured ones are set up via Settings → Integrations first.
-  const configuredChat = AI_CHAT_PROVIDERS.filter((p) => isConfigured(p.primaryEnvKey))
+  // unconfigured ones are set up via Settings → Integrations first. Hosts that
+  // implement a subset of providers narrow the list via `allowedProviders`.
+  const configuredChat = AI_CHAT_PROVIDERS.filter(
+    (p) =>
+      (!allowedProviders || allowedProviders.includes(p.id)) && isConfigured(p.primaryEnvKey),
+  )
   const configuredVoice = AI_VOICE_PROVIDERS.filter((p) => isConfigured(p.primaryEnvKey))
 
   // Whether this host actually consumes a voice (and so can select one). When

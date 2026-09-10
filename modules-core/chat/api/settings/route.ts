@@ -50,7 +50,16 @@ export async function GET() {
         .limit(1)
     )
 
-    return NextResponse.json(rows[0]?.settings ?? {})
+    // Strip system-managed bookkeeping keys (e.g. __schema_installed_hash) so
+    // they never reach config UIs — same pattern as module-template. They stay
+    // in the DB regardless; the PUT does a JSONB merge that preserves keys not
+    // present in the patch.
+    const raw = (rows[0]?.settings ?? {}) as Record<string, unknown>
+    const settings = Object.fromEntries(
+      Object.entries(raw).filter(([key]) => !key.startsWith('__'))
+    )
+
+    return NextResponse.json(settings)
   } catch (error) {
     console.error('GET /api/modules/chat/settings error:', error instanceof Error ? error.message : error)
     return createErrorResponse('Internal server error', 500)
