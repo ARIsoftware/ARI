@@ -39,6 +39,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { SubmenuRenderer } from "@/components/sidebar-submenu-renderer"
+import { useUserPreferences } from "@/hooks/use-user-preferences"
 
 
 // Types for render items (extracted so SortableSidebarGroup can use them)
@@ -430,7 +431,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const mobileSubmenuModule = mobileSubmenuId
     ? enabledModules.find(module => module.id === mobileSubmenuId)
     : undefined
-  const submenuToShow = mobileSubmenuModule ?? (showMainMenu ? undefined : activeSubmenuModule)
+
+  // During dashboard onboarding (welcome popup not yet dismissed or tour not
+  // finished) show the full module menu instead of the dashboard submenu — a
+  // fresh install lands on /dashboard and would otherwise only see
+  // Back/Dashboard/Settings, never discovering the other modules. Normal
+  // submenu behavior returns the moment onboarding completes. Waiting for
+  // prefs to load (undefined) keeps returning users on the submenu with no
+  // main-menu flash; the query key is shared with the onboarding dialog so
+  // this is cache-warm on /dashboard.
+  const dashboardSubmenuActive = activeSubmenuModule?.id === 'dashboard'
+  const { data: prefs } = useUserPreferences({ enabled: dashboardSubmenuActive })
+  const inOnboarding = dashboardSubmenuActive && prefs !== undefined && !prefs.welcome_dismissed
+
+  const submenuToShow =
+    mobileSubmenuModule ?? (showMainMenu || inOnboarding ? undefined : activeSubmenuModule)
 
   // Version stamp pinned to the bottom of the full menu (Default / Compressed /
   // the Mini hover panel). In Mini it stays mounted and is faded out by the

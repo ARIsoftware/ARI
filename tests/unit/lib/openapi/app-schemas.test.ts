@@ -937,6 +937,7 @@ describe('UserPreferencesSchema', () => {
       city: 'NYC',
       linkedin_url: 'https://linkedin.com/in/alice',
       timezone: 'America/New_York',
+      welcome_dismissed: true,
     })
   })
   it('accepts nullable fields as null', () => {
@@ -951,6 +952,7 @@ describe('UserPreferencesSchema', () => {
       city: null,
       linkedin_url: null,
       timezone: 'UTC',
+      welcome_dismissed: false,
     })
   })
   it('passes through extra keys', () => {
@@ -965,6 +967,7 @@ describe('UserPreferencesSchema', () => {
       city: null,
       linkedin_url: null,
       timezone: 'UTC',
+      welcome_dismissed: false,
       extra_field: 'kept',
     })
     expect((result as Record<string, unknown>).extra_field).toBe('kept')
@@ -975,6 +978,12 @@ describe('updateUserPreferencesSchema', () => {
   it('accepts empty body (all optional)', () => pass(updateUserPreferencesSchema, {}))
   it('accepts partial update', () => {
     pass(updateUserPreferencesSchema, { name: 'Bob', city: null })
+  })
+  it('accepts a welcome_dismissed-only update', () => {
+    pass(updateUserPreferencesSchema, { welcome_dismissed: true })
+  })
+  it('rejects a non-boolean welcome_dismissed', () => {
+    fail(updateUserPreferencesSchema, { welcome_dismissed: 'yes' })
   })
   it('rejects timezone longer than 50 chars', () => {
     fail(updateUserPreferencesSchema, { timezone: 'a'.repeat(51) })

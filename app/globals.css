@@ -2,7 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-
 /* Hide topbar when app is installed as standalone PWA */
 @media (display-mode: standalone) {
   :root {
@@ -16,7 +15,7 @@
 @layer base {
   :root {
     --topbar-height: 45px;
-    --font-family: "Space Grotesk", sans-serif;
+    --font-family: 'Space Grotesk', sans-serif;
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
@@ -173,7 +172,9 @@
     /* Reduce base font size for a more compact UI (13.5px = ~84% of 16px) */
     font-size: 13.5px;
     /* Smooth transition for theme switching */
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease;
   }
   body {
     @apply bg-background text-foreground;
@@ -191,7 +192,7 @@
 
 /* Topbar icon buttons - maintain 32px size (was h-8 w-8 = 2rem) */
 .topbar button,
-.topbar [role="button"] {
+.topbar [role='button'] {
   min-width: 32px;
   min-height: 32px;
 }
@@ -226,7 +227,7 @@
 }
 
 /* Add top spacing inside sidebar so first item isn't flush against top */
-[data-sidebar="sidebar"] > [data-sidebar="content"]:first-child {
+[data-sidebar='sidebar'] > [data-sidebar='content']:first-child {
   padding-top: 16px;
 }
 
@@ -257,37 +258,37 @@
 
 /* Tasks font size */
 .task-item,
-[class*="task"] {
+[class*='task'] {
   font-size: 13px;
 }
 
 /* Drag-and-Drop Mode (dnd-kit) */
 
 /* Allow vertical scrolling in sidebar during drag mode */
-.drag-mode-active [data-sidebar="content"] {
+.drag-mode-active [data-sidebar='content'] {
   overflow-y: auto !important;
   overflow-x: hidden !important;
 }
 
 /* Disable hover effects on menu buttons during drag mode */
-.drag-mode-active [data-sidebar="menu-button"]:hover {
+.drag-mode-active [data-sidebar='menu-button']:hover {
   background-color: transparent !important;
 }
 
 /* Terminal theme - green topbar border */
-[data-theme="terminal"] .topbar,
-[data-theme="terminal"] header.border-b {
+[data-theme='terminal'] .topbar,
+[data-theme='terminal'] header.border-b {
   border-bottom: 1px solid hsl(134 100% 74.5%) !important;
 }
 
 /* Terminal Amber theme - orange topbar border */
-[data-theme="terminal-amber"] .topbar,
-[data-theme="terminal-amber"] header.border-b {
+[data-theme='terminal-amber'] .topbar,
+[data-theme='terminal-amber'] header.border-b {
   border-bottom: 1px solid hsl(17 100% 56%) !important;
 }
 
 /* Grayscale theme - subtle ruled-paper background pattern on main areas */
-[data-theme="grayscale"] main {
+[data-theme='grayscale'] main {
   background-image: repeating-linear-gradient(
     rgba(0, 0, 0, 0.04) 0px,
     rgba(0, 0, 0, 0.04) 1px,
@@ -309,7 +310,7 @@
  * outside the filter and render in full color while grayscale is active.
  * Acceptable — modals are short-lived and "no colours" still holds for the
  * persistent chrome (sidebar, topbar, main content). */
-[data-theme="grayscale"] .ari-app-content {
+[data-theme='grayscale'] .ari-app-content {
   filter: grayscale(1);
 }
 
@@ -328,9 +329,9 @@
  * `[class*="bg-card"]` rather than `.bg-card` so opacity variants such as
  * `bg-card/50` are covered too. Popovers, dropdowns and dialogs are portaled
  * to document.body, outside this scope, so they keep the dark navy treatment. */
-[data-theme="sovereign"] [class*="bg-card"],
-[data-theme="sovereign"] [class*="dark:bg-transparent"],
-[data-theme="sovereign"] [class*="border-border bg-transparent"] {
+[data-theme='sovereign'] [class*='bg-card'],
+[data-theme='sovereign'] [class*='dark:bg-transparent'],
+[data-theme='sovereign'] [class*='border-border bg-transparent'] {
   --background: 0 0% 100%;
   --foreground: 223 68% 20%;
   --card-foreground: 223 68% 20%;
@@ -370,7 +371,7 @@
  * need restating. Both classes in the selector appear on that row and nowhere
  * else in the codebase, and the whole thing is scoped to this theme, so the
  * module stays untouched. */
-[data-theme="sovereign"] [class*="dark:bg-transparent"][class*="dark:shadow-none"] {
+[data-theme='sovereign'] [class*='dark:bg-transparent'][class*='dark:shadow-none'] {
   background-color: hsl(var(--card));
   box-shadow:
     0 1px 2px hsl(223 68% 6% / 0.4),
@@ -388,11 +389,10 @@
  *
  * That class pair appears only on this row in the codebase. The card-view
  * subtask panel is inside the card and needs nothing. */
-[data-theme="sovereign"] [class*="border-border bg-transparent"] {
+[data-theme='sovereign'] [class*='border-border bg-transparent'] {
   background-color: hsl(var(--card));
   box-shadow: 0 1px 2px hsl(223 68% 6% / 0.3);
 }
-
 
 /* ============================================================
  * Sovereign Day theme - navy chrome around a white workspace
@@ -412,7 +412,7 @@
  * `border-color` is set on the card element itself rather than by re-pointing
  * `--border`, which would also recolour separators, inputs and buttons *inside*
  * the card. */
-[data-theme="sovereign-day"] [class*="bg-card"] {
+[data-theme='sovereign-day'] [class*='bg-card'] {
   border-color: hsl(214 32% 91%);
 }
 
@@ -420,7 +420,7 @@
  * `border-border bg-transparent` row sitting bare on the white page. Give it
  * the same tinted surface and edge so the indented group reads as part of the
  * card above it. */
-[data-theme="sovereign-day"] [class*="border-border bg-transparent"] {
+[data-theme='sovereign-day'] [class*='border-border bg-transparent'] {
   background-color: hsl(var(--card));
   border-color: hsl(214 32% 91%);
 }
@@ -428,7 +428,7 @@
 /* The dashboard rail's "View all tasks" button is a hardcoded near-white pill
  * (`bg-[#f7fafc] text-black`) chosen for a dark panel; on this theme's white
  * rail it disappears, so give it the workspace border to keep its shape. */
-[data-theme="sovereign-day"] [class*="bg-[#f7fafc]"] {
+[data-theme='sovereign-day'] [class*='bg-[#f7fafc]'] {
   border: 1px solid hsl(var(--border));
 }
 
@@ -439,7 +439,7 @@
  * down the whole window, so point it at `--sidebar-border` instead. Scoped to
  * the wrapper's own `.peer[data-side]`, which is the sidebar and not a Radix
  * popper (those also carry `data-side`). */
-[data-theme="sovereign-day"] .peer[data-side] > div {
+[data-theme='sovereign-day'] .peer[data-side] > div {
   border-color: hsl(var(--sidebar-border));
 }
 
@@ -452,7 +452,7 @@
  * Matched on `h-[45px]`, which the announcement bar has and the breadcrumb
  * header (`sticky top-0 ... h-16`) does not — the header sits on the white
  * workspace, where the pale border is the right one and stays. */
-[data-theme="sovereign-day"] .topbar[class*="h-[45px]"] {
+[data-theme='sovereign-day'] .topbar[class*='h-[45px]'] {
   border-bottom-color: hsl(var(--sidebar-border));
 }
 
@@ -468,7 +468,7 @@
  * that token is re-pointed at the card's navy text colour for the row's
  * subtree — otherwise the text would be white on near-white. Pinned rows keep
  * their `shadow-lg` and filled pin icon, which is what distinguishes them. */
-[data-theme="sovereign-day"] [class*="dark:bg-transparent"][class*="dark:shadow-none"] {
+[data-theme='sovereign-day'] [class*='dark:bg-transparent'][class*='dark:shadow-none'] {
   --primary-foreground: var(--card-foreground);
   background-color: hsl(var(--card));
   border-color: hsl(214 32% 91%);
@@ -480,7 +480,7 @@
  * a theme only has to define the token — no per-icon selectors, no coupling
  * to lucide class names or fill attributes. HSL components, like every other
  * theme token. */
-[data-theme="sovereign-day"] {
+[data-theme='sovereign-day'] {
   --task-toggle-accent: 200 100% 50%;
 }
 
@@ -496,7 +496,7 @@
 
 /* Center the menu as a comfortable single column; the close-button row above
  * already supplies the top spacing, so keep our own top padding small */
-[data-mobile="true"] .mobile-main-nav {
+[data-mobile='true'] .mobile-main-nav {
   margin-top: 0;
   padding: 0.5rem 1rem 2rem;
   gap: 0;
@@ -506,25 +506,25 @@
 /* Each group is a centered block. Zero the group's own vertical padding so it
  * doesn't add extra space between groups — all row spacing comes uniformly from
  * each row's symmetric top/bottom padding (see the menu-button rule below). */
-[data-mobile="true"] .mobile-main-nav [data-sidebar="group"] {
+[data-mobile='true'] .mobile-main-nav [data-sidebar='group'] {
   width: 100%;
   max-width: 28rem;
   padding: 0;
 }
 
 /* Hide group labels — the spacing between groups is enough structure on mobile */
-[data-mobile="true"] .mobile-main-nav [data-sidebar="group-label"] {
+[data-mobile='true'] .mobile-main-nav [data-sidebar='group-label'] {
   display: none !important;
 }
 
 /* No extra gap between rows — spacing is provided by each row's own padding, so
  * within-group and cross-group gaps stay identical */
-[data-mobile="true"] .mobile-main-nav [data-sidebar="menu"] {
+[data-mobile='true'] .mobile-main-nav [data-sidebar='menu'] {
   gap: 0;
 }
 
 /* Menu rows: full width, centered, large, tappable */
-[data-mobile="true"] .mobile-main-nav [data-sidebar="menu-button"] {
+[data-mobile='true'] .mobile-main-nav [data-sidebar='menu-button'] {
   height: auto !important;
   justify-content: center;
   gap: 0;
@@ -537,18 +537,18 @@
 }
 
 /* No icons or chevrons in the mobile menu */
-[data-mobile="true"] .mobile-main-nav [data-sidebar="menu-button"] svg {
+[data-mobile='true'] .mobile-main-nav [data-sidebar='menu-button'] svg {
   display: none !important;
 }
 
 /* Center the label even when it was set to flex-1 for a chevron */
-[data-mobile="true"] .mobile-main-nav [data-sidebar="menu-button"] > span {
+[data-mobile='true'] .mobile-main-nav [data-sidebar='menu-button'] > span {
   flex: none !important;
   text-align: center;
 }
 
 /* Version footer: keep it quiet and centered at the bottom */
-[data-mobile="true"] .mobile-main-nav > div:last-child {
+[data-mobile='true'] .mobile-main-nav > div:last-child {
   text-align: center;
   margin-top: 1.5rem;
   padding-bottom: 0.5rem;
@@ -561,25 +561,24 @@
  * icons. The active highlight is full-bleed edge-to-edge.
  * ------------------------------------------------------------ */
 
-[data-mobile="true"] .mobile-sub-nav {
+[data-mobile='true'] .mobile-sub-nav {
   padding-top: 1rem;
 }
 
-
 /* Full-bleed rows: drop the group's side padding so highlights reach the edge */
-[data-mobile="true"] .mobile-sub-nav [data-sidebar="group"],
-[data-mobile="true"] .mobile-sub-nav [data-sidebar="group-content"] {
+[data-mobile='true'] .mobile-sub-nav [data-sidebar='group'],
+[data-mobile='true'] .mobile-sub-nav [data-sidebar='group-content'] {
   padding-left: 0;
   padding-right: 0;
 }
 
 /* Roomy spacing between rows */
-[data-mobile="true"] .mobile-sub-nav [data-sidebar="menu"] {
+[data-mobile='true'] .mobile-sub-nav [data-sidebar='menu'] {
   gap: 0.25rem;
 }
 
 /* Large, centered, tappable rows */
-[data-mobile="true"] .mobile-sub-nav [data-sidebar="menu-button"] {
+[data-mobile='true'] .mobile-sub-nav [data-sidebar='menu-button'] {
   height: auto !important;
   justify-content: center;
   gap: 0;
@@ -592,12 +591,12 @@
 }
 
 /* No icons — consistent with the main menu */
-[data-mobile="true"] .mobile-sub-nav [data-sidebar="menu-button"] svg {
+[data-mobile='true'] .mobile-sub-nav [data-sidebar='menu-button'] svg {
   display: none !important;
 }
 
 /* Center the label even when it was set to flex-1 for a chevron */
-[data-mobile="true"] .mobile-sub-nav [data-sidebar="menu-button"] > span {
+[data-mobile='true'] .mobile-sub-nav [data-sidebar='menu-button'] > span {
   flex: none !important;
   text-align: center;
 }
@@ -614,16 +613,16 @@
  * class, so it also covers module-owned submenu components.
  * ============================================================ */
 
-.mini-sidebar [data-sidebar="menu-button"] > *:not(:first-child),
-.mini-sidebar [data-sidebar="group-label"],
-.mini-sidebar [data-sidebar="version"] {
+.mini-sidebar [data-sidebar='menu-button'] > *:not(:first-child),
+.mini-sidebar [data-sidebar='group-label'],
+.mini-sidebar [data-sidebar='version'] {
   transition: opacity 150ms ease;
 }
 
 /* Collapsed: keep rows on one line so nothing wraps into the rail, and fade out
  * everything but the leading icon. The group-label rule is for labels a module
  * submenu renders — the main nav intentionally omits them in Mini. */
-.mini-sidebar[data-mini-expanded="false"] [data-sidebar="menu-button"] {
+.mini-sidebar[data-mini-expanded='false'] [data-sidebar='menu-button'] {
   white-space: nowrap;
 }
 
@@ -716,4 +715,28 @@
 }
 .driver-popover.ari-tour .driver-popover-arrow-side-bottom {
   border-bottom-color: hsl(var(--popover));
+}
+
+/* Tour intro step (element-less): keep driver.js's horizontal centering but
+ * pin the popover near the viewport top instead of vertically centered.
+ * !important because driver.js positions via inline styles. */
+.driver-popover.ari-tour-intro {
+  top: 90px !important;
+}
+
+/* Links inside tour popovers — same treatment as the modules-page dialog link */
+.driver-popover.ari-tour .driver-popover-description a {
+  color: #148962;
+  font-weight: 500;
+  text-underline-offset: 4px;
+}
+
+.driver-popover.ari-tour .driver-popover-description a:hover {
+  text-decoration: underline;
+}
+
+/* Sovereign Day: the welcome dialog's brand panel uses the chrome navy
+ * (matches sidebar-border) instead of the theme's bright blue --primary. */
+[data-theme='sovereign-day'] .ari-welcome-brand {
+  background-color: hsl(222 40% 20%);
 }

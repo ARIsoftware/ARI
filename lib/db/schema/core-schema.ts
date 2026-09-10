@@ -143,6 +143,7 @@ export const userPreferences = pgTable("user_preferences", {
 	city: varchar({ length: 100 }),
 	linkedinUrl: varchar("linkedin_url", { length: 500 }),
 	timezone: varchar({ length: 50 }).default('UTC'),
+	welcomeDismissed: boolean("welcome_dismissed").default(false).notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 }, (table) => [

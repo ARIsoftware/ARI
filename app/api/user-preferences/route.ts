@@ -8,7 +8,11 @@ import { logActivity } from '@/lib/activity-log'
 import { profileFieldSchemas, emptyToNull } from '@/lib/validation'
 import { UserPreferencesSchema, updateUserPreferencesSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
-import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+import {
+  DEFAULT_SECURITY,
+  ErrorResponseSchema,
+  InternalServerErrorResponse,
+} from '@/lib/openapi/common'
 import { withApiLogging } from '@/lib/api-logging'
 
 registry.registerPath({
@@ -19,8 +23,14 @@ registry.registerPath({
   tags: ['app'],
   security: DEFAULT_SECURITY,
   responses: {
-    200: { description: 'User preferences', content: { 'application/json': { schema: UserPreferencesSchema } } },
-    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    200: {
+      description: 'User preferences',
+      content: { 'application/json': { schema: UserPreferencesSchema } },
+    },
+    401: {
+      description: 'Unauthorized',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
     500: InternalServerErrorResponse,
   },
 })
@@ -34,9 +44,18 @@ registry.registerPath({
   security: DEFAULT_SECURITY,
   request: { body: { content: { 'application/json': { schema: updateUserPreferencesSchema } } } },
   responses: {
-    200: { description: 'Updated user preferences', content: { 'application/json': { schema: UserPreferencesSchema } } },
-    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
-    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    200: {
+      description: 'Updated user preferences',
+      content: { 'application/json': { schema: UserPreferencesSchema } },
+    },
+    400: {
+      description: 'Validation error',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
+    401: {
+      description: 'Unauthorized',
+      content: { 'application/json': { schema: ErrorResponseSchema } },
+    },
     500: InternalServerErrorResponse,
   },
 })
@@ -50,6 +69,7 @@ const userPreferencesSchema = z.object({
   city: emptyToNull(profileFieldSchemas.city),
   linkedin_url: emptyToNull(profileFieldSchemas.linkedin_url),
   timezone: z.string().trim().max(50).optional(),
+  welcome_dismissed: z.boolean().optional(),
 })
 
 function getErrorMessage(error: unknown): string {
@@ -72,6 +92,7 @@ const DEFAULT_PREFS = (userId: string, email: string) => ({
   city: null,
   linkedin_url: null,
   timezone: 'UTC',
+  welcome_dismissed: false,
 })
 
 async function handleGET() {
@@ -83,7 +104,7 @@ async function handleGET() {
     }
 
     const rows = await withRLS((db) =>
-      db.select().from(userPreferences).where(eq(userPreferences.userId, user.id)).limit(1)
+      db.select().from(userPreferences).where(eq(userPreferences.userId, user.id)).limit(1),
     )
 
     if (rows.length === 0) {
@@ -95,7 +116,7 @@ async function handleGET() {
     console.error('Failed to fetch user preferences:', error)
     return NextResponse.json(
       { error: 'Failed to fetch user preferences', message: getErrorMessage(error) },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }
@@ -114,40 +135,38 @@ async function handlePUT(request: NextRequest) {
     if (!validationResult.success) {
       return NextResponse.json(
         { error: 'Invalid input', details: validationResult.error.errors },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
     const validatedData = validationResult.data
 
+    // Fields absent from the body stay undefined and Drizzle skips them in
+    // both the insert (DB defaults apply) and the conflict set (stored values
+    // survive), so a partial PUT like { welcome_dismissed: true } never
+    // clobbers the rest of the profile. Clearing a field still works: the
+    // schema maps empty strings to explicit nulls, which are written.
+    const changes = {
+      name: validatedData.name,
+      email: validatedData.email,
+      title: validatedData.title,
+      companyName: validatedData.company_name,
+      country: validatedData.country,
+      city: validatedData.city,
+      linkedinUrl: validatedData.linkedin_url,
+      timezone: validatedData.timezone,
+      welcomeDismissed: validatedData.welcome_dismissed,
+    }
+
     const result = await withRLS((db) =>
-      db.insert(userPreferences)
-        .values({
-          userId: user.id,
-          name: validatedData.name ?? null,
-          email: validatedData.email ?? null,
-          title: validatedData.title ?? null,
-          companyName: validatedData.company_name ?? null,
-          country: validatedData.country ?? null,
-          city: validatedData.city ?? null,
-          linkedinUrl: validatedData.linkedin_url ?? null,
-          timezone: validatedData.timezone ?? 'UTC',
-        })
+      db
+        .insert(userPreferences)
+        .values({ userId: user.id, ...changes })
         .onConflictDoUpdate({
           target: userPreferences.userId,
-          set: {
-            name: validatedData.name ?? null,
-            email: validatedData.email ?? null,
-            title: validatedData.title ?? null,
-            companyName: validatedData.company_name ?? null,
-            country: validatedData.country ?? null,
-            city: validatedData.city ?? null,
-            linkedinUrl: validatedData.linkedin_url ?? null,
-            timezone: validatedData.timezone ?? 'UTC',
-            updatedAt: new Date().toISOString(),
-          },
+          set: { ...changes, updatedAt: new Date().toISOString() },
         })
-        .returning()
+        .returning(),
     )
 
     logActivity({
@@ -162,7 +181,7 @@ async function handlePUT(request: NextRequest) {
     console.error('Failed to save user preferences:', error)
     return NextResponse.json(
       { error: 'Failed to save user preferences', message: getErrorMessage(error) },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

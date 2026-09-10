@@ -26,12 +26,6 @@ import { authClient } from "@/lib/auth-client"
 import { useCommandPalette } from "@/components/command-palette"
 import { useDragDropMode } from "@/components/drag-drop-mode-context"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 
 import {
   DndContext,
@@ -98,7 +92,6 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
   const router = useRouter()
   const { session } = useAuth()
   const { setOpen: setCommandPaletteOpen } = useCommandPalette()
-  const [mounted, setMounted] = useState(false)
   const user = session?.user
   const { modules } = useModules()
   const { iconOrder, setPendingIconOrder } = useDragDropMode()
@@ -122,11 +115,6 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
     const orderB = iconOrder?.[b.id] ?? defaultOrder(b)
     return orderA - orderB
   })
-
-  // Only render portals after mounting to avoid hydration issues
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   // dnd-kit sensors and state for icon reordering
   const sensors = useSensors(
@@ -211,6 +199,7 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
                 size="icon"
                 className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 hover:text-topbar-foreground ${dragItemClass}`}
                 onClick={isDragMode ? undefined : () => router.push("/settings")}
+                data-tour="settings-icon"
               >
                 <Settings className="h-5 w-5" />
               </Button>
@@ -305,7 +294,9 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
 
   return (
     <TooltipProvider>
-      <div className="flex items-center gap-1">
+      {/* data-tour anchors the onboarding tour's cutout to the icon row itself,
+          not the flex-1 spacer around it (which spans half the bar) */}
+      <div className="flex items-center gap-1" data-tour="quick-icons">
         {/* Draggable icons container */}
         {isDragMode ? (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleIconDragEnd}>
@@ -329,48 +320,26 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
           </div>
         )}
 
-        {/* User Avatar - NOT draggable, always at the end */}
-        {mounted ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-full overflow-hidden p-0 hover:ring-2 hover:ring-white/20"
-              >
-                {user?.image ? (
-                  <img
-                    src={user.image}
-                    alt="Profile"
-                    className="h-8 w-8 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="h-8 w-8 rounded-full bg-gray-600 flex items-center justify-center">
-                    <User className="h-4 w-4 text-white" />
-                  </div>
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => router.push("/settings")}>
-                Settings
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleSignOut}>
-                Sign out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 rounded-full overflow-hidden p-0"
-          >
+        {/* User Avatar - NOT draggable, always at the end. Navigates to /settings. */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-full overflow-hidden p-0 hover:ring-2 hover:ring-white/20"
+          onClick={isDragMode ? undefined : () => router.push("/settings")}
+          aria-label="Settings"
+        >
+          {user?.image ? (
+            <img
+              src={user.image}
+              alt="Profile"
+              className="h-8 w-8 rounded-full object-cover"
+            />
+          ) : (
             <div className="h-8 w-8 rounded-full bg-gray-600 flex items-center justify-center">
               <User className="h-4 w-4 text-white" />
             </div>
-          </Button>
-        )}
+          )}
+        </Button>
       </div>
     </TooltipProvider>
   )
@@ -510,7 +479,7 @@ export function TaskAnnouncement() {
       <span className={`text-topbar-foreground font-medium ${dmSans.className}`}>
         {customMessage ?? "ARI"}
       </span>
-      <div className="flex-1 flex justify-end" data-tour="quick-icons">
+      <div className="flex-1 flex justify-end">
         <TopBarIcons />
       </div>
     </div>

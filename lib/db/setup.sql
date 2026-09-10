@@ -179,11 +179,16 @@ CREATE TABLE IF NOT EXISTS "user_preferences" (
   "city" VARCHAR(100),
   "linkedin_url" VARCHAR(500),
   "timezone" VARCHAR(50),
+  "welcome_dismissed" BOOLEAN NOT NULL DEFAULT FALSE,
   "created_at" TIMESTAMPTZ DEFAULT NOW(),
   "updated_at" TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY ("id"),
   CONSTRAINT "user_preferences_user_id_key" UNIQUE ("user_id")
 );
+
+-- Dashboard onboarding: set once the user dismisses the welcome popup or
+-- completes the tour (added after the table shipped, hence the ALTER).
+ALTER TABLE "user_preferences" ADD COLUMN IF NOT EXISTS "welcome_dismissed" BOOLEAN NOT NULL DEFAULT FALSE;
 
 ALTER TABLE "user_preferences" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "user_preferences_rls_select" ON "user_preferences";

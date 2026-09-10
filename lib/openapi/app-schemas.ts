@@ -571,6 +571,7 @@ export const UserPreferencesSchema = z.object({
   city: z.string().nullable(),
   linkedin_url: z.string().nullable(),
   timezone: z.string(),
+  welcome_dismissed: z.boolean(),
 }).passthrough().openapi('UserPreferences')
 
 export const updateUserPreferencesSchema = z.object({
@@ -582,4 +583,5 @@ export const updateUserPreferencesSchema = z.object({
   city: z.string().nullable().optional(),
   linkedin_url: z.string().nullable().optional(),
   timezone: z.string().max(50).optional(),
+  welcome_dismissed: z.boolean().optional(),
 }).openapi('UpdateUserPreferencesBody')

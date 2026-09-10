@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
+import { Space_Grotesk } from 'next/font/google'
 import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -11,15 +12,28 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { useUserPreferences, useUpdateUserPreferences } from '@/hooks/use-user-preferences'
 import 'driver.js/dist/driver.css'
 
-const DISMISS_KEY = 'ari:dashboard:welcomeDismissed'
+// Pre-DB installs stored the dismissal in localStorage; honored once and
+// written through to user_preferences so other browsers stay quiet too.
+const LEGACY_DISMISS_KEY = 'ari:dashboard:welcomeDismissed'
+
+// preload: false — this font paints only the "ARI" wordmark inside a dialog
+// most users see once, so it isn't worth a render-blocking preload on every
+// authenticated page; it loads on demand when the dialog first renders.
+const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], weight: '500', preload: false })
 
 /**
  * Welcome popup + guided tour for the dashboard. Mounted once in the (app)
  * layout and self-gates to /dashboard, so nothing in modules-core/dashboard
- * needs to change. Mirrors the /modules welcome dialog pattern: shows on
- * every dashboard visit until the user dismisses it (or takes the tour).
+ * needs to change.
+ *
+ * Dismissal is per-user in user_preferences.welcome_dismissed (so it follows
+ * the account across browsers) and is set only when the user clicks "Don't
+ * show this again" or finishes the tour on its final step. Closing the popup
+ * or abandoning the tour midway leaves it unset, so the popup returns on the
+ * next dashboard visit — same behavior as the /modules welcome dialog.
  *
  * The tour (driver.js) anchors to core shell elements via data-tour
  * attributes; steps whose target isn't in the DOM (e.g. mobile, where the
@@ -27,30 +41,63 @@ const DISMISS_KEY = 'ari:dashboard:welcomeDismissed'
  */
 export function DashboardOnboarding() {
   const pathname = usePathname()
-  const [open, setOpen] = useState(false)
+  const onDashboard = pathname === '/dashboard'
+  const { data: prefs } = useUserPreferences({ enabled: onDashboard })
+  const { mutate: savePrefs } = useUpdateUserPreferences()
 
-  useEffect(() => {
-    if (pathname !== '/dashboard') return
+  // Legacy flag, read once per app load (lazy initializer, so SSR's missing
+  // localStorage safely falls back to false). It only ever changes via our
+  // own write-through below, so no live subscription is needed.
+  const [legacyDismissed] = useState(() => {
     try {
-      if (!localStorage.getItem(DISMISS_KEY)) setOpen(true)
+      return !!localStorage.getItem(LEGACY_DISMISS_KEY)
     } catch {
-      /* localStorage disabled — default to showing it */
-      setOpen(true)
+      /* SSR or localStorage disabled — fall through to showing the popup */
+      return false
     }
-  }, [pathname])
+  })
 
-  const dismissForever = () => {
-    try {
-      localStorage.setItem(DISMISS_KEY, '1')
-    } catch {
-      /* ignore storage errors */
-    }
-    setOpen(false)
+  // Closing the popup (or starting the tour) hides it for the current
+  // dashboard visit only; cleared during render when the user navigates away
+  // (the "adjust state when props change" pattern) so the popup returns on
+  // the next visit until actually dismissed.
+  const [closed, setClosed] = useState(false)
+  if (closed && !onDashboard) setClosed(false)
+
+  const open = onDashboard && !!prefs && !prefs.welcome_dismissed && !legacyDismissed && !closed
+
+  const markDismissed = () => {
+    setClosed(true)
+    savePrefs({ welcome_dismissed: true })
   }
 
+  // Write the legacy localStorage dismissal through to user_preferences so
+  // other browsers stay quiet too — pure external-system sync; the popup is
+  // already suppressed via `legacyDismissed` above.
+  const syncedLegacy = useRef(false)
+  useEffect(() => {
+    if (!onDashboard || !prefs || prefs.welcome_dismissed) return
+    if (!legacyDismissed || syncedLegacy.current) return
+    syncedLegacy.current = true
+    savePrefs(
+      { welcome_dismissed: true },
+      {
+        // Drop the legacy key once the server owns the flag, so this
+        // write-through path retires itself; on failure the key stays and
+        // the next full page load retries.
+        onSuccess: () => {
+          try {
+            localStorage.removeItem(LEGACY_DISMISS_KEY)
+          } catch {
+            /* localStorage disabled — key already unreadable anyway */
+          }
+        },
+      },
+    )
+  }, [onDashboard, prefs, legacyDismissed, savePrefs])
+
   const startTour = async () => {
-    // Taking the tour counts as completing onboarding — don't re-show the popup.
-    dismissForever()
+    setClosed(true)
     const { driver } = await import('driver.js')
 
     const isMac =
@@ -59,16 +106,23 @@ export function DashboardOnboarding() {
 
     const candidates = [
       {
-        element: '[data-tour="main-content"]',
+        // Element-less: centered popover over the full overlay. The extra
+        // class pins it ~90px from the viewport top (see globals.css).
         popover: {
-          title: 'Your dashboard',
+          popoverClass: 'ari-tour ari-tour-intro',
+          title: 'Your Dashboard',
           description:
-            'This is your home base — widgets from your modules give you an at-a-glance view of tasks, fitness, goals, and more. Head to Settings to choose a layout and which widgets appear.',
+            'This is your customizable dashboard, where you can see the information that matters most to you.',
         },
       },
       {
         element: '[data-sidebar="sidebar"]',
         popover: {
+          // Vertically centered against the full-height sidebar so the popover
+          // sits mid-viewport at any window size (driver.js still clamps it
+          // on-screen), instead of hugging the viewport top.
+          side: 'right' as const,
+          align: 'center' as const,
           title: 'Everything is a module',
           description:
             'Every feature in ARI is a module, and they all live here in the sidebar. Press ' +
@@ -79,6 +133,8 @@ export function DashboardOnboarding() {
       {
         element: '[data-tour="quick-icons"]',
         popover: {
+          side: 'bottom' as const,
+          align: 'start' as const,
           title: 'Quick actions',
           description:
             'One-click access to your most-used tools — plus themes, settings, and sign out. Modules can add their own icons here too.',
@@ -103,10 +159,20 @@ export function DashboardOnboarding() {
         },
       },
       {
+        element: '[data-tour="settings-icon"]',
+        popover: {
+          title: 'Settings',
+          description:
+            'Fine-tune ARI here — your profile, themes, integrations, backups, and per-module options all live in Settings.',
+        },
+      },
+      {
         popover: {
           title: "You're all set",
+          // driver.js renders description as HTML, so the docs link works here;
+          // link styling lives under .ari-tour in globals.css.
           description:
-            'That’s the lay of the land. Make ARI yours — install modules, pick a theme, and arrange the dashboard the way you like it.',
+            'That’s the lay of the land. Make ARI yours — install modules, pick a theme, and arrange the dashboard the way you like it. Want to go deeper? <a href="https://ari.software/docs" target="_blank" rel="noopener noreferrer">Read the ARI docs</a> to learn how to use and manage ARI — and even create your own modules.',
         },
       },
     ]
@@ -115,33 +181,52 @@ export function DashboardOnboarding() {
     // element-less steps show as a centered popover.
     const steps = candidates.filter((s) => !s.element || document.querySelector(s.element))
 
-    driver({
+    const driverObj = driver({
       showProgress: true,
       popoverClass: 'ari-tour',
+      // No slide/morph between steps: the overlay cutout and popover jump
+      // straight to each step's target instead of animating across the screen.
+      animate: false,
       overlayOpacity: 0.55,
-      stagePadding: 6,
+      // 0 so the cutout hugs each target exactly — any padding leaks an
+      // undimmed strip of page background around flush elements like the
+      // sidebar (a bright line between sidebar and dimmed content).
+      stagePadding: 0,
       stageRadius: 8,
       nextBtnText: 'Next →',
       prevBtnText: '← Back',
       doneBtnText: 'Done',
       progressText: '{{current}} of {{total}}',
+      // Reaching the final step counts as completing onboarding; bailing out
+      // earlier (Esc, X, overlay click) leaves the popup armed for next visit.
+      // driver.js resets its state BEFORE this hook runs, so driverObj methods
+      // like isLastStep() read empty state here — the pre-reset snapshot only
+      // arrives via the hook's opts (index = activeIndex at destroy time).
+      onDestroyed: (_element, _step, { index }) => {
+        if (index === steps.length - 1) markDismissed()
+      },
       steps,
-    }).drive()
+    })
+    driverObj.drive()
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && setOpen(false)}>
-      <DialogContent className="sm:max-w-[36.4rem]">
-        <div className="-mx-6 -mt-6 mb-2 overflow-hidden rounded-t-lg bg-[#212121]">
-          <img
-            src="/ari-dashboard-terminal.svg"
-            alt="Terminal showing the ari tour command"
-            className="block h-auto w-full"
-          />
+    <Dialog open={open} onOpenChange={(o) => !o && setClosed(true)}>
+      {/* bg-black/55 matches the driver.js tour overlay (black at overlayOpacity 0.55) */}
+      <DialogContent className="sm:max-w-[36.4rem]" overlayClassName="bg-black/55">
+        {/* Brand panel follows the active theme via the primary tokens (same
+            pair as the Start button); the body inherits DialogContent's. */}
+        <div className="ari-welcome-brand -mx-6 -mt-6 mb-2 flex items-center justify-center rounded-t-lg bg-primary py-16">
+          <span
+            className={`${spaceGrotesk.className} select-none text-[155px] font-medium leading-none text-primary-foreground`}
+            aria-hidden="true"
+          >
+            ARI
+          </span>
         </div>
         <DialogHeader>
           <DialogTitle className="text-xl">Welcome to ARI</DialogTitle>
-          <DialogDescription className="pt-2 text-base">
+          <DialogDescription className="pt-2 text-[15px] font-normal leading-6">
             This dashboard is your home base — every widget on it comes from a module, and
             everything can be rearranged, themed, and extended. Take a 60-second tour to see how it
             all fits together.
@@ -155,7 +240,7 @@ export function DashboardOnboarding() {
         </div>
         <button
           type="button"
-          onClick={dismissForever}
+          onClick={markDismissed}
           className="mx-auto -mb-2 mt-1 block text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
         >
           Don&apos;t show this again

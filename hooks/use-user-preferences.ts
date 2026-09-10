@@ -13,6 +13,7 @@ export interface UserPreferences {
   city: string | null
   linkedin_url: string | null
   timezone: string
+  welcome_dismissed: boolean
 }
 
 // Form-shaped projection: nullable server fields become empty strings, timezone
@@ -30,24 +31,26 @@ export interface UserProfileForm {
 
 export function toProfileForm(p: UserPreferences | undefined | null): UserProfileForm {
   return {
-    name:         p?.name         ?? '',
-    email:        p?.email        ?? '',
-    title:        p?.title        ?? '',
+    name: p?.name ?? '',
+    email: p?.email ?? '',
+    title: p?.title ?? '',
     company_name: p?.company_name ?? '',
-    country:      p?.country      ?? '',
-    city:         p?.city         ?? '',
+    country: p?.country ?? '',
+    city: p?.city ?? '',
     linkedin_url: p?.linkedin_url ?? '',
-    timezone:     p?.timezone     ?? 'UTC',
+    timezone: p?.timezone ?? 'UTC',
   }
 }
 
 const KEY = ['user-preferences'] as const
 
 async function readServerError(res: Response, fallback: string): Promise<string> {
-  const body = await res.json().catch(() => ({})) as { message?: unknown; error?: unknown }
-  return (typeof body.message === 'string' && body.message)
-      || (typeof body.error === 'string' && body.error)
-      || fallback
+  const body = (await res.json().catch(() => ({}))) as { message?: unknown; error?: unknown }
+  return (
+    (typeof body.message === 'string' && body.message) ||
+    (typeof body.error === 'string' && body.error) ||
+    fallback
+  )
 }
 
 // Single source of truth for /api/user-preferences. Any number of components
