@@ -16,6 +16,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { satisfies, rangeAnchor } from './lib/semver-range.js';
 import generateSetupSql from './generate-setup-sql.js';
+import generateThemeRegistry from './generate-theme-registry.js';
 
 /**
  * Compute the SHA-256 hash of a module's database/schema.sql, hex-encoded.
@@ -1178,6 +1179,11 @@ function main() {
   // route always runs the canonical schema (no manual sync, no drift).
   console.log('📝 Generating setup-sql.ts...');
   generateSetupSql();
+
+  // Compile themes-custom/ + themes-core/ into the generated theme registry
+  // and aggregated per-theme stylesheet (see scripts/generate-theme-registry.js).
+  console.log('📝 Generating theme registry...');
+  generateThemeRegistry();
 
   console.log('');
   console.log('Registered modules:');

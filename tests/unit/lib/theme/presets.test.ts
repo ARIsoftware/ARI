@@ -1,6 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { THEME_PRESETS, getThemeById, DEFAULT_THEME_ID } from '@/lib/theme/presets'
 
+// The 18 shipped themes (themes-core/<id>/) in display order. Filtered rather
+// than compared directly so locally-added themes-custom/ themes (which merge
+// into THEME_PRESETS) don't fail the suite.
+const CORE_THEME_IDS = [
+  'default', 'dark', 'blueprint', 'light', 'evening-light', 'rose-quartz',
+  'terminal', 'terminal-amber', 'nord', 'dracula', 'catppuccin-mocha',
+  'github-dark', 'rose-pine', 'solarized-dark', 'grayscale', '8-bit',
+  'sovereign', 'sovereign-day',
+]
+
 describe('THEME_PRESETS — data integrity', () => {
   it('is a non-empty array', () => {
     expect(Array.isArray(THEME_PRESETS)).toBe(true)
@@ -41,6 +51,17 @@ describe('THEME_PRESETS — data integrity', () => {
     expect(uniqueIds.size).toBe(ids.length)
   })
 
+  // Upgrade-safety lock: users' saved theme choices (module_settings +
+  // localStorage) reference these ids, and the picker cycles the array by
+  // index, so both the ids and their order are user-visible contract.
+  // A themes-core/ rename or reorder must be a deliberate, reviewed change.
+  it('contains every core theme id in the canonical display order', () => {
+    const coreIds = THEME_PRESETS
+      .map(p => p.id)
+      .filter(id => CORE_THEME_IDS.includes(id))
+    expect(coreIds).toEqual(CORE_THEME_IDS)
+  })
+
   it('contains the default preset', () => {
     const def = THEME_PRESETS.find(p => p.id === 'default')
     expect(def).toBeDefined()
@@ -76,7 +97,7 @@ describe('THEME_PRESETS — optional fields', () => {
 
   it('most presets do NOT have topbarBackground', () => {
     const withTopbar = THEME_PRESETS.filter(p => p.colors.topbarBackground !== undefined)
-    // Only evening-light is expected to have it
+    // Only evening-light, sovereign, and sovereign-day are expected to have it
     expect(withTopbar.length).toBeLessThan(THEME_PRESETS.length)
   })
 })

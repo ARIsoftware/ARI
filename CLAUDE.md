@@ -392,6 +392,12 @@ Module-specific schemas live in `modules-{core,custom}/<id>/database/schema.sql`
 
 /modules-custom         # User-created modules (same structure as modules-core)
 
+/themes-core            # Built-in themes — one folder per theme id
+  /[theme-id]/
+    theme.json          # id, name, category, order, colors (HSL tokens)
+    theme.css           # Optional CSS scoped to [data-theme="<id>"]
+/themes-custom          # User themes (untracked; same-id folder overrides core)
+
 /tests/unit             # Centralized Vitest unit tests — mirrors source paths
   /lib/                 # Tests for root lib/** (e.g. auth-helpers.test.ts)
   /modules-core/        # Tests for core modules' lib/** code
@@ -419,6 +425,29 @@ Modules can add quick access icons to the global top navigation bar by configuri
 Modules can declare runtime npm packages in `module.json` under `npmDependencies` (same shape as `package.json` `dependencies`). When the user installs the module from `/modules`, the install API auto-runs `pnpm add` for them locally (or merges them into root `package.json` + commits via GitHub on Vercel). Version conflicts with existing root deps abort the install safely. For modules added to `modules-custom/` by hand (not via `/modules`), `./ari start` syncs their `npmDependencies` into root `package.json` automatically before installing (conflicts warn, never block startup); `./ari fix-deps` runs the same sync explicitly. See `/docs/MODULES.md` for full behavior.
 
 For full module documentation, see `/docs/MODULES.md`.
+
+### Theme System (file-based)
+
+Themes follow the same core/custom split as modules: built-ins live in
+`themes-core/<id>/` (overwritten on upgrade — never edit), user themes in
+`themes-custom/<id>/` (untracked, preserved on upgrade; a folder whose
+`theme.json` `id` matches a core theme fully replaces it, CSS included). Each
+theme is a `theme.json` (id, name, category, `order`, `colors` as `"H S% L%"`
+HSL tokens per `ThemeColors` in `lib/theme/types.ts`, optional
+`defaultFont`/`defaultFontSize`) plus an optional `theme.css` whose selectors
+must be scoped to `[data-theme="<id>"]`.
+
+`scripts/generate-theme-registry.js` (invoked by `pnpm generate-module-registry`,
+so it runs on every dev boot, build, and CI) compiles everything into the
+gitignored `lib/generated/theme-registry.ts` (the `THEME_PRESETS` array —
+re-exported through `lib/theme/presets.ts`, which also keeps `getThemeById` and
+`DEFAULT_THEME_ID`) and `lib/generated/theme-styles.css` (imported by
+`app/layout.tsx` after `globals.css`). **Never change an existing theme id** —
+users' saved selections reference ids — and never remove `default`, `dark`,
+`light`, or `sovereign-day` (the generator hard-fails if they're missing). A
+broken custom theme is warn-skipped; a broken core theme fails the build. After
+adding or editing themes, restart ARI or run `pnpm generate-module-registry`.
+Full documentation: `/docs/THEMES.md`.
 
 ## Environment Variables
 
@@ -642,6 +671,7 @@ Comprehensive database backup and restore system with dynamic table discovery. M
 
   Then ask the user: "Want me to duplicate `modules-core/<module-id>/` into `modules-custom/<module-id>/` so we can safely edit it there?" If you can perform the copy (e.g. via `cp -R`), do so after the user confirms. If you cannot, give the user the exact command to run themselves (e.g. `cp -R modules-core/tasks modules-custom/tasks`), and remind them to restart ARI so the override is picked up.
 - **When asked to modify any module, first check whether it is overridden.** If both `modules-core/<id>/` and `modules-custom/<id>/` exist, only the `modules-custom` copy is active — edit that one. If only `modules-core/<id>/` exists, follow the rule above (do not edit; offer to duplicate into `modules-custom`).
+- **Never edit themes in `themes-core/`.** Same model as modules: core themes are upstream-managed and overwritten on update. To modify a core theme, copy its folder into `themes-custom/` (same folder name) and edit the copy — it overrides the core theme by id after a restart. To create a new theme, add a new `themes-custom/<id>/` folder. Never change an existing theme's `id` (users' saved selections reference it). See `/docs/THEMES.md`.
 
 ## Multi-Agent Support (Claude Code + OpenAI Codex)
 

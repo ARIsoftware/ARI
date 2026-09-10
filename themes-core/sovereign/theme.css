@@ -1,0 +1,79 @@
+/* Sovereign theme - white cards on the navy background.
+ *
+ * `--card` is white and `--card-foreground` is deep blue, but most card
+ * surfaces in the app are raw `bg-card` divs whose text simply inherits the
+ * global `--foreground` (near-white for the navy chrome) — that would be
+ * invisible on white. So inside any card surface we re-scope the tokens that
+ * descendants resolve against: text becomes blue, muted/border/input become
+ * light blue-greys, and `--primary` flips from near-white to blue so buttons
+ * inside a card stay visible. Because these are plain CSS variables, every
+ * Tailwind utility (`text-muted-foreground`, `bg-muted`, `border-border`, ...)
+ * inside the card picks them up with no component changes.
+ *
+ * `[class*="bg-card"]` rather than `.bg-card` so opacity variants such as
+ * `bg-card/50` are covered too. Popovers, dropdowns and dialogs are portaled
+ * to document.body, outside this scope, so they keep the dark navy treatment. */
+[data-theme='sovereign'] [class*='bg-card'],
+[data-theme='sovereign'] [class*='dark:bg-transparent'],
+[data-theme='sovereign'] [class*='border-border bg-transparent'] {
+  --background: 0 0% 100%;
+  --foreground: 223 68% 20%;
+  --card-foreground: 223 68% 20%;
+  --muted: 220 30% 95%;
+  --muted-foreground: 222 22% 45%;
+  --secondary: 220 30% 94%;
+  --secondary-foreground: 223 68% 20%;
+  --accent: 220 45% 94%;
+  --accent-foreground: 223 68% 20%;
+  --primary: 220 70% 40%;
+  --primary-foreground: 0 0% 100%;
+  --border: 220 22% 88%;
+  --input: 220 22% 88%;
+  --ring: 220 70% 40%;
+  --chart-1: 217 91% 50%;
+  --chart-2: 152 55% 35%;
+  --chart-3: 220 60% 42%;
+  --chart-4: 199 89% 38%;
+  --chart-5: 250 55% 55%;
+  color: hsl(var(--card-foreground));
+}
+
+/* Sovereign theme - pinned task rows.
+ *
+ * The tasks module paints a pinned row `bg-[hsl(var(--primary))]` and then
+ * overrides it for dark themes with `dark:bg-transparent dark:shadow-none
+ * dark:border-[hsl(var(--primary))]`, i.e. in any dark-category theme a pinned
+ * row drops back to the page background and is marked by a bright outline
+ * alone. Against Sovereign's white cards that reads as a hole punched in the
+ * list rather than a highlight, so pinned rows get the same white surface as
+ * every other card here and keep their emphasis through the blue border and a
+ * heavier shadow.
+ *
+ * `--primary` is re-scoped to blue by the rule above (pinned rows are in its
+ * selector list), so the module's own `dark:border-[hsl(var(--primary))]`
+ * resolves to the blue border on its own — only the background and shadow
+ * need restating. Both classes in the selector appear on that row and nowhere
+ * else in the codebase, and the whole thing is scoped to this theme, so the
+ * module stays untouched. */
+[data-theme='sovereign'] [class*='dark:bg-transparent'][class*='dark:shadow-none'] {
+  background-color: hsl(var(--card));
+  box-shadow:
+    0 1px 2px hsl(223 68% 6% / 0.4),
+    0 4px 12px hsl(223 68% 6% / 0.25);
+}
+
+/* Sovereign theme - inline subtask rows.
+ *
+ * In list view the tasks module renders subtasks *outside* the task card, as
+ * indented `border-border bg-transparent` rows sitting directly on the page
+ * background, so they stayed navy while their parent card turned white. Give
+ * them the same white surface (they are in the token re-scoping block above,
+ * so their text and border follow) and a light shadow so the indented group
+ * still reads as subordinate to the card above it.
+ *
+ * That class pair appears only on this row in the codebase. The card-view
+ * subtask panel is inside the card and needs nothing. */
+[data-theme='sovereign'] [class*='border-border bg-transparent'] {
+  background-color: hsl(var(--card));
+  box-shadow: 0 1px 2px hsl(223 68% 6% / 0.3);
+}

@@ -92,8 +92,8 @@ After a successful merge:
    - If found, list them and tell the user:
      > "New database migration files were detected. Please review and run them manually in your SQL client of choice — Supabase Studio, pgweb, or `psql`."
 
-3. **Check if module files changed**: Look for changes in `modules-core/` or `module.json` files.
-   - If changed, run `pnpm generate-module-registry` automatically.
+3. **Check if module or theme files changed**: Look for changes in `modules-core/`, `module.json`, `themes-core/`, or `theme.json` files.
+   - If changed, run `pnpm generate-module-registry` automatically (it also regenerates the theme registry).
 
 4. **Check for new environment variables**: ARI ships no committed `.env.example`, so scan the diff for newly referenced env vars instead:
    ```bash
@@ -115,5 +115,5 @@ Show a final summary:
 - NEVER run SQL files automatically — always list them for the user to run manually.
 - NEVER force-push, reset, or use any destructive git commands.
 - NEVER modify `.env` files.
-- NEVER touch `modules-custom/` — that directory belongs to the user.
+- NEVER touch `modules-custom/` or `themes-custom/` — those directories belong to the user.
 - If anything goes wrong, explain clearly and let the user decide how to proceed.

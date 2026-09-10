@@ -783,7 +783,7 @@ async function update() {
     console.log('');
     console.log('  ' + RED + '✘' + RESET + ' Merge failed — you likely have conflicting local changes.');
     console.log('  ' + DIM + 'Resolve conflicts, then run: git add <file> && git commit' + RESET);
-    console.log('  ' + DIM + 'Tip: keep customizations in modules-custom/ to avoid conflicts.' + RESET);
+    console.log('  ' + DIM + 'Tip: keep customizations in modules-custom/ and themes-custom/ to avoid conflicts.' + RESET);
     process.exit(1);
   }
   console.log('  ' + GREEN + '✔' + RESET + ' Code updated');
