@@ -21,15 +21,18 @@ themes-core/<id>/
 - `name` — display name shown in Settings → Themes.
 - `category` — `"light"` or `"dark"` (drives the `dark` class and dark-variant styles).
 - `order` — sort position in the theme picker (core themes use 10, 20, … so new
-  themes can slot between). Themes without an order sort last.
+  themes can slot between). Themes without an order sort last, except a
+  `themes-custom` override of a core theme, which inherits the core theme's
+  order when it omits one.
 - `colors` — HSL component triples (`"H S% L%"`, no `hsl()` wrapper) for every token
   in `ThemeColors` (`lib/theme/types.ts`), plus `radius`. `topbarBackground` /
   `topbarForeground` are optional.
 - `defaultFont` / `defaultFontSize` — optional; applied when the theme is selected
   (see the `8-bit` theme).
 
-`theme.css` rules must be scoped to `[data-theme="<id>"]` — the generator warns
-about unscoped selectors because they would leak into every theme.
+`theme.css` rules must be scoped to `[data-theme="<id>"]` — an unscoped selector
+would leak into every theme, so the generator fails the build for unscoped core
+CSS and excludes (with a warning) unscoped custom CSS.
 
 The registry is generated into `lib/generated/theme-registry.ts` and
 `lib/generated/theme-styles.css` by `scripts/generate-theme-registry.js`, which runs

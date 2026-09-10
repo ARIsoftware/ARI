@@ -1,24 +1,53 @@
 import { describe, it, expect } from 'vitest'
 import { THEME_PRESETS, getThemeById, DEFAULT_THEME_ID } from '@/lib/theme/presets'
+import { scanThemesDirectory, sortThemes, toPreset } from '@/scripts/generate-theme-registry.js'
+import type { ThemePreset } from '@/lib/theme/types'
 
-// The 18 shipped themes (themes-core/<id>/) in display order. Filtered rather
-// than compared directly so locally-added themes-custom/ themes (which merge
-// into THEME_PRESETS) don't fail the suite.
+// The shipped theme set, read straight from themes-core/ so these assertions
+// hold regardless of any local themes-custom/ additions or overrides (which
+// merge into THEME_PRESETS and are allowed to change names, orders, fonts —
+// a user customizing a theme must not fail the suite).
+const coreScan = sortThemes(scanThemesDirectory('themes-core').themes)
+const CORE_PRESETS: ThemePreset[] = coreScan.map((t: { theme: unknown }) =>
+  toPreset(t.theme),
+) as ThemePreset[]
+
+// Upgrade-safety lock: users' saved theme choices (module_settings +
+// localStorage) reference these ids, and the picker cycles the array by
+// index, so both the ids and their display order are user-visible contract.
+// A themes-core/ rename or reorder must be a deliberate, reviewed change.
 const CORE_THEME_IDS = [
-  'default', 'dark', 'blueprint', 'light', 'evening-light', 'rose-quartz',
-  'terminal', 'terminal-amber', 'nord', 'dracula', 'catppuccin-mocha',
-  'github-dark', 'rose-pine', 'solarized-dark', 'grayscale', '8-bit',
-  'sovereign', 'sovereign-day',
+  'default',
+  'dark',
+  'blueprint',
+  'light',
+  'evening-light',
+  'rose-quartz',
+  'terminal',
+  'terminal-amber',
+  'nord',
+  'dracula',
+  'catppuccin-mocha',
+  'github-dark',
+  'rose-pine',
+  'solarized-dark',
+  'grayscale',
+  '8-bit',
+  'sovereign',
+  'sovereign-day',
 ]
 
-describe('THEME_PRESETS — data integrity', () => {
-  it('is a non-empty array', () => {
-    expect(Array.isArray(THEME_PRESETS)).toBe(true)
-    expect(THEME_PRESETS.length).toBeGreaterThan(0)
+describe('themes-core — shipped data integrity', () => {
+  it('scans without errors', () => {
+    expect(scanThemesDirectory('themes-core').errors).toEqual([])
+  })
+
+  it('contains every core theme id in the canonical display order', () => {
+    expect(CORE_PRESETS.map((p) => p.id)).toEqual(CORE_THEME_IDS)
   })
 
   it('every preset has an id, name, and category', () => {
-    for (const preset of THEME_PRESETS) {
+    for (const preset of CORE_PRESETS) {
       expect(typeof preset.id).toBe('string')
       expect(preset.id.length).toBeGreaterThan(0)
       expect(typeof preset.name).toBe('string')
@@ -28,77 +57,101 @@ describe('THEME_PRESETS — data integrity', () => {
 
   it('every preset has required color tokens', () => {
     const required = [
-      'background', 'foreground', 'primary', 'primaryForeground',
-      'secondary', 'secondaryForeground', 'muted', 'mutedForeground',
-      'accent', 'accentForeground', 'destructive', 'destructiveForeground',
-      'border', 'input', 'ring',
-      'chart1', 'chart2', 'chart3', 'chart4', 'chart5',
-      'sidebarBackground', 'sidebarForeground', 'sidebarPrimary',
-      'sidebarPrimaryForeground', 'sidebarAccent', 'sidebarAccentForeground',
-      'sidebarBorder', 'sidebarRing', 'radius',
+      'background',
+      'foreground',
+      'primary',
+      'primaryForeground',
+      'secondary',
+      'secondaryForeground',
+      'muted',
+      'mutedForeground',
+      'accent',
+      'accentForeground',
+      'destructive',
+      'destructiveForeground',
+      'border',
+      'input',
+      'ring',
+      'chart1',
+      'chart2',
+      'chart3',
+      'chart4',
+      'chart5',
+      'sidebarBackground',
+      'sidebarForeground',
+      'sidebarPrimary',
+      'sidebarPrimaryForeground',
+      'sidebarAccent',
+      'sidebarAccentForeground',
+      'sidebarBorder',
+      'sidebarRing',
+      'radius',
     ] as const
 
-    for (const preset of THEME_PRESETS) {
+    for (const preset of CORE_PRESETS) {
       for (const key of required) {
         expect(preset.colors[key], `${preset.id} missing ${key}`).toBeTruthy()
       }
     }
   })
 
-  it('preset IDs are unique', () => {
-    const ids = THEME_PRESETS.map(p => p.id)
-    const uniqueIds = new Set(ids)
-    expect(uniqueIds.size).toBe(ids.length)
-  })
-
-  // Upgrade-safety lock: users' saved theme choices (module_settings +
-  // localStorage) reference these ids, and the picker cycles the array by
-  // index, so both the ids and their order are user-visible contract.
-  // A themes-core/ rename or reorder must be a deliberate, reviewed change.
-  it('contains every core theme id in the canonical display order', () => {
-    const coreIds = THEME_PRESETS
-      .map(p => p.id)
-      .filter(id => CORE_THEME_IDS.includes(id))
-    expect(coreIds).toEqual(CORE_THEME_IDS)
-  })
-
   it('contains the default preset', () => {
-    const def = THEME_PRESETS.find(p => p.id === 'default')
+    const def = CORE_PRESETS.find((p) => p.id === 'default')
     expect(def).toBeDefined()
     expect(def?.name).toBe('Pastel')
     expect(def?.category).toBe('light')
   })
 
   it('contains dark themes', () => {
-    const darkThemes = THEME_PRESETS.filter(p => p.category === 'dark')
-    expect(darkThemes.length).toBeGreaterThan(0)
+    expect(CORE_PRESETS.filter((p) => p.category === 'dark').length).toBeGreaterThan(0)
   })
 
   it('contains light themes', () => {
-    const lightThemes = THEME_PRESETS.filter(p => p.category === 'light')
-    expect(lightThemes.length).toBeGreaterThan(0)
+    expect(CORE_PRESETS.filter((p) => p.category === 'light').length).toBeGreaterThan(0)
   })
-})
 
-describe('THEME_PRESETS — optional fields', () => {
   it('8-bit preset has defaultFont and defaultFontSize', () => {
-    const eightBit = THEME_PRESETS.find(p => p.id === '8-bit')
+    const eightBit = CORE_PRESETS.find((p) => p.id === '8-bit')
     expect(eightBit).toBeDefined()
     expect(eightBit?.defaultFont).toBe('press-start-2p')
     expect(eightBit?.defaultFontSize).toBe('11px')
   })
 
   it('evening-light preset has topbarBackground and topbarForeground', () => {
-    const eveningLight = THEME_PRESETS.find(p => p.id === 'evening-light')
+    const eveningLight = CORE_PRESETS.find((p) => p.id === 'evening-light')
     expect(eveningLight).toBeDefined()
     expect(eveningLight?.colors.topbarBackground).toBeDefined()
     expect(eveningLight?.colors.topbarForeground).toBeDefined()
   })
 
   it('most presets do NOT have topbarBackground', () => {
-    const withTopbar = THEME_PRESETS.filter(p => p.colors.topbarBackground !== undefined)
+    const withTopbar = CORE_PRESETS.filter((p) => p.colors.topbarBackground !== undefined)
     // Only evening-light, sovereign, and sovereign-day are expected to have it
-    expect(withTopbar.length).toBeLessThan(THEME_PRESETS.length)
+    expect(withTopbar.length).toBeLessThan(CORE_PRESETS.length)
+  })
+})
+
+// THEME_PRESETS (the generated registry) merges local themes-custom/ themes in,
+// so assertions here must hold for ANY valid theme set — never pin shipped
+// names/orders/contents against it.
+describe('THEME_PRESETS — registry integrity', () => {
+  it('is a non-empty array', () => {
+    expect(Array.isArray(THEME_PRESETS)).toBe(true)
+    expect(THEME_PRESETS.length).toBeGreaterThan(0)
+  })
+
+  it('preset IDs are unique', () => {
+    const ids = THEME_PRESETS.map((p) => p.id)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('contains every shipped core id', () => {
+    for (const id of CORE_THEME_IDS) {
+      expect(
+        THEME_PRESETS.some((p) => p.id === id),
+        `missing core id ${id}`,
+      ).toBe(true)
+    }
   })
 })
 
@@ -107,16 +160,10 @@ describe('getThemeById', () => {
     const theme = getThemeById('dark')
     expect(theme).toBeDefined()
     expect(theme?.id).toBe('dark')
-    expect(theme?.category).toBe('dark')
   })
 
   it('returns undefined for an unknown ID', () => {
     expect(getThemeById('nonexistent-theme')).toBeUndefined()
-  })
-
-  it('returns the default preset for "default"', () => {
-    const theme = getThemeById('default')
-    expect(theme?.name).toBe('Pastel')
   })
 
   it('can find each preset by its own id', () => {
@@ -137,8 +184,7 @@ describe('DEFAULT_THEME_ID', () => {
   })
 
   it('matches an existing preset', () => {
-    const preset = getThemeById(DEFAULT_THEME_ID)
-    expect(preset).toBeDefined()
+    expect(getThemeById(DEFAULT_THEME_ID)).toBeDefined()
   })
 
   it('is "sovereign-day"', () => {

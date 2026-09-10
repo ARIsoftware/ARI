@@ -71,8 +71,12 @@ Every selector must be scoped to your theme:
 }
 ```
 
-The generator warns about unscoped selectors — unscoped rules would leak into
-every theme. See `themes-core/grayscale/theme.css` (page filter),
+Scoping is enforced: an unscoped selector would leak into every theme, so a
+`themes-custom` theme.css containing one (including inside `@media`/`@supports`
+blocks, or as any member of a comma-separated list) is **excluded from the
+build with a warning** — the theme's colors still load, only its CSS is
+dropped. In `themes-core` an unscoped selector fails the build. See
+`themes-core/grayscale/theme.css` (page filter),
 `themes-core/terminal/theme.css` (topbar accent), and
 `themes-core/sovereign/theme.css` (component-level re-theming) for real examples.
 
@@ -96,10 +100,19 @@ It runs as part of `pnpm generate-module-registry`, which fires automatically on
 theme, restart ARI** (or run `pnpm generate-module-registry`) — themes are
 compiled in at startup, not read live.
 
+**Self-hosted production note**: a production server (`pnpm build && pnpm start`)
+bakes themes into the build — the dev-boot regeneration is skipped when
+`NODE_ENV=production`. After changing themes there, run `pnpm build` again and
+restart; restarting alone won't pick them up.
+
 Validation rules:
 
 - A broken theme in `themes-custom/` is **skipped with a warning** — a bad user
-  theme never breaks boot.
+  theme never breaks boot. A theme whose colors are valid but whose `theme.css`
+  is broken or unscoped keeps its colors and loses only the CSS.
+- Color values are checked for the `"H S% L%"` format (`radius` excepted) —
+  hex or `hsl()`-wrapped values pasted from a design tool are rejected with a
+  clear message instead of rendering as broken CSS.
 - A broken theme in `themes-core/` **fails the build** — the shipped set must be
   valid, and the ids `default`, `dark`, `light`, and `sovereign-day` must always
   exist (the app hardcodes them).

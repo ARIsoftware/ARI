@@ -91,6 +91,22 @@ const ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/
 // themes-core breaks boot, so generation fails loudly instead.
 export const REQUIRED_THEME_IDS = ['default', 'dark', 'light', 'sovereign-day']
 
+// Color tokens are HSL component triples in the shadcn convention ("H S% L%",
+// no hsl() wrapper) — the app renders them as hsl(var(--token)), so a hex or
+// hsl()-wrapped value would silently produce invalid CSS. radius is the one
+// non-color token (a CSS length like "0.5rem").
+const HSL_TRIPLE = /^\d+(\.\d+)?\s+\d+(\.\d+)?%\s+\d+(\.\d+)?%$/
+
+const KNOWN_TOP_LEVEL_FIELDS = new Set([
+  'id',
+  'name',
+  'category',
+  'order',
+  'colors',
+  'defaultFont',
+  'defaultFontSize',
+])
+
 function stripBom(text) {
   return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text
 }
@@ -122,6 +138,13 @@ export function validateTheme(theme) {
       errors.push(`"${key}" must be a string when present`)
     }
   }
+  for (const key of Object.keys(theme)) {
+    if (!KNOWN_TOP_LEVEL_FIELDS.has(key)) {
+      errors.push(
+        `"${key}" is not a recognized field (allowed: ${[...KNOWN_TOP_LEVEL_FIELDS].join(', ')})`,
+      )
+    }
+  }
   if (!theme.colors || typeof theme.colors !== 'object' || Array.isArray(theme.colors)) {
     errors.push('missing "colors" object')
   } else {
@@ -136,9 +159,13 @@ export function validateTheme(theme) {
       }
     }
     const known = new Set([...REQUIRED_COLOR_KEYS, ...OPTIONAL_COLOR_KEYS])
-    for (const key of Object.keys(theme.colors)) {
+    for (const [key, value] of Object.entries(theme.colors)) {
       if (!known.has(key)) {
         errors.push(`colors.${key} is not a recognized token`)
+      } else if (key !== 'radius' && typeof value === 'string' && !HSL_TRIPLE.test(value)) {
+        errors.push(
+          `colors.${key} must be HSL components "H S% L%" (e.g. "222 47% 11%"), got ${JSON.stringify(value)}`,
+        )
       }
     }
   }
@@ -146,12 +173,56 @@ export function validateTheme(theme) {
 }
 
 /**
- * Cheap structural check on a theme.css: one unbalanced brace would corrupt
- * every theme concatenated after it in the aggregate file.
+ * Remove comments from CSS and (optionally) blank out string literal contents,
+ * so structural checks don't trip over braces inside comments, url("..."),
+ * or content: "{". Returns null when a comment or string never terminates —
+ * an unterminated comment would swallow every theme concatenated after it in
+ * the aggregate file, so callers must treat null as invalid CSS.
+ */
+export function stripCssNoise(css, blankStrings = false) {
+  let out = ''
+  let i = 0
+  while (i < css.length) {
+    const ch = css[i]
+    if (ch === '/' && css[i + 1] === '*') {
+      const end = css.indexOf('*/', i + 2)
+      if (end === -1) return null // unterminated comment
+      i = end + 2
+      continue
+    }
+    if (ch === '"' || ch === "'") {
+      let j = i + 1
+      let literal = ''
+      while (j < css.length && css[j] !== ch && css[j] !== '\n') {
+        if (css[j] === '\\' && j + 1 < css.length) {
+          literal += css[j] + css[j + 1]
+          j += 2
+        } else {
+          literal += css[j]
+          j++
+        }
+      }
+      if (j >= css.length || css[j] === '\n') return null // unterminated string
+      out += ch + (blankStrings ? '' : literal) + ch
+      i = j + 1
+      continue
+    }
+    out += ch
+    i++
+  }
+  return out
+}
+
+/**
+ * Structural check on a theme.css: one unbalanced brace (or an unterminated
+ * comment/string) would corrupt every theme concatenated after it in the
+ * aggregate file. Braces inside comments and string literals don't count.
  */
 export function cssBracesBalanced(css) {
+  const cleaned = stripCssNoise(css, true)
+  if (cleaned === null) return false
   let depth = 0
-  for (const ch of css) {
+  for (const ch of cleaned) {
     if (ch === '{') depth++
     else if (ch === '}') {
       depth--
@@ -161,36 +232,71 @@ export function cssBracesBalanced(css) {
   return depth === 0
 }
 
+// Split a selector prelude on top-level commas, respecting (), [] nesting so
+// :is(a, b) or [attr="x,y"] don't split.
+function splitSelectorList(prelude) {
+  const members = []
+  let depth = 0
+  let current = ''
+  for (const ch of prelude) {
+    if (ch === '(' || ch === '[') depth++
+    else if (ch === ')' || ch === ']') depth = Math.max(0, depth - 1)
+    if (ch === ',' && depth === 0) {
+      members.push(current)
+      current = ''
+    } else {
+      current += ch
+    }
+  }
+  members.push(current)
+  return members.map((m) => m.trim()).filter(Boolean)
+}
+
+// Conditional group at-rules wrap ordinary style rules, so their contents must
+// be scope-checked too. Other block at-rules (@keyframes, @font-face, …) have
+// opaque contents that aren't selectors.
+const GROUP_AT_RULE = /^@(media|supports|layer|container|scope)\b/
+
 /**
- * Every top-level selector in a theme.css should be scoped to the theme's own
- * [data-theme="<id>"] — an unscoped selector leaks into every theme. Returns
- * the unscoped top-level selectors found (best-effort heuristic; comments are
- * stripped, nested braces are skipped).
+ * Every style-rule selector in a theme.css — at the top level, in a
+ * comma-separated list, or inside @media/@supports/@layer/@container blocks —
+ * must be scoped to the theme's own [data-theme="<id>"], or the rule leaks
+ * into every theme. Returns the unscoped selectors found. Assumes the css
+ * already passed cssBracesBalanced (unparseable css returns []).
  */
 export function findUnscopedSelectors(css, id) {
-  const noComments = css.replace(/\/\*[\s\S]*?\*\//g, '')
+  const cleaned = stripCssNoise(css, false)
+  if (cleaned === null) return []
   // Quote style is a formatting choice ([data-theme="x"], ='x', or =x) —
   // accept all three.
   const scoped = new RegExp(`\\[data-theme=("${id}"|'${id}'|${id})\\]`)
   const offenders = []
-  let depth = 0
+  // Context per open block: 'rules' = contents are style/at-rules to check,
+  // 'opaque' = contents are declarations or non-selector constructs.
+  const contexts = ['rules']
   let buffer = ''
-  for (const ch of noComments) {
+  for (const ch of cleaned) {
     if (ch === '{') {
-      if (depth === 0) {
-        const selector = buffer.trim()
-        // At-rules (@media, @supports, …) wrap their own rules; the inner
-        // selectors surface on the next depth-0 pass, so skip the at-rule line.
-        if (selector && !selector.startsWith('@') && !scoped.test(selector)) {
-          offenders.push(selector.replace(/\s+/g, ' '))
+      const prelude = buffer.trim()
+      if (contexts[contexts.length - 1] === 'rules' && prelude) {
+        if (prelude.startsWith('@')) {
+          contexts.push(GROUP_AT_RULE.test(prelude) ? 'rules' : 'opaque')
+        } else {
+          for (const member of splitSelectorList(prelude)) {
+            if (!scoped.test(member)) offenders.push(member.replace(/\s+/g, ' '))
+          }
+          contexts.push('opaque')
         }
-        buffer = ''
+      } else {
+        contexts.push('opaque')
       }
-      depth++
-    } else if (ch === '}') {
-      depth = Math.max(0, depth - 1)
       buffer = ''
-    } else if (depth === 0) {
+    } else if (ch === '}') {
+      if (contexts.length > 1) contexts.pop()
+      buffer = ''
+    } else if (ch === ';' && contexts[contexts.length - 1] === 'rules') {
+      buffer = '' // statement at-rule (@import, @charset, …) — not a selector
+    } else {
       buffer += ch
     }
   }
@@ -212,19 +318,47 @@ export function scanThemesDirectory(dirName, rootDir = ROOT) {
 
   const entries = fs
     .readdirSync(dirPath, { withFileTypes: true })
-    .filter((e) => e.isDirectory())
+    // Include symlinked folders (e.g. themes kept in a dotfiles repo) —
+    // Dirent.isDirectory() is false for symlinks-to-directories.
+    .filter((e) => {
+      if (e.isDirectory()) return true
+      if (!e.isSymbolicLink()) return false
+      try {
+        return fs.statSync(path.join(dirPath, e.name)).isDirectory()
+      } catch {
+        return false
+      }
+    })
     .map((e) => e.name)
     .sort() // readdir order is platform-dependent; output must be deterministic
 
   for (const folder of entries) {
-    const jsonPath = path.join(dirPath, folder, 'theme.json')
-    if (!fs.existsSync(jsonPath)) continue // not a theme folder (e.g. docs)
+    const folderPath = path.join(dirPath, folder)
+    let files
+    try {
+      files = fs.readdirSync(folderPath)
+    } catch {
+      continue // unreadable folder — nothing to load
+    }
+    // Exact-case check: existsSync('theme.json') would match 'Theme.json' on
+    // case-insensitive macOS/Windows but not on Linux (Vercel/CI), so the
+    // theme would silently vanish in production. Enforce the exact name
+    // everywhere and say so.
+    if (!files.includes('theme.json')) {
+      const variant = files.find((f) => f.toLowerCase() === 'theme.json')
+      if (variant) {
+        console.warn(
+          `⚠️  ${dirName}/${folder}/${variant}: must be named exactly "theme.json" (lowercase) — theme skipped`,
+        )
+      }
+      continue // not a theme folder (e.g. docs)
+    }
 
     let theme
     try {
-      theme = JSON.parse(stripBom(fs.readFileSync(jsonPath, 'utf-8')))
+      theme = JSON.parse(stripBom(fs.readFileSync(path.join(folderPath, 'theme.json'), 'utf-8')))
     } catch (err) {
-      errors.push(`${dirName}/${folder}/theme.json: invalid JSON (${err.message})`)
+      errors.push(`${dirName}/${folder}/theme.json: invalid JSON or unreadable (${err.message})`)
       continue
     }
 
@@ -241,19 +375,39 @@ export function scanThemesDirectory(dirName, rootDir = ROOT) {
     }
 
     let css = null
-    const cssPath = path.join(dirPath, folder, 'theme.css')
-    if (fs.existsSync(cssPath)) {
-      css = stripBom(fs.readFileSync(cssPath, 'utf-8'))
-      if (!cssBracesBalanced(css)) {
-        errors.push(
-          `${dirName}/${folder}/theme.css: unbalanced braces (would corrupt the aggregated stylesheet)`,
-        )
-        continue
+    const cssVariant = files.find((f) => f.toLowerCase() === 'theme.css')
+    if (cssVariant && cssVariant !== 'theme.css') {
+      console.warn(
+        `⚠️  ${dirName}/${folder}/${cssVariant}: must be named exactly "theme.css" (lowercase) — css ignored`,
+      )
+    }
+    if (files.includes('theme.css')) {
+      const cssProblems = []
+      try {
+        css = stripBom(fs.readFileSync(path.join(folderPath, 'theme.css'), 'utf-8'))
+      } catch (err) {
+        cssProblems.push(`unreadable (${err.code || err.message})`)
       }
-      for (const selector of findUnscopedSelectors(css, theme.id)) {
-        console.warn(
-          `⚠️  ${dirName}/${folder}/theme.css: selector not scoped to [data-theme="${theme.id}"]: ${selector}`,
+      if (css !== null && !cssBracesBalanced(css)) {
+        cssProblems.push(
+          'unbalanced braces or unterminated comment/string (would corrupt the aggregated stylesheet)',
         )
+      }
+      if (css !== null && cssProblems.length === 0) {
+        for (const selector of findUnscopedSelectors(css, theme.id)) {
+          cssProblems.push(`selector not scoped to [data-theme="${theme.id}"]: ${selector}`)
+        }
+      }
+      if (cssProblems.length > 0) {
+        if (dirName === 'themes-core') {
+          // Shipped CSS must be valid and scoped — fail the build.
+          errors.push(`${dirName}/${folder}/theme.css: ${cssProblems.join('; ')}`)
+          continue
+        }
+        // themes-custom: keep the theme's colors but exclude its CSS —
+        // leaking or broken CSS must not restyle every theme or break boot.
+        console.warn(`⚠️  ${dirName}/${folder}/theme.css excluded — ${cssProblems.join('; ')}`)
+        css = null
       }
     }
 
@@ -295,14 +449,36 @@ export function mergeThemes(scansByDirectory) {
   return [...map.values()]
 }
 
-/** Sort by (order, name); themes without an order go last. Stable. */
+/**
+ * Sort by (order, name); themes without an order go last. Stable, and the
+ * name tie-break is plain code-point comparison — localeCompare varies by
+ * machine locale, and generated output must be deterministic everywhere.
+ */
 export function sortThemes(themes) {
   return [...themes].sort((a, b) => {
     const ao = a.theme.order ?? Infinity
     const bo = b.theme.order ?? Infinity
     if (ao !== bo) return ao - bo
-    return a.theme.name.localeCompare(b.theme.name)
+    if (a.theme.name < b.theme.name) return -1
+    if (a.theme.name > b.theme.name) return 1
+    return 0
   })
+}
+
+/**
+ * The required ids must exist in themes-core specifically — a required id
+ * satisfied only by an untracked themes-custom folder would vanish on a fresh
+ * clone or Vercel deploy of the same repo.
+ */
+export function missingRequiredCoreIds(coreThemes) {
+  return REQUIRED_THEME_IDS.filter((id) => !coreThemes.some((t) => t.id === id))
+}
+
+// Folder names are not validated like ids, and both are interpolated into
+// /* ... */ comment headers — a name containing "*/" would terminate the
+// comment early and corrupt the generated file.
+function commentSafe(text) {
+  return String(text).split('*/').join('*∕')
 }
 
 // Emit order for color keys — mirrors the ThemeColors declaration order in
@@ -332,7 +508,7 @@ export function toPreset(theme) {
 export function renderRegistry(sortedThemes) {
   const presets = sortedThemes.map((t) => toPreset(t.theme))
   const sources = sortedThemes
-    .map((t) => ` *   - ${t.id} (from ${t.dirName}/${t.folder})`)
+    .map((t) => commentSafe(` *   - ${t.id} (from ${t.dirName}/${t.folder})`))
     .join('\n')
   return (
     `// AUTO-GENERATED by scripts/generate-theme-registry.js — DO NOT EDIT.\n` +
@@ -353,7 +529,7 @@ export function renderStyles(sortedThemes) {
   const blocks = sortedThemes
     .filter((t) => t.css !== null)
     .map((t) => {
-      const header = `/* ── theme: ${t.id} (from ${t.dirName}/${t.folder}/theme.css) ── */`
+      const header = `/* ${commentSafe(`── theme: ${t.id} (from ${t.dirName}/${t.folder}/theme.css) ──`)} */`
       return `${header}\n\n${t.css.trim()}\n`
     })
   return blocks.length > 0 ? `${banner}\n${blocks.join('\n')}` : banner
@@ -388,7 +564,10 @@ export default function generateThemeRegistry(rootDir = ROOT) {
 
   const sorted = sortThemes(mergeThemes(scans))
 
-  const missing = REQUIRED_THEME_IDS.filter((id) => !sorted.some((t) => t.id === id))
+  // The required ids must live in themes-core itself (not merely be satisfied
+  // by an untracked themes-custom override) — see missingRequiredCoreIds.
+  const coreScan = scans.find((s) => s.dirName === 'themes-core')
+  const missing = missingRequiredCoreIds(coreScan ? coreScan.themes : [])
   if (sorted.length === 0 || missing.length > 0) {
     console.error(
       sorted.length === 0

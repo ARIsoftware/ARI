@@ -136,6 +136,7 @@ export function ThemeProvider({ children, isAuthenticated: isAuthProp, isAuthLoa
         if (theme) {
           applyThemeColors(theme.colors)
           applyDarkModeClass(theme.category === 'dark', settings.activeThemeId)
+          applyFontSize(theme.defaultFontSize)
         }
         applyFont(settings.activeFont || DEFAULT_FONT_ID)
       } catch (e) {
@@ -231,6 +232,11 @@ export function ThemeProvider({ children, isAuthenticated: isAuthProp, isAuthLoa
         if (theme) {
           applyThemeColors(theme.colors)
           applyDarkModeClass(theme.category === 'dark', settings.activeThemeId)
+          // Apply (or clear) the theme's font-size override here too — setTheme
+          // only runs on explicit switches, so without this a fresh device with
+          // a server-saved font-sized theme (e.g. 8-bit) rendered at the
+          // default size, and a stale cross-device cache kept the wrong size.
+          applyFontSize(theme.defaultFontSize)
         }
         applyFont(settings.activeFont || DEFAULT_FONT_ID)
 

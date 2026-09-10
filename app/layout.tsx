@@ -11,6 +11,7 @@ import "./globals.css"
 // themes-custom/ + themes-core/ — must load after globals.css.
 import "../lib/generated/theme-styles.css"
 import { THEME_PRESETS } from "@/lib/theme/presets"
+import { FONTS } from "@/lib/theme/fonts"
 
 // Force dynamic rendering to ensure auth state is fresh on every request
 export const dynamic = 'force-dynamic'
@@ -52,10 +53,13 @@ export default async function RootLayout({
     // User not authenticated or error fetching - sidebar will load without modules
   }
 
-  // Theme-id → font-size map for the pre-paint script below, derived from the
-  // theme registry so file-based themes (core or custom) that set a
-  // defaultFontSize are honored before hydration. `<` is escaped so theme data
-  // can never terminate the inline <script>.
+  // Maps for the pre-paint script below, derived from the canonical sources
+  // (lib/theme/fonts.ts and the theme registry) so file-based themes and new
+  // fonts are honored before hydration without hand-maintaining duplicates.
+  // `<` is escaped so the data can never terminate the inline <script>.
+  const prePaintFonts = JSON.stringify(
+    Object.fromEntries(FONTS.map((f) => [f.id, f.family]))
+  ).replace(/</g, '\\u003c')
   const themeFontSizes = JSON.stringify(
     Object.fromEntries(
       THEME_PRESETS.filter((p) => p.defaultFontSize).map((p) => [p.id, p.defaultFontSize])
@@ -83,7 +87,7 @@ export default async function RootLayout({
             Mirrors the theme cache in localStorage['ari-theme-cache']. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var c=localStorage.getItem('ari-theme-cache');if(c){var s=JSON.parse(c);var fonts={'overpass-mono':'"Overpass Mono", monospace','geist':'"Geist", sans-serif','geist-mono':'"Geist Mono", monospace','open-sans':'"Open Sans", sans-serif','outfit':'"Outfit", sans-serif','science-gothic':'"Science Gothic", sans-serif','inter':'"Inter", sans-serif','jetbrains-mono':'"JetBrains Mono", monospace','ibm-plex-sans':'"IBM Plex Sans", sans-serif','fira-code':'"Fira Code", monospace','crimson-pro':'"Crimson Pro", serif','hanken-grotesk':'"Hanken Grotesk", sans-serif','space-grotesk':'"Space Grotesk", sans-serif','press-start-2p':'"Press Start 2P", monospace'};var themeFontSize=${themeFontSizes};if(s.activeFont&&fonts[s.activeFont]){document.documentElement.style.setProperty('--font-family',fonts[s.activeFont])}if(s.activeThemeId&&themeFontSize[s.activeThemeId]){document.documentElement.style.fontSize=themeFontSize[s.activeThemeId]}}}catch(e){}})();`,
+            __html: `(function(){try{var c=localStorage.getItem('ari-theme-cache');if(c){var s=JSON.parse(c);var fonts=${prePaintFonts};var themeFontSize=${themeFontSizes};if(s.activeFont&&fonts[s.activeFont]){document.documentElement.style.setProperty('--font-family',fonts[s.activeFont])}if(s.activeThemeId&&themeFontSize[s.activeThemeId]){document.documentElement.style.fontSize=themeFontSize[s.activeThemeId]}}}catch(e){}})();`,
           }}
         />
       </head>

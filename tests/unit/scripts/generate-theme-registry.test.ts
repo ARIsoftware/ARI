@@ -16,7 +16,9 @@ import {
   toPreset,
   renderRegistry,
   renderStyles,
+  missingRequiredCoreIds,
 } from '@/scripts/generate-theme-registry.js'
+import { CSS_VAR_MAP } from '@/lib/theme/types'
 
 function makeColors(overrides: Record<string, string> = {}) {
   const colors: Record<string, string> = {}
@@ -54,6 +56,29 @@ describe('constants', () => {
     expect(REQUIRED_COLOR_KEYS).toContain('popoverForeground')
     expect(REQUIRED_COLOR_KEYS).toContain('radius')
     expect(OPTIONAL_COLOR_KEYS).toEqual(['topbarBackground', 'topbarForeground'])
+  })
+
+  it('stays in sync with CSS_VAR_MAP — drift would silently break user themes on upgrade', () => {
+    // The generator's key list hand-mirrors ThemeColors; if a token is added
+    // to lib/theme/types.ts without updating the generator, every theme
+    // carrying it would be rejected as "not a recognized token".
+    expect(new Set([...REQUIRED_COLOR_KEYS, ...OPTIONAL_COLOR_KEYS])).toEqual(
+      new Set(Object.keys(CSS_VAR_MAP)),
+    )
+  })
+})
+
+describe('missingRequiredCoreIds', () => {
+  it('reports ids absent from the core scan even when a custom theme provides them', () => {
+    // Required ids must live in themes-core itself: an untracked themes-custom
+    // copy vanishes on fresh clones and Vercel deploys.
+    const core = [{ id: 'default' }, { id: 'dark' }, { id: 'light' }]
+    expect(missingRequiredCoreIds(core)).toEqual(['sovereign-day'])
+    expect(missingRequiredCoreIds([])).toEqual(REQUIRED_THEME_IDS)
+  })
+
+  it('returns empty when all required ids are shipped', () => {
+    expect(missingRequiredCoreIds(REQUIRED_THEME_IDS.map((id: string) => ({ id })))).toEqual([])
   })
 })
 
@@ -114,6 +139,31 @@ describe('validateTheme', () => {
     expect(errors.join()).toContain('colors.background')
   })
 
+  it('rejects hex and hsl()-wrapped color values (the most likely paste mistake)', () => {
+    expect(
+      validateTheme(makeTheme({ colors: makeColors({ background: '#0f172a' }) })).join(),
+    ).toContain('colors.background must be HSL components')
+    expect(
+      validateTheme(makeTheme({ colors: makeColors({ primary: 'hsl(222 47% 11%)' }) })).join(),
+    ).toContain('colors.primary must be HSL components')
+  })
+
+  it('accepts decimal HSL components and exempts radius from the format check', () => {
+    expect(validateTheme(makeTheme({ colors: makeColors({ border: '134 100% 74.5%' }) }))).toEqual(
+      [],
+    )
+    expect(validateTheme(makeTheme({ colors: makeColors({ radius: '0.625rem' }) }))).toEqual([])
+  })
+
+  it('rejects unknown top-level fields (typos would otherwise vanish silently)', () => {
+    expect(validateTheme(makeTheme({ Order: 25 })).join()).toContain(
+      '"Order" is not a recognized field',
+    )
+    expect(validateTheme(makeTheme({ defaultFontsize: '13.5px' })).join()).toContain(
+      '"defaultFontsize" is not a recognized field',
+    )
+  })
+
   it('rejects unrecognized and mistyped color tokens', () => {
     expect(validateTheme(makeTheme({ colors: makeColors({ glow: '1 2% 3%' }) })).join()).toContain(
       'colors.glow is not a recognized token',
@@ -137,6 +187,25 @@ describe('cssBracesBalanced', () => {
   it('rejects unbalanced braces in either direction', () => {
     expect(cssBracesBalanced('a { color: red')).toBe(false)
     expect(cssBracesBalanced('a } b {')).toBe(false)
+  })
+
+  it('ignores braces inside comments (valid css with { in a comment passes)', () => {
+    expect(
+      cssBracesBalanced("/* fixes the { layout bug */ [data-theme='x'] a { color: red }"),
+    ).toBe(true)
+  })
+
+  it('ignores braces inside string literals', () => {
+    expect(cssBracesBalanced('a { content: "{" }')).toBe(true)
+    expect(cssBracesBalanced("a { background: url('img{1}.png') }")).toBe(true)
+  })
+
+  it('rejects an unterminated comment (would swallow every theme after it)', () => {
+    expect(cssBracesBalanced('a { color: red }\n/* stray')).toBe(false)
+  })
+
+  it('rejects an unterminated string', () => {
+    expect(cssBracesBalanced('a { content: "oops }')).toBe(false)
   })
 })
 
@@ -170,10 +239,39 @@ describe('findUnscopedSelectors', () => {
     ])
   })
 
-  it('ignores comments and skips at-rule preludes', () => {
+  it('ignores comments and accepts scoped rules inside at-rule blocks', () => {
     const css =
       '/* .decoy { } */\n@media (min-width: 1px) {\n  [data-theme="terminal"] a { color: red }\n}'
     expect(findUnscopedSelectors(css, 'terminal')).toEqual([])
+  })
+
+  it('flags unscoped rules inside @media/@supports blocks', () => {
+    expect(findUnscopedSelectors('@media (min-width: 1px) { .leak { color: red } }', 't')).toEqual([
+      '.leak',
+    ])
+    expect(findUnscopedSelectors('@supports (display: grid) { body { margin: 0 } }', 't')).toEqual([
+      'body',
+    ])
+  })
+
+  it('flags an unscoped member of a comma-separated selector list', () => {
+    expect(findUnscopedSelectors('body, [data-theme="t"] main { color: red }', 't')).toEqual([
+      'body',
+    ])
+  })
+
+  it('does not split commas inside :is() or attribute selectors', () => {
+    expect(findUnscopedSelectors('[data-theme="t"] :is(a, b) { color: red }', 't')).toEqual([])
+  })
+
+  it('is not masked by a preceding statement at-rule like @import', () => {
+    expect(findUnscopedSelectors('@import url(x);\n.foo { color: red }', 't')).toEqual(['.foo'])
+  })
+
+  it('does not flag @keyframes frames or @font-face contents', () => {
+    const css =
+      '@keyframes spin { 0% { opacity: 0 } 100% { opacity: 1 } }\n@font-face { font-family: X; src: url(y) }'
+    expect(findUnscopedSelectors(css, 't')).toEqual([])
   })
 })
 
@@ -255,13 +353,65 @@ describe('scanThemesDirectory', () => {
     expect(errors.join()).toContain('unbalanced braces')
   })
 
-  it('warns on folder/id mismatch (id wins) and unscoped selectors', () => {
+  it('warns on folder/id mismatch (id wins) and excludes unscoped custom css, keeping the colors', () => {
     writeTheme('themes-custom', 'folder-name', makeTheme({ id: 'real-id' }), '.leak { color: red }')
-    const { themes } = scanThemesDirectory('themes-custom', root)
+    const { themes, errors } = scanThemesDirectory('themes-custom', root)
+    expect(errors).toEqual([])
     expect(themes[0].id).toBe('real-id')
+    expect(themes[0].css).toBeNull() // leaking css must not restyle every theme
     const warnings = warnSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('\n')
     expect(warnings).toContain("doesn't match theme id")
+    expect(warnings).toContain('excluded')
     expect(warnings).toContain('not scoped')
+  })
+
+  it('treats unscoped css in themes-core as a hard error', () => {
+    writeTheme('themes-core', 'leaky', makeTheme({ id: 'leaky' }), 'body { color: red }')
+    const { themes, errors } = scanThemesDirectory('themes-core', root)
+    expect(themes).toEqual([])
+    expect(errors.join()).toContain('not scoped')
+  })
+
+  it('keeps a custom theme whose css is unbalanced, dropping only the css', () => {
+    writeTheme('themes-custom', 'busted', makeTheme({ id: 'busted' }), '[data-theme="busted"] a {')
+    const { themes, errors } = scanThemesDirectory('themes-custom', root)
+    expect(errors).toEqual([])
+    expect(themes[0].id).toBe('busted')
+    expect(themes[0].css).toBeNull()
+  })
+
+  it('keeps a custom theme whose theme.css exists but cannot be read (never breaks boot)', () => {
+    writeTheme('themes-custom', 'odd', makeTheme({ id: 'odd' }))
+    // a directory named theme.css passes an existence check but fails to read
+    fs.mkdirSync(path.join(root, 'themes-custom', 'odd', 'theme.css'))
+    const { themes, errors } = scanThemesDirectory('themes-custom', root)
+    expect(errors).toEqual([])
+    expect(themes[0].id).toBe('odd')
+    expect(themes[0].css).toBeNull()
+  })
+
+  it('scans a symlinked theme folder', () => {
+    writeTheme('themes-elsewhere', 'linked', makeTheme({ id: 'linked' }))
+    fs.mkdirSync(path.join(root, 'themes-custom'), { recursive: true })
+    fs.symlinkSync(
+      path.join(root, 'themes-elsewhere', 'linked'),
+      path.join(root, 'themes-custom', 'linked'),
+    )
+    const { themes } = scanThemesDirectory('themes-custom', root)
+    expect(themes.map((t: { id: string }) => t.id)).toEqual(['linked'])
+  })
+
+  it('skips a wrongly-cased Theme.json with a warning (would vanish on Linux otherwise)', () => {
+    const dir = path.join(root, 'themes-custom', 'cased')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'Theme.json'), JSON.stringify(makeTheme({ id: 'cased' })))
+    const { themes } = scanThemesDirectory('themes-custom', root)
+    // The scan matches the exact directory-listing name, so this is skipped
+    // consistently on every platform — never works-on-mac-vanishes-on-Linux.
+    expect(themes).toEqual([])
+    const warnings = warnSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('\n')
+    expect(warnings).toContain('theme.json')
+    expect(warnings).toContain('lowercase')
   })
 })
 
