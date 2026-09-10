@@ -8,13 +8,8 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { BarChart3, Loader2, Plus, Square, Volume2 } from 'lucide-react'
 import { useDefaultLayoutData, useListenBrief } from '@/modules/dashboard/hooks/use-default-layout'
-import {
-  ModuleWidgets,
-  TodaysBriefWidget,
-  TaskActivityWidget,
-  TasksStatCard,
-} from '@/modules/dashboard/components/module-widgets'
-import { SystemStatusCard } from '@/modules/dashboard/components/system-status-card'
+import { useDefaultLayoutCards } from '@/modules/dashboard/components/module-widgets'
+import { SortableCardStack } from '@/modules/dashboard/components/sortable-cards'
 import { QuickAddTaskContext } from '@/modules/tasks/components/quick-add-task-sheet'
 
 const FALLBACK_BRIEF_MESSAGE = 'Everything is structured and ready — steady focus, as always.'
@@ -70,6 +65,7 @@ export function DefaultDashboardLayout() {
     tasks,
     tasksLoading,
   } = useDefaultLayoutData()
+  const { leftCards, middleCards } = useDefaultLayoutCards()
 
   // Date and greeting depend on the client clock — set after mount so the
   // server render never disagrees with the browser's timezone.
@@ -148,26 +144,15 @@ export function DefaultDashboardLayout() {
 
         {/* Three-column layout */}
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-          {/* Left column */}
-          <div className="space-y-6 lg:col-span-3">
-            {/* The Tasks module's Total Tasks stat card */}
-            <TasksStatCard />
+          {/* Left column — cards reorder in drag mode (Cmd+D), saved as statCardOrder */}
+          <SortableCardStack items={leftCards} kind="stat" className="space-y-6 lg:col-span-3" />
 
-            {/* System health at a glance — badge links to /health */}
-            <SystemStatusCard className="rounded-lg" />
-
-            {/* Dashboard cards from every other enabled module (portfolio, ...) */}
-            <ModuleWidgets />
-          </div>
-
-          {/* Middle column */}
-          <div className="space-y-6 lg:col-span-6">
-            {/* The Today's Brief module's own dashboard widget */}
-            <TodaysBriefWidget />
-
-            {/* The Tasks module's activity chart widget */}
-            <TaskActivityWidget />
-          </div>
+          {/* Middle column — widgets reorder in drag mode, saved as widgetOrder */}
+          <SortableCardStack
+            items={middleCards}
+            kind="widget"
+            className="space-y-6 lg:col-span-6"
+          />
 
           {/* Right column */}
           <div className="lg:col-span-3">

@@ -9,8 +9,7 @@ import {
   closestCenter,
   type DragEndEvent,
 } from '@dnd-kit/core'
-import { SortableContext, rectSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+import { SortableContext, rectSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { useModules } from '@/lib/modules/module-hooks'
 import { useDragDropMode } from '@/components/drag-drop-mode-context'
 import {
@@ -18,6 +17,7 @@ import {
   MODULE_DASHBOARD_WIDGETS,
 } from '@/lib/generated/module-dashboard-registry'
 import { SystemStatusCard } from '@/modules/dashboard/components/system-status-card'
+import { SortableItem, SYSTEM_STATUS_KEY } from './sortable-cards'
 
 // Dynamic ESM imports have an unknown module shape; resolveComponent probes for `default` or any exported function.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -81,48 +81,6 @@ function DynamicWidget({ loader }: { loader: () => Promise<DynamicModule> }) {
     </div>
   )
 }
-
-// --- Sortable wrapper ---
-
-const DRAG_MODE_CLASS =
-  'outline outline-[3px] outline-[#60a5fa80] shadow-[0_0_12px_rgba(96,165,250,0.2)] rounded-[0.8rem] cursor-grab'
-
-function SortableItem({
-  id,
-  isDragMode,
-  fullHeight,
-  children,
-}: {
-  id: string
-  isDragMode: boolean
-  fullHeight?: boolean
-  children: React.ReactNode
-}) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id,
-  })
-
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.85 : 1,
-    zIndex: isDragging ? 9999 : undefined,
-  }
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className={`${fullHeight ? 'h-full' : ''} ${isDragMode ? DRAG_MODE_CLASS : ''}`.trim()}
-    >
-      {children}
-    </div>
-  )
-}
-
-const SYSTEM_STATUS_KEY = '__system-status__'
 
 // --- Stat cards with sorting + dynamic grid ---
 

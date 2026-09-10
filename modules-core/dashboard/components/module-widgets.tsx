@@ -6,6 +6,8 @@ import {
   MODULE_DASHBOARD_STAT_CARDS,
   MODULE_DASHBOARD_WIDGETS,
 } from '@/lib/generated/module-dashboard-registry'
+import { SystemStatusCard } from '@/modules/dashboard/components/system-status-card'
+import { SYSTEM_STATUS_KEY, type DashboardCard } from './sortable-cards'
 
 // Modules whose data is already hand-built into the Default layout — their
 // generic dashboard cards would duplicate what the page shows.
@@ -73,53 +75,15 @@ function collectLoaders(
 }
 
 /**
- * The Today's Brief module's own dashboard widget, loaded from the generated
- * registry. Renders nothing when the module is disabled.
+ * Builds the Default layout's card lists as keyed items so the columns can be
+ * reordered in drag mode. Keys match the Boxy layout's (`tasks-stat-0`,
+ * `__system-status__`, `<module>-widget-<i>`, ...), so a card that appears in
+ * both layouts shares one saved order.
  */
-export function TodaysBriefWidget() {
-  const { modules } = useModules()
-  const enabled = modules.some((m) => m.id === 'todays-brief' && m.dashboard?.widgets)
-  const loader = MODULE_DASHBOARD_WIDGETS['todays-brief']?.[0]
-  if (!enabled || !loader) return null
-  // Hide the widget's own Listen button — the Default layout has one in its header.
-  return (
-    <div className="[&_[data-brief-listen]]:hidden">
-      <DynamicWidget loader={loader} />
-    </div>
-  )
-}
-
-/**
- * The Tasks module's Total Tasks stat card (registry index 0). Renders
- * nothing when the module is disabled.
- */
-export function TasksStatCard() {
-  const { modules } = useModules()
-  const enabled = modules.some((m) => m.id === 'tasks' && m.dashboard?.widgets)
-  const loader = MODULE_DASHBOARD_STAT_CARDS['tasks']?.[0]
-  if (!enabled || !loader) return null
-  return <DynamicWidget loader={loader} />
-}
-
-/**
- * The Tasks module's Task Activity chart widget. The registry lists tasks
- * widgets as [dashboard-activity-widget, dashboard-radar-widget] — index 0
- * is Activity.
- */
-export function TaskActivityWidget() {
-  const { modules } = useModules()
-  const enabled = modules.some((m) => m.id === 'tasks' && m.dashboard?.widgets)
-  const loader = MODULE_DASHBOARD_WIDGETS['tasks']?.[0]
-  if (!enabled || !loader) return null
-  return <DynamicWidget loader={loader} />
-}
-
-/**
- * Renders the dashboard stat cards and widgets contributed by every other
- * enabled module (portfolio, daily-fitness, ...), straight from the generated
- * registry — new modules appear here with no changes to this page.
- */
-export function ModuleWidgets() {
+export function useDefaultLayoutCards(): {
+  leftCards: DashboardCard[]
+  middleCards: DashboardCard[]
+} {
   const { modules } = useModules()
 
   const enabledIds = useMemo(
@@ -127,27 +91,58 @@ export function ModuleWidgets() {
     [modules],
   )
 
-  const statLoaders = useMemo(
-    () => collectLoaders(MODULE_DASHBOARD_STAT_CARDS, enabledIds, 'stat'),
-    [enabledIds],
-  )
-  const widgetLoaders = useMemo(
-    () => collectLoaders(MODULE_DASHBOARD_WIDGETS, enabledIds, 'widget'),
-    [enabledIds],
-  )
+  return useMemo(() => {
+    const leftCards: DashboardCard[] = []
 
-  if (statLoaders.length === 0 && widgetLoaders.length === 0) return null
+    // The Tasks module's Total Tasks stat card (registry index 0)
+    const tasksStatLoader = MODULE_DASHBOARD_STAT_CARDS['tasks']?.[0]
+    if (enabledIds.has('tasks') && tasksStatLoader) {
+      leftCards.push({ key: 'tasks-stat-0', node: <DynamicWidget loader={tasksStatLoader} /> })
+    }
 
-  // A single vertical stack: rendered inside the page's narrow left column,
-  // where the widgets stay compact instead of sprawling across the page.
-  return (
-    <>
-      {statLoaders.map(({ key, loader }) => (
-        <DynamicWidget key={key} loader={loader} />
-      ))}
-      {widgetLoaders.map(({ key, loader }) => (
-        <DynamicWidget key={key} loader={loader} />
-      ))}
-    </>
-  )
+    // System health at a glance — badge links to /health
+    leftCards.push({
+      key: SYSTEM_STATUS_KEY,
+      node: <SystemStatusCard className="rounded-lg" />,
+    })
+
+    // Dashboard cards from every other enabled module (portfolio, ...),
+    // straight from the generated registry — new modules appear here with no
+    // changes to this page.
+    for (const { key, loader } of collectLoaders(MODULE_DASHBOARD_STAT_CARDS, enabledIds, 'stat')) {
+      leftCards.push({ key, node: <DynamicWidget loader={loader} /> })
+    }
+    for (const { key, loader } of collectLoaders(MODULE_DASHBOARD_WIDGETS, enabledIds, 'widget')) {
+      leftCards.push({ key, node: <DynamicWidget loader={loader} /> })
+    }
+
+    const middleCards: DashboardCard[] = []
+
+    // The Today's Brief module's own dashboard widget — its Listen button is
+    // hidden because the Default layout has one in its header.
+    const briefLoader = MODULE_DASHBOARD_WIDGETS['todays-brief']?.[0]
+    if (enabledIds.has('todays-brief') && briefLoader) {
+      middleCards.push({
+        key: 'todays-brief-widget-0',
+        node: (
+          <div className="[&_[data-brief-listen]]:hidden">
+            <DynamicWidget loader={briefLoader} />
+          </div>
+        ),
+      })
+    }
+
+    // The Tasks module's Task Activity chart widget. The registry lists tasks
+    // widgets as [dashboard-activity-widget, dashboard-radar-widget] — index 0
+    // is Activity.
+    const taskActivityLoader = MODULE_DASHBOARD_WIDGETS['tasks']?.[0]
+    if (enabledIds.has('tasks') && taskActivityLoader) {
+      middleCards.push({
+        key: 'tasks-widget-0',
+        node: <DynamicWidget loader={taskActivityLoader} />,
+      })
+    }
+
+    return { leftCards, middleCards }
+  }, [enabledIds])
 }
