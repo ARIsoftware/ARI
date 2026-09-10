@@ -52,7 +52,13 @@ function useFirstName() {
       if (!meRes.ok) return null
       const me = await meRes.json()
       const fallback = String(me.first_name ?? me.name ?? '').trim()
-      return fallback ? fallback.split(/\s+/)[0] : null
+      if (!fallback) return null
+      // Bootstrap stamps the account name from the email's local part
+      // ("hello@ari.software" → "hello") — that placeholder is not a real
+      // name, so greet without one.
+      const emailLocalPart = String(me.email ?? '').split('@')[0].trim()
+      if (fallback.toLowerCase() === emailLocalPart.toLowerCase()) return null
+      return fallback.split(/\s+/)[0]
     },
     staleTime: 5 * 60 * 1000,
   })

@@ -53,6 +53,21 @@ function firstName(raw: string | null | undefined): string | null {
   return trimmed.split(/\s+/)[0]
 }
 
+/**
+ * Bootstrap stamps the account name from the email's local part
+ * ("hello@ari.software" → "hello"). That placeholder is not a real name, so
+ * drop it and let the greeting render without one.
+ */
+function withoutEmailPlaceholder(
+  raw: string | null | undefined,
+  email: string | null | undefined,
+): string | null {
+  const trimmed = (raw ?? '').trim()
+  if (!trimmed) return null
+  const emailLocalPart = (email ?? '').split('@')[0].trim()
+  return trimmed.toLowerCase() === emailLocalPart.toLowerCase() ? null : trimmed
+}
+
 function buildGreetingLine(name: string | null): string {
   return name ? `Good Morning ${name}.` : 'Good Morning.'
 }
@@ -82,7 +97,7 @@ export async function GET(request: NextRequest) {
     const prefs = prefsRows[0]
     const timezone = prefs?.timezone || 'UTC'
     const displayName = firstName(prefs?.name)
-      ?? firstName(user.user_metadata?.full_name)
+      ?? firstName(withoutEmailPlaceholder(user.user_metadata?.full_name, user.email))
       ?? firstName(user.user_metadata?.first_name)
     const greeting = buildGreetingLine(displayName)
 
