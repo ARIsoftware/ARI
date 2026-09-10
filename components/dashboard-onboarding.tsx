@@ -166,11 +166,11 @@ export function DashboardOnboarding() {
       },
       {
         popover: {
-          title: "You're all set",
+          title: 'Open, Personal, and Full of Possibility',
           // driver.js renders description as HTML, so the docs link works here;
           // link styling lives under .ari-tour in globals.css.
           description:
-            'That’s the lay of the land. Make ARI yours - install modules, pick a theme, and arrange the dashboard the way you like it. Want to go deeper? <a href="https://ari.software/docs" target="_blank" rel="noopener noreferrer">Read the ARI docs</a> to learn how to use and manage ARI - and even create your own modules.',
+            'Make ARI yours - install modules, pick a theme, and arrange the dashboard the way you like it. Want to go deeper? <a href="https://ari.software/docs" target="_blank" rel="noopener noreferrer">Read the ARI docs</a> to learn how to use and manage ARI - and even create your own modules.',
         },
       },
     ]
@@ -191,6 +191,20 @@ export function DashboardOnboarding() {
       // sidebar (a bright line between sidebar and dimmed content).
       stagePadding: 0,
       stageRadius: 8,
+      // driver.js already makes the whole page inert while the tour runs
+      // (`.driver-active *` gets pointer-events: none) EXCEPT the highlighted
+      // element, which stays clickable by default. That's the one way a user
+      // can accidentally navigate away mid-tour - e.g. hitting a top-bar icon
+      // while step 3 highlights it - so opt the active element out too.
+      disableActiveInteraction: true,
+      // Clicking the dimmed area defaults to 'close', which is the only reason
+      // a stray click ended the tour - driver.js already swallows the click
+      // itself (capture-phase preventDefault on the whole page). A no-op hook
+      // makes the overlay fully inert, so the tour only ends via X / Done /
+      // Esc.
+      overlayClickBehavior: () => {
+        // intentionally does nothing
+      },
       nextBtnText: 'Next →',
       prevBtnText: '← Back',
       doneBtnText: 'Done',
@@ -211,7 +225,14 @@ export function DashboardOnboarding() {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && setClosed(true)}>
       {/* bg-black/55 matches the driver.js tour overlay (black at overlayOpacity 0.55) */}
-      <DialogContent className="sm:max-w-[36.4rem]" overlayClassName="bg-black/55">
+      <DialogContent
+        className="sm:max-w-[36.4rem]"
+        overlayClassName="bg-black/55"
+        // Radix dismisses on any outside pointer/focus interaction by default.
+        // Block it so the welcome popup can only be left via Start, "Don't show
+        // this again", the X, or Esc - matching the tour's inert overlay.
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         {/* Brand panel follows the active theme via the primary tokens (same
             pair as the Start button); the body inherits DialogContent's. */}
         <div className="ari-welcome-brand -mx-6 -mt-6 mb-2 flex items-center justify-center rounded-t-lg bg-primary py-16">
