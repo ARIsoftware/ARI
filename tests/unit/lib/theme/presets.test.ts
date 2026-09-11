@@ -19,6 +19,7 @@ const CORE_PRESETS: ThemePreset[] = coreScan.map((t: { theme: unknown }) =>
 const CORE_THEME_IDS = [
   'default',
   'dark',
+  'sunny',
   'blueprint',
   'light',
   'evening-light',
