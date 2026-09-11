@@ -6,15 +6,19 @@
  * merge, and `./ari fix-deps` runs it on demand.
  *
  * Because boot runs it on every start, it must stay quiet and idempotent when
- * there is nothing to do: a dep already recorded in ANY root dependency block
- * counts as present, and a range form this checker cannot parse is assumed
- * satisfied rather than reported (see the satisfies() note below).
+ * there is nothing to do: a dep already recorded in any installed root block
+ * (see ROOT_DEP_BLOCKS) counts as present and is left alone.
  *
  * Mirrors the conflict policy in lib/modules/npm-installer.ts but collects
  * conflicts in the return value instead of aborting, so the caller can keep
  * going. Only ever ADDS deps missing from every block — never edits or removes
  * an existing entry, and never copies one block's dep into another (that would
  * leave the same package in two blocks at two ranges).
+ *
+ * Nothing is ever assumed to be fine: a declared range semver-range cannot read
+ * lands in `invalid` (reported and skipped) rather than in `satisfied`, and a
+ * package two modules disagree on is dropped entirely — writing one module's
+ * spec would silently break the other at runtime.
  *
  * Returns:
  *   {
@@ -42,7 +46,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { satisfies, rangeAnchor } from './lib/semver-range.js';
+import { satisfies, rangeAnchor, isReadableRange } from './lib/semver-range.js';
 
 // Kept in sync with lib/modules/npm-installer.ts:29-32.
 const MAX_DEPS_PER_MODULE = 25;
@@ -50,16 +54,15 @@ const NPM_NAME_RE = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
 const FORBIDDEN_SPEC_TOKENS = ['git:', 'http:', 'https:', 'file:', 'link:', 'workspace:', 'npm:', '..'];
 const MAX_SPEC_LEN = 100;
 
-// Every block a dep can already be recorded in, lowest precedence first so
+// Blocks pnpm actually installs for this package, lowest precedence first so
 // `dependencies` wins the lookup. A dep found in any of these is "present" —
 // we never copy it into `dependencies`, which would leave the same package in
 // two blocks at two ranges. generate-module-registry.js:129 merges the same way.
-const ROOT_DEP_BLOCKS = [
-  'peerDependencies',
-  'optionalDependencies',
-  'devDependencies',
-  'dependencies',
-];
+//
+// `peerDependencies` is deliberately absent: pnpm resolves peers of your
+// dependencies, not a root package's own peer declarations, so treating one as
+// present would skip the install and leave the module unresolvable.
+const ROOT_DEP_BLOCKS = ['optionalDependencies', 'devDependencies', 'dependencies'];
 
 function emptyResult(extra) {
   return {
@@ -91,7 +94,6 @@ export function reconcileCustomModuleDeps(root) {
 
 function reconcileInner(pkgPath, customDir) {
   const rootPkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-  const rootDeps = { ...(rootPkg.dependencies || {}) };
   const rootSpecs = collectRootSpecs(rootPkg);
 
   const { declared, invalid, conflicts: interModuleConflicts } = collectModuleDeps(customDir);
@@ -109,30 +111,36 @@ function reconcileInner(pkgPath, customDir) {
       continue;
     }
     const anchor = rangeAnchor(current.spec);
-    // Two ways to be un-comparable, both treated as satisfied:
-    //   anchor === null  — existing form carries no version ("*", "", git URL)
-    //   satisfies(…) === null — declared range uses a form this checker does
-    //     not parse (">1.0.0", "1.x", "^1 || ^2", ">=1.0.0 <2.0.0", ranges).
-    // Only an explicit false is a real conflict. generate-module-registry.js:141
-    // makes the same call; guessing otherwise would print a false conflict on
-    // every boot for perfectly valid npm ranges.
-    if (anchor === null || satisfies(anchor, spec) !== false) {
+    if (anchor === null) {
+      // The existing entry carries no comparable version ("*", "", a git URL).
+      // Don't second-guess what the user pinned.
       satisfied.push(name);
       continue;
     }
-    conflicts.push({
-      name,
-      declared: spec,
-      existing: current.spec,
-      block: current.block,
-      sources,
-    });
+    const result = satisfies(anchor, spec);
+    if (result === true) {
+      satisfied.push(name);
+    } else if (result === false) {
+      conflicts.push({ name, declared: spec, existing: current.spec, block: current.block, sources });
+    } else {
+      // Defensive: collectModuleDeps rejects unreadable ranges up front, so this
+      // should be unreachable. If it ever fires, report rather than assume
+      // satisfied — assuming would silently accept a version mismatch.
+      invalid.push({
+        module: sources.join(', '),
+        name,
+        reason: `unreadable version range "${spec}"`,
+      });
+    }
   }
 
   if (added.length === 0) {
     return { ok: true, added, satisfied, conflicts, invalid, changed: false };
   }
 
+  // Only `dependencies` is ever written, so build that snapshot here rather
+  // than on every call — the common boot path adds nothing.
+  const rootDeps = { ...(rootPkg.dependencies || {}) };
   for (const { name, spec } of added) rootDeps[name] = spec;
   const sortedDeps = {};
   for (const k of Object.keys(rootDeps).sort()) sortedDeps[k] = rootDeps[k];
@@ -175,6 +183,9 @@ function collectModuleDeps(customDir) {
   const declared = new Map();
   const invalid = [];
   const conflicts = [];
+  // Packages two modules disagree on — removed from `declared` at the end so
+  // neither module's spec gets written.
+  const unresolvable = new Set();
 
   let entries;
   try {
@@ -194,8 +205,16 @@ function collectModuleDeps(customDir) {
     let raw;
     try {
       raw = fs.readFileSync(manifestPath, 'utf8');
-    } catch {
-      // No module.json at all — not a module directory. Silent by design.
+    } catch (err) {
+      // A missing module.json just means "not a module directory" — silent by
+      // design. Anything else (EISDIR, EACCES, a broken symlink) is a manifest
+      // that exists but could not be read, which must not pass unnoticed.
+      if (err && err.code === 'ENOENT') continue;
+      invalid.push({
+        module: moduleId,
+        name: '(manifest)',
+        reason: `could not read module.json (${(err && err.code) || 'unknown error'})`,
+      });
       continue;
     }
 
@@ -238,6 +257,14 @@ function collectModuleDeps(customDir) {
         invalid.push({ module: moduleId, name, reason: `contains forbidden token "${forbidden}"` });
         continue;
       }
+      // Reject here, before the package can be added: a range we cannot read is
+      // a range we cannot compare, so writing it would hand pnpm a spec nobody
+      // validated. Checking only at comparison time would miss every package
+      // that is absent from the root entirely.
+      if (!isReadableRange(spec)) {
+        invalid.push({ module: moduleId, name, reason: `unreadable version range "${spec}"` });
+        continue;
+      }
 
       const existing = declared.get(name);
       if (!existing) {
@@ -245,11 +272,8 @@ function collectModuleDeps(customDir) {
         continue;
       }
 
-      // Two modules want the same package. First declaration wins; the second
-      // is logged either as a peer source (compatible) or as a conflict
-      // (incompatible). We anchor on the first declaration's spec.
-      // Same un-comparable-is-satisfied rule as the root comparison above:
-      // only an explicit false counts as an inter-module conflict.
+      // Two modules want the same package. We anchor on the first declaration's
+      // spec; a compatible second declaration just adds a source.
       const firstAnchor = rangeAnchor(existing.spec);
       const compatible = firstAnchor === null || satisfies(firstAnchor, spec) !== false;
       if (compatible) {
@@ -261,9 +285,15 @@ function collectModuleDeps(customDir) {
           existing: existing.spec,
           sources: [moduleId, ...existing.sources],
         });
+        // Installing either spec silently breaks the other module at runtime,
+        // which is harder to diagnose than the "Module not found" this whole
+        // path exists to prevent. Drop the package and let the user choose.
+        unresolvable.add(name);
       }
     }
   }
+
+  for (const name of unresolvable) declared.delete(name);
 
   return { declared, invalid, conflicts };
 }

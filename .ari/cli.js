@@ -116,15 +116,25 @@ function logReconcileResult(result, log) {
     log('  ' + GREEN + '✔' + RESET + ` Synced ${result.added.length} custom-module dep(s): ${names}`);
   }
   for (const c of result.conflicts) {
-    // `block` is set only on root-vs-module conflicts. Naming it matters when
-    // it isn't `dependencies` — otherwise "package.json has ^0.170.0" sends the
-    // user looking in the wrong section.
-    const where = c.block && c.block !== 'dependencies' ? `package.json ${c.block}` : 'package.json';
-    log('  ' + YELLOW + '⚠' + RESET + ` ${c.name}: module wants ${c.declared}, ${where} has ${c.existing}`);
+    // `block` is present only on root-vs-module conflicts; without it the other
+    // range belongs to a sibling module, not package.json. Saying "package.json
+    // has <spec>" in that case points the user at a file that never held it.
+    if (c.block) {
+      const where = c.block === 'dependencies' ? 'package.json' : `package.json ${c.block}`;
+      log('  ' + YELLOW + '⚠' + RESET + ` ${c.name}: module wants ${c.declared}, ${where} has ${c.existing}`);
+    } else {
+      log('  ' + YELLOW + '⚠' + RESET + ` ${c.name}: modules disagree — one wants ${c.declared}, another wants ${c.existing}`);
+      log('  ' + DIM + '  Skipped; pin the same range in both modules.' + RESET);
+    }
     log('  ' + DIM + '  Source(s): ' + c.sources.join(', ') + RESET);
   }
   for (const inv of result.invalid) {
-    log('  ' + YELLOW + '⚠' + RESET + ` ${inv.module}: skipped invalid dep "${inv.name}" (${inv.reason})`);
+    // '(manifest)' entries mean the whole module was skipped, not one dep.
+    if (inv.name === '(manifest)') {
+      log('  ' + YELLOW + '⚠' + RESET + ` ${inv.module}: skipped module (${inv.reason})`);
+    } else {
+      log('  ' + YELLOW + '⚠' + RESET + ` ${inv.module}: skipped dep "${inv.name}" (${inv.reason})`);
+    }
   }
 }
 
@@ -397,7 +407,10 @@ function start(opts = {}) {
   if (!quiet) console.log('  Installing dependencies...');
   let installOk = true;
   try {
-    const out = execSync('pnpm install --prefer-offline', {
+    // --no-frozen-lockfile because the reconciler above may have just rewritten
+    // package.json: pnpm defaults frozen-lockfile to true whenever CI is set,
+    // and would refuse the very install that picks up the new dep.
+    const out = execSync('pnpm install --prefer-offline --no-frozen-lockfile', {
       stdio: ['ignore', 'pipe', 'pipe'],
       cwd: ROOT,
       encoding: 'utf8',
@@ -408,12 +421,22 @@ function start(opts = {}) {
         : 'Dependencies installed';
       console.log('  ' + GREEN + '✔' + RESET + ' ' + label);
     }
-  } catch {
+  } catch (err) {
     installOk = false;
     stopSpinner();
     console.log('  ' + YELLOW + '⚠' + RESET + ' pnpm install failed — continuing with existing node_modules');
-    console.log('  ' + DIM + 'Likely offline or registry unreachable. If the dev server hits a' + RESET);
-    console.log('  ' + DIM + '"Module not found" error, run `pnpm install` manually.' + RESET);
+    // Print pnpm's own diagnosis rather than guessing. Guessing "probably
+    // offline" is wrong whenever a module declared a package that does not
+    // exist, and on later boots the reconciler is silent (nothing new to add),
+    // so this is the only place the real cause can surface.
+    const detail = String((err && (err.stderr || err.stdout)) || '').trim();
+    const lines = detail.split('\n').filter((l) => l.trim()).slice(-4);
+    if (lines.length > 0) {
+      for (const line of lines) console.log('  ' + DIM + line.slice(0, 200) + RESET);
+    } else {
+      console.log('  ' + DIM + 'Likely offline or registry unreachable.' + RESET);
+    }
+    console.log('  ' + DIM + 'If the dev server hits "Module not found", run `pnpm install` manually.' + RESET);
     if (quiet) startSpinner('Starting ARI');
   }
 
@@ -794,10 +817,12 @@ async function update() {
   console.log('  Reconciling custom module dependencies...');
   logReconcileResult(reconcileCustomModuleDeps(ROOT), (msg) => console.log(msg));
 
-  // Install dependencies
+  // Install dependencies. --no-frozen-lockfile for the same reason as in
+  // start(): the reconcile above can leave package.json ahead of the lockfile,
+  // and pnpm freezes by default when CI is set.
   console.log('  Installing dependencies...');
   try {
-    execSync('pnpm install', { stdio: 'inherit', cwd: ROOT });
+    execSync('pnpm install --no-frozen-lockfile', { stdio: 'inherit', cwd: ROOT });
   } catch {
     console.log('  ' + RED + '✘' + RESET + ' pnpm install failed');
     process.exit(1);
@@ -825,7 +850,9 @@ function fixDeps() {
   if (result.changed) {
     console.log('  Installing dependencies...');
     try {
-      execSync('pnpm install', { stdio: 'inherit', cwd: ROOT });
+      // --no-frozen-lockfile: we just rewrote package.json, and pnpm freezes by
+      // default when CI is set, which would reject this install.
+      execSync('pnpm install --no-frozen-lockfile', { stdio: 'inherit', cwd: ROOT });
       console.log('  ' + GREEN + '✔' + RESET + ' Dependencies installed');
     } catch {
       console.log('  ' + RED + '✘' + RESET + ' pnpm install failed');

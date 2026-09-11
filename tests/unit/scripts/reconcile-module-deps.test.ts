@@ -104,8 +104,8 @@ describe('adding missing deps', () => {
   })
 })
 
-describe('every root dependency block counts as present', () => {
-  it.each([['devDependencies'], ['optionalDependencies'], ['peerDependencies']])(
+describe('every installed root dependency block counts as present', () => {
+  it.each([['devDependencies'], ['optionalDependencies']])(
     'a compatible dep in %s is satisfied, not re-added',
     (block) => {
       const root = makeProject(
@@ -157,23 +157,93 @@ describe('every root dependency block counts as present', () => {
     expect(result.conflicts).toEqual([])
     expect(result.satisfied).toEqual(['three'])
   })
+
+  it('does not treat peerDependencies as present, since pnpm never installs them', () => {
+    const root = makeProject(
+      { name: 'ari', dependencies: {}, peerDependencies: { react: '^19.0.0' } },
+      { mymod: { npmDependencies: { react: '^19.0.0' } } },
+    )
+    const result = reconcileCustomModuleDeps(root)
+
+    expect(result.satisfied).toEqual([])
+    expect(result.added).toEqual([{ name: 'react', spec: '^19.0.0', sources: ['mymod'] }])
+    expect(readPkg(root).dependencies).toEqual({ react: '^19.0.0' })
+  })
 })
 
-describe('un-comparable ranges are not conflicts', () => {
-  it.each([['>1.0.0'], ['1.x'], ['^1 || ^2'], ['>=1.0.0 <2.0.0'], ['1.2.3 - 2.0.0']])(
-    'treats the unparseable declared range %s as satisfied',
+describe('range comparison', () => {
+  // Root pins 1.5.0. These ranges all include it, so they are satisfied — and
+  // crucially they are evaluated, not waved through for being hard to parse.
+  it.each([
+    ['>1.0.0'],
+    ['1.x'],
+    ['^1 || ^2'],
+    ['>=1.0.0 <2.0.0'],
+    ['1.2.3 - 2.0.0'],
+    ['~1.5.0'],
+    ['1.5'],
+    ['>=1.5.0'],
+  ])('accepts the satisfied range %s without a warning', (spec) => {
+    const root = makeProject(
+      { name: 'ari', dependencies: { pkg: '^1.5.0' } },
+      { mymod: { npmDependencies: { pkg: spec } } },
+    )
+    const result = reconcileCustomModuleDeps(root)
+
+    expect(result.conflicts).toEqual([])
+    expect(result.invalid).toEqual([])
+    expect(result.satisfied).toEqual(['pkg'])
+    expect(result.changed).toBe(false)
+  })
+
+  // The regression that matters: these plainly exclude the root's 19.2.0 and
+  // must not be silently accepted just because they are not caret ranges.
+  it.each([['18.x'], ['>=16 <18'], ['^17 || ^18'], ['16.0.0 - 18.9.9'], ['<19.0.0'], ['~18.2.0']])(
+    'reports the conflicting range %s instead of assuming it is fine',
     (spec) => {
       const root = makeProject(
-        { name: 'ari', dependencies: { pkg: '^1.5.0' } },
-        { mymod: { npmDependencies: { pkg: spec } } },
+        { name: 'ari', dependencies: { react: '^19.2.0' } },
+        { mymod: { npmDependencies: { react: spec } } },
       )
       const result = reconcileCustomModuleDeps(root)
 
-      expect(result.conflicts).toEqual([])
-      expect(result.satisfied).toEqual(['pkg'])
-      expect(result.changed).toBe(false)
+      expect(result.satisfied).toEqual([])
+      expect(result.conflicts).toHaveLength(1)
+      expect(result.conflicts[0]).toMatchObject({ name: 'react', declared: spec })
     },
   )
+
+  it('reports a range it cannot read as skipped, never as satisfied', () => {
+    const root = makeProject(
+      { name: 'ari', dependencies: { pkg: '^1.5.0' } },
+      { mymod: { npmDependencies: { pkg: '^not-a-version' } } },
+    )
+    const result = reconcileCustomModuleDeps(root)
+
+    expect(result.satisfied).toEqual([])
+    expect(result.conflicts).toEqual([])
+    expect(result.invalid).toEqual([
+      { module: 'mymod', name: 'pkg', reason: 'unreadable version range "^not-a-version"' },
+    ])
+    expect(result.changed).toBe(false)
+  })
+
+  it('rejects an unreadable range even when the package is absent from the root', () => {
+    // The comparison path never runs for a missing package, so the range has to
+    // be validated up front or an unchecked spec gets written and pnpm chokes.
+    const root = makeProject(
+      { name: 'ari', dependencies: {} },
+      { mymod: { npmDependencies: { weird: '^not-a-version' } } },
+    )
+    const result = reconcileCustomModuleDeps(root)
+
+    expect(result.added).toEqual([])
+    expect(result.changed).toBe(false)
+    expect(result.invalid).toEqual([
+      { module: 'mymod', name: 'weird', reason: 'unreadable version range "^not-a-version"' },
+    ])
+    expect(readPkg(root).dependencies).toEqual({})
+  })
 
   it.each([['*'], ['x'], ['latest'], ['']])(
     'treats the versionless existing spec %s as satisfied and never overwrites it',
@@ -280,6 +350,18 @@ describe('module directory scanning', () => {
     expect(result.added).toEqual([])
   })
 
+  it('reports a manifest that exists but cannot be read', () => {
+    // module.json as a directory: readFileSync fails with EISDIR, not ENOENT.
+    // Only the missing case may be silent.
+    const root = makeProject({ name: 'ari', dependencies: {} }, { weird: null })
+    fs.mkdirSync(path.join(root, 'modules-custom', 'weird', 'module.json'))
+    const result = reconcileCustomModuleDeps(root)
+
+    expect(result.invalid).toHaveLength(1)
+    expect(result.invalid[0]).toMatchObject({ module: 'weird', name: '(manifest)' })
+    expect(result.invalid[0].reason).toContain('could not read module.json')
+  })
+
   it('ignores a manifest with no or empty npmDependencies', () => {
     const root = makeProject(
       { name: 'ari', dependencies: {} },
@@ -374,21 +456,7 @@ describe('inter-module comparison', () => {
     expect(result.added[0].sources.sort()).toEqual(['a', 'b'])
   })
 
-  it('flags a floor the first-declared version cannot meet', () => {
-    // Anchoring is on the first declaration's concrete version, so ^3.22.0 vs
-    // ^3.23.0 is a conflict in one order and satisfied in the other. Pin the
-    // order by giving only one module a manifest the other must clear.
-    const root = makeProject(
-      { name: 'ari', dependencies: { zod: '^3.22.0' } },
-      { a: { npmDependencies: { zod: '^3.23.0' } } },
-    )
-    const result = reconcileCustomModuleDeps(root)
-
-    expect(result.conflicts).toHaveLength(1)
-    expect(result.conflicts[0]).toMatchObject({ name: 'zod', block: 'dependencies' })
-  })
-
-  it('reports two modules wanting incompatible majors', () => {
+  it('writes neither spec when two modules want incompatible majors', () => {
     const root = makeProject(
       { name: 'ari', dependencies: {} },
       {
@@ -400,11 +468,30 @@ describe('inter-module comparison', () => {
 
     expect(result.conflicts).toHaveLength(1)
     expect(result.conflicts[0].name).toBe('zod')
-    // Module-vs-module conflicts carry no root block.
+    // Module-vs-module conflicts carry no root block — the other range belongs
+    // to a sibling module, not package.json.
     expect(result.conflicts[0].block).toBeUndefined()
+    // Picking a side would silently break the losing module at runtime.
+    expect(result.added).toEqual([])
+    expect(result.changed).toBe(false)
+    expect(readPkg(root).dependencies).toEqual({})
   })
 
-  it('does not report a conflict when one side uses an unparseable range', () => {
+  it('still adds the other deps of modules that disagree on one package', () => {
+    const root = makeProject(
+      { name: 'ari', dependencies: {} },
+      {
+        a: { npmDependencies: { zod: '^3.22.0', axios: '^1.0.0' } },
+        b: { npmDependencies: { zod: '^4.0.0', dayjs: '^1.11.0' } },
+      },
+    )
+    const result = reconcileCustomModuleDeps(root)
+
+    expect(result.added.map((a: { name: string }) => a.name).sort()).toEqual(['axios', 'dayjs'])
+    expect(Object.keys(readPkg(root).dependencies).sort()).toEqual(['axios', 'dayjs'])
+  })
+
+  it('accepts a compatible second declaration expressed as a different range form', () => {
     const root = makeProject(
       { name: 'ari', dependencies: {} },
       {
@@ -412,7 +499,10 @@ describe('inter-module comparison', () => {
         b: { npmDependencies: { zod: '>=3.20.0 <4' } },
       },
     )
-    expect(reconcileCustomModuleDeps(root).conflicts).toEqual([])
+    const result = reconcileCustomModuleDeps(root)
+
+    expect(result.conflicts).toEqual([])
+    expect(result.added).toHaveLength(1)
   })
 })
 

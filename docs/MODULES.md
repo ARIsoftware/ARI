@@ -386,16 +386,19 @@ If a declared dependency conflicts with an incompatible version already in root 
 
 A module copied into `modules-custom/` by hand (git clone, shared folder) never went through the marketplace install, so its `npmDependencies` are not yet in root `package.json`. `./ari start` syncs them automatically before its dependency install, so a plain restart is enough. `./ari fix-deps` runs the same sync explicitly.
 
-Because it runs on every boot, this path is deliberately conservative:
+Because it runs on every boot, this path is deliberately conservative. It only ever **adds** a package that is missing; it never edits, removes, or moves an existing entry, and it never aborts startup (the marketplace install does abort). Anything it cannot resolve safely is reported as a warning and skipped:
 
-- A package already recorded in **any** root block (`dependencies`, `devDependencies`, `optionalDependencies`, `peerDependencies`) counts as present and is left alone. It is never copied into `dependencies`, which would leave one package in two blocks at two ranges. This is why a module declaring `@types/three` does not add a runtime dependency when the host already carries it as a devDependency.
-- Version conflicts never abort startup (the marketplace install does abort) — they print a warning naming the block that already holds the package, and the fix is left to you.
-- Range forms the bundled checker cannot parse (`>1.0.0`, `1.x`, `^1 || ^2`, `>=1.0.0 <2.0.0`) are assumed satisfied rather than reported, so valid ranges don't produce a warning on every start.
-- Dot-prefixed directories are skipped, matching the module scanner — renaming a module to `.old-thing` shelves its dependencies too.
+- A package already recorded in `dependencies`, `devDependencies`, or `optionalDependencies` counts as present and is left alone — it is never copied into `dependencies`, which would leave one package in two blocks at two ranges. This is why a module declaring `@types/three` adds no runtime dependency when the host already carries it as a devDependency. Caveat: a genuinely runtime package that the host happens to keep in `devDependencies` is also treated as present, so a production install (`pnpm install --prod`) would omit it. Modules should declare only real runtime packages.
+- `peerDependencies` is **not** consulted. pnpm resolves the peers of your dependencies, not a root package's own peer declarations, so counting one as present would skip the install and leave the module unresolvable.
+- A version conflict with the root prints a warning naming the block that already holds the package, and the fix is left to you.
+- If two modules declare incompatible ranges for the same package, neither is written — installing either one silently breaks the other module at runtime, which is harder to diagnose than a missing package. Pin the same range in both.
+- A version range the bundled checker cannot read is reported as skipped, never assumed to be fine. The checker understands exact, partial and x-ranges (`1`, `1.2`, `1.x`), caret, tilde, `>`/`>=`/`<`/`<=`/`=`, space-separated AND (`>=1.0.0 <2.0.0`), hyphen ranges (`1.2.3 - 2.0.0`), and `||`.
+- Dot-prefixed directories are skipped, matching the module scanner, so renaming a module to `.old-thing` stops it contributing new dependencies. Entries an earlier boot already wrote to `package.json` stay there — remove those yourself.
+- A `module.json` that is missing is silently ignored (the directory simply isn't a module). One that exists but cannot be read or parsed is reported, and the whole module is skipped.
 
 **Unsupported (v1):**
 
-- `devDependencies` / `peerDependencies` — not modeled. Modules ship type imports for compile-time use only, so the host project's existing `@types/*` install is responsible.
+- Declaring `devDependencies` / `peerDependencies` **from a module** — `npmDependencies` is a single flat map of runtime packages. (The host's own dev/optional blocks *are* consulted when deciding whether a package is already present; see above.)
 - Non-semver specifiers (git URLs, local paths) — rejected for safety. Modules should pin to published npm packages.
 
 ### Route Configuration
