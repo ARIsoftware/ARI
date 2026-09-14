@@ -293,3 +293,57 @@ describe('sslConfigFor', () => {
     })
   })
 })
+
+// ── createConfiguredPool (shared factory for the privileged + app pools) ─────
+
+describe('createConfiguredPool', () => {
+  it('applies the shared tuning on top of a discrete (app role) config', async () => {
+    const { createConfiguredPool } = await loadPool({ databaseUrl: undefined, nodeEnv: 'test' })
+    capturedPoolOptions = null
+    const p = createConfiguredPool(
+      { host: 'db.example.com', port: 6543, database: 'postgres', user: 'ari_app.ref', password: 'pw', ssl: { rejectUnauthorized: false }, max: 4 },
+      'App Pool'
+    )
+    expect(p).not.toBeNull()
+    expect(capturedPoolOptions).toEqual({
+      host: 'db.example.com',
+      port: 6543,
+      database: 'postgres',
+      user: 'ari_app.ref',
+      password: 'pw',
+      ssl: { rejectUnauthorized: false },
+      max: 4,
+      idleTimeoutMillis: 10000,
+      connectionTimeoutMillis: 15000,
+      allowExitOnIdle: true,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10000,
+    })
+    expect(mockPoolInstance.on).toHaveBeenCalledWith('error', expect.any(Function))
+  })
+
+  it('uses the production idle timeout and validates connections for factory-built pools too', async () => {
+    const { createConfiguredPool } = await loadPool({ databaseUrl: undefined, nodeEnv: 'production' })
+    capturedPoolOptions = null
+    const p = createConfiguredPool({ connectionString: 'postgresql://x@localhost/y', max: 2 })
+    expect(capturedPoolOptions!.idleTimeoutMillis).toBe(4000)
+
+    const clientQuery = vi.fn().mockResolvedValue({ rows: [] })
+    const rawClient = { query: clientQuery, release: vi.fn() }
+    mockPoolInstance.connect.mockResolvedValue(rawClient)
+    const client = await p.connect()
+    expect(clientQuery).toHaveBeenCalledWith('SELECT 1')
+    expect(client).toBe(rawClient)
+  })
+
+  it('labels the error handler per pool', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { createConfiguredPool } = await loadPool({ databaseUrl: undefined })
+    mockPoolInstance.on.mockClear()
+    createConfiguredPool({ connectionString: 'postgresql://x@localhost/y' }, 'App Pool')
+    const handler = mockPoolInstance.on.mock.calls.find((c: unknown[]) => c[0] === 'error')![1] as (e: Error) => void
+    handler(new Error('socket hang up'))
+    expect(warnSpy).toHaveBeenCalledWith('[App Pool] Unexpected connection error (will auto-recover):', 'socket hang up')
+    warnSpy.mockRestore()
+  })
+})

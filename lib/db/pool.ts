@@ -1,4 +1,4 @@
-import { Pool } from "pg"
+import { Pool, type PoolConfig } from "pg"
 
 declare global {
   // eslint-disable-next-line no-var
@@ -17,19 +17,20 @@ export function sslConfigFor(databaseUrl: string): false | { rejectUnauthorized:
     : { rejectUnauthorized: false }
 }
 
-function createPool(): Pool | null {
-  if (!process.env.DATABASE_URL) {
-    return null
-  }
-
+/**
+ * Build a pool with ARI's shared tuning. Used for the privileged pool below
+ * and for the non-BYPASSRLS app pool (lib/db/app-pool.ts) so both behave
+ * identically apart from the identity they connect with. `config` supplies
+ * that identity (a `connectionString`, or discrete host/user/password/...)
+ * plus `max` and `ssl`; everything else is fixed here.
+ */
+export function createConfiguredPool(config: PoolConfig, label = "DB Pool"): Pool {
   // In serverless (Vercel), each lambda gets its own pool.
   // Many concurrent lambdas × large pool = connection exhaustion on the upstream Postgres.
   const isProduction = process.env.NODE_ENV === "production"
-  const defaultMax = isProduction ? 3 : 10
 
   const p = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    max: Number.parseInt(process.env.DATABASE_POOL_MAX || String(defaultMax), 10),
+    ...config,
     // Close idle connections quickly so they don't go stale while the lambda is warm.
     // Hosted-Postgres connection poolers (e.g. Supabase's PgBouncer) close backend
     // connections after their own idle timeout — if our client-side timeout is longer,
@@ -42,16 +43,30 @@ function createPool(): Pool | null {
     // "Connection terminated unexpectedly".
     keepAlive: true,
     keepAliveInitialDelayMillis: 10000,
-    ssl: sslConfigFor(process.env.DATABASE_URL),
   })
 
   p.on("error", (err) => {
-    console.warn("[DB Pool] Unexpected connection error (will auto-recover):", err.message)
+    console.warn(`[${label}] Unexpected connection error (will auto-recover):`, err.message)
   })
 
   addConnectionValidation(p)
 
   return p
+}
+
+function createPool(): Pool | null {
+  if (!process.env.DATABASE_URL) {
+    return null
+  }
+
+  const isProduction = process.env.NODE_ENV === "production"
+  const defaultMax = isProduction ? 3 : 10
+
+  return createConfiguredPool({
+    connectionString: process.env.DATABASE_URL,
+    max: Number.parseInt(process.env.DATABASE_POOL_MAX || String(defaultMax), 10),
+    ssl: sslConfigFor(process.env.DATABASE_URL),
+  })
 }
 
 /**

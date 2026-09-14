@@ -69,6 +69,14 @@ export const ENV_REGISTRY: readonly EnvVarSpec[] = [
       'Set to 1 to disable DB-level RLS enforcement: the ari_app role is neither provisioned nor used and every query runs on the DATABASE_URL role (kill switch — no code change needed)',
   },
   {
+    key: 'DATABASE_APP_POOL_MAX',
+    required: false,
+    sensitive: false,
+    group: 'database',
+    description:
+      'Max connections for the ari_app (RLS-enforced) pool; defaults to DATABASE_POOL_MAX, then 3 in production / 10 in development — a serverless instance holds both pools',
+  },
+  {
     key: 'ARI_FIRST_RUN_ADMIN_EMAIL',
     required: false,
     sensitive: false,

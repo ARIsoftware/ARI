@@ -2,6 +2,15 @@ import { drizzle } from 'drizzle-orm/node-postgres'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { type PoolClient } from 'pg'
 import { pool } from './pool'
+import {
+  closeAppPool,
+  getAppPoolIfHealthy,
+  noteAppPoolConnectFailure,
+  noteFallback,
+  noteGrantMissRetry,
+} from './app-pool'
+import { ensureAppGrants } from './app-role'
+import { getErrorMessages, getPgError } from './postgres-error'
 
 // Type for the Drizzle database instance
 export type DrizzleDb = NodePgDatabase<Record<string, never>>
@@ -25,6 +34,42 @@ function pgBouncerCompat(client: PoolClient): PoolClient {
 }
 
 /**
+ * Check if an error indicates a dead/stale connection (closed by PgBouncer
+ * while the pool still held a reference to it). Drizzle wraps pg errors in
+ * DrizzleQueryError ("Failed query: …" with the real error on `cause`), so
+ * every message along the cause chain is checked.
+ */
+function isStaleConnectionError(error: any): boolean {
+  return getErrorMessages(error).some(
+    (msg) =>
+      msg.includes('Connection terminated unexpectedly') ||
+      msg.includes('Connection terminated due to connection timeout') ||
+      msg.includes('connection is closed') ||
+      msg.includes('Client has encountered a connection error')
+  )
+}
+
+/**
+ * SQLSTATE 42501 is shared by two very different errors:
+ *   - `permission denied for table …` — a table created after the last grant
+ *     sweep (module install, backup restore) that the app role cannot see yet;
+ *   - `new row violates row-level security policy …` — an RLS WITH CHECK
+ *     denial, i.e. exactly what enforcement is for.
+ * Only the first is ever retried, and only on the app pool. Matching on the
+ * code alone would silently re-run rejected writes. Reads through Drizzle's
+ * wrapper (the SQLSTATE and message live on `cause`).
+ */
+export function isGrantMissError(error: unknown): boolean {
+  const pg = getPgError(error)
+  return (
+    !!pg &&
+    pg.code === '42501' &&
+    typeof pg.message === 'string' &&
+    /^permission denied for (table|relation|schema|function|sequence|view)\b/i.test(pg.message)
+  )
+}
+
+/**
  * Execute database operations with RLS user context.
  *
  * CRITICAL: This sets the user context for RLS policies.
@@ -32,6 +77,12 @@ function pgBouncerCompat(client: PoolClient): PoolClient {
  *
  * IMPORTANT: For INSERT operations, you must still set user_id explicitly!
  * RLS validates that user_id matches current_user_id, but doesn't auto-populate it.
+ *
+ * Runs on the non-BYPASSRLS app pool (lib/db/app-pool.ts) whenever it is
+ * healthy, so Postgres enforces the policies; otherwise on the privileged
+ * pool exactly as before (defense-in-depth only). The choice is made once,
+ * when the connection is acquired — an operation's outcome never moves it to
+ * the privileged pool.
  *
  * @example
  * ```ts
@@ -52,20 +103,6 @@ function pgBouncerCompat(client: PoolClient): PoolClient {
  * })
  * ```
  */
-/**
- * Check if an error indicates a dead/stale connection (closed by PgBouncer
- * while the pool still held a reference to it).
- */
-function isStaleConnectionError(error: any): boolean {
-  const msg = error?.message || ''
-  return (
-    msg.includes('Connection terminated unexpectedly') ||
-    msg.includes('Connection terminated due to connection timeout') ||
-    msg.includes('connection is closed') ||
-    msg.includes('Client has encountered a connection error')
-  )
-}
-
 export async function withUserContext<T>(
   userId: string,
   operation: (db: DrizzleDb) => Promise<T>,
@@ -75,12 +112,29 @@ export async function withUserContext<T>(
     throw new Error('Database pool not initialized')
   }
 
-  const p = pool // narrowed to non-null by the guard above
-  const attempt = async (isRetry: boolean): Promise<T> => {
+  const privileged = pool // narrowed to non-null by the guard above
+  const attempt = async (isRetry: boolean, grantSwept: boolean): Promise<T> => {
     let client: PoolClient | null = null
+    let enforced = false
 
     try {
-      const rawClient = await p.connect()
+      // Pool selection — connection level only.
+      const appPool = await getAppPoolIfHealthy()
+      let rawClient: PoolClient
+      if (appPool) {
+        try {
+          rawClient = await appPool.connect()
+          enforced = true
+        } catch (connectError) {
+          // Snoozes the app pool (and repairs the role on 28P01/28000);
+          // this call runs on the privileged pool.
+          noteAppPoolConnectFailure(connectError)
+          rawClient = await privileged.connect()
+        }
+      } else {
+        noteFallback()
+        rawClient = await privileged.connect()
+      }
       client = pgBouncerCompat(rawClient)
 
       // Begin transaction - SET LOCAL only lasts within transaction
@@ -98,6 +152,12 @@ export async function withUserContext<T>(
       if (role) {
         const escapedRole = role.replace(/'/g, "''")
         setContext += `; SET LOCAL app.current_user_role = '${escapedRole}'`
+      }
+      // app.enforced arms the ownership-immutability trigger on shared
+      // tables (lib/db/setup.sql). Set ONLY on the app pool, so the trigger
+      // activates exactly with enforcement and the kill switch disables both.
+      if (enforced) {
+        setContext += `; SET LOCAL app.enforced = 'on'`
       }
       await client.query(setContext)
 
@@ -126,7 +186,18 @@ export async function withUserContext<T>(
       if (!isRetry && isStaleConnectionError(error)) {
         if (client) client.release(true) // true = destroy, don't return to pool
         client = null // prevent double-release in finally
-        return attempt(true)
+        return attempt(true, grantSwept)
+      }
+
+      // A table the app role has not been granted yet (created after the last
+      // sweep): sweep synchronously and retry ONCE — on the app pool again.
+      // RLS denials share SQLSTATE 42501 but never match isGrantMissError.
+      if (enforced && !grantSwept && isGrantMissError(error)) {
+        if (client) client.release()
+        client = null
+        noteGrantMissRetry()
+        await ensureAppGrants()
+        return attempt(isRetry, true)
       }
 
       throw error
@@ -136,7 +207,7 @@ export async function withUserContext<T>(
     }
   }
 
-  return attempt(false)
+  return attempt(false, false)
 }
 
 /**
@@ -203,10 +274,11 @@ export async function getPoolClient(): Promise<PoolClient> {
 }
 
 /**
- * Gracefully close the connection pool.
+ * Gracefully close the connection pools (privileged + app role).
  * Call this during application shutdown.
  */
 export async function closePool(): Promise<void> {
+  await closeAppPool()
   if (pool) {
     await pool.end()
   }

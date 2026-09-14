@@ -14,11 +14,25 @@ let mockPoolConnect: ReturnType<typeof vi.fn>
 let mockPoolEnd: ReturnType<typeof vi.fn>
 let mockDrizzleInstance: { select: ReturnType<typeof vi.fn> }
 
+// ── app pool mock (Phase 3): null = privileged pool, object = app pool ─────────
+let appPoolHolder: { pool: { connect: ReturnType<typeof vi.fn> } | null }
+let mockNoteAppPoolConnectFailure: ReturnType<typeof vi.fn>
+let mockNoteFallback: ReturnType<typeof vi.fn>
+let mockNoteGrantMissRetry: ReturnType<typeof vi.fn>
+let mockCloseAppPool: ReturnType<typeof vi.fn>
+let mockEnsureAppGrants: ReturnType<typeof vi.fn>
+
 beforeEach(() => {
   vi.resetModules()
   mockPoolConnect = vi.fn()
   mockPoolEnd = vi.fn().mockResolvedValue(undefined)
   mockDrizzleInstance = { select: vi.fn() }
+  appPoolHolder = { pool: null }
+  mockNoteAppPoolConnectFailure = vi.fn()
+  mockNoteFallback = vi.fn()
+  mockNoteGrantMissRetry = vi.fn()
+  mockCloseAppPool = vi.fn().mockResolvedValue(undefined)
+  mockEnsureAppGrants = vi.fn().mockResolvedValue(true)
 })
 
 // ── Load helpers ───────────────────────────────────────────────────────────────
@@ -28,6 +42,14 @@ async function loadDbIndex(pool: object | null) {
   vi.doMock('drizzle-orm/node-postgres', () => ({
     drizzle: vi.fn(() => mockDrizzleInstance),
   }))
+  vi.doMock('@/lib/db/app-pool', () => ({
+    getAppPoolIfHealthy: vi.fn(async () => appPoolHolder.pool),
+    noteAppPoolConnectFailure: mockNoteAppPoolConnectFailure,
+    noteFallback: mockNoteFallback,
+    noteGrantMissRetry: mockNoteGrantMissRetry,
+    closeAppPool: mockCloseAppPool,
+  }))
+  vi.doMock('@/lib/db/app-role', () => ({ ensureAppGrants: mockEnsureAppGrants }))
   return await import('@/lib/db/index')
 }
 
@@ -544,5 +566,239 @@ describe('closePool', () => {
   it('does nothing when pool is null', async () => {
     const { closePool } = await loadDbIndex(null)
     await expect(closePool()).resolves.toBeUndefined()
+  })
+
+  it('closes the app pool as well', async () => {
+    const pool = { connect: mockPoolConnect, end: mockPoolEnd }
+    const { closePool } = await loadDbIndex(pool)
+    await closePool()
+    expect(mockCloseAppPool).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ── withUserContext — app pool (DB-level RLS enforcement) ─────────────────────
+
+describe('withUserContext — app pool selection', () => {
+  function recordingClient(release = vi.fn()) {
+    const calls: string[] = []
+    const client = makeRawClient({
+      query: async (q: any) => {
+        calls.push(typeof q === 'string' ? q : (q?.text ?? ''))
+        return { rows: [] }
+      },
+      release,
+    })
+    return { client, calls, release }
+  }
+
+  it('runs on the app pool when it is healthy and arms app.enforced in the same round trip', async () => {
+    const app = recordingClient()
+    const appConnect = vi.fn().mockResolvedValue(app.client)
+    appPoolHolder.pool = { connect: appConnect }
+    const pool = { connect: mockPoolConnect, end: mockPoolEnd }
+    const { withUserContext } = await loadDbIndex(pool)
+
+    await expect(withUserContext('user1', async () => 'ok', 'admin')).resolves.toBe('ok')
+
+    expect(appConnect).toHaveBeenCalledTimes(1)
+    expect(mockPoolConnect).not.toHaveBeenCalled()
+    expect(app.calls.find((q) => q.includes('SET LOCAL'))).toBe(
+      "SET LOCAL app.current_user_id = 'user1'; SET LOCAL app.current_user_role = 'admin'; SET LOCAL app.enforced = 'on'"
+    )
+    expect(app.calls).toEqual(expect.arrayContaining(['BEGIN', 'COMMIT']))
+    expect(app.release).toHaveBeenCalledTimes(1)
+    expect(mockNoteFallback).not.toHaveBeenCalled()
+  })
+
+  it('appends app.enforced after the user id when no role is given', async () => {
+    const app = recordingClient()
+    appPoolHolder.pool = { connect: vi.fn().mockResolvedValue(app.client) }
+    const { withUserContext } = await loadDbIndex({ connect: mockPoolConnect, end: mockPoolEnd })
+    await withUserContext('user1', async () => 'ok')
+    expect(app.calls.find((q) => q.includes('SET LOCAL'))).toBe(
+      "SET LOCAL app.current_user_id = 'user1'; SET LOCAL app.enforced = 'on'"
+    )
+  })
+
+  it('never sets app.enforced on the privileged pool and counts the fallback', async () => {
+    const priv = recordingClient()
+    mockPoolConnect.mockResolvedValue(priv.client)
+    appPoolHolder.pool = null
+    const { withUserContext } = await loadDbIndex({ connect: mockPoolConnect, end: mockPoolEnd })
+    await withUserContext('user1', async () => 'ok', 'admin')
+    expect(priv.calls.find((q) => q.includes('SET LOCAL'))).toBe(
+      "SET LOCAL app.current_user_id = 'user1'; SET LOCAL app.current_user_role = 'admin'"
+    )
+    expect(priv.calls.some((q) => q.includes('app.enforced'))).toBe(false)
+    expect(mockNoteFallback).toHaveBeenCalledTimes(1)
+  })
+
+  it('falls back to the privileged pool for this call when the app pool connect fails', async () => {
+    const authErr = Object.assign(new Error('password authentication failed for user "ari_app"'), {
+      code: '28P01',
+    })
+    appPoolHolder.pool = { connect: vi.fn().mockRejectedValue(authErr) }
+    const priv = recordingClient()
+    mockPoolConnect.mockResolvedValue(priv.client)
+    const { withUserContext } = await loadDbIndex({ connect: mockPoolConnect, end: mockPoolEnd })
+
+    await expect(withUserContext('user1', async () => 'ok')).resolves.toBe('ok')
+
+    expect(mockNoteAppPoolConnectFailure).toHaveBeenCalledWith(authErr)
+    expect(mockPoolConnect).toHaveBeenCalledTimes(1)
+    expect(priv.calls.some((q) => q.includes('app.enforced'))).toBe(false)
+    expect(mockNoteFallback).not.toHaveBeenCalled() // counted by noteAppPoolConnectFailure instead
+  })
+
+  it('42501 "permission denied for table" on the app pool → sweep grants, retry once on the APP pool', async () => {
+    const first = recordingClient()
+    const second = recordingClient()
+    const appConnect = vi.fn().mockResolvedValueOnce(first.client).mockResolvedValueOnce(second.client)
+    appPoolHolder.pool = { connect: appConnect }
+    const { withUserContext } = await loadDbIndex({ connect: mockPoolConnect, end: mockPoolEnd })
+
+    const op = vi
+      .fn()
+      .mockRejectedValueOnce(
+        Object.assign(new Error('permission denied for table zz_new_module_table'), { code: '42501' })
+      )
+      .mockResolvedValueOnce('second try')
+
+    await expect(withUserContext('user1', op)).resolves.toBe('second try')
+
+    expect(mockEnsureAppGrants).toHaveBeenCalledTimes(1)
+    expect(mockNoteGrantMissRetry).toHaveBeenCalledTimes(1)
+    expect(appConnect).toHaveBeenCalledTimes(2)
+    expect(mockPoolConnect).not.toHaveBeenCalled() // never the privileged pool
+    expect(first.calls).toContain('ROLLBACK')
+    expect(first.release).toHaveBeenCalledTimes(1)
+    expect(second.calls).toContain('COMMIT')
+    expect(second.calls.some((q) => q.includes("app.enforced = 'on'"))).toBe(true)
+  })
+
+  it('retries the grant miss only once', async () => {
+    const c1 = recordingClient()
+    const c2 = recordingClient()
+    appPoolHolder.pool = {
+      connect: vi.fn().mockResolvedValueOnce(c1.client).mockResolvedValueOnce(c2.client),
+    }
+    const { withUserContext } = await loadDbIndex({ connect: mockPoolConnect, end: mockPoolEnd })
+    const denied = Object.assign(new Error('permission denied for table t'), { code: '42501' })
+
+    await expect(withUserContext('user1', async () => { throw denied })).rejects.toBe(denied)
+    expect(mockEnsureAppGrants).toHaveBeenCalledTimes(1)
+    expect(mockPoolConnect).not.toHaveBeenCalled()
+  })
+
+  it('42501 "new row violates row-level security policy" is rethrown — no sweep, no retry, no privileged pool', async () => {
+    const app = recordingClient()
+    const appConnect = vi.fn().mockResolvedValue(app.client)
+    appPoolHolder.pool = { connect: appConnect }
+    const { withUserContext } = await loadDbIndex({ connect: mockPoolConnect, end: mockPoolEnd })
+    const rls = Object.assign(
+      new Error('new row violates row-level security policy for table "tasks"'),
+      { code: '42501' }
+    )
+
+    await expect(withUserContext('user2', async () => { throw rls })).rejects.toBe(rls)
+
+    expect(mockEnsureAppGrants).not.toHaveBeenCalled()
+    expect(mockNoteGrantMissRetry).not.toHaveBeenCalled()
+    expect(appConnect).toHaveBeenCalledTimes(1)
+    expect(mockPoolConnect).not.toHaveBeenCalled()
+    expect(app.calls).toContain('ROLLBACK')
+  })
+
+  it('a grant-miss error on the privileged pool is rethrown untouched', async () => {
+    const priv = recordingClient()
+    mockPoolConnect.mockResolvedValue(priv.client)
+    appPoolHolder.pool = null
+    const { withUserContext } = await loadDbIndex({ connect: mockPoolConnect, end: mockPoolEnd })
+    const denied = Object.assign(new Error('permission denied for table t'), { code: '42501' })
+
+    await expect(withUserContext('user1', async () => { throw denied })).rejects.toBe(denied)
+    expect(mockEnsureAppGrants).not.toHaveBeenCalled()
+    expect(mockPoolConnect).toHaveBeenCalledTimes(1)
+  })
+
+  it('stale-connection retry works on the app pool too', async () => {
+    const staleRelease = vi.fn()
+    const stale = makeRawClient({
+      query: async () => { throw new Error('Connection terminated unexpectedly') },
+      release: staleRelease,
+    })
+    const good = recordingClient()
+    appPoolHolder.pool = {
+      connect: vi.fn().mockResolvedValueOnce(stale).mockResolvedValueOnce(good.client),
+    }
+    const { withUserContext } = await loadDbIndex({ connect: mockPoolConnect, end: mockPoolEnd })
+
+    await expect(withUserContext('user1', async () => 'ok')).resolves.toBe('ok')
+    expect(staleRelease).toHaveBeenCalledWith(true)
+    expect(good.calls.some((q) => q.includes("app.enforced = 'on'"))).toBe(true)
+    expect(mockPoolConnect).not.toHaveBeenCalled()
+  })
+
+  it('sees a grant miss through Drizzle\'s DrizzleQueryError wrapper (code lives on cause)', async () => {
+    const first = recordingClient()
+    const second = recordingClient()
+    appPoolHolder.pool = {
+      connect: vi.fn().mockResolvedValueOnce(first.client).mockResolvedValueOnce(second.client),
+    }
+    const { withUserContext } = await loadDbIndex({ connect: mockPoolConnect, end: mockPoolEnd })
+    const pgErr = Object.assign(new Error('permission denied for table zz_late'), { code: '42501' })
+    const wrapped = Object.assign(new Error('Failed query: SELECT count(*) FROM zz_late\nparams: '), {
+      cause: pgErr,
+    })
+    const op = vi.fn().mockRejectedValueOnce(wrapped).mockResolvedValueOnce('after sweep')
+
+    await expect(withUserContext('user1', op)).resolves.toBe('after sweep')
+    expect(mockEnsureAppGrants).toHaveBeenCalledTimes(1)
+    expect(mockPoolConnect).not.toHaveBeenCalled()
+  })
+
+  it('sees an RLS denial through the wrapper too — still no retry', async () => {
+    const app = recordingClient()
+    appPoolHolder.pool = { connect: vi.fn().mockResolvedValue(app.client) }
+    const { withUserContext } = await loadDbIndex({ connect: mockPoolConnect, end: mockPoolEnd })
+    const wrapped = Object.assign(new Error('Failed query: UPDATE tasks …'), {
+      cause: Object.assign(new Error('new row violates row-level security policy for table "tasks"'), {
+        code: '42501',
+      }),
+    })
+    await expect(withUserContext('user2', async () => { throw wrapped })).rejects.toBe(wrapped)
+    expect(mockEnsureAppGrants).not.toHaveBeenCalled()
+  })
+
+  it('retries a stale connection reported through the wrapper', async () => {
+    const staleRelease = vi.fn()
+    const stale = makeRawClient({ release: staleRelease })
+    const good = recordingClient()
+    mockPoolConnect.mockResolvedValueOnce(stale).mockResolvedValueOnce(good.client)
+    const { withUserContext } = await loadDbIndex({ connect: mockPoolConnect, end: mockPoolEnd })
+    const wrapped = Object.assign(new Error('Failed query: SELECT 1'), {
+      cause: new Error('Connection terminated unexpectedly'),
+    })
+    const op = vi.fn().mockRejectedValueOnce(wrapped).mockResolvedValueOnce('ok')
+
+    await expect(withUserContext('user1', op)).resolves.toBe('ok')
+    expect(staleRelease).toHaveBeenCalledWith(true)
+    expect(mockPoolConnect).toHaveBeenCalledTimes(2)
+  })
+
+  it('isGrantMissError matches only the permission-denied family of 42501', async () => {
+    const { isGrantMissError } = await loadDbIndex({ connect: mockPoolConnect, end: mockPoolEnd })
+    expect(isGrantMissError({ code: '42501', message: 'permission denied for table tasks' })).toBe(true)
+    expect(isGrantMissError({ code: '42501', message: 'permission denied for relation tasks' })).toBe(true)
+    expect(isGrantMissError({ code: '42501', message: 'permission denied for schema app' })).toBe(true)
+    expect(isGrantMissError({ code: '42501', message: 'permission denied for function f' })).toBe(true)
+    expect(isGrantMissError({ code: '42501', message: 'permission denied for sequence s' })).toBe(true)
+    expect(isGrantMissError({ code: '42501', message: 'new row violates row-level security policy for table "tasks"' })).toBe(false)
+    expect(isGrantMissError({ code: '42501', message: 'new row violates row-level security policy (USING expression) for table "t"' })).toBe(false)
+    expect(isGrantMissError({ code: '42501', message: 'permission denied to create role' })).toBe(false)
+    expect(isGrantMissError({ code: '23505', message: 'permission denied for table t' })).toBe(false)
+    expect(isGrantMissError({ code: '42501' })).toBe(false)
+    expect(isGrantMissError(null)).toBe(false)
+    expect(isGrantMissError('permission denied for table t')).toBe(false)
   })
 })
