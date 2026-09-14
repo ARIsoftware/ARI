@@ -13,9 +13,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 // ── shared mock state ──────────────────────────────────────────────────────────
 
 let mockPoolQuery: ReturnType<typeof vi.fn>
+let mockEnsureAppGrants: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
   mockPoolQuery = vi.fn().mockResolvedValue({})
+  mockEnsureAppGrants = vi.fn().mockResolvedValue(true)
   vi.resetModules()
 })
 
@@ -30,6 +32,7 @@ async function loadEnsureSchema(
 ) {
   vi.doMock('@/lib/db/pool', () => ({ pool }))
   vi.doMock('@/lib/db/setup-sql', () => ({ setupSql: '-- test setup sql' }))
+  vi.doMock('@/lib/db/app-role', () => ({ ensureAppGrants: mockEnsureAppGrants }))
 
   return await import('@/lib/db/ensure-schema')
 }
@@ -163,6 +166,25 @@ describe('reapplySchema', () => {
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('Schema re-applied')
     )
+    logSpy.mockRestore()
+  })
+
+  it('sweeps the app role grants after a successful re-apply (tables may have been recreated)', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const { ensureSchema, reapplySchema } = await loadEnsureSchema({ query: mockPoolQuery })
+    await ensureSchema()
+    expect(mockEnsureAppGrants).not.toHaveBeenCalled() // boot provisions via ensureAppRole instead
+    await reapplySchema()
+    expect(mockEnsureAppGrants).toHaveBeenCalledTimes(1)
+    logSpy.mockRestore()
+  })
+
+  it('does not sweep grants when the re-apply failed', async () => {
+    const logSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mockPoolQuery.mockRejectedValue(new Error('reapply failed'))
+    const { reapplySchema } = await loadEnsureSchema({ query: mockPoolQuery })
+    expect(await reapplySchema()).toBe(false)
+    expect(mockEnsureAppGrants).not.toHaveBeenCalled()
     logSpy.mockRestore()
   })
 

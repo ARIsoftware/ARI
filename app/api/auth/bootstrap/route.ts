@@ -5,6 +5,7 @@ import { pool } from "@/lib/db/pool"
 import { auth } from "@/lib/auth"
 import { withBootstrapUserCreate } from "@/lib/auth-bootstrap-gate"
 import { setupSql } from "@/lib/db/setup-sql"
+import { ensureAppRole } from "@/lib/db/app-role"
 import { upsertEnvVars } from "@/lib/env-file"
 import { checkRateLimit, getClientIp, isSameOriginRequest } from "@/lib/modules/public-route-security"
 import { isVercel } from "@/lib/deployment"
@@ -136,6 +137,12 @@ export async function POST(request: NextRequest) {
         )
       }
     }
+
+    // Fresh installs (notably Vercel, where instrumentation ran before the
+    // schema existed): provision the non-BYPASSRLS app role now that
+    // setup.sql is in place. Uses its own client + transaction-scoped lock,
+    // so it does not interact with the session lock held above. Never throws.
+    await ensureAppRole()
 
     const countResult = await client.query('SELECT COUNT(*) FROM public."user"')
     const count = parseInt(countResult.rows[0].count, 10)

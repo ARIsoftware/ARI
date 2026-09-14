@@ -36,6 +36,12 @@ vi.mock('@/lib/db', () => ({
   getPoolClient: vi.fn(),
 }))
 
+// ── app-role mock: the post-DDL grant sweep is fire-and-forget ────────────────
+const mockEnsureAppGrants = vi.fn(async () => true)
+vi.mock('@/lib/db/app-role', () => ({
+  ensureAppGrants: () => mockEnsureAppGrants(),
+}))
+
 // ── import SUT + mocked helpers ───────────────────────────────────────────────
 import { runSchemaSqlAtPath, runModuleSchemaInstall, scanForForbiddenSql } from '@/lib/modules/schema-installer'
 import { readFile } from 'fs/promises'
@@ -269,5 +275,35 @@ describe('runModuleSchemaInstall — already-exists module', () => {
     const result = await runModuleSchemaInstall('already-exists-module')
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.alreadyExisted).toBe(true)
+  })
+})
+
+// ── app role grant sweep after DDL ────────────────────────────────────────────
+
+describe('runModuleSchemaInstall — app role grant sweep', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockEnsureAppGrants.mockClear()
+  })
+
+  it('fires ensureAppGrants() after a successful install (fire-and-forget)', async () => {
+    setupDb()
+    const result = await runModuleSchemaInstall('known-module')
+    expect(result).toMatchObject({ ok: true })
+    expect(mockEnsureAppGrants).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not sweep grants when the schema failed to apply', async () => {
+    setupDb({ queryError: new Error('syntax error at or near "CREATE"') })
+    const result = await runModuleSchemaInstall('known-module')
+    expect(result.ok).toBe(false)
+    expect(mockEnsureAppGrants).not.toHaveBeenCalled()
+  })
+
+  it('does not sweep grants when the schema was refused by the forbidden-SQL scan', async () => {
+    setupDb()
+    const result = await runModuleSchemaInstall('forbidden-module')
+    expect(result.ok).toBe(false)
+    expect(mockEnsureAppGrants).not.toHaveBeenCalled()
   })
 })

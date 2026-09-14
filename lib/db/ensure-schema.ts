@@ -1,5 +1,6 @@
 import { pool } from "@/lib/db/pool"
 import { setupSql } from "@/lib/db/setup-sql"
+import { ensureAppGrants } from "@/lib/db/app-role"
 
 let ensured = false
 
@@ -31,6 +32,10 @@ export async function ensureSchema(): Promise<void> {
  * (e.g. a backup restore recreated a table from an older schema era). Unlike
  * ensureSchema(), this ignores the once-per-process latch. Returns true only
  * if setup.sql applied cleanly. Never throws.
+ *
+ * A re-apply usually means tables were recreated (backup restore), which
+ * destroys the app role's table grants — so a grant sweep follows every
+ * successful re-apply. Fire-and-forget: it never changes the return value.
  */
 export async function reapplySchema(): Promise<boolean> {
   if (!pool) return false
@@ -38,6 +43,7 @@ export async function reapplySchema(): Promise<boolean> {
     await pool.query(setupSql)
     ensured = true
     console.log("✅ Schema re-applied (lib/db/setup.sql)")
+    void ensureAppGrants()
     return true
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)

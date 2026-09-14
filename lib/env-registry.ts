@@ -61,6 +61,14 @@ export const ENV_REGISTRY: readonly EnvVarSpec[] = [
     description: 'Database backend: postgres | supabaselocal | supabasecloud',
   },
   {
+    key: 'ARI_DISABLE_APP_ROLE',
+    required: false,
+    sensitive: false,
+    group: 'database',
+    description:
+      'Set to 1 to disable DB-level RLS enforcement: the ari_app role is neither provisioned nor used and every query runs on the DATABASE_URL role (kill switch — no code change needed)',
+  },
+  {
     key: 'ARI_FIRST_RUN_ADMIN_EMAIL',
     required: false,
     sensitive: false,

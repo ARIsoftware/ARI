@@ -47,6 +47,18 @@ export async function register() {
         // ensureSchema swallows its own DB errors; this outer catch is for
         // the dynamic import itself.
       }
+
+      // Provision / reconcile the non-BYPASSRLS app role (DB-level RLS
+      // enforcement, Phase 2). Runs after setup.sql so the ari_instance
+      // columns exist. Never throws and never blocks startup on failure —
+      // the outcome is recorded for /health and the app keeps running on
+      // the privileged pool until the role is ready.
+      try {
+        const { ensureAppRole } = await import('./lib/db/app-role')
+        await ensureAppRole()
+      } catch {
+        // ensureAppRole swallows its own errors; this catch is for the import.
+      }
     }
 
     // Fire-and-forget anonymous install ping. Never blocks startup.

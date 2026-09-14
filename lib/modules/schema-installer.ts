@@ -19,6 +19,7 @@
 
 import { readFile } from 'fs/promises'
 import { getPoolClient } from '@/lib/db'
+import { ensureAppGrants } from '@/lib/db/app-role'
 import { MODULE_SCHEMAS } from '@/lib/generated/module-schemas'
 
 export type SchemaInstallResult =
@@ -93,6 +94,10 @@ async function executeSchemaSql(
     await client.query(sqlText)
     await client.query('COMMIT')
     console.log(`[module-installer] Ran schema.sql for ${moduleId}`)
+    // New module tables are auto-granted to the app role via ALTER DEFAULT
+    // PRIVILEGES; this sweep is the backstop (e.g. after a backup restore
+    // recreated tables). Fire-and-forget — never delays the install result.
+    void ensureAppGrants()
     return { ok: true }
   } catch (err) {
     try {

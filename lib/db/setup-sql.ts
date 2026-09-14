@@ -734,6 +734,14 @@ CREATE TABLE IF NOT EXISTS "ari_instance" (
 );
 
 ALTER TABLE "ari_instance" ADD COLUMN IF NOT EXISTS "first_signin_pinged" BOOLEAN NOT NULL DEFAULT FALSE;
+-- DB-level RLS enforcement (Phase 2): the non-BYPASSRLS app role's password,
+-- AES-encrypted with the key derived from BETTER_AUTH_SECRET (same scheme as
+-- stored API keys), plus the last rotation stamp that guards against two
+-- deployments with different secrets rotating each other's password. Written
+-- by lib/db/app-role.ts on the privileged pool; this table is deny-all under
+-- RLS so the app role itself can never read it.
+ALTER TABLE "ari_instance" ADD COLUMN IF NOT EXISTS "app_role_secret" TEXT;
+ALTER TABLE "ari_instance" ADD COLUMN IF NOT EXISTS "app_role_secret_rotated_at" TIMESTAMPTZ;
 
 INSERT INTO "ari_instance" ("telemetry_enabled")
 SELECT TRUE
