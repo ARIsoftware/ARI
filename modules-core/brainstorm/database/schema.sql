@@ -13,13 +13,23 @@ CREATE INDEX IF NOT EXISTS idx_brainstorm_boards_user_updated ON brainstorm_boar
 
 ALTER TABLE brainstorm_boards ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS brainstorm_boards_rls_select ON brainstorm_boards;
-CREATE POLICY brainstorm_boards_rls_select ON brainstorm_boards FOR SELECT USING (app.can_access_shared());
+CREATE POLICY brainstorm_boards_rls_select ON brainstorm_boards FOR SELECT USING ((SELECT app.can_access_shared()));
 DROP POLICY IF EXISTS brainstorm_boards_rls_insert ON brainstorm_boards;
-CREATE POLICY brainstorm_boards_rls_insert ON brainstorm_boards FOR INSERT WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY brainstorm_boards_rls_insert ON brainstorm_boards FOR INSERT WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS brainstorm_boards_rls_update ON brainstorm_boards;
-CREATE POLICY brainstorm_boards_rls_update ON brainstorm_boards FOR UPDATE USING (app.can_access_shared());
+CREATE POLICY brainstorm_boards_rls_update ON brainstorm_boards FOR UPDATE USING ((SELECT app.can_access_shared()))
+  WITH CHECK ((SELECT app.can_access_shared()));
 DROP POLICY IF EXISTS brainstorm_boards_rls_delete ON brainstorm_boards;
-CREATE POLICY brainstorm_boards_rls_delete ON brainstorm_boards FOR DELETE USING (app.can_access_shared());
+CREATE POLICY brainstorm_boards_rls_delete ON brainstorm_boards FOR DELETE USING ((SELECT app.can_access_shared()));
+
+-- Shared table: user_id may never be reassigned (see app.prevent_user_id_reassignment
+-- in lib/db/setup.sql — inert until the app pool sets app.enforced).
+DROP TRIGGER IF EXISTS brainstorm_boards_user_id_immutable ON brainstorm_boards;
+CREATE TRIGGER brainstorm_boards_user_id_immutable
+  BEFORE UPDATE ON brainstorm_boards
+  FOR EACH ROW
+  WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id)
+  EXECUTE FUNCTION app.prevent_user_id_reassignment();
 
 CREATE TABLE IF NOT EXISTS brainstorm_nodes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -37,13 +47,23 @@ CREATE INDEX IF NOT EXISTS idx_brainstorm_nodes_user_board ON brainstorm_nodes (
 
 ALTER TABLE brainstorm_nodes ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS brainstorm_nodes_rls_select ON brainstorm_nodes;
-CREATE POLICY brainstorm_nodes_rls_select ON brainstorm_nodes FOR SELECT USING (app.can_access_shared());
+CREATE POLICY brainstorm_nodes_rls_select ON brainstorm_nodes FOR SELECT USING ((SELECT app.can_access_shared()));
 DROP POLICY IF EXISTS brainstorm_nodes_rls_insert ON brainstorm_nodes;
-CREATE POLICY brainstorm_nodes_rls_insert ON brainstorm_nodes FOR INSERT WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY brainstorm_nodes_rls_insert ON brainstorm_nodes FOR INSERT WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS brainstorm_nodes_rls_update ON brainstorm_nodes;
-CREATE POLICY brainstorm_nodes_rls_update ON brainstorm_nodes FOR UPDATE USING (app.can_access_shared());
+CREATE POLICY brainstorm_nodes_rls_update ON brainstorm_nodes FOR UPDATE USING ((SELECT app.can_access_shared()))
+  WITH CHECK ((SELECT app.can_access_shared()));
 DROP POLICY IF EXISTS brainstorm_nodes_rls_delete ON brainstorm_nodes;
-CREATE POLICY brainstorm_nodes_rls_delete ON brainstorm_nodes FOR DELETE USING (app.can_access_shared());
+CREATE POLICY brainstorm_nodes_rls_delete ON brainstorm_nodes FOR DELETE USING ((SELECT app.can_access_shared()));
+
+-- Shared table: user_id may never be reassigned (see app.prevent_user_id_reassignment
+-- in lib/db/setup.sql — inert until the app pool sets app.enforced).
+DROP TRIGGER IF EXISTS brainstorm_nodes_user_id_immutable ON brainstorm_nodes;
+CREATE TRIGGER brainstorm_nodes_user_id_immutable
+  BEFORE UPDATE ON brainstorm_nodes
+  FOR EACH ROW
+  WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id)
+  EXECUTE FUNCTION app.prevent_user_id_reassignment();
 
 CREATE TABLE IF NOT EXISTS brainstorm_edges (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -62,10 +82,20 @@ CREATE INDEX IF NOT EXISTS idx_brainstorm_edges_target ON brainstorm_edges (targ
 
 ALTER TABLE brainstorm_edges ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS brainstorm_edges_rls_select ON brainstorm_edges;
-CREATE POLICY brainstorm_edges_rls_select ON brainstorm_edges FOR SELECT USING (app.can_access_shared());
+CREATE POLICY brainstorm_edges_rls_select ON brainstorm_edges FOR SELECT USING ((SELECT app.can_access_shared()));
 DROP POLICY IF EXISTS brainstorm_edges_rls_insert ON brainstorm_edges;
-CREATE POLICY brainstorm_edges_rls_insert ON brainstorm_edges FOR INSERT WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+CREATE POLICY brainstorm_edges_rls_insert ON brainstorm_edges FOR INSERT WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS brainstorm_edges_rls_update ON brainstorm_edges;
-CREATE POLICY brainstorm_edges_rls_update ON brainstorm_edges FOR UPDATE USING (app.can_access_shared());
+CREATE POLICY brainstorm_edges_rls_update ON brainstorm_edges FOR UPDATE USING ((SELECT app.can_access_shared()))
+  WITH CHECK ((SELECT app.can_access_shared()));
 DROP POLICY IF EXISTS brainstorm_edges_rls_delete ON brainstorm_edges;
-CREATE POLICY brainstorm_edges_rls_delete ON brainstorm_edges FOR DELETE USING (app.can_access_shared());
+CREATE POLICY brainstorm_edges_rls_delete ON brainstorm_edges FOR DELETE USING ((SELECT app.can_access_shared()));
+
+-- Shared table: user_id may never be reassigned (see app.prevent_user_id_reassignment
+-- in lib/db/setup.sql — inert until the app pool sets app.enforced).
+DROP TRIGGER IF EXISTS brainstorm_edges_user_id_immutable ON brainstorm_edges;
+CREATE TRIGGER brainstorm_edges_user_id_immutable
+  BEFORE UPDATE ON brainstorm_edges
+  FOR EACH ROW
+  WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id)
+  EXECUTE FUNCTION app.prevent_user_id_reassignment();

@@ -28,22 +28,32 @@ ALTER TABLE knowledge_collections ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view their own knowledge_collections" ON knowledge_collections;
 CREATE POLICY "Users can view their own knowledge_collections"
   ON knowledge_collections FOR SELECT
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
 
 DROP POLICY IF EXISTS "Users can insert their own knowledge_collections" ON knowledge_collections;
 CREATE POLICY "Users can insert their own knowledge_collections"
   ON knowledge_collections FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS "Users can update their own knowledge_collections" ON knowledge_collections;
 CREATE POLICY "Users can update their own knowledge_collections"
   ON knowledge_collections FOR UPDATE
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()))
+  WITH CHECK ((SELECT app.can_access_shared()));
 
 DROP POLICY IF EXISTS "Users can delete their own knowledge_collections" ON knowledge_collections;
 CREATE POLICY "Users can delete their own knowledge_collections"
   ON knowledge_collections FOR DELETE
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
+
+-- Shared table: user_id may never be reassigned (see app.prevent_user_id_reassignment
+-- in lib/db/setup.sql — inert until the app pool sets app.enforced).
+DROP TRIGGER IF EXISTS knowledge_collections_user_id_immutable ON knowledge_collections;
+CREATE TRIGGER knowledge_collections_user_id_immutable
+  BEFORE UPDATE ON knowledge_collections
+  FOR EACH ROW
+  WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id)
+  EXECUTE FUNCTION app.prevent_user_id_reassignment();
 
 CREATE OR REPLACE FUNCTION update_knowledge_collections_updated_at()
 RETURNS TRIGGER AS $$
@@ -128,22 +138,32 @@ ALTER TABLE knowledge_articles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can view their own knowledge_articles" ON knowledge_articles;
 CREATE POLICY "Users can view their own knowledge_articles"
   ON knowledge_articles FOR SELECT
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
 
 DROP POLICY IF EXISTS "Users can insert their own knowledge_articles" ON knowledge_articles;
 CREATE POLICY "Users can insert their own knowledge_articles"
   ON knowledge_articles FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS "Users can update their own knowledge_articles" ON knowledge_articles;
 CREATE POLICY "Users can update their own knowledge_articles"
   ON knowledge_articles FOR UPDATE
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()))
+  WITH CHECK ((SELECT app.can_access_shared()));
 
 DROP POLICY IF EXISTS "Users can delete their own knowledge_articles" ON knowledge_articles;
 CREATE POLICY "Users can delete their own knowledge_articles"
   ON knowledge_articles FOR DELETE
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
+
+-- Shared table: user_id may never be reassigned (see app.prevent_user_id_reassignment
+-- in lib/db/setup.sql — inert until the app pool sets app.enforced).
+DROP TRIGGER IF EXISTS knowledge_articles_user_id_immutable ON knowledge_articles;
+CREATE TRIGGER knowledge_articles_user_id_immutable
+  BEFORE UPDATE ON knowledge_articles
+  FOR EACH ROW
+  WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id)
+  EXECUTE FUNCTION app.prevent_user_id_reassignment();
 
 CREATE OR REPLACE FUNCTION update_knowledge_articles_updated_at()
 RETURNS TRIGGER AS $$

@@ -433,76 +433,116 @@ ALTER TABLE document_folders ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS document_folders_rls_select ON document_folders;
 CREATE POLICY document_folders_rls_select ON document_folders FOR SELECT
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
 
 DROP POLICY IF EXISTS document_folders_rls_insert ON document_folders;
 CREATE POLICY document_folders_rls_insert ON document_folders FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS document_folders_rls_update ON document_folders;
 CREATE POLICY document_folders_rls_update ON document_folders FOR UPDATE
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()))
+  WITH CHECK ((SELECT app.can_access_shared()));
 
 DROP POLICY IF EXISTS document_folders_rls_delete ON document_folders;
 CREATE POLICY document_folders_rls_delete ON document_folders FOR DELETE
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
+
+-- Shared table: user_id may never be reassigned (see app.prevent_user_id_reassignment
+-- in lib/db/setup.sql — inert until the app pool sets app.enforced).
+DROP TRIGGER IF EXISTS document_folders_user_id_immutable ON document_folders;
+CREATE TRIGGER document_folders_user_id_immutable
+  BEFORE UPDATE ON document_folders
+  FOR EACH ROW
+  WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id)
+  EXECUTE FUNCTION app.prevent_user_id_reassignment();
 
 -- documents
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS documents_rls_select ON documents;
 CREATE POLICY documents_rls_select ON documents FOR SELECT
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
 
 DROP POLICY IF EXISTS documents_rls_insert ON documents;
 CREATE POLICY documents_rls_insert ON documents FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS documents_rls_update ON documents;
 CREATE POLICY documents_rls_update ON documents FOR UPDATE
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()))
+  WITH CHECK ((SELECT app.can_access_shared()));
 
 DROP POLICY IF EXISTS documents_rls_delete ON documents;
 CREATE POLICY documents_rls_delete ON documents FOR DELETE
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
+
+-- Shared table: user_id may never be reassigned (see app.prevent_user_id_reassignment
+-- in lib/db/setup.sql — inert until the app pool sets app.enforced).
+DROP TRIGGER IF EXISTS documents_user_id_immutable ON documents;
+CREATE TRIGGER documents_user_id_immutable
+  BEFORE UPDATE ON documents
+  FOR EACH ROW
+  WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id)
+  EXECUTE FUNCTION app.prevent_user_id_reassignment();
 
 -- document_tags
 ALTER TABLE document_tags ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS document_tags_rls_select ON document_tags;
 CREATE POLICY document_tags_rls_select ON document_tags FOR SELECT
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
 
 DROP POLICY IF EXISTS document_tags_rls_insert ON document_tags;
 CREATE POLICY document_tags_rls_insert ON document_tags FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS document_tags_rls_update ON document_tags;
 CREATE POLICY document_tags_rls_update ON document_tags FOR UPDATE
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()))
+  WITH CHECK ((SELECT app.can_access_shared()));
 
 DROP POLICY IF EXISTS document_tags_rls_delete ON document_tags;
 CREATE POLICY document_tags_rls_delete ON document_tags FOR DELETE
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
+
+-- Shared table: user_id may never be reassigned (see app.prevent_user_id_reassignment
+-- in lib/db/setup.sql — inert until the app pool sets app.enforced).
+DROP TRIGGER IF EXISTS document_tags_user_id_immutable ON document_tags;
+CREATE TRIGGER document_tags_user_id_immutable
+  BEFORE UPDATE ON document_tags
+  FOR EACH ROW
+  WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id)
+  EXECUTE FUNCTION app.prevent_user_id_reassignment();
 
 -- document_tag_assignments — direct user_id check (post-denormalization).
 ALTER TABLE document_tag_assignments ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS document_tag_assignments_rls_select ON document_tag_assignments;
 CREATE POLICY document_tag_assignments_rls_select ON document_tag_assignments FOR SELECT
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
 
 DROP POLICY IF EXISTS document_tag_assignments_rls_insert ON document_tag_assignments;
 CREATE POLICY document_tag_assignments_rls_insert ON document_tag_assignments FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS document_tag_assignments_rls_update ON document_tag_assignments;
 CREATE POLICY document_tag_assignments_rls_update ON document_tag_assignments FOR UPDATE
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()))
+  WITH CHECK ((SELECT app.can_access_shared()));
 
 DROP POLICY IF EXISTS document_tag_assignments_rls_delete ON document_tag_assignments;
 CREATE POLICY document_tag_assignments_rls_delete ON document_tag_assignments FOR DELETE
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
+
+-- Shared table: user_id may never be reassigned (see app.prevent_user_id_reassignment
+-- in lib/db/setup.sql — inert until the app pool sets app.enforced).
+DROP TRIGGER IF EXISTS document_tag_assignments_user_id_immutable ON document_tag_assignments;
+CREATE TRIGGER document_tag_assignments_user_id_immutable
+  BEFORE UPDATE ON document_tag_assignments
+  FOR EACH ROW
+  WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id)
+  EXECUTE FUNCTION app.prevent_user_id_reassignment();
 
 -- =============================================================================
 -- VERIFICATION QUERIES

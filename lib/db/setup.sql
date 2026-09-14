@@ -55,6 +55,39 @@ RETURNS BOOLEAN AS $$
      AND current_setting('app.current_user_id', true) <> '';
 $$ LANGUAGE sql STABLE SET search_path = '';
 
+-- ----------------------------------------------------------------
+-- Ownership immutability for SHARED tables (DB-level RLS enforcement, Phase 1).
+-- RLS policies cannot compare OLD and NEW, so on a shared table (SELECT/
+-- UPDATE/DELETE gated by app.can_access_shared()) any authenticated user
+-- could `UPDATE ... SET user_id = <self>` and take ownership of a row — and,
+-- on tasks, then mark it private. This BEFORE UPDATE trigger rejects any
+-- user_id change. It is gated on the `app.enforced` GUC, which
+-- withUserContext() sets ONLY when a request runs on the non-BYPASSRLS app
+-- pool (Phase 3). Consequences:
+--   • inert until the app pool ships, and whenever ARI_DISABLE_APP_ROLE=1
+--     (the kill switch covers the whole enforcement layer);
+--   • privileged / no-context paths (bootstrap, backup restore, admin
+--     scripts) are exempt by construction;
+--   • setup.sql and backup import additionally run under
+--     session_replication_role = 'replica', which skips ordinary triggers.
+-- ERRCODE is plpgsql's default P0001 on purpose: it must NEVER be 42501,
+-- which the app-pool grant-miss handler treats as "permission denied".
+-- Each shared table attaches it with a WHEN clause so the function is only
+-- invoked when user_id actually changes.
+-- ----------------------------------------------------------------
+CREATE OR REPLACE FUNCTION app.prevent_user_id_reassignment()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF current_setting('app.enforced', true) = 'on'
+     AND NEW.user_id IS DISTINCT FROM OLD.user_id THEN
+    RAISE EXCEPTION 'user_id is immutable on shared table %', TG_TABLE_NAME
+      USING ERRCODE = 'P0001',
+            HINT = 'Ownership of shared rows cannot be transferred.';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SET search_path = '';
+
 -- ================================================================
 -- AUTH TABLES (user must come first - referenced by others)
 -- ================================================================
@@ -193,16 +226,17 @@ ALTER TABLE "user_preferences" ADD COLUMN IF NOT EXISTS "welcome_dismissed" BOOL
 ALTER TABLE "user_preferences" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "user_preferences_rls_select" ON "user_preferences";
 CREATE POLICY "user_preferences_rls_select" ON "user_preferences" FOR SELECT TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "user_preferences_rls_insert" ON "user_preferences";
 CREATE POLICY "user_preferences_rls_insert" ON "user_preferences" FOR INSERT TO public
-  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "user_preferences_rls_update" ON "user_preferences";
 CREATE POLICY "user_preferences_rls_update" ON "user_preferences" FOR UPDATE TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "user_preferences_rls_delete" ON "user_preferences";
 CREATE POLICY "user_preferences_rls_delete" ON "user_preferences" FOR DELETE TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 
 -- Table: app_branding
 -- Global, single-row login-screen branding (admin-managed). The login logo is
@@ -246,16 +280,17 @@ CREATE TABLE IF NOT EXISTS "module_settings" (
 ALTER TABLE "module_settings" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "module_settings_rls_select" ON "module_settings";
 CREATE POLICY "module_settings_rls_select" ON "module_settings" FOR SELECT TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "module_settings_rls_insert" ON "module_settings";
 CREATE POLICY "module_settings_rls_insert" ON "module_settings" FOR INSERT TO public
-  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "module_settings_rls_update" ON "module_settings";
 CREATE POLICY "module_settings_rls_update" ON "module_settings" FOR UPDATE TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "module_settings_rls_delete" ON "module_settings";
 CREATE POLICY "module_settings_rls_delete" ON "module_settings" FOR DELETE TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 
 -- Table: module_migrations
 CREATE TABLE IF NOT EXISTS "module_migrations" (
@@ -313,16 +348,17 @@ CREATE TABLE IF NOT EXISTS "api_keys" (
 ALTER TABLE "api_keys" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "api_keys_rls_select" ON "api_keys";
 CREATE POLICY "api_keys_rls_select" ON "api_keys" FOR SELECT TO public
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "api_keys_rls_insert" ON "api_keys";
 CREATE POLICY "api_keys_rls_insert" ON "api_keys" FOR INSERT TO public
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "api_keys_rls_update" ON "api_keys";
 CREATE POLICY "api_keys_rls_update" ON "api_keys" FOR UPDATE TO public
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "api_keys_rls_delete" ON "api_keys";
 CREATE POLICY "api_keys_rls_delete" ON "api_keys" FOR DELETE TO public
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 -- Table: api_key_usage_logs
 CREATE TABLE IF NOT EXISTS "api_key_usage_logs" (
@@ -340,16 +376,17 @@ CREATE TABLE IF NOT EXISTS "api_key_usage_logs" (
 ALTER TABLE "api_key_usage_logs" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "api_key_usage_logs_rls_select" ON "api_key_usage_logs";
 CREATE POLICY "api_key_usage_logs_rls_select" ON "api_key_usage_logs" FOR SELECT TO public
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "api_key_usage_logs_rls_insert" ON "api_key_usage_logs";
 CREATE POLICY "api_key_usage_logs_rls_insert" ON "api_key_usage_logs" FOR INSERT TO public
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "api_key_usage_logs_rls_update" ON "api_key_usage_logs";
 CREATE POLICY "api_key_usage_logs_rls_update" ON "api_key_usage_logs" FOR UPDATE TO public
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "api_key_usage_logs_rls_delete" ON "api_key_usage_logs";
 CREATE POLICY "api_key_usage_logs_rls_delete" ON "api_key_usage_logs" FOR DELETE TO public
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 -- ================================================================
 -- ACTIVITY LOG
@@ -388,10 +425,11 @@ CREATE POLICY "activity_log_rls_select" ON "activity_log" FOR SELECT TO public
   USING ((SELECT current_setting('app.current_user_role', true)) = 'admin');
 DROP POLICY IF EXISTS "activity_log_rls_insert" ON "activity_log";
 CREATE POLICY "activity_log_rls_insert" ON "activity_log" FOR INSERT TO public
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "activity_log_rls_update" ON "activity_log";
 CREATE POLICY "activity_log_rls_update" ON "activity_log" FOR UPDATE TO public
-  USING (false);
+  USING (false)
+  WITH CHECK (false);
 DROP POLICY IF EXISTS "activity_log_rls_delete" ON "activity_log";
 CREATE POLICY "activity_log_rls_delete" ON "activity_log" FOR DELETE TO public
   USING ((SELECT current_setting('app.current_user_role', true)) = 'admin');
@@ -444,16 +482,26 @@ ALTER TABLE "tasks" ENABLE ROW LEVEL SECURITY;
 -- Keep in lockstep with modules-core/tasks/database/schema.sql.
 DROP POLICY IF EXISTS "tasks_rls_select" ON "tasks";
 CREATE POLICY "tasks_rls_select" ON "tasks" FOR SELECT TO public
-  USING (app.can_access_shared() AND (is_private IS NOT TRUE OR user_id::text = (SELECT current_setting('app.current_user_id'))));
+  USING ((SELECT app.can_access_shared()) AND (is_private IS NOT TRUE OR user_id::text = (SELECT current_setting('app.current_user_id', true))));
 DROP POLICY IF EXISTS "tasks_rls_insert" ON "tasks";
 CREATE POLICY "tasks_rls_insert" ON "tasks" FOR INSERT TO public
-  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "tasks_rls_update" ON "tasks";
 CREATE POLICY "tasks_rls_update" ON "tasks" FOR UPDATE TO public
-  USING (app.can_access_shared() AND (is_private IS NOT TRUE OR user_id::text = (SELECT current_setting('app.current_user_id'))));
+  USING ((SELECT app.can_access_shared()) AND (is_private IS NOT TRUE OR user_id::text = (SELECT current_setting('app.current_user_id', true))))
+  WITH CHECK ((SELECT app.can_access_shared()) AND (is_private IS NOT TRUE OR user_id::text = (SELECT current_setting('app.current_user_id', true))));
 DROP POLICY IF EXISTS "tasks_rls_delete" ON "tasks";
 CREATE POLICY "tasks_rls_delete" ON "tasks" FOR DELETE TO public
-  USING (app.can_access_shared() AND (is_private IS NOT TRUE OR user_id::text = (SELECT current_setting('app.current_user_id'))));
+  USING ((SELECT app.can_access_shared()) AND (is_private IS NOT TRUE OR user_id::text = (SELECT current_setting('app.current_user_id', true))));
+
+-- Shared table: user_id may never be reassigned (see app.prevent_user_id_reassignment
+-- in lib/db/setup.sql — inert until the app pool sets app.enforced).
+DROP TRIGGER IF EXISTS tasks_user_id_immutable ON "tasks";
+CREATE TRIGGER tasks_user_id_immutable
+  BEFORE UPDATE ON "tasks"
+  FOR EACH ROW
+  WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id)
+  EXECUTE FUNCTION app.prevent_user_id_reassignment();
 
 -- Table: quotes
 CREATE TABLE IF NOT EXISTS "quotes" (
@@ -468,16 +516,26 @@ CREATE TABLE IF NOT EXISTS "quotes" (
 ALTER TABLE "quotes" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "quotes_rls_select" ON "quotes";
 CREATE POLICY "quotes_rls_select" ON "quotes" FOR SELECT TO public
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
 DROP POLICY IF EXISTS "quotes_rls_insert" ON "quotes";
 CREATE POLICY "quotes_rls_insert" ON "quotes" FOR INSERT TO public
-  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "quotes_rls_update" ON "quotes";
 CREATE POLICY "quotes_rls_update" ON "quotes" FOR UPDATE TO public
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()))
+  WITH CHECK ((SELECT app.can_access_shared()));
 DROP POLICY IF EXISTS "quotes_rls_delete" ON "quotes";
 CREATE POLICY "quotes_rls_delete" ON "quotes" FOR DELETE TO public
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
+
+-- Shared table: user_id may never be reassigned (see app.prevent_user_id_reassignment
+-- in lib/db/setup.sql — inert until the app pool sets app.enforced).
+DROP TRIGGER IF EXISTS quotes_user_id_immutable ON "quotes";
+CREATE TRIGGER quotes_user_id_immutable
+  BEFORE UPDATE ON "quotes"
+  FOR EACH ROW
+  WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id)
+  EXECUTE FUNCTION app.prevent_user_id_reassignment();
 
 -- Table: music_playlist
 CREATE TABLE IF NOT EXISTS "music_playlist" (
@@ -493,16 +551,17 @@ CREATE TABLE IF NOT EXISTS "music_playlist" (
 ALTER TABLE "music_playlist" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "music_playlist_rls_select" ON "music_playlist";
 CREATE POLICY "music_playlist_rls_select" ON "music_playlist" FOR SELECT TO public
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "music_playlist_rls_insert" ON "music_playlist";
 CREATE POLICY "music_playlist_rls_insert" ON "music_playlist" FOR INSERT TO public
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "music_playlist_rls_update" ON "music_playlist";
 CREATE POLICY "music_playlist_rls_update" ON "music_playlist" FOR UPDATE TO public
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "music_playlist_rls_delete" ON "music_playlist";
 CREATE POLICY "music_playlist_rls_delete" ON "music_playlist" FOR DELETE TO public
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 -- Table: notepad
 CREATE TABLE IF NOT EXISTS "notepad" (
@@ -517,16 +576,17 @@ CREATE TABLE IF NOT EXISTS "notepad" (
 ALTER TABLE "notepad" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "notepad_rls_select" ON "notepad";
 CREATE POLICY "notepad_rls_select" ON "notepad" FOR SELECT TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "notepad_rls_insert" ON "notepad";
 CREATE POLICY "notepad_rls_insert" ON "notepad" FOR INSERT TO public
-  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "notepad_rls_update" ON "notepad";
 CREATE POLICY "notepad_rls_update" ON "notepad" FOR UPDATE TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "notepad_rls_delete" ON "notepad";
 CREATE POLICY "notepad_rls_delete" ON "notepad" FOR DELETE TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 
 -- Table: notepad_revisions
 CREATE TABLE IF NOT EXISTS "notepad_revisions" (
@@ -540,16 +600,17 @@ CREATE TABLE IF NOT EXISTS "notepad_revisions" (
 ALTER TABLE "notepad_revisions" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "notepad_revisions_rls_select" ON "notepad_revisions";
 CREATE POLICY "notepad_revisions_rls_select" ON "notepad_revisions" FOR SELECT TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "notepad_revisions_rls_insert" ON "notepad_revisions";
 CREATE POLICY "notepad_revisions_rls_insert" ON "notepad_revisions" FOR INSERT TO public
-  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "notepad_revisions_rls_update" ON "notepad_revisions";
 CREATE POLICY "notepad_revisions_rls_update" ON "notepad_revisions" FOR UPDATE TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "notepad_revisions_rls_delete" ON "notepad_revisions";
 CREATE POLICY "notepad_revisions_rls_delete" ON "notepad_revisions" FOR DELETE TO public
-  USING (user_id::text = (SELECT current_setting('app.current_user_id')));
+  USING (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 
 -- Table: brainstorm_boards
 CREATE TABLE IF NOT EXISTS "brainstorm_boards" (
@@ -563,16 +624,26 @@ CREATE TABLE IF NOT EXISTS "brainstorm_boards" (
 ALTER TABLE "brainstorm_boards" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "brainstorm_boards_rls_select" ON "brainstorm_boards";
 CREATE POLICY "brainstorm_boards_rls_select" ON "brainstorm_boards" FOR SELECT TO public
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
 DROP POLICY IF EXISTS "brainstorm_boards_rls_insert" ON "brainstorm_boards";
 CREATE POLICY "brainstorm_boards_rls_insert" ON "brainstorm_boards" FOR INSERT TO public
-  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "brainstorm_boards_rls_update" ON "brainstorm_boards";
 CREATE POLICY "brainstorm_boards_rls_update" ON "brainstorm_boards" FOR UPDATE TO public
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()))
+  WITH CHECK ((SELECT app.can_access_shared()));
 DROP POLICY IF EXISTS "brainstorm_boards_rls_delete" ON "brainstorm_boards";
 CREATE POLICY "brainstorm_boards_rls_delete" ON "brainstorm_boards" FOR DELETE TO public
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
+
+-- Shared table: user_id may never be reassigned (see app.prevent_user_id_reassignment
+-- in lib/db/setup.sql — inert until the app pool sets app.enforced).
+DROP TRIGGER IF EXISTS brainstorm_boards_user_id_immutable ON "brainstorm_boards";
+CREATE TRIGGER brainstorm_boards_user_id_immutable
+  BEFORE UPDATE ON "brainstorm_boards"
+  FOR EACH ROW
+  WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id)
+  EXECUTE FUNCTION app.prevent_user_id_reassignment();
 
 -- Table: brainstorm_nodes
 CREATE TABLE IF NOT EXISTS "brainstorm_nodes" (
@@ -590,16 +661,26 @@ CREATE TABLE IF NOT EXISTS "brainstorm_nodes" (
 ALTER TABLE "brainstorm_nodes" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "brainstorm_nodes_rls_select" ON "brainstorm_nodes";
 CREATE POLICY "brainstorm_nodes_rls_select" ON "brainstorm_nodes" FOR SELECT TO public
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
 DROP POLICY IF EXISTS "brainstorm_nodes_rls_insert" ON "brainstorm_nodes";
 CREATE POLICY "brainstorm_nodes_rls_insert" ON "brainstorm_nodes" FOR INSERT TO public
-  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "brainstorm_nodes_rls_update" ON "brainstorm_nodes";
 CREATE POLICY "brainstorm_nodes_rls_update" ON "brainstorm_nodes" FOR UPDATE TO public
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()))
+  WITH CHECK ((SELECT app.can_access_shared()));
 DROP POLICY IF EXISTS "brainstorm_nodes_rls_delete" ON "brainstorm_nodes";
 CREATE POLICY "brainstorm_nodes_rls_delete" ON "brainstorm_nodes" FOR DELETE TO public
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
+
+-- Shared table: user_id may never be reassigned (see app.prevent_user_id_reassignment
+-- in lib/db/setup.sql — inert until the app pool sets app.enforced).
+DROP TRIGGER IF EXISTS brainstorm_nodes_user_id_immutable ON "brainstorm_nodes";
+CREATE TRIGGER brainstorm_nodes_user_id_immutable
+  BEFORE UPDATE ON "brainstorm_nodes"
+  FOR EACH ROW
+  WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id)
+  EXECUTE FUNCTION app.prevent_user_id_reassignment();
 
 -- Table: brainstorm_edges
 CREATE TABLE IF NOT EXISTS "brainstorm_edges" (
@@ -616,16 +697,26 @@ CREATE TABLE IF NOT EXISTS "brainstorm_edges" (
 ALTER TABLE "brainstorm_edges" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "brainstorm_edges_rls_select" ON "brainstorm_edges";
 CREATE POLICY "brainstorm_edges_rls_select" ON "brainstorm_edges" FOR SELECT TO public
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
 DROP POLICY IF EXISTS "brainstorm_edges_rls_insert" ON "brainstorm_edges";
 CREATE POLICY "brainstorm_edges_rls_insert" ON "brainstorm_edges" FOR INSERT TO public
-  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS "brainstorm_edges_rls_update" ON "brainstorm_edges";
 CREATE POLICY "brainstorm_edges_rls_update" ON "brainstorm_edges" FOR UPDATE TO public
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()))
+  WITH CHECK ((SELECT app.can_access_shared()));
 DROP POLICY IF EXISTS "brainstorm_edges_rls_delete" ON "brainstorm_edges";
 CREATE POLICY "brainstorm_edges_rls_delete" ON "brainstorm_edges" FOR DELETE TO public
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
+
+-- Shared table: user_id may never be reassigned (see app.prevent_user_id_reassignment
+-- in lib/db/setup.sql — inert until the app pool sets app.enforced).
+DROP TRIGGER IF EXISTS brainstorm_edges_user_id_immutable ON "brainstorm_edges";
+CREATE TRIGGER brainstorm_edges_user_id_immutable
+  BEFORE UPDATE ON "brainstorm_edges"
+  FOR EACH ROW
+  WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id)
+  EXECUTE FUNCTION app.prevent_user_id_reassignment();
 
 -- ================================================================
 -- ARI INSTANCE (per-install identity for anonymous telemetry)
@@ -774,6 +865,24 @@ AS $$
   ORDER BY t.table_name;
 $$;
 
+-- Callable only by the owner (the privileged DATABASE_URL role): EXECUTE is
+-- revoked from PUBLIC and, where they exist (Supabase), from the PostgREST
+-- roles anon/authenticated, which Supabase's default privileges would
+-- otherwise grant on every new public function. A SECURITY DEFINER function
+-- over information_schema is a table-name / row-count oracle for anyone who
+-- can call it. Re-run every boot because the DROP FUNCTION above resets the
+-- ACL. Phase 2 of DB-level RLS enforcement also revokes it from ari_app.
+REVOKE ALL ON FUNCTION public.get_all_user_tables() FROM PUBLIC;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    REVOKE ALL ON FUNCTION public.get_all_user_tables() FROM anon;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON FUNCTION public.get_all_user_tables() FROM authenticated;
+  END IF;
+END $$;
+
 -- Returns column metadata for every public-schema table in one call.
 DROP FUNCTION IF EXISTS public.get_all_table_columns();
 CREATE OR REPLACE FUNCTION public.get_all_table_columns()
@@ -807,6 +916,18 @@ AS $$
   ORDER BY c.table_name, c.ordinal_position;
 $$;
 
+-- Owner-only, same reasoning as get_all_user_tables() above.
+REVOKE ALL ON FUNCTION public.get_all_table_columns() FROM PUBLIC;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    REVOKE ALL ON FUNCTION public.get_all_table_columns() FROM anon;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON FUNCTION public.get_all_table_columns() FROM authenticated;
+  END IF;
+END $$;
+
 -- Returns approximate row counts for every public-schema table.
 DROP FUNCTION IF EXISTS public.get_table_row_counts();
 CREATE OR REPLACE FUNCTION public.get_table_row_counts()
@@ -832,6 +953,18 @@ BEGIN
   END LOOP;
 END;
 $$;
+
+-- Owner-only, same reasoning as get_all_user_tables() above.
+REVOKE ALL ON FUNCTION public.get_table_row_counts() FROM PUBLIC;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    REVOKE ALL ON FUNCTION public.get_table_row_counts() FROM anon;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON FUNCTION public.get_table_row_counts() FROM authenticated;
+  END IF;
+END $$;
 
 -- exec_sql (an arbitrary-SQL SECURITY DEFINER helper once used by backup
 -- discovery) has no callers anywhere in the codebase — the backup routes

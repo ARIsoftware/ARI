@@ -25,19 +25,20 @@ ALTER TABLE board_advisors ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS board_advisors_rls_select ON board_advisors;
 CREATE POLICY board_advisors_rls_select ON board_advisors FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS board_advisors_rls_insert ON board_advisors;
 CREATE POLICY board_advisors_rls_insert ON board_advisors FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS board_advisors_rls_update ON board_advisors;
 CREATE POLICY board_advisors_rls_update ON board_advisors FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS board_advisors_rls_delete ON board_advisors;
 CREATE POLICY board_advisors_rls_delete ON board_advisors FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 
 CREATE TABLE IF NOT EXISTS board_conversations (
@@ -55,19 +56,20 @@ ALTER TABLE board_conversations ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS board_conversations_rls_select ON board_conversations;
 CREATE POLICY board_conversations_rls_select ON board_conversations FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS board_conversations_rls_insert ON board_conversations;
 CREATE POLICY board_conversations_rls_insert ON board_conversations FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS board_conversations_rls_update ON board_conversations;
 CREATE POLICY board_conversations_rls_update ON board_conversations FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS board_conversations_rls_delete ON board_conversations;
 CREATE POLICY board_conversations_rls_delete ON board_conversations FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 
 -- role is either 'user' (the human asking) or 'advisor' (one persona's reply).
@@ -95,16 +97,17 @@ ALTER TABLE board_messages ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS board_messages_rls_select ON board_messages;
 CREATE POLICY board_messages_rls_select ON board_messages FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS board_messages_rls_insert ON board_messages;
 CREATE POLICY board_messages_rls_insert ON board_messages FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS board_messages_rls_update ON board_messages;
 CREATE POLICY board_messages_rls_update ON board_messages FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS board_messages_rls_delete ON board_messages;
 CREATE POLICY board_messages_rls_delete ON board_messages FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));

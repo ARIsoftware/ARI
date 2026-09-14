@@ -34,16 +34,26 @@ ALTER TABLE motivation_videos ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS motivation_videos_rls_select ON motivation_videos;
 CREATE POLICY motivation_videos_rls_select ON motivation_videos FOR SELECT
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
 
 DROP POLICY IF EXISTS motivation_videos_rls_insert ON motivation_videos;
 CREATE POLICY motivation_videos_rls_insert ON motivation_videos FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS motivation_videos_rls_update ON motivation_videos;
 CREATE POLICY motivation_videos_rls_update ON motivation_videos FOR UPDATE
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()))
+  WITH CHECK ((SELECT app.can_access_shared()));
 
 DROP POLICY IF EXISTS motivation_videos_rls_delete ON motivation_videos;
 CREATE POLICY motivation_videos_rls_delete ON motivation_videos FOR DELETE
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
+
+-- Shared table: user_id may never be reassigned (see app.prevent_user_id_reassignment
+-- in lib/db/setup.sql — inert until the app pool sets app.enforced).
+DROP TRIGGER IF EXISTS motivation_videos_user_id_immutable ON motivation_videos;
+CREATE TRIGGER motivation_videos_user_id_immutable
+  BEFORE UPDATE ON motivation_videos
+  FOR EACH ROW
+  WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id)
+  EXECUTE FUNCTION app.prevent_user_id_reassignment();

@@ -63,22 +63,23 @@ ALTER TABLE todays_brief_google_tokens ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS morning_brief_google_tokens_rls_select ON todays_brief_google_tokens;
 DROP POLICY IF EXISTS todays_brief_google_tokens_rls_select ON todays_brief_google_tokens;
 CREATE POLICY todays_brief_google_tokens_rls_select ON todays_brief_google_tokens FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS morning_brief_google_tokens_rls_insert ON todays_brief_google_tokens;
 DROP POLICY IF EXISTS todays_brief_google_tokens_rls_insert ON todays_brief_google_tokens;
 CREATE POLICY todays_brief_google_tokens_rls_insert ON todays_brief_google_tokens FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS morning_brief_google_tokens_rls_update ON todays_brief_google_tokens;
 DROP POLICY IF EXISTS todays_brief_google_tokens_rls_update ON todays_brief_google_tokens;
 CREATE POLICY todays_brief_google_tokens_rls_update ON todays_brief_google_tokens FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS morning_brief_google_tokens_rls_delete ON todays_brief_google_tokens;
 DROP POLICY IF EXISTS todays_brief_google_tokens_rls_delete ON todays_brief_google_tokens;
 CREATE POLICY todays_brief_google_tokens_rls_delete ON todays_brief_google_tokens FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 -- ─── iCal subscription (alternative to OAuth) ───────────────────────────────
 -- A single subscribed .ics feed URL per user (e.g. Google's "secret address in
@@ -102,22 +103,23 @@ ALTER TABLE todays_brief_ical_subscriptions ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS morning_brief_ical_subscriptions_rls_select ON todays_brief_ical_subscriptions;
 DROP POLICY IF EXISTS todays_brief_ical_subscriptions_rls_select ON todays_brief_ical_subscriptions;
 CREATE POLICY todays_brief_ical_subscriptions_rls_select ON todays_brief_ical_subscriptions FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS morning_brief_ical_subscriptions_rls_insert ON todays_brief_ical_subscriptions;
 DROP POLICY IF EXISTS todays_brief_ical_subscriptions_rls_insert ON todays_brief_ical_subscriptions;
 CREATE POLICY todays_brief_ical_subscriptions_rls_insert ON todays_brief_ical_subscriptions FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS morning_brief_ical_subscriptions_rls_update ON todays_brief_ical_subscriptions;
 DROP POLICY IF EXISTS todays_brief_ical_subscriptions_rls_update ON todays_brief_ical_subscriptions;
 CREATE POLICY todays_brief_ical_subscriptions_rls_update ON todays_brief_ical_subscriptions FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS morning_brief_ical_subscriptions_rls_delete ON todays_brief_ical_subscriptions;
 DROP POLICY IF EXISTS todays_brief_ical_subscriptions_rls_delete ON todays_brief_ical_subscriptions;
 CREATE POLICY todays_brief_ical_subscriptions_rls_delete ON todays_brief_ical_subscriptions FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 -- ─── Daily greeting cache ───────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS todays_brief_greetings (
@@ -142,19 +144,20 @@ ALTER TABLE todays_brief_greetings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS morning_brief_greetings_rls_select ON todays_brief_greetings;
 DROP POLICY IF EXISTS todays_brief_greetings_rls_select ON todays_brief_greetings;
 CREATE POLICY todays_brief_greetings_rls_select ON todays_brief_greetings FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS morning_brief_greetings_rls_insert ON todays_brief_greetings;
 DROP POLICY IF EXISTS todays_brief_greetings_rls_insert ON todays_brief_greetings;
 CREATE POLICY todays_brief_greetings_rls_insert ON todays_brief_greetings FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS morning_brief_greetings_rls_update ON todays_brief_greetings;
 DROP POLICY IF EXISTS todays_brief_greetings_rls_update ON todays_brief_greetings;
 CREATE POLICY todays_brief_greetings_rls_update ON todays_brief_greetings FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS morning_brief_greetings_rls_delete ON todays_brief_greetings;
 DROP POLICY IF EXISTS todays_brief_greetings_rls_delete ON todays_brief_greetings;
 CREATE POLICY todays_brief_greetings_rls_delete ON todays_brief_greetings FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));

@@ -43,17 +43,18 @@ ALTER TABLE module_template_entries ENABLE ROW LEVEL SECURITY;
 -- SELECT/UPDATE/DELETE with `app.can_access_shared()` and leave INSERT as-is.
 DROP POLICY IF EXISTS module_template_entries_rls_select ON module_template_entries;
 CREATE POLICY module_template_entries_rls_select ON module_template_entries FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 -- INSERT always stamps the creator as owner — keep this on shared tables too.
 DROP POLICY IF EXISTS module_template_entries_rls_insert ON module_template_entries;
 CREATE POLICY module_template_entries_rls_insert ON module_template_entries FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS module_template_entries_rls_update ON module_template_entries;
 CREATE POLICY module_template_entries_rls_update ON module_template_entries FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS module_template_entries_rls_delete ON module_template_entries;
 CREATE POLICY module_template_entries_rls_delete ON module_template_entries FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));

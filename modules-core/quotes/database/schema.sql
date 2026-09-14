@@ -18,16 +18,26 @@ ALTER TABLE quotes ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS quotes_rls_select ON quotes;
 CREATE POLICY quotes_rls_select ON quotes FOR SELECT
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
 
 DROP POLICY IF EXISTS quotes_rls_insert ON quotes;
 CREATE POLICY quotes_rls_insert ON quotes FOR INSERT
-  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS quotes_rls_update ON quotes;
 CREATE POLICY quotes_rls_update ON quotes FOR UPDATE
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()))
+  WITH CHECK ((SELECT app.can_access_shared()));
 
 DROP POLICY IF EXISTS quotes_rls_delete ON quotes;
 CREATE POLICY quotes_rls_delete ON quotes FOR DELETE
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()));
+
+-- Shared table: user_id may never be reassigned (see app.prevent_user_id_reassignment
+-- in lib/db/setup.sql — inert until the app pool sets app.enforced).
+DROP TRIGGER IF EXISTS quotes_user_id_immutable ON quotes;
+CREATE TRIGGER quotes_user_id_immutable
+  BEFORE UPDATE ON quotes
+  FOR EACH ROW
+  WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id)
+  EXECUTE FUNCTION app.prevent_user_id_reassignment();

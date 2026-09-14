@@ -75,16 +75,17 @@ ALTER TABLE portfolio_tickers ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS portfolio_tickers_rls_select ON portfolio_tickers;
 CREATE POLICY portfolio_tickers_rls_select ON portfolio_tickers FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS portfolio_tickers_rls_insert ON portfolio_tickers;
 CREATE POLICY portfolio_tickers_rls_insert ON portfolio_tickers FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS portfolio_tickers_rls_update ON portfolio_tickers;
 CREATE POLICY portfolio_tickers_rls_update ON portfolio_tickers FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS portfolio_tickers_rls_delete ON portfolio_tickers;
 CREATE POLICY portfolio_tickers_rls_delete ON portfolio_tickers FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));

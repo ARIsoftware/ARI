@@ -40,16 +40,17 @@ ALTER TABLE timezone_people ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS timezone_people_rls_select ON timezone_people;
 CREATE POLICY timezone_people_rls_select ON timezone_people FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS timezone_people_rls_insert ON timezone_people;
 CREATE POLICY timezone_people_rls_insert ON timezone_people FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS timezone_people_rls_update ON timezone_people;
 CREATE POLICY timezone_people_rls_update ON timezone_people FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS timezone_people_rls_delete ON timezone_people;
 CREATE POLICY timezone_people_rls_delete ON timezone_people FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));

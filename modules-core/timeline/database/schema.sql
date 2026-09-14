@@ -74,16 +74,17 @@ ALTER TABLE timeline_events ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS timeline_events_rls_select ON timeline_events;
 CREATE POLICY timeline_events_rls_select ON timeline_events FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS timeline_events_rls_insert ON timeline_events;
 CREATE POLICY timeline_events_rls_insert ON timeline_events FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS timeline_events_rls_update ON timeline_events;
 CREATE POLICY timeline_events_rls_update ON timeline_events FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS timeline_events_rls_delete ON timeline_events;
 CREATE POLICY timeline_events_rls_delete ON timeline_events FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));

@@ -95,19 +95,29 @@ ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 -- predicate explicitly (the default role has BYPASSRLS).
 DROP POLICY IF EXISTS tasks_rls_select ON tasks;
 CREATE POLICY tasks_rls_select ON tasks FOR SELECT
-  USING (app.can_access_shared() AND (is_private IS NOT TRUE OR user_id::text = (SELECT current_setting('app.current_user_id'))));
+  USING ((SELECT app.can_access_shared()) AND (is_private IS NOT TRUE OR user_id::text = (SELECT current_setting('app.current_user_id', true))));
 
 DROP POLICY IF EXISTS tasks_rls_insert ON tasks;
 CREATE POLICY tasks_rls_insert ON tasks FOR INSERT
-  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS tasks_rls_update ON tasks;
 CREATE POLICY tasks_rls_update ON tasks FOR UPDATE
-  USING (app.can_access_shared() AND (is_private IS NOT TRUE OR user_id::text = (SELECT current_setting('app.current_user_id'))));
+  USING ((SELECT app.can_access_shared()) AND (is_private IS NOT TRUE OR user_id::text = (SELECT current_setting('app.current_user_id', true))))
+  WITH CHECK ((SELECT app.can_access_shared()) AND (is_private IS NOT TRUE OR user_id::text = (SELECT current_setting('app.current_user_id', true))));
 
 DROP POLICY IF EXISTS tasks_rls_delete ON tasks;
 CREATE POLICY tasks_rls_delete ON tasks FOR DELETE
-  USING (app.can_access_shared() AND (is_private IS NOT TRUE OR user_id::text = (SELECT current_setting('app.current_user_id'))));
+  USING ((SELECT app.can_access_shared()) AND (is_private IS NOT TRUE OR user_id::text = (SELECT current_setting('app.current_user_id', true))));
+
+-- Shared table: user_id may never be reassigned (see app.prevent_user_id_reassignment
+-- in lib/db/setup.sql — inert until the app pool sets app.enforced).
+DROP TRIGGER IF EXISTS tasks_user_id_immutable ON tasks;
+CREATE TRIGGER tasks_user_id_immutable
+  BEFORE UPDATE ON tasks
+  FOR EACH ROW
+  WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id)
+  EXECUTE FUNCTION app.prevent_user_id_reassignment();
 
 -- =============================================================================
 -- SUBTASKS
@@ -144,21 +154,37 @@ CREATE INDEX IF NOT EXISTS idx_task_subtasks_user_task ON task_subtasks(user_id,
 
 ALTER TABLE task_subtasks ENABLE ROW LEVEL SECURITY;
 
+-- Subtasks inherit the parent task's privacy: a subtask of a task that
+-- another user has marked private is invisible and immutable, and nobody can
+-- attach a subtask to such a task. The EXISTS predicate mirrors tasks'
+-- (is_private IS NOT TRUE OR user_id = self) rule and the API's
+-- parentTaskVisibleTo() in lib/task-query.ts. Under DB-level enforcement the
+-- inner SELECT on tasks is itself RLS-filtered, so the two rules agree.
 DROP POLICY IF EXISTS task_subtasks_rls_select ON task_subtasks;
 CREATE POLICY task_subtasks_rls_select ON task_subtasks FOR SELECT
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()) AND EXISTS (SELECT 1 FROM tasks t WHERE t.id = task_subtasks.task_id AND (t.is_private IS NOT TRUE OR t.user_id::text = (SELECT current_setting('app.current_user_id', true)))));
 
 DROP POLICY IF EXISTS task_subtasks_rls_insert ON task_subtasks;
 CREATE POLICY task_subtasks_rls_insert ON task_subtasks FOR INSERT
-  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id::text = (SELECT current_setting('app.current_user_id', true)) AND EXISTS (SELECT 1 FROM tasks t WHERE t.id = task_subtasks.task_id AND (t.is_private IS NOT TRUE OR t.user_id::text = (SELECT current_setting('app.current_user_id', true)))));
 
 DROP POLICY IF EXISTS task_subtasks_rls_update ON task_subtasks;
 CREATE POLICY task_subtasks_rls_update ON task_subtasks FOR UPDATE
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()) AND EXISTS (SELECT 1 FROM tasks t WHERE t.id = task_subtasks.task_id AND (t.is_private IS NOT TRUE OR t.user_id::text = (SELECT current_setting('app.current_user_id', true)))))
+  WITH CHECK ((SELECT app.can_access_shared()) AND EXISTS (SELECT 1 FROM tasks t WHERE t.id = task_subtasks.task_id AND (t.is_private IS NOT TRUE OR t.user_id::text = (SELECT current_setting('app.current_user_id', true)))));
 
 DROP POLICY IF EXISTS task_subtasks_rls_delete ON task_subtasks;
 CREATE POLICY task_subtasks_rls_delete ON task_subtasks FOR DELETE
-  USING (app.can_access_shared());
+  USING ((SELECT app.can_access_shared()) AND EXISTS (SELECT 1 FROM tasks t WHERE t.id = task_subtasks.task_id AND (t.is_private IS NOT TRUE OR t.user_id::text = (SELECT current_setting('app.current_user_id', true)))));
+
+-- Shared table: user_id may never be reassigned (see app.prevent_user_id_reassignment
+-- in lib/db/setup.sql — inert until the app pool sets app.enforced).
+DROP TRIGGER IF EXISTS task_subtasks_user_id_immutable ON task_subtasks;
+CREATE TRIGGER task_subtasks_user_id_immutable
+  BEFORE UPDATE ON task_subtasks
+  FOR EACH ROW
+  WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id)
+  EXECUTE FUNCTION app.prevent_user_id_reassignment();
 
 -- Reconcile the derived counters with the real subtask rows. Tasks created
 -- before subtasks were rows stored a hand-entered numeric counter; the API no

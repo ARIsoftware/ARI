@@ -13,6 +13,14 @@
  *                reference `user.id` in a where filter.
  *   3. STAMP   — a route that INSERTs into a classified table must stamp
  *                `userId: user.id` (owner is stamped in both data models).
+ *   4. DENY-ALL — no `withRLS(...)` / `withUserContext(...)` block may query a
+ *                table whose policies are deny-all (`user`, `session`,
+ *                `account`, `verification`, `twoFactor`, `ari_instance`, …) or
+ *                admin-only (`activity_log`). Once request-path queries run on
+ *                the non-BYPASSRLS app pool those reads return EMPTY silently,
+ *                not an error — such tables are read through `withAdminDb` or
+ *                the raw pool only (as every current caller already does).
+ *                Scanned in route files AND every lib/ file (root + modules).
  *
  * Per-user vs shared is derived from the RLS policies themselves:
  * `app.can_access_shared()` in a table's policies → shared; policies built on
@@ -87,6 +95,33 @@ function classifyTablesFromSql(sql: string, into: Map<string, TableModel>): void
   }
 }
 
+/**
+ * Tables that request-path (RLS-context) queries must never touch.
+ *  - deny-all: every policy on the table is `USING (false)` (auth + instance tables)
+ *  - role-gated: SELECT is gated on `app.current_user_role` (admin-only audit tables)
+ */
+const denyAllTables = new Set<string>()
+const roleGatedTables = new Set<string>()
+
+function classifyRestrictedTables(sql: string): void {
+  const clean = stripSqlComments(sql)
+  const perTable = new Map<string, { total: number; denied: number; roleGated: boolean }>()
+  const policyRe = /CREATE\s+POLICY[^;]+?\bON\s+(?:public\.)?"?([a-zA-Z0-9_]+)"?[^;]*;/gi
+  for (const m of clean.matchAll(policyRe)) {
+    const table = m[1].toLowerCase()
+    const stmt = m[0]
+    const entry = perTable.get(table) ?? { total: 0, denied: 0, roleGated: false }
+    entry.total++
+    if (/\bUSING\s*\(\s*false\s*\)/i.test(stmt)) entry.denied++
+    if (/\bFOR\s+SELECT\b[\s\S]*app\.current_user_role/i.test(stmt)) entry.roleGated = true
+    perTable.set(table, entry)
+  }
+  for (const [table, e] of perTable) {
+    if (e.denied === e.total) denyAllTables.add(table)
+    else if (e.roleGated) roleGatedTables.add(table)
+  }
+}
+
 /** Map Drizzle export identifiers → SQL table names from a schema.ts file. */
 function parseDrizzleExports(src: string, into: Map<string, string>): void {
   const re = /export\s+const\s+(\w+)\s*=\s*pgTable\(\s*['"]([a-zA-Z0-9_]+)['"]/g
@@ -101,6 +136,7 @@ const tableModel = new Map<string, TableModel>() // sql table name → model
 const drizzleToTable = new Map<string, string>() // drizzle export name → sql table name
 
 classifyTablesFromSql(read(path.join(REPO_ROOT, 'lib/db/setup.sql')), tableModel)
+classifyRestrictedTables(read(path.join(REPO_ROOT, 'lib/db/setup.sql')))
 parseDrizzleExports(read(path.join(REPO_ROOT, 'lib/db/schema/core-schema.ts')), drizzleToTable)
 
 interface ModuleInfo {
@@ -125,7 +161,10 @@ function discoverModules(root: string): ModuleInfo[] {
       // invalid manifest is another audit's problem; treat as no public routes
     }
     const schemaSql = path.join(dir, 'database/schema.sql')
-    if (fs.existsSync(schemaSql)) classifyTablesFromSql(read(schemaSql), tableModel)
+    if (fs.existsSync(schemaSql)) {
+      classifyTablesFromSql(read(schemaSql), tableModel)
+      classifyRestrictedTables(read(schemaSql))
+    }
     const schemaTs = path.join(dir, 'database/schema.ts')
     if (fs.existsSync(schemaTs)) parseDrizzleExports(read(schemaTs), drizzleToTable)
     modules.push({ dir, rel: path.join(root, entry.name), publicRoutes })
@@ -142,7 +181,7 @@ const customModules = discoverModules('modules-custom')
 
 interface Violation {
   file: string
-  rule: 'auth' | 'filter' | 'stamp'
+  rule: 'auth' | 'filter' | 'stamp' | 'deny-all'
   message: string
 }
 
@@ -154,6 +193,59 @@ const OWNER_FILTER_RE =
   /(?:userId|user_id)\s*,\s*(?:user\.id|userId)\s*\)|user_id[^\n]{0,40}\$\{(?:user\.id|userId)\}/
 // userId: user.id | userId: userId | `{ userId,` shorthand in .values()
 const OWNER_STAMP_RE = /(?:userId|user_id)\s*:\s*(?:user\.id|userId)\b|\{\s*userId\s*,/
+
+/** The argument text of every `withRLS(` / `withUserContext(` call (balanced parens). */
+function rlsContextBlocks(src: string): string[] {
+  const blocks: string[] = []
+  for (const m of src.matchAll(/\bwith(?:RLS|UserContext)\s*\(/g)) {
+    const open = m.index + m[0].length - 1
+    let depth = 0
+    for (let i = open; i < src.length; i++) {
+      if (src[i] === '(') depth++
+      else if (src[i] === ')' && --depth === 0) {
+        blocks.push(src.slice(open + 1, i))
+        break
+      }
+    }
+  }
+  return blocks
+}
+
+/** Restricted tables a code block queries — via a Drizzle table object or raw SQL. */
+function restrictedTablesUsed(block: string): string[] {
+  const hits = new Set<string>()
+  const restricted = new Set([...denyAllTables, ...roleGatedTables])
+  for (const [ident, table] of drizzleToTable) {
+    if (!restricted.has(table)) continue
+    const viaDrizzle = new RegExp(
+      `\\.(?:from|insert|update|delete|leftJoin|innerJoin|rightJoin|fullJoin)\\(\\s*${ident}\\s*[,)]`,
+    )
+    if (viaDrizzle.test(block)) hits.add(table)
+  }
+  for (const table of restricted) {
+    // raw SQL: uppercase keywords only, so prose like "from user settings" can't match
+    const viaSql = new RegExp(`\\b(?:FROM|JOIN|INTO|UPDATE)\\s+(?:public\\.)?"?${table}"?(?![\\w])`)
+    if (viaSql.test(block)) hits.add(table)
+  }
+  return [...hits].sort()
+}
+
+function denyAllViolations(rel: string, src: string): Violation[] {
+  const violations: Violation[] = []
+  for (const block of rlsContextBlocks(src)) {
+    const hits = restrictedTablesUsed(block)
+    if (hits.length === 0) continue
+    violations.push({
+      file: rel,
+      rule: 'deny-all',
+      message:
+        `A withRLS/withUserContext block queries ${hits.join(', ')}. Those tables are deny-all or ` +
+        'admin-only under RLS: on the non-BYPASSRLS app pool the query returns nothing, silently. ' +
+        'Read them through withAdminDb / the raw pool instead.',
+    })
+  }
+  return violations
+}
 
 /** Drizzle table identifiers referenced by this file, resolved to models. */
 function referencedModels(src: string): Set<TableModel> {
@@ -186,7 +278,7 @@ function authViaModuleLib(src: string, moduleDir: string): boolean {
 
 function scanRouteFile(
   absFile: string,
-  opts: { requireAuth: boolean; moduleDir?: string }
+  opts: { requireAuth: boolean; moduleDir?: string },
 ): Violation[] {
   const rel = path.relative(REPO_ROOT, absFile)
   if (EXCEPTIONS[rel]) return []
@@ -233,6 +325,25 @@ function scanRouteFile(
     })
   }
 
+  violations.push(...denyAllViolations(rel, src))
+
+  return violations
+}
+
+/** DENY-ALL only, over every .ts under the given repo-relative directories (tests excluded). */
+function scanLibFiles(roots: string[]): Violation[] {
+  const violations: Violation[] = []
+  for (const root of roots) {
+    const files = walk(
+      path.join(REPO_ROOT, root),
+      (p) => p.endsWith('.ts') && !p.endsWith('.test.ts') && !p.includes('/generated/'),
+    )
+    for (const file of files) {
+      const rel = path.relative(REPO_ROOT, file)
+      if (EXCEPTIONS[rel]) continue
+      violations.push(...denyAllViolations(rel, stripTsComments(read(file))))
+    }
+  }
   return violations
 }
 
@@ -254,7 +365,7 @@ function scanModules(modules: ModuleInfo[]): Violation[] {
     const routeFiles = walk(path.join(mod.dir, 'api'), (p) => p.endsWith('route.ts'))
     for (const file of routeFiles) {
       violations.push(
-        ...scanRouteFile(file, { requireAuth: !isPublicRoute(mod, file), moduleDir: mod.dir })
+        ...scanRouteFile(file, { requireAuth: !isPublicRoute(mod, file), moduleDir: mod.dir }),
       )
     }
   }
@@ -294,6 +405,45 @@ describe('route security scan — sanity', () => {
   it('found route files to scan', () => {
     expect(coreModules.length).toBeGreaterThan(5)
   })
+
+  it('classified deny-all and admin-only tables from the policies', () => {
+    for (const t of ['user', 'session', 'account', 'verification', 'twofactor', 'ari_instance']) {
+      expect(denyAllTables.has(t), `${t} should be deny-all`).toBe(true)
+    }
+    expect(roleGatedTables.has('activity_log')).toBe(true)
+    expect(denyAllTables.has('tasks')).toBe(false)
+    expect(denyAllTables.has('module_settings')).toBe(false)
+  })
+
+  it('deny-all detection sees Drizzle and raw-SQL usage inside RLS blocks only', () => {
+    const drizzle = `await withRLS((db) => db.select().from(user).where(eq(user.id, id)))`
+    const raw = 'await withUserContext(uid, (db) => db.execute(sql`SELECT 1 FROM "user"`))'
+    const admin = `const { user } = await getAuthenticatedUser(); await withAdminDb((db) => db.select().from(user))`
+    const other = `await withRLS((db) => db.select().from(userPreferences).where(eq(userPreferences.userId, user.id)))`
+    expect(denyAllViolations('x.ts', drizzle)).toHaveLength(1)
+    expect(denyAllViolations('x.ts', raw)).toHaveLength(1)
+    expect(denyAllViolations('x.ts', admin)).toHaveLength(0)
+    expect(denyAllViolations('x.ts', other)).toHaveLength(0)
+  })
+})
+
+describe('route security scan — deny-all tables never read under RLS (lib + modules)', () => {
+  it('root lib/ and modules-core lib/ never query deny-all or admin-only tables inside withRLS', () => {
+    const roots = ['lib', ...coreModules.map((m) => path.join(m.rel, 'lib'))]
+    const violations = scanLibFiles(roots)
+    expect(violations, format(violations)).toEqual([])
+  })
+
+  it('modules-custom lib/ (warn-only)', () => {
+    const violations = scanLibFiles(customModules.map((m) => path.join(m.rel, 'lib')))
+    if (violations.length > 0) {
+      console.warn(
+        `\n⚠ route-security-scan: ${violations.length} deny-all issue(s) in modules-custom lib ` +
+          `(not failing the suite):${format(violations)}\n`,
+      )
+    }
+    expect(true).toBe(true)
+  })
 })
 
 describe('route security scan — app/api', () => {
@@ -316,7 +466,7 @@ describe('route security scan — modules-custom (warn-only)', () => {
     if (violations.length > 0) {
       console.warn(
         `\n⚠ route-security-scan: ${violations.length} potential issue(s) in modules-custom ` +
-          `(not failing the suite):${format(violations)}\n`
+          `(not failing the suite):${format(violations)}\n`,
       )
     }
     expect(true).toBe(true)

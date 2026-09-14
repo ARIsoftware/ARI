@@ -167,16 +167,17 @@ ALTER TABLE health_data_routes ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS health_data_routes_rls_select ON health_data_routes;
 CREATE POLICY health_data_routes_rls_select ON health_data_routes FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS health_data_routes_rls_insert ON health_data_routes;
 CREATE POLICY health_data_routes_rls_insert ON health_data_routes FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS health_data_routes_rls_update ON health_data_routes;
 CREATE POLICY health_data_routes_rls_update ON health_data_routes FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS health_data_routes_rls_delete ON health_data_routes;
 CREATE POLICY health_data_routes_rls_delete ON health_data_routes FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 ALTER TABLE health_data_imports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE health_data_daily_metrics ENABLE ROW LEVEL SECURITY;
@@ -187,78 +188,84 @@ ALTER TABLE health_data_ecgs ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS health_data_imports_rls_select ON health_data_imports;
 CREATE POLICY health_data_imports_rls_select ON health_data_imports FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS health_data_imports_rls_insert ON health_data_imports;
 CREATE POLICY health_data_imports_rls_insert ON health_data_imports FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS health_data_imports_rls_update ON health_data_imports;
 CREATE POLICY health_data_imports_rls_update ON health_data_imports FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS health_data_imports_rls_delete ON health_data_imports;
 CREATE POLICY health_data_imports_rls_delete ON health_data_imports FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS health_data_daily_metrics_rls_select ON health_data_daily_metrics;
 CREATE POLICY health_data_daily_metrics_rls_select ON health_data_daily_metrics FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS health_data_daily_metrics_rls_insert ON health_data_daily_metrics;
 CREATE POLICY health_data_daily_metrics_rls_insert ON health_data_daily_metrics FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS health_data_daily_metrics_rls_update ON health_data_daily_metrics;
 CREATE POLICY health_data_daily_metrics_rls_update ON health_data_daily_metrics FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS health_data_daily_metrics_rls_delete ON health_data_daily_metrics;
 CREATE POLICY health_data_daily_metrics_rls_delete ON health_data_daily_metrics FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS health_data_workouts_rls_select ON health_data_workouts;
 CREATE POLICY health_data_workouts_rls_select ON health_data_workouts FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS health_data_workouts_rls_insert ON health_data_workouts;
 CREATE POLICY health_data_workouts_rls_insert ON health_data_workouts FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS health_data_workouts_rls_update ON health_data_workouts;
 CREATE POLICY health_data_workouts_rls_update ON health_data_workouts FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS health_data_workouts_rls_delete ON health_data_workouts;
 CREATE POLICY health_data_workouts_rls_delete ON health_data_workouts FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS health_data_activity_days_rls_select ON health_data_activity_days;
 CREATE POLICY health_data_activity_days_rls_select ON health_data_activity_days FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS health_data_activity_days_rls_insert ON health_data_activity_days;
 CREATE POLICY health_data_activity_days_rls_insert ON health_data_activity_days FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS health_data_activity_days_rls_update ON health_data_activity_days;
 CREATE POLICY health_data_activity_days_rls_update ON health_data_activity_days FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS health_data_activity_days_rls_delete ON health_data_activity_days;
 CREATE POLICY health_data_activity_days_rls_delete ON health_data_activity_days FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS health_data_sleep_nights_rls_select ON health_data_sleep_nights;
 CREATE POLICY health_data_sleep_nights_rls_select ON health_data_sleep_nights FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS health_data_sleep_nights_rls_insert ON health_data_sleep_nights;
 CREATE POLICY health_data_sleep_nights_rls_insert ON health_data_sleep_nights FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS health_data_sleep_nights_rls_update ON health_data_sleep_nights;
 CREATE POLICY health_data_sleep_nights_rls_update ON health_data_sleep_nights FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS health_data_sleep_nights_rls_delete ON health_data_sleep_nights;
 CREATE POLICY health_data_sleep_nights_rls_delete ON health_data_sleep_nights FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS health_data_ecgs_rls_select ON health_data_ecgs;
 CREATE POLICY health_data_ecgs_rls_select ON health_data_ecgs FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS health_data_ecgs_rls_insert ON health_data_ecgs;
 CREATE POLICY health_data_ecgs_rls_insert ON health_data_ecgs FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS health_data_ecgs_rls_update ON health_data_ecgs;
 CREATE POLICY health_data_ecgs_rls_update ON health_data_ecgs FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 DROP POLICY IF EXISTS health_data_ecgs_rls_delete ON health_data_ecgs;
 CREATE POLICY health_data_ecgs_rls_delete ON health_data_ecgs FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));

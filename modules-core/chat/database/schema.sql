@@ -19,19 +19,20 @@ ALTER TABLE chat_conversations ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS chat_conversations_rls_select ON chat_conversations;
 CREATE POLICY chat_conversations_rls_select ON chat_conversations FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS chat_conversations_rls_insert ON chat_conversations;
 CREATE POLICY chat_conversations_rls_insert ON chat_conversations FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS chat_conversations_rls_update ON chat_conversations;
 CREATE POLICY chat_conversations_rls_update ON chat_conversations FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS chat_conversations_rls_delete ON chat_conversations;
 CREATE POLICY chat_conversations_rls_delete ON chat_conversations FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 
 CREATE TABLE IF NOT EXISTS chat_messages (
@@ -51,19 +52,20 @@ ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS chat_messages_rls_select ON chat_messages;
 CREATE POLICY chat_messages_rls_select ON chat_messages FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS chat_messages_rls_insert ON chat_messages;
 CREATE POLICY chat_messages_rls_insert ON chat_messages FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS chat_messages_rls_update ON chat_messages;
 CREATE POLICY chat_messages_rls_update ON chat_messages FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS chat_messages_rls_delete ON chat_messages;
 CREATE POLICY chat_messages_rls_delete ON chat_messages FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 
 CREATE TABLE IF NOT EXISTS chat_uploads (
@@ -86,19 +88,20 @@ ALTER TABLE chat_uploads ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS chat_uploads_rls_select ON chat_uploads;
 CREATE POLICY chat_uploads_rls_select ON chat_uploads FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS chat_uploads_rls_insert ON chat_uploads;
 CREATE POLICY chat_uploads_rls_insert ON chat_uploads FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS chat_uploads_rls_update ON chat_uploads;
 CREATE POLICY chat_uploads_rls_update ON chat_uploads FOR UPDATE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 DROP POLICY IF EXISTS chat_uploads_rls_delete ON chat_uploads;
 CREATE POLICY chat_uploads_rls_delete ON chat_uploads FOR DELETE
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
 
 -- ─── CHECK constraints ───────────────────────────────────────────────────
