@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AlertCircle, CheckCircle2, CircleSlash, XCircle, Loader2, Shield, ShieldAlert, ShieldCheck, Database as DatabaseIcon, Package, Save, Key, Globe, Lock, ChevronRight, HardDrive, FlaskConical } from 'lucide-react'
+import { isParameterValidationError, probeCandidates } from '@/lib/health/module-probe'
 import moduleManifest from '@/lib/generated/module-manifest.json'
 import { HTTP_METHODS, NON_MODULE_TAGS, X_ARI, type OpenApiSpec } from '@/lib/openapi/types'
 
@@ -103,17 +104,18 @@ const ENABLED_MODULE_API_ROUTES: ReadonlyMap<string, readonly ManifestApiRoute[]
 
 /**
  * One "Fetch <Module Name>" test per enabled module that exposes a GET route.
- * Prefers a static (non-parameterized) GET so the request is meaningful.
+ * The manifest does not say which routes need query/path parameters, so each
+ * test carries every GET route in preference order (lib/health/module-probe)
+ * and the runner walks the list, skipping routes that only ask for input.
  */
-type DynamicModuleTest = { name: string; moduleId: string; fullPath: string }
+type DynamicModuleTest = { name: string; moduleId: string; candidates: string[] }
 const DYNAMIC_MODULE_TESTS: DynamicModuleTest[] = (() => {
   const tests: DynamicModuleTest[] = []
   for (const [moduleId, routes] of ENABLED_MODULE_API_ROUTES) {
-    const getRoutes = routes.filter((r) => r.methods.includes('GET'))
-    const preferred = getRoutes.find((r) => !r.path.includes('[')) ?? getRoutes[0]
-    if (!preferred) continue
+    const candidates = probeCandidates(routes)
+    if (candidates.length === 0) continue
     const displayName = MODULE_NAME_BY_ID.get(moduleId) ?? moduleId
-    tests.push({ name: `Fetch ${displayName}`, moduleId, fullPath: preferred.fullPath })
+    tests.push({ name: `Fetch ${displayName}`, moduleId, candidates })
   }
   return tests.sort((a, b) => a.name.localeCompare(b.name))
 })()
@@ -2324,8 +2326,34 @@ export default function DatabaseTestPage() {
 
     const phase3Tests = runnableTests.map((test) => async () => {
       updateTestResult(test.name, { status: 'testing' })
+      let fullPath = test.candidates[0]
       try {
-        const response = await fetch(test.fullPath)
+        // Walk the module's GET routes in preference order. A route that only
+        // answers "Invalid query/path parameters" ran and authenticated fine —
+        // it just needs input this probe cannot supply — so try the next one.
+        let response: Response | null = null
+        const needsParams: string[] = []
+        for (const candidate of test.candidates) {
+          const attempt = await fetch(candidate)
+          if (
+            !attempt.ok &&
+            isParameterValidationError(attempt.status, await attempt.clone().json().catch(() => null))
+          ) {
+            needsParams.push(candidate)
+            continue
+          }
+          response = attempt
+          fullPath = candidate
+          break
+        }
+        if (!response) {
+          updateTestResult(test.name, {
+            status: 'warning',
+            message: 'Every GET route of this module needs parameters — nothing to probe without input',
+            data: { tried: needsParams },
+          })
+          return
+        }
         if (!response.ok) {
           const err = await response.json().catch(() => ({}))
           // A structured JSON 404 means the route ran (auth + logic) and
@@ -2335,14 +2363,14 @@ export default function DatabaseTestPage() {
           if (response.status === 404 && err.error) {
             phase3Summaries.set(test.moduleId, {
               rowCount: 0,
-              source: test.fullPath,
+              source: fullPath,
               hasUserScoping: false,
               allOwnedByCurrentUser: null,
             })
             updateTestResult(test.name, {
               status: 'success',
               message: `No data yet — API responded correctly (${err.error})`,
-              data: { count: 0, source: test.fullPath },
+              data: { count: 0, source: fullPath },
             })
             return
           }
@@ -2363,7 +2391,7 @@ export default function DatabaseTestPage() {
 
         phase3Summaries.set(test.moduleId, {
           rowCount: rows.length,
-          source: test.fullPath,
+          source: fullPath,
           hasUserScoping,
           allOwnedByCurrentUser,
         })
@@ -2371,7 +2399,7 @@ export default function DatabaseTestPage() {
         updateTestResult(test.name, {
           status: 'success',
           message: `Found ${rows.length} record(s) via API`,
-          data: { count: rows.length, source: test.fullPath }
+          data: { count: rows.length, source: fullPath }
         })
       } catch (error: unknown) {
         const msg = errMsg(error)
@@ -2391,7 +2419,7 @@ export default function DatabaseTestPage() {
           updateTestResult(test.name, {
             status: authWall ? 'warning' : 'error',
             error: msg,
-            data: { hint: 'Tests the real API route with Better Auth + withRLS()', source: test.fullPath }
+            data: { hint: 'Tests the real API route with Better Auth + withRLS()', source: fullPath }
           })
         }
       }
