@@ -128,21 +128,29 @@ ARI is multi-user. When you create a module, decide whether its content is
 | | Per-user (private) — *default* | Shared (collaborative) |
 |---|---|---|
 | Examples | fitness, health, journal, notes | tasks, contacts, documents |
-| `schema.sql` SELECT/UPDATE/DELETE | `USING (user_id = current_setting('app.current_user_id'))` | `USING (app.can_access_shared())` |
-| `schema.sql` INSERT | `WITH CHECK (user_id = current_setting(...))` | *same* — always stamp the owner |
+| `schema.sql` SELECT/UPDATE/DELETE | `USING (user_id = (SELECT current_setting('app.current_user_id', true)))` (+ same `WITH CHECK` on UPDATE) | `USING ((SELECT app.can_access_shared()))` + the ownership trigger |
+| `schema.sql` INSERT | `WITH CHECK (user_id = (SELECT current_setting(..., true)))` | *same* — always stamp the owner |
 | API reads/writes | **filter every query by `user_id = user.id`** | **no `user_id` filter** |
 | API INSERT | `userId: user.id` | *same* — record the creator |
 
-**The API-layer filter is the real boundary, not RLS.** The default database
-role has `BYPASSRLS`, so the RLS policies are defense-in-depth only (see
-`docs/SECURITY.md`). A per-user module that forgets a `user_id` filter will
-leak other users' rows; a shared module that keeps one will hide shared rows.
-Keep `schema.sql` and your API queries consistent.
+**Both layers enforce the rule — keep them consistent.** Request-path queries
+run as the non-BYPASSRLS `ari_app` role, so Postgres evaluates your policies
+on every query; the explicit API filter stays mandatory because ARI falls back
+to the privileged role whenever the app role is unavailable (see
+`docs/SECURITY.md`, Layer 3). A per-user module that forgets a `user_id`
+filter will leak other users' rows; a shared module that keeps one will hide
+shared rows. `pnpm test` lints the policies (`policy-contract.test.ts`) and
+the routes (`route-security-scan.test.ts`).
+
+Never read a deny-all table (`user`, `session`, `account`, `verification`,
+`twoFactor`, `ari_instance`) inside `withRLS()` — on the app role it returns
+no rows, silently. Use `withAdminDb()` after your own authorization check.
 
 **To convert this template to shared:** switch the SELECT/UPDATE/DELETE policies
-in `database/schema.sql` to `app.can_access_shared()`, and remove the
+in `database/schema.sql` to `(SELECT app.can_access_shared())`, add the
+ownership trigger (block shown in `schema.sql`), and remove the
 `eq(...userId, user.id)` filters from `api/data/route.ts` (GET/PUT/DELETE) —
-both are marked with inline comments. Leave INSERT stamping the owner.
+all are marked with inline comments. Leave INSERT stamping the owner.
 
 **Gating on permissions:** to restrict an endpoint (e.g. an admin-only action),
 use `requirePermission(user, 'manage_modules')` or `requireAdmin(user)` from

@@ -1,9 +1,12 @@
 /**
  * Route security convention scan.
  *
- * ARI's real tenant boundary is the API layer, not RLS (the default DB role has
- * BYPASSRLS — see docs/SECURITY.md). A per-user route missing its
- * `eq(table.userId, user.id)` filter silently leaks other users' rows.
+ * Two layers enforce tenant isolation: Postgres evaluates the RLS policies for
+ * request-path queries (they run as the non-BYPASSRLS ari_app role), and the
+ * API filter stays mandatory because ARI falls back to the privileged
+ * (bypassing) role whenever the app role is unavailable — see
+ * docs/SECURITY.md. A per-user route missing its `eq(table.userId, user.id)`
+ * filter leaks other users' rows the moment that happens.
  *
  * This suite statically scans every API route file and enforces three invariants:
  *
@@ -311,7 +314,7 @@ function scanRouteFile(
       message:
         'File queries a PER-USER table with select/update/delete but never filters by the owner ' +
         '(no `eq(table.userId, user.id)` / `${user.id}` found). This can leak or modify other ' +
-        "users' private rows — the API filter is the real tenant boundary (BYPASSRLS).",
+        "users' private rows whenever ARI runs on the privileged (BYPASSRLS) role — the API filter stays mandatory.",
     })
   }
 

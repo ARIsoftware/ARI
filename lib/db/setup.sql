@@ -396,9 +396,9 @@ CREATE POLICY "api_key_usage_logs_rls_delete" ON "api_key_usage_logs" FOR DELETE
 -- Central activity/audit trail. Rows are written post-response by
 -- lib/activity-log.ts directly on the pool (no RLS transaction). SELECT is
 -- admin-only: the policy reads app.current_user_role, which withUserContext()
--- sets from the server-verified user row. Like all policies here this is
--- defense-in-depth (the default role has BYPASSRLS) — any viewer API route
--- must still enforce admin access itself. Rows are immutable (no UPDATE);
+-- sets from the server-verified user row. Enforced by Postgres on the app
+-- role (request path) and defense-in-depth on the privileged role — any
+-- viewer API route must still enforce admin access itself. Rows are immutable (no UPDATE);
 -- DELETE is admin-only so a future viewer can offer log pruning.
 CREATE TABLE IF NOT EXISTS "activity_log" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -477,8 +477,8 @@ ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "assigned_agent_id" TEXT;
 ALTER TABLE "tasks" ADD COLUMN IF NOT EXISTS "is_private" BOOLEAN DEFAULT FALSE;
 ALTER TABLE "tasks" ENABLE ROW LEVEL SECURITY;
 -- Shared table with per-record privacy: masked (is_private) rows are only
--- visible/mutable by their owner. Defense-in-depth — the API applies the same
--- predicate explicitly (the default role has BYPASSRLS).
+-- visible/mutable by their owner. Enforced by Postgres on the app role; the
+-- API applies the same predicate explicitly for the privileged-role fallback.
 -- Keep in lockstep with modules-core/tasks/database/schema.sql.
 DROP POLICY IF EXISTS "tasks_rls_select" ON "tasks";
 CREATE POLICY "tasks_rls_select" ON "tasks" FOR SELECT TO public

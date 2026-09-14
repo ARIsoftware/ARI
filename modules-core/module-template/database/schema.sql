@@ -15,14 +15,28 @@
 --     rows (e.g. tasks, contacts, documents). To make a table shared, change
 --     the SELECT/UPDATE/DELETE policies below to use app.can_access_shared()
 --     while keeping the INSERT WITH CHECK on user_id (so the creator is still
---     stamped as owner). app.can_access_shared() is defined in lib/db/setup.sql.
---       USING (app.can_access_shared())
+--     stamped as owner), and attach the ownership trigger so nobody can take
+--     over a shared row. app.can_access_shared() is defined in lib/db/setup.sql.
+--       USING ((SELECT app.can_access_shared()))
+--       DROP TRIGGER IF EXISTS <table>_user_id_immutable ON <table>;
+--       CREATE TRIGGER <table>_user_id_immutable
+--         BEFORE UPDATE ON <table> FOR EACH ROW
+--         WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id)
+--         EXECUTE FUNCTION app.prevent_user_id_reassignment();
 --
--- IMPORTANT (see docs/SECURITY.md): the default DB role has BYPASSRLS, so these
--- policies are DEFENSE-IN-DEPTH, not the real boundary. The actual enforcement
--- lives in your API queries — a PER-USER table MUST filter every read/write by
--- user_id (see api/data/route.ts); a SHARED table must NOT. Keep the RLS policy
--- and the API filtering consistent with each other.
+-- IMPORTANT (see docs/SECURITY.md, Layer 3): request-path queries run as the
+-- non-BYPASSRLS ari_app role, so Postgres ENFORCES these policies — and your
+-- API queries must still filter correctly, because ARI falls back to the
+-- privileged role whenever the app role is unavailable. A PER-USER table MUST
+-- filter every read/write by user_id (see api/data/route.ts); a SHARED table
+-- must NOT. Keep the RLS policy and the API filtering consistent.
+--
+-- Policy rules (pinned by tests/unit/lib/db/policy-contract.test.ts):
+--   • current_setting('app.current_user_id', true) — always pass missing_ok
+--   • wrap calls as (SELECT ...) so they run once per statement, not per row
+--   • FOR UPDATE policies spell out WITH CHECK
+--   • an index whose leading column is user_id
+--   • never GRANT / OWNER TO here — grants for module tables are automatic
 -- ═══════════════════════════════════════════════════════════════════════════
 
 CREATE TABLE IF NOT EXISTS module_template_entries (
@@ -40,7 +54,9 @@ CREATE INDEX IF NOT EXISTS idx_module_template_entries_user_created ON module_te
 ALTER TABLE module_template_entries ENABLE ROW LEVEL SECURITY;
 
 -- PER-USER policies (default). For a SHARED table, replace the USING clause on
--- SELECT/UPDATE/DELETE with `app.can_access_shared()` and leave INSERT as-is.
+-- SELECT/UPDATE/DELETE (and the UPDATE WITH CHECK) with
+-- `(SELECT app.can_access_shared())`, add the ownership trigger from the header
+-- comment, and leave INSERT as-is.
 DROP POLICY IF EXISTS module_template_entries_rls_select ON module_template_entries;
 CREATE POLICY module_template_entries_rls_select ON module_template_entries FOR SELECT
   USING (user_id = (SELECT current_setting('app.current_user_id', true)));

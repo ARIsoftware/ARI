@@ -72,8 +72,8 @@ ARI tables are either **per-user** (private: fitness, journal, notepad, and all 
 
 Derive the model **per table** from the RLS policies (strip SQL comments first — the module-template's comments mention both patterns):
 
-- `USING (app.can_access_shared())` on SELECT/UPDATE/DELETE → **shared** (note: shared tables still use `current_setting` in their INSERT `WITH CHECK` — that does not make them per-user)
-- Policies built on `current_setting('app.current_user_id')` → **per-user**
+- `USING ((SELECT app.can_access_shared()))` (older files: bare `app.can_access_shared()`) on SELECT/UPDATE/DELETE → **shared** (note: shared tables still use `current_setting` in their INSERT `WITH CHECK` — that does not make them per-user)
+- Policies built on `current_setting('app.current_user_id', true)` → **per-user**
 
 Sources: the module's own `database/schema.sql`, plus `lib/db/setup.sql` for any **core** tables the module's routes touch (`module_settings` is the common one — it is per-user).
 
@@ -89,7 +89,8 @@ Then verify model consistency:
 - [ ] Missing `getAuthenticatedUser()` call at start of route handler — **High**
 - [ ] Missing 401 response when both `user` AND `withRLS` are not returned — **High**
 - [ ] User ID taken from request body or query string instead of session/key — **High** (user impersonation)
-- [ ] Missing `user_id` filter on SELECT/UPDATE/DELETE of a **per-user** table (see §0 classification) — relying solely on RLS — **High**. Per `docs/SECURITY.md`: the default Postgres role has `BYPASSRLS`, so explicit `where(eq(table.userId, user.id))` is **required**, not defense-in-depth. (Do NOT flag shared tables — see §0.)
+- [ ] Missing `user_id` filter on SELECT/UPDATE/DELETE of a **per-user** table (see §0 classification) — relying solely on RLS — **High**. Per `docs/SECURITY.md`: request-path queries run as the non-BYPASSRLS `ari_app` role, but ARI falls back to the privileged (bypassing) role whenever that role is unavailable, so the explicit `where(eq(table.userId, user.id))` is **required**, not optional. (Do NOT flag shared tables — see §0.)
+- [ ] A `withRLS(...)` block that queries a **deny-all** table (`user`, `session`, `account`, `verification`, `twoFactor`, `ari_instance`) or the admin-only `activity_log` — **High**. On the app role such a query returns no rows silently; those tables are read through `withAdminDb()` after an explicit authorization check. (`tests/unit/route-security-scan.test.ts` DENY-ALL invariant catches route and `lib/` files.)
 - [ ] Routes that should be admin-only but accessible to all authenticated users — **High**
 - [ ] Role/permission checks on the client only — **High**
 - [ ] Hardcoded user IDs, roles, or tenant IDs — **Medium**
@@ -382,9 +383,16 @@ Findings:
 - [ ] Every table has `userId: text("user_id").notNull()` in `schema.ts` (Drizzle) — **High**. Must be `text()`, **not** `uuid()`, for the same reason above. A `uuid("user_id")` column will silently accept inserts but may cause cast errors or comparison failures with the text-typed user ID from Better Auth.
 - [ ] Every table has `created_at` and `updated_at` (TIMESTAMPTZ) — **Low**
 - [ ] Every table has `ALTER TABLE ... ENABLE ROW LEVEL SECURITY;` — **High**
-- [ ] Every table has SELECT/INSERT/UPDATE/DELETE policies matching its data model (§0): per-user tables reference `current_setting('app.current_user_id')`; shared tables use `app.can_access_shared()` for SELECT/UPDATE/DELETE with `current_setting` only in the INSERT `WITH CHECK` — **High** if policies are missing or use the wrong model
+- [ ] Every table has SELECT/INSERT/UPDATE/DELETE policies matching its data model (§0): per-user tables reference `current_setting('app.current_user_id', true)`; shared tables use `app.can_access_shared()` for SELECT/UPDATE/DELETE with `current_setting` only in the INSERT `WITH CHECK` — **High** if policies are missing or use the wrong model
+- [ ] Policies are enforced by Postgres for request-path queries (the `ari_app` role), so they must be correct AND cheap — the following are pinned by `tests/unit/lib/db/policy-contract.test.ts` for core modules and reported for custom ones:
+  - `current_setting('app.…')` without the `, true` (missing_ok) argument — **Medium** (a context-less connection errors instead of denying)
+  - `app.can_access_shared()` or `current_setting(...)` called bare instead of `(SELECT app.can_access_shared())` / `(SELECT current_setting(...))` — **Medium** (evaluated once per row instead of once per statement; `can_access_shared()` cannot be inlined)
+  - `FOR UPDATE` policy without an explicit `WITH CHECK` — **Low** (Postgres reuses USING, but the intent must be visible)
+  - **Shared** table without the `app.prevent_user_id_reassignment()` BEFORE UPDATE trigger (`DROP TRIGGER IF EXISTS … ; CREATE TRIGGER … WHEN (OLD.user_id IS DISTINCT FROM NEW.user_id) EXECUTE FUNCTION app.prevent_user_id_reassignment()`) — **High** (any authenticated user can take ownership of a shared row and then mask it)
+  - `SECURITY DEFINER` function not followed by `REVOKE ALL ON FUNCTION … FROM PUBLIC` — **High** (callable by every role, including PostgREST's on Supabase)
+  - `GRANT`, `REVOKE … TO ari_app`, `ALTER DEFAULT PRIVILEGES` or `OWNER TO` in module SQL — **Medium**. Grants for module tables are applied automatically (default privileges + the post-install sweep); the app role must never own a table or RLS stops applying to it
 - [ ] No `auth.uid()` references (Better Auth incompatibility) — **High**
-- [ ] Indexes exist on `user_id` and frequently filtered columns — **Medium**
+- [ ] Indexes exist on `user_id` (as the **leading** column of at least one index on every per-user table — under enforcement the policy predicate is an index condition on every query) and on frequently filtered columns — **Medium**
 
 ### B4. API security & patterns
 For every `[module]/api/**/route.ts` (skip routes listed in `module.json` `publicRoutes[]` — those are governed by Part A §13):
@@ -392,7 +400,7 @@ For every `[module]/api/**/route.ts` (skip routes listed in `module.json` `publi
 - [ ] Every exported handler (`GET`/`POST`/`PUT`/`DELETE`/`PATCH`) calls `getAuthenticatedUser()` and returns 401 when `user` OR `withRLS` is missing **before any DB access** — **High**
 - [ ] Handler does not read `session.*` fields directly — use `user.*` instead. When the caller authenticated via `x-api-key`, `session` is `null` (see `lib/auth-helpers.ts`), so any `session.user.email` / `session.access_token` dereference crashes the route for API-key callers — **Medium**
 - [ ] All DB operations use `withRLS((db) => ...)`. Any direct use of the legacy `supabase` client is **Medium**
-- [ ] SELECT/UPDATE/DELETE queries on **per-user** tables (§0) include `.where(eq(table.userId, user.id))` (or `and(...)` with the resource id) — **High**. Per `docs/SECURITY.md`: the default Postgres role has `BYPASSRLS`, so explicit filters are **mandatory**, not defense-in-depth. On **shared** tables the reads must NOT be owner-filtered (§0) — **Medium** if they are.
+- [ ] SELECT/UPDATE/DELETE queries on **per-user** tables (§0) include `.where(eq(table.userId, user.id))` (or `and(...)` with the resource id) — **High**. Per `docs/SECURITY.md`: Postgres enforces the policy on the app role, but ARI falls back to the privileged (bypassing) role whenever that role is unavailable, so explicit filters are **mandatory**. On **shared** tables the reads must NOT be owner-filtered (§0) — **Medium** if they are.
 - [ ] Inserts explicitly set `userId: user.id` (Drizzle camelCase) — **High**
 - [ ] Request bodies validated via `validateRequestBody` from `lib/api-helpers.ts` **OR** `Schema.safeParse()` — **Medium**
 - [ ] Path/query params validated via `validatePathParams` / `validateQueryParams` — **Medium**
@@ -568,7 +576,7 @@ If a subagent's checks were skipped (e.g. a skill was unavailable), list them un
 When auditing, the subagents should be aware of these reference files:
 - `.claude/commands/ari-create-module.md` — source of truth for module creation rules
 - `docs/MODULES.md` — full module system reference (§7.5 public routes, §7.6 OpenAPI + API keys)
-- `docs/SECURITY.md` — layered security model; explains why `BYPASSRLS` makes explicit `user_id` filters mandatory
+- `docs/SECURITY.md` — layered security model; Layer 3 describes DB-level enforcement via the `ari_app` role, the policy authoring rules, the deny-all tables and why explicit `user_id` filters stay mandatory
 - `lib/auth-helpers.ts` — `getAuthenticatedUser` (resolves session cookie OR `x-api-key`), `withRLS` helper, `requireAuthIfUsersExist`
 - `lib/auth-middleware.ts` — `BETTER_AUTH_COOKIE_NAME`, `API_KEY_PREFIX`, `hasSessionCookie`, `hasApiKeyHeader`
 - `lib/api-keys.ts` — `hashApiKey`, `lookupApiKey`, `checkIpAllowed`, `recordApiKeyUsage`

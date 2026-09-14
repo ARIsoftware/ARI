@@ -762,25 +762,31 @@ A sibling file `database/uninstall.sql` should also exist with `DROP TABLE IF EX
 - **Per-user (private) — the default.** Each user only sees their own rows (fitness, journal, notes). SELECT/UPDATE/DELETE match `user_id`; the API filters every read/write by `user_id = user.id`.
 - **Shared (collaborative).** All authenticated users read/write the same rows (tasks, contacts, documents). SELECT/UPDATE/DELETE use `app.can_access_shared()`; the API does **not** filter by `user_id`.
 
-`INSERT` stamps `user_id = user.id` (the owner) in both models. Because the default DB role has `BYPASSRLS`, the **API-layer filter is the real boundary** — the RLS policy is defense-in-depth (see `docs/SECURITY.md`).
+`INSERT` stamps `user_id = user.id` (the owner) in both models. Both layers enforce the rule: request-path queries run as the non-BYPASSRLS `ari_app` role, so Postgres evaluates your policies — and the API filter stays mandatory because ARI falls back to the privileged role whenever the app role is unavailable (see `docs/SECURITY.md`, Layer 3). Policies are linted by `tests/unit/lib/db/policy-contract.test.ts`: pass `true` (missing_ok) to `current_setting`, wrap calls as `(SELECT …)`, spell out `WITH CHECK` on UPDATE, index `user_id`.
 
 **RLS Policy Pattern:**
 ```sql
 -- PER-USER (default): only the owner can see/modify the row
 DROP POLICY IF EXISTS my_table_rls_select ON my_table;
 CREATE POLICY my_table_rls_select ON my_table FOR SELECT
-  USING (user_id = (SELECT current_setting('app.current_user_id')));
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)));
 
--- SHARED: any authenticated user can see/modify the row
+DROP POLICY IF EXISTS my_table_rls_update ON my_table;
+CREATE POLICY my_table_rls_update ON my_table FOR UPDATE
+  USING (user_id = (SELECT current_setting('app.current_user_id', true)))
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
+
+-- SHARED: any authenticated user can see/modify the row (plus the ownership
+-- trigger — see modules-core/contacts/database/schema.sql for the full shape)
 -- CREATE POLICY my_table_rls_select ON my_table FOR SELECT
---   USING (app.can_access_shared());
+--   USING ((SELECT app.can_access_shared()));
 
 -- INSERT is identical for both — stamp the creator as owner:
 DROP POLICY IF EXISTS my_table_rls_insert ON my_table;
 CREATE POLICY my_table_rls_insert ON my_table FOR INSERT
-  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id')));
+  WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)));
 ```
-**Note:** Do NOT use `auth.uid()` — Better Auth doesn't populate that function. Use `current_setting('app.current_user_id')` which is set by `withRLS()`. `app.can_access_shared()` is defined in `lib/db/setup.sql`. See `modules-core/module-template/database/schema.sql` for the complete pattern with all four policies and how to switch a table between per-user and shared.
+**Note:** Do NOT use `auth.uid()` — Better Auth doesn't populate that function. Use `(SELECT current_setting('app.current_user_id', true))`, which is set by `withRLS()`; the `true` makes a context-less connection deny instead of error, and the `(SELECT …)` wrapper makes Postgres evaluate it once per statement. `app.can_access_shared()` is defined in `lib/db/setup.sql`. See `modules-core/module-template/database/schema.sql` for the complete pattern with all four policies and how to switch a table between per-user and shared.
 
 #### Step 5.3.3: Utility Functions (`lib/utils.ts`)
 

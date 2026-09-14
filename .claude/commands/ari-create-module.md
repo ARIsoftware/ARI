@@ -15,11 +15,12 @@ Before doing anything:
 ### Database Security
 - **All tables MUST have Row Level Security (RLS) policies enabled.** A table without RLS is an open table.
 - **Decide per-user vs shared for each content table (ARI is multi-user).** The choice must be consistent in BOTH `database/schema.sql` (RLS policy) and your API queries:
-  - **Per-user (private) — the safe default.** Users only see their own rows (fitness, journal, notes, and all config/secrets). RLS: `USING (user_id = (SELECT current_setting('app.current_user_id')))`; **API filters every SELECT/UPDATE/DELETE by `user_id = user.id`**.
-  - **Shared (collaborative).** All authenticated users read/write the same rows (like the built-in tasks/contacts/documents). RLS SELECT/UPDATE/DELETE: `USING (app.can_access_shared())`; **API does NOT filter by `user_id`**. Only make a table shared if the user explicitly wants collaborative data.
+  - **Per-user (private) — the safe default.** Users only see their own rows (fitness, journal, notes, and all config/secrets). RLS: `USING (user_id = (SELECT current_setting('app.current_user_id', true)))` with the same predicate as the UPDATE `WITH CHECK`; **API filters every SELECT/UPDATE/DELETE by `user_id = user.id`**.
+  - **Shared (collaborative).** All authenticated users read/write the same rows (like the built-in tasks/contacts/documents). RLS SELECT/UPDATE/DELETE: `USING ((SELECT app.can_access_shared()))` plus the `app.prevent_user_id_reassignment()` BEFORE UPDATE trigger (copy the block from `modules-core/contacts/database/schema.sql`); **API does NOT filter by `user_id`**. Only make a table shared if the user explicitly wants collaborative data.
   - INSERT stamps `user_id = user.id` (the owner) in BOTH models.
-- **The API-layer filter is the real tenant boundary, not RLS** — the default DB role has `BYPASSRLS`, so RLS is defense-in-depth only. A per-user query that forgets its `user_id` filter leaks other users' rows. See `docs/SECURITY.md`.
-- Since Better Auth does not use `auth.uid()`, RLS policies use `current_setting('app.current_user_id')` (set by `withRLS()`). `app.can_access_shared()` is defined in `lib/db/setup.sql`. See `modules-core/module-template/database/schema.sql` for the commented per-user/shared pattern.
+- **Both layers enforce the rule.** Request-path queries run as the non-BYPASSRLS `ari_app` role, so Postgres evaluates your policies — and the API filter stays mandatory because ARI falls back to the privileged role whenever the app role is unavailable. A per-user query that forgets its `user_id` filter leaks other users' rows. See `docs/SECURITY.md`.
+- Since Better Auth does not use `auth.uid()`, RLS policies use `(SELECT current_setting('app.current_user_id', true))` (set by `withRLS()`; `true` = missing_ok, `(SELECT …)` = evaluated once per statement). `app.can_access_shared()` is defined in `lib/db/setup.sql`. See `modules-core/module-template/database/schema.sql` for the commented per-user/shared pattern. `tests/unit/lib/db/policy-contract.test.ts` fails the build on a bare call, a missing `, true`, a `FOR UPDATE` policy without `WITH CHECK`, or a per-user table without a `user_id` index.
+- **Never read a deny-all table (`user`, `session`, `account`, `verification`, `twoFactor`, `ari_instance`) through `withRLS()`** — on the app role the query returns no rows, silently. Use `withAdminDb()` after your own authorization check (the tasks assignee picker is the reference). Never write `GRANT` / `OWNER TO` in module SQL — grants for new tables are automatic.
 - Never create tables with RLS disabled, even for "temporary" or "simple" modules.
 
 ### API Security
@@ -265,7 +266,7 @@ When approved, create the module following this order:
      - Schema additions in updates use `ALTER TABLE … ADD COLUMN IF NOT EXISTS …`
      - **Must contain NO** `DROP TABLE`, `DROP SCHEMA`, `DROP DATABASE`, `TRUNCATE`, `ALTER TABLE … DROP COLUMN`, or unconditional `DELETE`. The runtime installer at `lib/modules/schema-installer.ts` refuses to execute files containing any of these tokens.
      - Use `TEXT` type for `user_id` (matches Better Auth)
-     - Every table must include `ALTER TABLE [table] ENABLE ROW LEVEL SECURITY;` and SELECT/INSERT/UPDATE/DELETE policies referencing `current_setting('app.current_user_id')`
+     - Every table must include `ALTER TABLE [table] ENABLE ROW LEVEL SECURITY;` and SELECT/INSERT/UPDATE/DELETE policies referencing `(SELECT current_setting('app.current_user_id', true))` — UPDATE with an explicit `WITH CHECK`
      - Do NOT use `auth.uid()` (Better Auth doesn't use this) — use application-level enforcement via `withRLS()`
      - Use the `supabase-postgres-best-practices` skill to verify best practices for data types, indexes, and constraints
    - **`schema.ts`** — Drizzle ORM definitions used by API routes via `withRLS()`. The runtime source of truth. Must mirror `schema.sql` exactly.

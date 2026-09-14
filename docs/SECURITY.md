@@ -27,7 +27,7 @@ The proxy at `/proxy.ts` (Next.js 16 renamed the `middleware` convention to `pro
 
 Every API route calls `getAuthenticatedUser()` which validates the session server-side and provides a `withRLS()` helper. This helper wraps queries in a transaction that sets `SET LOCAL app.current_user_id`.
 
-**The application-layer query is the real tenant boundary.** Do not rely on implicit DB-level RLS filtering — Postgres superuser roles (including the default `postgres` role used by Supabase and by most local installs) have `BYPASSRLS`, so RLS (Layer 3) does not filter on its own.
+**Two layers enforce the same rule.** Request-path queries run as the non-BYPASSRLS `ari_app` role (Layer 3), so Postgres evaluates every RLS policy — but the explicit application-layer filter stays mandatory. It is the only boundary whenever ARI runs on the privileged role instead: the kill switch, an install whose `DATABASE_URL` role cannot create roles, the first seconds after a fresh install, or a connection failure on the app pool (which falls back for one minute at a time). Write every query as if RLS did not exist; RLS is there to catch the query you got wrong.
 
 ### Per-user (private) vs shared (collaborative) data
 
@@ -65,19 +65,52 @@ await withRLS((db) => db.insert(tasks).values({ title: 'New', userId: user.id })
 
 A per-user query that forgets its `user_id` filter leaks other users' rows; a shared query that keeps one hides shared rows. Keep the API filtering consistent with the table's RLS policy (Layer 3).
 
-## Layer 3: Database RLS Policies (Defense-in-Depth)
+## Layer 3: Database RLS Policies (Enforced by Postgres)
 
-RLS policies exist on all tables. These are **not enforced** when the application connects as a Postgres superuser — the default in all three supported `ARI_DB_MODE` values (`postgres`, `supabaselocal`, `supabasecloud`). They serve as defense-in-depth and activate if a restricted database role is used, at which point they must match the app-layer intent:
+RLS policies exist on every table, and Postgres enforces them for the request path: `withRLS()` / `withUserContext()` acquire their connection from a second pool that logs in as **`ari_app`**, a role with `NOSUPERUSER NOBYPASSRLS NOINHERIT` that owns nothing. Everything else — Better Auth, first-run bootstrap, `setup.sql`, module DDL, backups, `withAdminDb`, the activity log, telemetry — stays on the privileged `DATABASE_URL` role. Policies must therefore match the app-layer intent exactly:
 
-- **Per-user tables** — `USING (user_id = current_setting('app.current_user_id'))` on SELECT/UPDATE/DELETE.
-- **Shared tables** — `USING (app.can_access_shared())` on SELECT/UPDATE/DELETE (the function, defined in `lib/db/setup.sql`, returns true for any authenticated context).
-- **Both** — INSERT keeps `WITH CHECK (user_id = current_setting('app.current_user_id'))` so the creator is stamped as owner.
+- **Per-user tables** — `USING (user_id = (SELECT current_setting('app.current_user_id', true)))` on SELECT/UPDATE/DELETE, and the same predicate as the UPDATE `WITH CHECK`.
+- **Shared tables** — `USING ((SELECT app.can_access_shared()))` on SELECT/UPDATE/DELETE (the function, defined in `lib/db/setup.sql`, is true for any authenticated context), plus the `app.prevent_user_id_reassignment()` trigger so nobody can take ownership of a shared row.
+- **Both** — INSERT keeps `WITH CHECK (user_id = (SELECT current_setting('app.current_user_id', true)))` so the creator is stamped as owner.
 
-Each module defines its own RLS policies in `database/schema.sql` (auto-run on module enable). See `modules-core/module-template/database/schema.sql` for the canonical policy pattern and how to switch a table between per-user and shared.
+Policy authoring rules, all pinned by `tests/unit/lib/db/policy-contract.test.ts`:
 
-### Optional Hardening: Restricted Database Role
+- `current_setting('app.…', true)` — always pass `missing_ok`, so a connection without context denies instead of erroring.
+- Wrap `app.can_access_shared()` and `current_setting(…)` as `(SELECT …)` — the planner then evaluates them once per statement (an InitPlan) instead of once per row; bare, `can_access_shared()` cannot be inlined and runs for every row scanned.
+- Spell out `WITH CHECK` on every `FOR UPDATE` policy (Postgres reuses USING when it is omitted; the explicit form keeps intent visible).
+- Every per-user table has an index whose leading column is `user_id`.
+- Shared tables attach the ownership trigger; `SECURITY DEFINER` functions are followed by `REVOKE ALL … FROM PUBLIC`.
 
-For true DB-level enforcement, create a role without `BYPASSRLS` and use it for application connections. This is not required for the default setup — it adds operational complexity for open-source deployments.
+Each module defines its own RLS policies in `database/schema.sql` (auto-run on module enable). See `modules-core/module-template/database/schema.sql` for the canonical pattern and how to switch a table between per-user and shared.
+
+**Deny-all tables are never read through `withRLS()`.** `user`, `session`, `account`, `verification`, `twoFactor` and `ari_instance` carry `USING (false)` policies, and `activity_log` reads are admin-only. On the app role such a query returns **no rows, silently** — it does not error. Read them through `withAdminDb()` (or the raw pool) after your own authorization check, the way the tasks assignee picker and `lib/auth-helpers.ts` do. `tests/unit/route-security-scan.test.ts` fails any route or `lib/` file that breaks this.
+
+### DB-level RLS enforcement: the `ari_app` role
+
+**What it protects against.** Application bugs: a per-user query that forgot its `user_id` filter, a wrong shared/per-user classification, a module that returns another user's row. Postgres now refuses those reads and writes regardless of what the TypeScript said.
+
+**What it does not protect against.**
+
+- *Operators.* Anyone holding `DATABASE_URL` holds the privileged role and can read everything; the app role only changes what the *application* can do.
+- *SQL injection.* Identity is a session setting. Injected SQL can run `(SELECT set_config('app.current_user_id', '<victim>', true))` inside the very statement being attacked and the policies will honour it. Parameterised queries remain the injection control; RLS does not replace them.
+
+**How it works.**
+
+- **Provisioning (`lib/db/app-role.ts`).** On every boot, after `setup.sql`, ARI reads the app role's password from `ari_instance.app_role_secret` (AES-encrypted with the key derived from `BETTER_AUTH_SECRET`, the same scheme as stored API keys). If it decrypts, that is the whole boot cost: one `SELECT`. Otherwise ARI takes a transaction-scoped advisory lock, creates or repairs `ari_app` with a fresh random password (`CREATE ROLE` / `ALTER ROLE`), stores it with a rotation stamp, applies the grants, commits, and only then test-connects as the role. Grants are `USAGE` on `public` and `app`, `EXECUTE` on the `app` functions, `SELECT/INSERT/UPDATE/DELETE` on all `public` tables, `ALTER DEFAULT PRIVILEGES` so future module tables are granted at `CREATE` time, and `REVOKE` on the three `SECURITY DEFINER` backup RPCs. The role is never made an owner — non-ownership is what makes RLS apply to it.
+- **The app pool (`lib/db/app-pool.ts`).** Created lazily from that password with the same tuning as the privileged pool, connecting as `ari_app` (or `ari_app.<project-ref>` on Supabase's Supavisor pooler, which encodes the tenant in the username). `withUserContext()` takes its connection here when the pool is healthy and appends `SET LOCAL app.enforced = 'on'` to the context statement — the flag that arms the ownership trigger, so the trigger is live exactly when enforcement is.
+- **Degrade, never break.** Pool selection happens only when a connection is acquired. A failed connect snoozes the app pool for 60 s (that call and the ones after it run on the privileged role, exactly as before this feature); a bad password (`28P01`) or a missing role (`28000`) additionally drops the pool and repairs the role in the background, so `DROP ROLE` or an out-of-band password change heals without a restart. Forced repairs are rate-limited to one per minute per process. An operation's *outcome* never moves it to the privileged pool: the single retry that exists is a `42501 permission denied for table …` on a table created after the last grant sweep, which re-runs the grants and retries once **on the app pool**. `new row violates row-level security policy` shares that SQLSTATE and is rethrown untouched.
+- **Kill switch.** `ARI_DISABLE_APP_ROLE=1` restores the pre-enforcement behaviour completely: the role is neither provisioned nor used, and because `app.enforced` is never set, the ownership trigger is inert too. No code change; a restart locally, a redeploy on Vercel. `DATABASE_APP_POOL_MAX` sizes the app pool (default: `DATABASE_POOL_MAX`, then 3 in production / 10 in development — a serverless instance holds both pools).
+- **Unsupported databases.** If the `DATABASE_URL` role lacks `CREATEROLE`, provisioning reports *unsupported* and ARI runs permanently on the privileged role. Nothing breaks; `/health` says so.
+
+**Observability.** The `/health` RLS tab shows the real state — green *RLS is enforced* only when request-path queries run as `ari_app` and that role cannot bypass; calm yellow while the app runs on the privileged role (fallback, not provisioned, unsupported); grey under the kill switch; red only if `ari_app` ever gains `BYPASSRLS`. The same tab shows whether the role owns no tables, the fallback and grant-miss counters (steady state: 0) and the last transition. *Test RLS Policies* on the Database tab reports which role ran it; on the app role its negative test is real. `/api/health/full` carries an *RLS Enforcement* check that is warning-level while in fallback and fails only for a bypassing app role. Every entry into and exit from fallback writes one `activity_log` row (`rls_enforcement_fallback` / `rls_enforcement_restored`).
+
+**Runbook.**
+
+- *Rotation.* The password is rotated whenever the stored secret is missing or cannot be decrypted with the current `BETTER_AUTH_SECRET` — a restored backup from another install, or a rotated secret. Nothing to do; the next boot repairs it.
+- *Several deployments on one database* (preview environments, a fleet of lambdas) **must share `BETTER_AUTH_SECRET`**. A secret that does not decrypt but was rotated less than 15 minutes ago is treated as another deployment's: ARI runs in fallback and reports *secret-mismatch* instead of rotating it back and forth.
+- *Removing the role.* `DROP OWNED BY ari_app; DROP ROLE ari_app;` (both statements — grants and default privileges are dependencies, so a bare `DROP ROLE` fails). ARI recreates it as soon as a request finds it missing — in the background, within a minute, whether that happens live or after a restart (the boot fast path trusts the stored secret; the first app-pool connect is the probe).
+- *Password changed by hand.* Same self-heal as a dropped role: the next app-pool connect fails, the role is repaired, requests continue on the privileged role meanwhile.
+- *Turning it off.* `ARI_DISABLE_APP_ROLE=1` and restart. The role and the two `ari_instance` columns linger harmlessly.
 
 ## Layer 4: Authorization (Roles & Permissions)
 
@@ -193,7 +226,8 @@ When writing new API routes or module APIs:
    - Per-user: add `.where(eq(table.userId, user.id))` to SELECT, and `.where(and(eq(table.id, id), eq(table.userId, user.id)))` to UPDATE/DELETE by ID
    - Shared: do **not** add a `user_id` filter to reads/writes
 3. Set `user_id: user.id` in all INSERT values (both models)
-4. Never rely on implicit RLS filtering alone — the default DB role bypasses RLS
+4. Never rely on RLS alone — keep the explicit filters. ARI runs on the privileged (bypassing) role whenever the app role is unavailable, on installs whose `DATABASE_URL` role lacks `CREATEROLE`, and under the kill switch; RLS is the second layer, not the only one
 5. Gate privileged actions with `requirePermission(user, 'key')` / `requireAdmin(user)` from `lib/api-helpers.ts` (see Layer 4)
 6. Use `createErrorResponse()` from `lib/api-helpers.ts` or `safeErrorResponse()` from `lib/api-error.ts` in catch blocks — never expose internal error details to the client
-7. In **module** code, never shell out (`child_process`, `exec`, `spawn`), never `eval` / `new Function` / `vm.run`, never recursively delete from the filesystem, and never issue a `db.delete()` / `db.update()` without a `.where(...)` scoped to the owner. Core infrastructure has a few narrow, reviewed exceptions (e.g. `lib/modules/npm-installer.ts` spawning `pnpm`); a module has none.
+7. Write policies the way `tests/unit/lib/db/policy-contract.test.ts` expects: `current_setting('app.…', true)`, `(SELECT …)`-wrapped calls, explicit `WITH CHECK` on UPDATE, a `user_id` index — and never read a deny-all table (`user`, `session`, `ari_instance`, …) through `withRLS()`; use `withAdminDb()` after your own authorization check
+8. In **module** code, never shell out (`child_process`, `exec`, `spawn`), never `eval` / `new Function` / `vm.run`, never recursively delete from the filesystem, and never issue a `db.delete()` / `db.update()` without a `.where(...)` scoped to the owner. Core infrastructure has a few narrow, reviewed exceptions (e.g. `lib/modules/npm-installer.ts` spawning `pnpm`); a module has none.

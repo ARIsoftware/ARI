@@ -9,9 +9,13 @@
  *
  * MULTI-USER — this template is PER-USER (private): every SELECT/UPDATE/DELETE
  * filters by `user_id = user.id`, so each user only sees their own entries.
- * These explicit filters are the REAL tenant boundary, not just belt-and-
- * suspenders: the default DB role has BYPASSRLS, so the RLS policies in
- * database/schema.sql don't filter on their own (see docs/SECURITY.md).
+ * Keep these explicit filters even though Postgres now enforces the RLS
+ * policies in database/schema.sql for request-path queries (they run as the
+ * non-BYPASSRLS ari_app role): ARI falls back to the privileged role whenever
+ * that role is unavailable, and then the filter is the only boundary (see
+ * docs/SECURITY.md, Layer 3). Never read `user`/`session`/`ari_instance`
+ * inside withRLS() — deny-all tables return no rows on the app role; use
+ * withAdminDb() after your own authorization check.
  *
  *   → To make this module SHARED (all users read/write the same rows, like
  *     tasks/contacts/documents): remove the `eq(...userId, user.id)` filters
