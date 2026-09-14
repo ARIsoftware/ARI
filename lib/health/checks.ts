@@ -456,7 +456,7 @@ export function rlsEnforcementNote(appRole: AppRolePayload, privilegedBypassRls:
         ? `RLS is NOT enforced — ${appRole.roleName} has BYPASSRLS or superuser; revoke it (ALTER ROLE ${appRole.roleName} NOBYPASSRLS NOSUPERUSER) or enforcement is meaningless`
         : `Request-path queries run as ${appRole.roleName}, but its RLS bypass could not be confirmed off — check pg_roles`
     case 'disabled':
-      return 'RLS enforcement is switched off by ARI_DISABLE_APP_ROLE — request-path queries run on the privileged role and the policies below are defense-in-depth only; unset the variable and restart to re-enable'
+      return 'RLS enforcement is switched off by ARI_DISABLE_RLS_ENFORCEMENT — request-path queries run on the privileged role and the policies below are defense-in-depth only; unset the variable and restart to re-enable'
     case 'unsupported':
       return `RLS enforcement is unavailable on this database — the DATABASE_URL role cannot create the ${appRole.roleName} role (needs CREATEROLE); the policies below are defense-in-depth only`
     default:

@@ -61,7 +61,7 @@ export const ENV_REGISTRY: readonly EnvVarSpec[] = [
     description: 'Database backend: postgres | supabaselocal | supabasecloud',
   },
   {
-    key: 'ARI_DISABLE_APP_ROLE',
+    key: 'ARI_DISABLE_RLS_ENFORCEMENT',
     required: false,
     sensitive: false,
     group: 'database',

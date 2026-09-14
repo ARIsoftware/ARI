@@ -310,7 +310,7 @@ describe('runHealthScan — RLS enforcement (app role)', () => {
   })
 
   it.each([
-    ['disabled', 'ARI_DISABLE_APP_ROLE', false],
+    ['disabled', 'ARI_DISABLE_RLS_ENFORCEMENT', false],
     ['unsupported', 'no CREATEROLE', false],
     ['unavailable', 'not provisioned yet', true],
     ['fallback', 'Fallback to the privileged role', true],

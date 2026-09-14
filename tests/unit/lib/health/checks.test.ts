@@ -686,7 +686,7 @@ describe('rlsEnforcementNote', () => {
 
   it('disabled / unsupported / fallback wording', () => {
     expect(rlsEnforcementNote({ ...base, enforced: false, status: 'disabled' }, true)).toContain(
-      'ARI_DISABLE_APP_ROLE'
+      'ARI_DISABLE_RLS_ENFORCEMENT'
     )
     expect(rlsEnforcementNote({ ...base, enforced: false, status: 'unsupported' }, true)).toContain(
       'needs CREATEROLE'
@@ -1019,7 +1019,7 @@ describe('checkRlsTables', () => {
   it('kill switch and unsupported installs get their own wording', async () => {
     poolHolder.pool = rlsTablesPool([], true)
     appPoolHolder.state.mode = 'disabled'
-    expect((await checkRlsTables())!.note).toContain('ARI_DISABLE_APP_ROLE')
+    expect((await checkRlsTables())!.note).toContain('ARI_DISABLE_RLS_ENFORCEMENT')
     appPoolHolder.state.mode = 'unsupported'
     expect((await checkRlsTables())!.note).toContain('unavailable on this database')
   })

@@ -35,7 +35,7 @@ export interface ScanContext {
 function appRoleSummary(details: AppRolePayload): string {
   switch (details.status) {
     case 'disabled':
-      return 'Disabled by ARI_DISABLE_APP_ROLE — request-path queries run on the privileged role'
+      return 'Disabled by ARI_DISABLE_RLS_ENFORCEMENT — request-path queries run on the privileged role'
     case 'unsupported':
       return `Unavailable here: the DATABASE_URL role cannot create ${details.roleName} (no CREATEROLE) — running on the privileged role`
     case 'unavailable':

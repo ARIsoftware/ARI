@@ -14,7 +14,7 @@
  * `getAppRoleStatus()` for /health.
  *
  * State machine (per process):
- *   disabled     — ARI_DISABLE_APP_ROLE kill switch is set; nothing is touched.
+ *   disabled     — ARI_DISABLE_RLS_ENFORCEMENT kill switch is set; nothing is touched.
  *   unavailable  — no pool, no BETTER_AUTH_SECRET (pre-setup boot), or the
  *                  ari_instance columns are missing (setup.sql not applied yet).
  *   unsupported  — the DATABASE_URL role cannot CREATE/ALTER ROLE (42501);
@@ -132,9 +132,9 @@ export function _resetAppRoleStateForTests(): void {
   lastForcedAt = 0
 }
 
-/** `ARI_DISABLE_APP_ROLE=1` — the env-only kill switch for the whole enforcement layer. */
+/** `ARI_DISABLE_RLS_ENFORCEMENT=1` — the env-only kill switch for the whole enforcement layer. */
 export function isAppRoleDisabled(): boolean {
-  const v = (process.env.ARI_DISABLE_APP_ROLE ?? '').trim().toLowerCase()
+  const v = (process.env.ARI_DISABLE_RLS_ENFORCEMENT ?? '').trim().toLowerCase()
   return v === '1' || v === 'true' || v === 'yes' || v === 'on'
 }
 
@@ -251,7 +251,7 @@ export async function ensureAppRole(opts: { force?: boolean } = {}): Promise<App
     password = null
     return setStatus({
       state: 'disabled',
-      reason: 'ARI_DISABLE_APP_ROLE is set — running on the privileged role only',
+      reason: 'ARI_DISABLE_RLS_ENFORCEMENT is set — running on the privileged role only',
       rotatedAt: null,
     })
   }

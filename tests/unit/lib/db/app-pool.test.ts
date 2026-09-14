@@ -34,7 +34,7 @@ beforeEach(() => {
     ensureAppRole: vi.fn(async () => roleState.status),
   }
   vi.stubEnv('DATABASE_URL', 'postgresql://postgres:pw@localhost:5432/ari')
-  vi.stubEnv('ARI_DISABLE_APP_ROLE', '')
+  vi.stubEnv('ARI_DISABLE_RLS_ENFORCEMENT', '')
   vi.stubEnv('DATABASE_APP_POOL_MAX', '')
   vi.stubEnv('DATABASE_POOL_MAX', '')
   delete (globalThis as any).__ariPgAppPool
@@ -61,7 +61,7 @@ async function load() {
   }))
   vi.doMock('@/lib/db/app-role', () => ({
     isAppRoleDisabled: () => {
-      const v = (process.env.ARI_DISABLE_APP_ROLE ?? '').trim().toLowerCase()
+      const v = (process.env.ARI_DISABLE_RLS_ENFORCEMENT ?? '').trim().toLowerCase()
       return v === '1' || v === 'true' || v === 'yes' || v === 'on'
     },
     getAppRoleStatus: () => ({ ...roleState.status }),
@@ -159,7 +159,7 @@ describe('getAppPool', () => {
   })
 
   it('kill switch → null without touching the role or creating anything', async () => {
-    vi.stubEnv('ARI_DISABLE_APP_ROLE', '1')
+    vi.stubEnv('ARI_DISABLE_RLS_ENFORCEMENT', '1')
     const mod = await load()
     expect(await mod.getAppPool()).toBeNull()
     expect(roleState.ensureAppRole).not.toHaveBeenCalled()
@@ -325,10 +325,10 @@ describe('counters', () => {
     const mod = await load()
     mod.noteFallback()
     expect(mod.getAppPoolState().fallbackCount).toBe(1)
-    vi.stubEnv('ARI_DISABLE_APP_ROLE', '1')
+    vi.stubEnv('ARI_DISABLE_RLS_ENFORCEMENT', '1')
     mod.noteFallback()
     expect(mod.getAppPoolState().fallbackCount).toBe(1)
-    vi.stubEnv('ARI_DISABLE_APP_ROLE', '')
+    vi.stubEnv('ARI_DISABLE_RLS_ENFORCEMENT', '')
     roleState.status = { state: 'unsupported' }
     mod.noteFallback()
     expect(mod.getAppPoolState().fallbackCount).toBe(1)
@@ -447,7 +447,7 @@ describe('enforcement transitions', () => {
   })
 
   it('does not count or log a fallback while enforcement is not expected', async () => {
-    vi.stubEnv('ARI_DISABLE_APP_ROLE', '1')
+    vi.stubEnv('ARI_DISABLE_RLS_ENFORCEMENT', '1')
     const mod = await load()
     mod.noteFallback('user-a')
     await settle()

@@ -67,7 +67,7 @@ $$ LANGUAGE sql STABLE SET search_path = '';
 -- user_id change. It is gated on the \`app.enforced\` GUC, which
 -- withUserContext() sets ONLY when a request runs on the non-BYPASSRLS app
 -- pool (Phase 3). Consequences:
---   • inert until the app pool ships, and whenever ARI_DISABLE_APP_ROLE=1
+--   • inert until the app pool ships, and whenever ARI_DISABLE_RLS_ENFORCEMENT=1
 --     (the kill switch covers the whole enforcement layer);
 --   • privileged / no-context paths (bootstrap, backup restore, admin
 --     scripts) are exempt by construction;

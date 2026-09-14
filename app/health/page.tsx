@@ -279,7 +279,7 @@ function rlsBanner(report: RlsTablesReport): {
     case 'active':
       return { tone: 'red', title: `RLS not enforced — ${ar.roleName} can bypass row security` }
     case 'disabled':
-      return { tone: 'gray', title: 'RLS enforcement disabled by ARI_DISABLE_APP_ROLE — running on the privileged role' }
+      return { tone: 'gray', title: 'RLS enforcement disabled by ARI_DISABLE_RLS_ENFORCEMENT — running on the privileged role' }
     case 'unsupported':
       return { tone: 'yellow', title: 'RLS enforcement unavailable on this database — running on the privileged role' }
     default:

@@ -158,7 +158,7 @@ beforeEach(() => {
   pgHolder.ended = 0
   vi.stubEnv('BETTER_AUTH_SECRET', 'test-secret')
   vi.stubEnv('DATABASE_URL', 'postgresql://postgres:pw@localhost:5432/ari')
-  vi.stubEnv('ARI_DISABLE_APP_ROLE', '')
+  vi.stubEnv('ARI_DISABLE_RLS_ENFORCEMENT', '')
   logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
   warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 })
@@ -186,7 +186,7 @@ describe('ensureAppRole — gates', () => {
   it.each(['1', 'true', 'TRUE', ' yes ', 'on'])(
     'kill switch %j → disabled, nothing touched',
     async (v) => {
-      vi.stubEnv('ARI_DISABLE_APP_ROLE', v)
+      vi.stubEnv('ARI_DISABLE_RLS_ENFORCEMENT', v)
       const { pool } = makePool()
       poolHolder.pool = pool
       expect(isAppRoleDisabled()).toBe(true)
@@ -200,7 +200,7 @@ describe('ensureAppRole — gates', () => {
   )
 
   it.each(['', '0', 'false', 'off'])('kill switch %j is not set', (v) => {
-    vi.stubEnv('ARI_DISABLE_APP_ROLE', v)
+    vi.stubEnv('ARI_DISABLE_RLS_ENFORCEMENT', v)
     expect(isAppRoleDisabled()).toBe(false)
   })
 
@@ -695,9 +695,9 @@ describe('ensureAppGrants', () => {
   })
 
   it('is a no-op with the kill switch or without a pool', async () => {
-    vi.stubEnv('ARI_DISABLE_APP_ROLE', '1')
+    vi.stubEnv('ARI_DISABLE_RLS_ENFORCEMENT', '1')
     expect(await ensureAppGrants()).toBe(false)
-    vi.stubEnv('ARI_DISABLE_APP_ROLE', '')
+    vi.stubEnv('ARI_DISABLE_RLS_ENFORCEMENT', '')
     poolHolder.pool = null
     expect(await ensureAppGrants()).toBe(false)
   })
