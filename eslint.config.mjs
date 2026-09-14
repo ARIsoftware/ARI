@@ -14,6 +14,9 @@ const eslintConfig = [
       'public/**',
       'data/**',
       '.ari/**',
+      // Claude Code git worktrees (gitignored) carry their own .next/,
+      // node_modules/ and generated code — never lint a sibling checkout.
+      '.claude/worktrees/**',
       'next-env.d.ts',
       // Auto-generated — never hand-edited (see scripts/generate-module-registry.js).
       'lib/generated/**',
