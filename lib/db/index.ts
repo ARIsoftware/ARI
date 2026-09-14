@@ -6,6 +6,7 @@ import {
   closeAppPool,
   getAppPoolIfHealthy,
   noteAppPoolConnectFailure,
+  noteAppPoolServed,
   noteFallback,
   noteGrantMissRetry,
 } from './app-pool'
@@ -128,11 +129,12 @@ export async function withUserContext<T>(
         } catch (connectError) {
           // Snoozes the app pool (and repairs the role on 28P01/28000);
           // this call runs on the privileged pool.
-          noteAppPoolConnectFailure(connectError)
+          noteAppPoolConnectFailure(connectError, userId)
           rawClient = await privileged.connect()
         }
+        if (enforced) noteAppPoolServed(userId)
       } else {
-        noteFallback()
+        noteFallback(userId)
         rawClient = await privileged.connect()
       }
       client = pgBouncerCompat(rawClient)

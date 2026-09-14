@@ -14,12 +14,14 @@
 
 import {
   checkAiProviders,
+  checkAppRole,
   checkAuthConfig,
   checkDatabase,
   checkModuleStatus,
   checkMultiUser,
   checkStorageFilesystem,
   runRlsTest,
+  type AppRolePayload,
   type WithRLS,
 } from '@/lib/health/checks'
 import { safeErrorResponse } from '@/lib/api-error'
@@ -28,6 +30,19 @@ import type { HealthCheckResult, HealthScanResult, HealthStatus } from '@/lib/he
 export interface ScanContext {
   userId: string
   withRLS: WithRLS
+}
+
+function appRoleSummary(details: AppRolePayload): string {
+  switch (details.status) {
+    case 'disabled':
+      return 'Disabled by ARI_DISABLE_APP_ROLE — request-path queries run on the privileged role'
+    case 'unsupported':
+      return `Unavailable here: the DATABASE_URL role cannot create ${details.roleName} (no CREATEROLE) — running on the privileged role`
+    case 'unavailable':
+      return `${details.roleName} not provisioned yet — running on the privileged role${details.reason ? ` (${details.reason})` : ''}`
+    default:
+      return `Fallback to the privileged role${details.reason ? `: ${details.reason}` : ''}`
+  }
 }
 
 /** A check's verdict before timing is attached. */
@@ -110,13 +125,15 @@ const CHECKS: CheckDefinition[] = [
     run: async (ctx) => {
       const details = await runRlsTest(ctx.userId, ctx.withRLS)
       if (details.success) {
-        // A bypassing role is the documented default, but it means RLS is not
-        // the enforcing boundary — worth stating in the summary line.
+        // Say which role ran the test: on the app role the negative test is
+        // real; on a bypassing privileged role it is excused (fallback).
         return {
           status: 'ok',
-          message: details.bypassRls
-            ? 'Positive test passed (role bypasses RLS — app layer enforces isolation)'
-            : 'Positive and negative isolation tests passed',
+          message: details.enforced
+            ? `Positive and negative isolation tests passed as ${details.servedBy === 'app-role' ? 'the app role' : 'the connection role'} (RLS enforced by Postgres)`
+            : details.bypassRls
+              ? 'Positive test passed (role bypasses RLS — app layer enforces isolation)'
+              : 'Positive and negative isolation tests passed',
           details,
         }
       }
@@ -127,6 +144,35 @@ const CHECKS: CheckDefinition[] = [
           : 'Positive isolation test failed — user cannot read their own row',
         details,
       }
+    },
+  },
+  {
+    id: 'app-role',
+    name: 'RLS Enforcement',
+    run: async () => {
+      const details = await checkAppRole()
+      if (details.enforced) {
+        return {
+          status: 'ok',
+          message: `Request-path queries run as ${details.roleName} (RLS enforced by Postgres)`,
+          details,
+        }
+      }
+      if (details.status === 'active') {
+        // The role serves requests but cannot be trusted to enforce — loud.
+        return {
+          status: 'fail',
+          message:
+            details.appRoleBypassRls === true
+              ? `${details.roleName} has BYPASSRLS/superuser — revoke it`
+              : `${details.roleName} is active but its RLS bypass could not be verified`,
+          details,
+        }
+      }
+      // Fallback, unavailable, unsupported, disabled: the app keeps working on
+      // the privileged role. Warning-level by design — never turns the
+      // aggregate red.
+      return { status: 'warn', message: appRoleSummary(details), details }
     },
   },
   {

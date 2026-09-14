@@ -14,7 +14,11 @@ import * as fs from 'fs/promises'
 import * as path from 'path'
 import { randomBytes } from 'crypto'
 import { and, eq } from 'drizzle-orm'
+import type { Pool } from 'pg'
 import { pool } from '@/lib/db/pool'
+import { getAppPool, getAppPoolIfHealthy, getAppPoolState, type AppPoolMode } from '@/lib/db/app-pool'
+import { getAppRoleStatus } from '@/lib/db/app-role'
+import { APP_ROLE_NAME } from '@/lib/db/app-connection'
 import { MODULE_SCHEMAS } from '@/lib/generated/module-schemas'
 import { withUserContext, type DrizzleDb } from '@/lib/db'
 import { moduleSettings } from '@/lib/db/schema'
@@ -331,15 +335,16 @@ export async function checkStorageFilesystem(): Promise<StorageFilesystemPayload
 const SENTINEL_MODULE_ID = '__debug_rls_test__'
 
 /**
- * Whether the pooled connection role bypasses RLS (superuser or the explicit
- * BYPASSRLS attribute). Returns null if it can't be determined. When true,
- * RLS policies are not enforced and the tenant boundary is the application
- * layer — the documented ARI default.
+ * Whether a pool's connection role bypasses RLS (superuser or the explicit
+ * BYPASSRLS attribute). Returns null if it can't be determined. Defaults to
+ * the privileged pool (whose role normally DOES bypass — that is why the
+ * request path runs on the app pool instead); pass the app pool to verify the
+ * enforcing role really cannot bypass.
  */
-export async function connectionBypassesRls(): Promise<boolean | null> {
-  if (!pool) return null
+export async function connectionBypassesRls(p: Pool | null = pool): Promise<boolean | null> {
+  if (!p) return null
   try {
-    const { rows } = await pool.query<{ bypass: boolean }>(
+    const { rows } = await p.query<{ bypass: boolean }>(
       `SELECT (rolsuper OR rolbypassrls) AS bypass
          FROM pg_roles WHERE rolname = current_user`
     )
@@ -349,11 +354,127 @@ export async function connectionBypassesRls(): Promise<boolean | null> {
   }
 }
 
+// ── App role: DB-level RLS enforcement status ───────────────────────────────
+
+export type AppRoleHealthStatus = 'active' | 'fallback' | 'disabled' | 'unsupported' | 'unavailable'
+
+export interface AppRoleTransition {
+  type: 'fallback' | 'restored'
+  at: number
+  reason: string | null
+}
+
+export interface AppRolePayload {
+  /** What request-path queries are using right now. */
+  status: AppRoleHealthStatus
+  roleName: string
+  /** True only when request-path queries run as the app role AND that role cannot bypass RLS. */
+  enforced: boolean
+  /** BYPASSRLS/superuser probe on the app pool itself; null when it could not be probed. */
+  appRoleBypassRls: boolean | null
+  /** Why enforcement is not active (fallback reason, kill switch, no CREATEROLE, …). */
+  reason: string | null
+  /** No-FORCE compensating check: the app role must own no tables, or RLS would not apply to it. */
+  ownsNoTables: boolean | null
+  /** withUserContext() calls that ran on the privileged pool while enforcement was expected. */
+  fallbackCount: number
+  /** 42501 "permission denied" grant sweeps + retries — anything but 0 in steady state is worth a look. */
+  grantMissRetries: number
+  rotatedAt: string | null
+  lastTransition: AppRoleTransition | null
+}
+
+function appRoleStatusFromMode(mode: AppPoolMode): AppRoleHealthStatus {
+  switch (mode) {
+    case 'app':
+      return 'active'
+    case 'disabled':
+      return 'disabled'
+    case 'unsupported':
+      return 'unsupported'
+    case 'unavailable':
+      return 'unavailable'
+    default:
+      return 'fallback'
+  }
+}
+
+/**
+ * The truth about DB-level RLS enforcement in this process: which pool the
+ * request path uses, whether the app role really cannot bypass RLS, and the
+ * counters that reveal silent degradation.
+ */
+export async function checkAppRole(): Promise<AppRolePayload> {
+  // A never-attempted pool would report "pending"; resolve it so the report
+  // reflects what the next request will actually do.
+  if (getAppPoolState().mode === 'pending') await getAppPool()
+  const poolState = getAppPoolState()
+  const role = getAppRoleStatus()
+  const status = appRoleStatusFromMode(poolState.mode)
+
+  const appPool = status === 'active' ? await getAppPoolIfHealthy() : null
+  const appRoleBypassRls = appPool ? await connectionBypassesRls(appPool) : null
+
+  let ownsNoTables: boolean | null = null
+  if (pool) {
+    try {
+      const { rows } = await pool.query<{ n: number }>(
+        'SELECT count(*)::int AS n FROM pg_tables WHERE tableowner = $1',
+        [APP_ROLE_NAME]
+      )
+      ownsNoTables = (rows[0]?.n ?? 0) === 0
+    } catch {
+      ownsNoTables = null
+    }
+  }
+
+  return {
+    status,
+    roleName: APP_ROLE_NAME,
+    enforced: status === 'active' && appRoleBypassRls === false,
+    appRoleBypassRls,
+    reason: poolState.degradedReason ?? role.reason ?? null,
+    ownsNoTables,
+    fallbackCount: poolState.fallbackCount,
+    grantMissRetries: poolState.grantMissRetries,
+    rotatedAt: role.rotatedAt,
+    lastTransition: poolState.lastTransition,
+  }
+}
+
+/** One sentence that is true for every enforcement state — shown on the /health RLS tab. */
+export function rlsEnforcementNote(appRole: AppRolePayload, privilegedBypassRls: boolean | null): string {
+  if (appRole.enforced) {
+    return `RLS is enforced — request-path queries run as ${appRole.roleName}, which cannot bypass row security, so Postgres evaluates the policies below on every query`
+  }
+  if (privilegedBypassRls === false) {
+    return 'Connection role does not bypass RLS — the policies below are actively enforced at the database level'
+  }
+  switch (appRole.status) {
+    case 'active':
+      return appRole.appRoleBypassRls === true
+        ? `RLS is NOT enforced — ${appRole.roleName} has BYPASSRLS or superuser; revoke it (ALTER ROLE ${appRole.roleName} NOBYPASSRLS NOSUPERUSER) or enforcement is meaningless`
+        : `Request-path queries run as ${appRole.roleName}, but its RLS bypass could not be confirmed off — check pg_roles`
+    case 'disabled':
+      return 'RLS enforcement is switched off by ARI_DISABLE_APP_ROLE — request-path queries run on the privileged role and the policies below are defense-in-depth only; unset the variable and restart to re-enable'
+    case 'unsupported':
+      return `RLS enforcement is unavailable on this database — the DATABASE_URL role cannot create the ${appRole.roleName} role (needs CREATEROLE); the policies below are defense-in-depth only`
+    default:
+      return `RLS enforcement is in fallback — request-path queries run on the privileged role until the ${appRole.roleName} role recovers; the policies below are defense-in-depth meanwhile${appRole.reason ? ` (${appRole.reason})` : ''}`
+  }
+}
+
 export interface RlsTestPayload {
   authenticated: true
   userId: string
   success: boolean
+  /** Whether the PRIVILEGED pool's role bypasses RLS (kept for older clients). */
   bypassRls: boolean | null
+  /** Which pool actually served the test queries. */
+  servedBy: 'app-role' | 'privileged'
+  /** True when the test ran as the app role — the negative test is then real, never excused. */
+  enforced: boolean
+  mode: AppPoolMode
   positiveTest: {
     description: string
     rowCount: number
@@ -382,6 +503,9 @@ export async function runRlsTest(userId: string, withRLS: WithRLS): Promise<RlsT
   // Per-request fake user id for the negative test. Cryptographically random
   // so it cannot collide with a real Better Auth user id or leak across runs.
   const fakeUserId = `__debug_rls_fake_user_${randomBytes(16).toString('hex')}__`
+  // Which pool serves the queries below: the app pool unless it is snoozed,
+  // disabled or unsupported — detected by the fallback counter not moving.
+  const stateBefore = getAppPoolState()
 
   // Clear any leftover sentinel from a previously aborted run — otherwise the
   // unique (user_id, module_id) constraint fires.
@@ -424,19 +548,29 @@ export async function runRlsTest(userId: string, withRLS: WithRLS): Promise<RlsT
     )
     const negativePass = negativeRows.length === 0
 
-    // ARI's documented default (docs/SECURITY.md) connects as a Postgres
-    // superuser, which has BYPASSRLS — so the negative test intentionally
-    // "leaks" the row and isolation is enforced at the application layer. Only
-    // when the role does NOT bypass RLS is a failed negative test a real problem.
+    const stateAfter = getAppPoolState()
+    const servedBy: RlsTestPayload['servedBy'] =
+      stateAfter.mode === 'app' && stateAfter.fallbackCount === stateBefore.fallbackCount
+        ? 'app-role'
+        : 'privileged'
+    const enforced = servedBy === 'app-role'
+
+    // On the app role the negative test is real: a leak is a leak. On the
+    // privileged role (fallback, kill switch, unsupported install) that role
+    // normally has BYPASSRLS, so the row intentionally "leaks" and isolation is
+    // enforced at the application layer — excused, and reported as such.
     const bypassRls = await connectionBypassesRls()
 
-    const allPass = positivePass && (negativePass || bypassRls === true)
+    const allPass = positivePass && (negativePass || (!enforced && bypassRls === true))
 
     return {
       authenticated: true,
       userId,
       success: allPass,
       bypassRls,
+      servedBy,
+      enforced,
+      mode: stateAfter.mode,
       positiveTest: {
         description: 'Current user can see their own inserted row',
         rowCount: positiveRows.length,
@@ -451,9 +585,11 @@ export async function runRlsTest(userId: string, withRLS: WithRLS): Promise<RlsT
         passed: negativePass,
       },
       tableTested: 'module_settings',
-      note: bypassRls
-        ? 'Connection role bypasses RLS (documented default) — user isolation is enforced at the application layer; RLS is defense-in-depth only'
-        : 'End-to-end RLS check using a sentinel row — works on fresh installs with no real data',
+      note: enforced
+        ? `End-to-end RLS check ran as ${APP_ROLE_NAME}: Postgres itself hid the sentinel row from the other user context — works on fresh installs with no real data`
+        : bypassRls
+          ? `Ran on the privileged role (${stateAfter.mode === 'disabled' ? 'kill switch' : stateAfter.mode === 'unsupported' ? 'app role unsupported here' : 'app pool in fallback'}), which bypasses RLS — the negative test is excused; user isolation is enforced at the application layer until the app role is active`
+          : 'End-to-end RLS check using a sentinel row — works on fresh installs with no real data',
     }
   } finally {
     // Always clean up the sentinel row, even if an assertion failed above.
@@ -489,9 +625,11 @@ export interface RlsTableRow {
 }
 
 export interface RlsTablesPayload {
+  /** Whether the PRIVILEGED pool's role bypasses RLS. */
   bypassRls: boolean | null
-  /** True only when the connection role does NOT bypass RLS. */
+  /** True when request-path queries are RLS-enforced: the app role is active and cannot bypass, or the privileged role itself cannot. */
   enforced: boolean
+  appRole: AppRolePayload
   tables: RlsTableRow[]
   summary: { total: number; ok: number; noPolicies: number; disabled: number; system: number }
   note: string
@@ -550,6 +688,7 @@ export async function checkRlsTables(): Promise<RlsTablesPayload | null> {
 
   const moduleByTable = buildTableModuleMap(MODULE_SCHEMAS)
   const bypassRls = await connectionBypassesRls()
+  const appRole = await checkAppRole()
 
   const tables: RlsTableRow[] = rows.map((r) => {
     const status: RlsTableStatus = AUTH_SYSTEM_TABLES.has(r.table_name)
@@ -579,12 +718,10 @@ export async function checkRlsTables(): Promise<RlsTablesPayload | null> {
 
   return {
     bypassRls,
-    enforced: bypassRls === false,
+    enforced: appRole.enforced || bypassRls === false,
+    appRole,
     tables,
     summary,
-    note:
-      bypassRls === false
-        ? 'Connection role does not bypass RLS — the policies below are actively enforced at the database level'
-        : 'Connection role bypasses RLS (documented default) — policies below are defense-in-depth only; the table shows what WOULD be enforced if ARI switched to a non-bypass role',
+    note: rlsEnforcementNote(appRole, bypassRls),
   }
 }

@@ -31,6 +31,7 @@ import {
   HealthStorageFilesystemSchema,
   HealthRlsTestSchema,
   HealthRlsTablesSchema,
+  HealthAppRoleSchema,
   HealthMultiUserSchema,
   HealthCheckSchema,
   LicenseStatusSchema,
@@ -365,6 +366,16 @@ describe('HealthRlsTestSchema', () => {
       bypassRls: true,
     })
   })
+  it('accepts the enforcement fields and rejects an unknown servedBy', () => {
+    pass(HealthRlsTestSchema, {
+      authenticated: true,
+      success: true,
+      servedBy: 'app-role',
+      enforced: true,
+      mode: 'app',
+    })
+    fail(HealthRlsTestSchema, { authenticated: true, servedBy: 'somebody' })
+  })
   it('accepts unauthenticated', () => {
     pass(HealthRlsTestSchema, { authenticated: false })
   })
@@ -382,20 +393,44 @@ describe('HealthRlsTablesSchema', () => {
     status: 'ok',
   }
   const validSummary = { total: 1, ok: 1, noPolicies: 0, disabled: 0, system: 0 }
+  const validAppRole = {
+    status: 'active',
+    roleName: 'ari_app',
+    enforced: true,
+    appRoleBypassRls: false,
+    reason: null,
+    ownsNoTables: true,
+    fallbackCount: 0,
+    grantMissRetries: 0,
+    rotatedAt: '2026-09-13T00:00:00.000Z',
+    lastTransition: { type: 'restored', at: 1, reason: null },
+  }
 
   it('accepts a full report', () => {
     pass(HealthRlsTablesSchema, {
       bypassRls: true,
       enforced: false,
+      appRole: validAppRole,
       tables: [validTable],
       summary: validSummary,
       note: 'defense-in-depth only',
     })
   })
+  it('requires the app role block', () => {
+    fail(HealthRlsTablesSchema, {
+      bypassRls: true,
+      enforced: false,
+      tables: [validTable],
+      summary: validSummary,
+      note: 'x',
+    })
+  })
+
   it('accepts null bypassRls and an empty table list', () => {
     pass(HealthRlsTablesSchema, {
       bypassRls: null,
       enforced: false,
+      appRole: { ...validAppRole, status: 'fallback', enforced: false, lastTransition: null, rotatedAt: null },
       tables: [],
       summary: { total: 0, ok: 0, noPolicies: 0, disabled: 0, system: 0 },
       note: 'n/a',

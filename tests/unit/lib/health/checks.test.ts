@@ -25,6 +25,23 @@ vi.mock('@/lib/db', () => ({
   ),
 }))
 
+// ── app pool / app role mocks (DB-level RLS enforcement state) ─────────────
+const appPoolHolder = vi.hoisted(() => ({
+  state: {} as any,
+  pool: null as any,
+  getAppPool: vi.fn(async () => null as any),
+}))
+vi.mock('@/lib/db/app-pool', () => ({
+  getAppPoolState: () => ({ ...appPoolHolder.state }),
+  getAppPool: () => appPoolHolder.getAppPool(),
+  getAppPoolIfHealthy: async () => appPoolHolder.pool,
+}))
+const appRoleHolder = vi.hoisted(() => ({ status: {} as any }))
+vi.mock('@/lib/db/app-role', () => ({
+  getAppRoleStatus: () => ({ ...appRoleHolder.status }),
+}))
+vi.mock('@/lib/db/app-connection', () => ({ APP_ROLE_NAME: 'ari_app' }))
+
 vi.mock('@/lib/db/schema', () => ({
   moduleSettings: {
     id: 'id',
@@ -106,6 +123,7 @@ function queryableImpl(result: unknown): any {
 import {
   buildTableModuleMap,
   checkAiProviders,
+  checkAppRole,
   checkAuthConfig,
   checkDatabase,
   checkModuleStatus,
@@ -113,7 +131,9 @@ import {
   checkRlsTables,
   checkStorageFilesystem,
   connectionBypassesRls,
+  rlsEnforcementNote,
   runRlsTest,
+  type AppRolePayload,
   type WithRLS,
 } from '@/lib/health/checks'
 
@@ -124,9 +144,30 @@ function makeWithRLS(results: unknown[]) {
   return fn as typeof fn & WithRLS
 }
 
+/** Enforcement is live: app pool active, app role ready, app role cannot bypass. */
+function appPoolActive() {
+  appPoolHolder.state = {
+    mode: 'app',
+    degradedUntil: null,
+    degradedReason: null,
+    fallbackCount: 0,
+    grantMissRetries: 0,
+    lastTransition: null,
+  }
+  appPoolHolder.pool = { query: vi.fn().mockResolvedValue({ rows: [{ bypass: false }] }) }
+  appPoolHolder.getAppPool.mockReset().mockImplementation(async () => appPoolHolder.pool)
+  appRoleHolder.status = {
+    state: 'ready',
+    roleName: 'ari_app',
+    rotatedAt: '2026-09-13T00:00:00.000Z',
+    checkedAt: 1,
+  }
+}
+
 beforeEach(() => {
   poolHolder.pool = null
   dbHolder.userContextResults = []
+  appPoolActive()
   schemasHolder.schemas = {}
   registryHolder.modules = []
   providersHolder.providers = []
@@ -503,6 +544,158 @@ describe('connectionBypassesRls', () => {
     poolHolder.pool = { query: vi.fn().mockRejectedValue(new Error('no pg_roles')) }
     expect(await connectionBypassesRls()).toBeNull()
   })
+
+  it('probes whichever pool it is given (the app pool, for the enforcing role)', async () => {
+    poolHolder.pool = { query: vi.fn().mockResolvedValue({ rows: [{ bypass: true }] }) }
+    const appPool = { query: vi.fn().mockResolvedValue({ rows: [{ bypass: false }] }) } as any
+    expect(await connectionBypassesRls(appPool)).toBe(false)
+    expect(await connectionBypassesRls(null)).toBeNull()
+    expect(poolHolder.pool.query).not.toHaveBeenCalled()
+  })
+})
+
+// ── checkAppRole ───────────────────────────────────────────────────────────
+
+describe('checkAppRole', () => {
+  const ownsNone = () => ({ query: vi.fn().mockResolvedValue({ rows: [{ n: 0 }] }) })
+
+  it('reports an enforced, healthy app role', async () => {
+    poolHolder.pool = ownsNone()
+    const r = await checkAppRole()
+    expect(r).toEqual({
+      status: 'active',
+      roleName: 'ari_app',
+      enforced: true,
+      appRoleBypassRls: false,
+      reason: null,
+      ownsNoTables: true,
+      fallbackCount: 0,
+      grantMissRetries: 0,
+      rotatedAt: '2026-09-13T00:00:00.000Z',
+      lastTransition: null,
+    })
+    expect(poolHolder.pool.query).toHaveBeenCalledWith(
+      'SELECT count(*)::int AS n FROM pg_tables WHERE tableowner = $1',
+      ['ari_app']
+    )
+    expect(appPoolHolder.getAppPool).not.toHaveBeenCalled()
+  })
+
+  it('resolves a never-attempted (pending) pool first', async () => {
+    appPoolHolder.state.mode = 'pending'
+    appPoolHolder.getAppPool.mockImplementation(async () => {
+      appPoolHolder.state.mode = 'app'
+      return appPoolHolder.pool
+    })
+    const r = await checkAppRole()
+    expect(appPoolHolder.getAppPool).toHaveBeenCalledTimes(1)
+    expect(r.status).toBe('active')
+  })
+
+  it('is NOT enforced when the app role itself can bypass RLS', async () => {
+    appPoolHolder.pool = { query: vi.fn().mockResolvedValue({ rows: [{ bypass: true }] }) }
+    const r = await checkAppRole()
+    expect(r.status).toBe('active')
+    expect(r.appRoleBypassRls).toBe(true)
+    expect(r.enforced).toBe(false)
+  })
+
+  it('leaves the bypass probe null when the app pool is not active', async () => {
+    appPoolHolder.state.mode = 'fallback'
+    appPoolHolder.state.degradedReason = 'connect as the app role failed: 28P01'
+    appPoolHolder.state.fallbackCount = 3
+    appPoolHolder.state.lastTransition = { type: 'fallback', at: 5, reason: 'x' }
+    const r = await checkAppRole()
+    expect(r).toMatchObject({
+      status: 'fallback',
+      enforced: false,
+      appRoleBypassRls: null,
+      reason: 'connect as the app role failed: 28P01',
+      fallbackCount: 3,
+      lastTransition: { type: 'fallback', at: 5, reason: 'x' },
+    })
+    expect(appPoolHolder.pool.query).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['disabled', 'disabled'],
+    ['unsupported', 'unsupported'],
+    ['unavailable', 'unavailable'],
+    ['pending', 'fallback'],
+  ])('maps pool mode %s → %s', async (mode, expected) => {
+    appPoolHolder.state.mode = mode
+    appPoolHolder.getAppPool.mockImplementation(async () => null)
+    expect((await checkAppRole()).status).toBe(expected)
+  })
+
+  it("falls back to the role's own reason when the pool has none", async () => {
+    appPoolHolder.state.mode = 'unsupported'
+    appRoleHolder.status = { state: 'unsupported', reason: 'no CREATEROLE', rotatedAt: null }
+    expect((await checkAppRole()).reason).toBe('no CREATEROLE')
+  })
+
+  it('ownership check: false when the role owns a table, null on error or without a pool', async () => {
+    poolHolder.pool = { query: vi.fn().mockResolvedValue({ rows: [{ n: 2 }] }) }
+    expect((await checkAppRole()).ownsNoTables).toBe(false)
+    poolHolder.pool = { query: vi.fn().mockRejectedValue(new Error('no pg_tables')) }
+    expect((await checkAppRole()).ownsNoTables).toBeNull()
+    poolHolder.pool = { query: vi.fn().mockResolvedValue({ rows: [] }) }
+    expect((await checkAppRole()).ownsNoTables).toBe(true)
+    poolHolder.pool = null
+    expect((await checkAppRole()).ownsNoTables).toBeNull()
+  })
+})
+
+// ── rlsEnforcementNote ─────────────────────────────────────────────────────
+
+describe('rlsEnforcementNote', () => {
+  const base: AppRolePayload = {
+    status: 'active',
+    roleName: 'ari_app',
+    enforced: true,
+    appRoleBypassRls: false,
+    reason: null,
+    ownsNoTables: true,
+    fallbackCount: 0,
+    grantMissRetries: 0,
+    rotatedAt: null,
+    lastTransition: null,
+  }
+
+  it('enforced → green wording naming the role', () => {
+    expect(rlsEnforcementNote(base, true)).toMatch(/^RLS is enforced — request-path queries run as ari_app/)
+  })
+
+  it('privileged role that cannot bypass → legacy enforced wording', () => {
+    expect(rlsEnforcementNote({ ...base, enforced: false, status: 'unsupported' }, false)).toContain(
+      'actively enforced'
+    )
+  })
+
+  it('active but the app role bypasses → loud remediation', () => {
+    const note = rlsEnforcementNote({ ...base, enforced: false, appRoleBypassRls: true }, true)
+    expect(note).toContain('NOT enforced')
+    expect(note).toContain('ALTER ROLE ari_app NOBYPASSRLS')
+  })
+
+  it('active but the probe failed → could not be confirmed', () => {
+    expect(rlsEnforcementNote({ ...base, enforced: false, appRoleBypassRls: null }, true)).toContain(
+      'could not be confirmed'
+    )
+  })
+
+  it('disabled / unsupported / fallback wording', () => {
+    expect(rlsEnforcementNote({ ...base, enforced: false, status: 'disabled' }, true)).toContain(
+      'ARI_DISABLE_APP_ROLE'
+    )
+    expect(rlsEnforcementNote({ ...base, enforced: false, status: 'unsupported' }, true)).toContain(
+      'needs CREATEROLE'
+    )
+    const fb = rlsEnforcementNote({ ...base, enforced: false, status: 'fallback', reason: 'boom' }, true)
+    expect(fb).toContain('in fallback')
+    expect(fb).toContain('(boom)')
+    expect(rlsEnforcementNote({ ...base, enforced: false, status: 'unavailable' }, null)).not.toContain('(')
+  })
 })
 
 // ── runRlsTest ─────────────────────────────────────────────────────────────
@@ -542,6 +735,10 @@ describe('runRlsTest', () => {
 
     expect(result.success).toBe(true)
     expect(result.bypassRls).toBe(false)
+    expect(result.servedBy).toBe('app-role')
+    expect(result.enforced).toBe(true)
+    expect(result.mode).toBe('app')
+    expect(result.note).toContain('ran as ari_app')
     expect(result.positiveTest.passed).toBe(true)
     expect(result.positiveTest.allOwnedByCurrentUser).toBe(true)
     expect(result.negativeTest.passed).toBe(true)
@@ -552,7 +749,8 @@ describe('runRlsTest', () => {
     expect(withRLS).toHaveBeenCalledTimes(4)
   })
 
-  it('still succeeds when the negative test leaks because the role bypasses RLS', async () => {
+  it('in fallback, a leak is excused when the privileged role bypasses RLS', async () => {
+    appPoolHolder.state.mode = 'fallback'
     const result = await runRlsTest(
       'user-1',
       rlsSetup({
@@ -563,8 +761,69 @@ describe('runRlsTest', () => {
     )
 
     expect(result.success).toBe(true)
+    expect(result.servedBy).toBe('privileged')
+    expect(result.enforced).toBe(false)
+    expect(result.mode).toBe('fallback')
     expect(result.negativeTest.passed).toBe(false)
     expect(result.note).toContain('bypasses RLS')
+    expect(result.note).toContain('app pool in fallback')
+  })
+
+  it.each([
+    ['disabled', 'kill switch'],
+    ['unsupported', 'app role unsupported here'],
+  ])('names the reason the privileged role served the test (%s)', async (mode, phrase) => {
+    appPoolHolder.state.mode = mode
+    const result = await runRlsTest(
+      'user-1',
+      rlsSetup({ positiveRows: [{ userId: 'user-1' }], negativeRows: [{ userId: 'user-1' }], bypass: true })
+    )
+    expect(result.success).toBe(true)
+    expect(result.note).toContain(phrase)
+  })
+
+  it('on the app role a leak FAILS even though the privileged role bypasses RLS', async () => {
+    const result = await runRlsTest(
+      'user-1',
+      rlsSetup({
+        positiveRows: [{ userId: 'user-1' }],
+        negativeRows: [{ userId: 'user-1' }],
+        bypass: true,
+      })
+    )
+
+    expect(result.success).toBe(false)
+    expect(result.servedBy).toBe('app-role')
+    expect(result.enforced).toBe(true)
+  })
+
+  it('detects a mid-test fallback through the counter and excuses accordingly', async () => {
+    const withRLS = rlsSetup({
+      positiveRows: [{ userId: 'user-1' }],
+      negativeRows: [{ userId: 'user-1' }],
+      bypass: true,
+    })
+    const inner = withRLS.getMockImplementation()!
+    withRLS.mockImplementation(async (op) => {
+      appPoolHolder.state.fallbackCount += 1 // this call ran on the privileged pool
+      return inner(op)
+    })
+
+    const result = await runRlsTest('user-1', withRLS as unknown as WithRLS)
+
+    expect(result.servedBy).toBe('privileged')
+    expect(result.enforced).toBe(false)
+    expect(result.success).toBe(true)
+  })
+
+  it('without a bypassing privileged role, a fallback leak still fails', async () => {
+    appPoolHolder.state.mode = 'fallback'
+    const result = await runRlsTest(
+      'user-1',
+      rlsSetup({ positiveRows: [{ userId: 'user-1' }], negativeRows: [{ userId: 'user-1' }], bypass: null })
+    )
+    expect(result.success).toBe(false)
+    expect(result.note).toContain('sentinel row')
   })
 
   it('fails when the negative test leaks and the role does not bypass RLS', async () => {
@@ -687,6 +946,7 @@ describe('checkRlsTables', () => {
     return {
       query: vi.fn(async (sql: string) => {
         if (sql.includes('pg_roles')) return { rows: bypass === null ? [] : [{ bypass }] }
+        if (sql.includes('pg_tables')) return { rows: [{ n: 0 }] }
         return { rows: catalogRows }
       }),
     }
@@ -719,12 +979,15 @@ describe('checkRlsTables', () => {
       { table: 'user', module: 'core', rlsEnabled: false, rlsForced: false, policyCount: 0, status: 'system' },
     ])
     expect(result!.summary).toEqual({ total: 4, ok: 1, noPolicies: 1, disabled: 1, system: 1 })
+    // the privileged role bypasses, but the request path runs as the app role
     expect(result!.bypassRls).toBe(true)
-    expect(result!.enforced).toBe(false)
-    expect(result!.note).toContain('bypasses RLS')
+    expect(result!.enforced).toBe(true)
+    expect(result!.appRole).toMatchObject({ status: 'active', enforced: true, ownsNoTables: true })
+    expect(result!.note).toMatch(/^RLS is enforced/)
   })
 
-  it('reports enforcement when the role does not bypass RLS', async () => {
+  it('reports enforcement when the privileged role itself does not bypass RLS', async () => {
+    appPoolHolder.state.mode = 'unsupported'
     poolHolder.pool = rlsTablesPool(
       [{ table_name: 'tasks', rls_enabled: true, rls_forced: true, policy_count: 2 }],
       false
@@ -734,16 +997,41 @@ describe('checkRlsTables', () => {
 
     expect(result!.enforced).toBe(true)
     expect(result!.bypassRls).toBe(false)
+    expect(result!.appRole.status).toBe('unsupported')
     expect(result!.note).toContain('actively enforced')
   })
 
-  it('treats an unknown bypass state as not enforced', async () => {
+  it('fallback: not enforced, calm note with the reason, privileged bypass unknown', async () => {
+    appPoolHolder.state.mode = 'fallback'
+    appPoolHolder.state.degradedReason = 'connect as the app role failed'
     poolHolder.pool = rlsTablesPool([], null)
 
     const result = await checkRlsTables()
 
     expect(result!.bypassRls).toBeNull()
     expect(result!.enforced).toBe(false)
+    expect(result!.appRole.status).toBe('fallback')
+    expect(result!.note).toContain('in fallback')
+    expect(result!.note).toContain('connect as the app role failed')
     expect(result!.summary.total).toBe(0)
+  })
+
+  it('kill switch and unsupported installs get their own wording', async () => {
+    poolHolder.pool = rlsTablesPool([], true)
+    appPoolHolder.state.mode = 'disabled'
+    expect((await checkRlsTables())!.note).toContain('ARI_DISABLE_APP_ROLE')
+    appPoolHolder.state.mode = 'unsupported'
+    expect((await checkRlsTables())!.note).toContain('unavailable on this database')
+  })
+
+  it('an app role that can bypass RLS is reported loudly, never as enforced', async () => {
+    poolHolder.pool = rlsTablesPool([], true)
+    appPoolHolder.pool = { query: vi.fn().mockResolvedValue({ rows: [{ bypass: true }] }) }
+
+    const result = await checkRlsTables()
+
+    expect(result!.enforced).toBe(false)
+    expect(result!.appRole.appRoleBypassRls).toBe(true)
+    expect(result!.note).toContain('NOT enforced')
   })
 })

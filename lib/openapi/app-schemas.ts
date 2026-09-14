@@ -188,11 +188,31 @@ export const HealthStorageFilesystemSchema = z.object({
   error: z.string().optional(),
 }).openapi('HealthStorageFilesystem')
 
+export const HealthAppRoleSchema = z.object({
+  status: z.enum(['active', 'fallback', 'disabled', 'unsupported', 'unavailable']),
+  roleName: z.string(),
+  enforced: z.boolean(),
+  appRoleBypassRls: z.boolean().nullable(),
+  reason: z.string().nullable(),
+  ownsNoTables: z.boolean().nullable(),
+  fallbackCount: z.number().int(),
+  grantMissRetries: z.number().int(),
+  rotatedAt: z.string().nullable(),
+  lastTransition: z.object({
+    type: z.enum(['fallback', 'restored']),
+    at: z.number(),
+    reason: z.string().nullable(),
+  }).nullable(),
+}).openapi('HealthAppRole')
+
 export const HealthRlsTestSchema = z.object({
   authenticated: z.boolean(),
   userId: z.string().optional(),
   success: z.boolean().optional(),
   bypassRls: z.boolean().nullable().optional(),
+  servedBy: z.enum(['app-role', 'privileged']).optional(),
+  enforced: z.boolean().optional(),
+  mode: z.string().optional(),
   positiveTest: z.unknown().optional(),
   negativeTest: z.unknown().optional(),
   tableTested: z.string().optional(),
@@ -203,6 +223,7 @@ export const HealthRlsTestSchema = z.object({
 export const HealthRlsTablesSchema = z.object({
   bypassRls: z.boolean().nullable(),
   enforced: z.boolean(),
+  appRole: HealthAppRoleSchema,
   tables: z.array(z.object({
     table: z.string(),
     module: z.string(),

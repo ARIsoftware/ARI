@@ -234,13 +234,81 @@ interface RlsTableRow {
   policyCount: number
   status: 'ok' | 'no_policies' | 'disabled' | 'system'
 }
+interface AppRoleReport {
+  status: 'active' | 'fallback' | 'disabled' | 'unsupported' | 'unavailable'
+  roleName: string
+  enforced: boolean
+  appRoleBypassRls: boolean | null
+  reason: string | null
+  ownsNoTables: boolean | null
+  fallbackCount: number
+  grantMissRetries: number
+  rotatedAt: string | null
+  lastTransition: { type: 'fallback' | 'restored'; at: number; reason: string | null } | null
+}
 interface RlsTablesReport {
   bypassRls: boolean | null
   enforced: boolean
+  appRole: AppRoleReport
   tables: RlsTableRow[]
   summary: { total: number; ok: number; noPolicies: number; disabled: number; system: number }
   note: string
 }
+
+/**
+ * Three-state enforcement banner for the RLS tab. Green when Postgres enforces
+ * the policies (the app role serves requests and cannot bypass), calm yellow
+ * while the app keeps working on the privileged role (fallback, unsupported,
+ * not provisioned), grey when the operator switched enforcement off, red only
+ * when the app role itself turns out to bypass RLS.
+ */
+function rlsBanner(report: RlsTablesReport): {
+  tone: 'green' | 'yellow' | 'gray' | 'red'
+  title: string
+} {
+  const ar = report.appRole
+  if (report.enforced) {
+    return {
+      tone: 'green',
+      title: ar.enforced
+        ? `RLS is enforced — request-path queries run as ${ar.roleName} without BYPASSRLS`
+        : 'RLS enforced at the database level — the connection role does not bypass row security',
+    }
+  }
+  switch (ar.status) {
+    case 'active':
+      return { tone: 'red', title: `RLS not enforced — ${ar.roleName} can bypass row security` }
+    case 'disabled':
+      return { tone: 'gray', title: 'RLS enforcement disabled by ARI_DISABLE_APP_ROLE — running on the privileged role' }
+    case 'unsupported':
+      return { tone: 'yellow', title: 'RLS enforcement unavailable on this database — running on the privileged role' }
+    default:
+      return { tone: 'yellow', title: `RLS enforcement in fallback — running on the privileged role until ${ar.roleName} recovers` }
+  }
+}
+
+const RLS_BANNER_TONE = {
+  green: {
+    box: 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950',
+    text: 'text-green-700 dark:text-green-400',
+    icon: 'text-green-600 dark:text-green-400',
+  },
+  yellow: {
+    box: 'border-yellow-200 dark:border-yellow-900 bg-yellow-50 dark:bg-yellow-950',
+    text: 'text-yellow-700 dark:text-yellow-400',
+    icon: 'text-yellow-600 dark:text-yellow-400',
+  },
+  gray: {
+    box: 'border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900',
+    text: 'text-gray-700 dark:text-gray-300',
+    icon: 'text-gray-500 dark:text-gray-400',
+  },
+  red: {
+    box: 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950',
+    text: 'text-red-700 dark:text-red-400',
+    icon: 'text-red-600 dark:text-red-400',
+  },
+} as const
 
 // Severity order for the RLS table listing — problem rows surface first.
 const RLS_STATUS_ORDER: Record<RlsTableRow['status'], number> = {
@@ -2366,13 +2434,15 @@ export default function DatabaseTestPage() {
           } else if (rls.success) {
             updateTestResult('Test RLS Policies', {
               status: 'success',
-              message: rls.bypassRls
-                ? 'Isolation enforced at the app layer — the connection role bypasses RLS (ARI\'s documented default)'
-                : 'Per-user isolation working — RLS enforcing (positive + negative tests passed)',
+              message: rls.enforced
+                ? `Per-user isolation enforced by Postgres — positive + negative tests passed as the app role`
+                : rls.bypassRls
+                  ? 'Isolation enforced at the app layer — running on the privileged role, which bypasses RLS (fallback)'
+                  : 'Per-user isolation working — RLS enforcing (positive + negative tests passed)',
               data: {
-                note: rls.bypassRls
-                  ? 'The default superuser connection has BYPASSRLS, so RLS is defense-in-depth only; user isolation comes from the application layer. Content modules are shared (Phase 3); per-user tables (settings, prefs, API keys) stay isolated via app-layer filters.'
-                  : 'Content modules are shared (Phase 3); this confirms the per-user tables (module settings, preferences, API keys) are still isolated by RLS',
+                note: rls.note,
+                servedBy: rls.servedBy,
+                mode: rls.mode,
                 bypassRls: rls.bypassRls,
                 positiveTest: rls.positiveTest,
                 negativeTest: rls.negativeTest,
@@ -2879,30 +2949,30 @@ export default function DatabaseTestPage() {
 
               {rlsTables && (
                 <div className="space-y-6">
-                  {/* Enforcement banner */}
-                  <div className={`flex items-start gap-3 rounded-lg border p-4 ${
-                    rlsTables.enforced
-                      ? 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950'
-                      : 'border-yellow-200 dark:border-yellow-900 bg-yellow-50 dark:bg-yellow-950'
-                  }`}>
-                    {rlsTables.enforced ? (
-                      <ShieldCheck className="h-5 w-5 mt-0.5 text-green-600 dark:text-green-400 shrink-0" />
-                    ) : (
-                      <ShieldAlert className="h-5 w-5 mt-0.5 text-yellow-600 dark:text-yellow-400 shrink-0" />
-                    )}
-                    <div>
-                      <p className={`text-sm font-medium ${
-                        rlsTables.enforced
-                          ? 'text-green-700 dark:text-green-400'
-                          : 'text-yellow-700 dark:text-yellow-400'
-                      }`}>
-                        {rlsTables.enforced
-                          ? 'RLS enforced at the database level'
-                          : 'RLS not enforced — connection role bypasses row security'}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">{rlsTables.note}</p>
-                    </div>
-                  </div>
+                  {/* Enforcement banner — three states, never the stale "documented default" text once enforced */}
+                  {(() => {
+                    const banner = rlsBanner(rlsTables)
+                    const tone = RLS_BANNER_TONE[banner.tone]
+                    const ar = rlsTables.appRole
+                    const Icon = banner.tone === 'green' ? ShieldCheck : banner.tone === 'gray' ? Shield : ShieldAlert
+                    return (
+                      <div className={`flex items-start gap-3 rounded-lg border p-4 ${tone.box}`}>
+                        <Icon className={`h-5 w-5 mt-0.5 shrink-0 ${tone.icon}`} />
+                        <div className="min-w-0">
+                          <p className={`text-sm font-medium ${tone.text}`}>{banner.title}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{rlsTables.note}</p>
+                          <p className="text-xs text-muted-foreground mt-2 font-mono">
+                            role {ar.roleName} · state {ar.status}
+                            {ar.ownsNoTables !== null && ` · owns no tables: ${ar.ownsNoTables ? 'yes' : 'NO'}`}
+                            {` · fallbacks ${ar.fallbackCount} · grant-miss retries ${ar.grantMissRetries}`}
+                            {ar.rotatedAt && ` · password rotated ${new Date(ar.rotatedAt).toLocaleString()}`}
+                            {ar.lastTransition &&
+                              ` · last ${ar.lastTransition.type} ${new Date(ar.lastTransition.at).toLocaleTimeString()}`}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })()}
 
                   {/* Summary */}
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-3">

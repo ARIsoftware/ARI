@@ -42,6 +42,12 @@ export const APP_POOL_SNOOZE_MS = 60_000
 export type AppPoolMode =
   'pending' | 'app' | 'fallback' | 'disabled' | 'unsupported' | 'unavailable'
 
+export interface AppPoolTransition {
+  type: 'fallback' | 'restored'
+  at: number
+  reason: string | null
+}
+
 export interface AppPoolState {
   /** What withUserContext() would use right now. */
   mode: AppPoolMode
@@ -52,6 +58,8 @@ export interface AppPoolState {
   fallbackCount: number
   /** 42501 "permission denied" grant sweeps + retries (steady state: 0). */
   grantMissRetries: number
+  /** Last enforcement transition observed by a request in this process. */
+  lastTransition: AppPoolTransition | null
 }
 
 // ── per-process state ──────────────────────────────────────────────────────
@@ -64,6 +72,8 @@ let degradedReason: string | null = null
 let fallbackCount = 0
 let grantMissRetries = 0
 let lastWarnAt = 0
+let inFallback = false
+let lastTransition: AppPoolTransition | null = null
 
 /** Test seam: wipe the module-level state between cases. */
 export function _resetAppPoolStateForTests(): void {
@@ -75,6 +85,8 @@ export function _resetAppPoolStateForTests(): void {
   fallbackCount = 0
   grantMissRetries = 0
   lastWarnAt = 0
+  inFallback = false
+  lastTransition = null
   delete globalThis.__ariPgAppPool
 }
 
@@ -120,6 +132,42 @@ function snooze(reason: string): void {
 function clearSnooze(): void {
   degradedUntil = 0
   degradedReason = null
+}
+
+/** Enforcement is expected unless the kill switch is set or the DB cannot host the role. */
+function enforcementExpected(): boolean {
+  return !isAppRoleDisabled() && getAppRoleStatus().state !== 'unsupported'
+}
+
+/**
+ * Enforcement state transitions get an audit-trail row: one when request-path
+ * queries first fall back to the privileged role, one when they return to the
+ * app role. Attributed to the user whose request observed the change (the
+ * activity log needs an actor). Fire-and-forget, loaded lazily so the DB layer
+ * carries no static dependency on the activity log.
+ */
+function recordTransition(
+  type: AppPoolTransition['type'],
+  reason: string | null,
+  userId: string | undefined,
+): void {
+  inFallback = type === 'fallback'
+  lastTransition = { type, at: Date.now(), reason }
+  if (!userId) return
+  void import('@/lib/activity-log')
+    .then(({ logActivity }) =>
+      logActivity({
+        userId,
+        type: type === 'fallback' ? 'rls_enforcement_fallback' : 'rls_enforcement_restored',
+        source: 'system',
+        description:
+          type === 'fallback'
+            ? 'Request-path queries fell back to the privileged database role (RLS not enforced by Postgres)'
+            : 'Request-path queries returned to the RLS-enforcing app role',
+        metadata: reason ? { reason } : {},
+      }),
+    )
+    .catch(() => {})
 }
 
 // ── pool lifecycle ─────────────────────────────────────────────────────────
@@ -183,10 +231,12 @@ export async function getAppPoolIfHealthy(): Promise<Pool | null> {
  * then falls back for that one call). Credential failures also drop the pool
  * and repair the role in the background.
  */
-export function noteAppPoolConnectFailure(err: unknown): void {
+export function noteAppPoolConnectFailure(err: unknown, userId?: string): void {
   const code = pgCode(err)
-  snooze(`connect as the app role failed: ${errMessage(err)}`)
+  const reason = `connect as the app role failed: ${errMessage(err)}`
+  snooze(reason)
   fallbackCount++
+  if (!inFallback && enforcementExpected()) recordTransition('fallback', reason, userId)
   if (code === '28P01' || code === '28000') {
     resetAppPool()
     const failedAt = Date.now()
@@ -201,10 +251,17 @@ export function noteAppPoolConnectFailure(err: unknown): void {
 }
 
 /** A withUserContext() call ran on the privileged pool. Counted only when enforcement was expected. */
-export function noteFallback(): void {
-  if (isAppRoleDisabled()) return
-  if (getAppRoleStatus().state === 'unsupported') return
+export function noteFallback(userId?: string): void {
+  if (!enforcementExpected()) return
   fallbackCount++
+  if (!inFallback) {
+    recordTransition('fallback', degradedReason ?? getAppRoleStatus().reason ?? null, userId)
+  }
+}
+
+/** A withUserContext() call acquired a connection from the app pool. */
+export function noteAppPoolServed(userId?: string): void {
+  if (inFallback) recordTransition('restored', null, userId)
 }
 
 export function noteGrantMissRetry(): void {
@@ -243,5 +300,6 @@ export function getAppPoolState(): AppPoolState {
     degradedReason: snoozed ? degradedReason : null,
     fallbackCount,
     grantMissRetries,
+    lastTransition,
   }
 }

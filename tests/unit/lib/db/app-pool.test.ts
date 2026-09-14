@@ -18,6 +18,7 @@ let roleState: {
   ensureAppRole: ReturnType<typeof vi.fn<(opts?: unknown) => Promise<RoleStatus>>>
 }
 let warnSpy: ReturnType<typeof vi.spyOn>
+const activityHolder = { events: [] as Array<Record<string, unknown>>, importFails: false }
 
 function fakePool(): FakePool {
   return { end: vi.fn().mockResolvedValue(undefined), id: created.length + 1 }
@@ -37,6 +38,8 @@ beforeEach(() => {
   vi.stubEnv('DATABASE_APP_POOL_MAX', '')
   vi.stubEnv('DATABASE_POOL_MAX', '')
   delete (globalThis as any).__ariPgAppPool
+  activityHolder.events = []
+  activityHolder.importFails = false
   warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 })
 
@@ -65,8 +68,15 @@ async function load() {
     getAppRolePassword: () => roleState.password,
     ensureAppRole: (opts?: unknown) => roleState.ensureAppRole(opts),
   }))
+  vi.doMock('@/lib/activity-log', () => {
+    if (activityHolder.importFails) throw new Error('activity log unavailable')
+    return { logActivity: (e: Record<string, unknown>) => activityHolder.events.push(e) }
+  })
   return await import('@/lib/db/app-pool')
 }
+
+/** Let the lazy activity-log import (a real async module load) and its .then() settle. */
+const settle = () => new Promise((r) => setTimeout(r, 25))
 
 // ── resolveAppPoolMax ──────────────────────────────────────────────────────
 
@@ -375,7 +385,86 @@ describe('resetAppPool / closeAppPool', () => {
       degradedReason: null,
       fallbackCount: 0,
       grantMissRetries: 0,
+      lastTransition: null,
     })
+  })
+})
+
+// ── enforcement transitions → activity log ─────────────────────────────────
+
+describe('enforcement transitions', () => {
+  it('logs one fallback entry (attributed to the observing user) and then one restore', async () => {
+    roleState.status = { state: 'unavailable', reason: 'setup incomplete' }
+    roleState.password = null
+    const mod = await load()
+    await mod.getAppPool() // snoozes
+
+    mod.noteFallback('user-a')
+    mod.noteFallback('user-b') // same fallback episode — no second row
+    await settle()
+    expect(activityHolder.events).toHaveLength(1)
+    expect(activityHolder.events[0]).toMatchObject({
+      userId: 'user-a',
+      type: 'rls_enforcement_fallback',
+      source: 'system',
+      metadata: { reason: 'setup incomplete' },
+    })
+    expect(mod.getAppPoolState().lastTransition).toMatchObject({
+      type: 'fallback',
+      reason: 'setup incomplete',
+    })
+
+    mod.noteAppPoolServed('user-c')
+    mod.noteAppPoolServed('user-c') // already restored — no second row
+    await settle()
+    expect(activityHolder.events).toHaveLength(2)
+    expect(activityHolder.events[1]).toMatchObject({
+      userId: 'user-c',
+      type: 'rls_enforcement_restored',
+    })
+    expect(mod.getAppPoolState().lastTransition).toMatchObject({ type: 'restored', reason: null })
+  })
+
+  it('a connect failure records the fallback with its reason', async () => {
+    const mod = await load()
+    await mod.getAppPool()
+    mod.noteAppPoolConnectFailure(new Error('timeout exceeded'), 'user-a')
+    mod.noteAppPoolConnectFailure(new Error('timeout exceeded'), 'user-a')
+    await settle()
+    expect(activityHolder.events).toHaveLength(1)
+    expect((activityHolder.events[0].metadata as { reason: string }).reason).toContain(
+      'timeout exceeded',
+    )
+  })
+
+  it('records the transition even without an acting user, but writes no log row', async () => {
+    const mod = await load()
+    await mod.getAppPool()
+    mod.noteAppPoolConnectFailure(new Error('boom'))
+    await settle()
+    expect(activityHolder.events).toHaveLength(0)
+    expect(mod.getAppPoolState().lastTransition?.type).toBe('fallback')
+  })
+
+  it('does not count or log a fallback while enforcement is not expected', async () => {
+    vi.stubEnv('ARI_DISABLE_APP_ROLE', '1')
+    const mod = await load()
+    mod.noteFallback('user-a')
+    await settle()
+    expect(activityHolder.events).toHaveLength(0)
+    expect(mod.getAppPoolState().lastTransition).toBeNull()
+    expect(mod.noteAppPoolServed('user-a')).toBeUndefined()
+  })
+
+  it('swallows an activity-log import failure', async () => {
+    activityHolder.importFails = true
+    roleState.status = { state: 'unavailable', reason: 'x' }
+    roleState.password = null
+    const mod = await load()
+    await mod.getAppPool()
+    expect(() => mod.noteFallback('user-a')).not.toThrow()
+    await settle()
+    expect(mod.getAppPoolState().lastTransition?.type).toBe('fallback')
   })
 })
 

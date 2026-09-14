@@ -17,6 +17,7 @@ let mockDrizzleInstance: { select: ReturnType<typeof vi.fn> }
 // ── app pool mock (Phase 3): null = privileged pool, object = app pool ─────────
 let appPoolHolder: { pool: { connect: ReturnType<typeof vi.fn> } | null }
 let mockNoteAppPoolConnectFailure: ReturnType<typeof vi.fn>
+let mockNoteAppPoolServed: ReturnType<typeof vi.fn>
 let mockNoteFallback: ReturnType<typeof vi.fn>
 let mockNoteGrantMissRetry: ReturnType<typeof vi.fn>
 let mockCloseAppPool: ReturnType<typeof vi.fn>
@@ -29,6 +30,7 @@ beforeEach(() => {
   mockDrizzleInstance = { select: vi.fn() }
   appPoolHolder = { pool: null }
   mockNoteAppPoolConnectFailure = vi.fn()
+  mockNoteAppPoolServed = vi.fn()
   mockNoteFallback = vi.fn()
   mockNoteGrantMissRetry = vi.fn()
   mockCloseAppPool = vi.fn().mockResolvedValue(undefined)
@@ -45,6 +47,7 @@ async function loadDbIndex(pool: object | null) {
   vi.doMock('@/lib/db/app-pool', () => ({
     getAppPoolIfHealthy: vi.fn(async () => appPoolHolder.pool),
     noteAppPoolConnectFailure: mockNoteAppPoolConnectFailure,
+    noteAppPoolServed: mockNoteAppPoolServed,
     noteFallback: mockNoteFallback,
     noteGrantMissRetry: mockNoteGrantMissRetry,
     closeAppPool: mockCloseAppPool,
@@ -608,6 +611,7 @@ describe('withUserContext — app pool selection', () => {
     expect(app.calls).toEqual(expect.arrayContaining(['BEGIN', 'COMMIT']))
     expect(app.release).toHaveBeenCalledTimes(1)
     expect(mockNoteFallback).not.toHaveBeenCalled()
+    expect(mockNoteAppPoolServed).toHaveBeenCalledWith('user1')
   })
 
   it('appends app.enforced after the user id when no role is given', async () => {
@@ -631,6 +635,8 @@ describe('withUserContext — app pool selection', () => {
     )
     expect(priv.calls.some((q) => q.includes('app.enforced'))).toBe(false)
     expect(mockNoteFallback).toHaveBeenCalledTimes(1)
+    expect(mockNoteFallback).toHaveBeenCalledWith('user1')
+    expect(mockNoteAppPoolServed).not.toHaveBeenCalled()
   })
 
   it('falls back to the privileged pool for this call when the app pool connect fails', async () => {
@@ -644,10 +650,11 @@ describe('withUserContext — app pool selection', () => {
 
     await expect(withUserContext('user1', async () => 'ok')).resolves.toBe('ok')
 
-    expect(mockNoteAppPoolConnectFailure).toHaveBeenCalledWith(authErr)
+    expect(mockNoteAppPoolConnectFailure).toHaveBeenCalledWith(authErr, 'user1')
     expect(mockPoolConnect).toHaveBeenCalledTimes(1)
     expect(priv.calls.some((q) => q.includes('app.enforced'))).toBe(false)
     expect(mockNoteFallback).not.toHaveBeenCalled() // counted by noteAppPoolConnectFailure instead
+    expect(mockNoteAppPoolServed).not.toHaveBeenCalled()
   })
 
   it('42501 "permission denied for table" on the app pool → sweep grants, retry once on the APP pool', async () => {

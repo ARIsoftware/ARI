@@ -10,6 +10,7 @@ const checks = vi.hoisted(() => ({
   checkAuthConfig: vi.fn(),
   checkMultiUser: vi.fn(),
   runRlsTest: vi.fn(),
+  checkAppRole: vi.fn(),
   checkStorageFilesystem: vi.fn(),
   checkModuleStatus: vi.fn(),
   checkAiProviders: vi.fn(),
@@ -39,10 +40,13 @@ function allHealthy() {
   })
   checks.runRlsTest.mockResolvedValue({
     success: true,
-    bypassRls: false,
+    bypassRls: true,
+    servedBy: 'app-role',
+    enforced: true,
     positiveTest: { passed: true },
     negativeTest: { passed: true },
   })
+  checks.checkAppRole.mockResolvedValue(healthyAppRole())
   checks.checkStorageFilesystem.mockResolvedValue({
     provider: 'filesystem',
     applicable: true,
@@ -56,6 +60,21 @@ function allHealthy() {
     moduleChecks: { a: { exists: true, enabled: true }, b: { exists: true, enabled: false } },
   })
   checks.checkAiProviders.mockResolvedValue({ status: 'ok', configuredCount: 1, providers: [] })
+}
+
+function healthyAppRole() {
+  return {
+    status: 'active',
+    roleName: 'ari_app',
+    enforced: true,
+    appRoleBypassRls: false,
+    reason: null,
+    ownsNoTables: true,
+    fallbackCount: 0,
+    grantMissRetries: 0,
+    rotatedAt: null,
+    lastTransition: null,
+  }
 }
 
 /** Look one check up by id in a scan result. */
@@ -73,7 +92,7 @@ describe('runHealthScan — shape', () => {
 
     expect(result.status).toBe('ok')
     expect(result.checks.map((c) => c.id)).toEqual(HEALTH_CHECK_IDS)
-    expect(result.summary).toEqual({ total: 7, ok: 7, warn: 0, fail: 0, skip: 0 })
+    expect(result.summary).toEqual({ total: 8, ok: 8, warn: 0, fail: 0, skip: 0 })
     expect(Date.parse(result.startedAt)).not.toBeNaN()
     expect(result.durationMs).toBeGreaterThanOrEqual(0)
     for (const c of result.checks) {
@@ -95,8 +114,8 @@ describe('runHealthScan — shape', () => {
     const result = await runHealthScan(ctx)
 
     expect(byId(result, 'database')).toMatchObject({ status: 'fail', message: 'pool exploded' })
-    // the other six still ran
-    expect(result.summary.ok).toBe(6)
+    // the other seven still ran
+    expect(result.summary.ok).toBe(7)
     expect(result.status).toBe('fail')
   })
 })
@@ -228,14 +247,36 @@ describe('runHealthScan — multi-user', () => {
 })
 
 describe('runHealthScan — RLS', () => {
-  it('notes when the role bypasses RLS', async () => {
+  it('says the test ran as the app role when enforcement is live', async () => {
+    expect(byId(await runHealthScan(ctx), 'rls').message).toBe(
+      'Positive and negative isolation tests passed as the app role (RLS enforced by Postgres)'
+    )
+  })
+
+  it('notes when the (fallback) role bypasses RLS', async () => {
     checks.runRlsTest.mockResolvedValue({
       success: true,
       bypassRls: true,
+      servedBy: 'privileged',
+      enforced: false,
       positiveTest: { passed: true },
       negativeTest: { passed: false },
     })
     expect(byId(await runHealthScan(ctx), 'rls').message).toContain('app layer enforces isolation')
+  })
+
+  it('plain pass wording when a non-bypassing privileged role served the test', async () => {
+    checks.runRlsTest.mockResolvedValue({
+      success: true,
+      bypassRls: false,
+      servedBy: 'privileged',
+      enforced: false,
+      positiveTest: { passed: true },
+      negativeTest: { passed: true },
+    })
+    expect(byId(await runHealthScan(ctx), 'rls').message).toBe(
+      'Positive and negative isolation tests passed'
+    )
   })
 
   it('fails on a leaking negative test', async () => {
@@ -258,6 +299,49 @@ describe('runHealthScan — RLS', () => {
       negativeTest: { passed: true },
     })
     expect(byId(await runHealthScan(ctx), 'rls').message).toContain('cannot read their own row')
+  })
+})
+
+describe('runHealthScan — RLS enforcement (app role)', () => {
+  it('ok when the app role serves requests and cannot bypass', async () => {
+    const check = byId(await runHealthScan(ctx), 'app-role')
+    expect(check.status).toBe('ok')
+    expect(check.message).toBe('Request-path queries run as ari_app (RLS enforced by Postgres)')
+  })
+
+  it.each([
+    ['disabled', 'ARI_DISABLE_APP_ROLE', false],
+    ['unsupported', 'no CREATEROLE', false],
+    ['unavailable', 'not provisioned yet', true],
+    ['fallback', 'Fallback to the privileged role', true],
+  ])('%s is warning-level, never red', async (status, phrase, carriesReason) => {
+    checks.checkAppRole.mockResolvedValue({ ...healthyAppRole(), status, enforced: false, reason: 'why' })
+    const result = await runHealthScan(ctx)
+    const check = byId(result, 'app-role')
+    expect(check.status).toBe('warn')
+    expect(check.message).toContain(phrase)
+    expect(check.message.includes('why')).toBe(carriesReason)
+    expect(result.status).toBe('warn')
+  })
+
+  it('fallback without a reason keeps a plain message', async () => {
+    checks.checkAppRole.mockResolvedValue({ ...healthyAppRole(), status: 'fallback', enforced: false })
+    expect(byId(await runHealthScan(ctx), 'app-role').message).toBe('Fallback to the privileged role')
+    checks.checkAppRole.mockResolvedValue({ ...healthyAppRole(), status: 'unavailable', enforced: false })
+    expect(byId(await runHealthScan(ctx), 'app-role').message).toBe(
+      'ari_app not provisioned yet — running on the privileged role'
+    )
+  })
+
+  it('fails loudly when the app role can bypass RLS or cannot be verified', async () => {
+    checks.checkAppRole.mockResolvedValue({ ...healthyAppRole(), enforced: false, appRoleBypassRls: true })
+    let check = byId(await runHealthScan(ctx), 'app-role')
+    expect(check.status).toBe('fail')
+    expect(check.message).toContain('revoke it')
+    checks.checkAppRole.mockResolvedValue({ ...healthyAppRole(), enforced: false, appRoleBypassRls: null })
+    check = byId(await runHealthScan(ctx), 'app-role')
+    expect(check.status).toBe('fail')
+    expect(check.message).toContain('could not be verified')
   })
 })
 
