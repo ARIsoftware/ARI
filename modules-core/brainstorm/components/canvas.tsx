@@ -111,7 +111,7 @@ function IdeaNode({ id, data }: NodeProps) {
 
   return (
     <div
-      className={`group relative min-w-[170px] rounded-lg border shadow-sm px-2.5 py-1.5 ${cardClass}`}
+      className={`group relative min-w-[170px] max-w-[240px] rounded-lg border shadow-sm px-2.5 py-1.5 ${cardClass}`}
     >
       <Handle id="t" type="source" position={Position.Top} className={HANDLE_CLASS} />
       <Handle id="l" type="source" position={Position.Left} className={HANDLE_CLASS} />
@@ -153,7 +153,7 @@ function IdeaNode({ id, data }: NodeProps) {
         </button>
       </div>
 
-      <div className="text-[10px] font-semibold text-foreground">
+      <div className="text-[10px] font-semibold text-foreground leading-snug whitespace-pre-wrap break-words">
         {editing ? (
           <input
             ref={inputRef}
