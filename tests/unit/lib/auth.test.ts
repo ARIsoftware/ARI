@@ -181,22 +181,41 @@ describe('emailAndPassword.password.verify', () => {
 // We can verify what ended up in the config.
 
 describe('trustedOrigins', () => {
-  it('trustedOrigins is an array', () => {
-    expect(Array.isArray(capturedConfigHolder.cfg.trustedOrigins)).toBe(true)
+  // NODE_ENV is not 'production' in tests, so trustedOrigins is the dynamic
+  // dev resolver: static list + the request's own origin when it's a literal
+  // private address (so `./ari start --lan` works). See lib/auth-origins.ts.
+  const resolve = (request?: Request): string[] =>
+    capturedConfigHolder.cfg.trustedOrigins(request)
+
+  it('trustedOrigins is a function in development', () => {
+    expect(typeof capturedConfigHolder.cfg.trustedOrigins).toBe('function')
   })
 
   it('includes localhost origins in test env (non-production)', () => {
-    // NODE_ENV is not 'production' in tests
-    const origins: string[] = capturedConfigHolder.cfg.trustedOrigins
-    expect(origins).toContain('http://localhost:3000')
+    expect(resolve()).toContain('http://localhost:3000')
   })
 
   it('does not include NEXT_PUBLIC_APP_URL when env var is absent', () => {
     // At import time NEXT_PUBLIC_APP_URL was not set
-    const origins: string[] = capturedConfigHolder.cfg.trustedOrigins
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
     if (!appUrl) {
-      expect(origins.some(o => o.startsWith('https://'))).toBe(false)
+      expect(resolve().some(o => o.startsWith('https://'))).toBe(false)
+    }
+  })
+
+  it('adds the request origin when it is a literal private LAN address', () => {
+    const request = new Request('http://192.168.1.42:3000/api/auth/sign-in/email', {
+      headers: { origin: 'http://192.168.1.42:3000' },
+    })
+    expect(resolve(request)).toContain('http://192.168.1.42:3000')
+  })
+
+  it('does not add a public or rebindable request origin', () => {
+    for (const origin of ['https://evil.com', 'http://rebind.attacker.com']) {
+      const request = new Request('http://192.168.1.42:3000/api/auth/sign-in/email', {
+        headers: { origin },
+      })
+      expect(resolve(request)).not.toContain(origin)
     }
   })
 })

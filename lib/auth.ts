@@ -9,6 +9,7 @@ import { pool } from "@/lib/db/pool"
 // disk in this build (same pattern as middleware.ts).
 import { isMultiUserInstall } from "@/lib/multi-user"
 import { isBootstrapUserCreateAllowed } from "@/lib/auth-bootstrap-gate"
+import { privateNetworkTrustedOrigins } from "@/lib/auth-origins"
 import { getAriInstance, tryClaimFirstSigninPing } from "@/lib/telemetry/instance"
 import { sendTvConnect } from "@/lib/telemetry/send-tv-connect"
 import { logActivity } from "@/lib/activity-log"
@@ -19,33 +20,48 @@ import { logActivity } from "@/lib/activity-log"
 let firstSigninPingResolved = false
 
 // Build trusted origins
-const trustedOrigins: string[] = []
+const staticTrustedOrigins: string[] = []
 
 // Add production domain from env
 if (process.env.NEXT_PUBLIC_APP_URL) {
-  trustedOrigins.push(process.env.NEXT_PUBLIC_APP_URL)
+  staticTrustedOrigins.push(process.env.NEXT_PUBLIC_APP_URL)
 }
 
 // Add Vercel preview URLs
 if (process.env.VERCEL_URL) {
-  trustedOrigins.push(`https://${process.env.VERCEL_URL}`)
+  staticTrustedOrigins.push(`https://${process.env.VERCEL_URL}`)
 }
 
 // Add the Vercel production domain (covers deployments where NEXT_PUBLIC_APP_URL
 // isn't set yet, e.g. the first boot after a Deploy Button install)
 if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
-  trustedOrigins.push(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`)
+  staticTrustedOrigins.push(`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`)
 }
 
 // Only add localhost origins in development
 if (process.env.NODE_ENV !== 'production') {
-  trustedOrigins.push(
+  staticTrustedOrigins.push(
     "http://localhost:3000",
     "http://localhost:3001",
     "http://localhost:3002",
     "http://localhost:3003"
   )
 }
+
+/**
+ * In development, also trust the request's own origin when it's a literal
+ * private/loopback address — that's what `./ari start --lan` serves on, and
+ * the machine's LAN IP can't be known at boot. See lib/auth-origins.ts for
+ * why only address literals (never DNS names) qualify. Production keeps the
+ * static list only: origins there are configured, not inferred.
+ */
+const trustedOrigins =
+  process.env.NODE_ENV !== 'production'
+    ? (request?: Request) => [
+        ...staticTrustedOrigins,
+        ...privateNetworkTrustedOrigins(request),
+      ]
+    : staticTrustedOrigins
 
 /**
  * Hash a password with Argon2id (winner of the Password Hashing Competition).

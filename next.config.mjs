@@ -23,8 +23,22 @@ const commitSha =
   process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ||
   git("rev-parse --short HEAD", "unknown")
 
+// Private/loopback IPv4 ranges, as Next's hostname glob patterns (dot-segment
+// wildcards). `./ari start --lan` binds the dev server to 0.0.0.0, and Next
+// otherwise blocks cross-site dev requests (HMR websocket, /_next internals)
+// from any host but localhost — so the LAN page loads but never hot-reloads.
+// Dev-only config: `allowedDevOrigins` is ignored by production builds.
+const privateDevOrigins = [
+  '127.*.*.*',
+  '10.*.*.*',
+  '192.168.*.*',
+  '169.254.*.*',
+  ...Array.from({ length: 16 }, (_, i) => `172.${16 + i}.*.*`),
+]
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  allowedDevOrigins: privateDevOrigins,
   env: {
     NEXT_PUBLIC_ARI_VERSION: `${pkg.version}+${commitSha}`,
     NEXT_PUBLIC_ARI_COMMIT: commitSha,
