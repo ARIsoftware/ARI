@@ -5,6 +5,7 @@ import {
   Background,
   BaseEdge,
   ConnectionMode,
+  ControlButton,
   Controls,
   EdgeLabelRenderer,
   MiniMap,
@@ -27,7 +28,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { Button } from '@/components/ui/button'
-import { Plus, Save, Loader2, X, Pencil, Palette, Lock, Unlock } from 'lucide-react'
+import { Plus, Save, Loader2, X, Pencil, Palette, Lock, Unlock, Maximize2, Minimize2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import {
   AlertDialog,
@@ -53,6 +54,21 @@ const COLOR_CARD_CLASSES: Record<BrainstormColor, string> = {
   blue:   'bg-blue-50 border-blue-200 dark:bg-blue-950/40 dark:border-blue-800',
   violet: 'bg-violet-50 border-violet-200 dark:bg-violet-950/40 dark:border-violet-800',
   pink:   'bg-pink-50 border-pink-200 dark:bg-pink-950/40 dark:border-pink-800',
+}
+
+// The minimap paints flat SVG rects, so it can't reuse the card's Tailwind classes —
+// these are the same palette resolved to concrete colors that read at thumbnail size.
+const COLOR_MINIMAP: Record<BrainstormColor, string> = {
+  slate:  '#64748b',
+  red:    '#ef4444',
+  orange: '#f97316',
+  amber:  '#f59e0b',
+  green:  '#22c55e',
+  teal:   '#14b8a6',
+  sky:    '#0ea5e9',
+  blue:   '#3b82f6',
+  violet: '#8b5cf6',
+  pink:   '#ec4899',
 }
 
 interface IdeaNodeData {
@@ -200,14 +216,79 @@ interface CanvasInnerProps {
 
 function CanvasInner({ board }: CanvasInnerProps) {
   const { toast } = useToast()
-  const { screenToFlowPosition } = useReactFlow()
+  const { screenToFlowPosition, fitView } = useReactFlow()
   const wrapperRef = useRef<HTMLDivElement>(null)
   const saveBoard = useSaveBrainstormBoard(board.id)
   const [dirty, setDirty] = useState(false)
   const [locked, setLocked] = useState(false)
+  const [fullscreen, setFullscreen] = useState(false)
   const [pendingHref, setPendingHref] = useState<string | null>(null)
   const dirtyRef = useRef(false)
   useEffect(() => { dirtyRef.current = dirty }, [dirty])
+
+  // Fullscreen: prefer the native API, fall back to a fixed-position overlay when the
+  // browser refuses it (Safari quirks, sandboxed iframes without `allowfullscreen`).
+  const fullscreenFallbackRef = useRef(false)
+
+  useEffect(() => {
+    const sync = () => {
+      const el = (document.fullscreenElement || (document as any).webkitFullscreenElement) as Element | null
+      if (el === wrapperRef.current) setFullscreen(true)
+      else if (el === null) setFullscreen((cur) => (fullscreenFallbackRef.current ? cur : false))
+    }
+    document.addEventListener('fullscreenchange', sync)
+    document.addEventListener('webkitfullscreenchange', sync)
+    return () => {
+      document.removeEventListener('fullscreenchange', sync)
+      document.removeEventListener('webkitfullscreenchange', sync)
+    }
+  }, [])
+
+  const toggleFullscreen = useCallback(() => {
+    const el = wrapperRef.current
+    if (!el) return
+    const active = document.fullscreenElement || (document as any).webkitFullscreenElement
+
+    if (active || fullscreenFallbackRef.current) {
+      if (active) {
+        const exit = document.exitFullscreen?.bind(document) || (document as any).webkitExitFullscreen?.bind(document)
+        void Promise.resolve(exit?.()).catch(() => {})
+      }
+      fullscreenFallbackRef.current = false
+      setFullscreen(false)
+      return
+    }
+
+    const request = el.requestFullscreen?.bind(el) || (el as any).webkitRequestFullscreen?.bind(el)
+    if (!request) {
+      fullscreenFallbackRef.current = true
+      setFullscreen(true)
+      return
+    }
+    Promise.resolve(request()).catch(() => {
+      fullscreenFallbackRef.current = true
+      setFullscreen(true)
+    })
+  }, [])
+
+  // Escape leaves the CSS fallback (native fullscreen handles its own Escape)
+  useEffect(() => {
+    if (!fullscreen || !fullscreenFallbackRef.current) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        fullscreenFallbackRef.current = false
+        setFullscreen(false)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [fullscreen])
+
+  // Refit the graph once the canvas has resized into (or out of) fullscreen
+  useEffect(() => {
+    const t = setTimeout(() => { void fitView({ padding: 0.1, duration: 300 }) }, 180)
+    return () => clearTimeout(t)
+  }, [fullscreen, fitView])
 
   const updateNodeText = useCallback((id: string, text: string) => {
     setNodes((cur) => cur.map((n) => n.id === id ? { ...n, data: { ...n.data, text } } : n))
@@ -428,7 +509,14 @@ function CanvasInner({ board }: CanvasInnerProps) {
   }
 
   return (
-    <div ref={wrapperRef} className="relative h-[calc(100vh-220px)] min-h-[500px] w-full border rounded-lg overflow-hidden bg-background">
+    <div
+      ref={wrapperRef}
+      className={`border overflow-hidden bg-background ${
+        fullscreen
+          ? 'fixed inset-0 z-50 h-screen w-screen rounded-none'
+          : 'relative h-[calc(100vh-220px)] min-h-[500px] w-full rounded-lg'
+      }`}
+    >
       <div className="absolute top-3 left-3 z-10 flex gap-2">
         <Button size="sm" onClick={handleAddNode} disabled={locked}>
           <Plus className="w-4 h-4 mr-1" /> Add idea
@@ -461,8 +549,29 @@ function CanvasInner({ board }: CanvasInnerProps) {
         elementsSelectable={!locked}
       >
         <Background />
-        <Controls showInteractive={false} />
-        <MiniMap pannable zoomable />
+        <Controls showInteractive={false} showFitView={false}>
+          <ControlButton
+            onClick={toggleFullscreen}
+            title={fullscreen ? 'Exit full screen' : 'Full screen'}
+            aria-label={fullscreen ? 'Exit full screen' : 'Full screen'}
+          >
+            {fullscreen ? <Minimize2 /> : <Maximize2 />}
+          </ControlButton>
+        </Controls>
+        <MiniMap
+          pannable
+          zoomable
+          nodeColor={(n) => COLOR_MINIMAP[(n.data as unknown as IdeaNodeData)?.color] ?? COLOR_MINIMAP.slate}
+          nodeStrokeColor={(n) => COLOR_MINIMAP[(n.data as unknown as IdeaNodeData)?.color] ?? COLOR_MINIMAP.slate}
+          nodeStrokeWidth={6}
+          nodeBorderRadius={3}
+          bgColor="hsl(var(--background))"
+          maskColor="hsl(var(--muted-foreground) / 0.25)"
+          maskStrokeColor="hsl(var(--primary))"
+          maskStrokeWidth={2}
+          className="!bottom-3 !right-3 rounded-md border shadow-sm"
+          style={{ width: 240, height: 170 }}
+        />
       </ReactFlow>
       <AlertDialog open={pendingHref !== null} onOpenChange={(open) => { if (!open) setPendingHref(null) }}>
         <AlertDialogContent>
