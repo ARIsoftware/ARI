@@ -23,6 +23,7 @@ import { transformTaskForRadar, getTaskPriorityLevel } from "@/modules/tasks/lib
 import { TaskPriorityModal } from "@/modules/tasks/components/task-priority-modal"
 import { RadarTaskDots } from "@/modules/tasks/components/radar-task-dots"
 import { playTaskSound } from "@/modules/tasks/lib/task-sounds"
+import { parseDueDate } from "@/modules/tasks/lib/utils"
 
 const chartConfig = {
   value: {
@@ -290,7 +291,7 @@ export default function RadarPage() {
                                   </Badge>
                                   {task.dueDate && (
                                     <span className="text-xs text-muted-foreground">
-                                      Due: {new Date(task.dueDate).toLocaleDateString()}
+                                      Due: {parseDueDate(task.dueDate)?.toLocaleDateString()}
                                     </span>
                                   )}
                                 </div>

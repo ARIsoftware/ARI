@@ -176,11 +176,23 @@ export function useDisconnectIcal() {
 }
 
 // ─── Greeting (cached per day on the server) ─────────────────────────────────
-export function useGreeting(taskCount: number, meetingCount: number, enabled: boolean) {
+/**
+ * `refreshNonce` is bumped by the Refresh action. It both changes the query key
+ * (so React Query actually refetches instead of serving its 30-minute-fresh
+ * entry) and sends `refresh=1`, which makes the server rewrite today's cached
+ * message rather than hand back the one it already stored. A nonce of 0 is the
+ * ordinary page load: cache-friendly on both sides, no LLM call.
+ */
+export function useGreeting(
+  taskCount: number,
+  meetingCount: number,
+  enabled: boolean,
+  refreshNonce = 0,
+) {
   return useQuery({
     // Counts are part of the key so the first enabled fetch can't be locked to a
     // stale 0/0; the server still caches per day, so refetches stay cheap.
-    queryKey: [...GREETING_KEY, taskCount, meetingCount],
+    queryKey: [...GREETING_KEY, taskCount, meetingCount, refreshNonce],
     enabled,
     // Stable for the whole day — avoid refetch spam (the server caches it anyway).
     staleTime: 1000 * 60 * 30,
@@ -190,6 +202,7 @@ export function useGreeting(taskCount: number, meetingCount: number, enabled: bo
         taskCount: String(taskCount),
         meetingCount: String(meetingCount),
       })
+      if (refreshNonce > 0) params.set('refresh', '1')
       const res = await fetch(`${API_BASE}/greeting?${params.toString()}`)
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -340,8 +353,8 @@ export type BriefSpeechStatus = 'idle' | 'loading' | 'playing'
 /**
  * Plays the brief aloud: POSTs the text to the TTS route, turns the streamed
  * MP3 into an Object URL, and plays it through a single reused <audio> element.
- * Returns the current status plus `play(text)` and `stop()`. Audio + Object URL
- * are always revoked before the next play and on unmount.
+ * Returns the current status plus `play(text)`, `stop()` and `reset()`. Audio +
+ * Object URL are always revoked before the next play and on unmount.
  */
 export function useBriefSpeech() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -433,6 +446,17 @@ export function useBriefSpeech() {
     [stopPlayback, stop, playUrl],
   )
 
+  // Stop and throw away the cached clip, so the next Listen re-synthesizes.
+  // Used by Refresh: the brief's text is about to change underneath us, and the
+  // audio the user last heard describes the old day.
+  const reset = useCallback(() => {
+    stop()
+    if (cacheRef.current) {
+      URL.revokeObjectURL(cacheRef.current.url)
+      cacheRef.current = null
+    }
+  }, [stop])
+
   // On unmount: stop playback and free the cached Object URL.
   useEffect(() => {
     return () => {
@@ -444,5 +468,5 @@ export function useBriefSpeech() {
     }
   }, [stopPlayback])
 
-  return { status, play, stop }
+  return { status, play, stop, reset }
 }

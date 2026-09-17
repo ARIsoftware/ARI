@@ -60,6 +60,9 @@ export default function AddTaskPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const { enabled: northstarEnabled } = useModuleEnabled('northstar')
+  // The privacy eye needs the Users module installed AND enabled — same gate as
+  // the task list, so the two views can't disagree about whether it exists.
+  const { enabled: usersModuleEnabled } = useModuleEnabled('ari-users')
   const [loading, setLoading] = useState(false)
   const [date, setDate] = useState<Date>()
   const [northStars, setNorthStars] = useState<Goal[]>([])
@@ -319,7 +322,7 @@ export default function AddTaskPage() {
               <PrivacyPinToggle
                 pinned={formData.pinned}
                 isPrivate={formData.is_private}
-                showPrivacy={MULTI_USER}
+                showPrivacy={MULTI_USER && usersModuleEnabled}
                 onTogglePin={() => handleInputChange('pinned', !formData.pinned)}
                 onTogglePrivacy={() => handleInputChange('is_private', !formData.is_private)}
               />

@@ -34,7 +34,7 @@ const FEATURES: { icon: LucideIcon; title: string; desc: string }[] = [
   },
   {
     icon: ListChecks,
-    title: "Today's top priorities",
+    title: 'Top 5 priority tasks',
     desc: 'Your five highest-priority open tasks, pulled straight from the Tasks module.',
   },
   {

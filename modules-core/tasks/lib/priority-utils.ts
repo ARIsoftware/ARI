@@ -1,4 +1,6 @@
 import type { Task } from "@/modules/tasks/types"
+// Aliased so the local `daysUntilDue` const in getTaskColor stays readable.
+import { daysUntilDue as daysUntilDueFrom } from "@/modules/tasks/lib/utils"
 
 export type TaskAxes = {
   impact: number      // 1-5: Higher is better
@@ -82,12 +84,11 @@ export function getTaskPriorityLevel(score: number): 'critical' | 'high' | 'medi
 }
 
 export function getTaskColor(task: Task): string {
-  // Color based on due date urgency — restrained, desaturated dashboard tones
-  if (!task.due_date) return '#3f6699' // Dusty blue for no due date
-
-  const now = new Date()
-  const dueDate = new Date(task.due_date)
-  const daysUntilDue = Math.floor((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  // Color based on due date urgency — restrained, desaturated dashboard tones.
+  // daysUntilDue compares calendar days, so a task due TODAY is 0 rather than
+  // the -1 that subtracting raw clock times produces after midnight.
+  const daysUntilDue = daysUntilDueFrom(task.due_date)
+  if (daysUntilDue === null) return '#3f6699' // Dusty blue for no due date
 
   if (daysUntilDue < 0) return '#b0413a'     // Desaturated red for overdue
   if (daysUntilDue <= 3) return '#b07636'    // Clay amber for due soon

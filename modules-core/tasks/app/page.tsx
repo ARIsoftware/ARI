@@ -32,7 +32,7 @@ import {
   LineChart,
   RotateCcw,
 } from 'lucide-react'
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   toggleTaskCompletion,
   toggleTaskPin,
@@ -41,6 +41,7 @@ import {
   updateTask,
   agentStatusDotClass,
   isDueToday,
+  parseDueDate,
   type Task,
 } from '../lib/utils'
 import { isMultiUserInstall } from '@/lib/multi-user'
@@ -87,8 +88,12 @@ const getPriorityColor = (priority: string) => {
 }
 
 const formatDate = (dateString: string | null) => {
-  if (!dateString) return 'No due date'
-  return new Date(dateString).toLocaleDateString('en-US', {
+  // parseDueDate, not new Date(): due_date names a calendar day, and the bare
+  // "yyyy-MM-dd" form parses as UTC midnight — which renders as the previous day
+  // anywhere west of UTC.
+  const date = parseDueDate(dateString)
+  if (!date) return 'No due date'
+  return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -223,11 +228,13 @@ export default function TasksPage() {
   const user = session?.user
   const { toast } = useToast()
   const { enabled: majorProjectsEnabled } = useModuleEnabled('major-projects')
+  // Gates the privacy eye — see canMask below.
+  const { enabled: usersModuleEnabled } = useModuleEnabled('ari-users')
   const searchParams = useSearchParams()
 
   // TanStack Query for tasks - replaces local state + realtime subscription
   const queryClient = useQueryClient()
-  const { data: tasks = [], isLoading: loading, refetch: refetchTasks } = useTasks()
+  const { data: tasks = [], isLoading: loading } = useTasks()
   const deleteTaskMutation = useDeleteTask()
   const setTaskDeletedMutation = useSetTaskDeleted()
 
@@ -558,10 +565,13 @@ export default function TasksPage() {
     }
   }
 
-  // The mask (privacy) toggle only shows on multi-user installs, and only on
-  // tasks the current user owns — masking someone else's task would hide it
-  // from its owner, so the API rejects that and the UI never offers it.
-  const canMask = (task: Task) => MULTI_USER && !!user?.id && task.user_id === user.id
+  // The mask (privacy) toggle needs the Users module both INSTALLED (MULTI_USER,
+  // a build-time fact) and ENABLED for this user — with it switched off there
+  // are no teammates to hide anything from, so the eye is just noise. It is also
+  // limited to tasks the current user owns: masking someone else's task would
+  // hide it from its owner, so the API rejects that and the UI never offers it.
+  const canMask = (task: Task) =>
+    MULTI_USER && usersModuleEnabled && !!user?.id && task.user_id === user.id
 
   const handleToggleMask = async (task: Task) => {
     if (!user?.id) return

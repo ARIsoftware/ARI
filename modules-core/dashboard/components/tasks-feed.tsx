@@ -27,7 +27,12 @@ interface TasksFeedProps {
 function safeFormatDueDate(dueDate: string | null): string | null {
   if (!dueDate) return null
   try {
-    const date = new Date(dueDate)
+    // Built from the parts rather than new Date(dueDate): due_date is a calendar
+    // day, and the bare "yyyy-MM-dd" form parses as UTC midnight, which formats
+    // as the previous day in any timezone west of UTC.
+    const parts = /^(\d{4})-(\d{2})-(\d{2})/.exec(dueDate)
+    if (!parts) return null
+    const date = new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]))
     if (isNaN(date.getTime())) return null
     return format(date, 'MMM d')
   } catch {

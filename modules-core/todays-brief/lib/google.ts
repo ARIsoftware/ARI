@@ -7,9 +7,13 @@
  * claude.ai's connectors.
  *
  * Required env vars (see the module's Settings page for setup instructions):
- *   MORNING_BRIEF_GOOGLE_CLIENT_ID
- *   MORNING_BRIEF_GOOGLE_CLIENT_SECRET
- *   MORNING_BRIEF_GOOGLE_REDIRECT_URI   (optional override; otherwise derived)
+ *   TODAYS_BRIEF_GOOGLE_CLIENT_ID
+ *   TODAYS_BRIEF_GOOGLE_CLIENT_SECRET
+ *   TODAYS_BRIEF_GOOGLE_REDIRECT_URI   (optional override; otherwise derived)
+ *
+ * The module was renamed from "Morning Brief", so the original MORNING_BRIEF_*
+ * names are still accepted as a fallback for existing installs. Prefer the
+ * TODAYS_BRIEF_* names for new setups.
  */
 
 import type { BriefMeeting } from '@/modules/todays-brief/types'
@@ -32,10 +36,19 @@ export interface GoogleConfig {
   clientSecret: string
 }
 
+/**
+ * Reads an env var under its current name, falling back to the legacy
+ * MORNING_BRIEF_* name kept for installs configured before the rename.
+ * Empty strings are treated as unset so a blank override can't shadow a real value.
+ */
+function readBriefEnv(suffix: string): string | undefined {
+  return process.env[`TODAYS_BRIEF_${suffix}`] || process.env[`MORNING_BRIEF_${suffix}`] || undefined
+}
+
 /** Returns the configured OAuth client, or null when env vars are missing. */
 export function getGoogleConfig(): GoogleConfig | null {
-  const clientId = process.env.MORNING_BRIEF_GOOGLE_CLIENT_ID
-  const clientSecret = process.env.MORNING_BRIEF_GOOGLE_CLIENT_SECRET
+  const clientId = readBriefEnv('GOOGLE_CLIENT_ID')
+  const clientSecret = readBriefEnv('GOOGLE_CLIENT_SECRET')
   if (!clientId || !clientSecret) return null
   return { clientId, clientSecret }
 }
@@ -46,7 +59,7 @@ export function getGoogleConfig(): GoogleConfig | null {
  * derive from the app's configured base URL.
  */
 export function getRedirectUri(): string {
-  const explicit = process.env.MORNING_BRIEF_GOOGLE_REDIRECT_URI
+  const explicit = readBriefEnv('GOOGLE_REDIRECT_URI')
   if (explicit) return explicit
   const base = (process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/+$/, '')
   return `${base}/api/modules/todays-brief/google/callback`

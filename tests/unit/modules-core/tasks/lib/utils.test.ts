@@ -15,6 +15,8 @@ import { incrementTaskCompletion } from '@/lib/fitness-stats'
 import {
   toDueDateString,
   isDueToday,
+  parseDueDate,
+  daysUntilDue,
   agentStatusDotClass,
   recordTaskCompleted,
   getTasks,
@@ -84,6 +86,65 @@ describe('toDueDateString', () => {
   it('does not shift the date due to UTC conversion', () => {
     const d = new Date(2025, 11, 31) // Dec 31 2025 local
     expect(toDueDateString(d)).toBe('2025-12-31')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// parseDueDate / daysUntilDue
+// ---------------------------------------------------------------------------
+describe('parseDueDate', () => {
+  it('returns null for missing or unparseable input', () => {
+    expect(parseDueDate(null)).toBeNull()
+    expect(parseDueDate(undefined)).toBeNull()
+    expect(parseDueDate('')).toBeNull()
+    expect(parseDueDate('not-a-date')).toBeNull()
+    expect(parseDueDate('09/17/2026')).toBeNull()
+  })
+
+  it('keeps the stored calendar day instead of shifting it to the previous day', () => {
+    // The regression: new Date('2026-09-17') is UTC midnight, which is Sep 16 in
+    // any timezone west of UTC. These assertions are timezone-independent.
+    const date = parseDueDate('2026-09-17')!
+    expect(date.getFullYear()).toBe(2026)
+    expect(date.getMonth()).toBe(8) // September, 0-indexed
+    expect(date.getDate()).toBe(17)
+  })
+
+  it('pins the result to local midnight', () => {
+    const date = parseDueDate('2026-09-17')!
+    expect([date.getHours(), date.getMinutes(), date.getSeconds()]).toEqual([0, 0, 0])
+  })
+
+  it('reads the leading day out of the ISO datetime form older clients wrote', () => {
+    const date = parseDueDate('2026-09-17T00:00:00.000Z')!
+    expect(date.getDate()).toBe(17)
+    expect(date.getMonth()).toBe(8)
+  })
+})
+
+describe('daysUntilDue', () => {
+  // Mid-afternoon, so a naive clock-time subtraction would report today as -1.
+  const now = new Date(2026, 8, 17, 14, 30)
+
+  it('returns null without a usable due date', () => {
+    expect(daysUntilDue(null, now)).toBeNull()
+    expect(daysUntilDue('nonsense', now)).toBeNull()
+  })
+
+  it('counts a task due today as 0, not overdue', () => {
+    expect(daysUntilDue('2026-09-17', now)).toBe(0)
+  })
+
+  it('counts past and future days', () => {
+    expect(daysUntilDue('2026-09-15', now)).toBe(-2)
+    expect(daysUntilDue('2026-09-18', now)).toBe(1)
+    expect(daysUntilDue('2026-09-24', now)).toBe(7)
+  })
+
+  it('stays whole-numbered across a DST transition', () => {
+    // Nov 1 2026 is the US/Canada fall-back date: a 25-hour local day.
+    const beforeDst = new Date(2026, 9, 30, 9, 0)
+    expect(daysUntilDue('2026-11-03', beforeDst)).toBe(4)
   })
 })
 

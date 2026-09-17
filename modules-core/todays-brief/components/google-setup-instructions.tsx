@@ -100,8 +100,8 @@ export function GoogleSetupInstructions() {
         </li>
         <li>
           Add them to your <code className="rounded bg-muted px-1 py-0.5 text-xs">.env.local</code> and restart ARI:
-          <CopyField value="MORNING_BRIEF_GOOGLE_CLIENT_ID=your-client-id" label="env-id" />
-          <CopyField value="MORNING_BRIEF_GOOGLE_CLIENT_SECRET=your-client-secret" label="env-secret" />
+          <CopyField value="TODAYS_BRIEF_GOOGLE_CLIENT_ID=your-client-id" label="env-id" />
+          <CopyField value="TODAYS_BRIEF_GOOGLE_CLIENT_SECRET=your-client-secret" label="env-secret" />
         </li>
         <li>
           Back on this page, click{' '}
@@ -110,7 +110,7 @@ export function GoogleSetupInstructions() {
       </ol>
       <p className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
         Tip: if your ARI URL differs from the one shown above (for example in production), set{' '}
-        <code className="rounded bg-muted px-1 py-0.5">MORNING_BRIEF_GOOGLE_REDIRECT_URI</code> to the exact
+        <code className="rounded bg-muted px-1 py-0.5">TODAYS_BRIEF_GOOGLE_REDIRECT_URI</code> to the exact
         callback URL you registered, and use that same value as the redirect URI in the Google Console.
       </p>
     </div>

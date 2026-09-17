@@ -114,12 +114,24 @@ function priorityLabel(score: string | null): { label: string; className: string
   return { label: 'Low', className: 'bg-muted text-muted-foreground border-border' }
 }
 
+/**
+ * due_date names a calendar day, so it is read as LOCAL midnight — `new Date()`
+ * parses the bare "yyyy-MM-dd" form as UTC midnight, which displays as the
+ * previous day west of UTC. The day count is then taken between midnights, so a
+ * task due today reads "Due" rather than flipping to "Overdue" after 00:00.
+ *
+ * Deliberately local rather than imported from the Tasks module: the brief is
+ * only loosely (HTTP) coupled to Tasks and still renders when it is absent.
+ */
 function dueLabel(due: string | null): { text: string; className: string } | null {
   if (!due) return null
-  const dueDate = new Date(due)
+  const parts = /^(\d{4})-(\d{2})-(\d{2})/.exec(due)
+  if (!parts) return null
+  const dueDate = new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]))
   if (Number.isNaN(dueDate.getTime())) return null
   const now = new Date()
-  const days = Math.floor((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const days = Math.round((dueDate.getTime() - today.getTime()) / 86400000)
   const text = dueDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
   if (days < 0) return { text: `Overdue · ${text}`, className: 'text-red-600' }
   if (days <= 3) return { text: `Due ${text}`, className: 'text-orange-600' }
@@ -158,7 +170,7 @@ function buildBriefSpeech({
     const list = tasks.data ?? []
     if (list.length > 0) {
       const items = list.map((t, i) => `${i + 1}. ${t.title}.`).join(' ')
-      parts.push(`Here are your top priorities for today. ${items}`)
+      parts.push(`Here are your priority tasks. ${items}`)
     } else {
       parts.push('You have nothing pressing on your task list today.')
     }
@@ -192,7 +204,11 @@ function BriefSheet({
   quote,
   embedded = false,
   listenButton,
-}: Omit<BriefViewProps, 'onRefresh' | 'isRefreshing'> & { listenButton?: ReactNode }) {
+  refreshButton,
+}: Omit<BriefViewProps, 'onRefresh' | 'isRefreshing'> & {
+  listenButton?: ReactNode
+  refreshButton?: ReactNode
+}) {
   return (
     <>
       {/* Letterhead */}
@@ -206,11 +222,15 @@ function BriefSheet({
           </p>
         </div>
         <div className="flex items-center gap-4">
-          {listenButton}
+          {/* Embedded (dashboard) home for the actions — page mode puts them in
+              its own action bar above the sheet. Refresh anchors the far right of
+              the letterhead, outboard of the weather/date block. */}
+          {listenButton && <div className="mb-no-print">{listenButton}</div>}
           <div className="flex flex-col items-end gap-1">
             {weather?.available && weather.high != null && <WeatherBadge weather={weather} />}
             <p className="text-xs text-muted-foreground">{dateLabel}</p>
           </div>
+          {refreshButton && <div className="mb-no-print">{refreshButton}</div>}
         </div>
       </div>
 
@@ -259,7 +279,7 @@ function BriefSheet({
         <div className="mb-3 flex items-center gap-2">
           <ListChecks className="h-4 w-4 text-primary" />
           <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">
-            Today&apos;s Top Priorities
+            Top 5 Priority Tasks
           </h2>
         </div>
         <PrioritiesSection tasks={tasks} tasksEnabled={tasksEnabled} />
@@ -432,6 +452,26 @@ export function BriefView({
     </Button>
   )
 
+  // Refresh rebuilds every part of the brief, so the narration cached for the
+  // OLD text has to go with it — otherwise Listen would replay a clip describing
+  // the brief the user just refreshed away.
+  const handleRefresh = () => {
+    speech.reset()
+    onRefresh()
+  }
+
+  // One Refresh button for both homes, same as the Listen button above.
+  const refreshButton = (
+    <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+      {isRefreshing ? (
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+      ) : (
+        <RefreshCw className="mr-2 h-4 w-4" />
+      )}
+      Refresh
+    </Button>
+  )
+
   const sheetProps = {
     dateLabel,
     greeting,
@@ -442,6 +482,7 @@ export function BriefView({
     quote,
     embedded,
     listenButton: embedded ? listenButton : undefined,
+    refreshButton: embedded ? refreshButton : undefined,
   }
 
   return (
@@ -462,14 +503,7 @@ export function BriefView({
               <Maximize2 className="mr-2 h-4 w-4" />
               Full screen
             </Button>
-            <Button variant="outline" size="sm" onClick={onRefresh} disabled={isRefreshing}>
-              {isRefreshing ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="mr-2 h-4 w-4" />
-              )}
-              Refresh
-            </Button>
+            {refreshButton}
             <Button size="sm" onClick={() => window.print()}>
               <Printer className="mr-2 h-4 w-4" />
               Print

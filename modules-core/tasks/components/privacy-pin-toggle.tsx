@@ -1,6 +1,6 @@
 'use client'
 
-import { Pin, Eye, EyeOff } from 'lucide-react'
+import { Pin, Eye, EyeClosed } from 'lucide-react'
 
 /**
  * The pin + privacy-eye toggle pair shown in the top-right of the Task
@@ -35,13 +35,16 @@ export function PrivacyPinToggle({
           type="button"
           aria-label={isPrivate ? 'Make task shared' : 'Make task private'}
           title={
-            isPrivate ? 'Private: only you can see this task' : 'Make private (only you can see it)'
+            isPrivate
+              ? 'Private: only you can see this task'
+              : 'Shared: all users can see this task'
           }
           onClick={onTogglePrivacy}
           className="transition-colors"
         >
+          {/* Matches the list rows' toggle: a shut lid for private. */}
           {isPrivate ? (
-            <EyeOff className={`w-5 h-5 ${ACCENT}`} />
+            <EyeClosed className={`w-5 h-5 ${ACCENT}`} />
           ) : (
             <Eye className="w-5 h-5 text-gray-300 hover:text-[hsl(var(--primary))]" />
           )}

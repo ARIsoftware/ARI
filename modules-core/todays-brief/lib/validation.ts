@@ -21,6 +21,11 @@ export const SettingsSavedSchema = z.object({
 export const greetingQuerySchema = z.object({
   taskCount: z.coerce.number().int().min(0, 'taskCount must be 0 or more').max(10000).optional(),
   meetingCount: z.coerce.number().int().min(0, 'meetingCount must be 0 or more').max(10000).optional(),
+  // "1" = discard today's cached message and write a new one. Costs an LLM call,
+  // so it is only ever sent by the explicit Refresh action, never by a normal load.
+  // A literal (not z.coerce.boolean(), which turns "false" into true) so only an
+  // unambiguous opt-in regenerates.
+  refresh: z.literal('1').optional(),
 })
 
 export const GreetingResponseSchema = z.object({

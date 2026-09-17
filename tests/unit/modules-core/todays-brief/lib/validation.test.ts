@@ -103,6 +103,20 @@ describe('greetingQuerySchema', () => {
     expect(greetingQuerySchema.safeParse({}).success).toBe(true)
   })
 
+  it('leaves refresh undefined when absent', () => {
+    expect(greetingQuerySchema.parse({}).refresh).toBeUndefined()
+  })
+
+  it("accepts refresh='1' as the force-regenerate opt-in", () => {
+    expect(greetingQuerySchema.parse({ refresh: '1' }).refresh).toBe('1')
+  })
+
+  it('rejects any other refresh value, so "false"/"0" can never force a regeneration', () => {
+    for (const refresh of ['0', 'false', 'true', 'yes', '']) {
+      expect(greetingQuerySchema.safeParse({ refresh }).success).toBe(false)
+    }
+  })
+
   it('coerces string taskCount to number', () => {
     const result = greetingQuerySchema.parse({ taskCount: '5' })
     expect(result.taskCount).toBe(5)

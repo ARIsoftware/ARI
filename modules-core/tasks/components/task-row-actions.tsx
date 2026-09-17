@@ -1,7 +1,7 @@
 'use client'
 
 import type { MutableRefObject } from 'react'
-import { Pencil, Pin, Eye, EyeOff, Trash2, GripVertical } from 'lucide-react'
+import { Pencil, Pin, Eye, EyeClosed, Trash2, GripVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { Task } from '@/modules/tasks/types'
@@ -120,8 +120,10 @@ export function TaskRowActions({
                 onToggleMask(task)
               }}
             >
+              {/* EyeClosed (a shut lid), not EyeOff (a slashed eye) — the
+                  private state is "nobody is looking", not "disabled". */}
               {task.is_private ? (
-                <EyeOff className={`w-4 h-4 ${toggleOnClass}`} />
+                <EyeClosed className={`w-4 h-4 ${toggleOnClass}`} />
               ) : (
                 <Eye className={`w-4 h-4 ${toggleOffClass}`} />
               )}
@@ -131,7 +133,7 @@ export function TaskRowActions({
             <p>
               {task.is_private
                 ? 'Private: only you can see this task'
-                : 'Make private (only you can see it)'}
+                : 'Shared: all users can see this task'}
             </p>
           </TooltipContent>
         </Tooltip>

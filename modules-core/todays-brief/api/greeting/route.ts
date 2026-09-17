@@ -1,7 +1,7 @@
 /**
  * Today's Brief Module - Greeting API
  *
- * GET /api/modules/todays-brief/greeting?taskCount=&meetingCount=
+ * GET /api/modules/todays-brief/greeting?taskCount=&meetingCount=&refresh=
  *
  * Returns the brief's opening: a "Good Morning {name}" line plus an
  * AI-written motivational message. The motivational message is generated ONCE
@@ -11,6 +11,10 @@
  *
  * Tasks and calendar items are intentionally NOT part of this cache — the page
  * fetches those live on every visit.
+ *
+ * `refresh=1` (the Refresh button) bypasses the cache and rewrites today's row
+ * so the message reflects the day's load as it stands now. It costs an LLM call
+ * per press, so nothing sends it on an ordinary page load.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -34,7 +38,7 @@ registry.registerPath({
   method: 'get',
   path: '/api/modules/todays-brief/greeting',
   operationId: 'getTodaysBriefGreeting',
-  summary: "Get today's cached greeting + motivational message (generated via the selected AI provider)",
+  summary: "Get today's cached greeting + motivational message (generated via the selected AI provider; refresh=1 regenerates it)",
   tags: ['todays-brief'],
   security: DEFAULT_SECURITY,
   request: { query: greetingQuerySchema },
@@ -81,6 +85,7 @@ export async function GET(request: NextRequest) {
     }
     const taskCount = queryValidation.data.taskCount ?? 0
     const meetingCount = queryValidation.data.meetingCount ?? 0
+    const forceRegenerate = queryValidation.data.refresh === '1'
 
     const { user, withRLS } = await getAuthenticatedUser()
     if (!user || !withRLS) {
@@ -116,9 +121,13 @@ export async function GET(request: NextRequest) {
     const respond = (row: GreetingRow, cached: boolean) =>
       NextResponse.json({ greeting, message: row.message, brief_date: briefDate, cached, provider: row.provider, model: row.model })
 
-    const cachedRows = await loadCached()
-    if (cachedRows[0]) {
-      return respond(cachedRows[0], true)
+    // A forced refresh skips straight to generation — reading the cache would
+    // just return the message we are about to replace.
+    if (!forceRegenerate) {
+      const cachedRows = await loadCached()
+      if (cachedRows[0]) {
+        return respond(cachedRows[0], true)
+      }
     }
 
     // No cache yet → generate with the user's selected AI provider. Explicit
@@ -174,16 +183,26 @@ export async function GET(request: NextRequest) {
       return createErrorResponse('The AI provider failed to write the brief. Check the API key and model.', 502)
     }
 
-    // Cache it. onConflictDoNothing handles the race where two morning visits
-    // land at once — the loser just keeps the message it already generated.
-    const inserted = await withRLS((db) =>
-      db.insert(todaysBriefGreetings)
-        .values({ userId: user.id, briefDate, greeting, message, provider, model })
-        .onConflictDoNothing({ target: [todaysBriefGreetings.userId, todaysBriefGreetings.briefDate] })
-        .returning({ message: todaysBriefGreetings.message })
-    )
+    // Cache it. On an ordinary first visit onConflictDoNothing handles the race
+    // where two morning visits land at once — the loser just keeps the message it
+    // already generated. A forced refresh is the user explicitly asking for new
+    // text, so it overwrites the row instead.
+    const values = { userId: user.id, briefDate, greeting, message, provider, model }
+    const conflictTarget = [todaysBriefGreetings.userId, todaysBriefGreetings.briefDate]
+    const inserted = await withRLS((db) => {
+      const insert = db.insert(todaysBriefGreetings).values(values)
+      return (
+        forceRegenerate
+          ? insert.onConflictDoUpdate({
+              target: conflictTarget,
+              set: { greeting, message, provider, model },
+            })
+          : insert.onConflictDoNothing({ target: conflictTarget })
+      ).returning({ message: todaysBriefGreetings.message })
+    })
 
-    // If a concurrent request won the insert, return the stored value for consistency.
+    // If a concurrent request won the insert, return the stored value for
+    // consistency. A forced refresh always writes, so it never lands here.
     if (inserted.length === 0) {
       const winner = await loadCached()
       if (winner[0]) {

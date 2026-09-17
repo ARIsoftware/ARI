@@ -45,6 +45,8 @@ describe('getGoogleConfig', () => {
   afterEach(() => {
     delete process.env.MORNING_BRIEF_GOOGLE_CLIENT_ID
     delete process.env.MORNING_BRIEF_GOOGLE_CLIENT_SECRET
+    delete process.env.TODAYS_BRIEF_GOOGLE_CLIENT_ID
+    delete process.env.TODAYS_BRIEF_GOOGLE_CLIENT_SECRET
   })
 
   it('returns null when CLIENT_ID is missing', () => {
@@ -75,6 +77,7 @@ describe('getGoogleConfig', () => {
 describe('getRedirectUri', () => {
   afterEach(() => {
     delete process.env.MORNING_BRIEF_GOOGLE_REDIRECT_URI
+    delete process.env.TODAYS_BRIEF_GOOGLE_REDIRECT_URI
     delete process.env.BETTER_AUTH_URL
     delete process.env.NEXT_PUBLIC_APP_URL
   })
@@ -113,6 +116,60 @@ describe('getRedirectUri', () => {
     process.env.BETTER_AUTH_URL = 'https://myapp.example.com///'
     const uri = getRedirectUri()
     expect(uri).not.toContain('///')
+  })
+})
+
+// ─── env var naming (TODAYS_BRIEF_* with MORNING_BRIEF_* fallback) ───────────
+
+describe('env var naming', () => {
+  afterEach(() => {
+    delete process.env.MORNING_BRIEF_GOOGLE_CLIENT_ID
+    delete process.env.MORNING_BRIEF_GOOGLE_CLIENT_SECRET
+    delete process.env.MORNING_BRIEF_GOOGLE_REDIRECT_URI
+    delete process.env.TODAYS_BRIEF_GOOGLE_CLIENT_ID
+    delete process.env.TODAYS_BRIEF_GOOGLE_CLIENT_SECRET
+    delete process.env.TODAYS_BRIEF_GOOGLE_REDIRECT_URI
+    delete process.env.BETTER_AUTH_URL
+    delete process.env.NEXT_PUBLIC_APP_URL
+  })
+
+  it('reads the config from the TODAYS_BRIEF_* names', () => {
+    process.env.TODAYS_BRIEF_GOOGLE_CLIENT_ID = 'new-id'
+    process.env.TODAYS_BRIEF_GOOGLE_CLIENT_SECRET = 'new-secret'
+    expect(getGoogleConfig()).toEqual({ clientId: 'new-id', clientSecret: 'new-secret' })
+  })
+
+  it('prefers TODAYS_BRIEF_* over the legacy MORNING_BRIEF_* names', () => {
+    process.env.MORNING_BRIEF_GOOGLE_CLIENT_ID = 'old-id'
+    process.env.MORNING_BRIEF_GOOGLE_CLIENT_SECRET = 'old-secret'
+    process.env.TODAYS_BRIEF_GOOGLE_CLIENT_ID = 'new-id'
+    process.env.TODAYS_BRIEF_GOOGLE_CLIENT_SECRET = 'new-secret'
+    expect(getGoogleConfig()).toEqual({ clientId: 'new-id', clientSecret: 'new-secret' })
+  })
+
+  it('mixes the two prefixes when only one name is migrated', () => {
+    process.env.TODAYS_BRIEF_GOOGLE_CLIENT_ID = 'new-id'
+    process.env.MORNING_BRIEF_GOOGLE_CLIENT_SECRET = 'old-secret'
+    expect(getGoogleConfig()).toEqual({ clientId: 'new-id', clientSecret: 'old-secret' })
+  })
+
+  it('treats an empty TODAYS_BRIEF_* value as unset and falls back', () => {
+    process.env.TODAYS_BRIEF_GOOGLE_CLIENT_ID = ''
+    process.env.TODAYS_BRIEF_GOOGLE_CLIENT_SECRET = ''
+    process.env.MORNING_BRIEF_GOOGLE_CLIENT_ID = 'old-id'
+    process.env.MORNING_BRIEF_GOOGLE_CLIENT_SECRET = 'old-secret'
+    expect(getGoogleConfig()).toEqual({ clientId: 'old-id', clientSecret: 'old-secret' })
+  })
+
+  it('reads the redirect override from TODAYS_BRIEF_GOOGLE_REDIRECT_URI', () => {
+    process.env.TODAYS_BRIEF_GOOGLE_REDIRECT_URI = 'https://new.example.com/callback'
+    expect(getRedirectUri()).toBe('https://new.example.com/callback')
+  })
+
+  it('prefers the TODAYS_BRIEF_ redirect override over the legacy one', () => {
+    process.env.MORNING_BRIEF_GOOGLE_REDIRECT_URI = 'https://old.example.com/callback'
+    process.env.TODAYS_BRIEF_GOOGLE_REDIRECT_URI = 'https://new.example.com/callback'
+    expect(getRedirectUri()).toBe('https://new.example.com/callback')
   })
 })
 

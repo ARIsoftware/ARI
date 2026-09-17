@@ -14,6 +14,46 @@ export function toDueDateString(date: Date | undefined): string | null {
 }
 
 /**
+ * Parse a due_date into a Date pinned to LOCAL midnight of the day it names.
+ *
+ * due_date is a calendar day, not an instant. `new Date("2026-09-17")` parses
+ * the bare date form as UTC midnight, which in any timezone west of UTC renders
+ * as the PREVIOUS day — a task due Sep 17 displays as "Sep 16" in Toronto. Going
+ * through the numeric constructor keeps the day the picker actually stored.
+ *
+ * Returns null for empty or unparseable input, so callers can render a fallback
+ * rather than an "Invalid Date".
+ */
+export function parseDueDate(dueDate: string | null | undefined): Date | null {
+  if (!dueDate) return null
+  // Leading yyyy-MM-dd: matches both "2026-09-17" and the ISO datetime form
+  // older clients wrote. Anything after the day is a time-of-day we don't want.
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dueDate)
+  if (!match) return null
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+/**
+ * Whole calendar days from today until a due date: 0 = due today, negative =
+ * overdue, positive = upcoming. Null when there's no usable due date.
+ *
+ * Both sides are floored to local midnight first. Subtracting the raw clock time
+ * instead would make a task due TODAY come out as -1 ("Overdue") for the whole
+ * day after midnight. Math.round absorbs the 23- or 25-hour days that DST
+ * transitions produce.
+ */
+export function daysUntilDue(
+  dueDate: string | null | undefined,
+  now: Date = new Date(),
+): number | null {
+  const due = parseDueDate(dueDate)
+  if (!due) return null
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return Math.round((due.getTime() - today.getTime()) / 86400000)
+}
+
+/**
  * True when a task's due_date falls on today's local calendar day. The column
  * is a DATE, so the value arrives as "yyyy-MM-dd" (or an ISO datetime for rows
  * written by older clients) — comparing the leading 10 characters against the

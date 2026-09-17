@@ -42,6 +42,7 @@ import {
   updateTask,
   recordTaskCompleted,
   toDueDateString,
+  parseDueDate,
 } from '@/modules/tasks/lib/utils'
 import { playTaskSound } from '@/modules/tasks/lib/task-sounds'
 import { TaskSubtasks } from '@/modules/tasks/components/task-subtasks'
@@ -119,6 +120,9 @@ export default function EditTaskPage() {
   const queryClient = useQueryClient()
   const { enabled: majorProjectsEnabled } = useModuleEnabled('major-projects')
   const { enabled: northstarEnabled } = useModuleEnabled('northstar')
+  // The privacy eye needs the Users module installed AND enabled — same gate as
+  // the task list, so the two views can't disagree about whether it exists.
+  const { enabled: usersModuleEnabled } = useModuleEnabled('ari-users')
   const [loading, setLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
   const [date, setDate] = useState<Date>()
@@ -134,7 +138,7 @@ export default function EditTaskPage() {
   const [taskOwnerId, setTaskOwnerId] = useState<string | null>(null)
   // The mask toggle shows only on multi-user installs for the task's owner —
   // masking someone else's task would hide it from its owner (API rejects it).
-  const canMask = MULTI_USER && !!user?.id && taskOwnerId === user.id
+  const canMask = MULTI_USER && usersModuleEnabled && !!user?.id && taskOwnerId === user.id
 
   // Form state
   const [formData, setFormData] = useState({
@@ -206,7 +210,9 @@ export default function EditTaskPage() {
           project_id: foundTask.project_id || null,
         }
 
-        const loadedDate = foundTask.due_date ? new Date(foundTask.due_date) : undefined
+        // parseDueDate keeps the stored calendar day; new Date() would load the
+        // picker one day early and then save that shifted day right back.
+        const loadedDate = parseDueDate(foundTask.due_date) ?? undefined
 
         setTaskOwnerId(foundTask.user_id ?? null)
         setFormData(loaded)

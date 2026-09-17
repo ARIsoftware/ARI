@@ -203,15 +203,15 @@ describe('getTaskPriorityLevel', () => {
 // getTaskColor
 // ---------------------------------------------------------------------------
 
-// Build a due_date string N UTC days in the future from the current UTC date.
-// Using UTC arithmetic ensures getTaskColor's `new Date('YYYY-MM-DD')` (which
-// parses as UTC midnight) stays in the expected bucket regardless of the local
-// timezone of the test runner.
-function futureDateUTC(daysAhead: number): string {
+// Build a due_date string N days from today's LOCAL calendar day. getTaskColor
+// buckets by local calendar day (a due_date names a day, not an instant), so the
+// fixture has to speak the same units or the assertions drift by one near
+// midnight.
+function futureDate(daysAhead: number): string {
   const d = new Date()
-  const utcMidnight = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
-  utcMidnight.setUTCDate(utcMidnight.getUTCDate() + daysAhead)
-  return utcMidnight.toISOString().slice(0, 10)
+  const localMidnight = new Date(d.getFullYear(), d.getMonth(), d.getDate() + daysAhead)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${localMidnight.getFullYear()}-${pad(localMidnight.getMonth() + 1)}-${pad(localMidnight.getDate())}`
 }
 
 describe('getTaskColor', () => {
@@ -220,35 +220,42 @@ describe('getTaskColor', () => {
     expect(getTaskColor(task)).toBe('#3f6699')
   })
 
-  it('returns desaturated red for an overdue task (2 UTC days ago)', () => {
-    // 2 UTC days ago is unambiguously in the past regardless of timezone
-    const task = makeTask({ due_date: futureDateUTC(-2) })
-    expect(getTaskColor(task)).toBe('#b0413a')
-  })
-
-  it('returns clay amber for a task due in 2 UTC days (within <=3 window)', () => {
-    // 2 UTC days from now → daysUntilDue is guaranteed to be in [1,2]
-    const task = makeTask({ due_date: futureDateUTC(2) })
+  it('treats a task due TODAY as due-soon, not overdue', () => {
+    // The regression: subtracting raw clock times made today's task -1 (overdue)
+    // for every hour after local midnight.
+    const task = makeTask({ due_date: futureDate(0) })
     expect(getTaskColor(task)).toBe('#b07636')
   })
 
-  it('returns muted gold for a task due in 5 UTC days (4 < n <= 7)', () => {
-    const task = makeTask({ due_date: futureDateUTC(5) })
+  it('returns desaturated red for an overdue task (2 days ago)', () => {
+    // 2 days ago is unambiguously in the past regardless of timezone
+    const task = makeTask({ due_date: futureDate(-2) })
+    expect(getTaskColor(task)).toBe('#b0413a')
+  })
+
+  it('returns clay amber for a task due in 2 days (within <=3 window)', () => {
+    // 2 days from now → daysUntilDue is guaranteed to be in [1,2]
+    const task = makeTask({ due_date: futureDate(2) })
+    expect(getTaskColor(task)).toBe('#b07636')
+  })
+
+  it('returns muted gold for a task due in 5 days (4 < n <= 7)', () => {
+    const task = makeTask({ due_date: futureDate(5) })
     expect(getTaskColor(task)).toBe('#9a8a3f')
   })
 
-  it('returns slate green for a task due in 20 UTC days (> 7)', () => {
-    const task = makeTask({ due_date: futureDateUTC(20) })
+  it('returns slate green for a task due in 20 days (> 7)', () => {
+    const task = makeTask({ due_date: futureDate(20) })
     expect(getTaskColor(task)).toBe('#4f7a63')
   })
 
   it('all four color branches are covered', () => {
     const colors = new Set([
       getTaskColor(makeTask({ due_date: null })),
-      getTaskColor(makeTask({ due_date: futureDateUTC(-2) })),
-      getTaskColor(makeTask({ due_date: futureDateUTC(2) })),
-      getTaskColor(makeTask({ due_date: futureDateUTC(5) })),
-      getTaskColor(makeTask({ due_date: futureDateUTC(20) })),
+      getTaskColor(makeTask({ due_date: futureDate(-2) })),
+      getTaskColor(makeTask({ due_date: futureDate(2) })),
+      getTaskColor(makeTask({ due_date: futureDate(5) })),
+      getTaskColor(makeTask({ due_date: futureDate(20) })),
     ])
     expect(colors).toContain('#3f6699')
     expect(colors).toContain('#b0413a')
