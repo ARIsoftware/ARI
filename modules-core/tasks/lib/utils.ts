@@ -13,6 +13,18 @@ export function toDueDateString(date: Date | undefined): string | null {
   return date ? format(date, 'yyyy-MM-dd') : null
 }
 
+/**
+ * True when a task's due_date falls on today's local calendar day. The column
+ * is a DATE, so the value arrives as "yyyy-MM-dd" (or an ISO datetime for rows
+ * written by older clients) — comparing the leading 10 characters against the
+ * locally formatted today keeps the same calendar day the picker stored, with
+ * no timezone shift.
+ */
+export function isDueToday(dueDate: string | null | undefined, now: Date = new Date()): boolean {
+  if (!dueDate) return false
+  return dueDate.slice(0, 10) === format(now, 'yyyy-MM-dd')
+}
+
 /** Dot color for an agent's status — shared by AssignedAgentBadge and the assignee picker. */
 export function agentStatusDotClass(status: string): string {
   return status === 'working'

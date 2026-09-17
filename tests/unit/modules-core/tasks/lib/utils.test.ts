@@ -14,6 +14,7 @@ vi.mock('@/lib/fitness-stats', () => ({
 import { incrementTaskCompletion } from '@/lib/fitness-stats'
 import {
   toDueDateString,
+  isDueToday,
   agentStatusDotClass,
   recordTaskCompleted,
   getTasks,
@@ -83,6 +84,38 @@ describe('toDueDateString', () => {
   it('does not shift the date due to UTC conversion', () => {
     const d = new Date(2025, 11, 31) // Dec 31 2025 local
     expect(toDueDateString(d)).toBe('2025-12-31')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// isDueToday
+// ---------------------------------------------------------------------------
+describe('isDueToday', () => {
+  const now = new Date(2025, 4, 9) // May 9 2025 local
+
+  it('returns false for a missing due date', () => {
+    expect(isDueToday(null, now)).toBe(false)
+    expect(isDueToday(undefined, now)).toBe(false)
+    expect(isDueToday('', now)).toBe(false)
+  })
+
+  it('matches a yyyy-MM-dd due date on the same local day', () => {
+    expect(isDueToday('2025-05-09', now)).toBe(true)
+  })
+
+  it('ignores the time portion of an ISO datetime', () => {
+    expect(isDueToday('2025-05-09T23:30:00.000Z', now)).toBe(true)
+  })
+
+  it('returns false for other days', () => {
+    expect(isDueToday('2025-05-08', now)).toBe(false)
+    expect(isDueToday('2025-05-10', now)).toBe(false)
+  })
+
+  it('defaults to the current date when no clock is supplied', () => {
+    const today = new Date()
+    const stamp = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    expect(isDueToday(stamp)).toBe(true)
   })
 })
 

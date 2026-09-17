@@ -40,6 +40,7 @@ import {
   reorderTasks,
   updateTask,
   agentStatusDotClass,
+  isDueToday,
   type Task,
 } from '../lib/utils'
 import { isMultiUserInstall } from '@/lib/multi-user'
@@ -249,7 +250,7 @@ export default function TasksPage() {
   const router = useRouter()
   const projectFilter = searchParams.get('filter')
 
-  const filters = ['All', 'Pinned', 'In Progress', 'Completed', 'Deleted']
+  const filters = ['All', 'Pinned', 'Today', 'In Progress', 'Completed', 'Deleted']
 
   // Soft-deleted tasks for the "Deleted" tab. Fetched only while that tab is
   // open; invalidating ['tasks'] refreshes this alongside the active list.
@@ -302,10 +303,13 @@ export default function TasksPage() {
       // Hide completed tasks unless viewing "Completed" filter
       if (task.completed && activeFilter !== 'Completed') return false
 
+      // 'Pinned' and 'Today' filter on their own attribute; every other tab
+      // (besides 'All') matches the task's status verbatim.
       const matchesFilter =
         activeFilter === 'All' ||
         (activeFilter === 'Pinned' && task.pinned) ||
-        (activeFilter !== 'Pinned' && task.status === activeFilter)
+        (activeFilter === 'Today' && isDueToday(task.due_date)) ||
+        (activeFilter !== 'Pinned' && activeFilter !== 'Today' && task.status === activeFilter)
       const matchesSearch =
         task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         task.assignees.some((assignee: string) =>
