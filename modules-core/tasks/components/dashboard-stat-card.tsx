@@ -4,8 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { CheckSquare, Eye, Loader2 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
+import { useRouter } from 'next/navigation'
 
 export default function TasksDashboardStatCard() {
+  const router = useRouter()
   const { data: tasks, isLoading } = useQuery({
     queryKey: ['dashboard-tasks'],
     queryFn: async () => {
@@ -36,7 +38,7 @@ export default function TasksDashboardStatCard() {
           variant="ghost"
           size="sm"
           className="w-full mt-2 text-xs rounded-full hover:bg-secondary hover:text-secondary-foreground"
-          onClick={() => (window.location.href = '/tasks')}
+          onClick={() => router.push('/tasks')}
         >
           <Eye className="w-3 h-3 mr-1" />
           View All

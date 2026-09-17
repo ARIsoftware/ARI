@@ -16,7 +16,6 @@ import { fetchIcsText, looksLikeIcs } from '@/modules/todays-brief/lib/ical'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse, UnauthorizedResponse } from '@/lib/openapi/common'
 import { todaysBriefIcalSubscriptions } from '@/lib/db/schema'
-import { sql } from 'drizzle-orm'
 import { encrypt } from '@/lib/crypto'
 
 registry.registerPath({

@@ -1,4 +1,4 @@
-import { pgTable, index, uniqueIndex, pgPolicy, uuid, text, timestamp, date } from "drizzle-orm/pg-core"
+import { pgTable, uniqueIndex, pgPolicy, uuid, text, timestamp, date } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 // Mirrors modules-custom/todays-brief/database/schema.sql

@@ -1,13 +1,17 @@
 'use client'
 
-import { useContext, useEffect, useMemo, useState } from 'react'
+import { useContext, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { BarChart3, Loader2, Plus, Square, Volume2 } from 'lucide-react'
-import { useDefaultLayoutData, useListenBrief } from '@/modules/dashboard/hooks/use-default-layout'
+import {
+  useClientNow,
+  useDefaultLayoutData,
+  useListenBrief,
+} from '@/modules/dashboard/hooks/use-default-layout'
 import { useDefaultLayoutCards } from '@/modules/dashboard/components/module-widgets'
 import { SortableCardStack } from '@/modules/dashboard/components/sortable-cards'
 import { QuickAddTaskContext } from '@/modules/tasks/components/quick-add-task-sheet'
@@ -67,10 +71,9 @@ export function DefaultDashboardLayout() {
   } = useDefaultLayoutData()
   const { leftCards, middleCards } = useDefaultLayoutCards()
 
-  // Date and greeting depend on the client clock — set after mount so the
+  // Date and greeting depend on the client clock — null until mounted so the
   // server render never disagrees with the browser's timezone.
-  const [now, setNow] = useState<Date | null>(null)
-  useEffect(() => setNow(new Date()), [])
+  const now = useClientNow()
 
   const briefMessage = greeting?.message || FALLBACK_BRIEF_MESSAGE
 

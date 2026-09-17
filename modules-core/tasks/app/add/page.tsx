@@ -22,11 +22,12 @@ import { isMultiUserInstall } from '@/lib/multi-user'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Slider } from '@/components/ui/slider'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { createTask, createSubtask, toDueDateString } from '@/modules/tasks/lib/utils'
 import { playTaskSound } from '@/modules/tasks/lib/task-sounds'
 import { getGoals, type Goal } from '@/lib/goals'
+import type { Task } from '@/modules/tasks/types'
 import { useModuleEnabled } from '@/lib/modules/module-hooks'
 import { useToast } from '@/hooks/use-toast'
 import { useRouter } from 'next/navigation'
@@ -74,8 +75,8 @@ export default function AddTaskPage() {
     notes: '',
     assignees: [] as string[],
     assigned_agent_id: null as string | null,
-    status: 'Pending' as const,
-    priority: 'Medium' as const,
+    status: 'Pending' as Task['status'],
+    priority: 'Medium' as Task['priority'],
     pinned: false,
     is_private: false,
     completed: false,
@@ -116,7 +117,7 @@ export default function AddTaskPage() {
     loadNorthStars()
   }, [northstarEnabled])
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleInputChange = <K extends keyof typeof formData>(field: K, value: (typeof formData)[K]) => {
     setFormData((prev) => ({
       ...prev,
       [field]: value,
@@ -280,9 +281,9 @@ export default function AddTaskPage() {
     due: toDueDateString(date),
     subtasks,
   })
-  const initialSnapshotRef = useRef<string | null>(null)
-  if (initialSnapshotRef.current === null) initialSnapshotRef.current = currentSnapshot
-  const hasUnsavedChanges = !justSaved && currentSnapshot !== initialSnapshotRef.current
+  // Baseline captured from the first render's (pristine) form values.
+  const [initialSnapshot] = useState(currentSnapshot)
+  const hasUnsavedChanges = !justSaved && currentSnapshot !== initialSnapshot
 
   const { pendingHref, isSaving, requestNavigation, closeDialog, discardAndLeave, saveAndLeave } =
     useUnsavedChangesGuard({ hasUnsavedChanges, onSave: persistTask })
@@ -441,7 +442,7 @@ export default function AddTaskPage() {
                 <Label className="text-sm font-medium">Status</Label>
                 <Select
                   value={formData.status}
-                  onValueChange={(value: any) => handleInputChange('status', value)}
+                  onValueChange={(value) => handleInputChange('status', value as Task['status'])}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -463,7 +464,7 @@ export default function AddTaskPage() {
                 <Label className="text-sm font-medium">Priority</Label>
                 <Select
                   value={formData.priority}
-                  onValueChange={(value: any) => handleInputChange('priority', value)}
+                  onValueChange={(value) => handleInputChange('priority', value as Task['priority'])}
                 >
                   <SelectTrigger>
                     <SelectValue />

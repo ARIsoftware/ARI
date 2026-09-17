@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import Link from 'next/link'
 import {
   Dialog,
@@ -25,6 +25,27 @@ import {
 // header's info button. The "seen" flag lives in localStorage so it doesn't
 // nag on every visit.
 const SEEN_KEY = 'todays-brief-about-seen'
+
+function noopSubscribe(): () => void {
+  return () => {}
+}
+
+function isFirstVisit(): boolean {
+  try {
+    return !localStorage.getItem(SEEN_KEY)
+  } catch {
+    // localStorage unavailable (private mode etc.) — just skip the auto-open.
+    return false
+  }
+}
+
+function markSeen(): void {
+  try {
+    localStorage.setItem(SEEN_KEY, '1')
+  } catch {
+    // Nothing to do — the dialog will simply auto-open again next visit.
+  }
+}
 
 const FEATURES: { icon: LucideIcon; title: string; desc: string }[] = [
   {
@@ -60,32 +81,32 @@ const FEATURES: { icon: LucideIcon; title: string; desc: string }[] = [
 ]
 
 export function TodaysBriefAboutDialog() {
-  const [open, setOpen] = useState(false)
+  // Auto-open on the first visit. The seen flag lives in localStorage, so it is
+  // read through useSyncExternalStore (closed on the server, then the client
+  // value) rather than a post-mount setState. Once the user opens or closes the
+  // dialog themselves, their choice wins.
+  const firstVisit = useSyncExternalStore(noopSubscribe, isFirstVisit, () => false)
+  const [userOpen, setUserOpen] = useState<boolean | null>(null)
+  const open = userOpen ?? firstVisit
 
-  useEffect(() => {
-    try {
-      if (!localStorage.getItem(SEEN_KEY)) {
-        setOpen(true)
-        localStorage.setItem(SEEN_KEY, '1')
-      }
-    } catch {
-      // localStorage unavailable (private mode etc.) — just skip the auto-open.
-    }
-  }, [])
+  const handleOpenChange = (next: boolean) => {
+    setUserOpen(next)
+    if (!next) markSeen()
+  }
 
   return (
     <>
       <Button
         variant="ghost"
         size="icon"
-        onClick={() => setOpen(true)}
+        onClick={() => handleOpenChange(true)}
         aria-label="About Today's Brief"
         className="text-muted-foreground hover:text-foreground"
       >
         <Info className="h-5 w-5" />
       </Button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="sm:max-w-[34rem]">
           {/* Letterhead-style banner, echoing the brief's own header. */}
           <div className="-mx-6 -mt-6 mb-1 flex items-center gap-3 rounded-t-lg border-b border-border bg-gradient-to-b from-primary/10 to-transparent px-6 py-6">
@@ -126,7 +147,7 @@ export function TodaysBriefAboutDialog() {
             <Button asChild variant="outline" size="sm">
               <Link href="/todays-brief/settings">Open settings</Link>
             </Button>
-            <Button size="sm" onClick={() => setOpen(false)}>
+            <Button size="sm" onClick={() => handleOpenChange(false)}>
               Got it
             </Button>
           </div>

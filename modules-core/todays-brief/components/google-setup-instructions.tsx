@@ -1,30 +1,35 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { Button } from '@/components/ui/button'
 import { Check, Copy, ExternalLink } from 'lucide-react'
 
-/**
- * Step-by-step guide for creating the Google OAuth credentials this module needs.
- * Shown inside the Today's Brief settings panel.
- */
-export function GoogleSetupInstructions() {
-  const [redirectUri, setRedirectUri] = useState('https://your-ari-domain.com/api/modules/todays-brief/google/callback')
-  const [copied, setCopied] = useState<string | null>(null)
+const CALLBACK_PATH = '/api/modules/todays-brief/google/callback'
+const PLACEHOLDER_REDIRECT_URI = `https://your-ari-domain.com${CALLBACK_PATH}`
 
-  useEffect(() => {
-    // The redirect URI must match what's registered on the Google OAuth client.
-    setRedirectUri(`${window.location.origin}/api/modules/todays-brief/google/callback`)
-  }, [])
+function noopSubscribe(): () => void {
+  return () => {}
+}
 
-  const copy = (value: string, key: string) => {
-    navigator.clipboard?.writeText(value).then(() => {
-      setCopied(key)
-      setTimeout(() => setCopied(null), 1500)
-    })
-  }
+// The redirect URI must match what's registered on the Google OAuth client, so
+// it is built from the browser's origin. Read via useSyncExternalStore: the
+// server renders the placeholder, the client swaps in the real origin without a
+// hydration mismatch.
+const getRedirectUri = () => `${window.location.origin}${CALLBACK_PATH}`
+const getServerRedirectUri = () => PLACEHOLDER_REDIRECT_URI
 
-  const CopyField = ({ value, label }: { value: string; label: string }) => (
+function CopyField({
+  value,
+  label,
+  copied,
+  onCopy,
+}: {
+  value: string
+  label: string
+  copied: string | null
+  onCopy: (value: string, key: string) => void
+}) {
+  return (
     <div className="mt-1 flex items-center gap-2">
       <code className="flex-1 overflow-x-auto rounded-md border border-border bg-muted/50 px-2 py-1 text-xs text-foreground">
         {value}
@@ -34,13 +39,29 @@ export function GoogleSetupInstructions() {
         variant="outline"
         size="sm"
         className="h-7 flex-shrink-0 px-2"
-        onClick={() => copy(value, label)}
+        onClick={() => onCopy(value, label)}
         aria-label={copied === label ? 'Copied' : 'Copy to clipboard'}
       >
         {copied === label ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
       </Button>
     </div>
   )
+}
+
+/**
+ * Step-by-step guide for creating the Google OAuth credentials this module needs.
+ * Shown inside the Today's Brief settings panel.
+ */
+export function GoogleSetupInstructions() {
+  const redirectUri = useSyncExternalStore(noopSubscribe, getRedirectUri, getServerRedirectUri)
+  const [copied, setCopied] = useState<string | null>(null)
+
+  const copy = (value: string, key: string) => {
+    navigator.clipboard?.writeText(value).then(() => {
+      setCopied(key)
+      setTimeout(() => setCopied(null), 1500)
+    })
+  }
 
   return (
     <div className="space-y-4 text-sm">
@@ -70,7 +91,7 @@ export function GoogleSetupInstructions() {
         </li>
         <li>
           When asked for <span className="text-foreground">scopes</span>, add only this one:
-          <CopyField value="https://www.googleapis.com/auth/calendar.readonly" label="scope" />
+          <CopyField value="https://www.googleapis.com/auth/calendar.readonly" label="scope" copied={copied} onCopy={copy} />
           <span className="mt-1 block text-xs">
             It shows up under <span className="text-foreground">&ldquo;sensitive scopes&rdquo;</span> — that&apos;s
             expected. Read-only is all Today&apos;s Brief needs; don&apos;t add the read/write{' '}
@@ -91,7 +112,7 @@ export function GoogleSetupInstructions() {
           <span className="text-foreground">Authorized JavaScript origins</span> empty, and under{' '}
           <span className="text-foreground">Authorized redirect URIs</span> add exactly this URL (no trailing
           slash):
-          <CopyField value={redirectUri} label="redirect" />
+          <CopyField value={redirectUri} label="redirect" copied={copied} onCopy={copy} />
         </li>
         <li>
           Click <span className="text-foreground">Create</span> and copy the{' '}
@@ -100,8 +121,8 @@ export function GoogleSetupInstructions() {
         </li>
         <li>
           Add them to your <code className="rounded bg-muted px-1 py-0.5 text-xs">.env.local</code> and restart ARI:
-          <CopyField value="TODAYS_BRIEF_GOOGLE_CLIENT_ID=your-client-id" label="env-id" />
-          <CopyField value="TODAYS_BRIEF_GOOGLE_CLIENT_SECRET=your-client-secret" label="env-secret" />
+          <CopyField value="TODAYS_BRIEF_GOOGLE_CLIENT_ID=your-client-id" label="env-id" copied={copied} onCopy={copy} />
+          <CopyField value="TODAYS_BRIEF_GOOGLE_CLIENT_SECRET=your-client-secret" label="env-secret" copied={copied} onCopy={copy} />
         </li>
         <li>
           Back on this page, click{' '}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useApiKeysStatus } from '@/hooks/use-api-keys-status'
 import { AI_VOICE_PROVIDERS } from '@/lib/ai-providers'
@@ -246,4 +246,29 @@ export function useListenBrief(text: string) {
   }, [state, stop, text])
 
   return { state, toggle }
+}
+
+// The mount-time clock is client-only: the server render must not guess a
+// timezone or an hour. Each mount takes one reading (React calls subscribe
+// after the first client render) and holds it until the component unmounts,
+// so the greeting is stable for the visit and hydration never disagrees.
+let mountedNow: Date | null = null
+let subscribers = 0
+
+function subscribeClientNow(onChange: () => void): () => void {
+  if (subscribers++ === 0) mountedNow = new Date()
+  onChange()
+  return () => {
+    if (--subscribers === 0) mountedNow = null
+  }
+}
+
+const getClientNow = () => mountedNow
+const getServerNow = () => null
+
+/**
+ * The current time, or null until the component has mounted in the browser.
+ */
+export function useClientNow(): Date | null {
+  return useSyncExternalStore(subscribeClientNow, getClientNow, getServerNow)
 }

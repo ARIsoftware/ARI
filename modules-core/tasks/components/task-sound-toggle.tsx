@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useSyncExternalStore } from "react"
 import { Volume2, VolumeX } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -14,16 +14,13 @@ import {
 /**
  * Icon toggle for the tactile task sound effects. Persists the choice via the
  * task-sounds helper (localStorage) and stays in sync across mounts. Starts
- * from a stable server value (unmuted) and reconciles after mount to avoid a
- * hydration mismatch on the persisted preference.
+ * from a stable server value (unmuted) and takes the persisted preference on
+ * the client via useSyncExternalStore, so there is no hydration mismatch.
  */
 export function TaskSoundToggle() {
-  const [muted, setMuted] = useState(false)
-
-  useEffect(() => {
-    setMuted(isTaskSoundMuted())
-    return subscribeTaskSoundMuted(setMuted)
-  }, [])
+  // Server snapshot is always "unmuted"; React swaps in the persisted value on
+  // the client without a hydration mismatch or an extra render.
+  const muted = useSyncExternalStore(subscribeTaskSoundMuted, isTaskSoundMuted, () => false)
 
   const toggle = () => {
     const next = !muted

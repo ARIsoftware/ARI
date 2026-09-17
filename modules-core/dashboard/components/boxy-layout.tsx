@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Plus, BarChart3, Activity } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useDashboardData } from '@/modules/dashboard/hooks/use-dashboard'
 import { useDragDropMode } from '@/components/drag-drop-mode-context'
 import { TasksFeed } from './tasks-feed'
@@ -10,6 +11,7 @@ import { DashboardStatCards, DashboardWidgetArea } from './dashboard-widgets'
 export function BoxyDashboardLayout() {
   const { tasksEnabled, quote } = useDashboardData()
   const { isDragMode } = useDragDropMode()
+  const router = useRouter()
 
   // No loading gates — render the shell unconditionally. Modules-list and
   // recent-activity queries are TanStack-cached with long staleTime, so they
@@ -38,14 +40,14 @@ export function BoxyDashboardLayout() {
             </div>
             {tasksEnabled && (
               <div className="flex gap-2">
-                <Button size="sm" onClick={() => (window.location.href = '/tasks')}>
+                <Button size="sm" onClick={() => router.push('/tasks')}>
                   <Plus className="w-4 h-4 mr-2" />
                   New Task
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => (window.location.href = '/tasks/radar')}
+                  onClick={() => router.push('/tasks/radar')}
                 >
                   <BarChart3 className="w-4 h-4 mr-2" />
                   Priority Radar

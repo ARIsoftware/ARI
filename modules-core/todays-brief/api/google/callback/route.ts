@@ -20,7 +20,7 @@ import {
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, UnauthorizedResponse } from '@/lib/openapi/common'
 import { todaysBriefGoogleTokens } from '@/lib/db/schema'
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { encrypt, decrypt } from '@/lib/crypto'
 
 export const dynamic = 'force-dynamic'

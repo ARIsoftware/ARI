@@ -17,8 +17,8 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart'
 import { Loader2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import type { Task } from '@/modules/tasks/types'
-import { transformTaskForRadar } from '../lib/priority-utils'
 import { RadarTaskDots } from './radar-task-dots'
 
 const chartConfig = {
@@ -54,6 +54,7 @@ function prepareRadarData(tasks: Task[]) {
 }
 
 export default function TasksDashboardRadarWidget() {
+  const router = useRouter()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [hoveredTask, setHoveredTask] = useState<string | null>(null)
@@ -146,7 +147,7 @@ export default function TasksDashboardRadarWidget() {
             tasks={priorityTasks}
             hoveredTask={hoveredTask}
             onTaskHover={setHoveredTask}
-            onTaskClick={() => (window.location.href = '/tasks/radar')}
+            onTaskClick={() => router.push('/tasks/radar')}
             limit={5}
           />
         </div>

@@ -22,8 +22,8 @@ import {
 } from "@/components/ui/sheet"
 import { CalendarIcon, Plus, Pin, Loader2, Info } from "lucide-react"
 import { createTask, toDueDateString } from "@/modules/tasks/lib/utils"
+import type { Task } from "@/modules/tasks/types"
 import { useToast } from "@/hooks/use-toast"
-import { useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
@@ -82,8 +82,8 @@ function QuickAddTaskForm({ onSuccess }: { onSuccess: () => void }) {
     notes: "",
     assignees: [] as string[],
     assigned_agent_id: null as string | null,
-    status: "Pending" as const,
-    priority: "Medium" as const,
+    status: "Pending" as Task["status"],
+    priority: "Medium" as Task["priority"],
     pinned: false,
     completed: false,
     impact: 3,
@@ -93,7 +93,7 @@ function QuickAddTaskForm({ onSuccess }: { onSuccess: () => void }) {
     strategic_fit: 3,
   })
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleInputChange = <K extends keyof typeof formData>(field: K, value: (typeof formData)[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
@@ -236,7 +236,7 @@ function QuickAddTaskForm({ onSuccess }: { onSuccess: () => void }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
           <Label className="text-sm font-medium">Status</Label>
-          <Select value={formData.status} onValueChange={(value: any) => handleInputChange("status", value)}>
+          <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value as Task["status"])}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
@@ -254,7 +254,7 @@ function QuickAddTaskForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
         <div className="space-y-2">
           <Label className="text-sm font-medium">Priority</Label>
-          <Select value={formData.priority} onValueChange={(value: any) => handleInputChange("priority", value)}>
+          <Select value={formData.priority} onValueChange={(value) => handleInputChange("priority", value as Task["priority"])}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>

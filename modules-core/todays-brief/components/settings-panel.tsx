@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { AiProviderCard } from '@/components/ai-provider-card'
 import { useToast } from '@/hooks/use-toast'
 import { GoogleCalendarCard } from './google-calendar-card'
@@ -28,19 +28,21 @@ export function TodaysBriefSettingsPanel() {
   const { data: savedSettings } = useTodaysBriefSettings()
   const updateSettings = useUpdateTodaysBriefSettings()
 
-  const [settings, setSettings] = useState<TodaysBriefSettings>(DEFAULT_SETTINGS)
+  // Unsaved edits live in `draft`; while it is null the panel mirrors the saved
+  // settings directly (so a refetch shows through), and a successful save clears
+  // it. Derived rather than copied into state so no effect has to sync the two.
+  const [draft, setDraft] = useState<TodaysBriefSettings | null>(null)
   const [saved, setSaved] = useState(false)
 
-  useEffect(() => {
-    if (savedSettings) {
-      setSettings({ ...DEFAULT_SETTINGS, ...savedSettings })
-    }
-  }, [savedSettings])
+  const settings: TodaysBriefSettings = draft ?? { ...DEFAULT_SETTINGS, ...savedSettings }
+  const setSettings = (update: (prev: TodaysBriefSettings) => TodaysBriefSettings) =>
+    setDraft((prev) => update(prev ?? settings))
 
   const persist = (next: TodaysBriefSettings) => {
     setSaved(false)
     updateSettings.mutate(next, {
       onSuccess: () => {
+        setDraft(null)
         setSaved(true)
         setTimeout(() => setSaved(false), 3000)
       },

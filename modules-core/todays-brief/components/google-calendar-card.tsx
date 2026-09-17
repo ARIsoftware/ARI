@@ -63,7 +63,12 @@ export function GoogleCalendarCard() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const [showInstructions, setShowInstructions] = useState(false)
+  // The OAuth callback lands here with ?google_error=not_configured when the
+  // client id/secret are missing — open the setup guide straight away. Read at
+  // mount (the callback is a full-page redirect) instead of in the effect below.
+  const [showInstructions, setShowInstructions] = useState(
+    () => searchParams.get('google_error') === 'not_configured',
+  )
   const [showIcalHelp, setShowIcalHelp] = useState(false)
   const [icsUrl, setIcsUrl] = useState('')
   // The user's explicit tab choice; until they pick one, default to whichever
@@ -89,14 +94,15 @@ export function GoogleCalendarCard() {
         title: 'Google connection failed',
         description: ERROR_MESSAGES[error] ?? 'Something went wrong connecting Google.',
       })
-      if (error === 'not_configured') setShowInstructions(true)
     }
     router.replace('/todays-brief/settings')
   }, [searchParams, toast, router])
 
   const handleConnect = () => {
-    // Top-level navigation so the OAuth flow can set its state cookie + redirect.
-    window.location.href = '/api/modules/todays-brief/google/connect'
+    // Top-level navigation (not router.push): the destination is an API route,
+    // not a page — it sets the OAuth state cookie and redirects to Google.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.assign('/api/modules/todays-brief/google/connect')
   }
 
   const handleDisconnect = () => {

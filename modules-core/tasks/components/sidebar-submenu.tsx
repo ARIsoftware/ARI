@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import type { ModuleSubmenuProps } from '@/lib/modules/submenu-types'
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -18,7 +17,7 @@ const menuItems = [
   { label: 'Analytics', path: '/tasks/analytics', icon: LineChart },
 ]
 
-export default function TasksSubmenu({ moduleId, module }: ModuleSubmenuProps) {
+export default function TasksSubmenu() {
   const pathname = usePathname()
 
   return (

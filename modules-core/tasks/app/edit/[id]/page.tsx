@@ -35,7 +35,7 @@ import {
 } from 'lucide-react'
 import { isMultiUserInstall } from '@/lib/multi-user'
 import { Checkbox } from '@/components/ui/checkbox'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   getTasks,
@@ -47,7 +47,7 @@ import {
 import { playTaskSound } from '@/modules/tasks/lib/task-sounds'
 import { TaskSubtasks } from '@/modules/tasks/components/task-subtasks'
 import { getGoals, type Goal } from '@/lib/goals'
-import type { MajorProject } from '@/modules/tasks/types'
+import type { MajorProject, Task } from '@/modules/tasks/types'
 import { useModuleEnabled } from '@/lib/modules/module-hooks'
 import { useToast } from '@/hooks/use-toast'
 import { useRouter } from 'next/navigation'
@@ -133,7 +133,7 @@ export default function EditTaskPage() {
   // unsaved-changes guard.
   const [justSaved, setJustSaved] = useState(false)
   // Baseline snapshot of the loaded task; compared against the live form.
-  const initialSnapshotRef = useRef<string | null>(null)
+  const [initialSnapshot, setInitialSnapshot] = useState<string | null>(null)
   // Owner of the loaded task — only the owner may toggle per-record privacy.
   const [taskOwnerId, setTaskOwnerId] = useState<string | null>(null)
   // The mask toggle shows only on multi-user installs for the task's owner —
@@ -219,7 +219,7 @@ export default function EditTaskPage() {
         setDate(loadedDate)
         // Capture the baseline now, from the same values fed into state, so the
         // first post-load render isn't briefly flagged as dirty.
-        initialSnapshotRef.current = taskFormSnapshot(loaded, loadedDate)
+        setInitialSnapshot(taskFormSnapshot(loaded, loadedDate))
 
         // Load northstars/goals if northstar module is enabled
         if (northstarEnabled) {
@@ -257,7 +257,7 @@ export default function EditTaskPage() {
     loadData()
   }, [id, router, toast, user?.id, majorProjectsEnabled, northstarEnabled])
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleInputChange = <K extends keyof typeof formData>(field: K, value: (typeof formData)[K]) => {
     setFormData((prev) => ({
       ...prev,
       [field]: value,
@@ -380,8 +380,8 @@ export default function EditTaskPage() {
   const currentSnapshot = taskFormSnapshot(formData, date)
   const hasUnsavedChanges =
     !justSaved &&
-    initialSnapshotRef.current !== null &&
-    currentSnapshot !== initialSnapshotRef.current
+    initialSnapshot !== null &&
+    currentSnapshot !== initialSnapshot
 
   const { pendingHref, isSaving, requestNavigation, closeDialog, discardAndLeave, saveAndLeave } =
     useUnsavedChangesGuard({ hasUnsavedChanges, onSave: () => persistTask() })
@@ -543,7 +543,7 @@ export default function EditTaskPage() {
                 <Label className="text-sm font-medium">Status</Label>
                 <Select
                   value={formData.status}
-                  onValueChange={(value: any) => handleInputChange('status', value)}
+                  onValueChange={(value) => handleInputChange('status', value as Task['status'])}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -565,7 +565,7 @@ export default function EditTaskPage() {
                 <Label className="text-sm font-medium">Priority</Label>
                 <Select
                   value={formData.priority}
-                  onValueChange={(value: any) => handleInputChange('priority', value)}
+                  onValueChange={(value) => handleInputChange('priority', value as Task['priority'])}
                 >
                   <SelectTrigger>
                     <SelectValue />

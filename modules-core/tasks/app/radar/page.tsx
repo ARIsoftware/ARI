@@ -19,7 +19,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import type { Task } from "@/modules/tasks/types"
-import { transformTaskForRadar, getTaskPriorityLevel } from "@/modules/tasks/lib/priority-utils"
+import { transformTaskForRadar, type TaskAxes } from "@/modules/tasks/lib/priority-utils"
 import { TaskPriorityModal } from "@/modules/tasks/components/task-priority-modal"
 import { RadarTaskDots } from "@/modules/tasks/components/radar-task-dots"
 import { playTaskSound } from "@/modules/tasks/lib/task-sounds"
@@ -73,23 +73,23 @@ export default function RadarPage() {
   const [hoveredTask, setHoveredTask] = useState<string | null>(null)
 
   useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        // Better Auth uses HTTP-only cookies — sent automatically with
+        // same-origin fetch. No Authorization header needed.
+        const response = await fetch('/api/modules/tasks/priorities')
+        if (!response.ok) throw new Error('Failed to fetch tasks')
+        const data = await response.json()
+        setTasks(data)
+      } catch (error) {
+        console.error('Error fetching tasks:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
     fetchTasks()
   }, [])
-
-  const fetchTasks = async () => {
-    try {
-      // Better Auth uses HTTP-only cookies — sent automatically with
-      // same-origin fetch. No Authorization header needed.
-      const response = await fetch('/api/modules/tasks/priorities')
-      if (!response.ok) throw new Error('Failed to fetch tasks')
-      const data = await response.json()
-      setTasks(data)
-    } catch (error) {
-      console.error('Error fetching tasks:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   // Get top 5 incomplete tasks by priority score
   const priorityTasks = tasks
@@ -123,7 +123,7 @@ export default function RadarPage() {
     setViewMode(mode)
   }
 
-  const handleTaskUpdate = async (taskId: string, axes: any) => {
+  const handleTaskUpdate = async (taskId: string, axes: TaskAxes) => {
     try {
       const response = await fetch('/api/modules/tasks/priorities', {
         method: 'PUT',

@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { tasks, contacts } from '@/lib/db/schema'
 import { sql, desc } from 'drizzle-orm'
 import type { ActivityItem } from '@/modules/dashboard/types'
 
-export async function GET(_request: NextRequest) {
+export async function GET() {
   const { user, withRLS } = await getAuthenticatedUser()
   if (!user || !withRLS) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 })

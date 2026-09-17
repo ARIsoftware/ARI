@@ -57,7 +57,7 @@ export type Subtask = {
 export interface MajorProject {
   id: string
   project_name: string
-  [key: string]: any
+  [key: string]: unknown
 }
 
 // Aggregated analytics returned by GET /api/modules/tasks/stats (Analytics page).

@@ -52,11 +52,13 @@ function getPriorityColor(priority: TaskItem['priority']) {
 }
 
 function ViewAllButton() {
+  const router = useRouter()
+
   return (
     <Button
       variant="ghost"
       className="w-full mt-4 rounded-full bg-[#f7fafc] text-black hover:bg-[#eef2f7] hover:text-black"
-      onClick={() => (window.location.href = '/tasks')}
+      onClick={() => router.push('/tasks')}
     >
       <Eye className="w-4 h-4 mr-2" />
       View All
