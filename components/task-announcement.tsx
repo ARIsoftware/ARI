@@ -180,7 +180,6 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
                 size="icon"
                 className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 hover:text-topbar-foreground ${dragItemClass}`}
                 onClick={isDragMode ? undefined : () => setCommandPaletteOpen(true)}
-                data-tour="command-icon"
               >
                 <Command className="h-5 w-5" />
               </Button>
@@ -199,7 +198,6 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
                 size="icon"
                 className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 hover:text-topbar-foreground ${dragItemClass}`}
                 onClick={isDragMode ? undefined : () => router.push("/settings")}
-                data-tour="settings-icon"
               >
                 <Settings className="h-5 w-5" />
               </Button>
@@ -218,7 +216,6 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
                 size="icon"
                 className={`h-8 w-8 text-topbar-foreground hover:bg-white/10 hover:text-topbar-foreground ${dragItemClass}`}
                 onClick={isDragMode ? undefined : () => router.push("/modules")}
-                data-tour="modules-icon"
               >
                 <Package className="h-5 w-5" />
               </Button>
@@ -313,7 +310,9 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
         ) : (
           <div className="flex items-center gap-1">
             {sortedIcons.map((icon) => (
-              <div key={icon.id}>
+              // data-tour-icon lets the onboarding tour step through every
+              // icon (builtin and module) in whatever order the user arranged
+              <div key={icon.id} data-tour-icon={icon.id}>
                 {renderIconContent(icon)}
               </div>
             ))}
@@ -327,6 +326,7 @@ function TopBarIcons({ isDragMode = false }: { isDragMode?: boolean }) {
           className="h-8 w-8 rounded-full overflow-hidden p-0 hover:ring-2 hover:ring-white/20"
           onClick={isDragMode ? undefined : () => router.push("/settings")}
           aria-label="Settings"
+          data-tour-icon="icon-avatar"
         >
           {user?.image ? (
             <img

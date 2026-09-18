@@ -238,6 +238,9 @@ const Sidebar = React.forwardRef<
       data-side={side}
     >
       <div
+        // Onboarding tour anchor: this wrapper (not the inner sidebar) owns the
+        // border-r, so highlighting it keeps the border inside the cutout.
+        data-tour="sidebar"
         className={cn(
           "duration-200 sticky top-0 z-10 -mt-[45px] hidden h-svh w-[--sidebar-width] shrink-0 bg-sidebar transition-[margin,width] ease-linear md:flex",
           "group-data-[collapsible=offcanvas]:w-0 group-data-[collapsible=offcanvas]:overflow-hidden",

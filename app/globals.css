@@ -508,6 +508,32 @@
   border-bottom-color: hsl(var(--popover));
 }
 
+/* Top-bar tour targets (each icon's wrapper and the quick-icons row) get a primary
+ * fill while highlighted so the cutout reads against the dark bar. 8px
+ * matches the tour's stageRadius so the fill doesn't poke past the cutout. */
+[data-tour-icon].driver-active-element,
+[data-tour='quick-icons'].driver-active-element {
+  background-color: hsl(var(--primary));
+  border-radius: 8px;
+}
+
+[data-tour-icon].driver-active-element,
+[data-tour-icon].driver-active-element button,
+[data-tour='quick-icons'].driver-active-element button {
+  color: hsl(var(--primary-foreground));
+}
+
+/* Sidebar tour step: same primary fill. Retargets the sidebar tokens rather
+ * than setting background-color so bg-sidebar and every text-sidebar-foreground
+ * descendant follow; `color` covers text inheriting from the outer wrapper. */
+[data-tour='sidebar'].driver-active-element {
+  --sidebar-background: var(--primary);
+  --sidebar-foreground: var(--primary-foreground);
+  color: hsl(var(--primary-foreground));
+  /* the wrapper's border-r would otherwise show as a line beside the fill */
+  border-color: hsl(var(--primary));
+}
+
 /* Tour intro step (element-less): keep driver.js's horizontal centering but
  * pin the popover near the viewport top instead of vertically centered.
  * !important because driver.js positions via inline styles. */

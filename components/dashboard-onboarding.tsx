@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useUserPreferences, useUpdateUserPreferences } from '@/hooks/use-user-preferences'
+import { useModules } from '@/lib/modules/module-hooks'
 import 'driver.js/dist/driver.css'
 
 // Pre-DB installs stored the dismissal in localStorage; honored once and
@@ -38,12 +39,18 @@ const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], weight: '500', preload:
  * The tour (driver.js) anchors to core shell elements via data-tour
  * attributes; steps whose target isn't in the DOM (e.g. mobile, where the
  * sidebar lives in a closed sheet) are skipped automatically.
+ *
+ * Top-bar icons get one step each, read from the DOM (data-tour-icon) at tour
+ * start so the steps follow the user's own icon order. Builtin icons use the
+ * copy in startTour; module icons are described by their own manifest (name +
+ * description), so a newly installed module joins the tour with no change here.
  */
 export function DashboardOnboarding() {
   const pathname = usePathname()
   const onDashboard = pathname === '/dashboard'
   const { data: prefs } = useUserPreferences({ enabled: onDashboard })
   const { mutate: savePrefs } = useUpdateUserPreferences()
+  const { modules } = useModules()
 
   // Legacy flag, read once per app load (lazy initializer, so SSR's missing
   // localStorage safely falls back to false). It only ever changes via our
@@ -104,6 +111,55 @@ export function DashboardOnboarding() {
       typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform ?? '')
     const modKey = isMac ? '⌘' : 'Ctrl+'
 
+    const builtinIconCopy: Record<string, { title: string; description: string }> = {
+      'icon-command': {
+        title: 'Command palette',
+        description:
+          'Jump anywhere without touching the mouse. Press ' +
+          modKey +
+          'K from any page to search modules and actions.',
+      },
+      'icon-theme': {
+        title: 'Themes',
+        description:
+          'Switch the look of ARI in one click - light, dark, or any installed theme. You can even create your own.',
+      },
+      'icon-settings': {
+        title: 'Settings',
+        description:
+          'Configure ARI here - your profile, themes, AI providers, API access, account security, and more.',
+      },
+      'icon-modules': {
+        title: 'The Module Library',
+        description:
+          'Discover, install, and manage modules that extend ARI - or build your very own. This is where ARI grows with you.',
+      },
+      'icon-logout': {
+        title: 'Sign out',
+        description: 'End your session on this device. Your data stays safe until you sign back in.',
+      },
+      'icon-avatar': {
+        title: 'Your profile',
+        description: 'Your account at a glance - click it to update your profile and preferences.',
+      },
+    }
+
+    // One step per rendered top-bar icon, in on-screen order. Module icons
+    // whose component renders nothing leave a zero-width wrapper - skipped.
+    const iconSteps = Array.from(document.querySelectorAll<HTMLElement>('[data-tour-icon]'))
+      .filter((el) => el.offsetWidth > 0)
+      .flatMap((el) => {
+        const id = el.dataset.tourIcon ?? ''
+        const mod = id.startsWith('module-')
+          ? modules.find((m) => `module-${m.id}` === id)
+          : undefined
+        const copy = mod
+          ? { title: mod.name, description: mod.description ?? '' }
+          : builtinIconCopy[id]
+        if (!copy) return []
+        return [{ element: `[data-tour-icon="${id}"]`, popover: copy }]
+      })
+
     const candidates = [
       {
         // Element-less: centered popover over the full overlay. The extra
@@ -116,7 +172,7 @@ export function DashboardOnboarding() {
         },
       },
       {
-        element: '[data-sidebar="sidebar"]',
+        element: '[data-tour="sidebar"]',
         popover: {
           // Vertically centered against the full-height sidebar so the popover
           // sits mid-viewport at any window size (driver.js still clamps it
@@ -138,32 +194,7 @@ export function DashboardOnboarding() {
             'One-click access to your most-used tools - plus themes, settings, and sign out. Modules can add their own icons here too.',
         },
       },
-      {
-        element: '[data-tour="command-icon"]',
-        popover: {
-          title: 'Command palette',
-          description:
-            'Jump anywhere without touching the mouse. Press ' +
-            modKey +
-            'K from any page to search modules and actions.',
-        },
-      },
-      {
-        element: '[data-tour="modules-icon"]',
-        popover: {
-          title: 'The Module Library',
-          description:
-            'Discover, install, and manage modules that extend ARI - or build your very own. This is where ARI grows with you.',
-        },
-      },
-      {
-        element: '[data-tour="settings-icon"]',
-        popover: {
-          title: 'Settings',
-          description:
-            'Configure ARI here - your profile, themes, AI providers, API access, account security, and more.',
-        },
-      },
+      ...iconSteps,
       {
         popover: {
           title: 'Open, Personal, and Full of Possibility',
@@ -175,9 +206,12 @@ export function DashboardOnboarding() {
       },
     ]
 
-    // Keep element-anchored steps only when the target is actually rendered;
-    // element-less steps show as a centered popover.
-    const steps = candidates.filter((s) => !s.element || document.querySelector(s.element))
+    // Keep element-anchored steps only when the target is actually rendered
+    // and visible (the desktop sidebar wrapper stays in the DOM on mobile, just
+    // display: none); element-less steps show as a centered popover.
+    const steps = candidates.filter(
+      (s) => !s.element || !!document.querySelector<HTMLElement>(s.element)?.offsetWidth,
+    )
 
     const driverObj = driver({
       showProgress: true,
