@@ -3,12 +3,11 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers'
 import { withAdminDb } from '@/lib/db'
 import { moduleSettings } from '@/lib/db/schema'
 import { LICENSE_MODULE_ID } from '@/lib/license-helpers'
+import { validatePolarLicenseKey } from '@/lib/polar'
 import { validateLicenseSchema as ValidateSchema, ValidateLicenseResponseSchema } from '@/lib/openapi/app-schemas'
 import { registry } from '@/lib/openapi/registry'
 import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
 import { withApiLogging } from '@/lib/api-logging'
-
-const POLAR_ORGANIZATION_ID = "b1e4ddc2-774b-4bfb-aedd-5ffb0f67e8e3"
 
 registry.registerPath({
   method: 'post',
@@ -50,14 +49,7 @@ async function handlePOST(request: NextRequest) {
     // Validate against Polar API
     let polarResponse: Response
     try {
-      polarResponse = await fetch('https://api.polar.sh/v1/customer-portal/license-keys/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          key,
-          organization_id: POLAR_ORGANIZATION_ID,
-        }),
-      })
+      polarResponse = await validatePolarLicenseKey(key)
     } catch (fetchError) {
       console.error('[API /license/validate] Polar fetch failed:', fetchError)
       return NextResponse.json(
@@ -90,6 +82,15 @@ async function handlePOST(request: NextRequest) {
     }
 
     const polarData = await polarResponse.json()
+
+    // An unrecognisable payload is an upstream/API-shape problem, never a bad key.
+    if (typeof polarData?.status !== 'string') {
+      console.error('[API /license/validate] Unexpected Polar response shape:', polarData)
+      return NextResponse.json(
+        { error: { code: 'UPSTREAM_UNAVAILABLE', message: 'License validation service unavailable' } },
+        { status: 503 }
+      )
+    }
 
     // Check if key is valid
     if (polarData.status !== 'granted' && polarData.status !== 'active') {
