@@ -154,7 +154,7 @@ half-loaded. Re-run it with `pnpm generate-module-registry` (or
 | A module that declares `routes` has an `app/page.tsx` | Module skipped, warning logged. A module with no routes *and* no pages is valid (e.g. a top-bar-only module) |
 | `npmDependencies` are present in the root `package.json` at a compatible range | Warning only — the build still succeeds. (The hard limits — 25-package cap, package-name pattern, forbidden `git:`/`file:`/`link:`/`workspace:`/`npm:`/`..` specs — are enforced separately by `lib/modules/npm-installer.ts` at install time, not here.) |
 | `database/schema.sql` hashed into the manifest as `schemaSha256` | Omitted when the file is absent — the self-heal gate ([section 6](#6-database-integration)) then has nothing to compare and never re-runs |
-| A route exporting `isPublic = true` must not also import `getAuthenticatedUser` | Warning — flagged as a likely contradiction |
+| A route exporting `isPublic = true` must not also import `getAuthenticatedUser` | Warning — flagged as a likely contradiction. Suppressed when the route also exports a `publicSecurity` contract (e.g. `'rate_limit_only'`), which marks the route as intentionally public with the auth helper used only to gate optional detail |
 | `database/relations.ts` may only reference tables that exist | File skipped with a warning; the build still succeeds but those relations are unavailable at runtime |
 | Submenu / dashboard widget / stat-card component paths resolve | Warning |
 | Top-bar icon / provider component paths resolve | **Throws — the build fails** |
@@ -339,7 +339,7 @@ changes would be overwritten on the next dev/build run.
 | `routes` | `array` | Navigation items for sidebar |
 | `dependencies` | `object` | `{ modules?: string[], coreFeatures?: string[] }` — declares what this module reads from. **Informational only — not enforced**: nothing prevents disabling a dependency, so your module must degrade gracefully (gate fetches with `useModuleEnabled('<id>')` and show a notice; a disabled dependency's API returns 403). |
 | `database` | `object` | `{ tables: string[] }` — table names the module's `schema.sql` creates. Used for diagnostics; a `tables` list without a `schema.sql` logs a warning. |
-| `dashboard` | `object` | Dashboard configuration: `widgets` (boolean), `statCards` (small Quick Overview cards), `widgetComponents` (larger content-area widgets) — component paths relative to module root |
+| `dashboard` | `object` | Dashboard configuration: `widgets` (boolean), `statCards` (small Quick Overview cards), `widgetComponents` (larger content-area widgets) — component paths relative to module root. Every card gets a stable key (`<id>-stat-<i>` / `<id>-widget-<i>`) and is listed at `/dashboard/settings` under the module's `name` ("Tasks", "Tasks 2", ...), where each user can show or hide it (one selection shared by every layout). |
 | `settings` | `object` | **Inert — no code reads it.** There is no framework settings registry; render your settings panel from your own `app/settings/page.tsx` (see module-template). |
 | `submenu` | `object` | `{ component: "./components/..." }` — custom sliding submenu shown when the module's sidebar item is clicked |
 | `topBarIcon` | `object` | Top bar icon shortcut: `icon`/`route`/`tooltip`/`order`, or `component` for a fully custom top-bar component |
@@ -2547,6 +2547,7 @@ SELECT * FROM pg_policies WHERE tablename = 'my_module_data';
 - [ ] Widget component exports both named and default
 - [ ] Dashboard code includes module widgets
 - [ ] Module is enabled for user
+- [ ] Card is switched on at `/dashboard/settings` → Cards (only module-template's demo cards are hidden by default — see `modules-core/dashboard/lib/cards.ts`)
 
 ### Module Shows as Disabled
 

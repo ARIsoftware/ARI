@@ -375,8 +375,12 @@ function detectRouteMetadata(filePath) {
     // requireAdminIfUsersExist — either one gates the route once a user exists.
     if (/\brequire(?:Auth|Admin)IfUsersExist\b/.test(content)) meta.requiresAuthIfUsers = true;
     // Reliability check: warn if a route is marked public but also pulls in
-    // the auth helper — likely an accidental contradiction.
-    if (meta.isPublic && /getAuthenticatedUser/.test(content)) {
+    // the auth helper — likely an accidental contradiction. A route that also
+    // declares an explicit `publicSecurity` contract has opted in on purpose:
+    // it stays open to anonymous callers and uses the auth helper only as an
+    // optional gate for extra detail (e.g. /api/setup/status shows missing
+    // env-var names to admins once users exist). Skip the warning for those.
+    if (meta.isPublic && !meta.publicSecurity && /getAuthenticatedUser/.test(content)) {
       console.warn(`⚠️  ${filePath}: marked isPublic=true but imports getAuthenticatedUser — likely contradiction`);
     }
     return meta;
