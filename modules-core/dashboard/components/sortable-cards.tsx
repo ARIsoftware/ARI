@@ -18,7 +18,8 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { useDragDropMode } from '@/components/drag-drop-mode-context'
 
-export const SYSTEM_STATUS_KEY = '__system-status__'
+// Re-exported for the layouts; the key itself lives with the card catalogue.
+export { SYSTEM_STATUS_KEY } from '@/modules/dashboard/lib/cards'
 
 // Blue outline + glow shown on every draggable card while drag mode is active.
 // Radius is passed per call site so the outline hugs the card's own corners.

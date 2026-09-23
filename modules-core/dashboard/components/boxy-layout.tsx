@@ -1,7 +1,7 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
-import { Plus, BarChart3, Activity } from 'lucide-react'
+import { Plus, BarChart3 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useDashboardData } from '@/modules/dashboard/hooks/use-dashboard'
 import { useDragDropMode } from '@/components/drag-drop-mode-context'
@@ -44,11 +44,7 @@ export function BoxyDashboardLayout() {
                   <Plus className="w-4 h-4 mr-2" />
                   New Task
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.push('/tasks/radar')}
-                >
+                <Button variant="outline" size="sm" onClick={() => router.push('/tasks/radar')}>
                   <BarChart3 className="w-4 h-4 mr-2" />
                   Priority Radar
                 </Button>
@@ -56,15 +52,8 @@ export function BoxyDashboardLayout() {
             )}
           </div>
 
-          {/* Quick Stats Section */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Activity className="w-5 h-5 text-emerald-600" />
-              <h2 className="text-xl font-medium">Quick Overview</h2>
-            </div>
-
-            <DashboardStatCards />
-          </div>
+          {/* Quick Stats Section — renders nothing when every stat card is hidden */}
+          <DashboardStatCards />
 
           {/* Blue separator between zones during drag mode */}
           {isDragMode && <div className="border-t-2 border-dashed border-blue-400/50 my-2" />}

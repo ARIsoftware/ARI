@@ -10,6 +10,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core'
 import { SortableContext, rectSortingStrategy, arrayMove } from '@dnd-kit/sortable'
+import { Activity } from 'lucide-react'
 import { useModules } from '@/lib/modules/module-hooks'
 import { useDragDropMode } from '@/components/drag-drop-mode-context'
 import {
@@ -17,18 +18,26 @@ import {
   MODULE_DASHBOARD_WIDGETS,
 } from '@/lib/generated/module-dashboard-registry'
 import { SystemStatusCard } from '@/modules/dashboard/components/system-status-card'
+import { useHiddenDashboardCards } from '@/modules/dashboard/hooks/use-dashboard-settings'
+import { boxyLayoutSections, listDashboardCards } from '@/modules/dashboard/lib/cards'
 import { SortableItem, SYSTEM_STATUS_KEY } from './sortable-cards'
 
 // Dynamic ESM imports have an unknown module shape; resolveComponent probes for `default` or any exported function.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type DynamicModule = any
 
-function useEnabledDashboardModuleIds(): Set<string> {
+/** Visible cards split into Boxy's two sections (lib/cards.ts owns the rules). */
+function useBoxySections() {
   const { modules } = useModules()
-  return useMemo(
-    () => new Set(modules.filter((m) => m.dashboard?.widgets).map((m) => m.id)),
-    [modules],
-  )
+  // Cards the user switched off at /dashboard/settings — never mounted.
+  const hidden = useHiddenDashboardCards()
+  return useMemo(() => {
+    const cards = listDashboardCards(modules, {
+      statCards: MODULE_DASHBOARD_STAT_CARDS,
+      widgets: MODULE_DASHBOARD_WIDGETS,
+    })
+    return boxyLayoutSections(cards, hidden)
+  }, [modules, hidden])
 }
 
 /**
@@ -85,7 +94,7 @@ function DynamicWidget({ loader }: { loader: () => Promise<DynamicModule> }) {
 // --- Stat cards with sorting + dynamic grid ---
 
 export function DashboardStatCards() {
-  const enabledIds = useEnabledDashboardModuleIds()
+  const { stats } = useBoxySections()
   const { isDragMode, statCardOrder, pendingStatCardOrder, setPendingStatCardOrder } =
     useDragDropMode()
 
@@ -93,16 +102,19 @@ export function DashboardStatCards() {
 
   const loaders = useMemo(() => {
     const result: { key: string; loader: (() => Promise<DynamicModule>) | null }[] = []
-    for (const [moduleId, moduleLoaders] of Object.entries(MODULE_DASHBOARD_STAT_CARDS)) {
-      if (!enabledIds.has(moduleId)) continue
-      moduleLoaders.forEach((loader, i) => {
-        result.push({ key: `${moduleId}-stat-${i}`, loader })
-      })
+    for (const card of stats) {
+      // System Status card (no loader, rendered inline)
+      if (card.kind === 'system') {
+        result.push({ key: card.key, loader: null })
+        continue
+      }
+      // Index access isn't checked by TS — a stale saved key can miss.
+      const loader = MODULE_DASHBOARD_STAT_CARDS[card.moduleId!]?.[card.index] as
+        (() => Promise<DynamicModule>) | undefined
+      if (loader) result.push({ key: card.key, loader })
     }
-    // System Status card (no loader, rendered inline)
-    result.push({ key: SYSTEM_STATUS_KEY, loader: null })
     return result
-  }, [enabledIds])
+  }, [stats])
 
   // Sort items by saved order
   const sortedLoaders = useMemo(() => {
@@ -145,6 +157,10 @@ export function DashboardStatCards() {
 
   const gridClassName = `grid grid-cols-1 md:grid-cols-2 ${lgColsClass} gap-4`
 
+  // Every stat card hidden — drop the whole Quick Overview section rather
+  // than leave its heading over an empty grid.
+  if (sortedLoaders.length === 0) return null
+
   const content = sortedLoaders.map(({ key, loader }) => {
     const card =
       key === SYSTEM_STATUS_KEY ? (
@@ -167,37 +183,44 @@ export function DashboardStatCards() {
     )
   })
 
-  if (isDragMode) {
-    return (
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={itemIds} strategy={rectSortingStrategy}>
-          <div className={gridClassName}>{content}</div>
-        </SortableContext>
-      </DndContext>
-    )
-  }
+  const grid = isDragMode ? (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={itemIds} strategy={rectSortingStrategy}>
+        <div className={gridClassName}>{content}</div>
+      </SortableContext>
+    </DndContext>
+  ) : (
+    <div className={gridClassName}>{content}</div>
+  )
 
-  return <div className={gridClassName}>{content}</div>
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Activity className="w-5 h-5 text-emerald-600" />
+        <h2 className="text-xl font-medium">Quick Overview</h2>
+      </div>
+      {grid}
+    </div>
+  )
 }
 
 // --- Widget area with sorting ---
 
 export function DashboardWidgetArea() {
-  const enabledIds = useEnabledDashboardModuleIds()
+  const { widgets } = useBoxySections()
   const { isDragMode, widgetOrder, pendingWidgetOrder, setPendingWidgetOrder } = useDragDropMode()
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   const loaders = useMemo(() => {
     const result: { key: string; loader: () => Promise<DynamicModule> }[] = []
-    for (const [moduleId, moduleLoaders] of Object.entries(MODULE_DASHBOARD_WIDGETS)) {
-      if (!enabledIds.has(moduleId)) continue
-      moduleLoaders.forEach((loader, i) => {
-        result.push({ key: `${moduleId}-widget-${i}`, loader })
-      })
+    for (const card of widgets) {
+      const loader = MODULE_DASHBOARD_WIDGETS[card.moduleId!]?.[card.index] as
+        (() => Promise<DynamicModule>) | undefined
+      if (loader) result.push({ key: card.key, loader })
     }
     return result
-  }, [enabledIds])
+  }, [widgets])
 
   // Sort items by saved order
   const sortedLoaders = useMemo(() => {

@@ -1,5 +1,8 @@
+import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { DashboardSettings } from '@/modules/dashboard/types'
+import type { DashboardLayout } from '@/modules/dashboard/lib/validation'
+import { hiddenCardsFor } from '@/modules/dashboard/lib/cards'
 
 const SETTINGS_KEY = ['dashboard-settings']
 
@@ -13,6 +16,22 @@ export function useDashboardSettings() {
     },
     staleTime: 5 * 60 * 1000,
   })
+}
+
+/** The user's chosen layout ('default' until settings load or when unset). */
+export function useDashboardLayout(): DashboardLayout {
+  const { data: settings } = useDashboardSettings()
+  return settings?.layout ?? 'default'
+}
+
+/**
+ * Card keys hidden on the dashboard — the saved list, or the defaults when
+ * the user has never changed it. Both layouts filter their card lists through
+ * this so hidden cards never mount.
+ */
+export function useHiddenDashboardCards(): Set<string> {
+  const { data: settings } = useDashboardSettings()
+  return useMemo(() => hiddenCardsFor(settings), [settings])
 }
 
 export function useUpdateDashboardSettings() {

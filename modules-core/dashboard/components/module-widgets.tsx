@@ -7,18 +7,14 @@ import {
   MODULE_DASHBOARD_WIDGETS,
 } from '@/lib/generated/module-dashboard-registry'
 import { SystemStatusCard } from '@/modules/dashboard/components/system-status-card'
-import { SYSTEM_STATUS_KEY, type DashboardCard } from './sortable-cards'
-
-// Modules whose data is already hand-built into the Default layout — their
-// generic dashboard cards would duplicate what the page shows.
-// module-template is a developer demo and never belongs on a real dashboard.
-const EXCLUDED_MODULES = new Set([
-  'tasks',
-  'todays-brief',
-  'agents',
-  'brainstorm',
-  'module-template',
-])
+import { useHiddenDashboardCards } from '@/modules/dashboard/hooks/use-dashboard-settings'
+import {
+  cardKey,
+  defaultLayoutColumns,
+  listDashboardCards,
+  type DashboardCardInfo,
+} from '@/modules/dashboard/lib/cards'
+import type { DashboardCard } from './sortable-cards'
 
 // Dynamic ESM imports have an unknown module shape; resolveComponent probes
 // for `default` or any exported function (same pattern as the Boxy layout's
@@ -61,88 +57,48 @@ function DynamicWidget({ loader }: { loader: () => Promise<DynamicModule> }) {
   )
 }
 
-function collectLoaders(
-  registry: Record<string, (() => Promise<DynamicModule>)[]>,
-  enabledIds: Set<string>,
-  kind: string,
-) {
-  const result: { key: string; loader: () => Promise<DynamicModule> }[] = []
-  for (const [moduleId, loaders] of Object.entries(registry)) {
-    if (!enabledIds.has(moduleId) || EXCLUDED_MODULES.has(moduleId)) continue
-    loaders.forEach((loader, i) => result.push({ key: `${moduleId}-${kind}-${i}`, loader }))
-  }
-  return result
-}
-
 /**
  * Builds the Default layout's card lists as keyed items so the columns can be
  * reordered in drag mode. Keys match the Boxy layout's (`tasks-stat-0`,
  * `__system-status__`, `<module>-widget-<i>`, ...), so a card that appears in
- * both layouts shares one saved order.
+ * both layouts shares one saved order and one visibility setting. Placement
+ * rules live in `defaultLayoutColumns` (lib/cards.ts) so the settings page
+ * can sketch the same arrangement.
  */
 export function useDefaultLayoutCards(): {
   leftCards: DashboardCard[]
   middleCards: DashboardCard[]
 } {
   const { modules } = useModules()
-
-  const enabledIds = useMemo(
-    () => new Set(modules.filter((m) => m.dashboard?.widgets).map((m) => m.id)),
-    [modules],
-  )
+  const hidden = useHiddenDashboardCards()
 
   return useMemo(() => {
-    const leftCards: DashboardCard[] = []
-
-    // The Tasks module's Total Tasks stat card (registry index 0)
-    const tasksStatLoader = MODULE_DASHBOARD_STAT_CARDS['tasks']?.[0]
-    if (enabledIds.has('tasks') && tasksStatLoader) {
-      leftCards.push({ key: 'tasks-stat-0', node: <DynamicWidget loader={tasksStatLoader} /> })
-    }
-
-    // System health at a glance — badge links to /health
-    leftCards.push({
-      key: SYSTEM_STATUS_KEY,
-      node: <SystemStatusCard className="rounded-lg" />,
+    const cards = listDashboardCards(modules, {
+      statCards: MODULE_DASHBOARD_STAT_CARDS,
+      widgets: MODULE_DASHBOARD_WIDGETS,
     })
+    const { left, middle } = defaultLayoutColumns(cards, hidden)
 
-    // Dashboard cards from every other enabled module (portfolio, ...),
-    // straight from the generated registry — new modules appear here with no
-    // changes to this page.
-    for (const { key, loader } of collectLoaders(MODULE_DASHBOARD_STAT_CARDS, enabledIds, 'stat')) {
-      leftCards.push({ key, node: <DynamicWidget loader={loader} /> })
-    }
-    for (const { key, loader } of collectLoaders(MODULE_DASHBOARD_WIDGETS, enabledIds, 'widget')) {
-      leftCards.push({ key, node: <DynamicWidget loader={loader} /> })
-    }
-
-    const middleCards: DashboardCard[] = []
-
-    // The Today's Brief module's own dashboard widget — its Listen button is
-    // hidden because the Default layout has one in its header.
-    const briefLoader = MODULE_DASHBOARD_WIDGETS['todays-brief']?.[0]
-    if (enabledIds.has('todays-brief') && briefLoader) {
-      middleCards.push({
-        key: 'todays-brief-widget-0',
-        node: (
-          <div className="[&_[data-brief-listen]]:hidden">
-            <DynamicWidget loader={briefLoader} />
-          </div>
-        ),
-      })
+    const toCard = (card: DashboardCardInfo): DashboardCard | null => {
+      if (card.kind === 'system') {
+        return { key: card.key, node: <SystemStatusCard className="rounded-lg" /> }
+      }
+      const registry = card.kind === 'stat' ? MODULE_DASHBOARD_STAT_CARDS : MODULE_DASHBOARD_WIDGETS
+      const loader = registry[card.moduleId!]?.[card.index]
+      if (!loader) return null
+      let node: React.ReactNode = <DynamicWidget loader={loader} />
+      // Today's Brief's own Listen button is hidden — the Default layout has
+      // one in its header.
+      if (card.key === cardKey('todays-brief', 'widget', 0)) {
+        node = <div className="[&_[data-brief-listen]]:hidden">{node}</div>
+      }
+      return { key: card.key, node }
     }
 
-    // The Tasks module's Task Activity chart widget. The registry lists tasks
-    // widgets as [dashboard-activity-widget, dashboard-radar-widget] — index 0
-    // is Activity.
-    const taskActivityLoader = MODULE_DASHBOARD_WIDGETS['tasks']?.[0]
-    if (enabledIds.has('tasks') && taskActivityLoader) {
-      middleCards.push({
-        key: 'tasks-widget-0',
-        node: <DynamicWidget loader={taskActivityLoader} />,
-      })
+    const notNull = (c: DashboardCard | null): c is DashboardCard => c !== null
+    return {
+      leftCards: left.map(toCard).filter(notNull),
+      middleCards: middle.map(toCard).filter(notNull),
     }
-
-    return { leftCards, middleCards }
-  }, [enabledIds])
+  }, [modules, hidden])
 }

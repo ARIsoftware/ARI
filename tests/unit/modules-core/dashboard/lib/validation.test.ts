@@ -34,6 +34,18 @@ describe('DashboardSettingsSchema', () => {
     expect(DashboardSettingsSchema.safeParse({ layout: 'boxy', extra: true }).success).toBe(false)
   })
 
+  it('accepts a hiddenCards list, including an empty one', () => {
+    expect(DashboardSettingsSchema.safeParse({ hiddenCards: ['tasks-stat-0'] }).success).toBe(true)
+    expect(DashboardSettingsSchema.safeParse({ hiddenCards: [] }).success).toBe(true)
+  })
+
+  it('rejects hiddenCards that are not a list of non-empty strings', () => {
+    expect(DashboardSettingsSchema.safeParse({ hiddenCards: [''] }).success).toBe(false)
+    expect(DashboardSettingsSchema.safeParse({ hiddenCards: [1] }).success).toBe(false)
+    expect(DashboardSettingsSchema.safeParse({ hiddenCards: { default: [] } }).success).toBe(false)
+    expect(DashboardSettingsSchema.safeParse({ hiddenCards: 'a' }).success).toBe(false)
+  })
+
   it('rejects system-managed __-prefixed keys', () => {
     expect(DashboardSettingsSchema.safeParse({ __schema_installed_hash: 'abc' }).success).toBe(
       false,

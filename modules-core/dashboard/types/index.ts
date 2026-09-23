@@ -11,6 +11,8 @@ export interface ActivityItem {
 /** Per-user dashboard settings stored in module_settings. */
 export interface DashboardSettings {
   layout?: DashboardLayout
+  /** Hidden card keys, shared by every layout; unset falls back to DEFAULT_HIDDEN_CARDS. */
+  hiddenCards?: string[]
 }
 
 // Minimal local shapes of the other modules' API responses — the dashboard
