@@ -114,7 +114,7 @@ export function QuotesWidget() {
     <Card className="hover:shadow-md transition-shadow">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">Quotes</CardTitle>
-        <Quote className="h-4 w-4 text-[#aa2020]" />
+        <Quote className="h-4 w-4 text-primary" />
       </CardHeader>
       <CardContent>
         {/* Main metric */}
@@ -127,7 +127,7 @@ export function QuotesWidget() {
         {stats.randomQuote ? (
           <div className="mt-3 pt-3 border-t">
             <p className="text-xs text-muted-foreground mb-1">Daily inspiration:</p>
-            <p className="text-sm font-medium line-clamp-3 italic">
+            <p className="text-sm font-medium line-clamp-3">
               &quot;{stats.randomQuote.quote}&quot;
             </p>
             {stats.randomQuote.author && (

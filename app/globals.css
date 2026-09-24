@@ -183,6 +183,42 @@
   }
 }
 
+/* Themed page scrollbar — only the document (viewport) scrollbar follows the
+   theme's --primary token; inner scroll containers (sidebar, panels) keep the
+   browser default. Chrome 121+ ignores ::-webkit-scrollbar once scrollbar-color
+   is set, so the standard property is scoped to browsers without the WebKit
+   pseudo-elements (Firefox). scrollbar-color inherits, so body resets it. */
+@supports not selector(::-webkit-scrollbar) {
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary) / 0.5) transparent;
+  }
+  body {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+}
+html::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+html::-webkit-scrollbar-track {
+  background: transparent;
+}
+html::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--primary) / 0.5);
+  border-radius: 9999px;
+  /* Transparent border + background-clip keeps a gutter around the thumb */
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+html::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--primary));
+}
+html::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* Keep topbar at original size by using pixel values instead of rem */
 .topbar {
   font-size: 16px;

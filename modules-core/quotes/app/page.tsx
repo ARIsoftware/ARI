@@ -189,7 +189,7 @@ export default function QuotesPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground"></div>
       </div>
     );
   }
@@ -200,7 +200,7 @@ export default function QuotesPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-medium">Quotes</h1>
-          <p className="text-sm text-[#aa2020] mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Your collection of inspirational quotes
           </p>
         </div>
@@ -219,9 +219,9 @@ export default function QuotesPage() {
       )}
 
       {quotes.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-lg border">
-          <QuoteIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-500 dark:text-gray-400 mb-4">
+        <div className="text-center py-12 bg-card text-card-foreground rounded-lg border">
+          <QuoteIcon className="h-12 w-12 text-muted-foreground/60 mx-auto mb-4" />
+          <p className="text-muted-foreground mb-4">
             No quotes yet
           </p>
           <Button onClick={openAddModal}>
@@ -234,28 +234,28 @@ export default function QuotesPage() {
           {quotes.map((quote) => (
             <div
               key={quote.id}
-              className="bg-white rounded-lg border p-6 relative group hover:shadow-md transition-shadow"
+              className="bg-card text-card-foreground rounded-lg border p-6 relative group hover:shadow-md transition-shadow"
             >
               <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
                 <button
                   onClick={() => openEditModal(quote)}
-                  className="bg-blue-500 text-white p-2 rounded-full hover:bg-blue-600 transition-colors"
+                  className="bg-primary text-primary-foreground p-2 rounded-full hover:bg-primary/90 transition-colors"
                 >
                   <Edit className="h-3 w-3" />
                 </button>
                 <button
                   onClick={() => handleDeleteQuote(quote.id)}
-                  className="bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition-colors"
+                  className="bg-destructive text-destructive-foreground p-2 rounded-full hover:bg-destructive/90 transition-colors"
                 >
                   <Trash2 className="h-3 w-3" />
                 </button>
               </div>
-              <QuoteIcon className="h-8 w-8 text-gray-300 mb-3" />
-              <p className="text-gray-800 text-lg mb-3 italic">
+              <QuoteIcon className="h-8 w-8 text-muted-foreground/40 mb-3" />
+              <p className="text-lg mb-3">
                 {quote.quote}
               </p>
               {quote.author && (
-                <p className="text-gray-500 text-sm">
+                <p className="text-muted-foreground text-sm">
                   — {quote.author}
                 </p>
               )}
