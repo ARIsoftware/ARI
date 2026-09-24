@@ -108,6 +108,14 @@ export const ENV_REGISTRY: readonly EnvVarSpec[] = [
       'Set to 1 when ARI runs behind a reverse proxy you control — rate limiting then trusts X-Forwarded-For for the client IP (otherwise forgeable proxy headers are ignored)',
   },
   {
+    key: 'ARI_TUNNEL_ORIGIN',
+    required: false,
+    sensitive: false,
+    group: 'app',
+    description:
+      'Set automatically on the dev-server process by `./ari start --tunnel` (never in .env.local): the https origin of the Cloudflare Quick Tunnel to trust for that session. Development only',
+  },
+  {
     key: 'GITHUB_TOKEN',
     required: false,
     sensitive: true,

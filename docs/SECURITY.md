@@ -219,6 +219,16 @@ The non-local default tolerates self-signed certificates seen on managed Postgre
 
 HTTPS at the edge (Vercel or your reverse proxy) is unaffected and should be enforced separately.
 
+## Quick Tunnels (`./ari start --tunnel`)
+
+`./ari start --tunnel` exposes a local dev instance on a temporary `https://<random>.trycloudflare.com` URL via a Cloudflare Quick Tunnel. What that changes, and what it deliberately does not:
+
+- **What is exposed**: the sign-in page and every authenticated route, to anyone holding the URL. The account password (18-char minimum, Argon2id, rate-limited, optional TOTP) is the perimeter. The URL is random, unlisted, and dies with the process.
+- **Setup mode is never exposed.** The CLI refuses to open a tunnel unless `.env.local` is configured, no one-shot `ARI_FIRST_RUN_*` credentials remain, **and** the `user` table has at least one row (checked live). With zero users the public bootstrap and `/api/download-env` routes would let anyone with the URL become the admin.
+- **Origin trust is explicit, not inferred.** The CLI passes the tunnel origin to the dev server as `ARI_TUNNEL_ORIGIN` (process env only; never written to `.env.local`). `lib/auth.ts` adds it to Better Auth's trusted origins and `next.config.mjs` to `allowedDevOrigins`, in development only. A request's own `Host`/`Origin` is still never trusted for a DNS name — see `lib/auth-origins.ts`.
+- **`BETTER_AUTH_URL` is not changed**, so session cookies keep their non-`__Secure-` names and plain localhost keeps working alongside the tunnel. Features that build absolute callback URLs from it (Google OAuth in Today's Brief, the OpenAPI server URL) therefore only work from the owner's machine.
+- **Rate limiting through the tunnel is shared.** All tunnel visitors arrive from Cloudflare's edge, and `getClientIp()` ignores `X-Forwarded-For` unless `ARI_TRUST_PROXY=1`, so they share one bucket. The CLI does not set `ARI_TRUST_PROXY`: trusting forwarded IPs would let any visitor spoof their address.
+
 ## API Security Checklist for Contributors
 
 When writing new API routes or module APIs:

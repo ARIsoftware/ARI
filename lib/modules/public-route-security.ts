@@ -10,6 +10,7 @@
 
 import { NextRequest } from 'next/server'
 import { isVercel } from '@/lib/deployment'
+import { tunnelTrustedOrigins } from '@/lib/auth-origins'
 
 /**
  * In-memory rate limiter using sliding window
@@ -112,6 +113,12 @@ export function isSameOriginRequest(request: NextRequest): boolean {
   for (const envVar of ['VERCEL_URL', 'VERCEL_BRANCH_URL', 'VERCEL_PROJECT_PRODUCTION_URL']) {
     const host = process.env[envVar]
     if (host) trusted.add(`https://${host}`)
+  }
+  // `./ari start --tunnel`: the Quick Tunnel origin the CLI opened this session
+  // (set on this process by the CLI, never inferred from the request).
+  // Development only, matching lib/auth.ts and next.config.mjs.
+  if (process.env.NODE_ENV !== 'production') {
+    for (const origin of tunnelTrustedOrigins()) trusted.add(origin)
   }
 
   const origin = request.headers.get('origin')

@@ -9,7 +9,7 @@ import { pool } from "@/lib/db/pool"
 // disk in this build (same pattern as middleware.ts).
 import { isMultiUserInstall } from "@/lib/multi-user"
 import { isBootstrapUserCreateAllowed } from "@/lib/auth-bootstrap-gate"
-import { privateNetworkTrustedOrigins } from "@/lib/auth-origins"
+import { privateNetworkTrustedOrigins, tunnelTrustedOrigins } from "@/lib/auth-origins"
 import { getAriInstance, tryClaimFirstSigninPing } from "@/lib/telemetry/instance"
 import { sendTvConnect } from "@/lib/telemetry/send-tv-connect"
 import { logActivity } from "@/lib/activity-log"
@@ -52,14 +52,17 @@ if (process.env.NODE_ENV !== 'production') {
  * In development, also trust the request's own origin when it's a literal
  * private/loopback address — that's what `./ari start --lan` serves on, and
  * the machine's LAN IP can't be known at boot. See lib/auth-origins.ts for
- * why only address literals (never DNS names) qualify. Production keeps the
- * static list only: origins there are configured, not inferred.
+ * why only address literals (never DNS names) qualify. `./ari start --tunnel`
+ * adds its Cloudflare Quick Tunnel origin the same way (ARI_TUNNEL_ORIGIN, set
+ * by the CLI on this process only). Production keeps the static list only:
+ * origins there are configured, not inferred.
  */
 const trustedOrigins =
   process.env.NODE_ENV !== 'production'
     ? (request?: Request) => [
         ...staticTrustedOrigins,
         ...privateNetworkTrustedOrigins(request),
+        ...tunnelTrustedOrigins(),
       ]
     : staticTrustedOrigins
 

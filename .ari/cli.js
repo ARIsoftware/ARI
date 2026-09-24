@@ -2,11 +2,12 @@
 
 /**
  * ARI CLI — Local development helper
- * Usage: ./ari start | stop | status | update
+ * Usage: ./ari start [--lan] [--tunnel] [--verbose] | stop | status | update | fix-deps | doctor
  */
 
 import { execSync, spawn, spawnSync } from 'child_process';
 import fs from 'fs';
+import net from 'net';
 import path from 'path';
 import readline from 'readline';
 import os from 'os';
@@ -27,6 +28,19 @@ const WIN_PGWEB_EXE = IS_WIN
   ? path.join(process.env.LOCALAPPDATA || os.homedir(), 'ARI', 'bin', 'pgweb.exe')
   : null;
 
+// `./ari start --tunnel` — Cloudflare Quick Tunnel via the cloudflared binary.
+const TUNNEL_DOCS_URL = 'https://ari.software/docs/tunnel';
+// cloudflared prints the public URL inside an ASCII box on stderr, one line
+// after "Your quick Tunnel has been created!". Match only that boxed line: the
+// binary also logs `https://api.trycloudflare.com` (its provisioning API) on
+// failure, which a looser regex would happily banner as the tunnel URL.
+const TUNNEL_CREATED_MARKER = 'Your quick Tunnel has been created';
+const TUNNEL_URL_LINE_RE = /\|\s*(https:\/\/([a-z0-9-]+)\.trycloudflare\.com)\s*\|\s*$/;
+// QUIC (UDP 7844) is tried first; on networks that block it cloudflared falls
+// back to HTTP/2 over TCP 443 only after retries, so 30s is too tight.
+const TUNNEL_START_TIMEOUT_MS = 60_000;
+const TUNNEL_LOG_TAIL_LINES = 40;
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const YELLOW = '\x1b[1;33m';
@@ -43,14 +57,30 @@ function run(cmd, opts = {}) {
   }
 }
 
+/**
+ * Value of KEY in an env file, or null when the file/key is absent or the
+ * value is empty. One grammar for every reader in this file: the first
+ * `KEY=` line wins, surrounding whitespace is trimmed, and a matching pair of
+ * outer quotes is stripped (escaped quotes inside a double-quoted value, as
+ * written by lib/env-file.ts formatEnvValue(), are left as-is — callers here
+ * only need presence or a URL/mode token, never the exact secret).
+ */
+function readEnvKey(file, key) {
+  if (!fs.existsSync(file)) return null;
+  const content = fs.readFileSync(file, 'utf8');
+  const match = content.match(new RegExp('^' + key + '=(.*)$', 'm'));
+  if (!match) return null;
+  let value = match[1].trim();
+  if (value.length >= 2 && (value[0] === '"' || value[0] === "'") && value[value.length - 1] === value[0]) {
+    value = value.slice(1, -1);
+  }
+  return value || null;
+}
+
 function getDbMode() {
   // Check .env.local for ARI_DB_MODE
-  const envPath = path.join(ROOT, '.env.local');
-  if (fs.existsSync(envPath)) {
-    const content = fs.readFileSync(envPath, 'utf8');
-    const match = content.match(/^ARI_DB_MODE=["']?([^"'\s]+)["']?$/m);
-    if (match) return match[1];
-  }
+  const mode = readEnvKey(path.join(ROOT, '.env.local'), 'ARI_DB_MODE');
+  if (mode) return mode;
   // Backward compat: if .env.supabase.local exists, assume supabaselocal
   if (fs.existsSync(ENV_FILE)) return 'supabaselocal';
   return 'postgres';
@@ -144,12 +174,22 @@ function getDatabaseUrl() {
   const candidates = [path.join(ROOT, '.env.local'), ENV_FILE];
   let result = null;
   for (const p of candidates) {
-    if (!fs.existsSync(p)) continue;
-    const content = fs.readFileSync(p, 'utf8');
-    const match = content.match(/^DATABASE_URL=["']?([^"'\s]+)["']?$/m);
-    if (match) result = match[1];
+    const value = readEnvKey(p, 'DATABASE_URL');
+    if (value) result = value;
   }
   return result;
+}
+
+/**
+ * SSL setting for a one-off pg.Client, mirroring lib/db/pool.ts
+ * sslConfigFor(): plain for local databases, TLS without CA verification for
+ * hosted ones (Supabase's pooler presents a private CA). Must match what the
+ * app itself uses, or a pre-flight can refuse a database the app connects to.
+ */
+function sslConfigFor(databaseUrl) {
+  return databaseUrl.includes('127.0.0.1') || databaseUrl.includes('localhost')
+    ? false
+    : { rejectUnauthorized: false };
 }
 
 function isPgwebRunning() {
@@ -172,6 +212,159 @@ function commandExists(cmd) {
 function pgwebExecutable() {
   if (WIN_PGWEB_EXE && fs.existsSync(WIN_PGWEB_EXE)) return WIN_PGWEB_EXE;
   return commandExists('pgweb') ? 'pgweb' : null;
+}
+
+/**
+ * Path to cloudflared, or null. On Windows, winget's MSI/portable installs
+ * only update PATH for NEW shells, so the terminal that just ran the installer
+ * can't see it — probe winget's known install locations as a fallback.
+ */
+function cloudflaredExecutable() {
+  if (commandExists('cloudflared')) return 'cloudflared';
+  if (IS_WIN) {
+    const candidates = [
+      path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'cloudflared', 'cloudflared.exe'),
+      path.join(process.env.ProgramFiles || 'C:\\Program Files', 'cloudflared', 'cloudflared.exe'),
+      path.join(process.env.LOCALAPPDATA || os.homedir(), 'Microsoft', 'WinGet', 'Links', 'cloudflared.exe'),
+    ];
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) return candidate;
+    }
+  }
+  return null;
+}
+
+/**
+ * One-line cloudflared install command for this OS. Kept identical to the
+ * table on https://ari.software/docs/tunnel (the installer itself uses
+ * Cloudflare's package repos, which are several lines — the docs page shows
+ * both). Null when there is no one-liner, in which case the docs URL alone is
+ * printed.
+ */
+function cloudflaredInstallHint() {
+  if (process.platform === 'darwin') return 'brew install cloudflared';
+  if (IS_WIN) return 'winget install -e --id Cloudflare.cloudflared';
+  if (commandExists('apt-get')) {
+    const arch = { x64: 'amd64', arm64: 'arm64', arm: 'armhf' }[process.arch];
+    if (!arch) return null;
+    return `curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}.deb && sudo dpkg -i cloudflared.deb`;
+  }
+  if (commandExists('dnf')) {
+    return 'sudo dnf config-manager --add-repo https://pkg.cloudflare.com/cloudflared.repo && sudo dnf install -y cloudflared';
+  }
+  if (commandExists('pacman')) return 'sudo pacman -S cloudflared';
+  return null;
+}
+
+/**
+ * True when `port` can be bound on `host`. Probes the SAME host the dev
+ * server will bind, so the answer can't disagree with its own bind.
+ */
+function isPortFree(port, host) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once('error', () => resolve(false));
+    server.listen({ port, host, exclusive: true }, () => server.close(() => resolve(true)));
+  });
+}
+
+/**
+ * Whether the ARI database has at least one user. Reuses the doctor's pg
+ * pattern. Returns { ok: true } or { ok: false, reason } — never throws.
+ *
+ * This is the real setup gate for --tunnel: with zero users, the public
+ * bootstrap/download-env routes let anyone with the URL become the admin.
+ */
+async function databaseHasUsers() {
+  const dbUrl = getDatabaseUrl();
+  if (!dbUrl) return { ok: false, reason: 'no DATABASE_URL configured' };
+  let client;
+  try {
+    const pg = cjsRequire(path.join(ROOT, 'node_modules', 'pg'));
+    client = new pg.Client({
+      connectionString: dbUrl,
+      ssl: sslConfigFor(dbUrl),
+      connectionTimeoutMillis: 3000,
+    });
+    await client.connect();
+    const table = await client.query(`SELECT to_regclass('public."user"') AS t`);
+    if (!table.rows[0]?.t) return { ok: false, reason: 'the user table does not exist yet' };
+    const count = await client.query('SELECT count(*)::int AS n FROM "user"');
+    const n = count.rows[0]?.n ?? 0;
+    return n > 0 ? { ok: true } : { ok: false, reason: 'no user account exists yet' };
+  } catch (e) {
+    return { ok: false, reason: 'could not query the database (' + (e?.message || e) + ')' };
+  } finally {
+    try { await client?.end(); } catch {}
+  }
+}
+
+/** Feed complete lines from a stream to `onLine`, retaining partial chunks. */
+function readLines(stream, onLine) {
+  let rest = '';
+  stream.setEncoding('utf8');
+  stream.on('data', (chunk) => {
+    rest += chunk;
+    let idx;
+    while ((idx = rest.indexOf('\n')) !== -1) {
+      onLine(rest.slice(0, idx).replace(/\r$/, ''));
+      rest = rest.slice(idx + 1);
+    }
+  });
+  stream.on('end', () => { if (rest) onLine(rest); });
+}
+
+/**
+ * Spawn `cloudflared tunnel --url http://localhost:<port>` and resolve with
+ * the public URL once cloudflared prints it. The child keeps running; both of
+ * its pipes stay drained for its whole life (cloudflared logs continuously and
+ * would block on a full pipe). `tail` holds the last log lines for error output.
+ */
+function startTunnel(exe, port, { verbose }) {
+  // 127.0.0.1, not "localhost": cloudflared (Go) may resolve localhost to ::1
+  // while the dev server is bound to IPv4 only, which surfaces as a Cloudflare
+  // 502 with "dial tcp [::1]:<port>: connection refused". In tunnel mode the
+  // dev server is bound to an IPv4 address (see launchDevServer), so the two
+  // sides always agree.
+  const args = ['tunnel', '--url', `http://127.0.0.1:${port}`, '--no-autoupdate'];
+  if (process.env.ARI_TUNNEL_PROTOCOL) args.push('--protocol', process.env.ARI_TUNNEL_PROTOCOL);
+  const child = spawn(exe, args, {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    cwd: ROOT,
+    windowsHide: true,
+  });
+  const tail = [];
+
+  const ready = new Promise((resolve, reject) => {
+    let armed = false;
+    let settled = false;
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn(value);
+    };
+    const onLine = (line) => {
+      tail.push(line);
+      if (tail.length > TUNNEL_LOG_TAIL_LINES) tail.shift();
+      if (verbose) process.stdout.write(DIM + '  [tunnel] ' + line + RESET + '\n');
+      if (settled) return;
+      if (line.includes(TUNNEL_CREATED_MARKER)) { armed = true; return; }
+      if (!armed) return;
+      const match = TUNNEL_URL_LINE_RE.exec(line);
+      if (match && match[2] !== 'api') finish(resolve, match[1]);
+    };
+    readLines(child.stdout, onLine);
+    readLines(child.stderr, onLine);
+    child.once('error', (err) => finish(reject, err));
+    child.once('exit', (code, signal) => finish(reject, new Error(`cloudflared exited (${signal || code})`)));
+    const timer = setTimeout(
+      () => finish(reject, new Error(`no tunnel URL after ${TUNNEL_START_TIMEOUT_MS / 1000}s`)),
+      TUNNEL_START_TIMEOUT_MS,
+    );
+  });
+
+  return { child, ready, tail };
 }
 
 function startPgweb(log = console.log) {
@@ -311,6 +504,7 @@ function startDefault() {
   return start({
     quiet: !process.argv.includes('--verbose'),
     lan: process.argv.includes('--lan'),
+    tunnel: process.argv.includes('--tunnel'),
   });
 }
 
@@ -350,6 +544,7 @@ function start(opts = {}) {
   const mode = getDbMode();
   const quiet = !!opts.quiet;
   const lan = !!opts.lan;
+  const tunnel = !!opts.tunnel;
   const log = (...args) => { if (!quiet) console.log(...args); };
   let pgwebRunning = false;
 
@@ -363,8 +558,10 @@ function start(opts = {}) {
   let spinnerTimer = null;
   let spinnerLabel = 'Starting ARI';
   function startSpinner(label) {
-    if (!quiet || spinnerTimer) return;
+    if (!quiet) return;
     spinnerLabel = label || spinnerLabel;
+    if (spinnerTimer) return; // already spinning — just relabel
+
     process.stdout.write('\x1B[?25l'); // hide cursor
     spinnerTimer = setInterval(() => {
       const frame = spinnerFrames[spinnerIdx++ % spinnerFrames.length];
@@ -378,6 +575,49 @@ function start(opts = {}) {
     process.stdout.write('\r\x1B[2K'); // clear line
     process.stdout.write('\x1B[?25h'); // show cursor
     if (finalLine) process.stdout.write(finalLine + '\n');
+  }
+
+  // Hard stop: message always shows (console.log, not `log`), exit 1.
+  const fail = (...lines) => {
+    stopSpinner();
+    console.log('');
+    console.log('  ' + RED + '✘' + RESET + ' ' + lines[0]);
+    for (const line of lines.slice(1)) console.log(line ? '    ' + DIM + line + RESET : '');
+    console.log('');
+    process.exit(1);
+  };
+
+  // --tunnel pre-flight: everything we can check without touching the network
+  // or starting anything, so a misconfigured run fails in milliseconds.
+  let tunnelExe = null;
+  // With an explicit -p, Next does NOT fall back to another port when this one
+  // is busy (next-dev.js: allowRetry only when the port came from the default),
+  // so the tunnel's target and the dev server's port can never diverge.
+  const tunnelPort = Number(process.env.PORT) || 3000;
+  if (tunnel) {
+    tunnelExe = cloudflaredExecutable();
+    if (!tunnelExe) {
+      const hint = cloudflaredInstallHint();
+      fail(
+        'cloudflared is not installed.',
+        'To use Cloudflare Quick Tunnels, please install cloudflared using these instructions:',
+        TUNNEL_DOCS_URL,
+        ...(hint ? ['', hint] : []),
+      );
+    }
+    const envLocal = path.join(ROOT, '.env.local');
+    const setupIncomplete =
+      !readEnvKey(envLocal, 'BETTER_AUTH_SECRET') ||
+      // The wizard writes one-shot admin credentials and bootstrap strips
+      // them only after the admin exists — still present means not signed in yet.
+      !!readEnvKey(envLocal, 'ARI_FIRST_RUN_ADMIN_EMAIL') ||
+      !!readEnvKey(envLocal, 'ARI_FIRST_RUN_ADMIN_PASSWORD');
+    if (setupIncomplete) {
+      fail(
+        'Finish ARI setup locally first (open http://localhost:3000, complete the wizard and sign in once), then run ./ari start --tunnel.',
+        'The setup wizard has no password in front of it and must never be reachable from the internet.',
+      );
+    }
   }
 
   // Start the spinner immediately so the user sees feedback during the
@@ -528,111 +768,24 @@ function start(opts = {}) {
 
   log('');
 
-  // Start Next.js dev server — pipe stdout (and stderr in quiet mode) so we
-  // can suppress. Use shell:true with the command as a single string so:
-  //   - Windows resolves pnpm.cmd via cmd.exe (CreateProcess can't run .cmd
-  //     files directly — that path returns EINVAL).
-  //   - DEP0190 doesn't fire (the deprecation only triggers when args are
-  //     passed alongside shell:true; an empty args array avoids it).
-  // Default binds to localhost only — keeps the dev server off the LAN.
-  // `--lan` keeps the original behavior (Next defaults to 0.0.0.0 and
-  // auto-detects the LAN IP for its banner).
-  const devCmd = lan ? 'pnpm dev' : 'pnpm dev -H localhost';
-  const child = spawn(devCmd, [], {
-    stdio: ['inherit', 'pipe', quiet ? 'pipe' : 'inherit'],
-    cwd: ROOT,
-    shell: true,
-  });
+  // Children we own. `child` is the dev server, `tunnelChild` is cloudflared.
+  // Both are nullable so the signal handlers work during every phase
+  // (including the tunnel-URL wait, before the dev server exists).
+  let child = null;
+  let tunnelChild = null;
+  let shuttingDown = false;
 
-  // In quiet mode, buffer stderr instead of dropping it. If the child exits
-  // non-zero we print what we captured so failures aren't silent.
-  let stderrBuffer = '';
-  const STDERR_BUFFER_LIMIT = 64 * 1024;
-  if (quiet && child.stderr) {
-    child.stderr.on('data', (chunk) => {
-      if (stderrBuffer.length >= STDERR_BUFFER_LIMIT) return;
-      stderrBuffer += chunk.toString();
-      if (stderrBuffer.length > STDERR_BUFFER_LIMIT) {
-        stderrBuffer = stderrBuffer.slice(0, STDERR_BUFFER_LIMIT) + '\n[stderr truncated]';
-      }
-    });
-  }
-
-  // Next.js prints "Local:" before any route is compiled, so opening the
-  // browser immediately shows a 2-3s white page while routes JIT-compile.
-  // We GET the URL first (following redirects) to force compilation of the
-  // landing route, then open the browser to a ready page.
-  let browserScheduled = false;
-  function openBrowser(url) {
-    if (process.platform === 'darwin') run(`open ${url}`);
-    else if (process.platform === 'linux') run(`xdg-open ${url}`);
-    // 'start' is a cmd.exe builtin, not a binary — must invoke via cmd /c.
-    // Empty quoted "" is the title argument, required when the URL is quoted.
-    else if (IS_WIN) run(`cmd /c start "" "${url}"`);
-  }
-  async function waitForReady(url) {
-    const deadline = Date.now() + 30_000;
-    while (Date.now() < deadline) {
-      try {
-        const res = await fetch(url, { redirect: 'follow' });
-        if (res.status < 500) return;
-      } catch {}
-      await new Promise(r => setTimeout(r, 150));
+  const killTunnel = () => {
+    if (tunnelChild && tunnelChild.exitCode === null && !tunnelChild.killed) {
+      try { tunnelChild.kill(); } catch {}
     }
-  }
-
-  let networkUrl = null;
-  child.stdout.on('data', (data) => {
-    let text = data.toString();
-    // Without --lan, Next still prints a "Network:" line that just echoes
-    // the loopback hostname — strip it to avoid the duplicate.
-    if (!lan) text = text.replace(/^.*Network:.*\r?\n?/m, '');
-
-    // Capture Next's auto-detected LAN URL so we can show it in quiet mode.
-    if (lan && !networkUrl) {
-      const netMatch = text.match(/Network:\s+(http:\/\/[\w.-]+:\d+)/);
-      if (netMatch && !netMatch[1].includes('localhost')) networkUrl = netMatch[1];
-    }
-
-    if (!browserScheduled) {
-      const match = text.match(/Local:\s+(http:\/\/localhost:\d+)/);
-      if (match) {
-        browserScheduled = true;
-        const url = match[1];
-        waitForReady(url).then(async () => {
-          openBrowser(url);
-          const updateAvailable = await updateCheck;
-          if (quiet) {
-            stopSpinner(GREEN + '✔' + RESET + ' ARI is running');
-            process.stdout.write(DIM + '- Local:         ' + RESET + url + '\n');
-            if (networkUrl) {
-              process.stdout.write(DIM + '- Network:       ' + RESET + networkUrl + '\n');
-            }
-          }
-          if (pgwebRunning) {
-            process.stdout.write(DIM + '- Database UI:   ' + RESET + `http://localhost:${PGWEB_PORT}` + '\n');
-          }
-          if (updateAvailable) {
-            const line = '  ↑ ARI update available  ' + DIM + UPDATE_DOCS_URL + RESET + '\n';
-            process.stdout.write(quiet ? line : '\n' + line + '\n');
-          }
-          // Verbose-only: surface the last unit-test run's pass rate. `log` is a
-          // no-op in quiet mode, so this only shows under `./ari start --verbose`.
-          printUnitTestSummary(log);
-          if (quiet) {
-            process.stdout.write(DIM + 'Press Ctrl+C to stop ARI.' + RESET + '\n');
-          }
-        });
-      }
-    }
-
-    if (!quiet) process.stdout.write(text);
-    // In quiet mode, all child stdout is dropped.
-  });
+  };
 
   const cleanup = () => {
+    shuttingDown = true;
     stopSpinner();
-    child.kill();
+    killTunnel();
+    if (child) child.kill();
     if (mode === 'postgres') stopPgweb(log);
     if (!quiet) {
       if (mode === 'supabaselocal') {
@@ -647,15 +800,214 @@ function start(opts = {}) {
 
   process.on('SIGINT', cleanup);
   process.on('SIGTERM', cleanup);
+  // Last resort for every other exit path (hard stops, dev-server crash):
+  // never leave a cloudflared process holding a public URL open.
+  process.on('exit', killTunnel);
 
-  child.on('exit', (code) => {
-    if (code && code !== 0 && stderrBuffer.trim()) {
-      process.stderr.write('\n  ' + RED + '✘' + RESET + ' Dev server failed. stderr:\n');
-      process.stderr.write(stderrBuffer);
-      process.stderr.write('\n');
+  // Start Next.js dev server — pipe stdout (and stderr in quiet mode) so we
+  // can suppress. Use shell:true with the command as a single string so:
+  //   - Windows resolves pnpm.cmd via cmd.exe (CreateProcess can't run .cmd
+  //     files directly — that path returns EINVAL).
+  //   - DEP0190 doesn't fire (the deprecation only triggers when args are
+  //     passed alongside shell:true; an empty args array avoids it).
+  // Default binds to localhost only — keeps the dev server off the LAN.
+  // `--lan` keeps the original behavior (Next defaults to 0.0.0.0 and
+  // auto-detects the LAN IP for its banner).
+  // `--tunnel` pins the port (see tunnelPort), binds to the IPv4 loopback
+  // literal instead of "localhost" (so cloudflared, which dials 127.0.0.1,
+  // can never miss a server that Node happened to bind on ::1), and hands the
+  // tunnel origin to the dev server via ARI_TUNNEL_ORIGIN — read at boot by
+  // lib/auth.ts (Better Auth trusted origins) and next.config.mjs
+  // (allowedDevOrigins). Next's own .env loading never overrides a var already
+  // in process.env, so setting it on the child is enough and nothing touches
+  // .env.local.
+  function launchDevServer(tunnelUrl) {
+    const host = lan ? '' : tunnel ? ' -H 127.0.0.1' : ' -H localhost';
+    const devCmd = 'pnpm dev' + host + (tunnel ? ` -p ${tunnelPort}` : '');
+    child = spawn(devCmd, [], {
+      stdio: ['inherit', 'pipe', quiet ? 'pipe' : 'inherit'],
+      cwd: ROOT,
+      shell: true,
+      env: { ...process.env, ...(tunnelUrl ? { ARI_TUNNEL_ORIGIN: tunnelUrl } : {}) },
+    });
+
+    // In quiet mode, buffer stderr instead of dropping it. If the child exits
+    // non-zero we print what we captured so failures aren't silent.
+    let stderrBuffer = '';
+    const STDERR_BUFFER_LIMIT = 64 * 1024;
+    if (quiet && child.stderr) {
+      child.stderr.on('data', (chunk) => {
+        if (stderrBuffer.length >= STDERR_BUFFER_LIMIT) return;
+        stderrBuffer += chunk.toString();
+        if (stderrBuffer.length > STDERR_BUFFER_LIMIT) {
+          stderrBuffer = stderrBuffer.slice(0, STDERR_BUFFER_LIMIT) + '\n[stderr truncated]';
+        }
+      });
     }
-    process.exit(code || 0);
+
+    // Next.js prints "Local:" before any route is compiled, so opening the
+    // browser immediately shows a 2-3s white page while routes JIT-compile.
+    // We GET the URL first (following redirects) to force compilation of the
+    // landing route, then open the browser to a ready page.
+    let browserScheduled = false;
+    function openBrowser(url) {
+      if (process.platform === 'darwin') run(`open ${url}`);
+      else if (process.platform === 'linux') run(`xdg-open ${url}`);
+      // 'start' is a cmd.exe builtin, not a binary — must invoke via cmd /c.
+      // Empty quoted "" is the title argument, required when the URL is quoted.
+      else if (IS_WIN) run(`cmd /c start "" "${url}"`);
+    }
+    async function waitForReady(url) {
+      const deadline = Date.now() + 30_000;
+      while (Date.now() < deadline) {
+        try {
+          const res = await fetch(url, { redirect: 'follow' });
+          if (res.status < 500) return;
+        } catch {}
+        await new Promise(r => setTimeout(r, 150));
+      }
+    }
+
+    let networkUrl = null;
+    child.stdout.on('data', (data) => {
+      let text = data.toString();
+      // Without --lan, Next still prints a "Network:" line that just echoes
+      // the loopback hostname — strip it to avoid the duplicate.
+      if (!lan) text = text.replace(/^.*Network:.*\r?\n?/m, '');
+
+      // Capture Next's auto-detected LAN URL so we can show it in quiet mode.
+      if (lan && !networkUrl) {
+        const netMatch = text.match(/Network:\s+(http:\/\/[\w.-]+:\d+)/);
+        if (netMatch && !netMatch[1].includes('localhost')) networkUrl = netMatch[1];
+      }
+
+      if (!browserScheduled) {
+        // With -H 127.0.0.1 (tunnel mode) Next prints the literal; show and
+        // open the familiar localhost form either way.
+        const match = text.match(/Local:\s+http:\/\/(?:localhost|127\.0\.0\.1):(\d+)/);
+        if (match) {
+          browserScheduled = true;
+          const url = `http://localhost:${match[1]}`;
+          // Probe the literal the server is bound to in tunnel mode: on Node
+          // without autoSelectFamily, fetch('http://localhost') may try ::1
+          // only and spin for the whole readiness deadline.
+          const probeUrl = tunnel ? `http://127.0.0.1:${match[1]}` : url;
+          // Defensive: -p makes this impossible, but a tunnel must never be
+          // left pointing at a port the dev server isn't on.
+          if (tunnelUrl && Number(match[1]) !== tunnelPort) {
+            child.kill();
+            fail(`Dev server started on ${url} but the tunnel targets port ${tunnelPort}.`);
+          }
+          waitForReady(probeUrl).then(async () => {
+            openBrowser(url);
+            const updateAvailable = await updateCheck;
+            if (quiet) {
+              stopSpinner(GREEN + '✔' + RESET + ' ARI is running');
+              process.stdout.write(DIM + '- Local:         ' + RESET + url + '\n');
+              if (networkUrl) {
+                process.stdout.write(DIM + '- Network:       ' + RESET + networkUrl + '\n');
+              }
+            }
+            if (tunnelUrl) {
+              process.stdout.write(DIM + '- Tunnel:        ' + RESET + tunnelUrl + '\n');
+              process.stdout.write(DIM + "  Anyone with this URL can reach ARI's sign-in page. It is temporary and changes every restart." + RESET + '\n');
+            }
+            if (pgwebRunning) {
+              process.stdout.write(DIM + '- Database UI:   ' + RESET + `http://localhost:${PGWEB_PORT}` + '\n');
+            }
+            if (updateAvailable) {
+              const line = '  ↑ ARI update available  ' + DIM + UPDATE_DOCS_URL + RESET + '\n';
+              process.stdout.write(quiet ? line : '\n' + line + '\n');
+            }
+            // Verbose-only: surface the last unit-test run's pass rate. `log` is a
+            // no-op in quiet mode, so this only shows under `./ari start --verbose`.
+            printUnitTestSummary(log);
+            if (quiet) {
+              process.stdout.write(DIM + 'Press Ctrl+C to stop ARI.' + RESET + '\n');
+            }
+          });
+        }
+      }
+
+      if (!quiet) process.stdout.write(text);
+      // In quiet mode, all child stdout is dropped.
+    });
+
+    child.on('exit', (code) => {
+      killTunnel();
+      if (code && code !== 0 && stderrBuffer.trim()) {
+        process.stderr.write('\n  ' + RED + '✘' + RESET + ' Dev server failed. stderr:\n');
+        process.stderr.write(stderrBuffer);
+        process.stderr.write('\n');
+      }
+      process.exit(code || 0);
+    });
+  }
+
+  if (!tunnel) {
+    launchDevServer(null);
+    return;
+  }
+
+  // --tunnel: the public URL is only known once cloudflared reports it, and
+  // the dev server reads ARI_TUNNEL_ORIGIN at boot — so the tunnel starts
+  // first and the dev server second. Both remaining gates run before anything
+  // is exposed. The returned promise never resolves on purpose: the dispatcher
+  // exits the process when a command's promise resolves, and this process
+  // lives as long as its children do.
+  (async () => {
+    // Probe the exact host the dev server will bind in tunnel mode.
+    if (!(await isPortFree(tunnelPort, lan ? '0.0.0.0' : '127.0.0.1'))) {
+      fail(
+        `Port ${tunnelPort} is already in use. --tunnel needs a fixed port; stop the other process or set PORT=${tunnelPort + 1}.`,
+      );
+    }
+    const users = await databaseHasUsers();
+    if (!users.ok) {
+      fail(
+        'Finish ARI setup locally first (open http://localhost:3000, complete the wizard and sign in once), then run ./ari start --tunnel.',
+        'Reason: ' + users.reason + '.',
+        'With no admin account, the public setup routes would let anyone with the URL claim your ARI.',
+      );
+    }
+
+    if (quiet) startSpinner('Starting tunnel');
+    else log('  ' + DIM + 'Starting Cloudflare tunnel...' + RESET);
+    const started = startTunnel(tunnelExe, tunnelPort, { verbose: !quiet });
+    tunnelChild = started.child;
+    let tunnelUrl;
+    try {
+      tunnelUrl = await started.ready;
+    } catch (err) {
+      killTunnel();
+      const tailLines = started.tail.slice(-8);
+      fail(
+        `Could not start the Cloudflare tunnel (${err?.message || err}).`,
+        'Check your internet connection / firewall — cloudflared uses UDP 7844 and falls back to TCP 443.',
+        'Retry with: ARI_TUNNEL_PROTOCOL=http2 ./ari start --tunnel',
+        ...(tailLines.length ? ['', 'Last cloudflared output:', ...tailLines] : []),
+      );
+    }
+    log('  ' + GREEN + '✔' + RESET + ' Tunnel ready ' + DIM + tunnelUrl + RESET);
+    if (quiet) startSpinner('Starting ARI');
+
+    tunnelChild.on('exit', (code, signal) => {
+      // Ctrl+C reaches the whole process group / console, so cloudflared often
+      // dies before our own handler runs — that is not a disconnect.
+      if (shuttingDown || signal === 'SIGINT' || signal === 'SIGTERM') return;
+      process.stdout.write(
+        '\n  ' + YELLOW + '⚠' + RESET + ' Cloudflare tunnel disconnected — the public URL no longer works.\n' +
+        '    ' + DIM + 'The local URL still works. Restart ./ari start --tunnel for a new URL.' + RESET + '\n',
+      );
+    });
+
+    launchDevServer(tunnelUrl);
+  })().catch((err) => {
+    killTunnel();
+    fail('Unexpected error while starting the tunnel: ' + (err?.stack || err));
   });
+
+  return new Promise(() => {});
 }
 
 async function stop() {
@@ -990,7 +1342,7 @@ async function doctor() {
   if (dbUrl) {
     try {
       const pg = cjsRequire(path.join(ROOT, 'node_modules', 'pg'));
-      const client = new pg.Client({ connectionString: dbUrl, ssl: false, connectionTimeoutMillis: 3000 });
+      const client = new pg.Client({ connectionString: dbUrl, ssl: sslConfigFor(dbUrl), connectionTimeoutMillis: 3000 });
       await client.connect();
       const r = await client.query('SELECT 1 AS ok');
       await client.end();
@@ -1005,6 +1357,13 @@ async function doctor() {
   // pgweb
   const pgwebExe = pgwebExecutable();
   pgwebExe ? ok('pgweb', pgwebExe) : warn('pgweb', 'not installed (DB UI unavailable)');
+
+  // cloudflared (optional — powers `./ari start --tunnel`)
+  const cfExe = cloudflaredExecutable();
+  const cfV = cfExe ? run(`"${cfExe}" --version`) : null;
+  cfV
+    ? ok('cloudflared', 'v' + (cfV.match(/(\d{4}\.\d+\.\d+)/) || [, '?'])[1])
+    : warn('cloudflared', 'not installed (./ari start --tunnel unavailable)');
 
   // Mode-specific
   const mode = getDbMode();
@@ -1065,6 +1424,7 @@ if (!cmd || !commands[cmd]) {
   console.log('  Commands:');
   console.log('    start              Start database + dev server (binds to localhost only)');
   console.log('    start --lan        Also accept connections from other devices on your LAN');
+  console.log('    start --tunnel     Also open a temporary public URL (Cloudflare Quick Tunnel; needs cloudflared)');
   console.log('    start --verbose    Same as start, but shows full server logs');
   console.log('    startquiet         Alias for start (kept for backwards compatibility)');
   console.log('    stop               Stop database services');

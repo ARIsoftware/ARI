@@ -55,6 +55,7 @@ const TRUST_ENV_VARS = [
   'VERCEL_PROJECT_PRODUCTION_URL',
   'ARI_TRUST_PROXY',
   'ARI_DEPLOYMENT_TARGET',
+  'ARI_TUNNEL_ORIGIN',
 ] as const
 
 function clearTrustEnv() {
@@ -170,6 +171,44 @@ describe('isSameOriginRequest', () => {
     const req = makeRequest({
       requestUrl: 'http://localhost:3000/api/test',
       referer: 'https://attacker.example.com/page',
+    })
+    expect(isSameOriginRequest(req)).toBe(false)
+  })
+
+  it('trusts the Cloudflare Quick Tunnel origin set by ./ari start --tunnel', () => {
+    delete process.env.NEXT_PUBLIC_APP_URL
+    delete process.env.BETTER_AUTH_URL
+    process.env.ARI_TUNNEL_ORIGIN = 'https://quiet-river.trycloudflare.com'
+    const req = makeRequest({
+      requestUrl: 'http://localhost:3000/api/test',
+      origin: 'https://quiet-river.trycloudflare.com',
+    })
+    expect(isSameOriginRequest(req)).toBe(true)
+  })
+
+  it('ignores ARI_TUNNEL_ORIGIN in production (tunnel trust is development only)', () => {
+    delete process.env.NEXT_PUBLIC_APP_URL
+    delete process.env.BETTER_AUTH_URL
+    process.env.ARI_TUNNEL_ORIGIN = 'https://quiet-river.trycloudflare.com'
+    vi.stubEnv('NODE_ENV', 'production')
+    try {
+      const req = makeRequest({
+        requestUrl: 'http://localhost:3000/api/test',
+        origin: 'https://quiet-river.trycloudflare.com',
+      })
+      expect(isSameOriginRequest(req)).toBe(false)
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('does not trust a trycloudflare origin unless ARI_TUNNEL_ORIGIN names it', () => {
+    delete process.env.NEXT_PUBLIC_APP_URL
+    delete process.env.BETTER_AUTH_URL
+    delete process.env.ARI_TUNNEL_ORIGIN
+    const req = makeRequest({
+      requestUrl: 'http://localhost:3000/api/test',
+      origin: 'https://someone-else.trycloudflare.com',
     })
     expect(isSameOriginRequest(req)).toBe(false)
   })

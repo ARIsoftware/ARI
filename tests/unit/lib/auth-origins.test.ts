@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { isPrivateAddressHost, privateNetworkTrustedOrigins } from '@/lib/auth-origins'
+import {
+  isPrivateAddressHost,
+  privateNetworkTrustedOrigins,
+  tunnelTrustedOrigins,
+} from '@/lib/auth-origins'
 
 describe('isPrivateAddressHost', () => {
   it('accepts loopback and private IPv4 literals', () => {
@@ -96,5 +100,42 @@ describe('privateNetworkTrustedOrigins', () => {
 
   it('ignores a rebinding hostname even when it resolves to a private IP', () => {
     expect(privateNetworkTrustedOrigins(req({ origin: 'http://rebind.attacker.com' }))).toEqual([])
+  })
+})
+
+describe('tunnelTrustedOrigins', () => {
+  it('returns nothing when ARI_TUNNEL_ORIGIN is unset or blank', () => {
+    expect(tunnelTrustedOrigins({})).toEqual([])
+    expect(tunnelTrustedOrigins({ ARI_TUNNEL_ORIGIN: '' })).toEqual([])
+    expect(tunnelTrustedOrigins({ ARI_TUNNEL_ORIGIN: '   ' })).toEqual([])
+  })
+
+  it('trusts the https tunnel origin the CLI set', () => {
+    expect(tunnelTrustedOrigins({ ARI_TUNNEL_ORIGIN: 'https://quiet-river.trycloudflare.com' })).toEqual([
+      'https://quiet-river.trycloudflare.com',
+    ])
+  })
+
+  it('normalises to a bare origin (Better Auth compares origins exactly)', () => {
+    expect(
+      tunnelTrustedOrigins({ ARI_TUNNEL_ORIGIN: ' https://Quiet-River.trycloudflare.com/sign-in?x=1 ' }),
+    ).toEqual(['https://quiet-river.trycloudflare.com'])
+  })
+
+  it('rejects non-https and malformed values', () => {
+    expect(tunnelTrustedOrigins({ ARI_TUNNEL_ORIGIN: 'http://quiet-river.trycloudflare.com' })).toEqual([])
+    expect(tunnelTrustedOrigins({ ARI_TUNNEL_ORIGIN: 'quiet-river.trycloudflare.com' })).toEqual([])
+    expect(tunnelTrustedOrigins({ ARI_TUNNEL_ORIGIN: 'not a url' })).toEqual([])
+  })
+
+  it('reads process.env by default', () => {
+    const saved = process.env.ARI_TUNNEL_ORIGIN
+    process.env.ARI_TUNNEL_ORIGIN = 'https://abc.trycloudflare.com'
+    try {
+      expect(tunnelTrustedOrigins()).toEqual(['https://abc.trycloudflare.com'])
+    } finally {
+      if (saved === undefined) delete process.env.ARI_TUNNEL_ORIGIN
+      else process.env.ARI_TUNNEL_ORIGIN = saved
+    }
   })
 })

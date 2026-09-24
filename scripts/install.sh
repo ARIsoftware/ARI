@@ -96,6 +96,7 @@ printf "    ${DIM}○${RESET}  ${BOLD}Supabase CLI${RESET}  ${DIM}— database t
 printf "    ${DIM}○${RESET}  ${BOLD}PostgreSQL Server${RESET}  ${DIM}— database engine${RESET}\n\n"
 printf "    ${DIM}○${RESET}  ${BOLD}PostgreSQL Client${RESET}  ${DIM}— database operations (optional)${RESET}\n\n"
 printf "    ${DIM}○${RESET}  ${BOLD}pgweb${RESET}  ${DIM}— database UI (localhost:5050)${RESET}\n\n"
+printf "    ${DIM}○${RESET}  ${BOLD}Cloudflare Tunnel${RESET}  ${DIM}— share ARI over the internet (optional)${RESET}\n\n"
 printf "    ${DIM}○${RESET}  ${BOLD}Claude Code${RESET}  ${DIM}— AI coding assistant${RESET}\n\n"
 printf "    ${DIM}○${RESET}  ${BOLD}ARI${RESET}  ${DIM}— clone repo & install dependencies${RESET}\n"
 echo ""

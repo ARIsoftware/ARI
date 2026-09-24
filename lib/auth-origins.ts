@@ -22,6 +22,13 @@
  * Reaching a dev instance through a hostname (`ari.local`, a NAS name,
  * Tailscale MagicDNS) is still supported — set `NEXT_PUBLIC_APP_URL` or
  * `BETTER_AUTH_TRUSTED_ORIGINS` to that origin explicitly.
+ *
+ * `./ari start --tunnel` is the one hostname case ARI handles itself: the CLI
+ * opens a Cloudflare Quick Tunnel, learns its random `*.trycloudflare.com`
+ * origin, and passes it to the dev server as `ARI_TUNNEL_ORIGIN`. That is
+ * consistent with the rule above — the origin is configured by the process
+ * that created it (server-side, before boot), never inferred from a request
+ * header — so a rebinding page gains nothing. See `tunnelTrustedOrigins()`.
  */
 
 /** IPv4 literal, e.g. 192.168.1.42 */
@@ -79,4 +86,27 @@ export function privateNetworkTrustedOrigins(request?: Request | null): string[]
     if (isPrivateAddressHost(url.hostname)) return [url.origin]
   }
   return []
+}
+
+/**
+ * The public origin `./ari start --tunnel` exposed this session on, when
+ * set. The CLI sets `ARI_TUNNEL_ORIGIN` on the dev-server process only; it
+ * is never written to `.env.local`. Only an `https:` origin qualifies (Quick
+ * Tunnels terminate TLS at Cloudflare's edge), and the value is normalised to
+ * a bare origin because Better Auth compares trusted origins exactly.
+ * Returns `[]` when unset or malformed, so it can be spread into a list.
+ */
+export function tunnelTrustedOrigins(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): string[] {
+  const value = env.ARI_TUNNEL_ORIGIN?.trim()
+  if (!value) return []
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    return []
+  }
+  if (url.protocol !== 'https:') return []
+  return [url.origin]
 }

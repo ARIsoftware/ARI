@@ -36,9 +36,24 @@ const privateDevOrigins = [
   ...Array.from({ length: 16 }, (_, i) => `172.${16 + i}.*.*`),
 ]
 
+// `./ari start --tunnel` sets ARI_TUNNEL_ORIGIN on this process to the
+// Cloudflare Quick Tunnel it opened (https://<random>.trycloudflare.com). Allow
+// exactly that hostname — not `*.trycloudflare.com` — so only the tunnel we
+// opened can reach /_next internals and the HMR websocket.
+const tunnelDevOrigins = (() => {
+  const raw = process.env.ARI_TUNNEL_ORIGIN
+  if (!raw) return []
+  try {
+    const url = new URL(raw)
+    return url.protocol === 'https:' ? [url.hostname] : []
+  } catch {
+    return []
+  }
+})()
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  allowedDevOrigins: privateDevOrigins,
+  allowedDevOrigins: [...privateDevOrigins, ...tunnelDevOrigins],
   env: {
     NEXT_PUBLIC_ARI_VERSION: `${pkg.version}+${commitSha}`,
     NEXT_PUBLIC_ARI_COMMIT: commitSha,

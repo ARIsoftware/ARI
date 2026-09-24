@@ -3,9 +3,9 @@
 /**
  * ARI Installer — Main Interactive Installer
  *
- * Zero-dependency Node.js script that installs remaining tools (Git, pnpm,
- * Vercel CLI, Supabase CLI), clones the ARI repo, runs pnpm install, and
- * verifies the full setup.
+ * Zero-dependency Node.js script that installs remaining tools (Git, GitHub
+ * CLI, pnpm, Vercel CLI, Supabase CLI, PostgreSQL, pgweb, cloudflared, Claude
+ * Code), clones the ARI repo, runs pnpm install, and verifies the full setup.
  *
  * Called by install.sh after Homebrew + Node.js are bootstrapped.
  */
@@ -201,6 +201,12 @@ function ensureWindowsAriBinPath() {
 // Map Node's process.arch to the convention used in GitHub release asset names.
 function getWindowsReleaseArch() {
   return process.arch === 'arm64' ? 'arm64' : 'amd64';
+}
+
+// Same for cloudflared's Linux static binaries (cloudflared-linux-<arch>).
+// Returns null for architectures that have no published asset.
+function getLinuxReleaseArch() {
+  return { x64: 'amd64', arm64: 'arm64', arm: 'arm', ia32: '386' }[process.arch] || null;
 }
 
 // Find a release asset by arch, falling back to amd64 if no arch-specific one
@@ -549,6 +555,8 @@ function showWelcome() {
   console.log('');
   console.log(`    ${SYM_ARROW}  ${bold('pgweb')}  ${dim('— database UI (localhost:5050)')}`);
   console.log('');
+  console.log(`    ${SYM_ARROW}  ${bold('Cloudflare Tunnel')}  ${dim('— share ARI over the internet (optional)')}`);
+  console.log('');
   console.log(`    ${SYM_ARROW}  ${bold('Claude Code')}  ${dim('— AI coding assistant')}`);
   console.log('');
   console.log(`    ${SYM_ARROW}  ${bold('ARI')}  ${dim('— clone repo & install dependencies')}`);
@@ -590,7 +598,14 @@ function getInstallCmd(cmds) {
     if (cmds.linux && cmds.linux[PKG_MGR]) return cmds.linux[PKG_MGR];
     if (cmds.linux && cmds.linux.npm) return cmds.linux.npm;   // npm fallback
   }
-  return cmds.fallback || cmds.darwin || null;
+  if (cmds.fallback) return cmds.fallback;
+  // A Homebrew command is a valid last resort on Linux only when Homebrew
+  // (Linuxbrew) is actually present. This used to fall through to
+  // `cmds.darwin` unconditionally, which on brew-less Linux/Windows hosts can
+  // only fail with a confusing "try running this manually: brew ..." hint.
+  // Null makes installTools print "No install method" and skip.
+  if (cmds.darwin && PLATFORM === 'linux' && run('brew --version')) return cmds.darwin;
+  return null;
 }
 
 // ── Detection Functions ─────────────────────────────────────────────────────
@@ -666,6 +681,26 @@ function detectPsql() {
   if (!out) return { installed: false, version: null };
   // psql outputs "psql (PostgreSQL) 18.3" — only two version parts, so parseVersion won't match
   const match = out.match(/(\d+\.\d+(?:\.\d+)?)/);
+  return { installed: true, version: match ? match[1] : null };
+}
+
+function detectCloudflared() {
+  let out = run('cloudflared --version');
+  if (!out && process.platform === 'win32') {
+    // winget's MSI/portable installs only update PATH for new shells; probe
+    // the known install locations so verification is deterministic.
+    const candidates = [
+      path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'cloudflared', 'cloudflared.exe'),
+      path.join(process.env.ProgramFiles || 'C:\\Program Files', 'cloudflared', 'cloudflared.exe'),
+      path.join(process.env.LOCALAPPDATA || os.homedir(), 'Microsoft', 'WinGet', 'Links', 'cloudflared.exe'),
+    ];
+    for (const exe of candidates) {
+      if (fs.existsSync(exe)) { out = run(`"${exe}" --version`); if (out) break; }
+    }
+  }
+  if (!out) return { installed: false, version: null };
+  // cloudflared versions are YYYY.M.N (e.g. 2026.9.1)
+  const match = out.match(/(\d{4}\.\d+\.\d+)/);
   return { installed: true, version: match ? match[1] : null };
 }
 
@@ -944,6 +979,51 @@ const TOOLS = [
     description: 'Lightweight web UI for PostgreSQL (runs on localhost:5050).',
   },
   {
+    id: 'cloudflared',
+    name: 'Cloudflare Tunnel (cloudflared)',
+    required: false,
+    // Optional, but worth having: pressing Enter installs it. A decline or a
+    // failed install never affects the ARI install itself.
+    defaultYes: true,
+    // Every install path above puts the binary on PATH (brew, winget, the
+    // package repos, /usr/local/bin), so "exit 0 but not detected" is a real
+    // failure here — report it as one rather than a green tick.
+    verifyAfterInstall: true,
+    // Linux uses Cloudflare's signed package repos (same shape as the gh
+    // entry): signed packages, future upgrades via the package manager, and
+    // no architecture guessing. Plain string concatenation on purpose — a
+    // stray `${...}` inside a template literal here would be a JS error, and
+    // every step is &&-chained so a failed download fails the whole command.
+    installCmds: {
+      darwin: 'brew install cloudflared',
+      win32: 'winget install -e --id Cloudflare.cloudflared --source winget --accept-source-agreements --accept-package-agreements',
+      linux: {
+        apt:
+          'sudo mkdir -p --mode=0755 /usr/share/keyrings && ' +
+          'curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null && ' +
+          "echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list >/dev/null && " +
+          'sudo apt-get update && sudo apt-get install -y cloudflared',
+        dnf:
+          "sudo dnf install -y 'dnf-command(config-manager)' && " +
+          'sudo dnf config-manager --add-repo https://pkg.cloudflare.com/cloudflared.repo && ' +
+          'sudo dnf install -y cloudflared',
+        zypper:
+          'sudo zypper --non-interactive addrepo -f https://pkg.cloudflare.com/cloudflared.repo cloudflared; ' +
+          'sudo zypper --non-interactive --gpg-auto-import-keys install cloudflared',
+        pacman: 'sudo pacman -S --noconfirm cloudflared',
+      },
+      // Unknown Linux package manager: static binary from GitHub releases.
+      // Undefined when the CPU architecture has no release asset, which makes
+      // the installer print "No install method" and skip — never a broken command.
+      fallback: getLinuxReleaseArch()
+        ? 'curl -fsSL -o /tmp/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-' + getLinuxReleaseArch() +
+          ' && sudo install -m 755 /tmp/cloudflared /usr/local/bin/cloudflared && rm -f /tmp/cloudflared'
+        : undefined,
+    },
+    detect: detectCloudflared,
+    description: 'Share your local ARI over the internet with ./ari start --tunnel (Cloudflare Quick Tunnel).',
+  },
+  {
     id: 'claude-code',
     name: 'Claude Code',
     required: true,
@@ -999,7 +1079,9 @@ async function installTools() {
     const label = tool.required
       ? `Install ${tool.name}?`
       : `Install ${tool.name}? ${dim('(optional)')}`;
-    const defaultYes = tool.required;
+    // Required tools default to Yes; optional ones default to No unless the
+    // entry opts in with `defaultYes` (cloudflared).
+    const defaultYes = tool.defaultYes ?? tool.required;
     const shouldInstall = await askYesNo(label, defaultYes);
 
     if (!shouldInstall) {
@@ -1046,7 +1128,21 @@ async function installTools() {
       ensureWindowsPostgresPath();
       ensureWindowsAriBinPath();
       const after = tool.detect();
-      spinner.success(`${tool.name} ${after.version ? `v${after.version}` : ''} installed`);
+      if (!after.installed && tool.verifyAfterInstall) {
+        // An install command can exit 0 without leaving a working binary.
+        // Tools that opt in are never reported "installed" on the exit code
+        // alone — route through the failure path below, which re-detects and
+        // prints the manual command.
+        throw new Error(`${tool.name} is still not detected after the install command finished.`);
+      }
+      if (!after.installed) {
+        // Legitimately possible for tools whose install location isn't on
+        // this process's PATH yet (`go install` → $GOPATH/bin, npm's global
+        // bin dir): say so instead of claiming a version we couldn't read.
+        spinner.success(`${tool.name} installed ${dim('— not on PATH in this terminal yet; open a new terminal to use it')}`);
+      } else {
+        spinner.success(`${tool.name} ${after.version ? `v${after.version}` : ''} installed`);
+      }
       results.push({ ...tool, status: 'installed', version: after.version });
     } catch (err) {
       // winget returns non-zero when the package is already installed at the
@@ -1236,7 +1332,12 @@ async function runSetupSql(targetDir, databaseUrl) {
   try {
     const pg = cjsRequire(path.join(targetDir, 'node_modules', 'pg'));
     const sql = fs.readFileSync(setupSqlPath, 'utf8');
-    const client = new pg.Client({ connectionString: databaseUrl, ssl: false });
+    // Same SSL rule as the app (lib/db/pool.ts sslConfigFor): plain for local
+    // databases, TLS without CA verification for hosted ones.
+    const ssl = databaseUrl.includes('127.0.0.1') || databaseUrl.includes('localhost')
+      ? false
+      : { rejectUnauthorized: false };
+    const client = new pg.Client({ connectionString: databaseUrl, ssl });
     await client.connect();
     await client.query(sql);
     await client.end();
@@ -1755,6 +1856,15 @@ function runVerification(ariResult, supabaseResult) {
     optional: true,
   });
 
+  // Cloudflare Tunnel (cloudflared) — powers `./ari start --tunnel`
+  const cloudflared = detectCloudflared();
+  checks.push({
+    name: 'Cloudflare Tunnel',
+    ok: true, // optional, always "ok"
+    detail: cloudflared.installed ? `v${cloudflared.version}` : 'skipped',
+    optional: true,
+  });
+
   // ARI cloned
   const ariCloned = ariResult && ariResult.cloned && ariResult.dir;
   checks.push({
@@ -1896,6 +2006,13 @@ function showCompletion(ariResult, supabaseResult) {
     console.log(`  To stop ARI, press Ctrl+C and run:`);
     console.log('');
     console.log(`    ${DIM_BLUE}${ariStop}${RESET}`);
+    if (detectCloudflared().installed) {
+      const ariTunnel = PLATFORM === 'win32' ? '.\\ari.cmd start --tunnel' : './ari start --tunnel';
+      console.log('');
+      console.log(`  To share your ARI over the internet on a temporary public URL (after you've signed in once):`);
+      console.log('');
+      console.log(`    ${DIM_BLUE}${ariTunnel}${RESET}`);
+    }
 
   } else {
     console.log(`  Clone ARI manually and run:`);

@@ -500,6 +500,8 @@ OPENAI_API_KEY=your_openai_api_key  # For AI Assistant feature
 
 `./ari start` checks Docker, starts Supabase (idempotent), regenerates `.env.supabase.local`, and runs `pnpm dev`. On Windows, use `.\ari.cmd start`.
 
+Flags combine freely: `--lan` also binds to the local network, `--verbose` streams full logs, and `--tunnel` additionally opens a temporary public HTTPS URL through a Cloudflare Quick Tunnel (needs the `cloudflared` binary — offered by the installer — and a completed setup with at least one user; the CLI refuses otherwise so the password-less `/welcome` wizard is never exposed). The tunnel URL changes on every restart and dies with the process. The CLI hands the tunnel origin to the dev server as `ARI_TUNNEL_ORIGIN` (process env only, never `.env.local`), which `lib/auth.ts` adds to Better Auth's trusted origins and `next.config.mjs` adds to `allowedDevOrigins` — see `tunnelTrustedOrigins()` in `lib/auth-origins.ts`. `BETTER_AUTH_URL` stays on localhost, so OAuth callbacks (e.g. Today's Brief Google sign-in) only work from the owner's machine. Docs: https://ari.software/docs/tunnel.
+
 ### ARI CLI — Tracked in Git
 The `./ari` command runs `.ari/cli.js`. All three files (`./ari`, `./ari.cmd`, `.ari/cli.js`) are **tracked in git** — `git pull` keeps the CLI fresh. To modify CLI behavior, edit `.ari/cli.js` directly.
 
