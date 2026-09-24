@@ -17,7 +17,7 @@ interface DashboardCardsPanelProps {
   loading: boolean
   saving: boolean
   onChange: (key: string, visible: boolean) => void
-  /** Replace the whole draft (Show all / Hide all / Reset to defaults). */
+  /** Replace the whole draft (Reset to defaults). */
   onReplace: (hidden: Iterable<string>) => void
   defaults: readonly string[]
   onSave: () => void
@@ -43,8 +43,6 @@ export function DashboardCardsPanel({
   onDiscard,
 }: DashboardCardsPanelProps) {
   const inert = loading || saving
-  const allHidden = cards.every((c) => hidden.has(c.key))
-  const noneHidden = cards.every((c) => !hidden.has(c.key))
 
   return (
     <Card>
@@ -59,32 +57,6 @@ export function DashboardCardsPanel({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex max-w-2xl flex-wrap gap-x-4 gap-y-1 text-sm">
-          <button
-            type="button"
-            className="text-primary hover:underline disabled:opacity-50 disabled:no-underline"
-            disabled={inert || noneHidden}
-            onClick={() => onReplace([])}
-          >
-            Show all
-          </button>
-          <button
-            type="button"
-            className="text-primary hover:underline disabled:opacity-50 disabled:no-underline"
-            disabled={inert || allHidden}
-            onClick={() => onReplace(cards.map((c) => c.key))}
-          >
-            Hide all
-          </button>
-          <button
-            type="button"
-            className="text-primary hover:underline disabled:opacity-50 disabled:no-underline"
-            disabled={inert}
-            onClick={() => onReplace(defaults)}
-          >
-            Reset to defaults
-          </button>
-        </div>
         <ul className="max-w-2xl divide-y">
           {cards.map((card) => {
             const id = `dashboard-card-${card.key}`
@@ -105,6 +77,9 @@ export function DashboardCardsPanel({
           })}
         </ul>
         <div className="flex max-w-2xl items-center justify-end gap-2">
+          <Button variant="ghost" onClick={() => onReplace(defaults)} disabled={inert}>
+            Reset to defaults
+          </Button>
           {dirty && (
             <Button variant="ghost" onClick={onDiscard} disabled={saving}>
               Discard
