@@ -30,7 +30,7 @@ import { getGoals, type Goal } from '@/lib/goals'
 import type { Task } from '@/modules/tasks/types'
 import { useModuleEnabled } from '@/lib/modules/module-hooks'
 import { useToast } from '@/hooks/use-toast'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { calculatePriorityScore, getTaskPriorityLevel } from '@/modules/tasks/lib/priority-utils'
@@ -38,6 +38,11 @@ import { AssigneePicker } from '@/modules/tasks/components/assignee-picker'
 import { useUnsavedChangesGuard } from '@/modules/tasks/hooks/use-unsaved-changes-guard'
 import { UnsavedChangesDialog } from '@/modules/tasks/components/unsaved-changes-dialog'
 import { PrivacyPinToggle } from '@/modules/tasks/components/privacy-pin-toggle'
+import {
+  sanitizeTaskTitlePrefill,
+  TASK_TITLE_MAX_LENGTH,
+  TASK_TITLE_PARAM,
+} from '@/modules/tasks/lib/title-prefill'
 
 // Per-record privacy is only offered on multi-user installs.
 const MULTI_USER = isMultiUserInstall()
@@ -59,6 +64,7 @@ export default function AddTaskPage() {
   const user = session?.user
   const { toast } = useToast()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const queryClient = useQueryClient()
   const { enabled: northstarEnabled } = useModuleEnabled('northstar')
   // The privacy eye needs the Users module installed AND enabled — same gate as
@@ -69,9 +75,10 @@ export default function AddTaskPage() {
   const [northStars, setNorthStars] = useState<Goal[]>([])
   const [selectedNorthStars, setSelectedNorthStars] = useState<string[]>([])
 
-  // Form state
-  const [formData, setFormData] = useState({
-    title: '',
+  // Form state. `?title=` (sent by the ⌘K palette) pre-fills the title only —
+  // it is untrusted, so it is sanitized and never auto-submitted.
+  const [formData, setFormData] = useState(() => ({
+    title: sanitizeTaskTitlePrefill(searchParams.get(TASK_TITLE_PARAM)),
     notes: '',
     assignees: [] as string[],
     assigned_agent_id: null as string | null,
@@ -85,7 +92,7 @@ export default function AddTaskPage() {
     timeliness: 3,
     effort: 3,
     strategic_fit: 3,
-  })
+  }))
 
   const [subtasks, setSubtasks] = useState<string[]>([])
   const [newSubtask, setNewSubtask] = useState('')
@@ -341,6 +348,7 @@ export default function AddTaskPage() {
                 value={formData.title}
                 onChange={(e) => handleInputChange('title', e.target.value)}
                 className="w-full"
+                maxLength={TASK_TITLE_MAX_LENGTH}
                 required
               />
             </div>
