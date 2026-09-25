@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useRouter, usePathname } from "next/navigation"
+import { defaultFilter } from "cmdk"
 import {
   CommandDialog,
   CommandEmpty,
@@ -26,6 +27,16 @@ import { useModules } from "@/lib/modules/module-hooks"
 import { useCurrentUser } from "@/hooks/use-users"
 import { hasPermission } from "@/lib/permissions"
 import { isPublicPathname } from "@/lib/route-helpers"
+import { buildAddTaskHref, sanitizeTaskTitlePrefill } from "@/modules/tasks/lib/title-prefill"
+
+// cmdk item value for the "Add as a task" row.
+const ADD_TASK_VALUE = "ari-palette-add-task"
+
+// The "Add as a task" row matches every non-empty search, with the lowest
+// possible score so cmdk sorts it below every real match (Enter still picks the
+// best module/page match first). Everything else uses cmdk's default scoring.
+const paletteFilter: typeof defaultFilter = (value, search, keywords) =>
+  value === ADD_TASK_VALUE ? Number.MIN_VALUE : defaultFilter(value, search, keywords)
 
 interface CommandPaletteProps {
   open?: boolean
@@ -34,13 +45,22 @@ interface CommandPaletteProps {
 
 export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPaletteProps) {
   const [internalOpen, setInternalOpen] = React.useState(false)
+  const [search, setSearch] = React.useState("")
   const router = useRouter()
   const pathname = usePathname()
   const { modules, loading: modulesLoading } = useModules()
 
   // Use controlled state if provided, otherwise use internal state
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen
-  const setOpen = onOpenChange || setInternalOpen
+  const setOpenState = onOpenChange || setInternalOpen
+  // Closing also clears the search, so each opening starts empty.
+  const setOpen = React.useCallback(
+    (next: boolean) => {
+      if (!next) setSearch("")
+      setOpenState(next)
+    },
+    [setOpenState],
+  )
 
   const isPublicPage = isPublicPathname(pathname)
 
@@ -84,11 +104,19 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
   const { data: currentUser } = useCurrentUser({ enabled: !isPublicPage })
   const canAccessSettings = hasPermission(currentUser, 'access_settings')
 
+  // The title the "Add as a task" row would pre-fill (sanitized, so the label
+  // shows exactly what the add-task page will receive).
+  const addTaskTitle = tasksEnabled ? sanitizeTaskTitlePrefill(search) : ""
+
   if (isPublicPage) return null
 
   return (
-    <CommandDialog open={open} onOpenChange={setOpen}>
-      <CommandInput placeholder="Type a command or search..." />
+    <CommandDialog open={open} onOpenChange={setOpen} commandProps={{ filter: paletteFilter }}>
+      <CommandInput
+        placeholder="Type a command, search, or add a task..."
+        value={search}
+        onValueChange={setSearch}
+      />
       <CommandList>
         <CommandEmpty>No results found.</CommandEmpty>
 
@@ -147,6 +175,21 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
               <CommandItem onSelect={() => runCommand(() => router.push("/tasks/radar"))}>
                 <Radar className="mr-2 h-4 w-4" />
                 <span>Priority Radar</span>
+              </CommandItem>
+            </CommandGroup>
+          </>
+        )}
+
+        {addTaskTitle && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading="Add">
+              <CommandItem
+                value={ADD_TASK_VALUE}
+                onSelect={() => runCommand(() => router.push(buildAddTaskHref(addTaskTitle)))}
+              >
+                <Plus className="mr-2 h-4 w-4 shrink-0" />
+                <span className="truncate">Add &ldquo;{addTaskTitle}&rdquo; as a task</span>
               </CommandItem>
             </CommandGroup>
           </>
