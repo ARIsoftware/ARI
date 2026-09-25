@@ -1,0 +1,1225 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ARI Intro Video</title>
+    <style>
+      @font-face {
+        font-family: 'Inter';
+        font-weight: 400;
+        src: url('fonts/inter-latin-400-normal.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Inter';
+        font-weight: 500;
+        src: url('fonts/inter-latin-500-normal.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Inter';
+        font-weight: 600;
+        src: url('fonts/inter-latin-600-normal.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'JB';
+        font-weight: 400;
+        src: url('fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'JB';
+        font-weight: 500;
+        src: url('fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2');
+      }
+
+      :root {
+        --ink: #0b0d12;
+        --ink-2: #6b7280;
+        --ink-3: #9ca3af;
+        --line: #e5e7eb;
+        --navy: #1e3a8a;
+        --accent: #3b5ba5;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #000;
+      }
+      body {
+        font-family: 'Inter', sans-serif;
+        -webkit-font-smoothing: antialiased;
+        font-feature-settings: 'ss01', 'cv11';
+      }
+      .mono {
+        font-family: 'JB', monospace;
+      }
+      #stage {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: #fff;
+      }
+      .scene {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        will-change: opacity, transform, filter;
+      }
+      .a {
+        opacity: 0;
+        will-change: opacity, transform, filter;
+      }
+
+      /* ---------- Sky (scenes 1 + 6) ---------- */
+      .sky {
+        position: absolute;
+        inset: -80px;
+        background:
+          radial-gradient(70% 55% at 50% -5%, #24478a 0%, rgba(36, 71, 138, 0) 70%),
+          radial-gradient(120% 90% at 50% 0%, #34599c 0%, #4c75b6 45%, #7497cb 78%, #b9cbe6 100%);
+      }
+      .sky .horizon {
+        position: absolute;
+        left: -10%;
+        right: -10%;
+        bottom: -420px;
+        height: 700px;
+        border-radius: 50%;
+        background: radial-gradient(
+          closest-side,
+          rgba(255, 255, 255, 0.85),
+          rgba(226, 235, 248, 0.55) 55%,
+          rgba(226, 235, 248, 0)
+        );
+        filter: blur(20px);
+      }
+      .sky .haze {
+        position: absolute;
+        width: 900px;
+        height: 900px;
+        border-radius: 50%;
+        background: radial-gradient(
+          closest-side,
+          rgba(160, 190, 235, 0.35),
+          rgba(160, 190, 235, 0)
+        );
+      }
+
+      .glass-tile {
+        position: absolute;
+        width: 330px;
+        height: 330px;
+        border-radius: 72px;
+        background: linear-gradient(160deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.12));
+        border: 1.5px solid rgba(255, 255, 255, 0.45);
+        box-shadow:
+          0 50px 90px -20px rgba(18, 38, 84, 0.45),
+          0 10px 30px rgba(18, 38, 84, 0.15),
+          inset 0 1.5px 0 rgba(255, 255, 255, 0.55),
+          inset 0 -30px 60px rgba(255, 255, 255, 0.06);
+        backdrop-filter: blur(10px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .glass-tile .mark {
+        font-family: 'JB', monospace;
+        font-weight: 500;
+        font-size: 92px;
+        color: #fff;
+        letter-spacing: -0.02em;
+        text-shadow: 0 4px 18px rgba(20, 40, 90, 0.25);
+      }
+
+      /* ---------- Scene 1: hero ---------- */
+      #s1 .copy {
+        position: absolute;
+        left: 170px;
+        top: 285px;
+        color: #fff;
+      }
+      #s1 .eyebrow {
+        font-size: 25px;
+        color: rgba(255, 255, 255, 0.78);
+        letter-spacing: -0.005em;
+        margin-bottom: 34px;
+      }
+      #s1 h1 {
+        font-weight: 500;
+        font-size: 112px;
+        line-height: 1.02;
+        letter-spacing: -0.042em;
+      }
+      #s1 h1 .l2 {
+        color: rgba(255, 255, 255, 0.6);
+      }
+      #s1 .sub {
+        margin-top: 44px;
+        font-size: 31px;
+        line-height: 1.45;
+        color: rgba(255, 255, 255, 0.86);
+        letter-spacing: -0.012em;
+        width: 900px;
+      }
+      .term-pill {
+        margin-top: 44px;
+        display: inline-flex;
+        align-items: center;
+        gap: 22px;
+        height: 76px;
+        padding: 0 26px 0 30px;
+        width: 470px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1.5px solid rgba(255, 255, 255, 0.32);
+        color: #fff;
+        font-family: 'JB', monospace;
+        font-size: 25px;
+      }
+      .term-pill .dollar {
+        color: rgba(255, 255, 255, 0.6);
+      }
+      .term-pill .cmd {
+        flex: 1;
+      }
+      .caret {
+        display: inline-block;
+        width: 2px;
+        height: 1.05em;
+        background: currentColor;
+        vertical-align: -0.16em;
+        margin-left: 1px;
+      }
+      #s1 .glass-tile {
+        left: 1395px;
+        top: 360px;
+      }
+
+      /* ---------- Light scenes ---------- */
+      .light-bg {
+        position: absolute;
+        inset: 0;
+        background: #fff;
+      }
+      .top-haze {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: 460px;
+        background: linear-gradient(
+          180deg,
+          #9fb6dc 0%,
+          #c9d7ee 30%,
+          rgba(236, 241, 249, 0.6) 65%,
+          rgba(255, 255, 255, 0) 100%
+        );
+      }
+      .bottom-fog {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 420px;
+        background: linear-gradient(180deg, rgba(240, 241, 243, 0), #eeeff1);
+      }
+      h2.hl {
+        font-weight: 600;
+        font-size: 68px;
+        line-height: 1.1;
+        letter-spacing: -0.035em;
+        color: var(--ink);
+      }
+      h2.hl .l2 {
+        color: #71757d;
+      }
+
+      /* ---------- Scene 2: modules ---------- */
+      #s2 .left {
+        position: absolute;
+        left: 170px;
+        top: 262px;
+        width: 760px;
+        white-space: nowrap;
+      }
+      #s2 .list {
+        margin-top: 64px;
+        border-left: 2px solid var(--line);
+        position: relative;
+      }
+      #s2 .list .bar {
+        position: absolute;
+        left: -2px;
+        width: 3px;
+        height: 70px;
+        background: var(--ink);
+        border-radius: 2px;
+      }
+      #s2 .item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        height: 70px;
+        padding: 0 0 0 38px;
+        font-size: 30px;
+        letter-spacing: -0.015em;
+        color: #6b7078;
+        font-weight: 500;
+      }
+      #s2 .item .k {
+        font-family: 'JB', monospace;
+        font-size: 19px;
+        color: var(--ink-3);
+        font-weight: 400;
+      }
+      #s2 .frame {
+        position: absolute;
+        left: 1000px;
+        top: 150px;
+        width: 820px;
+        height: 790px;
+        border-radius: 42px;
+        background: linear-gradient(180deg, #ffffff 0%, #f1f4fa 55%, #c9d6ee 100%);
+        border: 1.5px solid #e6e9f0;
+        box-shadow:
+          0 30px 80px -30px rgba(40, 70, 130, 0.35),
+          inset 0 1px 0 #fff;
+      }
+      #s2 .card {
+        position: absolute;
+        left: 50px;
+        top: 50px;
+        right: 50px;
+        height: 575px;
+        border-radius: 22px;
+        background: #fff;
+        border: 1.5px solid #e8eaef;
+        box-shadow: 0 20px 50px -20px rgba(30, 50, 100, 0.3);
+        overflow: hidden;
+      }
+      #s2 .card .head {
+        height: 66px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 0 26px;
+        border-bottom: 1.5px solid #eef0f3;
+        font-family: 'JB', monospace;
+        font-size: 19px;
+        color: #374151;
+      }
+      #s2 .card .head .path {
+        color: var(--ink-3);
+      }
+      #s2 .code {
+        position: relative;
+        padding: 20px 0;
+        font-family: 'JB', monospace;
+        font-size: 19px;
+        line-height: 38px;
+        color: #374151;
+        white-space: pre;
+      }
+      #s2 .code .ln {
+        padding-left: 28px;
+        height: 38px;
+        position: relative;
+      }
+      #s2 .code .ln.cur {
+        background: #eef3fb;
+      }
+      #s2 .code .ln.cur::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background: #9fb6dc;
+      }
+      .tk-k {
+        color: var(--navy);
+      }
+      .tk-s {
+        color: #b3261e;
+      }
+      .tk-b {
+        color: #7c3aed;
+      }
+      .tk-p {
+        color: #6b7280;
+      }
+
+      /* ---------- Scene 3: grid ---------- */
+      #s3 .title {
+        position: absolute;
+        top: 92px;
+        left: 0;
+        right: 0;
+        text-align: center;
+      }
+      #s3 .wrap {
+        position: absolute;
+        left: 150px;
+        right: 150px;
+        top: 318px;
+        height: 700px;
+        border-radius: 36px;
+        border: 1.5px solid #e7e8ec;
+        background: #fbfbfc;
+        padding: 18px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+        gap: 18px;
+      }
+      #s3 .cell {
+        position: relative;
+        border-radius: 24px;
+        background-color: #f1f2f4;
+        background-image: radial-gradient(#d9dce2 1.2px, transparent 1.3px);
+        background-size: 22px 22px;
+        border: 1.5px solid #e9eaee;
+        overflow: hidden;
+      }
+      #s3 .cell::before {
+        content: '';
+        position: absolute;
+        left: 20%;
+        right: 20%;
+        top: 5%;
+        height: 70%;
+        background: radial-gradient(
+          closest-side,
+          rgba(190, 208, 238, 0.55),
+          rgba(190, 208, 238, 0)
+        );
+      }
+      #s3 .chips {
+        position: absolute;
+        left: 30px;
+        right: 30px;
+        top: 38px;
+        height: 170px;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-content: center;
+        gap: 14px 14px;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        height: 50px;
+        padding: 0 22px;
+        border-radius: 999px;
+        background: #fff;
+        border: 1.5px solid #e3e5ea;
+        box-shadow: 0 2px 6px rgba(20, 30, 60, 0.06);
+        font-family: 'JB', monospace;
+        font-size: 19px;
+        color: #1f2430;
+      }
+      .chip.on {
+        border-color: #1f2430;
+        box-shadow:
+          0 0 0 3px rgba(59, 91, 165, 0.14),
+          0 6px 14px rgba(20, 30, 60, 0.12);
+      }
+      .chip .dot {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        box-shadow: inset 0 0 0 1.5px rgba(0, 0, 0, 0.12);
+      }
+      .tiles {
+        display: flex;
+        gap: 34px;
+        justify-content: center;
+        align-items: flex-start;
+      }
+      .tile {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        font-family: 'JB', monospace;
+        font-size: 17px;
+        color: #4b5160;
+      }
+      .tile .ic {
+        width: 88px;
+        height: 88px;
+        border-radius: 22px;
+        background: #fff;
+        border: 1.5px solid #e3e5ea;
+        box-shadow: 0 4px 12px rgba(20, 30, 60, 0.07);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .tile.on .ic {
+        border-color: #1f2430;
+        box-shadow:
+          0 0 0 3px rgba(59, 91, 165, 0.14),
+          0 8px 18px rgba(20, 30, 60, 0.14);
+      }
+      #s3 .foot {
+        position: absolute;
+        left: 38px;
+        right: 38px;
+        bottom: 34px;
+      }
+      #s3 .foot .t {
+        font-size: 25px;
+        font-weight: 600;
+        color: var(--ink);
+        letter-spacing: -0.015em;
+      }
+      #s3 .foot .t .mono {
+        font-weight: 400;
+        font-size: 19px;
+        color: var(--ink-2);
+        margin-left: 10px;
+        letter-spacing: 0;
+      }
+      #s3 .foot .d {
+        margin-top: 8px;
+        font-size: 21px;
+        color: #6b7078;
+        letter-spacing: -0.008em;
+      }
+
+      /* ---------- Scene 4: build ---------- */
+      #s4 .left {
+        position: absolute;
+        left: 170px;
+        top: 360px;
+        width: 700px;
+      }
+      #s4 .sub {
+        margin-top: 36px;
+        font-size: 28px;
+        line-height: 1.5;
+        color: #5f646d;
+        letter-spacing: -0.01em;
+      }
+      #s4 .sub .mono {
+        font-size: 24px;
+        color: var(--ink);
+        background: #eef1f6;
+        padding: 2px 10px;
+        border-radius: 8px;
+      }
+      #s4 .term {
+        position: absolute;
+        left: 960px;
+        top: 250px;
+        width: 840px;
+        height: 580px;
+        border-radius: 26px;
+        background: linear-gradient(180deg, #121620, #0c0f16);
+        border: 1.5px solid #262c38;
+        box-shadow:
+          0 50px 100px -30px rgba(15, 25, 55, 0.55),
+          inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        overflow: hidden;
+      }
+      #s4 .term .bar {
+        height: 58px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 22px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      }
+      #s4 .term .bar i {
+        width: 13px;
+        height: 13px;
+        border-radius: 50%;
+        background: #3a404c;
+      }
+      #s4 .term .bar span {
+        flex: 1;
+        text-align: center;
+        margin-right: 60px;
+        font-family: 'JB', monospace;
+        font-size: 17px;
+        color: rgba(255, 255, 255, 0.45);
+      }
+      #s4 .tbody {
+        padding: 30px 36px;
+        font-family: 'JB', monospace;
+        font-size: 21px;
+        line-height: 40px;
+        color: rgba(255, 255, 255, 0.9);
+        white-space: pre;
+      }
+      #s4 .tbody .row {
+        opacity: 0;
+      }
+      .amber {
+        color: #fbbf24;
+      }
+      .muted {
+        color: rgba(255, 255, 255, 0.5);
+      }
+      .ok {
+        color: #4ade80;
+      }
+      #s4 .glow {
+        position: absolute;
+        right: -200px;
+        bottom: -300px;
+        width: 1300px;
+        height: 900px;
+        background: radial-gradient(
+          closest-side,
+          rgba(170, 195, 235, 0.55),
+          rgba(170, 195, 235, 0)
+        );
+      }
+
+      /* ---------- Scene 5: statements ---------- */
+      #s5 .pill {
+        position: absolute;
+        left: 50%;
+        top: 452px;
+        transform: translateX(-50%);
+        height: 50px;
+        padding: 0 22px;
+        border-radius: 999px;
+        border: 1.5px solid #dcdee3;
+        background: #fff;
+        font-size: 21px;
+        color: #50555e;
+        display: flex;
+        align-items: center;
+      }
+      #s5 .stmt {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 540px;
+        text-align: center;
+        font-weight: 500;
+        font-size: 80px;
+        letter-spacing: -0.038em;
+        color: var(--ink);
+      }
+
+      /* ---------- Scene 6: outro ---------- */
+      #s6 .glass-tile {
+        left: 795px;
+        top: 170px;
+      }
+      #s6 .brand {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 568px;
+        text-align: center;
+        color: #fff;
+      }
+      #s6 .brand .name {
+        font-weight: 500;
+        font-size: 108px;
+        letter-spacing: -0.045em;
+        line-height: 1;
+      }
+      #s6 .brand .tag {
+        margin-top: 26px;
+        font-size: 38px;
+        letter-spacing: -0.02em;
+        color: rgba(255, 255, 255, 0.66);
+        font-weight: 500;
+      }
+      #s6 .brand .facts {
+        margin-top: 44px;
+        display: inline-flex;
+        gap: 14px;
+      }
+      #s6 .brand .facts span {
+        height: 52px;
+        padding: 0 24px;
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        border: 1.5px solid rgba(255, 255, 255, 0.34);
+        background: rgba(255, 255, 255, 0.1);
+        font-size: 21px;
+        color: rgba(255, 255, 255, 0.92);
+      }
+      #s6 .url {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 950px;
+        text-align: center;
+        font-family: 'JB', monospace;
+        font-size: 26px;
+        color: rgba(40, 60, 100, 0.75);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <!-- 1. Hero -->
+      <section class="scene" id="s1">
+        <div class="sky">
+          <div class="haze" style="left: 1100px; top: 150px"></div>
+          <div class="horizon"></div>
+        </div>
+        <div class="copy">
+          <div class="eyebrow a" data-in="0.25">Latest release, v2.0</div>
+          <h1>
+            <div class="a" data-in="0.55">Your productivity OS,</div>
+            <div class="l2 a" data-in="0.85">on your own server.</div>
+          </h1>
+          <div class="sub a" data-in="1.45">
+            Tasks, documents, contacts, AI chat, and dozens more — each one a module in a workspace
+            you fully own.
+          </div>
+          <div class="term-pill a" data-in="2.0">
+            <span class="dollar">$</span
+            ><span class="cmd"
+              ><span id="s1cmd"></span><span class="caret" id="s1caret"></span
+            ></span>
+            <svg
+              width="26"
+              height="26"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="rgba(255,255,255,.7)"
+              stroke-width="1.8"
+            >
+              <rect x="8" y="8" width="12" height="12" rx="2.5" />
+              <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+            </svg>
+          </div>
+        </div>
+        <div class="glass-tile a" id="s1tile" data-in="1.1"><span class="mark">ARI.</span></div>
+      </section>
+
+      <!-- 2. Modules -->
+      <section class="scene" id="s2">
+        <div class="light-bg"></div>
+        <div class="top-haze"></div>
+        <div class="left">
+          <h2 class="hl">
+            <div class="a" data-in="0.2">Everything is a module.</div>
+            <div class="l2 a" data-in="0.45">One folder, one manifest.</div>
+          </h2>
+          <div class="list a" data-in="0.9" id="s2list">
+            <div class="bar" id="s2bar"></div>
+            <div class="item"><span>Identity</span><span class="k">"id"</span></div>
+            <div class="item"><span>Pages &amp; sidebar</span><span class="k">"routes"</span></div>
+            <div class="item"><span>Database</span><span class="k">"database"</span></div>
+            <div class="item"><span>Top bar icon</span><span class="k">"topBarIcon"</span></div>
+            <div class="item"><span>Dashboard widgets</span><span class="k">"dashboard"</span></div>
+            <div class="item">
+              <span>npm packages</span><span class="k">"npmDependencies"</span>
+            </div>
+          </div>
+        </div>
+        <div class="frame a" data-in="0.6">
+          <div class="card">
+            <div class="head">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#6b7280"
+                stroke-width="1.7"
+              >
+                <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+                <path d="M14 3v5h5" />
+              </svg>
+              <span class="path">modules-custom/habit-tracker/</span><span>module.json</span>
+            </div>
+            <div class="code" id="s2code"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Grid -->
+      <section class="scene" id="s3">
+        <div class="light-bg"></div>
+        <div class="bottom-fog"></div>
+        <div class="title">
+          <h2 class="hl">
+            <div class="a" data-in="0.2">Database, storage, AI, and themes.</div>
+            <div class="l2 a" data-in="0.45">Your stack. Swap one line.</div>
+          </h2>
+        </div>
+        <div class="wrap a" data-in="0.75">
+          <div class="cell" id="c-db">
+            <div class="chips">
+              <span class="chip">postgres</span>
+              <span class="chip">supabaselocal</span>
+              <span class="chip">supabasecloud</span>
+            </div>
+            <div class="foot">
+              <div class="t">Database.<span class="mono">ARI_DB_MODE</span></div>
+              <div class="d">Plain Postgres, local Supabase, or Supabase Cloud.</div>
+            </div>
+          </div>
+          <div class="cell" id="c-st">
+            <div class="chips">
+              <div class="tiles">
+                <div class="tile chip-like">
+                  <div class="ic">
+                    <svg
+                      width="40"
+                      height="40"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#1f2430"
+                      stroke-width="1.6"
+                    >
+                      <path
+                        d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
+                      />
+                    </svg>
+                  </div>
+                  filesystem
+                </div>
+                <div class="tile chip-like">
+                  <div class="ic">
+                    <svg
+                      width="40"
+                      height="40"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#c2410c"
+                      stroke-width="1.6"
+                    >
+                      <path d="M5 6c0-1.1 3.1-2 7-2s7 .9 7 2-3.1 2-7 2-7-.9-7-2z" />
+                      <path d="M5 6l1.6 12c.2 1.2 2.6 2 5.4 2s5.2-.8 5.4-2L19 6" />
+                    </svg>
+                  </div>
+                  s3
+                </div>
+                <div class="tile chip-like">
+                  <div class="ic">
+                    <svg
+                      width="44"
+                      height="44"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#ea7a1a"
+                      stroke-width="1.6"
+                    >
+                      <path
+                        d="M7 18h10.5a3.5 3.5 0 0 0 .4-7A5.5 5.5 0 0 0 7.3 9.5 4.3 4.3 0 0 0 7 18z"
+                      />
+                    </svg>
+                  </div>
+                  r2
+                </div>
+                <div class="tile chip-like">
+                  <div class="ic">
+                    <svg width="38" height="38" viewBox="0 0 24 24" fill="#3ecf8e">
+                      <path
+                        d="M13.2 2.6c.5-.6 1.4-.2 1.4.5V11h5.6c.8 0 1.2.9.7 1.5l-9.1 9c-.5.6-1.4.2-1.4-.5V13H4.8c-.8 0-1.2-.9-.7-1.5z"
+                      />
+                    </svg>
+                  </div>
+                  supabase
+                </div>
+              </div>
+            </div>
+            <div class="foot">
+              <div class="t">Storage.<span class="mono">ARI_STORAGE_PROVIDER</span></div>
+              <div class="d">Keep files on disk, or point ARI at S3, R2, or Supabase Storage.</div>
+            </div>
+          </div>
+          <div class="cell" id="c-ai">
+            <div class="chips">
+              <span class="chip">openai</span>
+              <span class="chip">anthropic</span>
+              <span class="chip">gemini</span>
+              <span class="chip">openrouter</span>
+            </div>
+            <div class="foot">
+              <div class="t">AI.<span class="mono">Settings → Integrations</span></div>
+              <div class="d">
+                Any provider behind Chat, Board of Advisors, and your own modules.
+              </div>
+            </div>
+          </div>
+          <div class="cell" id="c-th">
+            <div class="chips">
+              <span class="chip"><i class="dot" style="background: hsl(213 32% 52%)"></i>nord</span>
+              <span class="chip"
+                ><i class="dot" style="background: hsl(265 89% 78%)"></i>dracula</span
+              >
+              <span class="chip"
+                ><i class="dot" style="background: hsl(2 55% 83%)"></i>rose-pine</span
+              >
+              <span class="chip"
+                ><i class="dot" style="background: hsl(134 100% 60%)"></i>terminal</span
+              >
+              <span class="chip"
+                ><i class="dot" style="background: hsl(267 84% 81%)"></i>catppuccin-mocha</span
+              >
+              <span class="chip"
+                ><i class="dot" style="background: hsl(47 100% 50%)"></i>sunny</span
+              >
+            </div>
+            <div class="foot">
+              <div class="t">Themes.<span class="mono">themes-custom/</span></div>
+              <div class="d">19 built-in themes. Drop in a folder to make your own.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Build your own -->
+      <section class="scene" id="s4">
+        <div class="light-bg"></div>
+        <div class="glow"></div>
+        <div class="left">
+          <h2 class="hl">
+            <div class="a" data-in="0.2">Describe it.</div>
+            <div class="l2 a" data-in="0.45">ARI builds the module.</div>
+          </h2>
+          <div class="sub a" data-in="0.95">
+            Run <span class="mono">/ari-create-module</span> in Claude Code or Codex. No coding
+            required.
+          </div>
+        </div>
+        <div class="term a" data-in="0.6">
+          <div class="bar"><i></i><i></i><i></i><span>~/ari</span></div>
+          <div class="tbody" id="s4body"></div>
+        </div>
+      </section>
+
+      <!-- 5. Also in ARI -->
+      <section class="scene" id="s5">
+        <div class="light-bg"></div>
+        <div class="bottom-fog"></div>
+        <div class="pill a" data-in="0.25">Also in ARI</div>
+        <div class="stmt" id="st0">Your data stays on your server.</div>
+        <div class="stmt" id="st1">Invite your team. Keep private things private.</div>
+        <div class="stmt" id="st2">Backups that verify before they restore.</div>
+      </section>
+
+      <!-- 6. Outro -->
+      <section class="scene" id="s6">
+        <div class="sky">
+          <div class="haze" style="left: 520px; top: -120px"></div>
+          <div class="horizon"></div>
+        </div>
+        <div class="glass-tile a" id="s6tile" data-in="0.3"><span class="mark">ARI.</span></div>
+        <div class="brand">
+          <div class="name a" data-in="0.75">ARI.Software</div>
+          <div class="tag a" data-in="1.05">Premier Personal Productivity.</div>
+          <div class="facts a" data-in="1.5">
+            <span>Open source</span><span>Self-hosted</span><span>AI native</span
+            ><span>Fully extendable</span>
+          </div>
+        </div>
+        <div class="url a" data-in="2.0">ari.software</div>
+      </section>
+    </div>
+
+    <script>
+      // Deterministic timeline: window.render(t) paints the frame at t seconds.
+      const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x))
+      const easeOut = (x) => 1 - Math.pow(1 - x, 3)
+      const easeInOut = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2)
+      const prog = (t, a, d) => easeOut(clamp((t - a) / d))
+      const $ = (s) => document.querySelector(s)
+
+      // [id, start, end]
+      const SCENES = [
+        ['s1', 0, 8.6],
+        ['s2', 8.4, 20.6],
+        ['s3', 20.4, 32.2],
+        ['s4', 32.0, 43.4],
+        ['s5', 43.2, 52.0],
+        ['s6', 51.8, 60.0],
+      ]
+      const DURATION = 60
+      const FADE = 0.7
+
+      function setIn(el, local, delay, dist = 26, dur = 0.9) {
+        const k = prog(local, delay, dur)
+        el.style.opacity = k
+        el.style.transform = `translateY(${(1 - k) * dist}px)`
+        el.style.filter = k < 1 ? `blur(${(1 - k) * 8}px)` : 'none'
+      }
+
+      // ---------- Scene 2 code ----------
+      const CODE = [
+        [['{', 'p']],
+        [
+          ['  "id"', 'k'],
+          [': ', 'p'],
+          ['"habit-tracker"', 's'],
+          [',', 'p'],
+        ],
+        [
+          ['  "name"', 'k'],
+          [': ', 'p'],
+          ['"Habit Tracker"', 's'],
+          [',', 'p'],
+        ],
+        [
+          ['  "icon"', 'k'],
+          [': ', 'p'],
+          ['"Flame"', 's'],
+          [',', 'p'],
+        ],
+        [
+          ['  "routes"', 'k'],
+          [': [', 'p'],
+        ],
+        [
+          ['    { ', 'p'],
+          ['"path"', 'k'],
+          [': ', 'p'],
+          ['"/habits"', 's'],
+          [', ', 'p'],
+          ['"label"', 'k'],
+          [': ', 'p'],
+          ['"Habits"', 's'],
+          [' }', 'p'],
+        ],
+        [['  ],', 'p']],
+        [
+          ['  "database"', 'k'],
+          [': { ', 'p'],
+          ['"tables"', 'k'],
+          [': [', 'p'],
+          ['"habits"', 's'],
+          ['] },', 'p'],
+        ],
+        [
+          ['  "topBarIcon"', 'k'],
+          [': { ', 'p'],
+          ['"icon"', 'k'],
+          [': ', 'p'],
+          ['"Flame"', 's'],
+          [', ', 'p'],
+          ['"route"', 'k'],
+          [': ', 'p'],
+          ['"/habits"', 's'],
+          [' },', 'p'],
+        ],
+        [
+          ['  "dashboard"', 'k'],
+          [': { ', 'p'],
+          ['"widgets"', 'k'],
+          [': ', 'p'],
+          ['true', 'b'],
+          [' },', 'p'],
+        ],
+        [
+          ['  "npmDependencies"', 'k'],
+          [': { ', 'p'],
+          ['"date-fns"', 'k'],
+          [': ', 'p'],
+          ['"^4.1.0"', 's'],
+          [' }', 'p'],
+        ],
+        [['}', 'p']],
+      ]
+      const LINE_TO_ITEM = [0, 0, 0, 0, 1, 1, 1, 2, 3, 4, 5, 5]
+      const lineLens = CODE.map((l) => l.reduce((n, [s]) => n + s.length, 0))
+      const TOTAL = lineLens.reduce((a, b) => a + b, 0)
+      const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+
+      // Typing pace weighted so each list item gets comparable screen time.
+      function typedChars(local) {
+        const a = 1.4
+        const b = 11.0
+        return Math.floor(TOTAL * clamp((local - a) / (b - a)))
+      }
+
+      function paintCode(local) {
+        const n = typedChars(local)
+        let left = n
+        let cur = 0
+        const rows = CODE.map((toks, i) => {
+          const avail = left
+          left = Math.max(0, left - lineLens[i])
+          if (avail > 0) cur = i
+          if (avail >= lineLens[i] && i < CODE.length - 1 && left > 0) cur = i + 1
+          let rem = avail
+          let inner = ''
+          for (const [s, c] of toks) {
+            if (rem <= 0) break
+            const part = s.slice(0, rem)
+            rem -= part.length
+            inner += `<span class="tk-${c}">${esc(part)}</span>`
+          }
+          return inner
+        })
+        cur = Math.min(cur, CODE.length - 1)
+        const blink = n >= TOTAL ? Math.floor(local * 2) % 2 === 0 : true
+        $('#s2code').innerHTML = rows
+          .map(
+            (inner, i) =>
+              `<div class="ln${i === cur ? ' cur' : ''}">${inner}${
+                i === cur && blink ? '<span class="caret" style="color:#1e3a8a"></span>' : ''
+              }</div>`,
+          )
+          .join('')
+        return cur
+      }
+
+      function paintList(local, cur) {
+        const target = LINE_TO_ITEM[cur] * 70
+        const items = document.querySelectorAll('#s2 .item')
+        items.forEach((el, i) => {
+          const on = i === LINE_TO_ITEM[cur]
+          el.style.color = on ? '#0b0d12' : '#6b7078'
+          el.querySelector('.k').style.color = on ? '#3b5ba5' : '#9ca3af'
+        })
+        $('#s2bar').style.transform = `translateY(${target}px)`
+      }
+
+      // ---------- Scene 3 ----------
+      function paintGrid(local) {
+        const cells = ['#c-db', '#c-st', '#c-ai', '#c-th']
+        cells.forEach((sel, ci) => {
+          const chips = document.querySelectorAll(`${sel} .chip, ${sel} .tile`)
+          const n = chips.length
+          const on = local > 3.4 ? Math.floor((local - 3.4 + ci * 0.35) / 1.3) % n : -1
+          chips.forEach((ch, i) => {
+            const k = prog(local, 1.2 + ci * 0.22 + i * 0.09, 0.6)
+            ch.style.opacity = k
+            ch.style.transform = `translateY(${(1 - k) * 14}px) scale(${0.92 + 0.08 * k})`
+            ch.classList.toggle('on', i === on)
+          })
+          const foot = document.querySelector(`${sel} .foot`)
+          setIn(foot, local, 1.0 + ci * 0.18, 14)
+        })
+      }
+
+      // ---------- Scene 4 terminal ----------
+      const PROMPT = '/ari-create-module'
+      const DESC = 'A habit tracker with daily streaks and a dashboard widget'
+      const OUT = [
+        ['', ''],
+        [
+          '<span class="muted">●</span> Planning module <span class="amber">habit-tracker</span>…',
+          5.3,
+        ],
+        ['<span class="ok">✓</span> modules-custom/habit-tracker/module.json', 6.0],
+        [
+          '<span class="ok">✓</span> database/schema.sql  <span class="muted">per-user · RLS</span>',
+          6.4,
+        ],
+        ['<span class="ok">✓</span> api/habits/route.ts', 6.8],
+        ['<span class="ok">✓</span> app/page.tsx', 7.1],
+        ['<span class="ok">✓</span> components/streak-widget.tsx', 7.4],
+        ['', ''],
+        ['Done. Restart ARI to load <span class="amber">Habit Tracker</span>.', 8.1],
+      ]
+      function paintTerm(local) {
+        const p1 = Math.floor(clamp((local - 1.4) / 0.9) * PROMPT.length)
+        const p2 = Math.floor(clamp((local - 2.6) / 2.0) * DESC.length)
+        const typingDesc = local >= 2.6 && p2 < DESC.length
+        const typingPrompt = p1 < PROMPT.length || (local < 2.6 && local >= 1.4)
+        const blink = Math.floor(local * 2.2) % 2 === 0
+        const caret = '<span class="caret"></span>'
+        let html = `<div><span class="amber">›</span> ${esc(PROMPT.slice(0, p1))}${
+          typingPrompt && (p1 < PROMPT.length || blink) ? caret : ''
+        }</div>`
+        html += `<div class="muted">  ${esc(DESC.slice(0, p2))}${typingDesc ? caret : ''}</div>`
+        for (const [line, at] of OUT) {
+          if (at === '') {
+            html += '<div>&nbsp;</div>'
+            continue
+          }
+          const k = prog(local, at, 0.45)
+          html += `<div style="opacity:${k};transform:translateY(${(1 - k) * 8}px)">  ${line}</div>`
+        }
+        const done = local > 8.1
+        if (done) html += `<div><span class="amber">›</span> ${blink ? caret : ''}</div>`
+        $('#s4body').innerHTML = html
+      }
+
+      // ---------- Scene 5 statements ----------
+      function paintStatements(local) {
+        const slots = [
+          [0.7, 3.2],
+          [3.4, 5.9],
+          [6.1, 8.8],
+        ]
+        slots.forEach(([a, b], i) => {
+          const el = $('#st' + i)
+          const kin = prog(local, a, 0.8)
+          const kout = i === 2 ? 0 : easeInOut(clamp((local - (b - 0.35)) / 0.45))
+          el.style.opacity = kin * (1 - kout)
+          el.style.transform = `translateY(${(1 - kin) * 30 - kout * 30}px)`
+          el.style.filter = `blur(${(1 - kin) * 10 + kout * 10}px)`
+        })
+      }
+
+      window.DURATION = DURATION
+      window.render = function (t) {
+        SCENES.forEach(([id, a, b], idx) => {
+          const el = document.getElementById(id)
+          // The next scene sits fully opaque underneath while this one fades out on top,
+          // so crossfades never dip through the stage background.
+          const vis = t >= a - FADE - 0.001 && t <= b + 0.001
+          el.style.display = vis ? 'block' : 'none'
+          if (!vis) return
+          const fout = b >= DURATION ? 0 : easeInOut(clamp((t - (b - FADE)) / FADE))
+          el.style.zIndex = SCENES.length - idx
+          el.style.opacity = 1 - fout
+          el.style.transform = `scale(${1 + fout * 0.02})`
+          el.style.filter = fout > 0 ? `blur(${fout * 6}px)` : 'none'
+          const local = t - a
+          el.querySelectorAll('.a').forEach((x) => setIn(x, local, parseFloat(x.dataset.in || 0)))
+
+          if (id === 's1') {
+            const cmd = './ari start'
+            const n = Math.floor(clamp((local - 2.7) / 1.0) * cmd.length)
+            $('#s1cmd').textContent = cmd.slice(0, n)
+            $('#s1caret').style.opacity = n < cmd.length || Math.floor(local * 2) % 2 === 0 ? 1 : 0
+            const tile = $('#s1tile')
+            const k = prog(local, 1.1, 1.4)
+            tile.style.transform = `translateY(${(1 - k) * 60 + Math.sin(local * 1.1) * 10}px) rotate(${(1 - k) * -6}deg) scale(${0.9 + 0.1 * k})`
+            el.querySelector('.sky').style.transform = `translateY(${-local * 4}px)`
+          }
+          if (id === 's2') {
+            const cur = paintCode(local)
+            paintList(local, cur)
+          }
+          if (id === 's3') paintGrid(local)
+          if (id === 's4') paintTerm(local)
+          if (id === 's5') paintStatements(local)
+          if (id === 's6') {
+            const tile = $('#s6tile')
+            const k = prog(local, 0.3, 1.4)
+            tile.style.transform = `translateY(${(1 - k) * 70 + Math.sin(local * 1.1) * 8}px) scale(${0.85 + 0.15 * k})`
+            el.querySelector('.sky').style.transform = `translateY(${local * 4}px)`
+          }
+        })
+      }
+
+      // Live preview when opened directly in a browser.
+      if (!location.search.includes('render')) {
+        const t0 = performance.now()
+        const loop = () => {
+          window.render(((performance.now() - t0) / 1000) % DURATION)
+          requestAnimationFrame(loop)
+        }
+        document.fonts.ready.then(loop)
+      }
+    </script>
+  </body>
+</html>
