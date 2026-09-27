@@ -29,6 +29,16 @@ if (!/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(ARI_BRANCH) || ARI_BRANCH.includes('..
   process.exit(1);
 }
 
+// Which ARI to install from main: the newest release tag (default), a specific
+// release, or "edge" for the unreleased tip of main. Ignored when ARI_BRANCH
+// names another branch. Release tags are bare X.Y.Z — see pinToRelease().
+const RELEASE_TAG_RE = /^\d+\.\d+\.\d+$/;
+const ARI_VERSION = (process.env.ARI_VERSION || 'latest').replace(/^v(?=\d)/, '');
+if (ARI_VERSION !== 'latest' && ARI_VERSION !== 'edge' && !RELEASE_TAG_RE.test(ARI_VERSION)) {
+  console.error(`Invalid ARI_VERSION: '${ARI_VERSION}' (expected latest, edge, or a release like 2.0.5)`);
+  process.exit(1);
+}
+
 // Local-dev Postgres password used on Windows. EDB's installer leaves the
 // postgres superuser with no usable password unless we pass one via --override
 // at install time. Resolution order:
@@ -1253,7 +1263,21 @@ async function cloneAndSetup() {
     await runAsync(`git clone${branchFlag} https://github.com/ARIsoftware/ARI.git "${targetDir}"`);
     // Rename origin to upstream (public ARI repo) so user can add their own origin later
     await runAsync('git remote rename origin upstream', { cwd: targetDir });
-    spinner.success(`ARI cloned to ${dim(targetDir)}${ARI_BRANCH !== 'main' ? ` (branch: ${ARI_BRANCH})` : ''}`);
+
+    let installed = ARI_BRANCH !== 'main' ? ` (branch: ${ARI_BRANCH})` : '';
+    let pinWarning = null;
+    if (ARI_BRANCH === 'main' && ARI_VERSION === 'edge') {
+      installed = ' (edge: latest main)';
+    } else if (ARI_BRANCH === 'main') {
+      const pinned = pinToRelease(targetDir);
+      if (pinned.ok) installed = ` (version ${pinned.version})`;
+      else pinWarning = pinned.reason;
+    }
+    spinner.success(`ARI cloned to ${dim(targetDir)}${installed}`);
+    if (pinWarning) {
+      console.log(`  ${SYM_WARN} ${yellow(pinWarning)}`);
+      console.log(`  ${dim('Installed the latest code from main instead. Run ./ari update later to move to a release.')}`);
+    }
   } catch (err) {
     spinner.error('Failed to clone ARI repository');
     console.log(`  ${dim(err.message.split('\n').slice(0, 3).join('\n  '))}`);
@@ -1264,6 +1288,43 @@ async function cloneAndSetup() {
   }
 
   return await installDependencies(targetDir);
+}
+
+/**
+ * Move a freshly cloned `main` onto a release so new installs start on
+ * released code rather than whatever main's tip holds. The clone already
+ * brought every tag, so this needs no network. `checkout -B` keeps the branch
+ * named main and tracking upstream/main, which `./ari update` relies on.
+ *
+ * Only ever called on a clone this installer just made — never on an existing
+ * directory, where moving the branch could drop the user's commits.
+ *
+ * Never throws: any problem returns { ok: false, reason } and leaves the
+ * working main checkout in place. SYNC: release-tag rules mirror
+ * scripts/lib/update-target.js, which this standalone file cannot import.
+ */
+function pinToRelease(targetDir) {
+  const listed = run('git tag -l --sort=-v:refname', { cwd: targetDir });
+  const releases = (listed || '').split('\n').map((name) => name.trim()).filter((name) => RELEASE_TAG_RE.test(name));
+
+  if (releases.length === 0) {
+    return { ok: false, reason: 'No ARI releases were found in the repository.' };
+  }
+  const version = ARI_VERSION === 'latest' ? releases[0] : releases.find((name) => name === ARI_VERSION);
+  if (!version) {
+    return { ok: false, reason: `ARI ${ARI_VERSION} is not a released version (latest is ${releases[0]}).` };
+  }
+
+  // rev-list resolves an annotated tag to its commit without the `^{commit}`
+  // suffix, whose caret is an escape character in cmd.exe.
+  const sha = run(`git rev-list -n 1 refs/tags/${version}`, { cwd: targetDir });
+  if (!sha || !/^[0-9a-f]{40,64}$/.test(sha)) {
+    return { ok: false, reason: `Could not resolve ARI ${version}.` };
+  }
+  if (run(`git checkout -q -B main ${sha}`, { cwd: targetDir }) === null) {
+    return { ok: false, reason: `Could not switch to ARI ${version}.` };
+  }
+  return { ok: true, version };
 }
 
 async function installDependencies(targetDir) {

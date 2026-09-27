@@ -496,6 +496,11 @@ OPENAI_API_KEY=your_openai_api_key  # For AI Assistant feature
 
 # Check Supabase status
 ./ari status
+
+# Update to the latest release (or a specific newer one / unreleased main)
+./ari update
+./ari update 2.0.5
+./ari update --edge
 ```
 
 `./ari start` checks Docker, starts Supabase (idempotent), regenerates `.env.supabase.local`, and runs `pnpm dev`. On Windows, use `.\ari.cmd start`.
@@ -503,11 +508,31 @@ OPENAI_API_KEY=your_openai_api_key  # For AI Assistant feature
 Flags combine freely: `--lan` also binds to the local network, `--verbose` streams full logs, and `--tunnel` additionally opens a temporary public HTTPS URL through a Cloudflare Quick Tunnel (needs the `cloudflared` binary — offered by the installer — and a completed setup with at least one user; the CLI refuses otherwise so the password-less `/welcome` wizard is never exposed). The tunnel URL changes on every restart and dies with the process. The CLI hands the tunnel origin to the dev server as `ARI_TUNNEL_ORIGIN` (process env only, never `.env.local`), which `lib/auth.ts` adds to Better Auth's trusted origins and `next.config.mjs` adds to `allowedDevOrigins` — see `tunnelTrustedOrigins()` in `lib/auth-origins.ts`. `BETTER_AUTH_URL` stays on localhost, so OAuth callbacks (e.g. Today's Brief Google sign-in) only work from the owner's machine. Docs: https://ari.software/docs/tunnel.
 
 ### ARI CLI — Tracked in Git
-The `./ari` command runs `.ari/cli.js`. All three files (`./ari`, `./ari.cmd`, `.ari/cli.js`) are **tracked in git** — `git pull` keeps the CLI fresh. To modify CLI behavior, edit `.ari/cli.js` directly.
+The `./ari` command runs `.ari/cli.js`. All three files (`./ari`, `./ari.cmd`, `.ari/cli.js`) are **tracked in git** — `./ari update` keeps the CLI fresh (a plain `git pull` also does, but it follows `main`, i.e. an edge update). To modify CLI behavior, edit `.ari/cli.js` directly.
 
 Line endings and the executable bit are pinned via `.gitattributes` (`ari` = LF, `ari.cmd` = CRLF) and `git update-index --chmod=+x ari`. Don't normalize line endings or strip the +x bit.
 
 Other files inside `.ari/` (e.g. `.ari/pgweb.pid`) are runtime state and remain gitignored via `.ari/*` + `!.ari/cli.js`.
+
+### Updates & Releases
+
+ARI releases are **annotated git tags named `X.Y.Z`** (no `v` prefix — `.npmrc` sets `tag-version-prefix=""`) on `ARIsoftware/ARI`. Users move between releases; only `--edge` follows `main`.
+
+- `./ari update` → latest release. `./ari update <version>` → that release, **forward only** (a version older than the installed one is refused; there are no down-migrations). `./ari update --edge` → merges `upstream/main`.
+- The release list always comes from the remote (`git ls-remote --tags upstream`) and the update merges the tag's **commit sha**, never the local tag name — local tags can be missing, stale, or conflicting. History decides "already up to date" (`git merge-base --is-ancestor`), not `package.json`, because installs that followed `main` sit ahead of the latest tag.
+- The CLI never resets, force-moves, or checks out over a user's install. The one `git checkout -B main <sha>` lives in the installer and only runs on a clone it just created.
+- Pure decision logic is in `scripts/lib/update-target.js` (unit tested in `tests/unit/scripts/lib/update-target.test.ts`); `.ari/cli.js` only does git and terminal I/O. The installer (`scripts/install.mjs`) is a standalone file and carries its own copy of the release-tag rule — keep the two in sync.
+- Startup notice (`checkForUpdates()` in `.ari/cli.js`) compares the installed version with the latest upstream tag and must never delay startup: it settles on its own 3s timer.
+- Fresh installs land on the latest release. `ARI_VERSION=2.0.5` installs a specific release, `ARI_VERSION=edge` installs `main`; `ARI_BRANCH=<branch>` still installs that branch as-is.
+- The in-app "New version is available" dialog is fed by `api.ari.software/version/latest`, which reads `version` from `package.json` on `main` — **not** the tags. The two agree only when the release checklist below is followed.
+
+**Release checklist** (every release):
+
+1. `pnpm version <patch|minor|major>` — creates the "bump" commit and the bare `X.Y.Z` tag together.
+2. `git push --atomic upstream main <X.Y.Z>` — the commit and its tag must reach GitHub in one step.
+3. Never push a `package.json` version bump without its tag: the in-app dialog would advertise a version `./ari update` cannot find yet.
+4. `scripts/install.mjs` is always downloaded from `main` but installs the latest **release**, so it must stay compatible with the code in the latest tag.
+5. Never move or delete a published tag, and tag only commits on `main`.
 
 For manual control without the CLI:
 ```bash

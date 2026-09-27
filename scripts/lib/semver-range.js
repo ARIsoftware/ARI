@@ -43,7 +43,13 @@ export function parseVersion(s) {
   return nums
 }
 
-function cmp(a, b) {
+/**
+ * Compare two parsed versions (as returned by parseVersion).
+ * @param {number[]} a
+ * @param {number[]} b
+ * @returns {number} negative when a < b, 0 when equal, positive when a > b
+ */
+export function cmp(a, b) {
   for (let i = 0; i < 3; i++) {
     if (a[i] !== b[i]) return a[i] - b[i]
   }

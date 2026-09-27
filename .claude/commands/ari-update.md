@@ -1,4 +1,12 @@
-Pull the latest ARI updates from the official upstream repository.
+Update ARI to the latest release from the official upstream repository.
+
+ARI releases are git tags named `X.Y.Z` (no `v` prefix) on `ARIsoftware/ARI`. By default an update moves to the **latest release**, not to the tip of `main`.
+
+- The user names a version (e.g. "update to 2.0.5") → target that release. It must be **newer** than the installed version.
+- The user explicitly asks for "edge", "main", or unreleased code → target `upstream/main` instead (see step 4).
+- Otherwise → target the latest release.
+
+`./ari update`, `./ari update <version>` and `./ari update --edge` do the same from the terminal.
 
 ## Steps
 
@@ -37,26 +45,59 @@ Skip silently if the files are already tracked, or don't exist.
 
 ### 3. Check for Uncommitted Changes
 
-- Run `git status` to check for uncommitted changes (staged, unstaged, or untracked).
+- If `git rev-parse -q --verify MERGE_HEAD` succeeds, a previous merge is unfinished. Tell the user to resolve it (`git add <file> && git commit`) and stop.
+- Run `git status --porcelain --untracked-files=no` to check for uncommitted changes to tracked files. Untracked files (custom modules and themes) are expected and need no warning.
 - If there are uncommitted changes, warn the user:
   > "You have uncommitted changes. It's recommended to commit or stash them before updating. Would you like to continue anyway?"
 - Ask for confirmation. If they say no, stop.
 
-### 4. Fetch Upstream
+### 4. Choose the Target
+
+**Release (default).** List upstream's releases — this reads the remote directly, so it does not depend on local tags, which can be missing or stale:
+
+```bash
+git ls-remote --tags upstream
+```
+
+- Consider only tags named exactly `X.Y.Z`. Ignore anything else (`v2.1.0`, `2.1.0-beta.1`).
+- Annotated tags appear twice; the line ending in `^{}` carries the **commit** sha. Use that sha. A tag with no `^{}` line is lightweight and its own sha is the commit.
+- The target is the highest version (compare numerically: `2.0.10` is newer than `2.0.9`), or the version the user asked for.
+- Read the installed version from `package.json` (`version`).
+
+Stop here, without changing anything, when:
+
+| Situation | Tell the user |
+|---|---|
+| The command fails | "Could not list releases from upstream. Check your network connection." |
+| No `X.Y.Z` tags exist | "No releases found upstream." Offer the edge update instead. |
+| The requested version is not a tag | "ARI `<version>` is not a released version." List the newer releases. |
+| The requested version is older than the installed one | "ARI `<version>` is older than the installed `<current>`. Downgrading is not supported: the database schema only moves forward." |
+
+**Never downgrade.** Do not check out, reset to, or otherwise move to an older release, even if asked. ARI's schema is applied forward-only on every boot, so older code against a newer database is unsupported.
+
+**Edge (only when explicitly requested).** The target is `upstream/main`.
+
+### 5. Fetch Upstream
 
 - Run `git fetch upstream` to download the latest changes.
-- If the fetch fails (e.g., network error, repo not accessible), show the error and stop.
+- For a release target, confirm its commit is available: `git cat-file -e <sha>^{commit}`. If it is not, run `git fetch upstream refs/tags/<version>` and check again. (A plain fetch can fail on a conflicting local tag; that alone is not a reason to stop as long as the commit is available.)
+- If the commit still isn't available, or an edge fetch fails, show the error and stop.
 
-### 5. Show What's Changed
+### 6. Show What's Changed
 
-- Run `git log HEAD..upstream/main --oneline` to show new commits.
-- Run `git diff --stat HEAD..upstream/main` to show which files changed.
-- If there are no new changes, tell the user "You're already up to date!" and stop.
+In the commands below, `<target>` is the release's commit sha, or `upstream/main` for edge.
+
+- Check whether the target is already part of the user's history: `git merge-base --is-ancestor <target> HEAD`.
+  - Exit code `0`: nothing to do. Run `git rev-list --count <target>..HEAD`; if it is `0` say "ARI `<version>` is installed. Already up to date.", otherwise "You already have ARI `<version>` plus N newer commit(s). No newer release yet." Then stop.
+  - Exit code `1`: continue.
+  - Any other exit code: show the error and stop.
+- Run `git log HEAD..<target> --oneline` to show new commits.
+- Run `git diff --stat HEAD...<target>` (three dots) to show which files the update changes. Two dots would also list the user's own local commits as if they were being removed.
 - Present the summary to the user clearly:
-  > "There are X new commits from ARI upstream affecting Y files."
-  > Show the commit list and file summary.
+  > "ARI `<current>` → `<version>`: X new commits affecting Y files."
+  > Show the commit list and file summary. For edge, say the commits are unreleased.
 
-### 6. Ask for Confirmation
+### 7. Ask for Confirmation
 
 Ask the user:
 > "Would you like to merge these updates into your local branch?"
@@ -67,9 +108,13 @@ With options:
 
 If they say no, stop.
 
-### 7. Merge Upstream
+### 8. Merge
 
-- Run `git merge upstream/main --no-edit` to merge the updates.
+- Run the merge against the **commit sha**, not the tag name:
+  ```bash
+  git merge --ff --no-edit -m "Update ARI to <version>" <sha>
+  ```
+  For edge: `git merge --ff --no-edit -m "Update ARI to latest main" upstream/main`. (`-m` only applies when a merge commit is needed; a fast-forward ignores it.)
 - If the merge succeeds cleanly, continue to post-update steps.
 - If there are merge conflicts:
   - Run `git diff --name-only --diff-filter=U` to list conflicted files.
@@ -80,7 +125,7 @@ If they say no, stop.
     > "Tip: Keeping your customizations in `modules-custom/` avoids most conflicts."
   - Do NOT run `git merge --abort` unless the user asks. Stop here.
 
-### 8. Post-Update Tasks
+### 9. Post-Update Tasks
 
 After a successful merge:
 
@@ -103,17 +148,18 @@ After a successful merge:
    - If something is referenced but not configured, tell the user:
      > "This update references new environment variables that aren't in your `.env.local`: `<names>`. Please add them before restarting.""
 
-### 9. Summary
+### 10. Summary
 
 Show a final summary:
 > "ARI has been updated successfully!"
-> Include: number of new commits merged, any action items remaining (pnpm install, SQL migrations, env vars).
+> Include: the version now installed (`version` in `package.json`), number of new commits merged, any action items remaining (pnpm install, SQL migrations, env vars).
 > Remind the user to restart their dev server if it's running.
 
 ## Important Rules
 
 - NEVER run SQL files automatically — always list them for the user to run manually.
 - NEVER force-push, reset, or use any destructive git commands.
+- NEVER downgrade to an older release, and never update to `main` unless the user explicitly asked for edge.
 - NEVER modify `.env` files.
 - NEVER touch `modules-custom/` or `themes-custom/` — those directories belong to the user.
 - If anything goes wrong, explain clearly and let the user decide how to proceed.

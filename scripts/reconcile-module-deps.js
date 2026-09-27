@@ -2,8 +2,8 @@
  * Reconcile npm deps declared in modules-custom/*\/module.json with root
  * package.json. Called from .ari/cli.js — boot (`./ari start`) runs it before
  * its `pnpm install` so a module dropped into modules-custom/ by hand works
- * after a plain restart, `./ari update` runs it after a successful upstream
- * merge, and `./ari fix-deps` runs it on demand.
+ * after a plain restart, `./ari update` runs it after a successful release
+ * (or `--edge`) merge, and `./ari fix-deps` runs it on demand.
  *
  * Because boot runs it on every start, it must stay quiet and idempotent when
  * there is nothing to do: a dep already recorded in any installed root block

@@ -1,10 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import {
+  cmp,
   isReadableRange,
   parseVersion,
   rangeAnchor,
   satisfies,
 } from '@/scripts/lib/semver-range.js'
+
+describe('cmp', () => {
+  it.each([
+    [[1, 2, 3], [1, 2, 3], 0],
+    [[1, 2, 4], [1, 2, 3], 1],
+    [[1, 2, 3], [1, 2, 4], -1],
+    [[1, 3, 0], [1, 2, 9], 1],
+    [[2, 0, 0], [1, 9, 9], 1],
+    [[2, 0, 10], [2, 0, 9], 1],
+  ])('compares %j with %j', (a, b, expected) => {
+    expect(Math.sign(cmp(a, b))).toBe(expected)
+  })
+})
 
 describe('parseVersion', () => {
   it.each([

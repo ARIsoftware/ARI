@@ -6,7 +6,12 @@
 # Usage:
 #   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/ARIsoftware/ARI/main/scripts/install.sh)"
 #
-# To install from a specific branch:
+# Installs the latest ARI release by default. To install a specific release, or
+# the unreleased tip of main:
+#   ARI_VERSION=2.0.5 /bin/bash -c "$(curl -fsSL https://ari.software/install)"
+#   ARI_VERSION=edge  /bin/bash -c "$(curl -fsSL https://ari.software/install)"
+#
+# To install from a specific branch (ARI_VERSION is then ignored):
 #   ARI_BRANCH=develop /bin/bash -c "$(curl -fsSL https://ari.software/install)"
 #
 

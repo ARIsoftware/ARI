@@ -2,7 +2,7 @@
 
 /**
  * ARI CLI — Local development helper
- * Usage: ./ari start [--lan] [--tunnel] [--verbose] | stop | status | update | fix-deps | doctor
+ * Usage: ./ari start [--lan] [--tunnel] [--verbose] | stop | status | update [version] [--edge] | fix-deps | doctor
  */
 
 import { execSync, spawn, spawnSync } from 'child_process';
@@ -14,6 +14,13 @@ import os from 'os';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { reconcileCustomModuleDeps } from '../scripts/reconcile-module-deps.js';
+import {
+  isNewerRelease,
+  latestTag,
+  parseRemoteTags,
+  parseUpdateArgs,
+  resolveUpdateTarget,
+} from '../scripts/lib/update-target.js';
 
 const cjsRequire = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -52,6 +59,29 @@ const RESET = '\x1b[0m';
 function run(cmd, opts = {}) {
   try {
     return execSync(cmd, { encoding: 'utf8', stdio: 'pipe', cwd: ROOT, ...opts }).trim();
+  } catch {
+    return null;
+  }
+}
+
+// git with an argument array — no shell, so values that came from the command
+// line or from a remote (versions, shas) can never be interpreted as syntax.
+// Returns { status, stdout, stderr }; status is null when git could not be run
+// or was killed by the timeout.
+function git(args, opts = {}) {
+  const res = spawnSync('git', args, { cwd: ROOT, encoding: 'utf8', windowsHide: true, ...opts });
+  return {
+    status: res.error ? null : res.status,
+    stdout: (res.stdout || '').trim(),
+    stderr: (res.stderr || '').trim(),
+  };
+}
+
+// Version from package.json, or null when it can't be read.
+function readAriVersion() {
+  try {
+    const version = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
+    return typeof version === 'string' && version ? version : null;
   } catch {
     return null;
   }
@@ -125,10 +155,18 @@ function writeEnvFile(supabaseVars) {
   fs.writeFileSync(ENV_FILE, content);
 }
 
+// Resolves with the typed answer, or null when stdin ends without one (piped
+// or closed input). Without the close handler the promise would never settle
+// and the process would exit 0 having silently done nothing.
 function ask(question) {
   return new Promise((resolve) => {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    let answered = false;
+    rl.on('close', () => {
+      if (!answered) resolve(null);
+    });
     rl.question(question, (answer) => {
+      answered = true;
       rl.close();
       resolve(answer);
     });
@@ -428,29 +466,70 @@ const UPSTREAM_REPO = 'ARIsoftware/ARI';
 const UPSTREAM_URL = `https://github.com/${UPSTREAM_REPO}.git`;
 const UPDATE_DOCS_URL = 'https://ari.software/docs/updating';
 
-// Best-effort upstream check. Returns false on any failure so startup is never blocked or false-alarmed.
-async function checkForUpdates() {
-  if (run('git rev-parse --git-dir') === null) return false;
+const UPDATE_CHECK_TIMEOUT_MS = 3000;
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 2000);
-  try {
-    const res = await fetch(`https://api.github.com/repos/${UPSTREAM_REPO}/commits/main`, {
-      headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'ari-cli' },
-      signal: controller.signal,
+// Never let a release lookup stop to ask for credentials: no helper, no
+// terminal prompt, no GUI prompt, no ssh passphrase/host-key question (a user
+// `url.<base>.insteadOf` rewrite can turn the https URL into ssh).
+const GIT_NO_PROMPT_ARGS = ['-c', 'credential.helper='];
+function gitNoPromptEnv() {
+  return {
+    ...process.env,
+    GIT_TERMINAL_PROMPT: '0',
+    GCM_INTERACTIVE: 'never',
+    GIT_SSH_COMMAND: 'ssh -oBatchMode=yes',
+  };
+}
+
+// Best-effort release check: resolves { latest, current } when upstream has a
+// newer release tag than the installed version, otherwise null. Any failure is
+// null so startup is never blocked or false-alarmed.
+//
+// The timer settles the promise itself rather than waiting for the child to
+// exit: killing git does not always end its remote helper, which can keep the
+// pipe open, and start() awaits this before printing the ready banner.
+function checkForUpdates() {
+  return new Promise((resolve) => {
+    let settled = false;
+    let child = null;
+    let timer = null;
+    const settle = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value);
+    };
+
+    // Not a git checkout → `./ari update` couldn't act on a notice anyway.
+    if (run('git rev-parse --git-dir') === null) return settle(null);
+    const current = readAriVersion();
+    if (!current) return settle(null);
+
+    timer = setTimeout(() => {
+      settle(null);
+      try { child.kill(); } catch {}
+    }, UPDATE_CHECK_TIMEOUT_MS);
+
+    try {
+      child = spawn('git', [...GIT_NO_PROMPT_ARGS, 'ls-remote', '--tags', '--refs', UPSTREAM_URL], {
+        cwd: ROOT,
+        env: gitNoPromptEnv(),
+        stdio: ['ignore', 'pipe', 'ignore'],
+        windowsHide: true,
+      });
+    } catch {
+      return settle(null);
+    }
+
+    let out = '';
+    child.stdout.on('data', (chunk) => { out += chunk; });
+    child.on('error', () => settle(null));
+    child.on('close', (code) => {
+      if (code !== 0) return settle(null);
+      const latest = latestTag(parseRemoteTags(out));
+      settle(latest && isNewerRelease(latest.version, current) ? { latest: latest.version, current } : null);
     });
-    if (!res.ok) return false;
-    const data = await res.json();
-    const sha = data && data.sha;
-    if (typeof sha !== 'string' || !/^[0-9a-f]{40}$/.test(sha)) return false;
-
-    // cat-file -e returns nonzero (null) when the commit isn't in our local object DB → upstream is ahead.
-    return run(`git cat-file -e ${sha}`) === null;
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(timer);
-  }
+  });
 }
 
 // ── Commands ───────────────────────────────────────────────────────────────
@@ -916,7 +995,7 @@ function start(opts = {}) {
               process.stdout.write(DIM + '- Database UI:   ' + RESET + `http://localhost:${PGWEB_PORT}` + '\n');
             }
             if (updateAvailable) {
-              const line = '  ↑ ARI update available  ' + DIM + UPDATE_DOCS_URL + RESET + '\n';
+              const line = '  ↑ ARI ' + updateAvailable.latest + ' available ' + DIM + '(you have ' + updateAvailable.current + ') — run ./ari update  ' + UPDATE_DOCS_URL + RESET + '\n';
               process.stdout.write(quiet ? line : '\n' + line + '\n');
             }
             // Verbose-only: surface the last unit-test run's pass rate. `log` is a
@@ -1029,7 +1108,8 @@ async function stop() {
     const pgReady = run(PG_IS_READY) !== null;
     if (pgReady) {
       const answer = await ask('  Your PostgreSQL database is running. Stop it now? (Y/n) ');
-      if (!answer || answer.toLowerCase() === 'y') {
+      // null = no terminal to answer on; don't stop a database nobody agreed to stop.
+      if (answer !== null && (!answer || answer.toLowerCase() === 'y')) {
         if (process.platform === 'darwin') {
           run('brew services stop postgresql@17');
         } else if (IS_WIN) {
@@ -1078,10 +1158,183 @@ function status() {
   }
 }
 
-async function update() {
+const UPDATE_USAGE = 'Usage: ./ari update [version] [--edge]';
+const UPDATE_PREVIEW_MAX_COMMITS = 20;
+
+function printUpdateUsage() {
+  console.log('  ' + UPDATE_USAGE);
   console.log('');
+  console.log('    ./ari update           Update to the latest release');
+  console.log('    ./ari update 2.0.5     Update to a specific newer release');
+  console.log('    ./ari update --edge    Update to the latest unreleased code on main');
+  console.log('');
+}
+
+// `git diff --stat` output, already trimmed by run()/git(): re-indent every
+// line the same so the file column stays aligned.
+function printDiffStat(diffStat) {
+  for (const line of diffStat.split('\n')) {
+    console.log('   ' + DIM + line.trim() + RESET);
+  }
+}
+
+function updateFail(message, hint) {
+  console.log('  ' + RED + '✘' + RESET + ' ' + message);
+  if (hint) console.log('  ' + DIM + hint + RESET);
+  console.log('');
+  process.exit(1);
+}
+
+function updateDone(message) {
+  console.log('  ' + GREEN + '✔' + RESET + ' ' + message);
+  console.log('');
+  process.exit(0);
+}
+
+// A prompt that needs a real answer: no terminal means we stop rather than guess.
+async function askForUpdate(question) {
+  const answer = await ask(question);
+  if (answer === null) {
+    console.log('');
+    updateFail('No interactive terminal to confirm on. Update cancelled.');
+  }
+  return answer.trim().toLowerCase();
+}
+
+// Resolve which release to move to and make sure its commit is available
+// locally. Returns { version, sha, current }, or exits when there is nothing to
+// do or the request can't be honoured. Never changes the working tree.
+function resolveReleaseTarget(requested) {
+  console.log('  Looking up ARI releases...');
+  const listed = git([...GIT_NO_PROMPT_ARGS, 'ls-remote', '--tags', 'upstream'], {
+    env: gitNoPromptEnv(),
+    timeout: 15000,
+  });
+  if (listed.status !== 0) {
+    updateFail('Could not list releases from upstream. Check your network connection.');
+  }
+
+  const current = readAriVersion();
+  const resolved = resolveUpdateTarget({
+    currentVersion: current,
+    requested,
+    tags: parseRemoteTags(listed.stdout),
+  });
+
+  if (resolved.kind === 'no-tags') {
+    updateFail('No releases found upstream.', 'Use ./ari update --edge to follow main.');
+  }
+  if (resolved.kind === 'unknown-version') {
+    updateFail(
+      `ARI ${resolved.requested} is not a released version.`,
+      resolved.newer.length > 0
+        ? 'Newer releases: ' + resolved.newer.slice(0, 10).join(', ')
+        : 'There is no release newer than the one installed.',
+    );
+  }
+  if (resolved.kind === 'downgrade') {
+    updateFail(
+      `ARI ${resolved.requested} is older than the installed ${resolved.current}.`,
+      'Downgrading is not supported: the database schema only moves forward.',
+    );
+  }
+  if (resolved.kind === 'installed-newer') {
+    updateDone(`Installed ARI ${resolved.current} is newer than the latest release ${resolved.latest}. Nothing to do.`);
+  }
+
+  const { version, sha } = resolved.target;
+
+  // Best effort: refreshes upstream/main and brings new tags. A failure here is
+  // not fatal on its own (e.g. a conflicting local tag with tagOpt=--tags) —
+  // what matters is whether the release commit is available below.
+  console.log('  Fetching upstream...');
+  const fetched = git(['fetch', 'upstream'], { env: gitNoPromptEnv() });
+
+  const hasCommit = () => git(['cat-file', '-e', sha + '^{commit}']).status === 0;
+  if (!hasCommit()) {
+    // Fetches the tag's objects into FETCH_HEAD only; no local tag is written.
+    git(['fetch', 'upstream', 'refs/tags/' + version], { env: gitNoPromptEnv() });
+    if (!hasCommit()) {
+      updateFail(
+        `Could not download ARI ${version} from upstream. Check your network connection.`,
+        fetched.stderr.split('\n')[0],
+      );
+    }
+  }
+
+  // History is the ground truth: an install that followed main can already
+  // contain a release regardless of what its package.json reports.
+  const ancestry = git(['merge-base', '--is-ancestor', sha, 'HEAD']).status;
+  if (ancestry !== 0 && ancestry !== 1) {
+    updateFail('Could not compare your copy with ARI ' + version + '.', 'Run ./ari doctor for details.');
+  }
+  if (ancestry === 0) {
+    const ahead = Number(git(['rev-list', '--count', sha + '..HEAD']).stdout) || 0;
+    updateDone(
+      ahead === 0
+        ? `ARI ${version} is installed. Already up to date.`
+        : `You already have ARI ${version} plus ${ahead} newer commit(s). No newer release yet.`,
+    );
+  }
+
+  return { version, sha, current, sameVersion: resolved.relation === 'same' };
+}
+
+// Show what a release update would bring in, without touching anything.
+function previewRelease({ version, sha, current, sameVersion }) {
+  const incoming = git(['log', '--oneline', 'HEAD..' + sha]).stdout.split('\n').filter((l) => l.trim());
+  // Three dots: what the release adds since the common ancestor. Two dots would
+  // also list the user's own local commits, reversed, as if they'd be removed.
+  const diffStat = git(['diff', '--stat', 'HEAD...' + sha]).stdout;
+
+  console.log('');
+  if (sameVersion) {
+    console.log('  ' + YELLOW + `Your copy reports ${version} but is missing ${incoming.length} commit(s) from that release:` + RESET);
+  } else {
+    console.log('  ' + YELLOW + `ARI ${current || 'unknown'} → ${version}` + RESET + DIM + `  (${incoming.length} commit(s))` + RESET);
+  }
+  console.log('');
+  for (const line of incoming.slice(0, UPDATE_PREVIEW_MAX_COMMITS)) {
+    console.log('    ' + DIM + line + RESET);
+  }
+  if (incoming.length > UPDATE_PREVIEW_MAX_COMMITS) {
+    console.log('    ' + DIM + `... and ${incoming.length - UPDATE_PREVIEW_MAX_COMMITS} more` + RESET);
+  }
+  console.log('');
+  if (diffStat) {
+    printDiffStat(diffStat);
+    console.log('');
+  }
+
+  // Only accurate when the install sits exactly on a release; otherwise the
+  // link would show changes the user already has.
+  if (current && !sameVersion && git(['rev-parse', '-q', '--verify', 'refs/tags/' + current + '^{commit}']).stdout === git(['rev-parse', 'HEAD']).stdout) {
+    console.log('  ' + DIM + `https://github.com/${UPSTREAM_REPO}/compare/${current}...${version}` + RESET);
+    console.log('');
+  }
+}
+
+async function update() {
+  const args = parseUpdateArgs(process.argv.slice(3));
+
+  console.log('');
+  if (args.error) {
+    console.log('  ' + RED + '✘' + RESET + ' ' + args.error);
+    console.log('');
+    printUpdateUsage();
+    process.exit(1);
+  }
+  if (args.help) {
+    printUpdateUsage();
+    process.exit(0);
+  }
+
   console.log('  ' + YELLOW + 'Checking for ARI updates...' + RESET);
   console.log('');
+
+  if (run('git rev-parse --git-dir') === null) {
+    updateFail('This copy of ARI is not a git checkout, so it cannot be updated in place.', UPDATE_DOCS_URL);
+  }
 
   // Ensure upstream remote exists
   const remotes = run('git remote') || '';
@@ -1097,14 +1350,21 @@ async function update() {
     console.log('  ' + GREEN + '✔' + RESET + ' Upstream remote exists');
   }
 
-  // Warn about uncommitted changes
-  const statusOut = run('git status --porcelain') || '';
-  if (statusOut.length > 0) {
-    const changedCount = statusOut.split('\n').filter(l => l.trim()).length;
-    console.log('  ' + YELLOW + '⚠' + RESET + ` You have ${changedCount} uncommitted change(s).`);
-    console.log('  ' + DIM + 'Consider committing or stashing before updating.' + RESET);
-    const answer = await ask('  Continue anyway? (y/N) ');
-    if (!answer || answer.toLowerCase() !== 'y') {
+  // A half-finished merge must be resolved first; merging on top of it fails
+  // with a message that doesn't say why.
+  if (git(['rev-parse', '-q', '--verify', 'MERGE_HEAD']).status === 0) {
+    updateFail(
+      'A previous merge is still in progress.',
+      'Resolve the conflicts and run: git add <file> && git commit  (or cancel it with: git merge --abort)',
+    );
+  }
+
+  // Detached HEAD (e.g. after `git checkout 2.0.5`): the update would land on
+  // no branch and be easy to lose.
+  if (git(['symbolic-ref', '-q', 'HEAD']).status !== 0) {
+    console.log('  ' + YELLOW + '⚠' + RESET + ' You are not on a branch (detached HEAD).');
+    console.log('  ' + DIM + 'Updating here leaves the result on no branch. Switch first with: git switch main' + RESET);
+    if ((await askForUpdate('  Continue anyway? (y/N) ')) !== 'y') {
       console.log('  ' + DIM + 'Update cancelled.' + RESET);
       console.log('');
       process.exit(0);
@@ -1112,49 +1372,86 @@ async function update() {
     console.log('');
   }
 
-  // Fetch upstream
-  console.log('  Fetching upstream...');
-  const fetchResult = run('git fetch upstream');
-  if (fetchResult === null) {
-    console.log('  ' + RED + '✘' + RESET + ' Failed to fetch upstream. Check your network connection.');
-    process.exit(1);
-  }
-
-  // Show what's changed
-  const newCommits = run('git log HEAD..upstream/main --oneline') || '';
-  if (!newCommits.trim()) {
-    console.log('  ' + GREEN + '✔' + RESET + ' Already up to date!');
+  // Warn about uncommitted changes to tracked files. Untracked files are left
+  // out: custom modules and themes are untracked by design, and git refuses the
+  // merge by itself if one of them would be overwritten.
+  const statusOut = run('git status --porcelain --untracked-files=no') || '';
+  if (statusOut.length > 0) {
+    const changedCount = statusOut.split('\n').filter(l => l.trim()).length;
+    console.log('  ' + YELLOW + '⚠' + RESET + ` You have ${changedCount} uncommitted change(s).`);
+    console.log('  ' + DIM + 'Consider committing or stashing before updating.' + RESET);
+    if ((await askForUpdate('  Continue anyway? (y/N) ')) !== 'y') {
+      console.log('  ' + DIM + 'Update cancelled.' + RESET);
+      console.log('');
+      process.exit(0);
+    }
     console.log('');
-    process.exit(0);
   }
 
-  const commitCount = newCommits.split('\n').filter(l => l.trim()).length;
-  const diffStat = run('git diff --stat HEAD..upstream/main') || '';
+  // What to merge, and the message a (non-fast-forward) merge commit gets.
+  let mergeRef;
+  let mergeMessage;
 
-  console.log('');
-  console.log('  ' + YELLOW + `${commitCount} new commit(s) available:` + RESET);
-  console.log('');
-  for (const line of newCommits.split('\n').filter(l => l.trim())) {
-    console.log('    ' + DIM + line + RESET);
+  if (args.edge) {
+    // Fetch upstream
+    console.log('  Fetching upstream...');
+    const fetchResult = run('git fetch upstream');
+    if (fetchResult === null) {
+      updateFail('Failed to fetch upstream. Check your network connection.');
+    }
+
+    // Show what's changed
+    const newCommits = run('git log HEAD..upstream/main --oneline') || '';
+    if (!newCommits.trim()) {
+      updateDone('Already up to date with main.');
+    }
+
+    const commitLines = newCommits.split('\n').filter(l => l.trim());
+    const diffStat = run('git diff --stat HEAD...upstream/main') || '';
+
+    console.log('');
+    console.log('  ' + YELLOW + `${commitLines.length} new commit(s) on main ` + RESET + DIM + '(unreleased)' + RESET);
+    console.log('');
+    for (const line of commitLines.slice(0, UPDATE_PREVIEW_MAX_COMMITS)) {
+      console.log('    ' + DIM + line + RESET);
+    }
+    if (commitLines.length > UPDATE_PREVIEW_MAX_COMMITS) {
+      console.log('    ' + DIM + `... and ${commitLines.length - UPDATE_PREVIEW_MAX_COMMITS} more` + RESET);
+    }
+    console.log('');
+    printDiffStat(diffStat);
+    console.log('');
+
+    mergeRef = 'upstream/main';
+    mergeMessage = 'Update ARI to latest main';
+  } else {
+    const target = resolveReleaseTarget(args.version);
+    previewRelease(target);
+    // Merge the commit itself, not the tag name: a local tag can be missing,
+    // stale, or point somewhere else, and upstream's sha is the authority.
+    mergeRef = target.sha;
+    mergeMessage = 'Update ARI to ' + target.version;
   }
-  console.log('');
-  console.log('  ' + DIM + diffStat + RESET);
-  console.log('');
 
   // Ask for confirmation
-  const answer = await ask('  Merge these updates? (Y/n) ');
-  if (answer && answer.toLowerCase() === 'n') {
+  if ((await askForUpdate('  Merge these updates? (Y/n) ')) === 'n') {
     console.log('  ' + DIM + 'Update cancelled.' + RESET);
     console.log('');
     process.exit(0);
   }
 
-  // Merge upstream
+  // Merge. Fast-forward whenever history allows it — stated explicitly so a
+  // user-level `merge.ff=false` can't turn every update into a merge commit.
+  // Local commits make a real merge necessary; that commit gets a readable
+  // message instead of git's default "Merge commit '<sha>'".
   console.log('');
   console.log('  Merging updates...');
-  try {
-    execSync('git merge upstream/main --no-edit', { stdio: 'inherit', cwd: ROOT });
-  } catch {
+  const canFastForward = git(['merge-base', '--is-ancestor', 'HEAD', mergeRef]).status === 0;
+  const mergeArgs = canFastForward
+    ? ['merge', '--ff-only', mergeRef]
+    : ['merge', '--no-edit', '-m', mergeMessage, mergeRef];
+  const merged = git(mergeArgs, { stdio: 'inherit' });
+  if (merged.status !== 0) {
     console.log('');
     console.log('  ' + RED + '✘' + RESET + ' Merge failed — you likely have conflicting local changes.');
     console.log('  ' + DIM + 'Resolve conflicts, then run: git add <file> && git commit' + RESET);
@@ -1182,7 +1479,8 @@ async function update() {
   console.log('  ' + GREEN + '✔' + RESET + ' Dependencies installed');
 
   console.log('');
-  console.log('  ' + GREEN + 'Update complete!' + RESET + ' Run ' + DIM + './ari start' + RESET + ' to launch.');
+  const nowOn = readAriVersion();
+  console.log('  ' + GREEN + 'Update complete!' + RESET + (nowOn ? ' Now on ARI ' + nowOn + '.' : '') + ' Run ' + DIM + './ari start' + RESET + ' to launch.');
   console.log('');
 }
 
@@ -1258,10 +1556,7 @@ async function doctor() {
 
   lines.push('  ' + DIM + 'Platform: ' + process.platform + ' ' + os.release() + RESET);
 
-  let ariVersion = '';
-  try {
-    ariVersion = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version || '';
-  } catch {}
+  const ariVersion = readAriVersion() || '';
   const ariCommit = run('git rev-parse --short HEAD') || '';
   const ariVersionStr = ariVersion + (ariCommit ? '+' + ariCommit : '');
   ariVersionStr ? ok('ARI version', ariVersionStr) : warn('ARI version', 'unknown');
@@ -1429,7 +1724,9 @@ if (!cmd || !commands[cmd]) {
   console.log('    startquiet         Alias for start (kept for backwards compatibility)');
   console.log('    stop               Stop database services');
   console.log('    status             Show database status');
-  console.log('    update             Pull latest ARI updates + install dependencies');
+  console.log('    update             Update to the latest ARI release + install dependencies');
+  console.log('    update <version>   Update to a specific newer release (e.g. ./ari update 2.0.5)');
+  console.log('    update --edge      Update to the latest unreleased code on main');
   console.log('    fix-deps           Re-sync custom-module npm deps into package.json');
   console.log('    doctor             Print diagnostic report (paste this when asking for help)');
   console.log('');

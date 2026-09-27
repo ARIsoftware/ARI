@@ -303,7 +303,7 @@ upstream  https://github.com/ARIsoftware/ARI.git (push)`}
                 <strong className="text-foreground">origin</strong> = your private repo (your changes go here)
               </li>
               <li>
-                <strong className="text-foreground">upstream</strong> = official ARI repo (pull updates from here with{" "}
+                <strong className="text-foreground">upstream</strong> = official ARI repo (releases come from here; update with{" "}
                 <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">/ari-update</code>)
               </li>
             </ul>

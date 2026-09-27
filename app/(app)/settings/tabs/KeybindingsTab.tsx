@@ -110,7 +110,19 @@ export function KeybindingsTab(): React.ReactElement {
           <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3">
             <div>
               <span className="text-sm font-medium text-slate-700">./ari update</span>
-              <p className="text-xs text-slate-500 mt-0.5">Pull latest ARI updates and install dependencies</p>
+              <p className="text-xs text-slate-500 mt-0.5">Update to the latest ARI release and install dependencies</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3">
+            <div>
+              <span className="text-sm font-medium text-slate-700">./ari update 2.0.5</span>
+              <p className="text-xs text-slate-500 mt-0.5">Update to a specific newer release</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3">
+            <div>
+              <span className="text-sm font-medium text-slate-700">./ari update --edge</span>
+              <p className="text-xs text-slate-500 mt-0.5">Update to the latest unreleased code on main</p>
             </div>
           </div>
         </CardContent>
@@ -142,7 +154,7 @@ export function KeybindingsTab(): React.ReactElement {
           <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/50 px-4 py-3">
             <div>
               <span className="text-sm font-medium text-slate-700">/ari-update</span>
-              <p className="text-xs text-slate-500 mt-0.5">Pull the latest ARI updates from the official upstream repository</p>
+              <p className="text-xs text-slate-500 mt-0.5">Update ARI to the latest release from the official upstream repository</p>
             </div>
           </div>
         </CardContent>

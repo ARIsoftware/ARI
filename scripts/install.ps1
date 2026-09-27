@@ -8,7 +8,12 @@
   Usage (run in PowerShell):
     irm https://raw.githubusercontent.com/ARIsoftware/ARI/main/scripts/install.ps1 | iex
 
-  To install from a specific branch:
+  Installs the latest ARI release by default. To install a specific release, or
+  the unreleased tip of main:
+    $env:ARI_VERSION="2.0.5"; irm https://raw.githubusercontent.com/ARIsoftware/ARI/main/scripts/install.ps1 | iex
+    $env:ARI_VERSION="edge"; irm https://raw.githubusercontent.com/ARIsoftware/ARI/main/scripts/install.ps1 | iex
+
+  To install from a specific branch (ARI_VERSION is then ignored):
     $env:ARI_BRANCH="develop"; irm https://raw.githubusercontent.com/ARIsoftware/ARI/main/scripts/install.ps1 | iex
 
   Install transcripts are written by default to $env:TEMP\ari-install-*.log so
