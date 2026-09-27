@@ -66,6 +66,22 @@ function applyThemeColors(colors: ThemeColors) {
   if (!colors.topbarForeground) {
     root.style.removeProperty('--topbar-foreground')
   }
+  repaintDocumentScrollbar()
+}
+
+// Chrome does not restyle ::-webkit-scrollbar pseudo-elements when an inherited
+// custom property they read changes, so after a theme switch the page scrollbar
+// (globals.css paints its thumb from --scrollbar-thumb / --primary) keeps the
+// previous theme's colour until a hover or reload. Tearing the scrollbar down
+// and restoring it within one synchronous task rebuilds its painter with the
+// new tokens; no frame is rendered in between, so nothing visibly flickers and
+// the scroll offset is retained.
+function repaintDocumentScrollbar() {
+  const root = document.documentElement
+  const previous = root.style.overflow
+  root.style.overflow = 'hidden'
+  void root.offsetHeight // force layout so the scrollbar is actually removed
+  root.style.overflow = previous
 }
 
 // Apply font to document
