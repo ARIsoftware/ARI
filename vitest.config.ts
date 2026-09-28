@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -7,6 +7,15 @@ const configDir = path.dirname(fileURLToPath(import.meta.url))
 export default defineConfig({
   test: {
     include: ['tests/unit/**/*.test.ts'],
+    // *.lab.test.ts build real git repositories and run the CLI and installer
+    // against them: thorough, but about half a minute. `pnpm test` and CI run
+    // them. The test report generated on every dev boot and build
+    // (scripts/generate-test-report.mjs) sets ARI_SKIP_LAB_TESTS=1 so that
+    // starting ARI does not wait for them.
+    exclude: [
+      ...configDefaults.exclude,
+      ...(process.env.ARI_SKIP_LAB_TESTS === '1' ? ['**/*.lab.test.ts'] : []),
+    ],
     environment: 'node',
     coverage: {
       provider: 'v8',
@@ -21,10 +30,7 @@ export default defineConfig({
       // module's lib/**. modules-custom/* is untracked (local-only) and is
       // intentionally NOT covered here. React components, pages, and thin
       // API-route glue are also out of scope for this effort.
-      include: [
-        'lib/**/*.ts',
-        'modules-core/**/lib/**/*.ts',
-      ],
+      include: ['lib/**/*.ts', 'modules-core/**/lib/**/*.ts'],
       exclude: [
         '**/*.d.ts',
         '**/types.ts',

@@ -46,13 +46,17 @@ function writeFallback(reason) {
     console.warn(`[test-report] ${reason} — wrote fallback report.`)
   } catch (err) {
     // Even the fallback write failed — log and move on; never throw.
-    console.warn(`[test-report] Could not write fallback report: ${err instanceof Error ? err.message : String(err)}`)
+    console.warn(
+      `[test-report] Could not write fallback report: ${err instanceof Error ? err.message : String(err)}`,
+    )
   }
 }
 
 try {
   if (process.env.ARI_SKIP_TEST_REPORT === '1') {
-    console.log('[test-report] Skipped (ARI_SKIP_TEST_REPORT=1) — leaving any existing report as-is.')
+    console.log(
+      '[test-report] Skipped (ARI_SKIP_TEST_REPORT=1) — leaving any existing report as-is.',
+    )
   } else if (process.env.VERCEL) {
     // Vercel builds (including zero-config Deploy Button installs) shouldn't
     // spend build minutes running the test suite — CI already covers it.
@@ -76,7 +80,9 @@ try {
     const result = spawnSync(
       process.execPath,
       [VITEST_ENTRY, 'run', '--reporter=json', `--outputFile=${OUTPUT_PATH}`],
-      { cwd: REPO_ROOT, stdio: 'inherit', env: process.env }
+      // The slow git-lab suites (*.lab.test.ts) are left to `pnpm test` and CI:
+      // this runs on every dev boot.
+      { cwd: REPO_ROOT, stdio: 'inherit', env: { ...process.env, ARI_SKIP_LAB_TESTS: '1' } },
     )
 
     if (!fs.existsSync(OUTPUT_PATH)) {
@@ -86,7 +92,7 @@ try {
       writeFallback(
         result.error
           ? `Vitest failed to run: ${result.error.message}`
-          : 'Vitest produced no report file (crash or collect error)'
+          : 'Vitest produced no report file (crash or collect error)',
       )
     } else {
       // Fresh report on disk (may contain failing tests — that's fine). Stamp the
@@ -98,7 +104,7 @@ try {
       const passed = report.numPassedTests ?? 0
       const pct = total > 0 ? Math.floor((passed / total) * 100) : 0
       console.log(
-        `[test-report] Wrote ${path.relative(REPO_ROOT, OUTPUT_PATH)} — ${passed}/${total} passed (${pct}%).`
+        `[test-report] Wrote ${path.relative(REPO_ROOT, OUTPUT_PATH)} — ${passed}/${total} passed (${pct}%).`,
       )
     }
   }
