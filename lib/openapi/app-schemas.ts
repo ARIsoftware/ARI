@@ -418,6 +418,10 @@ export const VersionCheckResponseSchema = z.object({
   latestVersion: z.string().nullable(),
 }).openapi('VersionCheckResponse')
 
+export const VersionCheckIgnoreResponseSchema = z.object({
+  success: z.literal(true),
+}).openapi('VersionCheckIgnoreResponse')
+
 // ────────────────────────────────────────────────────────────
 // /api/settings
 // ────────────────────────────────────────────────────────────

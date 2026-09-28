@@ -2,9 +2,12 @@
 
 import * as React from "react"
 import { usePathname } from "next/navigation"
-import { ArrowRight, ExternalLink, Rocket } from "lucide-react"
+import { ExternalLink } from "lucide-react"
 
-import { useVersionCheck } from "@/hooks/use-version-check"
+import {
+  useIgnoreVersionNotice,
+  useVersionCheck,
+} from "@/hooks/use-version-check"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -16,32 +19,31 @@ import {
 
 const UPDATE_DOCS_URL = "https://ari.software/docs/updating"
 
-// Session-local dismissal. The server's 4-day stamp was already written when
-// the check ran, so a dismissal needs no API call — this flag only stops the
-// TanStack-cached result from reopening the popup on soft navigation. It
-// resets on hard reload, where the server gate answers false for 4 days.
-let dismissedThisSession = false
-
 /**
- * "New version is available" popup, shown on /dashboard when the server-side
- * check (at most one upstream call per user per 4 days) reports an update.
+ * "New version is available" popup, shown on /dashboard on every visit while
+ * the server reports an update, until the user clicks Ignore.
  */
 export function UpdateNoticeDialog() {
   const pathname = usePathname()
-  const { data } = useVersionCheck(pathname === "/dashboard")
-  const [dismissed, setDismissed] = React.useState(() => dismissedThisSession)
+  const onDashboard = pathname === "/dashboard"
+  const { data } = useVersionCheck(onDashboard)
+  const ignoreNotice = useIgnoreVersionNotice()
+  // Closing without choosing (X, Escape, click outside) hides the popup only
+  // for the current visit: leaving /dashboard clears it, so the next visit
+  // shows the popup again. Only Ignore silences it for 4 days.
+  const [closed, setClosed] = React.useState(false)
+  if (!onDashboard && closed) setClosed(false)
 
   const open =
-    pathname === "/dashboard" &&
-    !!data?.updateAvailable &&
-    !!data.latestVersion &&
-    !dismissed
+    onDashboard && !!data?.updateAvailable && !!data.latestVersion && !closed
 
   const handleOpenChange = (next: boolean) => {
-    if (!next) {
-      dismissedThisSession = true
-      setDismissed(true)
-    }
+    if (!next) setClosed(true)
+  }
+
+  const handleIgnore = () => {
+    handleOpenChange(false)
+    ignoreNotice.mutate()
   }
 
   if (!data?.latestVersion) return null
@@ -50,24 +52,19 @@ export function UpdateNoticeDialog() {
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md gap-0 overflow-hidden p-0">
         <div className="bg-gradient-to-b from-accent/10 to-transparent px-6 pb-5 pt-6">
-          <div className="flex items-start gap-4">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent ring-1 ring-accent/25">
-              <Rocket className="h-5 w-5" />
-            </div>
-            <DialogHeader className="space-y-1.5">
-              <DialogTitle className="text-base font-semibold">
-                New version is available
-              </DialogTitle>
-              <DialogDescription>
-                A newer release of ARI is ready. Update to get the latest
-                features, improvements, and fixes.
-              </DialogDescription>
-            </DialogHeader>
-          </div>
+          <DialogHeader className="space-y-1.5">
+            <DialogTitle className="text-base font-semibold">
+              New version is available
+            </DialogTitle>
+            <DialogDescription>
+              A newer release of ARI is ready. Update to get the latest
+              features, improvements, and fixes.
+            </DialogDescription>
+          </DialogHeader>
         </div>
 
         <div className="px-6">
-          <div className="flex items-center justify-center gap-3 rounded-lg border bg-muted/40 px-4 py-3">
+          <div className="flex items-center justify-center gap-3 py-3">
             <div className="flex flex-col items-center gap-0.5">
               <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                 Installed
@@ -76,9 +73,22 @@ export function UpdateNoticeDialog() {
                 v{data.currentVersion}
               </span>
             </div>
-            <ArrowRight className="h-4 w-4 text-muted-foreground/60" />
+            {/* lucide ArrowRight geometry, stretched to ~3.2x the length */}
+            <svg
+              viewBox="0 0 77 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              className="h-4 w-[51px] text-muted-foreground/60"
+            >
+              <path d="M5 12h67" />
+              <path d="m65 5 7 7-7 7" />
+            </svg>
             <div className="flex flex-col items-center gap-0.5">
-              <span className="text-[10px] font-medium uppercase tracking-wider text-accent">
+              <span className="text-[10px] font-medium uppercase tracking-wider text-foreground">
                 Latest
               </span>
               <span className="font-mono text-sm font-semibold text-foreground">
@@ -89,7 +99,7 @@ export function UpdateNoticeDialog() {
         </div>
 
         <div className="flex items-center justify-end gap-2 px-6 pb-6 pt-5">
-          <Button variant="outline" onClick={() => handleOpenChange(false)}>
+          <Button variant="outline" onClick={handleIgnore}>
             Ignore
           </Button>
           <Button asChild>
