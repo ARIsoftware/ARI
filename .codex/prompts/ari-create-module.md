@@ -1,0 +1,1059 @@
+The user would like to create a custom module in the modules-custom directory. Each new module should start with the modules-core/module-template module as a starting template.
+
+## Pre-flight Checks
+
+Before doing anything:
+1. Read `/docs/SECURITY.md` - understand the layered security model (middleware, withRLS, database RLS)
+2. Read `/CLAUDE.md` for project conventions (authentication, RLS). For theme-aware UI, see the **Theming** section later in this prompt.
+3. Confirm `modules-core/module-template` exists. **If it does not exist, STOP immediately. Tell the user: "The Module Template at `modules-core/module-template` is missing — this is required as the starting template for new modules. How would you like to proceed?" Wait for the user's instructions before doing anything else.**
+4. Confirm we are at the repo root and that `modules-custom` exists. If not, create it.
+
+## Security Requirements
+
+**Security is absolutely paramount.** Every module must be secure by default. No exceptions.
+
+### Database Security
+- **All tables MUST have Row Level Security (RLS) policies enabled.** A table without RLS is an open table.
+- **Decide per-user vs shared for each content table (ARI is multi-user).** The choice must be consistent in BOTH `database/schema.sql` (RLS policy) and your API queries:
+  - **Per-user (private) — the safe default.** Users only see their own rows (fitness, journal, notes, and all config/secrets). RLS: `USING (user_id = (SELECT current_setting('app.current_user_id', true)))` with the same predicate as the UPDATE `WITH CHECK`; **API filters every SELECT/UPDATE/DELETE by `user_id = user.id`**.
+  - **Shared (collaborative).** All authenticated users read/write the same rows (like the built-in tasks/contacts/documents). RLS SELECT/UPDATE/DELETE: `USING ((SELECT app.can_access_shared()))` plus the `app.prevent_user_id_reassignment()` BEFORE UPDATE trigger (copy the block from `modules-core/contacts/database/schema.sql`); **API does NOT filter by `user_id`**. Only make a table shared if the user explicitly wants collaborative data.
+  - INSERT stamps `user_id = user.id` (the owner) in BOTH models.
+- **Both layers enforce the rule.** Request-path queries run as the non-BYPASSRLS `ari_app` role, so Postgres evaluates your policies — and the API filter stays mandatory because ARI falls back to the privileged role whenever the app role is unavailable. A per-user query that forgets its `user_id` filter leaks other users' rows. See `docs/SECURITY.md`.
+- Since Better Auth does not use `auth.uid()`, RLS policies use `(SELECT current_setting('app.current_user_id', true))` (set by `withRLS()`; `true` = missing_ok, `(SELECT …)` = evaluated once per statement). `app.can_access_shared()` is defined in `lib/db/setup.sql`. See `modules-core/module-template/database/schema.sql` for the commented per-user/shared pattern. `tests/unit/lib/db/policy-contract.test.ts` fails the build on a bare call, a missing `, true`, a `FOR UPDATE` policy without `WITH CHECK`, or a per-user table without a `user_id` index.
+- **Never read a deny-all table (`user`, `session`, `account`, `verification`, `twoFactor`, `ari_instance`) through `withRLS()`** — on the app role the query returns no rows, silently. Use `withAdminDb()` after your own authorization check (the tasks assignee picker is the reference). Never write `GRANT` / `OWNER TO` in module SQL — grants for new tables are automatic.
+- Never create tables with RLS disabled, even for "temporary" or "simple" modules.
+
+### API Security
+- **Every API route MUST call `getAuthenticatedUser()` and verify the user exists** before doing anything else. Unauthenticated requests must be rejected immediately.
+- **All database operations MUST use `withRLS()`** — never use the raw Supabase client or unscoped Drizzle queries.
+- **Match the API query to the table's per-user/shared choice** (see Database Security): per-user tables filter every read/write by `user_id = user.id`; shared tables do not.
+- **Gate privileged actions** with `requirePermission(user, 'key')` / `requireAdmin(user)` from `@/lib/api-helpers` (keys: `manage_users`, `manage_admins`, `manage_modules`, `access_settings`, `generate_api_keys`). Admins pass every permission.
+- **All user input MUST be validated with Zod schemas** before use. Never trust client-provided data.
+- Never expose internal error details (stack traces, SQL errors) to the client. Return generic error messages.
+- **Public/webhook routes** require secret-based validation (HMAC signatures, bearer tokens, etc.) implemented **in the handler itself** — the declared `publicRoutes` security config is metadata only, the framework enforces nothing. If needed, read `/docs/MODULES.md` section 7.5 for the `publicRoutes` pattern and the `checkRateLimit`/`getClientIp` helpers from `@/lib/modules/public-route-security`.
+
+### General Security Principles
+- Never store secrets, API keys, or credentials in code or client-accessible files. Use environment variables.
+- Never log sensitive data (passwords, tokens, PII) in API routes.
+- Always use parameterized queries (Drizzle handles this) — never interpolate user input into SQL.
+- If a module accepts file uploads, validate file types and sizes server-side.
+
+## Files You Must Never Edit
+
+**A module is created by adding ONE folder under `modules-custom/<id>/`. Nothing else.** There are no registration touchpoints — `pnpm generate-module-registry` wires everything up automatically. Editing any file outside that folder will cause real damage: those files are upstream-managed, and the user will lose your edits — and get a merge conflict that blocks future updates — the next time they run `ari-update`. This is not a stylistic preference; it is a hard correctness rule.
+
+### Forbidden — never edit these during module creation
+
+- `app/globals.css` — themes, CSS variables, global styles all live here. **Never add a rule, variable, animation, or import to this file for a module.**
+- `app/layout.tsx`, `app/page.tsx`, any other file under `app/` that isn't a module-owned route
+- `tailwind.config.*` and `postcss.config.*`
+- `next.config.mjs`, `middleware.ts`, `instrumentation.ts`
+- `components/` (the shared shadcn/ui directory) — do not add module components here
+- `lib/` — do not add module hooks, types, utilities, or constants here. This includes the auto-generated files under `lib/generated/` and the barrels `lib/db/schema/schema.ts` + `relations.ts`
+- `package.json` directly — module npm deps go in `module.json` under `npmDependencies`; the installer handles the rest
+- Any file inside `modules-core/` (these are upstream-managed; the only correct response is to duplicate the module into `modules-custom/` first — see the project-level rule in `CLAUDE.md`)
+
+### There are NO registration touchpoints outside the module folder
+
+A module is **one folder and nothing else**. Do not edit any file outside `modules-custom/<id>/` — there is no exception.
+
+Everything is discovered and wired automatically by `pnpm generate-module-registry` (which runs before every `pnpm dev` / `pnpm build`): pages, API routes, the Drizzle schema and relations barrels, submenus, top-bar icons, dashboard widgets, providers, and public routes. It reads `module.json` and the module's folder layout — nothing needs to be registered by hand.
+
+The generated files (`lib/generated/*`, plus the barrels `lib/db/schema/schema.ts` and `relations.ts`) are stamped **"DO NOT EDIT THIS FILE MANUALLY"**. Any edit you make there is overwritten on the next dev/build run, so it is never a fix — it just looks like one until the next restart.
+
+If you find yourself wanting to edit a file outside the module folder, **stop.** The correct fix is almost always to put the code inside `modules-custom/<id>/` instead. If you genuinely believe an exception is needed, ask the user before editing.
+
+See `docs/MODULES.md` §2 ("External Registration Points: None").
+
+### Module-scoped styles
+
+If a module needs custom CSS (animations, keyframes, one-off rules that can't be expressed with Tailwind utility classes), put the CSS file inside the module folder — for example `modules-custom/<id>/styles.css` — and import it from the module's `app/page.tsx`. **Do not add the CSS to `app/globals.css`.** Theme-aware colors should still use semantic Tailwind tokens (`bg-background`, `text-foreground`, etc.) — see the Theming section below.
+
+## npm Dependencies: Prefer What's Already Installed
+
+**Before adding ANY new npm package, check whether ARI already ships one that covers the need** — read the root `package.json` `dependencies` (read-only; never edit it). Reusing an installed package avoids version conflicts (the module installer aborts the install if an `npmDependencies` entry clashes with a root dependency), keeps installs fast, and keeps the bundle small.
+
+Common needs already covered by a fresh ARI install (non-exhaustive — always check `package.json` for the current list):
+
+| Need | Use what's installed |
+|---|---|
+| Animation / transitions | `framer-motion`; `tailwindcss-animate` utility classes for simple cases |
+| Charts / graphs | `recharts` — via ARI's `@/components/ui/chart` wrapper |
+| Date/time formatting & math | `date-fns` |
+| Icons | `lucide-react` |
+| Drag and drop / sortable lists | `@dnd-kit/core` + `@dnd-kit/sortable` |
+| Dialogs, dropdowns, tooltips, toasts, tabs, etc. | shadcn/ui components in `components/ui/` (Radix under the hood) |
+| Command palette / searchable menus | `cmdk` |
+| Drawers / bottom sheets | `vaul` |
+| Carousels | `embla-carousel-react` |
+| Validation | `zod` |
+| File upload UI | `react-dropzone` |
+| Calendars / date pickers | `react-day-picker` |
+| Resizable panels | `react-resizable-panels` |
+| Flow / node diagrams | `@xyflow/react` |
+| 3D | `three` + `@react-three/fiber` + `@react-three/drei` |
+| Confetti / celebration effects | `canvas-confetti` |
+| QR codes | `qrcode.react` |
+| UUIDs | `uuid` (or `crypto.randomUUID()`) |
+| Conditional class names | `clsx` + `tailwind-merge` via `cn()` from `@/lib/utils` |
+
+Rules:
+
+1. **Check `package.json` first.** If an installed package covers the need — even if it isn't the package you'd reach for by default — use it. Do not add a functional duplicate of something already installed (e.g. no `dayjs`/`moment` alongside `date-fns`, no `animate.css` alongside `framer-motion`, no `react-icons` alongside `lucide-react`, no chart library alongside `recharts`).
+2. **A new package is fine when nothing installed is genuinely suitable** (missing capability, not just unfamiliarity). Briefly tell the user what you're adding and why the existing option doesn't fit.
+3. **Declare new packages in `module.json` under `npmDependencies`** — never by editing `package.json` directly. Prefer well-maintained, actively published packages.
+
+## Postgres & Supabase Skills
+
+This project includes Supabase guidance for Claude in `.claude/skills/`. When creating database schemas, use the `supabase-postgres-best-practices` skill to look up PostgreSQL best practices for data types, indexes, constraints, and table design. For Codex, rely on the documented schema conventions in this prompt and the repo docs instead. These references help ensure database tables follow PostgreSQL conventions and best practices.
+
+## Questions to Ask
+
+Ask the user the following questions ONE AT A TIME, waiting for each answer before continuing. When asking each question, prefix it with "ARI:" instead of numbering them (e.g., "ARI: What is the name of the module?"). Do not ask about v0 generated code, unless the user mentions is.
+
+1. **Module Name**: What is the name of the module? (e.g., "Habit Tracker", "Recipe Book", "Budget Manager")
+2. **Description**: Please describe this module in detail. What is the purpose of the module? What features does it need? What data will be stored in the database?
+3. **Navigation**: Should it appear in the sidebar? If so, what should the page name be?
+4. **Submenu**: Does the module have any subpages which require a submenu?
+5. **Top Bar**: Should it have a quick-access icon in the top bar?
+6. **Onboarding**: Does this module need an onboarding/setup screen to collect initial configuration from the user? (e.g., asking for birthdate, preferences, API keys, etc.)
+7. **Dashboard Widget**: Should this module add a card or widget to the main Dashboard? If yes, describe what it should display (e.g., summary stat, chart, recent items list). There are two types: **stat cards** (small cards in the Quick Overview grid) and **widgets** (larger components in the content area below).
+8. **File Storage**: Does this module need to store files (images, documents, audio, etc.)? If yes, what types of files and are there any size limits? (Files are stored via the ARI File Storage System — works in all database modes with no extra configuration.)
+9. **AI Provider**: Should we add an AI Provider configuration screen where users can select the provider they want this module to use (e.g., Claude, Gemini, OpenAI)? (If yes, the settings panel includes the shared `AiProviderCard` — see "AI Provider Selection" below. Only ask/build this when the module actually calls an LLM.)
+10. **Per-user vs shared data**: ARI is multi-user. Should this module's data be **per-user (private)** — each person only sees their own (the default; right for personal data like logs, notes, health) — or **shared (collaborative)** — everyone sees and edits the same records (like a shared task list or document library)? This decides the RLS policy and whether API queries filter by `user_id` (see Security Requirements → Database Security). Default to per-user unless the user asks for collaboration.
+
+If the user provides v0 code:
+- Read and analyze all provided v0 code files
+- Summarize what the v0 UI does: components, data model, interactions, CRUD operations
+- Rephrase the Description question (Q3) as a confirmation: "ARI: Based on the v0 code, this module appears to [summary]. Is this accurate? Any changes or additions needed?"
+- When v0 code is provided, skip UI layout clarifying questions (e.g., "list view, cards, calendar?") since the UI is already defined. Focus clarifying questions on data/business logic instead.
+
+Then ask follow-up clarifying questions based on their answers. You can ask any clarifying questions. Here are some examples of clarifying questions:
+
+- What data needs to be stored?
+- How do you envision the main UI/layout? (list view, cards, calendar, etc.)
+- Do you need to create, edit, and delete entries? Or just view them?
+- Are there any statuses, categories, or tags needed?
+- Do you need any sorting, filtering, or search capabilities?
+- Should entries have dates/timestamps? Due dates? Recurring items?
+- Do you need any calculations, totals, or statistics displayed?
+- Are there any relationships to other modules or data (e.g., linking to tasks, contacts)? What should happen if the other data/module is not available or installed?
+- Are there any existing apps or tools that do something similar to what you want?
+- **Does this module need to receive data from external services?** (e.g., webhooks from Stripe, Resend, GitHub, etc.) If yes, a public route with security validation will be needed.
+- **Does this module need to store any files?** (e.g., images, PDFs, audio clips) If yes, files are stored via the ARI File Storage System with no extra configuration.
+
+Continue asking questions until you have a very clear picture of what to build. The goal is to avoid building the wrong thing or missing important requirements.
+
+Note: The user may have requested to create the module in the modules-core directory. If so, please inform them that it is highly recommended that all new modules are placed in the modules-custom directory, and confirm with them that the new module should be placed in the modules-custom directory as recommended. Give the user the opportunity to confirm that the module can be placed in the the modules-custom directory. If they reply that the module should be in the modules-core directory please comply with that request.
+
+## Validation Rules
+
+- Derive a folder slug from the module name in kebab-case (e.g., "Habit Tracker" -> "habit-tracker").
+- Only lowercase alphanumeric characters and hyphens allowed.
+- Ensure the target folder does not already exist at that location. If it does, ask for a new name.
+- Module ID in module.json must match the folder slug.
+
+## Before Proceeding
+
+After collecting answers:
+1. Ask any additional clarifying questions if required.
+2. Present a detailed summary with your understandings and then ask for explicit approval to proceed.
+
+## v0 Code Integration
+
+If the user provided v0.dev code, perform the following analysis and preparation before
+starting the Implementation Steps. Present findings to the user for confirmation.
+
+### v0 Code Analysis
+
+Analyze all provided v0 code and extract:
+1. **Component hierarchy** — identify the main page component vs. sub-components
+2. **Data model** — what entities/data structures are implied by mock/static data arrays
+3. **shadcn imports** — list all `@/components/ui/*` imports used
+4. **External dependencies** — any npm imports beyond react, next, @/components/ui/*, @/lib/*, lucide-react
+5. **CRUD operations** — what create/read/update/delete actions are implied by buttons and handlers
+6. **State classification** — which useState calls are "data state" (→ becomes TanStack Query) vs. "UI state" (→ stays as useState, e.g. dialog open/close, form inputs)
+
+### Dependency Resolution
+
+1. List all `@/components/ui/*` imports found in the v0 code
+2. Check which components exist in `components/ui/` directory (use `ls components/ui/`)
+3. Report any missing components to the user
+4. With user approval, install missing components: `npx shadcn@latest add [component1] [component2] ...`
+5. Check for non-standard npm package imports. Before installing anything new, apply the "npm Dependencies: Prefer What's Already Installed" rules — if the v0 code imports a package that duplicates one ARI already has (e.g. a different animation, date, icon, or chart library), rewrite the import to use the installed equivalent instead of installing the duplicate. Only install genuinely new capabilities, declared in `module.json` `npmDependencies`
+6. Note: if v0 imports `recharts` directly, prefer ARI's existing `@/components/ui/chart` wrapper
+
+### Code Restructuring Rules
+
+When transforming v0 output into module structure:
+- The main/root component becomes `app/page.tsx` with `export default function`
+- Extract sub-components into separate files in `components/` directory
+- Remove any v0 layout wrappers (`<html>`, `<body>`, root divs with font/theme setup)
+- Ensure `'use client'` directive is present
+- Preserve ALL Tailwind classes and visual styling exactly as-is
+- If a shadcn component is already installed in ARI with customizations, keep ARI's version — do NOT overwrite with v0's version
+- Replace mock/static data with placeholder comments (e.g., `// TODO: wire to TanStack Query`) during initial restructuring
+
+### Data Layer Derivation
+
+Reverse-engineer the database schema from v0's mock data:
+- Each mock data array → a database table
+- Each object key → a column
+- Type inference: strings → TEXT, numbers → INTEGER or NUMERIC, dates → TIMESTAMPTZ, booleans → BOOLEAN
+- Status/category fields with fixed string values → suggest CHECK constraint or enum
+- Always include `user_id TEXT` and standard timestamps (`created_at`, `updated_at`)
+- Use the `supabase-postgres-best-practices` skill to validate the derived schema design
+
+Present the derived data model to the user for confirmation before building API routes.
+
+## Implementation Steps
+
+When approved, create the module following this order:
+
+1. **Copy template structure** from `modules-core/module-template/`
+   - **If v0 code was provided:** Copy the template for module.json, API, hooks, types, and database structure only. Do NOT use `modules-core/module-template`'s `app/page.tsx` — the v0 code will replace it.
+1.5. **If v0 code was provided — Install dependencies:**
+   - Follow the Dependency Resolution steps from the "v0 Code Integration" section
+   - Install any missing shadcn components and npm packages before proceeding
+2. **Update module.json** with:
+   - Correct id, name, description
+   - Proper icon and route
+   - topBarIcon if requested
+   - submenu configuration if requested (see Submenu section below)
+   - Dashboard widget configuration if requested (see Dashboard Widgets section below)
+   - Required dependencies
+3. **Create/update page component** in `app/page.tsx`
+   - **If v0 code was provided:** Use the v0 component as the base for `app/page.tsx`. Apply the Code Restructuring Rules from the "v0 Code Integration" section. Extract sub-components to `components/` directory.
+   - **Random Quote under title**: Every module page MUST include a random quote displayed under the page title when the Quotes module is enabled. Follow the Module Template pattern:
+     1. Import `useModuleEnabled` from `@/lib/modules/module-hooks` and `useEffect`
+     2. Check if quotes is enabled: `const { enabled: quotesEnabled, loading: quotesLoading } = useModuleEnabled('quotes')`
+     3. Add state: `const [randomQuote, setRandomQuote] = useState<{ quote: string; author?: string } | null>(null)`
+     4. Fetch a random quote in `useEffect` when `quotesEnabled && !quotesLoading` (fetch from `/api/modules/quotes/quotes`, pick random)
+     5. Display below the `<h1>` title:
+        ```tsx
+        {quotesEnabled && randomQuote && (
+          <p className="text-sm text-muted-foreground mt-1">
+            {randomQuote.quote}
+          </p>
+        )}
+        ```
+     See `modules-core/module-template/app/page.tsx` for the complete implementation.
+4. **Create API routes** if needed:
+   - Use `const { user, withRLS } = await getAuthenticatedUser()` (NOT supabase client)
+   - Use `withRLS((db) => db.select()...)` for all database operations
+   - Import tables from `@/lib/db/schema`
+   - Use `toSnakeCase()` from `@/lib/api-helpers` for responses
+   - **Drizzle `numeric()` columns return STRINGS** - convert to `Number()` in GET responses before sending to client (see "Drizzle Numeric Column Handling" section below)
+   - **Zod schemas MUST have human-readable error messages** on every constraint (see "Zod Validation Rules" section below)
+   - **Zod schemas MUST live in `[module]/lib/validation.ts`** (not inline in `route.ts`) and be tagged with `.openapi('SchemaName')` so they appear as named components in `/api/openapi.json` and `/api-docs`. See "OpenAPI Annotations" section below.
+   - **Every route handler MUST be preceded by a `registry.registerPath({...})` call** documenting the method, path, tags (use the module id), `security: DEFAULT_SECURITY`, request schema, and response schemas. This is what surfaces the route in the OpenAPI spec, `/api-docs`, `/settings?tab=api`, and the `/health` Endpoints panel.
+   - See `modules-core/module-template/api/data/route.ts` and `modules-core/module-template/lib/validation.ts` as the reference
+   - **If v0 code was provided:** Use the derived data model from the "v0 Code Integration" analysis to inform API route data shapes. Build routes that serve data in the same shape the v0 components already expect (matching the mock data structure).
+5. **API routes register themselves — do NOT edit any file to wire them up.**
+   - `scripts/generate-module-registry.js` walks `[module]/api/**/route.ts` and writes the `MODULE_API_ROUTES` map into `lib/generated/module-api-registry.ts` (a static map, because Next.js/Turbopack cannot resolve dynamic imports at runtime). That file is auto-generated — never hand-edit it, and never edit the dispatcher at `/app/api/modules/[module]/[[...path]]/route.ts`, which only imports the map.
+   - Just place the handler at the right path and re-run `pnpm generate-module-registry` (step 10). The URL follows the folder layout:
+     ```
+     [module]/api/data/route.ts        →  /api/modules/<id>/data
+     [module]/api/settings/route.ts    →  /api/modules/<id>/settings
+     [module]/api/data/[id]/route.ts   →  /api/modules/<id>/data/<uuid>
+     ```
+   - Dynamic segments must be named literally `[id]` — other param names are not resolved by the dispatcher.
+6. **Create database files** if the module owns tables. **All three files are required** and live in `[module-folder]/database/`:
+   - **`schema.sql`** — auto-executed on **every** module enable (by `lib/modules/schema-installer.ts`). **Must be fully idempotent**:
+     - Every `CREATE TABLE` uses `IF NOT EXISTS`
+     - Every `CREATE INDEX` uses `IF NOT EXISTS`
+     - Every policy is wrapped: `DROP POLICY IF EXISTS … ON <table>; CREATE POLICY …`
+     - Schema additions in updates use `ALTER TABLE … ADD COLUMN IF NOT EXISTS …`
+     - **Must contain NO** `DROP TABLE`, `DROP SCHEMA`, `DROP DATABASE`, `TRUNCATE`, `ALTER TABLE … DROP COLUMN`, or unconditional `DELETE`. The runtime installer at `lib/modules/schema-installer.ts` refuses to execute files containing any of these tokens.
+     - Use `TEXT` type for `user_id` (matches Better Auth)
+     - Every table must include `ALTER TABLE [table] ENABLE ROW LEVEL SECURITY;` and SELECT/INSERT/UPDATE/DELETE policies referencing `(SELECT current_setting('app.current_user_id', true))` — UPDATE with an explicit `WITH CHECK`
+     - Do NOT use `auth.uid()` (Better Auth doesn't use this) — use application-level enforcement via `withRLS()`
+     - Use the `supabase-postgres-best-practices` skill to verify best practices for data types, indexes, and constraints
+   - **`schema.ts`** — Drizzle ORM definitions used by API routes via `withRLS()`. The runtime source of truth. Must mirror `schema.sql` exactly.
+   - **`uninstall.sql`** — manual-only teardown script containing only `DROP TABLE IF EXISTS … CASCADE` statements (drop in reverse FK order) plus the standard header warning. **This file is NEVER auto-run** by the schema installer, an enable hook, a disable hook, or any API route. It exists only so a user can manually drop the module's tables from their SQL client of choice (Supabase Studio, pgweb for local Postgres, or `psql`).
+   - See `modules-core/module-template/database/` for the canonical example of all three files.
+7. **Add Drizzle schema definition** to `/lib/db/schema/schema.ts` (REQUIRED for API routes to work)
+   - See existing table definitions in that file for examples
+   - Use `text("user_id")` for the user_id column
+8. **Update types** in `types/index.ts`
+   - **If v0 code was provided:** Derive TypeScript interfaces from the v0 mock data structures identified during analysis.
+9. **Create TanStack Query hooks** in the module's `hooks/` directory (e.g., `modules-custom/[module]/hooks/use-[module-name].ts`) (see below)
+9.5. **If v0 code was provided — Wire components to real data:**
+   - Replace all static/mock data arrays with TanStack Query hook calls (e.g., `useModuleEntries()`)
+   - Replace mock event handlers with real mutation calls (e.g., `createEntry.mutate(...)`)
+   - Add loading states using `isLoading` from `useQuery`
+   - Add error handling with toast notifications
+   - Add optimistic updates following the patterns in "Optimistic Updates Pattern" section
+   - Ensure dialogs follow the "Dialog & Form Validation Pattern" section
+   - Verify no hardcoded mock data remains in any component
+10. **Run `pnpm generate-module-registry`** to wire the module in. This single command registers everything: pages, API routes, the Drizzle schema/relations barrels, submenu, top-bar icon, dashboard widgets, and public routes. Re-run it after adding any new page, API route, or `module.json` field.
+11. **If public routes needed** (webhooks, external API access):
+    - Add `publicRoutes` array to module.json with security configuration (static paths only — no `[id]` segments)
+    - Write a plain route handler that implements the declared security itself: signature/key verification plus `checkRateLimit`/`getClientIp` from `@/lib/modules/public-route-security`. There is no framework wrapper — the handler is the only gate (public routes bypass auth AND the module-enabled check).
+    - Document the required environment variable for the secret
+    - If needed, read `/docs/MODULES.md` section 7.5 for the full pattern, or copy `modules-core/module-template/api/webhook/route.ts.example`
+12. **Database tables provision automatically.** Because `schema.sql` is auto-run on every module enable, you do NOT need to ask the user to run any SQL manually. The user only needs to enable the new module from the `/modules` page and the tables will be created. (Exception: if the user wants to fully remove the module's tables later, they can manually run `uninstall.sql` from their SQL client — Supabase Studio, pgweb, or `psql`.)
+13. **If file storage needed** — set up ARI File Storage. See the "ARI File Storage System" section below.
+
+## ARI File Storage System
+
+If the module needs to store files (images, documents, audio, etc.), use the **ARI File Storage System**. This provides authenticated file upload, serving, listing, and deletion via central API endpoints. The storage backend is selected by the `ARI_STORAGE_PROVIDER` env var in `.env.local` (defaults to `filesystem` when unset). By default, files are stored on the local filesystem at `data/storage/{user_id}/{bucket}/` and are always scoped to the authenticated user.
+
+### Storage configuration (env vars)
+
+Storage is configured entirely via environment variables — there is no UI form. Users add these to `.env.local`:
+
+- `ARI_STORAGE_PROVIDER` → `filesystem` (default) | `s3` | `r2` | `supabase-s3`
+- `ARI_S3_*` — AWS S3 credentials (access key, secret, bucket, region, endpoint)
+- `ARI_R2_*` — Cloudflare R2 credentials (account ID, access key, secret, bucket)
+- `ARI_SUPABASE_S3_*` — Supabase Storage S3 credentials (endpoint, access key, secret, bucket, region)
+
+Modules do NOT configure storage themselves. The Settings → Storage tab is documentation-only and shows the active provider plus the env-var names.
+
+### How It Works
+
+The ARI File Storage System provides four central endpoints:
+- `POST /api/storage/upload` — Upload a file (FormData with `bucket` and `file` fields)
+- `GET /api/storage/serve/{bucket}/{filename}` — Serve a file (authenticated, streams binary data)
+- `GET /api/storage/list?bucket={name}` — List files in a bucket
+- `DELETE /api/storage/delete` — Delete a file (JSON body with `bucket` and `filename`)
+
+All endpoints require authentication via `getAuthenticatedUser()`. The user ID is always derived from the session — never from client input.
+
+### Using Storage in a Module
+
+**Option A: Call central endpoints directly from the client (simplest)**
+
+Use TanStack Query hooks to call the central `/api/storage/` endpoints. See `modules-core/module-template/hooks/use-module-template.ts` for reference implementations of `useUploadFile()`, `useListFiles()`, and `useDeleteFile()`.
+
+**Option B: Create a module-specific upload wrapper (when you need custom validation)**
+
+Create an upload route in your module's `api/upload/route.ts` that validates files and delegates to `getStorageProvider()` from `@/lib/storage`. See `modules-core/module-template/api/upload/route.ts` for a complete example.
+
+Resolve the active provider with `readStorageConfig()` (sync, env-only) and pass it to `getStorageProvider()`:
+
+```ts
+import { getStorageProvider, readStorageConfig } from '@/lib/storage'
+
+const storageConfig = readStorageConfig()
+const provider = getStorageProvider(storageConfig)
+```
+
+The same code works for `filesystem`, `s3`, `r2`, and `supabase-s3` with zero conditional logic. If your module truly needs provider-aware behavior (e.g., a feature that only makes sense on S3-compatible storage), read `process.env.ARI_STORAGE_PROVIDER` directly:
+
+```ts
+if (process.env.ARI_STORAGE_PROVIDER === 's3') { ... }
+```
+
+### Bucket Naming
+
+Use the module slug with hyphens as the bucket name (e.g., `my-module`). Bucket names must be lowercase alphanumeric plus hyphens, max 64 characters.
+
+### Storage in module.json
+
+Add a `storage` field to document the module's storage needs (informational, not enforced):
+
+```json
+{
+  "storage": {
+    "bucket": "my-module",
+    "maxFileSize": 10485760,
+    "allowedMimeTypes": ["image/jpeg", "image/png", "image/webp"]
+  }
+}
+```
+
+### File Upload UI Example
+
+See `modules-core/module-template/components/file-upload-example.tsx` for a complete drag-and-drop upload component with file listing and deletion.
+
+### Key Rules
+
+- **Bucket names** use the module slug with hyphens (e.g., `habit-tracker`)
+- **Files are always user-scoped** — the user ID is derived server-side, never from the client
+- **All files are private** — served only through authenticated API endpoints, never via public URLs
+- **Validate server-side** — always check file type and size before storing, even if the client validates too
+- **No SQL needed** — the file storage system does not require any database tables or RLS policies for basic usage. Only add database tables if you need to store additional file metadata.
+
+## Data Fetching Best Practices
+
+**Always use TanStack Query** for modules that fetch data. Do NOT use the old `useState` + `useEffect` + `fetch` pattern.
+
+### Create TanStack Query Hooks
+
+Create hooks inside the module directory at `hooks/use-[module-name].ts` (e.g., `modules-custom/my-module/hooks/use-my-module.ts`). All module hooks MUST live inside the module folder — never in `/lib/hooks/`.
+
+Each hook file should export:
+- `useModuleEntries()` - fetches data with `useQuery`
+- `useCreateModuleEntry()` - creates with `useMutation` + optimistic updates
+- `useUpdateModuleEntry()` - updates with `useMutation` + optimistic updates
+- `useDeleteModuleEntry()` - deletes with `useMutation` + optimistic updates
+
+**IMPORTANT**: When importing types from modules, always use `@/modules/` alias:
+```typescript
+import type { MyModuleEntry } from '@/modules/my-module/types'  // Correct!
+// NOT: '@/modules-custom/my-module/types' or '@/modules-core/my-module/types'
+```
+
+See `modules-core/module-template/hooks/` for the reference pattern.
+
+### Optimistic Updates Pattern
+
+All mutations should implement optimistic updates:
+1. **Do NOT close dialogs before server confirms** - only close in `onSuccess` callback (see "Dialog & Form Validation Pattern" below)
+2. Update cache in `onMutate` so UI reflects changes instantly
+3. Rollback in `onError` if the server request fails
+4. Show toast notification on error with the actual error message from the server
+
+### Don't Block on Session
+
+Do NOT add `if (!session) return <Loading />` at the start of the page component. This causes a visible "Authenticating..." delay. Instead:
+- Render the page structure immediately
+- Let TanStack Query handle the loading state with `isLoading`
+- Middleware already protects routes from unauthenticated users
+- API routes use cookies/headers for auth automatically
+
+See `modules-core/module-template/hooks/use-module-template.ts` for the complete reference implementation.
+
+## Dashboard Widgets Implementation
+
+If the user wants their module to contribute cards or widgets to the main Dashboard, configure the `dashboard` field in `module.json`:
+
+```json
+"dashboard": {
+  "widgets": true,
+  "statCards": ["./components/dashboard-stat-card.tsx"],
+  "widgetComponents": ["./components/dashboard-widget.tsx"]
+}
+```
+
+**Two types of dashboard components:**
+
+1. **`statCards`** — Small cards rendered in the "Quick Overview" grid row at the top of the dashboard (alongside System Status). Best for: summary counts, scores, single metrics.
+
+2. **`widgetComponents`** — Larger widgets rendered in the content area below the stats grid. Best for: charts, lists, multi-card sections.
+
+**Rules for dashboard components:**
+- Must be **self-contained**: fetch their own data via API calls, handle their own loading states
+- Must `export default` (dynamic imports expect a default export)
+- Must include `'use client'` directive
+- Use `@tanstack/react-query` for data fetching (useQuery)
+- Wrap content in Shadcn `<Card>` components to match dashboard styling
+- Include a "View All" or navigation button linking to the module's main page
+- See `modules-core/tasks/components/dashboard-stat-card.tsx` as a stat card reference
+- See `modules-core/todays-brief/components/dashboard-widget.tsx` or `modules-core/module-template/components/widget.tsx` as a widget reference
+
+After creating dashboard components, run `pnpm generate-module-registry` to register them in the auto-generated dashboard registry.
+
+## Submenu Implementation
+
+If the module requires a sidebar submenu, follow the Module Template module as the template:
+
+**Note:** Submenus should only contain the actual navigation links (Overview, Settings, etc.). Do NOT include the module name as a header item - the Back button provides sufficient context for users to know which module they're in.
+
+1. **Read the Module Template submenu component** at `modules-core/module-template/components/sidebar-submenu.tsx` - copy and adapt this for your module
+2. **Read the Module Template module.json** to see how the `submenu` field is configured
+3. **Declare the submenu in `module.json`** — that is the whole registration:
+   ```json
+   { "submenu": { "component": "./components/sidebar-submenu.tsx" } }
+   ```
+   - Then run `pnpm generate-module-registry`. It writes the entry into `MODULE_SUBMENUS` in `lib/generated/module-submenu-registry.ts`, which `/components/sidebar-submenu-renderer.tsx` reads.
+   - **Do NOT edit `/components/sidebar-submenu-renderer.tsx`.** It contains no per-module list to add to, and any edit is overwritten. (There is no `SUBMENU_COMPONENTS` registry — older instructions naming one are obsolete.)
+4. **Create sub-pages** for each submenu item (e.g., `app/settings/page.tsx`)
+
+Always reference the Module Template module's actual code as the source of truth for submenu implementation.
+
+## Onboarding Section Implementation
+
+If the module requires an onboarding/setup screen, follow the **Module Template module** pattern at `modules-core/module-template/app/page.tsx`. This provides a clean, centered card-based setup experience.
+
+**IMPORTANT**: Module Template is a template module that ALWAYS shows the onboarding screen (with a skip button) so developers can see the pattern. When creating a real module, you must modify the condition to only show onboarding until the user completes it.
+
+### Onboarding Pattern Overview
+
+1. **Settings storage**: Use the existing `module_settings` table with JSONB settings column (no separate table needed)
+2. **Conditional render**: Check if `settings?.onboardingCompleted` is true; if not, show onboarding screen
+3. **Centered card UI**: Use a centered Card component with icon, title, and form fields
+4. **Flag completion**: Set `onboardingCompleted: true` when user completes setup
+
+### Implementation Steps
+
+1. **Use existing module_settings table**: No separate table needed. Settings are stored in the `module_settings` table's JSONB `settings` column, keyed by `module_id`.
+
+2. **Add onboarding fields to your types** in `types/index.ts`:
+   ```typescript
+   export interface ModuleSettings {
+     onboardingCompleted: boolean
+     // Add your configuration fields here
+     myField1: string
+     myField2: string
+   }
+   ```
+
+3. **Create settings API route** (`api/settings/route.ts`) - copy from Module Template:
+   - GET: Fetch user settings (returns empty object `{}` if none exist)
+   - PUT: Create/update settings (upsert pattern using `module_id`)
+
+4. **Create TanStack Query hooks** for settings (see `modules-core/module-template/hooks/use-module-template.ts`):
+   ```typescript
+   export function useModuleSettings() {
+     return useQuery({
+       queryKey: ['module-name-settings'],
+       queryFn: async (): Promise<Partial<ModuleSettings>> => {
+         const res = await fetch('/api/modules/module-name/settings')
+         if (!res.ok) return {}
+         return await res.json()
+       },
+     })
+   }
+
+   export function useUpdateModuleSettings() {
+     const queryClient = useQueryClient()
+     return useMutation({
+       mutationFn: async (settings: Partial<ModuleSettings>): Promise<void> => {
+         const res = await fetch('/api/modules/module-name/settings', {
+           method: 'PUT',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify(settings),
+         })
+         if (!res.ok) throw new Error('Failed to save settings')
+       },
+       onMutate: async (newSettings) => {
+         await queryClient.cancelQueries({ queryKey: ['module-name-settings'] })
+         const previous = queryClient.getQueryData<Partial<ModuleSettings>>(['module-name-settings'])
+         queryClient.setQueryData<Partial<ModuleSettings>>(['module-name-settings'], (old = {}) => ({
+           ...old,
+           ...newSettings,
+         }))
+         return { previous }
+       },
+       onError: (_err, _newSettings, context) => {
+         if (context?.previous) {
+           queryClient.setQueryData(['module-name-settings'], context.previous)
+         }
+       },
+       onSettled: () => {
+         queryClient.invalidateQueries({ queryKey: ['module-name-settings'] })
+       },
+     })
+   }
+   ```
+
+5. **Implement onboarding UI in page component**:
+
+   **NOTE**: Module Template uses `showOnboardingDemo` state to always show the onboarding as a demo.
+   For real modules, remove that state and use `!settings?.onboardingCompleted` directly:
+
+   ```tsx
+   const { data: settings, isLoading: settingsLoading } = useModuleSettings()
+   const updateSettings = useUpdateModuleSettings()
+
+   // Loading state
+   if (settingsLoading) {
+     return (
+       <div className="flex items-center justify-center h-96">
+         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+       </div>
+     )
+   }
+
+   // Onboarding screen - shows until user completes it
+   // NOTE: Module Template uses `showOnboardingDemo` state instead - remove that for real modules!
+   if (!settings?.onboardingCompleted) {
+     return (
+       <div className="p-6 max-w-md mx-auto">
+         <Card>
+           <CardHeader className="text-center">
+             <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+               <YourIcon className="w-8 h-8 text-primary" />
+             </div>
+             <CardTitle className="text-2xl">Welcome to Module Name</CardTitle>
+             <CardDescription>
+               Brief description of what this module does.
+             </CardDescription>
+           </CardHeader>
+           <CardContent className="space-y-4">
+             {/* Form fields for initial setup */}
+             <div className="space-y-2">
+               <Label htmlFor="fieldName">Field Label</Label>
+               <Input
+                 id="fieldName"
+                 value={fieldValue}
+                 onChange={(e) => setFieldValue(e.target.value)}
+               />
+             </div>
+             <Button
+               className="w-full"
+               onClick={handleSetup}
+               disabled={updateSettings.isPending}
+             >
+               {updateSettings.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+               Get Started
+             </Button>
+             {/* NOTE: Remove the "Skip to Module Demo" button from Module Template - that's only for the template */}
+           </CardContent>
+         </Card>
+       </div>
+     )
+   }
+
+   // Main view (after onboarding complete)
+   return (
+     <div className="p-6">
+       {/* Main module content */}
+       {/* NOTE: Remove the "View Onboarding Demo" button from Module Template - that's only for the template */}
+     </div>
+   )
+   ```
+
+### Key Components Used
+- `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent` from `@/components/ui/card`
+- `Button` from `@/components/ui/button`
+- `Input` from `@/components/ui/input`
+- `Label` from `@/components/ui/label`
+- `Select` components for dropdown options
+- `Loader2` from `lucide-react` for loading spinner
+
+### Reference Files
+- **Main example**: `modules-core/module-template/app/page.tsx` (onboarding UI pattern)
+- **Settings API**: `modules-core/module-template/api/settings/route.ts`
+- **Hooks**: `modules-core/module-template/hooks/use-module-template.ts` (useModuleTemplateSettings, useUpdateModuleTemplateSettings)
+- **Types**: `modules-core/module-template/types/index.ts`
+
+## AI Provider Selection
+
+Only build this when the user answered **yes** to the AI Provider question (Q9) — i.e. the module actually calls an LLM. Do NOT add it to modules that never talk to a provider.
+
+**Never rebuild the provider grid inside a module.** ARI ships a single shared component, `components/ai-provider-card.tsx`, that every module imports. Building it once means a future change (new providers, restyle, copy) rolls out to all modules at once. Duplicating it defeats the entire purpose.
+
+### How to add it
+
+1. **Add the settings field.** In `types/index.ts`, add `selectedAiProvider: AiProviderId | null` to the module's settings interface and import the type:
+
+   ```typescript
+   import type { AiProviderId } from '@/lib/ai-providers'
+   // ...
+   selectedAiProvider: AiProviderId | null
+   ```
+
+   Add `selectedAiProvider: null` to the `DEFAULT_SETTINGS` constant in the settings panel.
+
+2. **Render the shared card** at the top of the module's settings panel (`components/settings-panel.tsx`):
+
+   ```tsx
+   import { AiProviderCard } from '@/components/ai-provider-card'
+
+   <AiProviderCard
+     value={settings.selectedAiProvider}
+     onChange={(id) => updateSetting('selectedAiProvider', id)}
+     onSave={handleSave}            // optional embedded Save button
+     isSaving={updateSettings.isPending}
+     justSaved={saved}
+   />
+   ```
+
+   Omit `onSave`/`isSaving`/`justSaved` if the settings page already has its own page-level Save that persists the whole settings object.
+
+### What the card does for you (don't re-implement)
+
+- **Controlled component.** The host module owns `selectedAiProvider` and persists it like any other setting — no new API route or table.
+- **Lists only configured providers.** It reads `useApiKeysStatus()` and shows only providers with an API key set under Settings → Integrations. If none are configured, it renders an empty state linking the user there.
+- **Auto-selects a lone provider.** When exactly one provider is configured and nothing is selected yet, the card calls `onChange` with that provider so the module defaults to the only available choice (persisted on the next save).
+- **Provider ids** come from `@/lib/ai-providers` (`AiProviderId`, `AI_PROVIDERS`) — the single source of truth. Never hard-code a provider list.
+
+The card only records *which* provider to use. Resolving that provider's API key/model env vars and actually calling the LLM at runtime is the module's own responsibility.
+
+### Reference
+- **Shared component**: `components/ai-provider-card.tsx`
+- **Live example**: `modules-core/module-template/components/settings-panel.tsx` (renders `AiProviderCard`)
+- **Provider list / types**: `lib/ai-providers.ts`
+
+## Drizzle Numeric Column Handling
+
+**CRITICAL**: Drizzle ORM returns `numeric()` / `decimal()` columns as **strings**, not numbers. This WILL crash any code that calls `.toFixed()`, does arithmetic, or passes values to charts/sorting.
+
+**Rule**: Always convert numeric columns to `Number()` in the API GET response before sending to the client. Do this once in the API layer so every UI consumer gets proper numbers.
+
+```typescript
+// In GET route - after fetching from DB, before returning response:
+const normalized = rows.map((r) => ({
+  ...r,
+  // Convert every numeric() column to a real number
+  battingAvg: Number(r.battingAvg),
+  percentage: Number(r.percentage),
+  score: Number(r.score),
+}))
+
+return NextResponse.json({ items: toSnakeCase(normalized) })
+```
+
+**Also applies to POST/PATCH `.returning()`** - if your create/update route uses `.returning()` and sends the result back, those numeric columns will also be strings. Normalize them before responding.
+
+**When to watch out**: Any Drizzle schema column defined with `numeric()`, `decimal()`, or `real()`. Integer columns (`integer()`) are fine - they return as numbers.
+
+**Design tip**: If a column only needs whole numbers or simple decimals (no precision requirements), prefer `integer()` or `doublePrecision()` over `numeric()` to avoid this issue entirely. Use `numeric(precision, scale)` only when exact decimal precision matters (e.g., currency, batting averages).
+
+## Zod Validation Rules
+
+**Every Zod constraint MUST have a human-readable error message.** Never use bare `.min()` / `.max()` without a message - the default errors are cryptic and unhelpful.
+
+```typescript
+// WRONG - cryptic default errors like "Number must be less than or equal to 1"
+z.number().min(0).max(1)
+z.string().min(1).max(100)
+
+// RIGHT - clear, user-friendly messages
+z.number().min(0, 'AVG must be between 0 and 1.000').max(1, 'AVG must be between 0 and 1.000')
+z.string().min(1, 'Name is required').max(100, 'Name must be 100 characters or less')
+```
+
+**API routes must return Zod issue details** so the client can display them. This pattern is already used in the codebase:
+```typescript
+const parseResult = Schema.safeParse(body)
+if (!parseResult.success) {
+  return NextResponse.json({ error: 'Validation failed', details: parseResult.error.issues }, { status: 400 })
+}
+```
+
+**In mutation hooks**, surface the Zod details from the API response so the user sees specific errors:
+
+```typescript
+mutationFn: async (data: CreateRequest): Promise<Item> => {
+  const res = await fetch('/api/modules/my-module/items', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    const details = err.details?.map((d: any) => d.message).join(', ')
+    throw new Error(details || err.error || 'Failed to create item')
+  }
+  const json = await res.json()
+  return json.item
+},
+```
+
+## OpenAPI Annotations
+
+Every API route in ARI is documented via the shared OpenAPI 3.1 registry. The spec is generated at `predev`/`prebuild` (`scripts/generate-openapi.ts`), served at `/api/openapi.json` (auth-gated), and rendered interactively at `/api-docs` via Scalar. Routes also appear in `/settings?tab=api` and the `/health` Endpoints panel, both of which consume the same spec.
+
+**This is not optional.** A module's routes that skip the registry call still work, but they will be invisible to `/api-docs`, `/settings?tab=api`, and `/health`, and they will fail the Module Audit.
+
+### Where schemas live
+
+All request bodies, query params, and response bodies belong in `modules-{core,custom}/<id>/lib/validation.ts` and must be tagged with `.openapi('SchemaName')`:
+
+```typescript
+// modules-custom/my-module/lib/validation.ts
+import { z } from 'zod'
+import '@/lib/openapi/registry'  // side-effect import extends zod with .openapi()
+
+export const createEntrySchema = z.object({
+  title: z.string().min(1, 'Title is required').max(200, 'Title must be 200 characters or fewer'),
+}).openapi('MyModuleCreateEntryBody')
+
+export const EntrySchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string(),
+  title: z.string(),
+  created_at: z.string(),
+  updated_at: z.string(),
+}).openapi('MyModuleEntry')
+
+export const EntryListResponseSchema = z.object({
+  entries: z.array(EntrySchema),
+  count: z.number().int().nonnegative(),
+}).openapi('MyModuleEntryListResponse')
+```
+
+### Registering the route
+
+Inside each `route.ts`, import the registry and shared helpers, then register one block per HTTP verb above the handler:
+
+```typescript
+import { registry } from '@/lib/openapi/registry'
+import { DEFAULT_SECURITY, ErrorResponseSchema, InternalServerErrorResponse } from '@/lib/openapi/common'
+import { createEntrySchema, EntryListResponseSchema } from '@/modules/my-module/lib/validation'
+
+registry.registerPath({
+  method: 'post',
+  path: '/api/modules/my-module/data',
+  operationId: 'createMyModuleEntry',
+  summary: 'Create a new entry',
+  tags: ['my-module'],            // tag MUST be the module id (anything not in NON_MODULE_TAGS = module)
+  security: DEFAULT_SECURITY,     // accepts either Better Auth session cookie OR x-api-key header
+  request: { body: { content: { 'application/json': { schema: createEntrySchema } } } },
+  responses: {
+    201: { description: 'Created entry', content: { 'application/json': { schema: EntryListResponseSchema } } },
+    400: { description: 'Validation error', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    401: { description: 'Unauthorized', content: { 'application/json': { schema: ErrorResponseSchema } } },
+    500: InternalServerErrorResponse,
+  },
+})
+
+export async function POST(request: NextRequest) { /* ... */ }
+```
+
+### Rules
+
+- **Tags = module id.** The build script classifies any tag not in `NON_MODULE_TAGS` (`'app'`, `'auth'`) as a module id. Always tag your routes with the module's slug (e.g. `tags: ['my-module']`).
+- **Use `DEFAULT_SECURITY`** for any route gated by `getAuthenticatedUser()`. It declares both `apiKey` (x-api-key header) and `sessionCookie` — Better Auth session OR API key both work. Don't define your own security schemes.
+- **Use the shared error response.** Import `ErrorResponseSchema`, `UnauthorizedResponse`, and `InternalServerErrorResponse` from `@/lib/openapi/common` instead of redefining the same `{ error, details }` shape per route.
+- **`operationId` must be unique** across the whole spec — prefix with the module slug (e.g. `createMyModuleEntry`, `listMyModuleEntries`).
+- **Multipart uploads:** declare the file field as `z.any().openapi({ type: 'string', format: 'binary' })` — see `modules-core/module-template/lib/validation.ts` `UploadFormSchema` and `modules-core/module-template/api/upload/route.ts`.
+- **Public/webhook routes** (declared in `publicRoutes`) inherit `x-ari-public`, `x-ari-security-type`, and related extensions automatically from `module.json`. You still need a `registry.registerPath` call to make them visible in `/api-docs` — just omit `security` (or set it to `[]`) since they don't require user auth.
+- **Settings → API tab** lets users mint API keys (prefix from `lib/auth-middleware.ts` `API_KEY_PREFIX`). Routes that use `DEFAULT_SECURITY` accept these automatically — there's nothing for the module to wire up.
+
+After adding annotations, the route should appear in `/api-docs` and `/health` → Endpoints on the next dev-server restart (the spec is regenerated by the `predev` hook).
+
+## Dialog & Form Validation Pattern
+
+**All create/edit dialogs MUST implement inline validation with red outlines.** Never rely only on toast messages for validation errors.
+
+### Required Pattern:
+
+1. **Client-side validation function** that mirrors the Zod schema:
+```typescript
+type FieldErrors = Record<string, string>
+
+function validateForm(form: CreateRequest): FieldErrors {
+  const errors: FieldErrors = {}
+  if (!form.name.trim()) errors.name = 'Name is required'
+  if (form.score < 0 || form.score > 100) errors.score = 'Must be 0-100'
+  // ... mirror all Zod rules
+  return errors
+}
+```
+
+2. **Error state in the component**:
+```typescript
+const [errors, setErrors] = useState<FieldErrors>({})
+```
+
+3. **Validate on submit, show inline errors**:
+```typescript
+const handleSave = () => {
+  const fieldErrors = validateForm(form)
+  setErrors(fieldErrors)
+  if (Object.keys(fieldErrors).length > 0) return // Stop - don't close dialog
+
+  // Only close on success, NOT before the API call
+  createMutation.mutate(form, {
+    onSuccess: () => setDialogOpen(false),
+    onError: (err) => toast({ variant: 'destructive', title: 'Failed to create item', description: err.message }),
+  })
+}
+```
+
+4. **Red outlines on invalid fields**:
+```typescript
+const inputClass = (field: string) =>
+  errors[field] ? 'border-red-500 focus-visible:ring-red-500' : ''
+
+const selectTriggerClass = (field: string) =>
+  errors[field] ? 'border-red-500 ring-red-500' : ''
+```
+
+5. **Error messages below fields**:
+```tsx
+<Input className={inputClass('name')} value={form.name} onChange={(e) => updateField('name', e.target.value)} />
+{errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
+```
+
+6. **Clear errors as user fixes them**:
+```typescript
+const updateField = (field: keyof CreateRequest, value: any) => {
+  setForm((prev) => ({ ...prev, [field]: value }))
+  if (errors[field]) setErrors((prev) => { const next = { ...prev }; delete next[field]; return next })
+}
+```
+
+7. **Reset errors when opening dialog**:
+```typescript
+const openCreate = () => {
+  setForm(emptyForm)
+  setErrors({})
+  setDialogOpen(true)
+}
+```
+
+**NEVER close the dialog before the server confirms success.** If validation fails (client or server), the dialog stays open so the user can fix their input without re-entering everything.
+
+## Dialog/Drawer Accessibility
+
+Every `DialogContent`/`DrawerContent` must include a `DialogTitle`/`DrawerTitle` (Radix logs a console error otherwise). When the design has no visible title, wrap the title in `VisuallyHidden` from `@radix-ui/react-visually-hidden` rather than omitting it.
+
+## Theming
+
+ARI ships multiple themes — default light, `.dark`, `.light`, `.blueprint`, `[data-theme="terminal"]`, and `[data-theme="grayscale"]` — all defined in `app/globals.css` as HSL CSS variables. A module that only styles for light + dark will visually degrade in the other themes (washed-out cards, low-contrast text, off-brand chrome).
+
+**`app/globals.css` is read-only for module creation.** Do not add new CSS variables, theme rules, animations, or imports to it. If your module needs custom CSS, follow the "Module-scoped styles" guidance in the "Files You Must Never Edit" section above. For colors, always use the semantic Tailwind tokens listed below — they re-color correctly across every theme without needing any change to `globals.css`.
+
+### Recommended approach
+
+Use Tailwind classes that map to semantic tokens. They re-color automatically across every theme:
+
+| Purpose | Class |
+|---------|-------|
+| Page/section background | `bg-background` |
+| Body text | `text-foreground` |
+| Card / panel surface | `bg-card`, `text-card-foreground` |
+| Secondary / muted surface | `bg-secondary`, `bg-muted` |
+| De-emphasized text | `text-muted-foreground` |
+| Borders & dividers | `border-border` |
+| Form input chrome | `bg-input`, `ring-ring` |
+| Primary action | `bg-primary`, `text-primary-foreground` |
+| Accent / highlight | `bg-accent`, `text-accent-foreground` |
+| Destructive action | `bg-destructive`, `text-destructive-foreground` |
+| Sidebar surfaces | `bg-sidebar`, `text-sidebar-foreground`, `bg-sidebar-accent`, etc. |
+
+For chart colors, prefer `hsl(var(--chart-1))` through `hsl(var(--chart-5))` so visualizations recolor with the theme.
+
+### Patterns it is recommended to avoid
+
+These work, but they tend to look broken or off-brand outside of light/dark mode. Prefer the semantic tokens above unless you have a deliberate reason:
+
+- **Hardcoded hex values** (e.g. `text-[#aa2020]`, `bg-[#091a32]`) — locked to one color across every theme. Acceptable for intentional brand accents (ARI's signature red quote line is an example); generally avoid for primary surfaces, body text, and borders.
+- **Raw palette classes** (e.g. `bg-blue-50`, `text-gray-700`, `border-zinc-200`) — same issue; the color won't shift between themes.
+- **Manually-paired light/dark variants** (e.g. `bg-blue-50 dark:bg-blue-950`) — covers two themes but still misses `.blueprint`, `[data-theme="terminal"]`, and `[data-theme="grayscale"]`.
+- **Inline `style={{ color: '#...' }}`** for theme-relevant surfaces.
+
+When a custom color is the right call (brand red, status pill, illustrative accent), scope it tightly to that element rather than using it for the surrounding chrome.
+
+## Input Validation & Sanitization
+
+**All input fields MUST have appropriate validation and sanitization by default.** Every field should enforce constraints that match its purpose, with clear and friendly error messages. Validation must happen on both client (for immediate feedback) and server (for security).
+
+### Rules for common field types:
+
+| Field type | Constraints |
+|------------|------------|
+| **Names/titles** | `.min(1, 'Required').max(100, '...')`, trim whitespace |
+| **Descriptions/text** | `.max(500, '...')` or appropriate limit |
+| **URLs** | `.url('Must be a valid URL')` or validate via `new URL()` |
+| **Email** | `.email('Must be a valid email')` |
+| **Bucket/slug names** | Lowercase alphanumeric + hyphens, max 63 chars, regex pattern |
+| **API keys/tokens** | Max length, no pattern restriction (secrets can contain anything) |
+| **Region/locale codes** | Lowercase alphanumeric + hyphens, max 64 chars |
+| **Numbers** | `.min()` / `.max()` with descriptive messages |
+| **Dates** | Use `.datetime()` or `.date()` |
+
+### Client-side enforcement:
+
+1. **Set `maxLength` on all `<Input>` elements** so users can't type beyond the limit
+2. **Validate patterns before submit** using a `validateForm()` function (see Dialog & Form Validation Pattern above)
+3. **Show red border + inline error** on invalid fields — never rely only on toasts
+4. **Clear errors as the user edits** the field (don't wait for re-submit)
+5. **For endpoint/URL fields**, validate with `new URL(value)` in a try/catch
+6. **For select/dropdown fields**, ensure values are from the allowed set
+
+### Server-side enforcement:
+
+1. **Zod schemas must mirror client constraints** — the server is the source of truth
+2. **Use `.regex()` with a descriptive message** for pattern-restricted fields (e.g., bucket names, regions)
+3. **Use `.max()` with a message** on every string field — never accept unbounded input
+4. **Sanitize before storage** — trim whitespace, normalize case where appropriate
+5. **Never trust client-declared MIME types** — validate file extensions server-side
+
+### Error message guidelines:
+
+- Be specific: "Bucket name must be lowercase with only letters, numbers, and hyphens" (not "Invalid format")
+- Include limits: "Name must be 100 characters or less" (not "Too long")
+- For required fields: "Name is required" (not "Required" or "Field is empty")
+
+## Code Review & Simplification
+
+Before running the QA checklist, review ALL generated code for the new module. Spawn three review agents in parallel using the Agent tool:
+
+1. **Code Reuse Agent** — Find duplicate code, shared logic opportunities, and unnecessary abstractions across the module's files
+2. **Code Quality Agent** — Identify quality issues, inconsistencies with existing codebase patterns, and readability problems
+3. **Efficiency Agent** — Spot performance issues, unnecessary operations, redundant re-renders, and memory concerns
+
+After all three agents report back, apply fixes to the module code. Then apply these simplification rules to all generated files:
+
+- **No nested ternaries** — use switch statements or if/else chains for multiple conditions
+- **Clarity over brevity** — prefer explicit, readable code over dense one-liners
+- **Reduce nesting** — flatten deeply nested logic with early returns or guard clauses
+- **Remove obvious comments** — delete comments that just restate what the code does
+- **Clean up imports** — remove unused imports, sort them logically
+- **Consistent naming** — ensure all variables, functions, and components follow codebase conventions
+
+Then proceed to the QA checklist.
+
+## Quality Assurance Checklist
+
+Before marking complete, verify:
+- [ ] **SECURITY: All API routes authenticate via `getAuthenticatedUser()` and reject unauthenticated requests**
+- [ ] **SECURITY: All database operations use `withRLS()` — no raw/unscoped queries**
+- [ ] **SECURITY: All user input validated with Zod before use**
+- [ ] **SECURITY: Database tables have RLS enabled** (verify in schema.sql: `ALTER TABLE ... ENABLE ROW LEVEL SECURITY`)
+- [ ] **SECURITY: No secrets, credentials, or sensitive data hardcoded or logged**
+- [ ] **No edits to forbidden core files** — `app/globals.css`, `tailwind.config.*`, `next.config.mjs`, `middleware.ts`, root `app/` files, shared `lib/` or `components/` were NOT modified. **No file outside `modules-custom/<id>/` was touched at all** — including `lib/generated/*` and the `lib/db/schema/` barrels, which are regenerated by `pnpm generate-module-registry`. Run `git status` to confirm: the only changes should be the module folder plus the regenerated files the script itself rewrote
+- [ ] **Module-specific CSS, if any, lives inside the module folder** (e.g. `modules-custom/<id>/styles.css`) — never added to `app/globals.css`
+- [ ] module.json is valid and complete
+- [ ] All API routes use `withRLS()` helper (NOT Supabase client) - see `modules-core/module-template/api/data/route.ts`
+- [ ] **If module has API routes**: Routes registered in `MODULE_API_ROUTES` in `/app/api/modules/[module]/[[...path]]/route.ts`
+- [ ] Drizzle schema added to `/lib/db/schema/schema.ts` (required for API routes)
+- [ ] **Database `database/schema.sql` created** inside the module folder, fully idempotent (`CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, `DROP POLICY IF EXISTS … CREATE POLICY …`, `ALTER TABLE … ADD COLUMN IF NOT EXISTS`)
+- [ ] **`schema.sql` contains NO `DROP TABLE`, `DROP SCHEMA`, `DROP DATABASE`, `TRUNCATE`, `ALTER TABLE … DROP COLUMN`, or unconditional `DELETE`** (the runtime installer will refuse to execute the file)
+- [ ] **Database `database/uninstall.sql` created** with the standard manual-only header and `DROP TABLE IF EXISTS … CASCADE` for every table the module owns (drop in reverse FK order)
+- [ ] TanStack Query hooks created inside the module directory (`hooks/use-[module-name].ts`) — NOT in `/lib/hooks/`
+- [ ] **All imports use `@/modules/` alias** (NOT `@/modules-custom/` or `@/modules-core/`)
+- [ ] Page uses TanStack Query hooks (not manual useState/useEffect/fetch)
+- [ ] Optimistic updates implemented for all mutations
+- [ ] **If tables use `numeric()` columns**: API GET routes convert them to `Number()` before responding
+- [ ] **All Zod constraints have human-readable error messages** (no bare `.min()` / `.max()`)
+- [ ] **Mutation hooks surface API error details** (parse `err.details` from Zod validation responses)
+- [ ] **All Zod schemas live in `[module]/lib/validation.ts`** (not inline in route files) and are tagged with `.openapi('SchemaName')`
+- [ ] **Every API route handler is preceded by a `registry.registerPath({...})` block** that sets `tags: ['<module-id>']`, `security: DEFAULT_SECURITY`, and uses the shared `ErrorResponseSchema`/`InternalServerErrorResponse` for error responses
+- [ ] **`operationId`s are unique** across the module (prefix with the module slug)
+- [ ] **Routes appear in `/api-docs`** after `pnpm dev` restarts (the spec is regenerated by the `predev` hook)
+- [ ] **All create/edit dialogs have inline validation** (red outlines + error text below fields)
+- [ ] **Dialogs only close on `onSuccess`** (never before API confirms - user must not lose form data on error)
+- [ ] **Every `DialogContent`/`DrawerContent` includes a `DialogTitle`/`DrawerTitle`** (use `VisuallyHidden` if the design has no visible title)
+- [ ] **Random quote displayed under page title** when Quotes module is enabled (follows Module Template pattern)
+- [ ] Page does NOT block on session check (no "Authenticating..." spinner)
+- [ ] **Page does NOT include layout wrappers** (no SidebarProvider, AppSidebar, SidebarInset, TaskAnnouncement, or header with breadcrumbs - these are already provided by the shared app shell)
+- [ ] Component prefers semantic Tailwind tokens (`bg-background`, `text-foreground`, `bg-card`, `text-muted-foreground`, `border-border`, etc.) over raw palette classes for primary surfaces, text, and borders — see the Theming section
+- [ ] No TypeScript errors (`npx tsc --noEmit`)
+- [ ] Module appears in sidebar after registry generation
+- [ ] Page loads without errors in dev server (no duplicate toolbars)
+- [ ] **If public routes exist**: `publicRoutes` configured in module.json with security
+- [ ] **If public routes exist**: Handler implements the declared security itself (signature/key check + `checkRateLimit` from `@/lib/modules/public-route-security`) — the framework enforces nothing for public routes
+- [ ] **If public routes exist**: Endpoint visible in `/health` → Endpoints tab
+- [ ] **If onboarding exists**: Settings types include `onboardingCompleted` flag
+- [ ] **If onboarding exists**: Settings API with GET (fetch) and PUT (upsert) endpoints
+- [ ] **If onboarding exists**: Conditional render shows onboarding when `!settings?.onboardingCompleted`
+- [ ] **If onboarding exists**: Centered card UI follows Module Template pattern
+- [ ] **If onboarding exists**: Removed Module Template demo-specific code (`showOnboardingDemo` state, "Skip to Module Demo" button, "View Onboarding Demo" button)
+- [ ] **If v0 import used**: All mock/static data replaced with TanStack Query hooks
+- [ ] **If v0 import used**: No hardcoded data arrays remain in components
+- [ ] **If v0 import used**: All event handlers wired to real mutations
+- [ ] **If v0 import used**: All missing shadcn components installed (no import errors)
+- [ ] **If v0 import used**: Any non-standard npm dependencies installed
+- [ ] **No duplicate dependencies added** — checked root `package.json` first; every need covered by an installed package uses that package (see "npm Dependencies: Prefer What's Already Installed"); any genuinely new package is declared in `module.json` `npmDependencies`
+- [ ] **If v0 import used**: v0 layout wrappers removed (no extra html/body wrappers)
+- [ ] **If v0 import used**: Component has default export and 'use client' directive
+- [ ] **If file storage needed**: Module uses `/api/storage/upload` or a module-specific wrapper using `getStorageProvider(readStorageConfig())`
+- [ ] **If file storage needed**: Module does NOT read or write storage credentials anywhere — `ARI_STORAGE_PROVIDER` and provider env vars are the only configuration surface
+- [ ] **If file storage needed**: Upload validates file type and size server-side
+- [ ] **If file storage needed**: Files served via authenticated `/api/storage/serve/[...path]` (never public URLs)
+- [ ] **If file storage needed**: File upload UI uses TanStack Query mutations with error handling
+- [ ] **If file storage needed**: `module.json` documents storage config (bucket, allowed types, size limits)
+
+## Critical Rules
+
+1. **Security is paramount.** Every module must be secure by default — no exceptions. All API routes must authenticate, all DB operations must use `withRLS()`, all input must be Zod-validated, all tables must have RLS enabled. See the Security Requirements section above for full details.
+2. **ALL module code MUST be self-contained within the module directory.** Hooks, components, types, utilities, styles — everything lives inside `modules-core/<id>/` or `modules-custom/<id>/`. NEVER place module-specific code in shared directories like `lib/hooks/`, `lib/`, or `components/`. NEVER edit `app/globals.css`, `tailwind.config.*`, `next.config.mjs`, `middleware.ts`, or other root configuration/style files — they are upstream-managed and your edits will be wiped (and block updates) the next time the user runs `ari-update`. A module must be installable by adding its single folder, and deletable by removing its single folder. **There are no exceptions** — registration is fully automatic via `pnpm generate-module-registry`, which rewrites `lib/generated/*` and the `lib/db/schema/` barrels for you. Never hand-edit those. See the "Files You Must Never Edit" section above for the full list.
+3. **NEVER start the dev server** — the user will do this.
+4. **Never run a .sql statement without explicit approval.**
+5. **Follow existing code patterns exactly** — use `modules-core/module-template` as the template.
+6. **API routes must use Drizzle + withRLS()** — NOT Supabase client.
+7. **Do NOT use `auth.uid()` in database RLS policies** — Better Auth doesn't support this. User isolation is enforced at the application level via `withRLS()` helper.
+8. **API route registration is MANUAL**: The `generate-module-registry` script only auto-generates page routes. API routes MUST be manually registered in `MODULE_API_ROUTES` in `/app/api/modules/[module]/[[...path]]/route.ts` — this is a Next.js/Turbopack limitation.
+9. **Module Portability**: Always use `@/modules/` alias for imports (NOT `@/modules-custom/` or `@/modules-core/`). This allows modules to be moved between directories without code changes. The alias resolves `modules-custom` first, then `modules-core`.
+10. **v0 code is a visual starting point only**: Always build proper API routes, hooks, and database schema. Never leave mock data in production components.
+11. **Use the Supabase agent-skills** when creating database schemas. Use the `supabase-postgres-best-practices` skill to validate data types, indexes, and constraints — do not skip this step.
+12. **Don't use PostgreSQL array casts in Drizzle's `sql` template literal** (e.g. `${value}::uuid[]`). Drizzle parameterizes values for safety, so the array gets passed as a bound parameter (`$1`) that PostgreSQL can't cast to a typed array. Instead, use Drizzle's query builder methods (e.g. individual `update().where()` calls with `Promise.all` for batch operations).
+13. If the user must take any action to complete the module setup (for example, run a .sql file or restart the dev server), make that your last message so it is clearly visible. Use these statement: "🧑🏼‍💻 USER ACTION REQUIRED:" followed by clear, step-by-step instructions for what they need to do.
