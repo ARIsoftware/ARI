@@ -1201,34 +1201,72 @@ const SHELL_UNSAFE_PATH_RE = /["'`$\\;|&<>\n\r]/;
 
 // ── Setup ARI ───────────────────────────────────────────────────────
 
-async function cloneAndSetup() {
+// Is this path unusable as a fresh install folder? True for a folder with
+// anything in it, and also for a file, or a folder that can't be read — none
+// of them is a place a clone can go.
+function isPathInUse(target) {
+  if (!fs.existsSync(target)) return false;
+  try {
+    return !fs.statSync(target).isDirectory() || fs.readdirSync(target).length > 0;
+  } catch {
+    return true;
+  }
+}
+
+// The remote is named upstream from the start (the public ARI repo), leaving
+// origin free for the user's own repository. Naming it at clone time, rather
+// than renaming afterwards, also works when the user's git is configured with
+// a different default remote name.
+function manualCloneCommand(branch, repoUrl, targetDir) {
+  const branchFlag = branch !== 'main' ? ` --branch ${branch}` : '';
+  return `git clone --origin upstream${branchFlag} ${repoUrl}${targetDir ? ` "${targetDir}"` : ''}`;
+}
+
+/**
+ * Ask where ARI goes, clone it there and put it on the requested release.
+ *
+ * Returns { cloned, dir, depsInstalled } or, for a failure that must end the
+ * install, { cloned: false, dir: null, fatal: [headline, ...details] }.
+ *
+ * The options exist for the tests (tests/unit/scripts/install.lab.test.ts); the
+ * installer itself calls this with none.
+ */
+async function cloneAndSetup({
+  version = ARI_VERSION,
+  branch = ARI_BRANCH,
+  repoUrl = ARI_REPO_URL,
+  ask = askQuestion,
+  confirm = askYesNo,
+  install = installDependencies,
+  lookupTimeoutMs = 20000,
+} = {}) {
   console.log('');
   hr();
   console.log(`  ${blue('Setup ARI')}`);
   hr();
 
-  // A release asked for by name must exist. Find out now, before anything is
-  // cloned, rather than leaving a different version on disk than the one
-  // requested. A lookup that fails or times out is not proof it's missing, so
-  // the install carries on: the clone reports network problems properly, and
+  // A release asked for by name is delivered or the install fails; it is never
+  // swapped for another version.
+  const wantsNamedRelease = branch === 'main' && RELEASE_TAG_RE.test(version);
+  const fatal = (...messages) => ({ cloned: false, dir: null, fatal: messages });
+
+  // Find out now whether that release exists, before anything is cloned. A
+  // lookup that fails or times out is not proof it's missing, so the install
+  // carries on: the clone reports network problems properly, and
   // pinToRelease() below still refuses to deliver a different version.
-  if (ARI_BRANCH === 'main' && RELEASE_TAG_RE.test(ARI_VERSION)) {
-    console.log(`  ${dim(`Checking that ARI ${ARI_VERSION} is a released version…`)}`);
-    const found = run(`git ls-remote --tags --refs ${ARI_REPO_URL} refs/tags/${ARI_VERSION}`, { timeout: 20000 });
+  if (wantsNamedRelease) {
+    console.log(`  ${dim(`Checking that ARI ${version} is a released version…`)}`);
+    const found = run(`git ls-remote --tags --refs "${repoUrl}" refs/tags/${version}`, { timeout: lookupTimeoutMs });
     if (found !== null && found.trim() === '') {
-      return {
-        cloned: false,
-        dir: null,
-        fatal: [
-          `ARI ${ARI_VERSION} is not a released version. ARI was not installed.`,
-          'See the available releases at https://github.com/ARIsoftware/ARI/tags, or leave ARI_VERSION unset to install the latest one.',
-        ],
-      };
+      return fatal(
+        `ARI ${version} is not a released version. ARI was not installed.`,
+        'See the available releases at https://github.com/ARIsoftware/ARI/tags, or leave ARI_VERSION unset to install the latest one.',
+      );
     }
   }
 
   const defaultDir = path.join(os.homedir(), 'ARI');
-  const answer = await askQuestion(`  Where would you like to install ARI? ${dim(`[${defaultDir}]`)} `);
+  const answer = await ask(`  Where would you like to install ARI? ${dim(`[${defaultDir}]`)} `);
   let targetDir = answer || defaultDir;
 
   // Expand ~ to home directory
@@ -1247,9 +1285,6 @@ async function cloneAndSetup() {
     return { cloned: false, dir: null };
   }
 
-  // A release asked for by name needs a folder of its own; see below.
-  const wantsNamedRelease = ARI_BRANCH === 'main' && RELEASE_TAG_RE.test(ARI_VERSION);
-
   // Check if target exists
   if (fs.existsSync(targetDir)) {
     const packageJson = path.join(targetDir, 'package.json');
@@ -1259,13 +1294,13 @@ async function cloneAndSetup() {
     // one requested. It offers a different folder instead (below).
     if (fs.existsSync(packageJson) && wantsNamedRelease) {
       console.log(`  ${SYM_WARN} ${yellow('Directory already exists and contains a project.')}`);
-      console.log(`  ${dim(`ARI ${ARI_VERSION} will be installed into a new folder, leaving that one as it is.`)}`);
+      console.log(`  ${dim(`ARI ${version} will be installed into a new folder, leaving that one as it is.`)}`);
     } else if (fs.existsSync(packageJson)) {
       console.log(`  ${SYM_WARN} ${yellow('Directory already exists and contains a project.')}`);
-      const useExisting = await askYesNo('Use existing directory?', true);
+      const useExisting = await confirm('Use existing directory?', true);
       if (useExisting) {
         console.log(`  ${SYM_CHECK} Using existing directory: ${dim(targetDir)}`);
-        return await installDependencies(targetDir);
+        return await install(targetDir);
       }
     }
 
@@ -1277,11 +1312,11 @@ async function cloneAndSetup() {
       altDir = `${targetDir}-${counter}`;
     }
     console.log(`  ${SYM_WARN} ${yellow(`${targetDir} already exists.`)}`);
-    const altAnswer = await askQuestion(`  Use ${dim(altDir)} instead? [Y/n] `);
+    const altAnswer = await ask(`  Use ${dim(altDir)} instead? [Y/n] `);
     if (isYes(altAnswer, true)) {
       targetDir = altDir;
     } else {
-      const custom = await askQuestion('  Enter a custom path: ');
+      const custom = await ask('  Enter a custom path: ');
       if (!custom) {
         console.log(`  ${SYM_CROSS} ${red('No path provided. Skipping clone.')}`);
         return { cloned: false, dir: null };
@@ -1292,17 +1327,13 @@ async function cloneAndSetup() {
         return { cloned: false, dir: null };
       }
       // The path typed here gets no second round of questions. With a named
-      // release, a folder that is already in use ends the install rather than
+      // release, a path that is already in use ends the install rather than
       // letting a failed clone be reported as a finished one.
-      if (wantsNamedRelease && fs.existsSync(targetDir) && fs.readdirSync(targetDir).length > 0) {
-        return {
-          cloned: false,
-          dir: null,
-          fatal: [
-            `${targetDir} already exists and is not empty, so ARI ${ARI_VERSION} was not installed. Nothing was changed.`,
-            'Run the installer again and choose a folder that does not exist yet.',
-          ],
-        };
+      if (wantsNamedRelease && isPathInUse(targetDir)) {
+        return fatal(
+          `${targetDir} already exists and is in use, so ARI ${version} was not installed. Nothing was changed.`,
+          'Run the installer again and choose a folder that does not exist yet.',
+        );
       }
     }
   }
@@ -1312,63 +1343,51 @@ async function cloneAndSetup() {
   spinner.start('Cloning ARI repository…');
 
   try {
-    const branchFlag = ARI_BRANCH !== 'main' ? ` --branch ${ARI_BRANCH}` : '';
-    await runAsync(`git clone${branchFlag} ${ARI_REPO_URL} "${targetDir}"`);
-    // Rename origin to upstream (public ARI repo) so user can add their own origin later
-    await runAsync('git remote rename origin upstream', { cwd: targetDir });
-
-    let installed = ARI_BRANCH !== 'main' ? ` (branch: ${ARI_BRANCH})` : '';
-    let pinWarning = null;
-    if (ARI_BRANCH === 'main' && ARI_VERSION === 'edge') {
-      installed = ' (edge: latest main)';
-    } else if (ARI_BRANCH === 'main') {
-      const pinned = pinToRelease(targetDir);
-      if (pinned.ok) {
-        installed = ` (version ${pinned.version})`;
-      } else if (ARI_VERSION !== 'latest') {
-        // Asked for by name and not delivered: stop. Carrying on would set up
-        // and migrate a database for a version the user did not choose. `dir`
-        // stays null so nothing downstream treats the folder as an install.
-        spinner.error(`Could not install ARI ${ARI_VERSION}`);
-        return {
-          cloned: false,
-          dir: null,
-          fatal: [
-            `${pinned.reason} ARI was not installed.`,
-            `The folder ${targetDir} holds the latest code from main and has not been set up.`,
-            'Remove it and run the installer again, or leave ARI_VERSION unset to install the latest release.',
-          ],
-        };
-      } else {
-        pinWarning = pinned.reason;
-      }
-    }
-    spinner.success(`ARI cloned to ${dim(targetDir)}${installed}`);
-    if (pinWarning) {
-      console.log(`  ${SYM_WARN} ${yellow(pinWarning)}`);
-      console.log(`  ${dim('Installed the latest code from main instead. Run ./ari update later to move to a release.')}`);
-    }
+    await runAsync(manualCloneCommand(branch, repoUrl, targetDir));
   } catch (err) {
     spinner.error('Failed to clone ARI repository');
     console.log(`  ${dim(err.message.split('\n').slice(0, 3).join('\n  '))}`);
     console.log('');
     if (wantsNamedRelease) {
       // Whatever is or isn't in that folder, it is not the release asked for.
-      return {
-        cloned: false,
-        dir: null,
-        fatal: [
-          `ARI ${ARI_VERSION} was not installed: the download failed.`,
-          'Check your network connection and run the installer again.',
-        ],
-      };
+      return fatal(
+        `ARI ${version} was not installed: it could not be downloaded to ${targetDir}.`,
+        'The message from git is shown above. Fix that and run the installer again.',
+      );
     }
     console.log(`  ${dim('You can try cloning manually:')}`);
-    console.log(`  ${DIM_BLUE}git clone${ARI_BRANCH !== 'main' ? ` --branch ${ARI_BRANCH}` : ''} https://github.com/ARIsoftware/ARI.git "${targetDir}"${RESET}`);
-    return { cloned: false, dir: targetDir };
+    console.log(`  ${DIM_BLUE}${manualCloneCommand(branch, repoUrl, targetDir)}${RESET}`);
+    return { cloned: false, dir: null };
   }
 
-  return await installDependencies(targetDir);
+  let installed = branch !== 'main' ? ` (branch: ${branch})` : '';
+  let pinWarning = null;
+  if (branch === 'main' && version === 'edge') {
+    installed = ' (edge: latest main)';
+  } else if (branch === 'main') {
+    const pinned = pinToRelease(targetDir, version);
+    if (pinned.ok) {
+      installed = ` (version ${pinned.version})`;
+    } else if (version !== 'latest') {
+      // Asked for by name and not delivered: stop. Carrying on would set up
+      // and migrate a database for a version the user did not choose.
+      spinner.error(`Could not install ARI ${version}`);
+      return fatal(
+        `${pinned.reason} ARI was not installed.`,
+        `The folder ${targetDir} holds the latest code from main and has not been set up.`,
+        'Remove it and run the installer again, or leave ARI_VERSION unset to install the latest release.',
+      );
+    } else {
+      pinWarning = pinned.reason;
+    }
+  }
+  spinner.success(`ARI cloned to ${dim(targetDir)}${installed}`);
+  if (pinWarning) {
+    console.log(`  ${SYM_WARN} ${yellow(pinWarning)}`);
+    console.log(`  ${dim('Installed the latest code from main instead. Run ./ari update later to move to a release.')}`);
+  }
+
+  return await install(targetDir);
 }
 
 /**
@@ -1386,16 +1405,16 @@ async function cloneAndSetup() {
  * SYNC: release-tag rules mirror
  * scripts/lib/update-target.js, which this standalone file cannot import.
  */
-function pinToRelease(targetDir) {
+function pinToRelease(targetDir, requested = ARI_VERSION) {
   const listed = run('git tag -l --sort=-v:refname', { cwd: targetDir });
   const releases = (listed || '').split('\n').map((name) => name.trim()).filter((name) => RELEASE_TAG_RE.test(name));
 
   if (releases.length === 0) {
     return { ok: false, reason: 'No ARI releases were found in the repository.' };
   }
-  const version = ARI_VERSION === 'latest' ? releases[0] : releases.find((name) => name === ARI_VERSION);
+  const version = requested === 'latest' ? releases[0] : releases.find((name) => name === requested);
   if (!version) {
-    return { ok: false, reason: `ARI ${ARI_VERSION} is not a released version (latest is ${releases[0]}).` };
+    return { ok: false, reason: `ARI ${requested} is not a released version (latest is ${releases[0]}).` };
   }
 
   // rev-list resolves an annotated tag to its commit without the `^{commit}`
@@ -2123,20 +2142,36 @@ function shortenPath(p) {
 
 // ── Completion Screen ───────────────────────────────────────────────────────
 
+// Did the install produce a working copy of ARI? Decides the closing screen
+// and the exit code, so a failed download is never reported as a success.
+function installOutcome(ariResult) {
+  if (!ariResult || !ariResult.cloned || !ariResult.dir) return 'not-installed';
+  return ariResult.depsInstalled ? 'complete' : 'dependencies-missing';
+}
+
 function showCompletion(ariResult, supabaseResult) {
+  const outcome = installOutcome(ariResult);
   console.log('');
   drawBox([
     '',
-    green('Installation Complete!'),
+    outcome === 'complete' ? green('Installation Complete!') : yellow('Installation Not Finished'),
     '',
   ]);
   console.log('');
+  if (outcome === 'not-installed') {
+    console.log(`  ${SYM_WARN} ${yellow('The tools were set up, but ARI itself was not downloaded.')}`);
+    console.log('');
+  } else if (outcome === 'dependencies-missing') {
+    console.log(`  ${SYM_WARN} ${yellow('ARI was downloaded, but its dependencies were not installed.')}`);
+    console.log(`  ${dim(`Run this first:  cd "${ariResult.dir}" && pnpm install`)}`);
+    console.log('');
+  }
 
   const ariStart = PLATFORM === 'win32' ? '.\\ari.cmd start' : './ari start';
   const ariStartVerbose = PLATFORM === 'win32' ? '.\\ari.cmd start --verbose' : './ari start --verbose';
   const ariStop = PLATFORM === 'win32' ? '.\\ari.cmd stop' : './ari stop';
 
-  if (ariResult && ariResult.dir) {
+  if (outcome !== 'not-installed') {
     console.log(`  To start ARI, navigate to the directory where you installed ARI and run:`);
     console.log('');
     console.log(`    ${DIM_BLUE}${ariStart}${RESET}`);
@@ -2161,7 +2196,7 @@ function showCompletion(ariResult, supabaseResult) {
   } else {
     console.log(`  Clone ARI manually and run:`);
     console.log('');
-    console.log(`    ${DIM_BLUE}git clone${ARI_BRANCH !== 'main' ? ` --branch ${ARI_BRANCH}` : ''} https://github.com/ARIsoftware/ARI.git${RESET}`);
+    console.log(`    ${DIM_BLUE}${manualCloneCommand(ARI_BRANCH, ARI_REPO_URL)}${RESET}`);
     console.log(`    ${DIM_BLUE}cd ARI${RESET}`);
     console.log(`    ${DIM_BLUE}pnpm install${RESET}`);
     console.log(`    ${DIM_BLUE}${ariStart}${RESET}`);
@@ -2258,18 +2293,25 @@ async function main() {
   showCompletion(ariResult, dbResult);
 
   // Write install directory for the shell wrapper to cd into
+  const outcome = installOutcome(ariResult);
   const dirFile = process.env.ARI_INSTALL_DIR_FILE;
-  if (dirFile && ariResult && ariResult.dir) {
+  if (dirFile && outcome !== 'not-installed') {
     try { fs.writeFileSync(dirFile, ariResult.dir); } catch (e) { /* best-effort */ }
   }
 
   process.stdout.write(SHOW_CURSOR);
-  process.exit(0);
+  process.exit(outcome === 'complete' ? 0 : 1);
 }
 
-main().catch((err) => {
-  process.stdout.write(SHOW_CURSOR);
-  console.error(`\n  ${SYM_CROSS} ${red('Unexpected error:')}`);
-  console.error(`  ${dim(err.message)}\n`);
-  process.exit(1);
-});
+// Exported for the tests, which import this file with ARI_INSTALLER_IMPORT_ONLY=1
+// so that it defines everything and runs nothing. Anything else runs the installer.
+export { cloneAndSetup, installOutcome, isPathInUse, isYes, manualCloneCommand, pinToRelease };
+
+if (process.env.ARI_INSTALLER_IMPORT_ONLY !== '1') {
+  main().catch((err) => {
+    process.stdout.write(SHOW_CURSOR);
+    console.error(`\n  ${SYM_CROSS} ${red('Unexpected error:')}`);
+    console.error(`  ${dim(err.message)}\n`);
+    process.exit(1);
+  });
+}
