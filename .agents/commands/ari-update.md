@@ -189,9 +189,13 @@ After a successful merge:
    - If changed, ask the user: "Dependencies have changed. Run `pnpm install` now?"
    - If they confirm, run `pnpm install`.
 
-2. **Check for new SQL migrations**: Look for any new or changed `.sql` files in the diff.
-   - If found, list them and tell the user:
-     > "New database migration files were detected. Please review and run them manually in your SQL client of choice — Supabase Studio, pgweb, or `psql`."
+2. **Check for database changes**: Look for new or changed `.sql` files in the diff. ARI applies its own schema, so there is normally nothing for the user to run:
+   - `lib/db/setup.sql` is applied automatically every time ARI starts.
+   - A module's `database/schema.sql` is applied automatically, for each module a user has enabled, the next time that user loads ARI.
+   - If either kind changed, tell the user:
+     > "This update includes database changes. ARI applies them automatically the next time it starts. There is nothing to run by hand."
+   - Never suggest running a `database/uninstall.sql`. It is a manual teardown script that drops the module's tables and is not part of an update.
+   - If any other `.sql` file changed (for example under `migrations/` or `scripts/`), list it and say that ARI does not apply it automatically and an update does not normally need it. Do not tell the user to run it.
 
 3. **Check if module or theme files changed**: Look for changes in `modules-core/`, `module.json`, `themes-core/`, or `theme.json` files.
    - If changed, run `pnpm generate-module-registry` automatically (it also regenerates the theme registry).
@@ -208,12 +212,12 @@ After a successful merge:
 
 Show a final summary:
 > "ARI has been updated successfully!"
-> Include: the version now installed (`version` in `package.json`), number of new commits merged, any action items remaining (pnpm install, SQL migrations, env vars).
+> Include: the version now installed (`version` in `package.json`), number of new commits merged, any action items remaining (pnpm install, env vars). If the update included database changes, say they apply automatically on the next start.
 > Remind the user to restart their dev server if it's running.
 
 ## Important Rules
 
-- NEVER run SQL files automatically — always list them for the user to run manually.
+- NEVER run SQL files, and never tell the user to run one as part of an update. ARI applies its schema itself on start.
 - NEVER force-push, reset, or use any destructive git commands.
 - NEVER downgrade to an older release, and never update to `main` unless the user explicitly asked for edge.
 - NEVER merge without showing the user what will change and getting a clear yes.
