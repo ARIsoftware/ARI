@@ -529,6 +529,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               setShowMainMenu(true)
             }}
           />
+          {versionFooter}
         </SidebarContent>
         <SidebarRail />
       </Sidebar>

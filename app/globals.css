@@ -391,6 +391,12 @@ html::-webkit-scrollbar-corner {
   padding-top: 1rem;
 }
 
+/* Version footer under a module submenu: centered, like the main menu's */
+[data-mobile='true'] .mobile-sub-nav + [data-sidebar='version'] {
+  text-align: center;
+  padding-bottom: 0.5rem;
+}
+
 /* Full-bleed rows: drop the group's side padding so highlights reach the edge */
 [data-mobile='true'] .mobile-sub-nav [data-sidebar='group'],
 [data-mobile='true'] .mobile-sub-nav [data-sidebar='group-content'] {

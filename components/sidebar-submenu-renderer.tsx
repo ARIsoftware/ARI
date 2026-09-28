@@ -52,7 +52,9 @@ export function SubmenuRenderer({ moduleId, module, onBack }: SubmenuRendererPro
   }
 
   return (
-    <div className="mobile-sub-nav flex flex-col h-full overflow-hidden" onClick={handleContentClick}>
+    // flex-1 rather than h-full: the sidebar pins a version stamp below this, and
+    // a full-height submenu would push it out of view.
+    <div className="mobile-sub-nav flex flex-col flex-1 min-h-0 overflow-hidden" onClick={handleContentClick}>
       {/* Back header — desktop only; on mobile it renders in the sheet header */}
       {!isMobile && (
         <SidebarGroup>
