@@ -33,6 +33,7 @@ if (!/^[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(ARI_BRANCH) || ARI_BRANCH.includes('..
 // release, or "edge" for the unreleased tip of main. Ignored when ARI_BRANCH
 // names another branch. Release tags are bare X.Y.Z — see pinToRelease().
 const RELEASE_TAG_RE = /^\d+\.\d+\.\d+$/;
+const ARI_REPO_URL = 'https://github.com/ARIsoftware/ARI.git';
 const ARI_VERSION = (process.env.ARI_VERSION || 'latest').replace(/^v(?=\d)/, '');
 if (ARI_VERSION !== 'latest' && ARI_VERSION !== 'edge' && !RELEASE_TAG_RE.test(ARI_VERSION)) {
   console.error(`Invalid ARI_VERSION: '${ARI_VERSION}' (expected latest, edge, or a release like 2.0.5)`);
@@ -436,11 +437,20 @@ function askQuestion(prompt) {
   });
 }
 
+// Enter takes the default; only a clear "y" or "yes" is a yes. Anything else —
+// "yikes", a pasted path — is a no, so an unclear answer is never consent.
+// SYNC: same rule as parseYesNo() in scripts/lib/update-target.js, which this
+// standalone file cannot import.
+function isYes(answer, defaultYes) {
+  const value = String(answer).trim().toLowerCase();
+  if (value === '') return defaultYes;
+  return value === 'y' || value === 'yes';
+}
+
 async function askYesNo(question, defaultYes = true) {
   const hint = defaultYes ? '[Y/n]' : '[y/N]';
   const answer = await askQuestion(`  ${question} ${dim(hint)} `);
-  if (answer === '') return defaultYes;
-  return /^[Yy]/.test(answer);
+  return isYes(answer, defaultYes);
 }
 
 async function pressEnter(msg = 'Press ENTER to continue') {
@@ -1197,6 +1207,26 @@ async function cloneAndSetup() {
   console.log(`  ${blue('Setup ARI')}`);
   hr();
 
+  // A release asked for by name must exist. Find out now, before anything is
+  // cloned, rather than leaving a different version on disk than the one
+  // requested. A lookup that fails or times out is not proof it's missing, so
+  // the install carries on: the clone reports network problems properly, and
+  // pinToRelease() below still refuses to deliver a different version.
+  if (ARI_BRANCH === 'main' && RELEASE_TAG_RE.test(ARI_VERSION)) {
+    console.log(`  ${dim(`Checking that ARI ${ARI_VERSION} is a released version…`)}`);
+    const found = run(`git ls-remote --tags --refs ${ARI_REPO_URL} refs/tags/${ARI_VERSION}`, { timeout: 20000 });
+    if (found !== null && found.trim() === '') {
+      return {
+        cloned: false,
+        dir: null,
+        fatal: [
+          `ARI ${ARI_VERSION} is not a released version. ARI was not installed.`,
+          'See the available releases at https://github.com/ARIsoftware/ARI/tags, or leave ARI_VERSION unset to install the latest one.',
+        ],
+      };
+    }
+  }
+
   const defaultDir = path.join(os.homedir(), 'ARI');
   const answer = await askQuestion(`  Where would you like to install ARI? ${dim(`[${defaultDir}]`)} `);
   let targetDir = answer || defaultDir;
@@ -1217,10 +1247,20 @@ async function cloneAndSetup() {
     return { cloned: false, dir: null };
   }
 
+  // A release asked for by name needs a folder of its own; see below.
+  const wantsNamedRelease = ARI_BRANCH === 'main' && RELEASE_TAG_RE.test(ARI_VERSION);
+
   // Check if target exists
   if (fs.existsSync(targetDir)) {
     const packageJson = path.join(targetDir, 'package.json');
-    if (fs.existsSync(packageJson)) {
+    // A release asked for by name needs a folder of its own. An existing
+    // project is somebody's copy at whatever version it happens to hold: the
+    // installer neither moves it to another version nor passes it off as the
+    // one requested. It offers a different folder instead (below).
+    if (fs.existsSync(packageJson) && wantsNamedRelease) {
+      console.log(`  ${SYM_WARN} ${yellow('Directory already exists and contains a project.')}`);
+      console.log(`  ${dim(`ARI ${ARI_VERSION} will be installed into a new folder, leaving that one as it is.`)}`);
+    } else if (fs.existsSync(packageJson)) {
       console.log(`  ${SYM_WARN} ${yellow('Directory already exists and contains a project.')}`);
       const useExisting = await askYesNo('Use existing directory?', true);
       if (useExisting) {
@@ -1238,7 +1278,7 @@ async function cloneAndSetup() {
     }
     console.log(`  ${SYM_WARN} ${yellow(`${targetDir} already exists.`)}`);
     const altAnswer = await askQuestion(`  Use ${dim(altDir)} instead? [Y/n] `);
-    if (altAnswer === '' || /^[Yy]/.test(altAnswer)) {
+    if (isYes(altAnswer, true)) {
       targetDir = altDir;
     } else {
       const custom = await askQuestion('  Enter a custom path: ');
@@ -1251,6 +1291,19 @@ async function cloneAndSetup() {
         console.log(`  ${SYM_CROSS} ${red('Install path contains unsupported characters. Skipping clone.')}`);
         return { cloned: false, dir: null };
       }
+      // The path typed here gets no second round of questions. With a named
+      // release, a folder that is already in use ends the install rather than
+      // letting a failed clone be reported as a finished one.
+      if (wantsNamedRelease && fs.existsSync(targetDir) && fs.readdirSync(targetDir).length > 0) {
+        return {
+          cloned: false,
+          dir: null,
+          fatal: [
+            `${targetDir} already exists and is not empty, so ARI ${ARI_VERSION} was not installed. Nothing was changed.`,
+            'Run the installer again and choose a folder that does not exist yet.',
+          ],
+        };
+      }
     }
   }
 
@@ -1260,7 +1313,7 @@ async function cloneAndSetup() {
 
   try {
     const branchFlag = ARI_BRANCH !== 'main' ? ` --branch ${ARI_BRANCH}` : '';
-    await runAsync(`git clone${branchFlag} https://github.com/ARIsoftware/ARI.git "${targetDir}"`);
+    await runAsync(`git clone${branchFlag} ${ARI_REPO_URL} "${targetDir}"`);
     // Rename origin to upstream (public ARI repo) so user can add their own origin later
     await runAsync('git remote rename origin upstream', { cwd: targetDir });
 
@@ -1270,8 +1323,25 @@ async function cloneAndSetup() {
       installed = ' (edge: latest main)';
     } else if (ARI_BRANCH === 'main') {
       const pinned = pinToRelease(targetDir);
-      if (pinned.ok) installed = ` (version ${pinned.version})`;
-      else pinWarning = pinned.reason;
+      if (pinned.ok) {
+        installed = ` (version ${pinned.version})`;
+      } else if (ARI_VERSION !== 'latest') {
+        // Asked for by name and not delivered: stop. Carrying on would set up
+        // and migrate a database for a version the user did not choose. `dir`
+        // stays null so nothing downstream treats the folder as an install.
+        spinner.error(`Could not install ARI ${ARI_VERSION}`);
+        return {
+          cloned: false,
+          dir: null,
+          fatal: [
+            `${pinned.reason} ARI was not installed.`,
+            `The folder ${targetDir} holds the latest code from main and has not been set up.`,
+            'Remove it and run the installer again, or leave ARI_VERSION unset to install the latest release.',
+          ],
+        };
+      } else {
+        pinWarning = pinned.reason;
+      }
     }
     spinner.success(`ARI cloned to ${dim(targetDir)}${installed}`);
     if (pinWarning) {
@@ -1282,6 +1352,17 @@ async function cloneAndSetup() {
     spinner.error('Failed to clone ARI repository');
     console.log(`  ${dim(err.message.split('\n').slice(0, 3).join('\n  '))}`);
     console.log('');
+    if (wantsNamedRelease) {
+      // Whatever is or isn't in that folder, it is not the release asked for.
+      return {
+        cloned: false,
+        dir: null,
+        fatal: [
+          `ARI ${ARI_VERSION} was not installed: the download failed.`,
+          'Check your network connection and run the installer again.',
+        ],
+      };
+    }
     console.log(`  ${dim('You can try cloning manually:')}`);
     console.log(`  ${DIM_BLUE}git clone${ARI_BRANCH !== 'main' ? ` --branch ${ARI_BRANCH}` : ''} https://github.com/ARIsoftware/ARI.git "${targetDir}"${RESET}`);
     return { cloned: false, dir: targetDir };
@@ -1300,7 +1381,9 @@ async function cloneAndSetup() {
  * directory, where moving the branch could drop the user's commits.
  *
  * Never throws: any problem returns { ok: false, reason } and leaves the
- * working main checkout in place. SYNC: release-tag rules mirror
+ * working main checkout in place. The caller decides what that means — the
+ * default "latest" falls back to main, a release asked for by name does not.
+ * SYNC: release-tag rules mirror
  * scripts/lib/update-target.js, which this standalone file cannot import.
  */
 function pinToRelease(targetDir) {
@@ -2135,6 +2218,18 @@ async function main() {
 
   // Clone & setup
   const ariResult = await cloneAndSetup();
+
+  // A failure that must not be reported as a finished install: stop here, with
+  // a failing exit code, before the verification and "complete" screens.
+  if (ariResult && ariResult.fatal) {
+    const [headline, ...details] = ariResult.fatal;
+    console.log('');
+    console.log(`  ${SYM_CROSS} ${red(headline)}`);
+    for (const line of details) console.log(`  ${dim(line)}`);
+    console.log('');
+    process.stdout.write(SHOW_CURSOR);
+    process.exit(1);
+  }
 
   // Database mode selection and setup (only if clone succeeded and deps installed)
   let dbResult = null;

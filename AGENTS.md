@@ -522,17 +522,22 @@ ARI releases are **annotated git tags named `X.Y.Z`** (no `v` prefix — `.npmrc
 - The release list always comes from the remote (`git ls-remote --tags upstream`) and the update merges the tag's **commit sha**, never the local tag name — local tags can be missing, stale, or conflicting. History decides "already up to date" (`git merge-base --is-ancestor`), not `package.json`, because installs that followed `main` sit ahead of the latest tag.
 - The CLI never resets, force-moves, or checks out over a user's install. The one `git checkout -B main <sha>` lives in the installer and only runs on a clone it just created.
 - Pure decision logic is in `scripts/lib/update-target.js` (unit tested in `tests/unit/scripts/lib/update-target.test.ts`); `.ari/cli.js` only does git and terminal I/O. The installer (`scripts/install.mjs`) is a standalone file and carries its own copy of the release-tag rule — keep the two in sync.
-- Startup notice (`checkForUpdates()` in `.ari/cli.js`) compares the installed version with the latest upstream tag and must never delay startup: it settles on its own 3s timer.
+- Startup notice (`checkForUpdates()` in `.ari/cli.js`) compares the installed version with the latest tag on the **same `upstream` remote** `./ari update` uses (the official URL is only the fallback when no remote exists), so it never advertises a release the update can't see. It must never delay startup or prompt: it settles on its own 3s timer and runs git with credential prompts disabled. `./ari update` itself is interactive and runs git with the user's own configuration and visible output, so private mirrors can authenticate and failures show git's real error.
+- Every yes/no prompt goes through `parseYesNo()`: Enter takes the prompt's default, `y`/`yes` is yes, and **anything else is no** — an unclear answer is never consent. `classifyUpdate()` turns the version relation plus git history into the outcome; `package.json` alone never decides.
+- A release asked for by name must be delivered or the command fails: the installer aborts on an unknown `ARI_VERSION` before cloning. Only the default (`latest`) falls back to `main` when no release can be found.
 - Fresh installs land on the latest release. `ARI_VERSION=2.0.5` installs a specific release, `ARI_VERSION=edge` installs `main`; `ARI_BRANCH=<branch>` still installs that branch as-is.
 - The in-app "New version is available" dialog is fed by `api.ari.software/version/latest`, which reads `version` from `package.json` on `main` — **not** the tags. The two agree only when the release checklist below is followed.
 
 **Release checklist** (every release):
 
-1. `pnpm version <patch|minor|major>` — creates the "bump" commit and the bare `X.Y.Z` tag together.
-2. `git push --atomic upstream main <X.Y.Z>` — the commit and its tag must reach GitHub in one step.
-3. Never push a `package.json` version bump without its tag: the in-app dialog would advertise a version `./ari update` cannot find yet.
-4. `scripts/install.mjs` is always downloaded from `main` but installs the latest **release**, so it must stay compatible with the code in the latest tag.
-5. Never move or delete a published tag, and tag only commits on `main`.
+1. Bump `"version"` in `package.json` to the new `X.Y.Z` and commit **only that file**: `git commit -m "Bump version to X.Y.Z" -- package.json`. The bump must be the last commit of the release, with everything it ships already committed before it.
+2. Tag that commit with an annotated tag: `git tag -a X.Y.Z -m "ARI X.Y.Z"`. The tag name must equal the `package.json` version exactly.
+3. `git push --atomic upstream main X.Y.Z` — the commit and its tag must reach GitHub in one step.
+4. Never push a `package.json` version bump without its tag: the in-app dialog would advertise a version `./ari update` cannot find yet.
+5. `scripts/install.mjs` is always downloaded from `main` but installs the latest **release**, so it must stay compatible with the code in the latest tag.
+6. Never move or delete a published tag, and tag only commits on `main`.
+
+`pnpm version <patch|minor|major>` is not used: it refuses to run while the working tree has untracked files ("Working tree is not clean"), and `modules-custom/` and `themes-custom/` are untracked by design.
 
 For manual control without the CLI:
 ```bash
