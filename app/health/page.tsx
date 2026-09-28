@@ -2741,6 +2741,10 @@ export default function DatabaseTestPage() {
       <div className="mb-8">
         <h1 className="text-4xl font-bold tracking-tight">Health Check</h1>
         <p className="text-muted-foreground mt-2">Comprehensive system testing and diagnostics</p>
+        {/* Release number only: NEXT_PUBLIC_ARI_VERSION is "<version>+<commit>". */}
+        <p className="text-muted-foreground mt-2">
+          ARI Version: {(process.env.NEXT_PUBLIC_ARI_VERSION || '').split('+')[0] || 'unknown'}
+        </p>
       </div>
 
       {/* System Status */}
