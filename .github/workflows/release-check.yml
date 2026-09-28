@@ -1,0 +1,25 @@
+name: Release check
+# Runs when a tag is pushed. `./ari update` moves every install to the newest
+# X.Y.Z tag and the in-app notice advertises the version in package.json, so a
+# tag that disagrees with the code it points at misleads all of them.
+on:
+  push:
+    tags: ['*']
+
+permissions:
+  contents: read
+
+jobs:
+  verify-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # Full history and tags: the check reads the tag object itself and
+          # asks whether the tagged commit is part of main.
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Verify the tag is a valid release
+        run: node scripts/check-release-tag.mjs "$GITHUB_REF_NAME" origin/main
