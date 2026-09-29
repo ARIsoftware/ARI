@@ -185,8 +185,12 @@ export type UpgradeLab = {
 
 /** Does this released updater know about release tags, or does it follow main? */
 export function followsReleases(updater: ReleasedUpdater): boolean {
-  const cli = updater.files.find((file) => file.path === '.ari/cli.js')
-  return Boolean(cli && cli.content.includes('ls-remote'))
+  // The update code was in the CLI itself up to 2.0.10, and is in scripts/lib since.
+  return updater.files.some(
+    (file) =>
+      (file.path === '.ari/cli.js' || file.path.startsWith('scripts/lib/')) &&
+      file.content.includes('ls-remote'),
+  )
 }
 
 /**
