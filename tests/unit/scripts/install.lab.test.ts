@@ -18,6 +18,8 @@ type CloneResult = {
   fatal?: string[]
 }
 type Installer = {
+  installOutcome: (result: CloneResult | null) => string
+  reportFatal: (result: CloneResult | null) => boolean
   cloneAndSetup: (options: Record<string, unknown>) => Promise<CloneResult>
   isPathInUse: (target: string) => boolean
   isYes: (answer: unknown, defaultYes: boolean) => boolean
@@ -73,6 +75,8 @@ posix('downloading ARI', { timeout: 120_000 }, () => {
     branch?: string
     repoUrl?: string
     answers: string[]
+    lookupTimeoutMs?: number
+    install?: (dir: string) => Promise<CloneResult>
   }) => {
     const answers = [...opts.answers]
     const asked: string[] = []
@@ -88,8 +92,9 @@ posix('downloading ARI', { timeout: 120_000 }, () => {
         asked.push(question)
         return installer.isYes(answers.shift() ?? '', true)
       },
-      install: async (dir: string) => ({ cloned: true, dir, depsInstalled: true }),
-      lookupTimeoutMs: 5000,
+      install:
+        opts.install ?? (async (dir: string) => ({ cloned: true, dir, depsInstalled: true })),
+      lookupTimeoutMs: opts.lookupTimeoutMs ?? 5000,
     })
     return { result, asked }
   }
@@ -183,6 +188,67 @@ posix('downloading ARI', { timeout: 120_000 }, () => {
       expect(result.fatal?.[0]).toContain('ARI 2.0.9 was not installed')
       expect(result.fatal?.join(' ')).not.toMatch(/network/i)
       expect(result.dir).toBeNull()
+    })
+  })
+
+  // The check made before cloning can be unavailable: no answer in time, or a
+  // network that lets the clone through but not the lookup. Then the clone is
+  // what finds out, and by then there is a folder on disk.
+  describe('a release asked for by name that turns out to be missing after the download', () => {
+    const lookupUnavailable = { lookupTimeoutMs: 1 }
+
+    it('stops, says which folder was left behind, and hands no folder on', async () => {
+      const target = freshPath()
+      const { result } = await run({ version: '2.0.99', answers: [target], ...lookupUnavailable })
+
+      expect(result.cloned).toBe(false)
+      expect(result.dir).toBeNull()
+      expect(result.fatal?.[0]).toContain('ARI 2.0.99 is not a released version')
+      expect(result.fatal?.[0]).toContain('ARI was not installed')
+      expect(result.fatal?.join('\n')).toContain(target)
+      expect(result.fatal?.join('\n')).toContain('has not been set up')
+    })
+
+    it('does not set up the folder it leaves behind', async () => {
+      const target = freshPath()
+      let setUp = false
+      await run({
+        version: '2.0.99',
+        answers: [target],
+        ...lookupUnavailable,
+        install: async (dir: string) => {
+          setUp = true
+          return { cloned: true, dir, depsInstalled: true }
+        },
+      })
+
+      expect(setUp).toBe(false)
+      // What is there is the download, untouched: the tip of main.
+      expect(fs.existsSync(path.join(target, 'unreleased.txt'))).toBe(true)
+    })
+
+    it('ends the install with a failing exit code instead of the closing screen', async () => {
+      const target = freshPath()
+      const { result } = await run({ version: '2.0.99', answers: [target], ...lookupUnavailable })
+
+      expect(installer.installOutcome(result)).toBe('not-installed')
+      expect(installer.reportFatal(result)).toBe(true)
+    })
+
+    it('stops on a tag that exists but does not name a commit', async () => {
+      // A tag can point at any object. One that points at a folder listing
+      // passes every check by name and cannot be checked out.
+      const odd = path.join(lab.root, 'odd-tag.git')
+      const helper = lab.install('2.0.8')
+      helper.git('clone', '-q', '--bare', lab.upstream, odd)
+      const tree = helper.git('--git-dir', odd, 'rev-parse', 'main^{tree}')
+      helper.git('--git-dir', odd, 'tag', '2.0.50', tree)
+      const target = freshPath()
+      const { result } = await run({ version: '2.0.50', repoUrl: odd, answers: [target] })
+
+      expect(result.cloned).toBe(false)
+      expect(result.dir).toBeNull()
+      expect(result.fatal?.[0]).toMatch(/Could not (resolve|switch to) ARI 2\.0\.50/)
     })
   })
 

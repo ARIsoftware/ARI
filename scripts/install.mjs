@@ -2142,6 +2142,30 @@ function shortenPath(p) {
 
 // ── Completion Screen ───────────────────────────────────────────────────────
 
+// Say why the install cannot go on, when it cannot. Returns whether it did.
+function reportFatal(ariResult) {
+  if (!ariResult || !ariResult.fatal) return false;
+  const [headline, ...details] = ariResult.fatal;
+  console.log('');
+  console.log(`  ${SYM_CROSS} ${red(headline)}`);
+  for (const line of details) console.log(`  ${dim(line)}`);
+  console.log('');
+  return true;
+}
+
+// The end of the install: the closing screen, the note that tells the shell
+// wrapper which folder to move into, and the exit code. The wrappers only move
+// into the folder when there is one worth moving into.
+function concludeInstall(ariResult, dbResult, { dirFile = process.env.ARI_INSTALL_DIR_FILE } = {}) {
+  showCompletion(ariResult, dbResult);
+
+  const outcome = installOutcome(ariResult);
+  if (dirFile && outcome !== 'not-installed') {
+    try { fs.writeFileSync(dirFile, ariResult.dir); } catch (e) { /* best-effort */ }
+  }
+  return outcome === 'complete' ? 0 : 1;
+}
+
 // Did the install produce a working copy of ARI? Decides the closing screen
 // and the exit code, so a failed download is never reported as a success.
 function installOutcome(ariResult) {
@@ -2256,12 +2280,7 @@ async function main() {
 
   // A failure that must not be reported as a finished install: stop here, with
   // a failing exit code, before the verification and "complete" screens.
-  if (ariResult && ariResult.fatal) {
-    const [headline, ...details] = ariResult.fatal;
-    console.log('');
-    console.log(`  ${SYM_CROSS} ${red(headline)}`);
-    for (const line of details) console.log(`  ${dim(line)}`);
-    console.log('');
+  if (reportFatal(ariResult)) {
     process.stdout.write(SHOW_CURSOR);
     process.exit(1);
   }
@@ -2289,23 +2308,23 @@ async function main() {
   // Verification
   runVerification(ariResult, dbResult);
 
-  // Completion
-  showCompletion(ariResult, dbResult);
-
-  // Write install directory for the shell wrapper to cd into
-  const outcome = installOutcome(ariResult);
-  const dirFile = process.env.ARI_INSTALL_DIR_FILE;
-  if (dirFile && outcome !== 'not-installed') {
-    try { fs.writeFileSync(dirFile, ariResult.dir); } catch (e) { /* best-effort */ }
-  }
-
+  const exitCode = concludeInstall(ariResult, dbResult);
   process.stdout.write(SHOW_CURSOR);
-  process.exit(outcome === 'complete' ? 0 : 1);
+  process.exit(exitCode);
 }
 
 // Exported for the tests, which import this file with ARI_INSTALLER_IMPORT_ONLY=1
 // so that it defines everything and runs nothing. Anything else runs the installer.
-export { cloneAndSetup, installOutcome, isPathInUse, isYes, manualCloneCommand, pinToRelease };
+export {
+  cloneAndSetup,
+  concludeInstall,
+  installOutcome,
+  isPathInUse,
+  isYes,
+  manualCloneCommand,
+  pinToRelease,
+  reportFatal,
+};
 
 if (process.env.ARI_INSTALLER_IMPORT_ONLY !== '1') {
   main().catch((err) => {
