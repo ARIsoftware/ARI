@@ -11,7 +11,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-const REPO_ROOT = path.resolve(__dirname, '..', '..', '..')
+export const REPO_ROOT = path.resolve(__dirname, '..', '..', '..')
 
 /** Files the CLI needs to run, copied into the lab's upstream repository. */
 const CLI_FILES = ['.ari/cli.js', 'scripts/reconcile-module-deps.js', 'scripts/lib']
@@ -36,6 +36,11 @@ export type Install = {
   commit: (message: string) => string
   /** Run `./ari update ...args`, answering prompts with `input` (one line each). */
   update: (
+    args?: string[],
+    opts?: { input?: string; env?: Record<string, string | undefined> },
+  ) => RunResult
+  /** Run the install's own `./ari` launcher script with any arguments. */
+  launcher: (
     args?: string[],
     opts?: { input?: string; env?: Record<string, string | undefined> },
   ) => RunResult
@@ -101,17 +106,26 @@ export function useLabEnvironment(env: Record<string, string | undefined>): () =
   }
 }
 
-type LabEnv = Record<string, string | undefined>
+export type LabEnv = Record<string, string | undefined>
 
 /** Node's spawn functions take NodeJS.ProcessEnv, which Next widens to require NODE_ENV. */
-const forSpawn = (env: LabEnv) => env as NodeJS.ProcessEnv
+export const forSpawn = (env: LabEnv) => env as NodeJS.ProcessEnv
+
+/** The caller's environment with everything that could redirect git taken out. */
+export function cleanEnv(): LabEnv {
+  return Object.fromEntries(Object.entries(process.env).filter(([key]) => !LEAKY.test(key)))
+}
+
+/**
+ * The Node that runs the CLI in the lab. The tests' own Node by default; set
+ * ARI_LAB_NODE to the path of another `node` to run the CLI under that version
+ * instead (the launcher finds it too: its folder is put first on PATH).
+ */
+export const LAB_NODE = process.env.ARI_LAB_NODE || process.execPath
 
 function baseEnv(binDir: string): LabEnv {
-  const inherited = Object.fromEntries(
-    Object.entries(process.env).filter(([key]) => !LEAKY.test(key)),
-  )
   return {
-    ...inherited,
+    ...cleanEnv(),
     GIT_CONFIG_GLOBAL: os.devNull,
     GIT_CONFIG_SYSTEM: os.devNull,
     GIT_CONFIG_NOSYSTEM: '1',
@@ -120,7 +134,7 @@ function baseEnv(binDir: string): LabEnv {
     GIT_COMMITTER_NAME: 'ARI Test',
     GIT_COMMITTER_EMAIL: 'test@example.invalid',
     GIT_TERMINAL_PROMPT: '0',
-    PATH: binDir + path.delimiter + (process.env.PATH ?? ''),
+    PATH: [binDir, path.dirname(LAB_NODE), process.env.PATH ?? ''].join(path.delimiter),
   }
 }
 
@@ -140,13 +154,87 @@ function setVersion(dir: string, version: string) {
   fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + '\n')
 }
 
-export function createLab(): Lab {
+export type Workspace = {
+  root: string
+  env: LabEnv
+  /** git bound to a directory; throws when the command fails. */
+  gitIn: (cwd: string) => (...args: string[]) => string
+  /** An Install object for a directory that already holds a clone. */
+  installAt: (dir: string) => Install
+  cleanup: () => void
+}
+
+/** A temp directory with a stub pnpm on PATH and an environment sealed off from the caller's. */
+export function createWorkspace(): Workspace {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ari-update-lab-')))
   const binDir = path.join(root, 'bin')
   fs.mkdirSync(binDir)
   // The update ends with `pnpm install`; a real one would hit the network.
   fs.writeFileSync(path.join(binDir, 'pnpm'), '#!/bin/sh\necho "[stub pnpm $*]"\n', { mode: 0o755 })
   const env = baseEnv(binDir)
+
+  const gitIn =
+    (cwd: string) =>
+    (...args: string[]) =>
+      execFileSync('git', args, {
+        cwd,
+        env: forSpawn(env),
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }).trim()
+
+  const run = (dir: string, command: string, args: string[], input: string, extra: LabEnv) => {
+    const res = spawnSync(command, args, {
+      cwd: dir,
+      env: forSpawn({ ...env, ...extra }),
+      encoding: 'utf8',
+      // An empty input closes stdin straight away, as with `< /dev/null`.
+      input,
+      timeout: 90_000,
+    })
+    const out = ((res.stdout ?? '') + (res.stderr ?? ''))
+      .replace(ANSI, '')
+      .split(root)
+      .join('<lab>')
+    return { status: res.error ? null : res.status, out }
+  }
+
+  const installAt: Workspace['installAt'] = (dir) => {
+    const git = gitIn(dir)
+    return {
+      dir,
+      git,
+      gitStatus: (...args) =>
+        spawnSync('git', args, { cwd: dir, env: forSpawn(env), stdio: 'ignore' }).status ?? -1,
+      head: () => git('rev-parse', 'HEAD'),
+      version: () => JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')).version,
+      write: (file, content) => {
+        fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true })
+        fs.writeFileSync(path.join(dir, file), content)
+      },
+      commit: (message) => {
+        git('add', '-A')
+        git('commit', '-q', '-m', message)
+        return git('rev-parse', 'HEAD')
+      },
+      update: (args = [], { input = '', env: extra = {} } = {}) =>
+        run(dir, LAB_NODE, [path.join(dir, '.ari', 'cli.js'), 'update', ...args], input, extra),
+      launcher: (args = [], { input = '', env: extra = {} } = {}) =>
+        run(dir, path.join(dir, 'ari'), args, input, extra),
+    }
+  }
+
+  return {
+    root,
+    env,
+    gitIn,
+    installAt,
+    cleanup: () => fs.rmSync(root, { recursive: true, force: true }),
+  }
+}
+
+export function createLab(): Lab {
+  const { root, env, gitIn, installAt, cleanup } = createWorkspace()
 
   const realGit = execFileSync('/bin/sh', ['-c', 'command -v git'], {
     env: forSpawn(env),
@@ -177,16 +265,6 @@ export function createLab(): Lab {
     ].join('\n'),
     { mode: 0o755 },
   )
-
-  const gitIn =
-    (cwd: string) =>
-    (...args: string[]) =>
-      execFileSync('git', args, {
-        cwd,
-        env: forSpawn(env),
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-      }).trim()
 
   // ── upstream: releases 2.0.8, 2.0.9, 2.0.10, then one unreleased commit ──
   const src = path.join(root, 'src')
@@ -241,42 +319,7 @@ export function createLab(): Lab {
     const git = gitIn(dir)
     if (!opts.shallow) git('checkout', '-q', '-B', 'main', releases[at] ?? at)
 
-    return {
-      dir,
-      git,
-      gitStatus: (...args) =>
-        spawnSync('git', args, { cwd: dir, env: forSpawn(env), stdio: 'ignore' }).status ?? -1,
-      head: () => git('rev-parse', 'HEAD'),
-      version: () => JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')).version,
-      write: (file, content) => {
-        fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true })
-        fs.writeFileSync(path.join(dir, file), content)
-      },
-      commit: (message) => {
-        git('add', '-A')
-        git('commit', '-q', '-m', message)
-        return git('rev-parse', 'HEAD')
-      },
-      update: (args = [], { input = '', env: extra = {} } = {}) => {
-        const res = spawnSync(
-          process.execPath,
-          [path.join(dir, '.ari', 'cli.js'), 'update', ...args],
-          {
-            cwd: dir,
-            env: forSpawn({ ...env, ...extra }),
-            encoding: 'utf8',
-            // An empty input closes stdin straight away, as with `< /dev/null`.
-            input: input ?? '',
-            timeout: 90_000,
-          },
-        )
-        const out = ((res.stdout ?? '') + (res.stderr ?? ''))
-          .replace(ANSI, '')
-          .split(root)
-          .join('<lab>')
-        return { status: res.error ? null : res.status, out }
-      },
-    }
+    return installAt(dir)
   }
 
   const publish: Lab['publish'] = (version, opts = {}) => {
@@ -304,6 +347,6 @@ export function createLab(): Lab {
     staleMirror,
     install,
     publish,
-    cleanup: () => fs.rmSync(root, { recursive: true, force: true }),
+    cleanup,
   }
 }

@@ -9,7 +9,9 @@
  * generated on every dev boot. See vitest.config.ts.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { createLab, type Lab } from './harness'
+import { execFileSync } from 'node:child_process'
+import fs from 'node:fs'
+import { createLab, forSpawn, LAB_NODE, type Lab } from './harness'
 
 // The lab stubs pnpm with a shell script and the CLI is exercised through
 // POSIX pipes; Windows is covered by the unit tests of the decision logic.
@@ -39,6 +41,34 @@ suite('./ari update', { timeout: 120_000 }, () => {
   }
   afterAll(() => {
     for (const own of ownLabs) own.cleanup()
+  })
+
+  describe('the lab', () => {
+    // The CLI and the launcher must run under the same Node, and it must be the
+    // one asked for: a run meant to test an older Node that quietly used the
+    // tests' own would prove nothing.
+    it('runs the CLI and the launcher under the Node it was told to use', () => {
+      const install = lab.install('2.0.8')
+      const script = "console.log('node:' + process.version + ':' + process.execPath)"
+      install.write('.ari/which-node.mjs', script)
+      const direct = execFileSync(LAB_NODE, ['.ari/which-node.mjs'], {
+        cwd: install.dir,
+        env: forSpawn(lab.env),
+        encoding: 'utf8',
+      }).trim()
+      const viaPath = execFileSync('/bin/sh', ['-c', 'node .ari/which-node.mjs'], {
+        cwd: install.dir,
+        env: forSpawn(lab.env),
+        encoding: 'utf8',
+      }).trim()
+
+      expect(viaPath).toBe(direct)
+      if (process.env.ARI_LAB_NODE) {
+        expect(fs.realpathSync(direct.split(':').slice(2).join(':'))).toBe(
+          fs.realpathSync(process.env.ARI_LAB_NODE),
+        )
+      }
+    })
   })
 
   describe('choosing the release', () => {
