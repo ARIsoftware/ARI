@@ -4,7 +4,7 @@ What changed in each ARI release. `./ari update` links here when it offers a rel
 
 Releases are tags named `X.Y.Z` on `main`. Earlier releases are described by their commits: https://github.com/ARIsoftware/ARI/tags
 
-## Unreleased
+## 2.0.11
 
 ### Updating
 
@@ -32,6 +32,8 @@ Releases are tags named `X.Y.Z` on `main`. Earlier releases are described by the
 - A pushed tag is checked by CI: it must be an annotated `X.Y.Z` tag on `main`, match `package.json`, and have an entry in this file.
 - Command prompts are also kept in `.codex/prompts/`.
 - `@redocly/cli` updated to 1.34.20 (GHSA-657c-g7qc-r9j2, development only).
+- The updater of every past release is run against the current code under test, since an update is carried out by the version already installed.
+- The release check script and the end of the installer are covered by tests. CI checks out the release tags those tests need.
 
 ## 2.0.10
 
