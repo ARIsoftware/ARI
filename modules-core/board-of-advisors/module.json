@@ -8,7 +8,7 @@
   "icon": "Users",
   "enabled": true,
   "fullscreen": false,
-  "menuPriority": 4,
+  "menuPriority": 5,
   "permissions": {
     "database": true,
     "api": true,

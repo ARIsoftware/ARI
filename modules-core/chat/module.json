@@ -8,7 +8,7 @@
   "icon": "MessageCircle",
   "enabled": true,
   "fullscreen": false,
-  "menuPriority": 4,
+  "menuPriority": 5,
   "topBarIcon": {
     "icon": "MessageCircle",
     "route": "/chat",

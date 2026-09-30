@@ -8,7 +8,7 @@
   "icon": "FileBox",
   "enabled": true,
   "fullscreen": false,
-  "menuPriority": 45,
+  "menuPriority": 4,
   "permissions": {
     "database": true,
     "api": true,

@@ -8,7 +8,7 @@
   "icon": "BookOpen",
   "enabled": true,
   "fullscreen": false,
-  "menuPriority": 30,
+  "menuPriority": 3,
   "permissions": {
     "database": true,
     "api": true,
