@@ -4,6 +4,12 @@ What changed in each ARI release. `./ari update` links here when it offers a rel
 
 Releases are tags named `X.Y.Z` on `main`. Earlier releases are described by their commits: https://github.com/ARIsoftware/ARI/tags
 
+## 2.0.12
+
+### Licensing
+
+- License checks now use Polar API version `2026-10`. Polar retires `2026-04` in January 2027.
+
 ## 2.0.11
 
 ### Updating

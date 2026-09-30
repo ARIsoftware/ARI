@@ -4,7 +4,7 @@ export const POLAR_ORGANIZATION_ID = 'b1e4ddc2-774b-4bfb-aedd-5ffb0f67e8e3'
  * Pinned Polar API version (https://polar.sh/docs/api-reference/versioning).
  * Bump after checking the release notes for the fields the license route reads.
  */
-export const POLAR_API_VERSION = '2026-04'
+export const POLAR_API_VERSION = '2026-10'
 
 const VALIDATE_URL = 'https://api.polar.sh/v1/customer-portal/license-keys/validate'
 
