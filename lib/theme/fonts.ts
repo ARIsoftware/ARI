@@ -2,11 +2,11 @@ import type { FontOption } from './types'
 
 /**
  * Available Font Options
- * 10 fonts including the existing 6 plus 4 new additions
+ * To add one, also add it to FAMILIES in scripts/vendor-google-fonts.mjs and run
+ * that script, which self-hosts the font files in app/fonts/.
  */
 
 export const FONTS: FontOption[] = [
-  // Existing fonts (already loaded in layout.tsx)
   {
     id: 'overpass-mono',
     name: 'Overpass Mono',
@@ -37,7 +37,6 @@ export const FONTS: FontOption[] = [
     name: 'Science Gothic',
     family: '"Science Gothic", sans-serif',
   },
-  // New fonts (need to be added to layout.tsx)
   {
     id: 'inter',
     name: 'Inter',

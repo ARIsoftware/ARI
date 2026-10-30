@@ -40,6 +40,24 @@ hashes see uncommitted changes and work in archive installs without history.
 pnpm dev-cache-guard
 ```
 
+## vendor-google-fonts.mjs
+
+**Downloads the fonts ARI uses into `app/fonts/`, so browsers never contact Google.**
+
+Writes the `.woff2` files, `fonts.css` (Google's `@font-face` rules with relative URLs)
+and `LICENSES.txt` (each family's Open Font License). `app/layout.tsx` imports
+`fonts.css`, so the bundler serves the files from `/_next/static/media` under
+content-hashed names with immutable caching.
+
+The output is committed and nothing runs it at build or boot. To add a font, add it to
+`FAMILIES` in the script and to `lib/theme/fonts.ts`, then run it. Use the font's literal
+name in CSS: `next/font` would hash it, and themes and modules refer to fonts by name.
+
+**Manually:**
+```bash
+node scripts/vendor-google-fonts.mjs
+```
+
 ## generate-module-registry.js
 
 **Auto-generates the module pages registry for dynamic routing.**

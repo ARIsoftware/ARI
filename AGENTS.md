@@ -450,6 +450,14 @@ broken custom theme is warn-skipped; a broken core theme fails the build. After
 adding or editing themes, restart ARI or run `pnpm generate-module-registry`.
 Full documentation: `/docs/THEMES.md`.
 
+### Fonts (self-hosted)
+
+Browsers must never contact Google for fonts, so the CSP allows no font hosts.
+The picker's fonts live in `app/fonts/` (`.woff2` files, `fonts.css`, licenses),
+written by `scripts/vendor-google-fonts.mjs` and committed. To add one, add it to
+`FAMILIES` in that script and to `lib/theme/fonts.ts`, then run the script.
+`tests/unit/lib/theme/vendored-fonts.test.ts` fails if a picker font isn't vendored.
+
 ## Environment Variables
 
 ### Local Development

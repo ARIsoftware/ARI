@@ -4,6 +4,15 @@ What changed in each ARI release. `./ari update` links here when it offers a rel
 
 Releases are tags named `X.Y.Z` on `main`. Earlier releases are described by their commits: https://github.com/ARIsoftware/ARI/tags
 
+## Unreleased
+
+### Fonts
+
+- ARI now serves its own fonts. Your browser no longer contacts Google to load them, and they work offline.
+- JetBrains Mono, IBM Plex Sans and Fira Code now load when you pick them. Before, they showed a fallback font unless you had them installed.
+- ARI's security policy now blocks Google Fonts links. If a custom module or theme adds one, remove it: the fonts in ARI's font list work by name without a link. Other fonts need to be bundled with the module or theme.
+- Google Sans, Google Sans Flex and Raleway are no longer loaded. Nothing in ARI used them. A custom module or theme that did will show a fallback font unless it bundles them.
+
 ## 2.0.12
 
 ### Licensing

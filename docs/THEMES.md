@@ -58,7 +58,8 @@ themes-custom/<id>/
   (`lib/theme/types.ts`), plus optional `topbarBackground`/`topbarForeground`.
 - **`defaultFont` / `defaultFontSize`** *(optional)* — applied whenever the theme
   is activated (the `8-bit` theme uses `press-start-2p` at `11px`). Font ids come
-  from `lib/theme/fonts.ts`.
+  from `lib/theme/fonts.ts`. Fonts are self-hosted from `app/fonts/`: to add one,
+  add it to `FAMILIES` in `scripts/vendor-google-fonts.mjs` and run that script.
 
 ### theme.css
 

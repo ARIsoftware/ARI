@@ -6,6 +6,8 @@ import { getInstalledModules, getDuplicateModuleErrors } from "@/lib/modules"
 import { getEnabledModules } from "@/lib/modules/module-registry"
 import { getAuthenticatedUser } from "@/lib/auth-helpers"
 import { ModuleErrorOverlay } from "@/components/module-error-overlay"
+// Self-hosted fonts, so browsers never contact Google (scripts/vendor-google-fonts.mjs).
+import "./fonts/fonts.css"
 import "./globals.css"
 // Aggregated per-theme CSS ([data-theme="<id>"] rules) generated from
 // themes-custom/ + themes-core/ — must load after globals.css.
@@ -79,9 +81,6 @@ export default async function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="ARI" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,200..900;1,200..900&family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&family=Google+Sans+Flex:opsz,wght@6..144,1..1000&family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Outfit:wght@100..900&family=Overpass+Mono:wght@300..700&family=Press+Start+2P&family=Raleway:ital,wght@0,100..900;1,100..900&family=Science+Gothic:wght@100..900&family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet" />
         {/* Inline theme/font bootstrap: runs synchronously before first paint to
             prevent FOUT. Inlined (no external file) so there is no network round-trip.
             Mirrors the theme cache in localStorage['ari-theme-cache']. */}
