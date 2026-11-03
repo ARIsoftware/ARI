@@ -252,48 +252,51 @@ export function ApiKeyProvidersSection({
                   saved && "border-green-600/40 bg-green-600/40",
                 )}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-4">
                   <div>
                     <p className="text-sm font-medium">{provider.name}</p>
                     <p className="text-xs text-muted-foreground">{provider.envKey}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{provider.description}</p>
                   </div>
                   {saved ? (
-                    <Badge className="border-transparent bg-green-600/20 text-green-800 hover:bg-green-600/20 dark:bg-green-500/25 dark:text-green-300">
+                    <Badge className="shrink-0 border-transparent bg-green-600/20 text-green-800 hover:bg-green-600/20 dark:bg-green-500/25 dark:text-green-300">
                       Enabled
                     </Badge>
                   ) : (
-                    <Badge variant="outline">Not configured</Badge>
+                    <Badge variant="outline" className="shrink-0">Not configured</Badge>
                   )}
                 </div>
                 <Separator className="my-4" />
-                <p className="text-sm text-muted-foreground">
-                  {provider.description}
-                </p>
-                <div className="mt-4 space-y-3">
-                  <div className="flex gap-2">
-                    {renderField(provider.envKey, provider.placeholder, !provider.keyIsPlaintext)}
-                    {buttonInline && renderSaveButton(provider)}
+                <div className="space-y-3">
+                  <div>
+                    <p className="mb-2 text-sm text-muted-foreground">
+                      {provider.keyIsPlaintext ? "Base URL" : "API Key"}
+                    </p>
+                    <div className="flex gap-2">
+                      {renderField(provider.envKey, provider.placeholder, !provider.keyIsPlaintext)}
+                      {buttonInline && renderSaveButton(provider)}
+                    </div>
                   </div>
                   {provider.modelField && (
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">
+                      <p className="mb-2 text-sm text-muted-foreground">
                         Specify the model you want to use (optional)
                       </p>
                       {renderModelField(provider.modelField.envKey, provider.modelField.placeholder)}
-                      <p className="text-[10px] text-muted-foreground mt-1">
+                      <p className="mt-1.5 text-xs text-muted-foreground">
                         Leave blank to use the default model.
                       </p>
                     </div>
                   )}
                   {provider.extraFields?.map((field) => (
                     <div key={field.envKey}>
-                      <p className="text-xs text-muted-foreground mb-1">
+                      <p className="mb-2 text-sm text-muted-foreground">
                         {field.label || field.envKey}{field.optional ? " (optional)" : ""}
                       </p>
                       {renderField(field.envKey, field.placeholder)}
                     </div>
                   ))}
-                  {!buttonInline && renderSaveButton(provider, "w-full")}
+                  {!buttonInline && renderSaveButton(provider, "w-[100px]")}
                   {errors[provider.id] && (
                     <p className="text-xs text-red-500">{errors[provider.id]}</p>
                   )}

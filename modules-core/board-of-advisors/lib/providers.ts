@@ -25,6 +25,7 @@ const OPENAI_COMPAT_BASE: Partial<Record<AiProviderId, string>> = {
   deepseek: 'https://api.deepseek.com/v1',
   groq: 'https://api.groq.com/openai/v1',
   perplexity: 'https://api.perplexity.ai',
+  cohere: 'https://api.cohere.ai/compatibility/v1',
 }
 
 export type IntegrationSettings = Record<string, unknown>

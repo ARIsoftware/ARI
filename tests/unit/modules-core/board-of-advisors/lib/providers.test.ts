@@ -405,6 +405,32 @@ describe('streamCompletion — openai (fetch mock)', () => {
   })
 })
 
+describe('streamCompletion — cohere (fetch mock)', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it("streams through Cohere's OpenAI-compatible endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      makeSSEStream(['data: {"choices":[{"delta":{"content":"Hi"}}]}', 'data: [DONE]']),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const chunks: string[] = []
+    for await (const chunk of streamCompletion({
+      provider: 'cohere',
+      model: 'command-a-03-2025',
+      apiKey: 'co-test',
+      system: 'sys',
+      prompt: 'hi',
+    })) {
+      chunks.push(chunk)
+    }
+    expect(chunks.join('')).toBe('Hi')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://api.cohere.ai/compatibility/v1/chat/completions')
+    expect((init as RequestInit).headers).toMatchObject({ Authorization: 'Bearer co-test' })
+  })
+})
+
 describe('streamCompletion — claude (fetch mock)', () => {
   afterEach(() => vi.unstubAllGlobals())
 

@@ -55,7 +55,7 @@ describe('callLLM — OpenAI-compatible providers', () => {
   })
 
   const openAICompatibleProviders = [
-    'openai', 'openrouter', 'groq', 'deepseek', 'xai', 'mistral', 'perplexity',
+    'openai', 'openrouter', 'groq', 'deepseek', 'xai', 'mistral', 'perplexity', 'cohere',
   ] as const
 
   for (const provider of openAICompatibleProviders) {

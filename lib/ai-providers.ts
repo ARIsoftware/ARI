@@ -20,6 +20,7 @@ export const AI_PROVIDER_IDS = [
   'deepseek',
   'groq',
   'perplexity',
+  'cohere',
   'elevenlabs',
   'ollama',
 ] as const
@@ -132,6 +133,15 @@ export const AI_PROVIDERS: readonly AiProvider[] = [
     primaryPlaceholder: '',
     modelEnvKey: 'PERPLEXITY_MODEL',
     modelPlaceholder: 'sonar',
+  },
+  {
+    id: 'cohere',
+    name: 'Cohere',
+    description: "Cohere's Command models for enterprise chat and RAG.",
+    primaryEnvKey: 'COHERE_API_KEY',
+    primaryPlaceholder: '',
+    modelEnvKey: 'COHERE_MODEL',
+    modelPlaceholder: 'command-a-03-2025',
   },
   {
     id: 'elevenlabs',

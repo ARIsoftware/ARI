@@ -32,6 +32,7 @@ const OPENAI_COMPATIBLE_BASE: Partial<Record<AiProviderId, string>> = {
   xai: 'https://api.x.ai/v1',
   mistral: 'https://api.mistral.ai/v1',
   perplexity: 'https://api.perplexity.ai',
+  cohere: 'https://api.cohere.ai/compatibility/v1',
 }
 
 export async function callLLM(opts: CallLLMOptions): Promise<{ text: string }> {

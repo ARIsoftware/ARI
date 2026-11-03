@@ -1270,6 +1270,7 @@ async function doctor() {
     const aiKeyEnv = [
       'OPENROUTER_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GOOGLE_GEMINI_API_KEY',
       'XAI_API_KEY', 'MISTRAL_API_KEY', 'DEEPSEEK_API_KEY', 'GROQ_API_KEY', 'PERPLEXITY_API_KEY',
+      'COHERE_API_KEY',
     ];
     const aiSet = aiKeyEnv.filter((k) => readKey(content, k));
     const ollamaUrl = readKey(content, 'OLLAMA_BASE_URL');

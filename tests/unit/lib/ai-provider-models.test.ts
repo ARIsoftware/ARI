@@ -479,6 +479,51 @@ describe('getProviderModels — elevenlabs', () => {
   })
 })
 
+// ── getProviderModels — cohere ───────────────────────────────────────────────
+
+describe('getProviderModels — cohere', () => {
+  it('returns chat models from Cohere with bearer auth', async () => {
+    mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        models: [{ name: 'command-a-03-2025' }, { name: 'command-r7b-12-2024' }, { name: 'command-a-03-2025' }, {}],
+      }),
+    })
+    vi.stubGlobal('fetch', mockFetch)
+    process.env.COHERE_API_KEY = 'co-key'
+
+    const { getProviderModels } = await loadModule()
+    const result = await getProviderModels('user1', 'cohere')
+
+    expect(result.source).toBe('live')
+    expect(result.models.map((m) => m.id)).toEqual(['command-a-03-2025', 'command-r7b-12-2024'])
+    const [url, init] = mockFetch.mock.calls[0]
+    expect(url).toContain('https://api.cohere.com/v1/models')
+    expect(url).toContain('endpoint=chat')
+    expect(init.headers.Authorization).toBe('Bearer co-key')
+    delete process.env.COHERE_API_KEY
+  })
+
+  it('handles a body without a models array', async () => {
+    mockFetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) })
+    vi.stubGlobal('fetch', mockFetch)
+    process.env.COHERE_API_KEY = 'co-key'
+
+    const { getProviderModels } = await loadModule()
+    const result = await getProviderModels('user1', 'cohere')
+
+    expect(result).toEqual({ models: [], source: 'live' })
+    delete process.env.COHERE_API_KEY
+  })
+
+  it('returns unavailable when no API key for cohere', async () => {
+    delete process.env.COHERE_API_KEY
+    const { getProviderModels } = await loadModule()
+    const result = await getProviderModels('user1', 'cohere')
+    expect(result.source).toBe('unavailable')
+  })
+})
+
 // ── getProviderModels — perplexity (no list endpoint) ─────────────────────────
 
 describe('getProviderModels — perplexity', () => {

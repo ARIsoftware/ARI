@@ -194,6 +194,15 @@ async function fetchModels(provider: AiProvider, secret: string | null): Promise
     return dedupe(models)
   }
 
+  // Cohere: { models: [{ name, endpoints }] } — `endpoint=chat` keeps chat models only.
+  if (id === 'cohere') {
+    if (!secret) throw new Error('no api key')
+    const json = (await fetchJson('https://api.cohere.com/v1/models?endpoint=chat&page_size=1000', {
+      Authorization: `Bearer ${secret}`,
+    })) as { models?: Array<{ name?: string }> }
+    return dedupe((json.models ?? []).map((m) => ({ id: String(m.name ?? '') })))
+  }
+
   // Perplexity and anything else: no public list endpoint.
   throw new Error('no list endpoint')
 }
