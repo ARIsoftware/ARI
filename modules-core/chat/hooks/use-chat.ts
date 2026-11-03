@@ -9,8 +9,8 @@ import type {
   ChatProvider,
 } from '@/modules/chat/types'
 
-const CONVERSATIONS_KEY = ['chat-conversations']
-const conversationDetailKey = (id: string) => ['chat-conversation', id]
+export const CONVERSATIONS_KEY = ['chat-conversations']
+export const conversationDetailKey = (id: string) => ['chat-conversation', id]
 const UPLOADS_KEY = ['chat-uploads']
 const SETTINGS_KEY = ['chat-settings']
 const PROVIDERS_KEY = ['chat-providers']
@@ -41,11 +41,16 @@ export function useChatConversations() {
   })
 }
 
+export interface ConversationDetail {
+  conversation: ChatConversation
+  messages: ChatMessage[]
+}
+
 export function useChatConversationDetail(id: string | null) {
   return useQuery({
     queryKey: conversationDetailKey(id ?? ''),
     enabled: !!id,
-    queryFn: async (): Promise<{ conversation: ChatConversation; messages: ChatMessage[] }> => {
+    queryFn: async (): Promise<ConversationDetail> => {
       const res = await fetch(`/api/modules/chat/conversations/${id}`)
       if (!res.ok) throw new Error(await readJsonError(res, 'Failed to load conversation'))
       return res.json()
@@ -77,30 +82,55 @@ export function useCreateConversation() {
   })
 }
 
-export function useRenameConversation() {
+/** Rename a conversation and/or switch the provider + model it talks to. */
+export function useUpdateConversation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ id, title }: { id: string; title: string }): Promise<ChatConversation> => {
+    mutationFn: async ({
+      id,
+      ...patch
+    }: {
+      id: string
+      title?: string
+      provider?: ChatProvider
+      model?: string
+    }): Promise<ChatConversation> => {
       const res = await fetch(`/api/modules/chat/conversations/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title }),
+        body: JSON.stringify(patch),
       })
-      if (!res.ok) throw new Error(await readJsonError(res, 'Failed to rename'))
+      if (!res.ok) throw new Error(await readJsonError(res, 'Failed to update chat'))
       const data = await res.json()
       return data.conversation
     },
-    onMutate: async ({ id, title }) => {
+    onMutate: async ({ id, ...patch }) => {
       await queryClient.cancelQueries({ queryKey: CONVERSATIONS_KEY })
+      await queryClient.cancelQueries({ queryKey: conversationDetailKey(id) })
       const previous = queryClient.getQueryData<ChatConversation[]>(CONVERSATIONS_KEY)
+      const previousDetail = queryClient.getQueryData<ConversationDetail>(conversationDetailKey(id))
+      // Only copy fields the caller set, so a model switch never blanks the title.
+      const apply = (c: ChatConversation): ChatConversation => ({
+        ...c,
+        ...(patch.title !== undefined ? { title: patch.title } : {}),
+        ...(patch.provider !== undefined ? { provider: patch.provider } : {}),
+        ...(patch.model !== undefined ? { model: patch.model } : {}),
+      })
       queryClient.setQueryData<ChatConversation[]>(CONVERSATIONS_KEY, (old = []) =>
-        old.map((c) => (c.id === id ? { ...c, title } : c))
+        old.map((c) => (c.id === id ? apply(c) : c))
       )
-      return { previous }
+      if (previousDetail) {
+        queryClient.setQueryData<ConversationDetail>(conversationDetailKey(id), {
+          ...previousDetail,
+          conversation: apply(previousDetail.conversation),
+        })
+      }
+      return { previous, previousDetail }
     },
-    onError: (_err, _vars, context) => {
+    onError: (_err, { id }, context) => {
       if (context?.previous) queryClient.setQueryData(CONVERSATIONS_KEY, context.previous)
+      if (context?.previousDetail) queryClient.setQueryData(conversationDetailKey(id), context.previousDetail)
     },
     onSettled: (_data, _err, { id }) => {
       queryClient.invalidateQueries({ queryKey: CONVERSATIONS_KEY })
@@ -134,26 +164,52 @@ export function useDeleteConversation() {
   })
 }
 
-// ─── Streaming message sender ──────────────────────────────────────────
+// ─── Streaming replies ─────────────────────────────────────────────────
 
-export interface SendMessageStreamArgs {
+/** A request that produces a streamed assistant reply. */
+export type ChatTurnRequest =
+  | { kind: 'send'; content: string; attachments: ChatAttachment[] }
+  | { kind: 'regenerate' }
+  | { kind: 'edit'; messageId: string; content: string }
+
+export interface StreamTurnArgs {
   conversationId: string
-  content: string
-  attachments?: ChatAttachment[]
+  request: ChatTurnRequest
   onDelta?: (text: string) => void
+  /** A long step is running (e.g. "Generating image…"). */
+  onStatus?: (text: string) => void
   onUserMessageId?: (id: string) => void
   onDone?: (id: string, content: string, partial?: boolean) => void
   onError?: (message: string) => void
   signal?: AbortSignal
 }
 
-export async function sendMessageStream(args: SendMessageStreamArgs): Promise<void> {
-  const res = await fetch(`/api/modules/chat/conversations/${args.conversationId}/messages`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    signal: args.signal,
-    body: JSON.stringify({ content: args.content, attachments: args.attachments ?? [] }),
-  })
+function turnFetch(conversationId: string, request: ChatTurnRequest, signal?: AbortSignal): Promise<Response> {
+  const base = `/api/modules/chat/conversations/${conversationId}`
+  const json = { 'Content-Type': 'application/json' }
+  switch (request.kind) {
+    case 'send':
+      return fetch(`${base}/messages`, {
+        method: 'POST',
+        headers: json,
+        signal,
+        body: JSON.stringify({ content: request.content, attachments: request.attachments }),
+      })
+    case 'regenerate':
+      return fetch(`${base}/regenerate`, { method: 'POST', signal })
+    case 'edit':
+      return fetch(`${base}/messages/${request.messageId}`, {
+        method: 'PATCH',
+        headers: json,
+        signal,
+        body: JSON.stringify({ content: request.content }),
+      })
+  }
+}
+
+/** Run one reply turn and feed its Server-Sent Events to the callbacks. */
+export async function streamTurn(args: StreamTurnArgs): Promise<void> {
+  const res = await turnFetch(args.conversationId, args.request, args.signal)
 
   if (!res.ok || !res.body) {
     const msg = await readJsonError(res, 'Failed to send message')
@@ -175,6 +231,9 @@ export async function sendMessageStream(args: SendMessageStreamArgs): Promise<vo
       switch (event.type) {
         case 'delta':
           args.onDelta?.(String(event.text ?? ''))
+          break
+        case 'status':
+          args.onStatus?.(String(event.text ?? ''))
           break
         case 'user_message_id':
           args.onUserMessageId?.(String(event.id))

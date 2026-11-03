@@ -10,6 +10,8 @@ import {
   ROLES,
   createConversationSchema,
   updateConversationSchema,
+  chatMessageParamSchema,
+  editMessageSchema,
   ChatAttachmentSchema,
   SendAttachmentSchema,
   sendMessageSchema,
@@ -70,8 +72,10 @@ describe('createConversationSchema', () => {
     expect(r.success).toBe(false)
     if (!r.success) {
       expect(r.error.issues[0].message).toBe(
-        'Provider must be one of: openai, anthropic, gemini, openrouter',
+        `Provider must be one of: ${PROVIDERS.join(', ')}`,
       )
+      expect(r.error.issues[0].message).toContain('anthropic')
+      expect(r.error.issues[0].message).toContain('cohere')
     }
   })
 
@@ -126,6 +130,53 @@ describe('updateConversationSchema', () => {
 
   it('rejects a title over 200 chars', () => {
     expect(updateConversationSchema.safeParse({ title: 'a'.repeat(201) }).success).toBe(false)
+  })
+
+  it('accepts a provider + model switch, with or without a title', () => {
+    expect(updateConversationSchema.safeParse({ provider: 'openai', model: 'gpt-x' }).success).toBe(true)
+    expect(updateConversationSchema.safeParse({ title: 'T', provider: 'anthropic', model: 'm' }).success).toBe(true)
+  })
+
+  it('requires provider and model together', () => {
+    const onlyProvider = updateConversationSchema.safeParse({ provider: 'openai' })
+    expect(onlyProvider.success).toBe(false)
+    expect(onlyProvider.error?.issues[0].message).toBe('Provider and model must be changed together')
+    expect(updateConversationSchema.safeParse({ title: 'T', model: 'm' }).success).toBe(false)
+  })
+
+  it('explains an empty update', () => {
+    expect(updateConversationSchema.safeParse({}).error?.issues[0].message).toBe('Provide a title or a provider and model')
+  })
+
+  it('rejects an unknown provider, blank model, or over-long model', () => {
+    expect(updateConversationSchema.safeParse({ provider: 'nope', model: 'm' }).success).toBe(false)
+    expect(updateConversationSchema.safeParse({ provider: 'openai', model: '   ' }).success).toBe(false)
+    expect(
+      updateConversationSchema.safeParse({ provider: 'openai', model: 'm'.repeat(MODEL_ID_MAX_LENGTH + 1) }).success,
+    ).toBe(false)
+  })
+})
+
+// ─── chatMessageParamSchema / editMessageSchema ──────────────────────────────
+
+describe('chatMessageParamSchema', () => {
+  it('requires both ids to be UUIDs', () => {
+    expect(chatMessageParamSchema.safeParse({ id: VALID_UUID, messageId: VALID_UUID2 }).success).toBe(true)
+    expect(chatMessageParamSchema.safeParse({ id: VALID_UUID, messageId: 'x' }).success).toBe(false)
+    expect(chatMessageParamSchema.safeParse({ id: VALID_UUID }).success).toBe(false)
+  })
+})
+
+describe('editMessageSchema', () => {
+  it('accepts edited content within bounds', () => {
+    expect(editMessageSchema.safeParse({ content: 'better question' }).success).toBe(true)
+    expect(editMessageSchema.safeParse({ content: 'a'.repeat(50000) }).success).toBe(true)
+  })
+
+  it('rejects empty or over-long content', () => {
+    expect(editMessageSchema.safeParse({ content: '' }).success).toBe(false)
+    expect(editMessageSchema.safeParse({ content: 'a'.repeat(50001) }).success).toBe(false)
+    expect(editMessageSchema.safeParse({}).success).toBe(false)
   })
 })
 

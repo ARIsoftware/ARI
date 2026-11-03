@@ -2,6 +2,8 @@ import { z } from 'zod'
 import '@/lib/openapi/registry'
 import { safeText } from '@/lib/validation'
 import { MODEL_ID_MAX_LENGTH } from '@/lib/ai-providers'
+import { CHAT_PROVIDER_IDS } from './utils'
+import type { ChatProvider } from '../types'
 
 // Shared cap for model-id fields — the same constant AiProviderCard uses for
 // its input maxLength, so the client affordance and server validation agree.
@@ -16,7 +18,8 @@ export const chatIdParamSchema = z.object({
   id: uuidSchema,
 })
 
-export const PROVIDERS = ['openai', 'anthropic', 'gemini', 'openrouter'] as const
+// Every chat provider in the shared registry (see CHAT_PROVIDER_IDS).
+export const PROVIDERS = CHAT_PROVIDER_IDS as [ChatProvider, ...ChatProvider[]]
 export const ROLES = ['user', 'assistant', 'system'] as const
 
 // ─── Conversation schemas ──────────────────────────────────────────────
@@ -25,17 +28,25 @@ export const createConversationSchema = z
   .object({
     title: safeText(200).min(1, 'Title is required').optional(),
     provider: z.enum(PROVIDERS, {
-      errorMap: () => ({
-        message: 'Provider must be one of: openai, anthropic, gemini, openrouter',
-      }),
+      error: `Provider must be one of: ${PROVIDERS.join(', ')}`,
     }),
     model: modelIdMax(z.string().min(1, 'Model is required')),
   })
   .openapi('ChatCreateConversationBody')
 
+// Rename and/or switch the model a conversation talks to. Provider and model
+// travel together — a model id only means something for its own provider.
 export const updateConversationSchema = z
   .object({
-    title: safeText(200).min(1, 'Title is required'),
+    title: safeText(200).min(1, 'Title is required').optional(),
+    provider: z.enum(PROVIDERS).optional(),
+    model: modelIdMax(z.string().trim().min(1, 'Model is required')).optional(),
+  })
+  .refine((d) => d.title !== undefined || d.provider !== undefined, {
+    message: 'Provide a title or a provider and model',
+  })
+  .refine((d) => (d.provider === undefined) === (d.model === undefined), {
+    message: 'Provider and model must be changed together',
   })
   .openapi('ChatUpdateConversationBody')
 
@@ -71,6 +82,22 @@ export const sendMessageSchema = z
       .optional(),
   })
   .openapi('ChatSendMessageBody')
+
+// Path params for /conversations/{id}/messages/{messageId}.
+export const chatMessageParamSchema = z.object({
+  id: uuidSchema,
+  messageId: uuidSchema,
+})
+
+// Editing a user turn replaces its text (attachments are kept) and answers it again.
+export const editMessageSchema = z
+  .object({
+    content: z
+      .string()
+      .min(1, 'Message cannot be empty')
+      .max(50000, 'Message must be 50000 characters or fewer'),
+  })
+  .openapi('ChatEditMessageBody')
 
 // Shared limit/offset pagination for list endpoints. `.catch()` falls back to
 // the default on any malformed value (missing param, empty `?limit=`, NaN)

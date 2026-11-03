@@ -113,8 +113,20 @@ CREATE POLICY chat_uploads_rls_delete ON chat_uploads FOR DELETE
 -- the module — new writes are still enforced. Operators can run
 -- ALTER TABLE ... VALIDATE CONSTRAINT later to check existing rows.
 
+-- Provider: Chat accepts every chat provider in the shared registry
+-- (lib/ai-providers.ts), which grows over time, so the exact list is enforced
+-- by Zod and the database only checks the id's shape. Installs from before
+-- this change carry a four-provider list; replace it.
 DO $$
 BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'chat_conversations_provider_check'
+      AND conrelid = 'chat_conversations'::regclass
+      AND pg_get_constraintdef(oid) LIKE '%openrouter%'
+  ) THEN
+    ALTER TABLE chat_conversations DROP CONSTRAINT chat_conversations_provider_check;
+  END IF;
   IF NOT EXISTS (
     SELECT 1 FROM pg_constraint
     WHERE conname = 'chat_conversations_provider_check'
@@ -122,7 +134,7 @@ BEGIN
   ) THEN
     ALTER TABLE chat_conversations
       ADD CONSTRAINT chat_conversations_provider_check
-      CHECK (provider IN ('openai', 'anthropic', 'gemini', 'openrouter'))
+      CHECK (provider ~ '^[a-z0-9_-]+$')
       NOT VALID;
   END IF;
 END $$;

@@ -10,10 +10,12 @@ import {
   chatProviderMeta,
   chatToRegistryId,
   registryToChatId,
-  CHAT_REGISTRY_IDS,
+  CHAT_PROVIDER_IDS,
   PROVIDER_LABELS,
   PROVIDER_DEFAULT_MODELS,
   isImageMime,
+  localDayKey,
+  dayLabel,
 } from '@/modules-core/chat/lib/utils'
 import { AI_PROVIDERS } from '@/lib/ai-providers'
 import type { ChatProvider } from '@/modules-core/chat/types'
@@ -95,7 +97,7 @@ describe('chatProviderMeta', () => {
   })
 })
 
-// ─── chatToRegistryId / registryToChatId / CHAT_REGISTRY_IDS ──────────────────
+// ─── chatToRegistryId / registryToChatId / CHAT_PROVIDER_IDS ──────────────────
 
 describe('chatToRegistryId', () => {
   it('maps each chat provider to its registry id', () => {
@@ -114,26 +116,27 @@ describe('registryToChatId', () => {
   it('maps registry ids back to chat providers', () => {
     expect(registryToChatId('openai')).toBe('openai')
     expect(registryToChatId('claude')).toBe('anthropic')
-    expect(registryToChatId('gemini')).toBe('gemini')
-    expect(registryToChatId('openrouter')).toBe('openrouter')
+    expect(registryToChatId('mistral')).toBe('mistral')
+    expect(registryToChatId('ollama')).toBe('ollama')
   })
 
-  it('returns null for registry providers Chat does not implement', () => {
-    expect(registryToChatId('mistral')).toBeNull()
-    expect(registryToChatId('ollama')).toBeNull()
+  it('returns null for voice providers', () => {
+    expect(registryToChatId('elevenlabs')).toBeNull()
   })
 })
 
-describe('CHAT_REGISTRY_IDS', () => {
-  it('lists exactly the registry ids Chat implements', () => {
-    expect(CHAT_REGISTRY_IDS).toEqual(['openai', 'claude', 'gemini', 'openrouter'])
+describe('CHAT_PROVIDER_IDS', () => {
+  it('lists every chat (non-voice) registry provider, with claude as anthropic', () => {
+    expect(CHAT_PROVIDER_IDS).toEqual(
+      AI_PROVIDERS.filter((p) => p.kind !== 'voice').map((p) => (p.id === 'claude' ? 'anthropic' : p.id)),
+    )
+    expect(CHAT_PROVIDER_IDS).toContain('cohere')
+    expect(CHAT_PROVIDER_IDS).not.toContain('elevenlabs')
   })
 
-  it('round-trips through registryToChatId', () => {
-    for (const id of CHAT_REGISTRY_IDS) {
-      const chatId = registryToChatId(id)
-      expect(chatId).not.toBeNull()
-      expect(chatToRegistryId(chatId!)).toBe(id)
+  it('round-trips through chatToRegistryId', () => {
+    for (const id of CHAT_PROVIDER_IDS) {
+      expect(registryToChatId(chatToRegistryId(id))).toBe(id)
     }
   })
 })
@@ -141,13 +144,12 @@ describe('CHAT_REGISTRY_IDS', () => {
 // ─── PROVIDER_LABELS / PROVIDER_DEFAULT_MODELS ────────────────────────────────
 
 describe('PROVIDER_LABELS', () => {
-  it('has the chat-specific display labels', () => {
-    expect(PROVIDER_LABELS).toEqual({
-      openai: 'OpenAI',
-      anthropic: 'Anthropic Claude',
-      gemini: 'Google Gemini',
-      openrouter: 'OpenRouter',
-    })
+  it('uses registry names, with the chat-specific Anthropic label', () => {
+    expect(PROVIDER_LABELS.anthropic).toBe('Anthropic Claude')
+    expect(PROVIDER_LABELS.openai).toBe('OpenAI')
+    expect(PROVIDER_LABELS.gemini).toBe('Google Gemini')
+    expect(PROVIDER_LABELS.cohere).toBe('Cohere')
+    expect(Object.keys(PROVIDER_LABELS)).toEqual(CHAT_PROVIDER_IDS)
   })
 })
 
@@ -170,6 +172,10 @@ describe('PROVIDER_DEFAULT_MODELS', () => {
   it('derives openrouter default from the registry', () => {
     expect(PROVIDER_DEFAULT_MODELS.openrouter).toBe(registryPlaceholder('openrouter'))
   })
+
+  it('derives cohere default from the registry', () => {
+    expect(PROVIDER_DEFAULT_MODELS.cohere).toBe(registryPlaceholder('cohere'))
+  })
 })
 
 // ─── isImageMime ──────────────────────────────────────────────────────────────
@@ -187,5 +193,37 @@ describe('isImageMime', () => {
 
   it('is case-sensitive (uppercase prefix is not an image)', () => {
     expect(isImageMime('IMAGE/png')).toBe(false)
+  })
+})
+
+describe('localDayKey', () => {
+  it('formats the local calendar day', () => {
+    const d = new Date(2026, 0, 5, 23, 30)
+    expect(localDayKey(d.toISOString())).toBe('2026-01-05')
+  })
+})
+
+describe('dayLabel', () => {
+  const now = new Date(2026, 8, 30, 12, 0) // Wed 30 Sep 2026
+  const iso = (y: number, m: number, d: number) => new Date(y, m, d, 9, 0).toISOString()
+
+  it('names today and yesterday', () => {
+    expect(dayLabel(iso(2026, 8, 30), now)).toBe('Today')
+    expect(dayLabel(iso(2026, 8, 29), now)).toBe('Yesterday')
+  })
+
+  it('uses the weekday within the last week', () => {
+    expect(dayLabel(iso(2026, 8, 27), now)).toBe(new Date(2026, 8, 27).toLocaleDateString(undefined, { weekday: 'long' }))
+  })
+
+  it('uses a date for older days, with the year only when it differs', () => {
+    const older = dayLabel(iso(2026, 7, 1), now)
+    expect(older).toBe(new Date(2026, 7, 1).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }))
+    const lastYear = dayLabel(iso(2025, 7, 1), now)
+    expect(lastYear).toContain('2025')
+  })
+
+  it('defaults to the current time', () => {
+    expect(dayLabel(new Date().toISOString())).toBe('Today')
   })
 })

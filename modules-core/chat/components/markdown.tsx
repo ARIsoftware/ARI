@@ -1,14 +1,23 @@
 'use client'
 
-import { createElement, Fragment, memo, useState, type ReactNode } from 'react'
+import { createElement, Fragment, memo, useMemo, useState, type ReactNode } from 'react'
 import { Check, Copy } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { highlight, type TokenKind } from '@/modules/chat/lib/highlight'
+import {
+  isTableStart,
+  parseTableSeparator,
+  splitTableRow,
+  type TableAlign,
+} from '@/modules/chat/lib/markdown-table'
 
 /**
  * Tiny, dependency-free Markdown renderer tuned for chat replies.
  * Renders via React nodes only (never dangerouslySetInnerHTML) so output is XSS-safe.
- * Supports: fenced code blocks, headings, lists, blockquotes, rules, and the
- * inline set most models lean on (code, bold, italic, strikethrough, links).
+ * Supports: fenced code blocks (syntax-highlighted), GFM tables, headings,
+ * lists, blockquotes, rules, and the inline set most models lean on (code,
+ * bold, italic, strikethrough, links). Renders fine mid-stream: an unclosed
+ * fence simply runs to the end of the text so far.
  */
 
 function safeHref(url: string): string | null {
@@ -102,8 +111,21 @@ function renderInline(text: string, keyBase = 'i'): ReactNode[] {
   return out
 }
 
+// Theme-aware token colours: fixed hues read on both light and dark themes.
+const TOKEN_CLASS: Record<TokenKind, string | undefined> = {
+  plain: undefined,
+  keyword: 'text-violet-600 dark:text-violet-400',
+  string: 'text-emerald-700 dark:text-emerald-400',
+  number: 'text-amber-700 dark:text-amber-400',
+  comment: 'italic text-muted-foreground',
+  function: 'text-sky-700 dark:text-sky-400',
+  type: 'text-rose-700 dark:text-rose-400',
+  property: 'text-sky-700 dark:text-sky-400',
+}
+
 function CodeBlock({ code, lang }: { code: string; lang?: string }) {
   const [copied, setCopied] = useState(false)
+  const tokens = useMemo(() => highlight(code, lang), [code, lang])
 
   const copy = () => {
     navigator.clipboard?.writeText(code).then(() => {
@@ -113,7 +135,7 @@ function CodeBlock({ code, lang }: { code: string; lang?: string }) {
   }
 
   return (
-    <div className="group/code my-3 overflow-hidden rounded-lg border border-border bg-foreground/[0.03]">
+    <div className="group/code my-3 overflow-hidden rounded-xl border border-border bg-foreground/[0.03]">
       <div className="flex items-center justify-between border-b border-border/60 bg-foreground/[0.03] px-3 py-1.5">
         <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
           {lang || 'code'}
@@ -128,8 +150,52 @@ function CodeBlock({ code, lang }: { code: string; lang?: string }) {
         </button>
       </div>
       <pre className="overflow-x-auto p-3 text-[0.8rem] leading-relaxed">
-        <code className="font-mono text-foreground">{code}</code>
+        <code className="font-mono text-foreground">
+          {tokens.map((t, i) => {
+            const cls = TOKEN_CLASS[t.kind]
+            return cls ? <span key={i} className={cls}>{t.text}</span> : <Fragment key={i}>{t.text}</Fragment>
+          })}
+        </code>
       </pre>
+    </div>
+  )
+}
+
+const ALIGN_CLASS: Record<Exclude<TableAlign, null>, string> = {
+  left: 'text-left',
+  center: 'text-center',
+  right: 'text-right',
+}
+
+function Table({ header, aligns, rows, keyBase }: { header: string[]; aligns: TableAlign[]; rows: string[][]; keyBase: string }) {
+  const alignOf = (col: number) => {
+    const a = aligns[col]
+    return a ? ALIGN_CLASS[a] : 'text-left'
+  }
+  return (
+    <div className="my-3 overflow-x-auto rounded-xl border border-border">
+      <table className="w-full border-collapse text-sm">
+        <thead className="bg-foreground/[0.04]">
+          <tr>
+            {header.map((cell, c) => (
+              <th key={c} className={cn('whitespace-nowrap border-b border-border px-3 py-2 font-semibold', alignOf(c))}>
+                {renderInline(cell, `${keyBase}-h${c}`)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, r) => (
+            <tr key={r} className="border-b border-border/60 last:border-0 even:bg-foreground/[0.02]">
+              {header.map((_, c) => (
+                <td key={c} className={cn('px-3 py-2 align-top', alignOf(c))}>
+                  {renderInline(row[c] ?? '', `${keyBase}-r${r}c${c}`)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -141,6 +207,7 @@ type Block =
   | { kind: 'ul'; items: string[] }
   | { kind: 'ol'; items: string[] }
   | { kind: 'hr' }
+  | { kind: 'table'; header: string[]; aligns: TableAlign[]; rows: string[][] }
   | { kind: 'p'; lines: string[] }
 
 function parseBlocks(src: string): Block[] {
@@ -191,6 +258,22 @@ function parseBlocks(src: string): Block[] {
       continue
     }
 
+    // GFM table: header row + separator, then rows until a non-row line.
+    if (isTableStart(lines, i)) {
+      const header = splitTableRow(line)!
+      const aligns = parseTableSeparator(lines[i + 1])!
+      const rows: string[][] = []
+      i += 2
+      while (i < lines.length && !/^\s*$/.test(lines[i])) {
+        const row = splitTableRow(lines[i])
+        if (!row) break
+        rows.push(row)
+        i++
+      }
+      blocks.push({ kind: 'table', header, aligns, rows })
+      continue
+    }
+
     // Blockquote
     if (/^\s*>\s?/.test(line)) {
       const buf: string[] = []
@@ -233,7 +316,8 @@ function parseBlocks(src: string): Block[] {
       !/^(#{1,6})\s+/.test(lines[i]) &&
       !/^\s*>\s?/.test(lines[i]) &&
       !/^\s*[-*+]\s+/.test(lines[i]) &&
-      !/^\s*\d+\.\s+/.test(lines[i])
+      !/^\s*\d+\.\s+/.test(lines[i]) &&
+      !isTableStart(lines, i)
     ) {
       buf.push(lines[i])
       i++
@@ -251,11 +335,11 @@ function parseBlocks(src: string): Block[] {
 }
 
 const HEADING_CLASS: Record<number, string> = {
-  1: 'text-lg font-semibold mt-4 mb-2',
-  2: 'text-base font-semibold mt-4 mb-2',
-  3: 'text-sm font-semibold mt-3 mb-1.5',
-  4: 'text-sm font-semibold mt-3 mb-1.5',
-  5: 'text-sm font-medium mt-2 mb-1',
+  1: 'text-xl font-semibold mt-4 mb-2',
+  2: 'text-lg font-semibold mt-4 mb-2',
+  3: 'text-base font-semibold mt-3 mb-1.5',
+  4: 'text-base font-semibold mt-3 mb-1.5',
+  5: 'text-base font-medium mt-2 mb-1',
   6: 'text-xs font-medium uppercase tracking-wide text-muted-foreground mt-2 mb-1',
 }
 
@@ -263,7 +347,7 @@ export const Markdown = memo(function Markdown({ content }: { content: string })
   const blocks = parseBlocks(content)
 
   return (
-    <div className="space-y-2 text-sm leading-relaxed">
+    <div className="space-y-2 text-base leading-relaxed">
       {blocks.map((block, idx) => {
         switch (block.kind) {
           case 'code':
@@ -276,6 +360,8 @@ export const Markdown = memo(function Markdown({ content }: { content: string })
             )
           case 'hr':
             return <hr key={idx} className="my-3 border-border" />
+          case 'table':
+            return <Table key={idx} header={block.header} aligns={block.aligns} rows={block.rows} keyBase={`t${idx}`} />
           case 'quote':
             return (
               <blockquote

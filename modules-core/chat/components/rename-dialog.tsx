@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { CHAT_TYPE_CLASS } from '@/modules/chat/lib/utils'
 
 interface RenameDialogProps {
   open: boolean
@@ -49,7 +50,7 @@ export function RenameDialog({ open, initialTitle, isPending, onCancel, onSubmit
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onCancel() }}>
-      <DialogContent>
+      <DialogContent className={CHAT_TYPE_CLASS}>
         <DialogHeader>
           <DialogTitle>Rename chat</DialogTitle>
           <DialogDescription>Give this chat a more memorable title.</DialogDescription>

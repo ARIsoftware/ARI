@@ -1,35 +1,13 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Loader2, MessageSquare, MoreHorizontal, Pencil, Search, Sparkles, SquarePen, Trash2 } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
+import { Loader2, Search, Sparkles } from 'lucide-react'
 import { cn, formatRelativeTime } from '@/lib/utils'
-import {
-  useChatConversations,
-  useDeleteConversation,
-  useRenameConversation,
-} from '@/modules/chat/hooks/use-chat'
+import { useChatConversations } from '@/modules/chat/hooks/use-chat'
 import { PROVIDER_LABELS } from '@/modules/chat/lib/utils'
-import { RenameDialog } from './rename-dialog'
+import { ConversationActions } from './conversation-actions'
 import type { ChatConversation } from '@/modules/chat/types'
 
 interface ConversationListProps {
@@ -66,13 +44,8 @@ function groupConversations(convos: ChatConversation[]): [GroupLabel, ChatConver
 
 export function ConversationList({ activeId, onSelect, onCreate, isCreating }: ConversationListProps) {
   const { data: conversations = [], isLoading } = useChatConversations()
-  const renameMutation = useRenameConversation()
-  const deleteMutation = useDeleteConversation()
-  const { toast } = useToast()
 
   const [query, setQuery] = useState('')
-  const [renaming, setRenaming] = useState<ChatConversation | null>(null)
-  const [deleting, setDeleting] = useState<ChatConversation | null>(null)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -82,36 +55,6 @@ export function ConversationList({ activeId, onSelect, onCreate, isCreating }: C
 
   const grouped = useMemo(() => groupConversations(filtered), [filtered])
 
-  const handleRename = (title: string) => {
-    if (!renaming) return
-    renameMutation.mutate(
-      { id: renaming.id, title },
-      {
-        onSuccess: () => setRenaming(null),
-        onError: (err) => toast({
-          variant: 'destructive',
-          title: 'Failed to rename chat',
-          description: err instanceof Error ? err.message : 'Please try again.',
-        }),
-      },
-    )
-  }
-
-  const handleDelete = () => {
-    if (!deleting) return
-    deleteMutation.mutate(deleting.id, {
-      onSuccess: () => {
-        if (activeId === deleting.id) onSelect('')
-        setDeleting(null)
-      },
-      onError: (err) => toast({
-        variant: 'destructive',
-        title: 'Failed to delete chat',
-        description: err instanceof Error ? err.message : 'Please try again.',
-      }),
-    })
-  }
-
   return (
     <aside className="flex h-full w-72 shrink-0 flex-col border-r bg-background">
       {/* New chat */}
@@ -120,13 +63,9 @@ export function ConversationList({ activeId, onSelect, onCreate, isCreating }: C
           type="button"
           onClick={onCreate}
           disabled={isCreating}
-          className="group flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-60"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-60"
         >
-          {isCreating ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <SquarePen className="h-4 w-4 transition-transform group-hover:scale-110" />
-          )}
+          {isCreating && <Loader2 className="h-4 w-4 animate-spin" />}
           New chat
         </button>
       </div>
@@ -183,18 +122,12 @@ export function ConversationList({ activeId, onSelect, onCreate, isCreating }: C
                       }
                     }}
                     className={cn(
-                      'group flex cursor-pointer items-start gap-2.5 border-b border-l-2 p-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      'group flex cursor-pointer items-start gap-2.5 border-l-2 p-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                       isActive
                         ? 'border-l-accent bg-muted'
                         : 'border-l-transparent hover:bg-muted/50',
                     )}
                   >
-                    <MessageSquare
-                      className={cn(
-                        'mt-0.5 h-4 w-4 shrink-0',
-                        isActive ? 'text-accent' : 'text-muted-foreground',
-                      )}
-                    />
                     <div className="min-w-0 flex-1">
                       <h3 className={cn('line-clamp-1 text-sm leading-tight', isActive ? 'font-semibold' : 'font-medium')}>
                         {convo.title}
@@ -206,32 +139,11 @@ export function ConversationList({ activeId, onSelect, onCreate, isCreating }: C
                         </span>
                       </div>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`Chat actions for ${convo.title}`}
-                          className="h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenuItem onSelect={() => setRenaming(convo)}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Rename
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-600 focus:text-red-600"
-                          onSelect={() => setDeleting(convo)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <ConversationActions
+                      conversation={convo}
+                      onDeleted={(id) => { if (activeId === id) onSelect('') }}
+                      triggerClassName="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
+                    />
                   </div>
                 )
               })}
@@ -246,34 +158,6 @@ export function ConversationList({ activeId, onSelect, onCreate, isCreating }: C
         {query && <span>{filtered.length} shown</span>}
       </div>
 
-      <RenameDialog
-        open={!!renaming}
-        initialTitle={renaming?.title ?? ''}
-        isPending={renameMutation.isPending}
-        onCancel={() => setRenaming(null)}
-        onSubmit={handleRename}
-      />
-
-      <AlertDialog open={!!deleting} onOpenChange={(next) => { if (!next) setDeleting(null) }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this chat?</AlertDialogTitle>
-            <AlertDialogDescription>
-              All messages in &ldquo;{deleting?.title}&rdquo; will be permanently removed. Uploaded files stay in the Uploads tab.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); handleDelete() }}
-              disabled={deleteMutation.isPending}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </aside>
   )
 }

@@ -33,6 +33,19 @@ lucide-react is now version 1, which removed brand icons such as `Github`.
 
 - Cohere is now an AI provider in Settings → Integrations. Add an API key and pick a model from the live list. Board of Advisors and Today's Brief can use it.
 
+### Chat
+
+- Stop a reply while it's being written (Stop button or Esc). What was written so far is saved.
+- Replies render as formatted Markdown while they stream, with syntax-highlighted code blocks and tables.
+- The conversation no longer jumps to the bottom while you scroll up during a reply. A button jumps back to the latest message.
+- Regenerate the latest reply, or edit one of your messages and send it again. Editing an earlier message replaces the replies after it.
+- Switch provider and model from the message box, for the current chat or as the default for new chats.
+- Paste or drag images and files into a chat. Images show as thumbnails you can open.
+- The message box grows as you type. New chats open a welcome screen with a greeting. "New chat" no longer creates an empty conversation.
+- Shortcuts: Esc to stop, ↑ in an empty message box to edit your last message.
+- Chat works with every AI provider set up in Settings → Integrations (xAI, Mistral, DeepSeek, Groq, Perplexity, Cohere, Ollama), not just OpenAI, Anthropic, Gemini and OpenRouter.
+- Chat can generate images. Ask it to draw or create a picture and the image appears in the reply. It uses the chat's own provider when that one can make images (OpenAI, Gemini, xAI, OpenRouter), otherwise the first of those with a key.
+
 ### Startup
 
 - `./ari start` is about six seconds faster when nothing has changed: the unit-test report behind the Health page is reused instead of running the whole suite on every boot. The suite still runs whenever a file changed since the last report, whenever that report had a failure, and with `ARI_FORCE_TEST_REPORT=1`.

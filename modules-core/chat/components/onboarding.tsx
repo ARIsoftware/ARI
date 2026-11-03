@@ -20,7 +20,7 @@ interface OnboardingProps {
 const FEATURES = [
   { icon: Zap, title: 'Streams in real time', desc: 'Replies appear token-by-token, just like ChatGPT.' },
   { icon: FileText, title: 'Reads your files', desc: 'Attach images or text and the model reads them.' },
-  { icon: Sparkles, title: 'Any provider', desc: 'OpenAI, Anthropic, Gemini, or OpenRouter — your key, your model.' },
+  { icon: Sparkles, title: 'Any provider', desc: 'Any AI provider from Settings → Integrations — your key, your model.' },
 ]
 
 export function ChatOnboarding({ onComplete, isPending }: OnboardingProps) {

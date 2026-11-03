@@ -1,4 +1,8 @@
-export type ChatProvider = 'openai' | 'anthropic' | 'gemini' | 'openrouter'
+import type { AiProviderId } from '@/lib/ai-providers'
+
+// Every chat (non-voice) provider in the shared registry. Chat stores the
+// registry's `claude` as `anthropic` (older rows use that id).
+export type ChatProvider = 'anthropic' | Exclude<AiProviderId, 'claude' | 'elevenlabs'>
 export type ChatRole = 'user' | 'assistant' | 'system'
 
 export interface ChatAttachment {

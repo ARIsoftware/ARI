@@ -1,25 +1,70 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from 'react'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
-import { ArrowUp, Loader2, Paperclip, X } from 'lucide-react'
+import { AlertCircle, ArrowUp, FileText, Loader2, Paperclip, Square, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUploadChatFile } from '@/modules/chat/hooks/use-chat'
-import { formatBytes } from '@/modules/chat/lib/utils'
+import { formatBytes, isImageMime } from '@/modules/chat/lib/utils'
 import type { ChatAttachment, ChatUpload } from '@/modules/chat/types'
+import {
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentDescription,
+  AttachmentGroup,
+  AttachmentMedia,
+  AttachmentTitle,
+} from './ui/attachment'
+
+export interface ComposerHandle {
+  /** Queue files for upload (used by the thread-wide drop zone). */
+  addFiles: (files: File[]) => void
+  focus: () => void
+}
 
 interface ComposerProps {
   conversationId: string | null
   onSend: (content: string, attachments: ChatAttachment[]) => void
-  isSending: boolean
-  /** Optional element rendered in the footer, left of the send button (e.g. the model pill). */
+  /** Stops the reply being streamed. */
+  onStop?: () => void
+  isStreaming: boolean
+  /** ↑ in an empty composer — edit your last message. */
+  onEditLast?: () => void
+  /** Optional element rendered in the footer, left of the send button (e.g. the model picker). */
   accessory?: React.ReactNode
+  /** Welcome screen: roomier box that starts taller. */
+  size?: 'default' | 'large'
+  autoFocus?: boolean
+  ref?: Ref<ComposerHandle>
 }
 
 const MAX_MESSAGE_LENGTH = 50000
 const MAX_ATTACHMENTS = 10
+export const ACCEPTED_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'text/plain',
+  'text/markdown',
+  'text/csv',
+  'application/json',
+]
+
+interface PendingFile {
+  key: string
+  name: string
+  size: number
+  mime: string
+  /** Local object URL for image thumbnails (revoked on remove / send). */
+  previewUrl: string | null
+  status: 'uploading' | 'done' | 'error'
+  attachment?: ChatAttachment
+  error?: string
+}
 
 function uploadToAttachment(upload: ChatUpload): ChatAttachment {
   return {
@@ -32,15 +77,67 @@ function uploadToAttachment(upload: ChatUpload): ChatAttachment {
   }
 }
 
-export function Composer({ conversationId, onSend, isSending, accessory }: ComposerProps) {
+// Browsers sometimes report an empty type for .md/.csv — fall back to the extension.
+function effectiveMime(file: File): string {
+  if (file.type) return file.type
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  if (ext === 'md' || ext === 'markdown') return 'text/markdown'
+  if (ext === 'csv') return 'text/csv'
+  if (ext === 'json') return 'application/json'
+  if (ext === 'txt') return 'text/plain'
+  return ''
+}
+
+export function Composer({
+  conversationId,
+  onSend,
+  onStop,
+  isStreaming,
+  onEditLast,
+  accessory,
+  size = 'default',
+  autoFocus,
+  ref,
+}: ComposerProps) {
   const [text, setText] = useState('')
-  const [attachments, setAttachments] = useState<ChatAttachment[]>([])
+  const [files, setFiles] = useState<PendingFile[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  // Latest attachments for callbacks that outlive a render (unmount cleanup, addFiles).
+  const filesRef = useRef(files)
+  useEffect(() => {
+    filesRef.current = files
+  }, [files])
   const uploadFile = useUploadChatFile()
   const { toast } = useToast()
 
-  const handleFiles = async (files: FileList) => {
-    if (attachments.length + files.length > MAX_ATTACHMENTS) {
+  // Revoke any preview URLs still held when the composer unmounts.
+  useEffect(() => () => filesRef.current.forEach((f) => f.previewUrl && URL.revokeObjectURL(f.previewUrl)), [])
+
+  // Grow with the text, from one line up to the CSS max-height (then scroll).
+  useLayoutEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [text])
+
+  useEffect(() => {
+    if (autoFocus) textareaRef.current?.focus()
+  }, [autoFocus, conversationId])
+
+  const addFiles = (incoming: File[]) => {
+    if (incoming.length === 0) return
+    const accepted = incoming.filter((f) => ACCEPTED_MIME_TYPES.includes(effectiveMime(f)))
+    const rejected = incoming.length - accepted.length
+    if (rejected > 0) {
+      toast({
+        variant: 'destructive',
+        title: rejected === 1 ? 'Unsupported file' : `${rejected} unsupported files`,
+        description: 'Chat accepts images (JPEG, PNG, WebP, GIF) and text files (TXT, Markdown, CSV, JSON).',
+      })
+    }
+    if (filesRef.current.length + accepted.length > MAX_ATTACHMENTS) {
       toast({
         variant: 'destructive',
         title: 'Too many attachments',
@@ -49,30 +146,63 @@ export function Composer({ conversationId, onSend, isSending, accessory }: Compo
       return
     }
 
-    for (const file of Array.from(files)) {
-      try {
-        const upload = await uploadFile.mutateAsync({ file, conversationId })
-        setAttachments((prev) => [...prev, uploadToAttachment(upload)])
-      } catch (err) {
-        toast({
-          variant: 'destructive',
-          title: `Failed to upload ${file.name}`,
-          description: err instanceof Error ? err.message : 'Please try again.',
-        })
+    for (const file of accepted) {
+      const mime = effectiveMime(file)
+      const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+      const pending: PendingFile = {
+        key,
+        name: file.name || 'pasted-image.png',
+        size: file.size,
+        mime,
+        previewUrl: isImageMime(mime) ? URL.createObjectURL(file) : null,
+        status: 'uploading',
       }
+      setFiles((prev) => [...prev, pending])
+      uploadFile
+        .mutateAsync({ file, conversationId })
+        .then((upload) => {
+          setFiles((prev) =>
+            prev.map((f) => (f.key === key ? { ...f, status: 'done', attachment: uploadToAttachment(upload) } : f)),
+          )
+        })
+        .catch((err) => {
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.key === key
+                ? { ...f, status: 'error', error: err instanceof Error ? err.message : 'Upload failed' }
+                : f,
+            ),
+          )
+        })
     }
+    textareaRef.current?.focus()
   }
 
+  useImperativeHandle(ref, () => ({ addFiles, focus: () => textareaRef.current?.focus() }))
+
+  const removeFile = (key: string) => {
+    setFiles((prev) => {
+      const gone = prev.find((f) => f.key === key)
+      if (gone?.previewUrl) URL.revokeObjectURL(gone.previewUrl)
+      return prev.filter((f) => f.key !== key)
+    })
+  }
+
+  const isUploading = files.some((f) => f.status === 'uploading')
+  const hasFailed = files.some((f) => f.status === 'error')
+  const trimmed = text.trim()
+  const canSend = !!trimmed && !isStreaming && !isUploading && !hasFailed
+
   const handleSend = () => {
-    const trimmed = text.trim()
-    if (!trimmed) return
+    if (!trimmed || isStreaming) return
     // Don't send while a file is still uploading — otherwise it would resolve
     // into the just-cleared attachment list and ride along on the next message.
-    if (uploadFile.isPending) {
-      toast({
-        title: 'Upload in progress',
-        description: 'Wait for the attachment to finish uploading before sending.',
-      })
+    if (isUploading) {
+      toast({ title: 'Upload in progress', description: 'Wait for the attachment to finish uploading before sending.' })
+      return
+    }
+    if (hasFailed) {
+      toast({ variant: 'destructive', title: 'An attachment failed to upload', description: 'Remove it (or re-attach it) before sending.' })
       return
     }
     if (trimmed.length > MAX_MESSAGE_LENGTH) {
@@ -83,83 +213,142 @@ export function Composer({ conversationId, onSend, isSending, accessory }: Compo
       })
       return
     }
-    onSend(trimmed, attachments)
+    onSend(trimmed, files.flatMap((f) => (f.attachment ? [f.attachment] : [])))
+    files.forEach((f) => f.previewUrl && URL.revokeObjectURL(f.previewUrl))
     setText('')
-    setAttachments([])
-  }
-
-  const removeAttachment = (uploadId: string) => {
-    setAttachments((prev) => prev.filter((a) => a.upload_id !== uploadId))
+    setFiles([])
   }
 
   const charCount = text.length
   const nearLimit = charCount > MAX_MESSAGE_LENGTH * 0.9
-  const canSend = !!text.trim() && !isSending && !uploadFile.isPending
 
   return (
     <div className="w-full">
-      {attachments.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-2 px-1">
-          {attachments.map((a) => (
-            <div
-              key={a.upload_id}
-              className="flex items-center gap-2 rounded-lg border bg-muted/50 px-2.5 py-1.5 text-xs shadow-sm animate-in fade-in zoom-in-95"
-            >
-              <Paperclip className="h-3 w-3 text-accent" />
-              <span className="max-w-[200px] truncate font-medium">{a.original_name}</span>
-              <span className="text-muted-foreground">{formatBytes(a.size)}</span>
-              <button
-                onClick={() => removeAttachment(a.upload_id)}
-                className="rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground"
-                aria-label={`Remove ${a.original_name}`}
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="flex flex-col gap-1.5 rounded-[26px] border bg-card px-5 py-4 shadow-[0_10px_40px_-8px_rgba(0,0,0,0.18)] transition-all focus-within:border-accent/40 focus-within:shadow-[0_14px_48px_-8px_rgba(0,0,0,0.26)] focus-within:ring-2 focus-within:ring-accent/10">
+      <div
+        className={cn(
+          'flex flex-col gap-2 rounded-[26px] border border-border/60 bg-card px-4 pb-3 pt-3 shadow-[0_4px_4px_0_rgba(0,0,0,0.04),0_0_1px_0_rgba(0,0,0,0.25),0_8px_80px_0_rgba(0,0,0,0.04)]',
+          size === 'large' && 'px-5 pt-4',
+        )}
+      >
         <input
           ref={fileInputRef}
           type="file"
           multiple
           className="hidden"
-          accept="image/jpeg,image/png,image/webp,image/gif,text/plain,text/markdown,text/csv,application/json"
+          accept={ACCEPTED_MIME_TYPES.join(',')}
           onChange={(e) => {
             if (e.target.files) {
-              handleFiles(e.target.files)
+              addFiles(Array.from(e.target.files))
               e.target.value = ''
             }
           }}
         />
 
-        <Textarea
+        {files.length > 0 && (
+          <AttachmentGroup className="px-0.5 pt-0.5">
+            {files.map((f) => {
+              const state = f.status === 'done' ? 'done' : f.status === 'error' ? 'error' : 'uploading'
+              if (f.previewUrl) {
+                return (
+                  <Attachment
+                    key={f.key}
+                    state={state}
+                    orientation="vertical"
+                    className="w-16 p-1 animate-in fade-in zoom-in-95"
+                    title={f.error ?? f.name}
+                  >
+                    <AttachmentMedia variant="image" className="rounded-lg">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview */}
+                      <img src={f.previewUrl} alt={f.name} />
+                      {f.status === 'uploading' && (
+                        <span className="absolute inset-0 flex items-center justify-center bg-background/40">
+                          <Loader2 className="h-4 w-4 animate-spin text-foreground" />
+                        </span>
+                      )}
+                      {f.status === 'error' && (
+                        <span className="absolute inset-0 flex items-center justify-center bg-destructive/20">
+                          <AlertCircle className="h-4 w-4 text-destructive" />
+                        </span>
+                      )}
+                    </AttachmentMedia>
+                    <AttachmentActions>
+                      <AttachmentAction onClick={() => removeFile(f.key)} aria-label={`Remove ${f.name}`}>
+                        <X />
+                      </AttachmentAction>
+                    </AttachmentActions>
+                  </Attachment>
+                )
+              }
+              return (
+                <Attachment key={f.key} state={state} size="sm" className="max-w-[240px] animate-in fade-in zoom-in-95">
+                  <AttachmentMedia>
+                    {f.status === 'uploading' ? (
+                      <Loader2 className="animate-spin" />
+                    ) : f.status === 'error' ? (
+                      <AlertCircle />
+                    ) : (
+                      <FileText />
+                    )}
+                  </AttachmentMedia>
+                  <AttachmentContent>
+                    <AttachmentTitle>{f.name}</AttachmentTitle>
+                    <AttachmentDescription>
+                      {f.status === 'error' ? f.error : f.status === 'uploading' ? 'Uploading…' : formatBytes(f.size)}
+                    </AttachmentDescription>
+                  </AttachmentContent>
+                  <AttachmentActions>
+                    <AttachmentAction onClick={() => removeFile(f.key)} aria-label={`Remove ${f.name}`}>
+                      <X />
+                    </AttachmentAction>
+                  </AttachmentActions>
+                </Attachment>
+              )
+            })}
+          </AttachmentGroup>
+        )}
+
+        <textarea
+          ref={textareaRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing) return
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
               handleSend()
+            } else if (e.key === 'ArrowUp' && !text && onEditLast) {
+              e.preventDefault()
+              onEditLast()
+            }
+          }}
+          onPaste={(e) => {
+            const pasted = Array.from(e.clipboardData.files)
+            if (pasted.length > 0) {
+              e.preventDefault()
+              addFiles(pasted)
             }
           }}
           placeholder="Message the AI…"
-          rows={7}
+          rows={1}
           maxLength={MAX_MESSAGE_LENGTH}
-          className="min-h-0 flex-1 resize-none border-0 bg-transparent px-1.5 py-1 text-sm leading-relaxed shadow-none focus-visible:ring-0"
+          aria-label="Message"
+          className={cn(
+            'max-h-[40vh] w-full resize-none overflow-y-auto border-0 bg-transparent px-1.5 py-1 text-base leading-relaxed outline-none placeholder:text-muted-foreground',
+            size === 'large' ? 'min-h-[4.5rem] text-[15px]' : 'min-h-[2rem]',
+          )}
         />
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <Button
             variant="ghost"
             size="icon"
             className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
             onClick={() => fileInputRef.current?.click()}
-            disabled={uploadFile.isPending}
-            aria-label="Attach file"
+            disabled={files.length >= MAX_ATTACHMENTS}
+            aria-label="Attach files"
+            title="Attach files (or paste / drop them)"
           >
-            {uploadFile.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+            <Paperclip className="h-4 w-4" />
           </Button>
 
           <div className="flex min-w-0 items-center gap-2">
@@ -169,20 +358,32 @@ export function Composer({ conversationId, onSend, isSending, accessory }: Compo
                 {charCount.toLocaleString()} / {MAX_MESSAGE_LENGTH.toLocaleString()}
               </span>
             )}
-            <Button
-              size="icon"
-              className={cn(
-                'h-8 w-8 shrink-0 rounded-full transition-all',
-                canSend
-                  ? 'bg-accent text-accent-foreground hover:opacity-90'
-                  : 'bg-muted text-muted-foreground hover:bg-muted',
-              )}
-              onClick={handleSend}
-              disabled={!canSend}
-              aria-label="Send message"
-            >
-              {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
-            </Button>
+            {isStreaming ? (
+              <Button
+                size="icon"
+                className="h-8 w-8 shrink-0 rounded-full bg-foreground text-background transition-all hover:bg-foreground/85"
+                onClick={onStop}
+                aria-label="Stop generating"
+                title="Stop generating (Esc)"
+              >
+                <Square className="h-3 w-3 fill-current" />
+              </Button>
+            ) : (
+              <Button
+                size="icon"
+                className={cn(
+                  'h-8 w-8 shrink-0 rounded-full transition-all',
+                  canSend
+                    ? 'bg-accent text-accent-foreground hover:opacity-90'
+                    : 'bg-muted text-muted-foreground hover:bg-muted',
+                )}
+                onClick={handleSend}
+                disabled={!canSend}
+                aria-label="Send message"
+              >
+                {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+              </Button>
+            )}
           </div>
         </div>
       </div>

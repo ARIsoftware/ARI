@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Loader2, RefreshCw, Settings, Sparkles } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { AlertTriangle, Loader2, RefreshCw, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import Link from 'next/link'
@@ -17,7 +17,7 @@ import { useRandomQuote } from '@/modules/chat/hooks/use-quote'
 import { ConversationList } from '@/modules/chat/components/conversation-list'
 import { ChatThread } from '@/modules/chat/components/chat-thread'
 import { ChatOnboarding } from '@/modules/chat/components/onboarding'
-import { PROVIDER_LABELS } from '@/modules/chat/lib/utils'
+import { CHAT_TYPE_CLASS } from '@/modules/chat/lib/utils'
 import type { ChatProvider } from '@/modules/chat/types'
 
 export default function ChatPage() {
@@ -28,17 +28,15 @@ export default function ChatPage() {
   const updateSettings = useUpdateChatSettings()
 
   const { data: providers = [], isLoading: providersLoading, isError: providersError, refetch: refetchProviders } = useChatProviders()
-  const { data: conversations = [] } = useChatConversations()
+  const { data: conversations = [], isLoading: conversationsLoading } = useChatConversations()
   const createConversation = useCreateConversation()
 
-  const [activeId, setActiveId] = useState<string | null>(null)
+  // undefined = nothing chosen yet (open the most recent chat); null = a new,
+  // not-yet-created chat — it's created on its first message, so "New chat"
+  // never leaves empty conversations behind.
+  const [chosenId, setActiveId] = useState<string | null | undefined>(undefined)
+  const activeId = chosenId === undefined ? (conversations[0]?.id ?? null) : chosenId
 
-  // Once we have conversations, default-select the most recent.
-  useEffect(() => {
-    if (!activeId && conversations.length > 0) {
-      setActiveId(conversations[0].id)
-    }
-  }, [conversations, activeId])
 
   const activeProvider = useMemo<{ id: ChatProvider; model: string } | null>(() => {
     if (providers.length === 0) return null
@@ -56,35 +54,26 @@ export default function ChatPage() {
     return { id: preferred.id, model }
   }, [providers, settings])
 
-  const handleCreateConversation = () => {
-    if (!activeProvider) {
-      toast({
-        variant: 'destructive',
-        title: 'No provider configured',
-        description: 'Add an API key in Settings → Integrations first.',
-      })
-      return
-    }
-    createConversation.mutate(
-      { provider: activeProvider.id, model: activeProvider.model },
-      {
-        onSuccess: (convo) => setActiveId(convo.id),
-        onError: (err) => toast({
-          variant: 'destructive',
-          title: 'Failed to start chat',
-          description: err instanceof Error ? err.message : 'Please try again.',
-        }),
-      },
-    )
-  }
-
   // Used by the welcome composer to start a chat on the first message (ChatGPT-style).
   const createConversationForSend = async () => {
     if (!activeProvider) throw new Error('Add an API key in Settings → Integrations first.')
     return createConversation.mutateAsync({ provider: activeProvider.id, model: activeProvider.model })
   }
 
-  if (settingsLoading || providersLoading) {
+  const changeDefaultModel = (choice: { provider: ChatProvider; model: string }) => {
+    updateSettings.mutate(
+      { defaultProvider: choice.provider, defaultModel: choice.model },
+      {
+        onError: (err) => toast({
+          variant: 'destructive',
+          title: 'Failed to change the default model',
+          description: err instanceof Error ? err.message : 'Please try again.',
+        }),
+      },
+    )
+  }
+
+  if (settingsLoading || providersLoading || conversationsLoading) {
     return (
       <div className="flex items-center justify-center h-96">
         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -95,7 +84,7 @@ export default function ChatPage() {
   // A failed fetch must not masquerade as "no providers configured".
   if (settingsError || providersError) {
     return (
-      <div className="flex items-center justify-center h-96 p-6">
+      <div className={`flex items-center justify-center h-96 p-6 text-foreground ${CHAT_TYPE_CLASS}`}>
         <Alert variant="destructive" className="max-w-md">
           <AlertTriangle className="w-4 h-4" />
           <AlertTitle>Failed to load chat</AlertTitle>
@@ -120,7 +109,7 @@ export default function ChatPage() {
 
   if (!settings?.onboardingCompleted) {
     return (
-      <div className="p-6">
+      <div className={`p-6 text-foreground ${CHAT_TYPE_CLASS}`}>
         <div className="mb-4">
           <h1 className="text-4xl font-medium">Chat</h1>
           {randomQuote && (
@@ -148,31 +137,8 @@ export default function ChatPage() {
 
   const configuredCount = providers.filter((p) => p.configured).length
 
-  // Model/config pill rendered inside the welcome composer's footer, next to
-  // the send button (active conversations show provider/model in their header).
-  const modelPill = (
-    <Link
-      href="/chat/settings"
-      className="group flex min-w-0 shrink items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-xs shadow-sm transition-colors hover:border-accent/40 hover:bg-accent/5"
-    >
-      {activeProvider ? (
-        <>
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
-          <span className="whitespace-nowrap font-medium">{PROVIDER_LABELS[activeProvider.id] ?? activeProvider.id}</span>
-          <span className="hidden truncate font-mono text-muted-foreground sm:inline">{activeProvider.model}</span>
-        </>
-      ) : (
-        <>
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/40" />
-          <span className="whitespace-nowrap text-muted-foreground">No provider configured</span>
-        </>
-      )}
-      <Settings className="h-3 w-3 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
-    </Link>
-  )
-
   return (
-    <div className="relative flex flex-col h-[calc(100vh-4rem)] min-h-[600px]">
+    <div className={`relative flex flex-col h-[calc(100vh-4rem)] min-h-[600px] text-foreground ${CHAT_TYPE_CLASS}`}>
       {configuredCount === 0 && (
         <div className="px-6 pt-4">
           <Alert>
@@ -192,14 +158,17 @@ export default function ChatPage() {
         <ConversationList
           activeId={activeId}
           onSelect={(id) => setActiveId(id || null)}
-          onCreate={handleCreateConversation}
+          onCreate={() => setActiveId(null)}
           isCreating={createConversation.isPending}
         />
         <ChatThread
           conversationId={activeId}
           onCreateConversation={createConversationForSend}
           onActivate={setActiveId}
-          composerAccessory={modelPill}
+          onDeleted={(id) => { if (activeId === id) setActiveId(null) }}
+          providers={providers}
+          defaultChoice={activeProvider ? { provider: activeProvider.id, model: activeProvider.model } : null}
+          onChangeDefault={changeDefaultModel}
         />
       </div>
     </div>

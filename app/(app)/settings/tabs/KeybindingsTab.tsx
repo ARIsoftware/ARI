@@ -31,6 +31,21 @@ const KEYBINDINGS: KeyBinding[] = [
     keys: ["Ctrl", "⇧", "L"],
     description: "Open the add task panel",
   },
+  {
+    id: "chat-stop",
+    keys: ["Esc"],
+    description: "Chat: stop the reply being generated",
+  },
+  {
+    id: "chat-edit-last",
+    keys: ["↑"],
+    description: "Chat: edit your last message (in an empty message box)",
+  },
+  {
+    id: "chat-newline",
+    keys: ["⇧", "Enter"],
+    description: "Chat: new line in a message (Enter sends)",
+  },
 ]
 
 function KeyCombo({ keys }: { keys: string[] }) {

@@ -49,10 +49,13 @@ import {
   getProviderApiKey,
   getProviderConfiguredModel,
   listProviderAvailability,
+  resolveImageConfig,
   expandAttachments,
   streamChat,
   type StreamChatOptions,
 } from '@/modules-core/chat/lib/providers'
+import { CHAT_PROVIDER_IDS } from '@/modules-core/chat/lib/utils'
+import { AI_PROVIDERS } from '@/lib/ai-providers'
 import type { ChatAttachment, ChatMessage, ChatRole } from '@/modules-core/chat/types'
 
 const mockWithAdminDb = vi.mocked(withAdminDb)
@@ -65,10 +68,7 @@ const mockValidateStoredFilename = vi.mocked(validateStoredFilename)
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 // All env keys the chat providers can read — blanked per-test for determinism.
-const ENV_KEYS = [
-  'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'OPENROUTER_API_KEY',
-  'OPENAI_MODEL', 'ANTHROPIC_MODEL', 'GOOGLE_GEMINI_MODEL', 'OPENROUTER_MODEL',
-]
+const ENV_KEYS = AI_PROVIDERS.flatMap((p) => [p.primaryEnvKey, p.modelEnvKey])
 
 function primeSettings(rows: Array<{ settings: unknown }>) {
   mockWithAdminDb.mockImplementation(async (fn: (db: never) => Promise<unknown>) => {
@@ -250,24 +250,25 @@ describe('getProviderConfiguredModel', () => {
 // ─── listProviderAvailability ────────────────────────────────────────────────
 
 describe('listProviderAvailability', () => {
-  it('reports all four providers with saved/env/absent configuration', async () => {
-    primeSettings([{ settings: { OPENAI_API_KEY: 'sk-o', OPENAI_MODEL: 'gpt-saved' } }])
+  it('reports every registry chat provider with saved/env/absent configuration', async () => {
+    primeSettings([{ settings: { OPENAI_API_KEY: 'sk-o', OPENAI_MODEL: 'gpt-saved', COHERE_API_KEY: 'co' } }])
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-a-env')
     vi.stubEnv('ANTHROPIC_MODEL', 'claude-env')
 
     const list = await listProviderAvailability('u1')
-    expect(list).toEqual([
-      { provider: 'openai', configured: true, configuredModel: 'gpt-saved', defaultModel: 'gpt-5' },
-      { provider: 'anthropic', configured: true, configuredModel: 'claude-env', defaultModel: 'claude-sonnet-4-5' },
-      { provider: 'gemini', configured: false, configuredModel: null, defaultModel: 'gemini-2.5-flash' },
-      { provider: 'openrouter', configured: false, configuredModel: null, defaultModel: 'openrouter/auto' },
-    ])
+    expect(list.map((a) => a.provider)).toEqual(CHAT_PROVIDER_IDS)
+    expect(list.map((a) => a.provider)).not.toContain('elevenlabs')
+    const by = (id: string) => list.find((a) => a.provider === id)
+    expect(by('openai')).toEqual({ provider: 'openai', configured: true, configuredModel: 'gpt-saved', defaultModel: 'gpt-5' })
+    expect(by('anthropic')).toEqual({ provider: 'anthropic', configured: true, configuredModel: 'claude-env', defaultModel: 'claude-sonnet-4-5' })
+    expect(by('gemini')).toEqual({ provider: 'gemini', configured: false, configuredModel: null, defaultModel: 'gemini-2.5-flash' })
+    expect(by('cohere')).toMatchObject({ configured: true, defaultModel: 'command-a-03-2025' })
   })
 
   it('ignores non-string saved models', async () => {
     primeSettings([{ settings: { OPENAI_API_KEY: 'sk-o', OPENAI_MODEL: 123 } }])
     const list = await listProviderAvailability('u1')
-    expect(list[0]).toMatchObject({ provider: 'openai', configured: true, configuredModel: null })
+    expect(list.find((a) => a.provider === 'openai')).toMatchObject({ configured: true, configuredModel: null })
   })
 })
 
@@ -465,6 +466,98 @@ describe('streamChat — openrouter', () => {
   })
 })
 
+// ─── streamChat — other OpenAI-compatible providers ──────────────────────────
+
+describe('streamChat — OpenAI-compatible registry providers', () => {
+  it.each([
+    ['cohere', 'https://api.cohere.ai/compatibility/v1/chat/completions'],
+    ['xai', 'https://api.x.ai/v1/chat/completions'],
+    ['mistral', 'https://api.mistral.ai/v1/chat/completions'],
+    ['deepseek', 'https://api.deepseek.com/v1/chat/completions'],
+    ['groq', 'https://api.groq.com/openai/v1/chat/completions'],
+    ['perplexity', 'https://api.perplexity.ai/chat/completions'],
+  ] as const)('%s streams from its base URL with bearer auth', async (provider, expectedUrl) => {
+    const fetchMock = vi.fn().mockResolvedValue(sseResponse(['data: {"choices":[{"delta":{"content":"ok"}}]}\n']))
+    vi.stubGlobal('fetch', fetchMock)
+    const deltas = await collect(streamChat(opts({ provider, history: [msg('user', 'hi')] })))
+    expect(deltas).toEqual(['ok'])
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe(expectedUrl)
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer sk-key')
+  })
+
+  it('normalizes history to one leading system message and alternating turns', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(sseResponse(['data: {"choices":[{"delta":{"content":"ok"}}]}\n']))
+    vi.stubGlobal('fetch', fetchMock)
+    const history = [
+      msg('assistant', 'orphan'),
+      msg('system', 'sys A'),
+      msg('user', 'q1'),
+      msg('user', 'q1 again'),
+      msg('assistant', 'a1'),
+      msg('system', 'sys B'),
+      msg('user', 'q2'),
+    ]
+    await collect(streamChat(opts({ provider: 'perplexity', history })))
+    expect(fetchBody(fetchMock).messages).toEqual([
+      { role: 'system', content: 'sys A\n\nsys B' },
+      { role: 'user', content: 'q1\n\nq1 again' },
+      { role: 'assistant', content: 'a1' },
+      { role: 'user', content: 'q2' },
+    ])
+  })
+
+  it('omits the system message when the history has none', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(sseResponse(['data: {"choices":[{"delta":{"content":"ok"}}]}\n']))
+    vi.stubGlobal('fetch', fetchMock)
+    await collect(streamChat(opts({ provider: 'mistral', history: [msg('user', 'hi')] })))
+    expect(fetchBody(fetchMock).messages).toEqual([{ role: 'user', content: 'hi' }])
+  })
+
+  it('throws for a provider Chat has no adapter for', async () => {
+    const err = await collectErr(streamChat(opts({ provider: 'elevenlabs' as never })))
+    expect(err.message).toBe('elevenlabs is not supported by Chat. Pick another provider.')
+  })
+})
+
+// ─── streamChat — Ollama ─────────────────────────────────────────────────────
+
+describe('streamChat — ollama', () => {
+  it('streams from <base>/v1 without an Authorization header', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(sseResponse(['data: {"choices":[{"delta":{"content":"local"}}]}\n']))
+    vi.stubGlobal('fetch', fetchMock)
+    const deltas = await collect(
+      streamChat(opts({ provider: 'ollama', apiKey: ' http://localhost:11434/ ', history: [msg('user', 'hi')] }))
+    )
+    expect(deltas).toEqual(['local'])
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('http://localhost:11434/v1/chat/completions')
+    expect((init.headers as Record<string, string>).Authorization).toBeUndefined()
+  })
+
+  it('never reflects the endpoint error body', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      body: null,
+      text: async () => 'internal secret page',
+    } as unknown as Response)
+    vi.stubGlobal('fetch', fetchMock)
+    const err = await collectErr(streamChat(opts({ provider: 'ollama', apiKey: 'http://10.0.0.5:8080' })))
+    expect(err.message).toBe('Provider request failed (404)')
+  })
+
+  it('rejects a base URL that is not a URL', async () => {
+    const err = await collectErr(streamChat(opts({ provider: 'ollama', apiKey: 'not a url' })))
+    expect(err.message).toMatch(/not a valid URL/)
+  })
+
+  it('rejects a non-http(s) base URL', async () => {
+    const err = await collectErr(streamChat(opts({ provider: 'ollama', apiKey: 'file:///etc/passwd' })))
+    expect(err.message).toMatch(/must start with http/)
+  })
+})
+
 // ─── streamChat — Anthropic ──────────────────────────────────────────────────
 
 describe('streamChat — anthropic', () => {
@@ -606,5 +699,195 @@ describe('streamChat — gemini', () => {
     vi.stubGlobal('fetch', fetchMock)
     const err = await collectErr(streamChat(opts({ provider: 'gemini', history: [msg('user', 'hi')] })))
     expect(err.message).toBe('Provider request failed (403): Forbidden')
+  })
+})
+
+// ─── Image tool ──────────────────────────────────────────────────────────────
+
+/** Drain a streamChat generator, returning its text and its tool calls. */
+async function run(gen: AsyncGenerator<string, unknown>) {
+  const text: string[] = []
+  let r = await gen.next()
+  while (!r.done) {
+    text.push(r.value)
+    r = await gen.next()
+  }
+  return { text, calls: r.value }
+}
+
+const IMG_ATT_ON_REPLY = att({ original_name: 'a red fox' })
+
+describe('streamChat — image tool (OpenAI-compatible)', () => {
+  it('offers the tool and assembles streamed tool-call fragments', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      sseResponse([
+        'data: {"choices":[{"delta":{"content":"Drawing it."}}]}\n',
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"generate_image","arguments":"{\\"pro"}}]}}]}\n',
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"mpt\\":\\"a fox\\"}"}}]}}]}\n',
+        'data: {"choices":[{"delta":{"tool_calls":[{"function":{"name":"other","arguments":"not json"}}]}}]}\n',
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":5,"function":{"arguments":"{}"}}]}}]}\n',
+      ])
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const { text, calls } = await run(
+      streamChat(opts({ provider: 'openai', imageTool: true, history: [msg('user', 'draw a fox')] }))
+    )
+    expect(text).toEqual(['Drawing it.'])
+    expect(calls).toEqual([
+      { name: 'generate_image', args: { prompt: 'a fox' } },
+      { name: 'other', args: {} },
+    ])
+    const tools = fetchBody(fetchMock).tools as Array<{ function: { name: string } }>
+    expect(tools.map((t) => t.function.name)).toEqual(['generate_image'])
+  })
+
+  it('treats non-object tool arguments as empty', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      sseResponse(['data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"name":"generate_image","arguments":"[1]"}}]}}]}\n'])
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const { calls } = await run(streamChat(opts({ provider: 'groq', imageTool: true, history: [msg('user', 'x')] })))
+    expect(calls).toEqual([{ name: 'generate_image', args: {} }])
+  })
+
+  it('sends no tools when the tool is off, and never to Perplexity', async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => sseResponse(['data: {"choices":[{"delta":{"content":"ok"}}]}\n']))
+    vi.stubGlobal('fetch', fetchMock)
+    await run(streamChat(opts({ provider: 'openai', history: [msg('user', 'x')] })))
+    await run(streamChat(opts({ provider: 'perplexity', imageTool: true, history: [msg('user', 'x')] })))
+    expect(fetchBody(fetchMock, 0)).not.toHaveProperty('tools')
+    expect(fetchBody(fetchMock, 1)).not.toHaveProperty('tools')
+  })
+
+  it('retries without tools when the model rejects them', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 404, body: null, text: async () => 'No endpoints found that support tool use' } as unknown as Response)
+      .mockResolvedValueOnce(sseResponse(['data: {"choices":[{"delta":{"content":"plain"}}]}\n']))
+    vi.stubGlobal('fetch', fetchMock)
+    const { text, calls } = await run(
+      streamChat(opts({ provider: 'openrouter', imageTool: true, history: [msg('user', 'x')] }))
+    )
+    expect(text).toEqual(['plain'])
+    expect(calls).toEqual([])
+    expect(fetchBody(fetchMock, 0)).toHaveProperty('tools')
+    expect(fetchBody(fetchMock, 1)).not.toHaveProperty('tools')
+  })
+
+  it('reports the retry failure (hiding the body for Ollama)', async () => {
+    const toolErr = { ok: false, status: 400, body: null, text: async () => 'model does not support tools' } as unknown as Response
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(toolErr)
+      .mockResolvedValueOnce({ ok: false, status: 500, body: null, text: async () => 'internal' } as unknown as Response)
+      .mockResolvedValueOnce(toolErr)
+      .mockResolvedValueOnce({ ok: false, status: 502, body: null, text: async () => 'secret' } as unknown as Response)
+    vi.stubGlobal('fetch', fetchMock)
+    const a = await collectErr(streamChat(opts({ provider: 'openai', imageTool: true })))
+    expect(a.message).toBe('Provider request failed (500): internal')
+    const b = await collectErr(streamChat(opts({ provider: 'ollama', apiKey: 'http://localhost:11434', imageTool: true })))
+    expect(b.message).toBe('Provider request failed (502)')
+  })
+
+  it('does not retry an unrelated client error', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 401, body: null, text: async () => 'bad key' } as unknown as Response)
+    vi.stubGlobal('fetch', fetchMock)
+    const err = await collectErr(streamChat(opts({ provider: 'openai', imageTool: true })))
+    expect(err.message).toBe('Provider request failed (401): bad key')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not retry a tool-sounding error when the tool was not offered', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 400, body: null, text: async () => 'tool' } as unknown as Response)
+    vi.stubGlobal('fetch', fetchMock)
+    await collectErr(streamChat(opts({ provider: 'openai' })))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('replays a past generated image to the model as a note', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(sseResponse(['data: {"choices":[{"delta":{"content":"ok"}}]}\n']))
+    vi.stubGlobal('fetch', fetchMock)
+    const history = [
+      msg('user', 'draw a fox'),
+      msg('assistant', '', [IMG_ATT_ON_REPLY, TXT_ATT]),
+      msg('user', 'make it blue'),
+    ]
+    await run(streamChat(opts({ provider: 'openai', history })))
+    expect((fetchBody(fetchMock).messages as unknown[])[1]).toEqual({
+      role: 'assistant',
+      content: '[Generated image: a red fox]',
+    })
+  })
+})
+
+describe('streamChat — image tool (Anthropic)', () => {
+  it('offers the tool and collects tool_use input', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      sseResponse([
+        'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"On it."}}\n',
+        'data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"t1","name":"generate_image"}}\n',
+        'data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\\"prompt\\":"}}\n',
+        'data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"\\"a fox\\"}"}}\n',
+        'data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta"}}\n',
+        'data: {"type":"content_block_start","index":2,"content_block":{"type":"tool_use","id":"t2"}}\n',
+        'data: {"type":"content_block_delta","index":9,"delta":{"type":"input_json_delta","partial_json":"x"}}\n',
+        'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta"}}\n',
+      ])
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const history = [msg('user', 'first'), msg('assistant', 'done', [IMG_ATT_ON_REPLY]), msg('user', 'draw')]
+    const { text, calls } = await run(streamChat(opts({ provider: 'anthropic', imageTool: true, history })))
+    expect(text).toEqual(['On it.'])
+    expect(calls).toEqual([{ name: 'generate_image', args: { prompt: 'a fox' } }])
+    const body = fetchBody(fetchMock)
+    expect((body.tools as Array<{ name: string }>)[0].name).toBe('generate_image')
+    expect((body.messages as unknown[])[1]).toEqual({ role: 'assistant', content: 'done\n\n[Generated image: a red fox]' })
+  })
+})
+
+describe('streamChat — image tool (Gemini)', () => {
+  it('offers function declarations and collects functionCall parts', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      sseResponse([
+        'data: {"candidates":[{"content":{"parts":[{"text":"Sure. "},{"functionCall":{"name":"generate_image","args":{"prompt":"a fox"}}}]}}]}\n',
+        'data: {"candidates":[{"content":{"parts":[{"functionCall":{"name":"generate_image","args":[1]}},{"functionCall":{}}]}}]}\n',
+      ])
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const history = [msg('user', 'a'), msg('assistant', '', [IMG_ATT_ON_REPLY]), msg('user', 'b')]
+    const { text, calls } = await run(streamChat(opts({ provider: 'gemini', imageTool: true, history })))
+    expect(text).toEqual(['Sure. '])
+    expect(calls).toEqual([
+      { name: 'generate_image', args: { prompt: 'a fox' } },
+      { name: 'generate_image', args: {} },
+    ])
+    const body = fetchBody(fetchMock)
+    expect(body.tools).toEqual([
+      { functionDeclarations: [expect.objectContaining({ name: 'generate_image' })] },
+    ])
+    expect((body.contents as unknown[])[1]).toEqual({ role: 'model', parts: [{ text: '[Generated image: a red fox]' }] })
+  })
+})
+
+// ─── resolveImageConfig ──────────────────────────────────────────────────────
+
+describe('resolveImageConfig', () => {
+  it("uses the chat's own provider when it can make images", async () => {
+    primeSettings([{ settings: { XAI_API_KEY: 'x-key', OPENAI_API_KEY: 'o-key' } }])
+    await expect(resolveImageConfig('u1', 'xai')).resolves.toEqual({ provider: 'xai', apiKey: 'x-key', model: 'grok-2-image' })
+  })
+
+  it('falls back to the first configured image provider', async () => {
+    primeSettings([{ settings: { ANTHROPIC_API_KEY: 'a', OPENROUTER_API_KEY: 'or-key' } }])
+    await expect(resolveImageConfig('u1', 'anthropic')).resolves.toEqual({
+      provider: 'openrouter',
+      apiKey: 'or-key',
+      model: 'google/gemini-2.5-flash-image',
+    })
+  })
+
+  it('returns null when no image provider has a key', async () => {
+    primeSettings([{ settings: { ANTHROPIC_API_KEY: 'a' } }])
+    await expect(resolveImageConfig('u1', 'anthropic')).resolves.toBeNull()
   })
 })

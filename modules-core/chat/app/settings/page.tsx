@@ -11,7 +11,7 @@ import {
   useUpdateChatSettings,
 } from '@/modules/chat/hooks/use-chat'
 import { useRandomQuote } from '@/modules/chat/hooks/use-quote'
-import { CHAT_REGISTRY_IDS, chatToRegistryId, registryToChatId } from '@/modules/chat/lib/utils'
+import { chatToRegistryId, registryToChatId } from '@/modules/chat/lib/utils'
 import type { AiProviderId } from '@/lib/ai-providers'
 
 export default function ChatSettingsPage() {
@@ -120,7 +120,6 @@ export default function ChatSettingsPage() {
           onChange={setSelectedOverride}
           models={models}
           onModelChange={(id, model) => setModelEdits((prev) => ({ ...prev, [id]: model }))}
-          allowedProviders={CHAT_REGISTRY_IDS}
           onSave={handleSave}
           isSaving={updateSettings.isPending}
           justSaved={saved}

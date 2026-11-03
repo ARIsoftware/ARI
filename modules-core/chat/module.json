@@ -2,8 +2,8 @@
   "id": "chat",
   "group": "AI",
   "name": "Chat",
-  "description": "ChatGPT-style conversational interface using any LLM provider configured in Settings → Integrations (OpenAI, Anthropic, Gemini, OpenRouter).",
-  "version": "1.0.0",
+  "description": "ChatGPT-style conversational interface using any LLM provider configured in Settings → Integrations.",
+  "version": "1.1.0",
   "author": "ARI",
   "icon": "MessageCircle",
   "enabled": true,
@@ -35,7 +35,9 @@
   "database": {
     "tables": ["chat_conversations", "chat_messages", "chat_uploads"]
   },
-  "npmDependencies": {},
+  "npmDependencies": {
+    "@shadcn/react": "^0.3.1"
+  },
   "storage": {
     "bucket": "chat",
     "maxFileSize": 26214400,

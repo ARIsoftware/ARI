@@ -36,7 +36,7 @@ registry.registerPath({
   method: 'patch',
   path: '/api/modules/chat/conversations/{id}',
   operationId: 'renameChatConversation',
-  summary: 'Rename a conversation',
+  summary: 'Rename a conversation and/or switch its provider and model',
   tags: ['chat'],
   security: DEFAULT_SECURITY,
   request: { params: chatIdParamSchema, body: { content: { 'application/json': { schema: updateConversationSchema } } } },
@@ -121,10 +121,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const { user, withRLS } = await getAuthenticatedUser()
     if (!user || !withRLS) return createErrorResponse('Unauthorized', 401)
 
+    const { title, provider, model } = validation.data
     const rows = await withRLS((db) =>
       db
         .update(chatConversations)
-        .set({ title: validation.data.title.trim(), updatedAt: new Date().toISOString() })
+        .set({
+          ...(title !== undefined ? { title: title.trim() } : {}),
+          ...(provider !== undefined && model !== undefined ? { provider, model } : {}),
+          updatedAt: new Date().toISOString(),
+        })
         .where(and(eq(chatConversations.id, id), eq(chatConversations.userId, user.id)))
         .returning()
     )
