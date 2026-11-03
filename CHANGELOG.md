@@ -9,6 +9,7 @@ Releases are tags named `X.Y.Z` on `main`. Earlier releases are described by the
 ### Security
 
 - Updated every dependency with a known vulnerability, including Next.js (remote code execution), Better Auth (sign-in as another user), Zod and pnpm. `pnpm audit` now reports no known vulnerabilities.
+- pnpm now refuses any package version published less than 5 days ago (`minimumReleaseAge` in `pnpm-workspace.yaml`), so a compromised release has time to be caught before ARI would install it.
 - Removed twelve unused packages (svix, react-resizable-panels, embla-carousel-react, drizzle-kit and eight unused Radix UI primitives) and their unused `components/ui` wrappers.
 
 ### Custom modules
