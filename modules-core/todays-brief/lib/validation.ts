@@ -75,7 +75,7 @@ export const ElevenLabsVoiceSchema = z.object({
   name: z.string(),
   category: z.string().nullable(),
   previewUrl: z.string().nullable(),
-  labels: z.record(z.string()).nullable(),
+  labels: z.record(z.string(), z.string()).nullable(),
 }).openapi('TodaysBriefVoice')
 
 export const VoicesResponseSchema = z.object({

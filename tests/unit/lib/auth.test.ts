@@ -21,11 +21,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // ── better-auth mock ──────────────────────────────────────────────────────────
 // vi.mock factories are hoisted above all statements. Use vi.hoisted() to
 // declare shared state that both the factory and test code can access.
-const capturedConfigHolder = vi.hoisted(() => ({ cfg: {} as Record<string, any> }))
+const capturedConfigHolder = vi.hoisted(() => ({ cfg: {} as Record<string, any>, calls: 0 }))
 
 vi.mock('better-auth', () => {
   const betterAuth = vi.fn((cfg: Record<string, any>) => {
     capturedConfigHolder.cfg = cfg
+    capturedConfigHolder.calls += 1
     return { __cfg: cfg }
   })
   return { betterAuth }
@@ -130,9 +131,9 @@ describe('auth module exports', () => {
     expect((auth as any).__cfg).toBeDefined()
   })
 
-  it('betterAuth() was called exactly once at import time', async () => {
-    const { betterAuth } = await import('better-auth')
-    expect(betterAuth).toHaveBeenCalledTimes(1)
+  // Counted by hand: vitest 5 clears vi.fn() call history before each test.
+  it('betterAuth() was called exactly once at import time', () => {
+    expect(capturedConfigHolder.calls).toBe(1)
   })
 })
 

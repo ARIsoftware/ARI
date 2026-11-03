@@ -111,7 +111,7 @@ describe('safeText', () => {
     const result = tightSchema.safeParse('toolongstring')
     expect(result.success).toBe(false)
     if (!result.success) {
-      expect(result.error.errors[0].message).toContain('5')
+      expect(result.error.issues[0].message).toContain('5')
     }
   })
 })

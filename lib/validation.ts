@@ -110,12 +110,12 @@ export const vercelConfigureRequestSchema = z.object({
 export function firstZodError(schema: z.ZodTypeAny, value: unknown): string | null {
   const result = schema.safeParse(value)
   if (result.success) return null
-  return result.error.errors[0]?.message ?? 'Invalid value'
+  return result.error.issues[0]?.message ?? 'Invalid value'
 }
 
 // Flatten a ZodError into the compact shape that clients render
 // ({ path: 'field.name', message: '...' }[]). Keeps bytes small and
 // decouples callers from the full Zod error schema.
 export function flattenZodErrors(error: z.ZodError): Array<{ path: string; message: string }> {
-  return error.errors.map((e) => ({ path: e.path.join('.'), message: e.message }))
+  return error.issues.map((e) => ({ path: e.path.join('.'), message: e.message }))
 }

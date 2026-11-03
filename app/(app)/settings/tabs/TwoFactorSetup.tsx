@@ -50,10 +50,15 @@ export function TwoFactorSetup({ twoFactorEnabled: initialEnabled }: { twoFactor
         setLoading(false)
         return
       }
-      setTotpURI(res.data?.totpURI || "")
-      setBackupCodes(res.data?.backupCodes || [])
+      if (res.data?.method !== "totp") {
+        setError("Failed to enable 2FA")
+        setLoading(false)
+        return
+      }
+      setTotpURI(res.data.totpURI)
+      setBackupCodes(res.data.backupCodes)
       // Extract secret from TOTP URI
-      const secretMatch = res.data?.totpURI?.match(/secret=([A-Z2-7]+)/)
+      const secretMatch = res.data.totpURI.match(/secret=([A-Z2-7]+)/)
       setSecret(secretMatch?.[1] || "")
       setStep("qr")
     } catch {

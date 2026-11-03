@@ -11,7 +11,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-export const REPO_ROOT = path.resolve(__dirname, '..', '..', '..')
+export const REPO_ROOT = path.resolve(import.meta.dirname, '..', '..', '..')
 
 /** Files the CLI needs to run, copied into the lab's upstream repository. */
 const CLI_FILES = ['.ari/cli.js', 'scripts/reconcile-module-deps.js', 'scripts/lib']

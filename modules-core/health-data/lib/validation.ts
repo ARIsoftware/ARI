@@ -5,7 +5,7 @@ import '@/lib/openapi/registry'
 
 export const uploadQuerySchema = z.object({
   action: z.enum(['begin', 'chunk', 'finish'], {
-    errorMap: () => ({ message: 'action must be one of: begin, chunk, finish' }),
+    error: 'action must be one of: begin, chunk, finish',
   }),
   id: z.string().uuid('id must be a valid upload session id').optional(),
   index: z.coerce.number().int('index must be an integer').min(0, 'index must be 0 or greater').optional(),

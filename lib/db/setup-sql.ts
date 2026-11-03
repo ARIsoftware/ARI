@@ -177,10 +177,15 @@ CREATE TABLE IF NOT EXISTS "twoFactor" (
   "backupCodes" TEXT NOT NULL,
   "userId" TEXT NOT NULL,
   "verified" BOOLEAN DEFAULT TRUE,
+  "failedVerificationCount" INTEGER DEFAULT 0,
+  "lockedUntil" TIMESTAMPTZ,
   PRIMARY KEY ("id")
 );
 -- Additive upgrade for installs that predate Better Auth 1.6's twoFactor schema.
 ALTER TABLE "twoFactor" ADD COLUMN IF NOT EXISTS "verified" BOOLEAN DEFAULT TRUE;
+-- Better Auth 1.7 rejects every auth request until these columns exist.
+ALTER TABLE "twoFactor" ADD COLUMN IF NOT EXISTS "failedVerificationCount" INTEGER DEFAULT 0;
+ALTER TABLE "twoFactor" ADD COLUMN IF NOT EXISTS "lockedUntil" TIMESTAMPTZ;
 ALTER TABLE "twoFactor" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "twoFactor_rls_deny" ON "twoFactor";
 CREATE POLICY "twoFactor_rls_deny" ON "twoFactor" FOR ALL TO public USING (false);

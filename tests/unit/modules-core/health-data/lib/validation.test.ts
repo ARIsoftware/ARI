@@ -24,7 +24,7 @@ describe('uploadQuerySchema', () => {
   it('accepts valid chunk action with id and index', () => {
     const result = uploadQuerySchema.safeParse({
       action: 'chunk',
-      id: '00000000-0000-0000-0000-000000000001',
+      id: '00000000-0000-4000-8000-000000000001',
       index: 0,
     })
     expect(result.success).toBe(true)
@@ -33,7 +33,7 @@ describe('uploadQuerySchema', () => {
   it('accepts valid finish action', () => {
     const result = uploadQuerySchema.safeParse({
       action: 'finish',
-      id: '00000000-0000-0000-0000-000000000001',
+      id: '00000000-0000-4000-8000-000000000001',
     })
     expect(result.success).toBe(true)
   })
@@ -41,7 +41,7 @@ describe('uploadQuerySchema', () => {
   it('rejects invalid action', () => {
     const result = uploadQuerySchema.safeParse({ action: 'invalid' })
     expect(result.success).toBe(false)
-    expect(result.error?.errors[0].message).toContain('begin')
+    expect(result.error?.issues[0].message).toContain('begin')
   })
 
   it('rejects non-UUID id', () => {
@@ -52,7 +52,7 @@ describe('uploadQuerySchema', () => {
   it('rejects negative index', () => {
     const result = uploadQuerySchema.safeParse({
       action: 'chunk',
-      id: '00000000-0000-0000-0000-000000000001',
+      id: '00000000-0000-4000-8000-000000000001',
       index: -1,
     })
     expect(result.success).toBe(false)
@@ -61,7 +61,7 @@ describe('uploadQuerySchema', () => {
   it('coerces string index to number', () => {
     const result = uploadQuerySchema.safeParse({
       action: 'chunk',
-      id: '00000000-0000-0000-0000-000000000001',
+      id: '00000000-0000-4000-8000-000000000001',
       index: '3',
     })
     expect(result.success).toBe(true)
@@ -137,7 +137,7 @@ describe('metricsQuerySchema', () => {
 
 describe('ImportStatusSchema', () => {
   const validStatus = {
-    id: '00000000-0000-0000-0000-000000000001',
+    id: '00000000-0000-4000-8000-000000000001',
     status: 'completed',
     progress: 100,
     phase: 'Done',
@@ -225,7 +225,7 @@ describe('MetricSeriesSchema', () => {
 describe('WorkoutSchema', () => {
   it('accepts a valid workout', () => {
     const result = WorkoutSchema.safeParse({
-      id: '00000000-0000-0000-0000-000000000001',
+      id: '00000000-0000-4000-8000-000000000001',
       activity_type: 'Running',
       start_time: '2026-01-01T07:00:00-05:00',
       end_time: '2026-01-01T07:30:00-05:00',
@@ -242,7 +242,7 @@ describe('WorkoutSchema', () => {
 
   it('accepts null nullable fields', () => {
     const result = WorkoutSchema.safeParse({
-      id: '00000000-0000-0000-0000-000000000001',
+      id: '00000000-0000-4000-8000-000000000001',
       activity_type: 'Yoga',
       start_time: '2026-01-01T07:00:00Z',
       end_time: '2026-01-01T08:00:00Z',
@@ -321,7 +321,7 @@ describe('SleepNightSchema', () => {
 describe('RouteSchema', () => {
   it('accepts a valid route', () => {
     const result = RouteSchema.safeParse({
-      id: '00000000-0000-0000-0000-000000000001',
+      id: '00000000-0000-4000-8000-000000000001',
       route_date: '2026-01-01',
       started_at: '2026-01-01T07:00:00Z',
       distance_km: 5.3,
@@ -334,7 +334,7 @@ describe('RouteSchema', () => {
 
   it('rejects invalid point tuple (wrong length)', () => {
     const result = RouteSchema.safeParse({
-      id: '00000000-0000-0000-0000-000000000001',
+      id: '00000000-0000-4000-8000-000000000001',
       route_date: '2026-01-01',
       started_at: null,
       distance_km: null,
@@ -349,7 +349,7 @@ describe('RouteSchema', () => {
 describe('EcgSchema', () => {
   it('accepts a valid ECG', () => {
     const result = EcgSchema.safeParse({
-      id: '00000000-0000-0000-0000-000000000001',
+      id: '00000000-0000-4000-8000-000000000001',
       recorded_at: '2026-01-01T09:00:00-05:00',
       classification: 'Sinus Rhythm',
       symptoms: 'None',
@@ -365,7 +365,7 @@ describe('EcgSchema', () => {
 
   it('accepts all-null nullable fields', () => {
     const result = EcgSchema.safeParse({
-      id: '00000000-0000-0000-0000-000000000001',
+      id: '00000000-0000-4000-8000-000000000001',
       recorded_at: null,
       classification: null,
       symptoms: null,

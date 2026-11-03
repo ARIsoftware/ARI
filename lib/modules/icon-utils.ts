@@ -48,7 +48,7 @@ const FALLBACK_ICON: LucideIcon = Package
  * keys from `dynamicIconImports`. PascalCase → kebab conversion alone would
  * miss them, so map them explicitly to the canonical kebab key.
  *
- * Verified against lucide-react@0.454.0's `dynamicIconImports.js`. When
+ * Verified against lucide-react@1.64.0's `dynamicIconImports.js`. When
  * upgrading lucide, re-run the diff (see notes in PR) to refresh this map.
  */
 const ICON_NAME_ALIASES: Record<string, string> = {

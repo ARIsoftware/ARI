@@ -9,7 +9,6 @@ function formatZodIssue(err: z.ZodIssue) {
   return {
     field: err.path.join('.'),
     message: err.message,
-    received: 'received' in err ? err.received : undefined,
   }
 }
 
@@ -26,7 +25,7 @@ export async function validateRequestBody<T>(
     return { success: true, data: validatedData }
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const errorMessages = error.errors.map(formatZodIssue)
+      const errorMessages = error.issues.map(formatZodIssue)
       
       return {
         success: false,
@@ -63,7 +62,7 @@ export function validatePathParams<T>(
     return { success: true, data: validatedData }
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const errorMessages = error.errors.map(formatZodIssue)
+      const errorMessages = error.issues.map(formatZodIssue)
       
       return {
         success: false,
@@ -100,7 +99,7 @@ export function validateQueryParams<T>(
     return { success: true, data: validatedData }
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const errorMessages = error.errors.map(formatZodIssue)
+      const errorMessages = error.issues.map(formatZodIssue)
       
       return {
         success: false,

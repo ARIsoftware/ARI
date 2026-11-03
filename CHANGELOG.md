@@ -6,12 +6,32 @@ Releases are tags named `X.Y.Z` on `main`. Earlier releases are described by the
 
 ## Unreleased
 
+### Security
+
+- Updated every dependency with a known vulnerability, including Next.js (remote code execution), Better Auth (sign-in as another user), Zod and pnpm. `pnpm audit` now reports no known vulnerabilities.
+
+### Custom modules
+
+Zod is now version 4, and these changes can break a custom module:
+
+- `error.errors` is gone. Use `error.issues`.
+- `required_error`, `invalid_type_error` and `errorMap` are gone. Use `error`, for example `z.enum(VALUES, { error: 'Invalid value' })`.
+- `z.record(valueSchema)` now needs a key schema: `z.record(z.string(), valueSchema)`.
+- `.default(x).optional()` now fills in `x` when the field is missing. Remove `.default(x)` if the field should stay empty.
+- `z.string().uuid()` now rejects values that aren't real UUIDs, such as `00000000-0000-0000-0000-000000000001`.
+
+lucide-react is now version 1, which removed brand icons such as `Github`.
+
 ### Fonts
 
 - ARI now serves its own fonts. Your browser no longer contacts Google to load them, and they work offline.
 - JetBrains Mono, IBM Plex Sans and Fira Code now load when you pick them. Before, they showed a fallback font unless you had them installed.
 - ARI's security policy now blocks Google Fonts links. If a custom module or theme adds one, remove it: the fonts in ARI's font list work by name without a link. Other fonts need to be bundled with the module or theme.
 - Google Sans, Google Sans Flex and Raleway are no longer loaded. Nothing in ARI used them. A custom module or theme that did will show a fallback font unless it bundles them.
+
+### Startup
+
+- `./ari start` is about six seconds faster when nothing has changed: the unit-test report behind the Health page is reused instead of running the whole suite on every boot. The suite still runs whenever a file changed since the last report, whenever that report had a failure, and with `ARI_FORCE_TEST_REPORT=1`.
 
 ## 2.0.12
 

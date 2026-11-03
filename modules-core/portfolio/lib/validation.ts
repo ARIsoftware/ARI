@@ -35,13 +35,13 @@ const uuidSchema = z.string().uuid('Invalid ticker id format')
 export const createTickerSchema = z
   .object({
     symbol: z
-      .string({ required_error: 'Symbol is required' })
+      .string({ error: 'Symbol is required' })
       .min(1, 'Symbol is required')
       .max(10, 'Symbol must be 10 characters or fewer')
       .transform(normalizeSymbol)
       .refine((s) => SYMBOL_REGEX.test(s), { message: SYMBOL_ERROR }),
     shares: z
-      .number({ invalid_type_error: 'Shares must be a number' })
+      .number({ error: 'Shares must be a number' })
       .nonnegative('Shares must be zero or greater')
       .finite('Shares must be a finite number')
       .max(MAX_SHARES, 'Shares value is too large')

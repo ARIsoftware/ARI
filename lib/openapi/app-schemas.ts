@@ -78,7 +78,7 @@ export const CurrentUserResponseSchema = z.object({
   last_name: z.string().nullable(),
   image: z.string().nullable(),
   role: z.enum(['admin', 'user']),
-  permissions: z.record(z.boolean()),
+  permissions: z.record(z.string(), z.boolean()),
 }).openapi('CurrentUser')
 
 // ────────────────────────────────────────────────────────────

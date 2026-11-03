@@ -8,7 +8,7 @@ export const DashboardSettingsSchema = z
   .object({
     layout: z
       .enum(DASHBOARD_LAYOUTS, {
-        errorMap: () => ({ message: "Layout must be 'default' or 'boxy'" }),
+        error: "Layout must be 'default' or 'boxy'",
       })
       .optional(),
     // Card keys hidden on the dashboard (see lib/cards.ts for the key format),

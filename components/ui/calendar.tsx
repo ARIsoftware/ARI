@@ -13,6 +13,11 @@ export type CalendarProps = React.ComponentProps<typeof DayPicker> & {
    * there's no unambiguous "today" to apply in multiple/range mode.
    */
   showTodayButton?: boolean
+  /**
+   * Alias of `autoFocus`. react-day-picker v10 removed this prop, but it is what
+   * shadcn's calendar snippet passes, so modules written against it keep working.
+   */
+  initialFocus?: boolean
 }
 
 /**
@@ -27,6 +32,7 @@ function Calendar({
   classNames,
   showOutsideDays = true,
   showTodayButton = true,
+  initialFocus,
   ...props
 }: CalendarProps) {
   // Month is left uncontrolled until the Today button needs to jump the view;
@@ -57,6 +63,7 @@ function Calendar({
   return (
     <div className={cn('w-fit', className)}>
       <DayPicker
+        autoFocus={initialFocus}
         showOutsideDays={showOutsideDays}
         month={month}
         onMonthChange={handleMonthChange}

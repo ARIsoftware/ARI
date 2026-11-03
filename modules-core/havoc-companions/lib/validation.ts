@@ -3,7 +3,7 @@ import '@/lib/openapi/registry'
 import { ALL_SPECIES } from './animals'
 
 const SpeciesSchema = z.enum(ALL_SPECIES, {
-  errorMap: () => ({ message: 'Unknown species' }),
+  error: 'Unknown species',
 })
 
 const AnimalSchema = z.object({

@@ -5,11 +5,11 @@ const uuidSchema = z.string().uuid('Invalid UUID format')
 const nonEmptyString = z.string().min(1, 'Cannot be empty')
 
 export const TaskStatus = z.enum(['Pending', 'In Progress', 'Completed'], {
-  errorMap: () => ({ message: 'Invalid task status' })
+  error: 'Invalid task status'
 })
 
 export const TaskPriority = z.enum(['Low', 'Medium', 'High'], {
-  errorMap: () => ({ message: 'Invalid task priority' })
+  error: 'Invalid task priority'
 })
 
 const MonsterColorsSchema = z.object({
@@ -34,11 +34,11 @@ export const createTaskSchema = z.object({
     // Per-record privacy: the creator owns the task, so they may create it masked
     is_private: z.boolean().default(false),
     completed: z.boolean().default(false),
-    impact: z.number().min(1).max(5).default(3).optional(),
-    severity: z.number().min(1).max(5).default(3).optional(),
-    timeliness: z.number().min(1).max(5).default(3).optional(),
-    effort: z.number().min(1).max(5).default(3).optional(),
-    strategic_fit: z.number().min(1).max(5).default(3).optional(),
+    impact: z.number().min(1).max(5).optional(),
+    severity: z.number().min(1).max(5).optional(),
+    timeliness: z.number().min(1).max(5).optional(),
+    effort: z.number().min(1).max(5).optional(),
+    strategic_fit: z.number().min(1).max(5).optional(),
     project_id: z.union([uuidSchema, z.null()]).optional(),
     assigned_agent_id: z.union([z.string().max(120, 'Invalid agent id'), z.null()]).optional(),
     monster_type: z.union([z.string().max(50, 'Monster type too long'), z.null()]).optional(),

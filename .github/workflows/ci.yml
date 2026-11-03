@@ -12,7 +12,7 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           # Full history and tags. tests/unit/ari-cli/upgrade-paths.lab.test.ts
           # takes every released updater out of the release tags and runs it
@@ -20,7 +20,7 @@ jobs:
           # suite fails in CI rather than silently testing nothing.
           fetch-depth: 0
       - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: pnpm

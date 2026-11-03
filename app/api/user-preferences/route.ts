@@ -134,7 +134,7 @@ async function handlePUT(request: NextRequest) {
     const validationResult = userPreferencesSchema.safeParse(body)
     if (!validationResult.success) {
       return NextResponse.json(
-        { error: 'Invalid input', details: validationResult.error.errors },
+        { error: 'Invalid input', details: validationResult.error.issues },
         { status: 400 },
       )
     }

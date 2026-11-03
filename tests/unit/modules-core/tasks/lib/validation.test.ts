@@ -75,6 +75,15 @@ describe('TaskPriority', () => {
 // createTaskSchema
 // ---------------------------------------------------------------------------
 describe('createTaskSchema', () => {
+  // The create route only computes a priority score when a factor was supplied.
+  // Zod 4 applies `.default()` under `.optional()`, which would make that always true.
+  it('leaves priority factors unset when they are not supplied', () => {
+    const { task } = createTaskSchema.parse({ task: { title: 'x' } })
+    for (const key of ['impact', 'severity', 'timeliness', 'effort', 'strategic_fit'] as const) {
+      expect(task[key]).toBeUndefined()
+    }
+  })
+
   const minValid = { task: { title: 'Hello' } }
 
   it('parses a minimal valid payload (title only)', () => {
@@ -240,7 +249,7 @@ describe('prioritiesQuerySchema', () => {
 // updatePrioritiesSchema
 // ---------------------------------------------------------------------------
 describe('updatePrioritiesSchema', () => {
-  const validUuid = '00000000-0000-0000-0000-000000000001'
+  const validUuid = '00000000-0000-4000-8000-000000000001'
   const validAxes = { impact: 3, severity: 3, timeliness: 3, effort: 3, strategic_fit: 3 }
 
   it('accepts valid taskId + axes', () => {
@@ -261,7 +270,7 @@ describe('updatePrioritiesSchema', () => {
 // batchPrioritiesSchema
 // ---------------------------------------------------------------------------
 describe('batchPrioritiesSchema', () => {
-  const uuid = '00000000-0000-0000-0000-000000000001'
+  const uuid = '00000000-0000-4000-8000-000000000001'
 
   it('accepts an array of UUIDs', () => {
     const result = batchPrioritiesSchema.parse({ taskIds: [uuid] })
@@ -310,7 +319,7 @@ describe('analyticsQuerySchema', () => {
 // incrementCompletionSchema
 // ---------------------------------------------------------------------------
 describe('incrementCompletionSchema', () => {
-  const uuid = '00000000-0000-0000-0000-000000000001'
+  const uuid = '00000000-0000-4000-8000-000000000001'
 
   it('defaults increment to 1', () => {
     const result = incrementCompletionSchema.parse({ taskId: uuid })
@@ -338,7 +347,7 @@ describe('incrementCompletionSchema', () => {
 // createSubtaskSchema
 // ---------------------------------------------------------------------------
 describe('createSubtaskSchema', () => {
-  const uuid = '00000000-0000-0000-0000-000000000001'
+  const uuid = '00000000-0000-4000-8000-000000000001'
 
   it('accepts valid subtask', () => {
     const result = createSubtaskSchema.parse({ subtask: { task_id: uuid, title: 'Do something' } })
@@ -362,7 +371,7 @@ describe('createSubtaskSchema', () => {
 // UpdateSubtaskRequestSchema
 // ---------------------------------------------------------------------------
 describe('UpdateSubtaskRequestSchema', () => {
-  const uuid = '00000000-0000-0000-0000-000000000001'
+  const uuid = '00000000-0000-4000-8000-000000000001'
 
   it('accepts partial updates', () => {
     const result = UpdateSubtaskRequestSchema.parse({ id: uuid, updates: { completed: true } })
@@ -383,7 +392,7 @@ describe('UpdateSubtaskRequestSchema', () => {
 // ListSubtasksQuerySchema
 // ---------------------------------------------------------------------------
 describe('ListSubtasksQuerySchema', () => {
-  const uuid = '00000000-0000-0000-0000-000000000001'
+  const uuid = '00000000-0000-4000-8000-000000000001'
 
   it('accepts task_id as UUID', () => {
     expect(ListSubtasksQuerySchema.parse({ task_id: uuid }).task_id).toBe(uuid)
@@ -403,7 +412,7 @@ describe('ListSubtasksQuerySchema', () => {
 // ---------------------------------------------------------------------------
 describe('DeleteTaskQuerySchema', () => {
   it('accepts valid UUID', () => {
-    const uuid = '00000000-0000-0000-0000-000000000001'
+    const uuid = '00000000-0000-4000-8000-000000000001'
     expect(DeleteTaskQuerySchema.parse({ id: uuid }).id).toBe(uuid)
   })
 
