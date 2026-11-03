@@ -85,11 +85,9 @@ Common needs already covered by a fresh ARI install (non-exhaustive — always c
 | Dialogs, dropdowns, tooltips, toasts, tabs, etc. | shadcn/ui components in `components/ui/` (Radix under the hood) |
 | Command palette / searchable menus | `cmdk` |
 | Drawers / bottom sheets | `vaul` |
-| Carousels | `embla-carousel-react` |
 | Validation | `zod` |
 | File upload UI | `react-dropzone` |
 | Calendars / date pickers | `react-day-picker` |
-| Resizable panels | `react-resizable-panels` |
 | Flow / node diagrams | `@xyflow/react` |
 | 3D | `three` + `@react-three/fiber` + `@react-three/drei` |
 | Confetti / celebration effects | `canvas-confetti` |
