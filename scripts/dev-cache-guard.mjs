@@ -36,7 +36,7 @@ import { execFileSync } from 'node:child_process'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const DEV_CACHE_DIR = path.join(ROOT, '.next', 'dev')
@@ -258,6 +258,20 @@ export default function devCacheGuard() {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+/**
+ * Run only as the entry script, never when a test imports the module. Node
+ * resolves symlinks in the entry it loads, so argv[1] is resolved the same way
+ * before comparing: a checkout reached through a symlinked directory must run.
+ */
+function isEntryScript() {
+  if (!process.argv[1]) return false
+  try {
+    return fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
+  } catch {
+    return false
+  }
+}
+
+if (isEntryScript()) {
   devCacheGuard()
 }
