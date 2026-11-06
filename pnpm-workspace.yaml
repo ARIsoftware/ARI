@@ -2,11 +2,11 @@
 # guard — pin pre/post scripts on regardless of any user-level .npmrc.
 enablePrePostScripts: true
 
-# Refuse versions published less than 5 days ago (value is minutes). A
+# Refuse versions published less than 4 days ago (value is minutes). A
 # compromised release is usually pulled within days; a legitimate security fix
 # still reaches us after the delay. pnpm checks lockfile entries too, so the
 # lockfile must be resolved under this policy (a stale one fails `pnpm install`).
-minimumReleaseAge: 7200
+minimumReleaseAge: 5760
 
 allowBuilds:
   core-js: true
