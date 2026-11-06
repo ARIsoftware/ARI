@@ -6,6 +6,10 @@ Releases are tags named `X.Y.Z` on `main`. Earlier releases are described by the
 
 ## Unreleased
 
+### Timeline
+
+- The timeline now runs to Dec 31, 2040 instead of ending at Dec 31, 2026. Month labels name the year, event dates outside the current year show it, zoomed all the way out the axis shows years, and the page opens centered on today.
+
 ### Security
 
 - Updated every dependency with a known vulnerability, including Next.js (remote code execution), Better Auth (sign-in as another user), Zod and pnpm. `pnpm audit` now reports no known vulnerabilities.

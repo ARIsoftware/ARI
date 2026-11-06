@@ -2,7 +2,7 @@
   "id": "timeline",
   "group": "Overview",
   "name": "Timeline",
-  "description": "A horizontal timeline of your events from Sep 1 to Dec 31, 2026, with a live today marker and faded past events.",
+  "description": "A horizontal timeline of your events from Sep 1, 2026 to Dec 31, 2040, with a live today marker and faded past events.",
   "version": "1.0.0",
   "author": "User",
   "icon": "CalendarRange",

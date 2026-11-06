@@ -23,8 +23,9 @@ import {
   TOTAL_DAYS,
   ALL_DAYS,
   MONTH_SEGMENTS,
+  YEAR_SEGMENTS,
   dayIndexOf,
-  formatShortDate,
+  formatEventDate,
   todayIso,
 } from '../lib/timeline-range'
 
@@ -57,12 +58,20 @@ const LABEL_GAP = 12
 
 // Zoom = horizontal room per day tick, in px. The chart scrolls horizontally
 // when TOTAL_DAYS * spacing exceeds the viewport; 'fit' squeezes the whole
-// range into the visible width.
+// range into the visible width. The range spans years, so the first visit
+// opens at INITIAL_SPACING centered on today rather than 'fit'; the zoom
+// percentage shown to the user is relative to DEFAULT_SPACING.
 const ZOOM_LEVELS = [8, 12, 16, 24, 32, 48, 64]
 const DEFAULT_SPACING = 32
+const INITIAL_SPACING = 16
 const ZOOM_STORAGE_KEY = 'ari-timeline-zoom'
 type ZoomSpacing = number | 'fit'
 const FALLBACK_WIDTH = TOTAL_DAYS * DEFAULT_SPACING
+
+// Below this many px per day the day ticks, day numbers and month labels have
+// no room (the whole range 'fit' into a viewport is well under 1px/day), so
+// the axis switches to an overview: month-start ticks and year labels.
+const DAY_DETAIL_MIN_SPACING = 6
 
 // SSR-safe read of the persisted zoom level (server snapshot = null so the
 // server and hydration renders agree, then the client value applies).
@@ -107,7 +116,10 @@ function TimelineChartInner({ events, isLoading, isError, onRetry, onEventClick 
   } else if (storedZoom !== null && ZOOM_LEVELS.includes(Number(storedZoom))) {
     persistedZoom = Number(storedZoom)
   }
-  const spacing = zoomOverride ?? persistedZoom ?? 'fit'
+  const spacing = zoomOverride ?? persistedZoom ?? INITIAL_SPACING
+  // Until the user zooms, every scrollable layout centers today (covers the
+  // first render and the hydration re-render that applies the stored zoom).
+  const centerOnToday = useRef(true)
 
   // Track the rendered width so label-collision math works in real pixels.
   useEffect(() => {
@@ -120,19 +132,33 @@ function TimelineChartInner({ events, isLoading, isError, onRetry, onEventClick 
     return () => observer.disconnect()
   }, [])
 
+  const today = todayIso()
+  const todayInRange = today >= TIMELINE_START && today <= TIMELINE_END
+  const todayIndex = todayInRange ? dayIndexOf(today) : null
+  // If today is past the whole range, everything is in the past.
+  const pastCutoff = todayIndex ?? (today > TIMELINE_END ? TOTAL_DAYS : 0)
+
   // After a zoom change, keep whatever was in the middle of the viewport there.
+  // Before the user has zoomed, bring today (or the start of the range) into
+  // the middle instead.
   useLayoutEffect(() => {
     const el = scrollRef.current
-    if (!el || zoomAnchor.current === null) return
-    el.scrollLeft = zoomAnchor.current * el.scrollWidth - el.clientWidth / 2
-    zoomAnchor.current = null
-  }, [spacing])
+    if (!el) return
+    if (zoomAnchor.current !== null) {
+      el.scrollLeft = zoomAnchor.current * el.scrollWidth - el.clientWidth / 2
+      zoomAnchor.current = null
+      return
+    }
+    if (spacing === 'fit' || !centerOnToday.current) return
+    el.scrollLeft = (leftPctNum(todayIndex ?? 0) / 100) * el.scrollWidth - el.clientWidth / 2
+  }, [spacing, todayIndex])
 
   const changeZoom = (next: ZoomSpacing) => {
     const el = scrollRef.current
     if (el && el.scrollWidth > 0) {
       zoomAnchor.current = (el.scrollLeft + el.clientWidth / 2) / el.scrollWidth
     }
+    centerOnToday.current = false
     setZoomOverride(next)
     window.localStorage.setItem(ZOOM_STORAGE_KEY, String(next))
   }
@@ -143,12 +169,7 @@ function TimelineChartInner({ events, isLoading, isError, onRetry, onEventClick 
     spacing === 'fit' ? (chartWidth > 0 ? chartWidth / TOTAL_DAYS : 8) : spacing
   const zoomInLevel = ZOOM_LEVELS.find((l) => l > effectiveSpacing + 0.5)
   const zoomOutLevel = [...ZOOM_LEVELS].reverse().find((l) => l < effectiveSpacing - 0.5)
-
-  const today = todayIso()
-  const todayInRange = today >= TIMELINE_START && today <= TIMELINE_END
-  const todayIndex = todayInRange ? dayIndexOf(today) : null
-  // If today is past the whole range, everything is in the past.
-  const pastCutoff = todayIndex ?? (today > TIMELINE_END ? TOTAL_DAYS : 0)
+  const showDayDetail = effectiveSpacing >= DAY_DETAIL_MIN_SPACING
 
   const width = chartWidth || FALLBACK_WIDTH
 
@@ -234,51 +255,81 @@ function TimelineChartInner({ events, isLoading, isError, onRetry, onEventClick 
         style={spacing === 'fit' ? undefined : { minWidth: TOTAL_DAYS * spacing }}
       >
         <div ref={chartRef} className="relative h-full">
-        {/* Day ticks (decorative) */}
-        <div aria-hidden="true">
-          {ALL_DAYS.map((info, i) => (
-            <div
-              key={info.iso}
-              className={cn(
-                'absolute w-[4px] -translate-x-1/2 rounded-full',
-                TICK_SHADES[i % TICK_SHADES.length],
-                i < pastCutoff && 'opacity-30'
-              )}
-              style={{ left: leftPct(i), bottom: BASELINE, height: 36 }}
-            />
-          ))}
-        </div>
+        {showDayDetail ? (
+          <>
+            {/* Day ticks (decorative) */}
+            <div aria-hidden="true">
+              {ALL_DAYS.map((info, i) => (
+                <div
+                  key={info.iso}
+                  className={cn(
+                    'absolute w-[4px] -translate-x-1/2 rounded-full',
+                    TICK_SHADES[i % TICK_SHADES.length],
+                    i < pastCutoff && 'opacity-30'
+                  )}
+                  style={{ left: leftPct(i), bottom: BASELINE, height: 36 }}
+                />
+              ))}
+            </div>
 
-        {/* Day numbers + month labels (axis chrome, decorative) */}
-        <div aria-hidden="true">
-          {ALL_DAYS.map((info, i) => {
-            const isToday = i === todayIndex
-            if (!NUMBERED_DAYS.has(info.day) && !isToday && !eventDayIndexes.has(i)) return null
-            return (
-              <span
-                key={`n-${info.iso}`}
-                className={cn(
-                  'absolute -translate-x-1/2 text-sm tabular-nums',
-                  isToday
-                    ? 'font-semibold text-blue-600 dark:text-blue-400'
-                    : 'text-muted-foreground/70'
-                )}
-                style={{ left: leftPct(i), bottom: BASELINE - 40 }}
-              >
-                {info.day}
-              </span>
-            )
-          })}
-          {MONTH_SEGMENTS.map((seg) => (
-            <span
-              key={seg.label}
-              className="absolute -translate-x-1/2 text-sm font-medium tracking-[0.25em] text-muted-foreground/60"
-              style={{ left: leftPct((seg.startIndex + seg.endIndex) / 2), bottom: 12 }}
-            >
-              {seg.label}
-            </span>
-          ))}
-        </div>
+            {/* Day numbers + month labels (axis chrome, decorative) */}
+            <div aria-hidden="true">
+              {ALL_DAYS.map((info, i) => {
+                const isToday = i === todayIndex
+                if (!NUMBERED_DAYS.has(info.day) && !isToday && !eventDayIndexes.has(i)) return null
+                return (
+                  <span
+                    key={`n-${info.iso}`}
+                    className={cn(
+                      'absolute -translate-x-1/2 text-sm tabular-nums',
+                      isToday
+                        ? 'font-semibold text-blue-600 dark:text-blue-400'
+                        : 'text-muted-foreground/70'
+                    )}
+                    style={{ left: leftPct(i), bottom: BASELINE - 40 }}
+                  >
+                    {info.day}
+                  </span>
+                )
+              })}
+              {MONTH_SEGMENTS.map((seg) => (
+                <span
+                  key={seg.startIndex}
+                  className="absolute -translate-x-1/2 whitespace-nowrap text-sm font-medium tracking-[0.25em] text-muted-foreground/60"
+                  style={{ left: leftPct((seg.startIndex + seg.endIndex) / 2), bottom: 12 }}
+                >
+                  {seg.label}
+                </span>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Overview axis: a tick at each month start (taller at each year) */}
+            <div aria-hidden="true">
+              {MONTH_SEGMENTS.map((seg) => (
+                <div
+                  key={seg.startIndex}
+                  className={cn(
+                    'absolute w-[4px] -translate-x-1/2 rounded-full',
+                    seg.month === 1 ? 'bg-blue-500/80' : 'bg-blue-500/35',
+                    seg.startIndex < pastCutoff && 'opacity-30'
+                  )}
+                  style={{ left: leftPct(seg.startIndex), bottom: BASELINE, height: seg.month === 1 ? 36 : 20 }}
+                />
+              ))}
+              {YEAR_SEGMENTS.map((seg) => (
+                <span
+                  key={seg.year}
+                  className="absolute -translate-x-1/2 text-sm font-medium tabular-nums tracking-[0.25em] text-muted-foreground/60"
+                  style={{ left: leftPct((seg.startIndex + seg.endIndex) / 2), bottom: 12 }}
+                >
+                  {seg.year}
+                </span>
+              ))}
+            </div>
+          </>
+        )}
 
         {/* Today marker: full-height line + dot on the baseline */}
         {todayIndex !== null && (
@@ -326,7 +377,7 @@ function TimelineChartInner({ events, isLoading, isError, onRetry, onEventClick 
                 onClick={() => onEventClick(event)}
                 disabled={isTemp}
                 title={event.name}
-                aria-label={`Edit event: ${event.name}, ${formatShortDate(event.event_date)}`}
+                aria-label={`Edit event: ${event.name}, ${formatEventDate(event.event_date, today)}`}
                 className="absolute -translate-x-1/2 rounded-md px-2 py-1 text-center outline-none transition-colors hover:bg-accent/60 focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none"
                 style={{
                   left: `clamp(5rem, ${leftPctNum(index)}%, calc(100% - 5rem))`,
@@ -347,7 +398,7 @@ function TimelineChartInner({ events, isLoading, isError, onRetry, onEventClick 
                     isPast ? 'text-muted-foreground/40' : 'text-muted-foreground'
                   )}
                 >
-                  {formatShortDate(event.event_date)}
+                  {formatEventDate(event.event_date, today)}
                 </span>
               </button>
             </div>

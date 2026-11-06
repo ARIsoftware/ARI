@@ -55,12 +55,13 @@ describe('createEventSchema', () => {
 
   it('rejects dates outside the fixed range', () => {
     expect(createEventSchema.safeParse({ name: 'A', event_date: '2026-08-31' }).success).toBe(false)
-    expect(createEventSchema.safeParse({ name: 'A', event_date: '2027-01-01' }).success).toBe(false)
+    expect(createEventSchema.safeParse({ name: 'A', event_date: '2041-01-01' }).success).toBe(false)
   })
 
-  it('accepts the range boundaries', () => {
+  it('accepts the range boundaries and the years in between', () => {
     expect(createEventSchema.safeParse({ name: 'A', event_date: '2026-09-01' }).success).toBe(true)
-    expect(createEventSchema.safeParse({ name: 'A', event_date: '2026-12-31' }).success).toBe(true)
+    expect(createEventSchema.safeParse({ name: 'A', event_date: '2027-12-30' }).success).toBe(true)
+    expect(createEventSchema.safeParse({ name: 'A', event_date: '2040-12-31' }).success).toBe(true)
   })
 
   it('rejects invalid color formats', () => {

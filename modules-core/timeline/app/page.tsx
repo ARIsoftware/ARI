@@ -4,7 +4,7 @@
  * Timeline Module - Main Page
  *
  * Horizontal timeline of the user's events across a fixed range
- * (Sep 1 – Dec 31, 2026). Rendered via the catch-all module route,
+ * (Sep 1, 2026 – Dec 31, 2040). Rendered via the catch-all module route,
  * so it MUST use a default export.
  *
  * Route: /timeline

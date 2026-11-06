@@ -1,6 +1,6 @@
 # Timeline
 
-A horizontal timeline of your events across a fixed range: **Sep 1 – Dec 31, 2026**.
+A horizontal timeline of your events across a fixed range: **Sep 1, 2026 – Dec 31, 2040**.
 
 - Every day gets a small vertical tick in a cycling shade of blue.
 - Days with an event get a tall line with a dot and the event's name and date above it.
