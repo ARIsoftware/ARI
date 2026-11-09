@@ -95,7 +95,9 @@ const IDENT_RE = /[A-Za-z_$][\w$]*/y
 function familyFor(lang?: string): Family | null {
   if (!lang) return C_LIKE
   const key = lang.toLowerCase()
-  return key in FAMILIES ? FAMILIES[key] : C_LIKE
+  // Own keys only: the language is model-controlled, and an inherited name
+  // such as "constructor" would resolve to an Object.prototype function.
+  return Object.hasOwn(FAMILIES, key) ? FAMILIES[key] : C_LIKE
 }
 
 export function highlight(code: string, lang?: string): Token[] {

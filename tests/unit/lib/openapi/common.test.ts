@@ -43,12 +43,13 @@ describe('ErrorResponseSchema', () => {
     expect(result.success).toBe(true)
   })
 
-  it('accepts details with optional received field', () => {
+  it('does not advertise a received field, which no response carries', () => {
     const result = ErrorResponseSchema.safeParse({
       error: 'Validation failed',
       details: [{ field: 'age', message: 'must be number', received: 'hello' }],
     })
     expect(result.success).toBe(true)
+    expect(result.data?.details?.[0]).toEqual({ field: 'age', message: 'must be number' })
   })
 
   it('rejects when error field is missing', () => {

@@ -3,8 +3,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { hasPermission, type PermissionActor, type PermissionKey } from '@/lib/permissions'
 
-// `received` only exists on a subset of ZodIssue union members
-// (e.g. ZodInvalidTypeIssue) — narrow before access.
 function formatZodIssue(err: z.ZodIssue) {
   return {
     field: err.path.join('.'),

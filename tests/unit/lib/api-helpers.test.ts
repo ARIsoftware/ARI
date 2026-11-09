@@ -77,15 +77,13 @@ describe('validateRequestBody — zod validation failure', () => {
     }
   })
 
-  it('includes "received" when ZodIssue has it', async () => {
-    // z.string() with a number gives ZodInvalidTypeIssue which has `received`
+  it('reports only field and message for a type mismatch', async () => {
     const req = makeRequest({ name: 99 })
     const result = await validateRequestBody(req, nameSchema)
     expect(result.success).toBe(false)
     if (!result.success) {
       const json = await result.response.json()
-      // Some issues have received, some don't — just verify structure is there
-      expect(json.details[0]).toHaveProperty('field', 'name')
+      expect(json.details[0]).toEqual({ field: 'name', message: expect.any(String) })
     }
   })
 })

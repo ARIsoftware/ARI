@@ -21,7 +21,8 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
+import { isEntryScript } from './lib/entry-script.js'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const OUTPUT_DIR = path.join(ROOT, 'app', 'fonts')
@@ -177,7 +178,8 @@ async function main() {
   )
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Run only as the entry script, never when a test imports the module.
+if (isEntryScript(import.meta.url)) {
   main().catch((error) => {
     console.error(`❌ ${error.message}`)
     process.exit(1)

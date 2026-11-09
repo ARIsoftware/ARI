@@ -264,24 +264,23 @@ export const AssistantMessage = memo(function AssistantMessage({
       <div className="min-w-0 flex-1 space-y-1">
         <Markdown content={message.content} />
         <MessageAttachments items={message.attachments} align="start" />
-        {message.content && (
-          <div
-            className={cn(
-              'flex items-center gap-0.5 transition-opacity focus-within:opacity-100 group-hover:opacity-100',
-              canRegenerate ? 'opacity-100' : 'opacity-0',
-            )}
-          >
-            <CopyAction text={message.content} />
-            {canRegenerate && (
-              <ActionButton label="Regenerate" onClick={onRegenerate}>
-                <RefreshCw />
-              </ActionButton>
-            )}
-            <span className="ml-1 text-[11px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
-              {timeOf(message.created_at)}
-            </span>
-          </div>
-        )}
+        {/* An image-only reply has no text to copy but can still be regenerated. */}
+        <div
+          className={cn(
+            'flex items-center gap-0.5 transition-opacity focus-within:opacity-100 group-hover:opacity-100',
+            canRegenerate ? 'opacity-100' : 'opacity-0',
+          )}
+        >
+          {message.content && <CopyAction text={message.content} />}
+          {canRegenerate && (
+            <ActionButton label="Regenerate" onClick={onRegenerate}>
+              <RefreshCw />
+            </ActionButton>
+          )}
+          <span className="ml-1 text-[11px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+            {timeOf(message.created_at)}
+          </span>
+        </div>
       </div>
     </div>
   )

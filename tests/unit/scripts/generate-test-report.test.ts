@@ -9,6 +9,7 @@ import {
   FINGERPRINT_VERSION,
   canReuseReport,
   fingerprintFromParts,
+  localDay,
   parseStatusPaths,
 } from '@/scripts/generate-test-report.mjs'
 
@@ -40,6 +41,7 @@ describe('fingerprintFromParts', () => {
     head: 'a'.repeat(40),
     nodeVersion: 'v26.0.0',
     platform: 'darwin-arm64',
+    day: '2026-11-08',
     entries: [
       { path: 'lib/a.ts', size: 10, mtimeMs: 1000 },
       { path: 'tests/b.test.ts', size: 20, mtimeMs: 2000 },
@@ -89,8 +91,25 @@ describe('fingerprintFromParts', () => {
     )
   })
 
+  it('changes with the calendar day, since some tests read the real clock', () => {
+    expect(fingerprintFromParts({ ...base, day: '2026-11-09' })).not.toBe(
+      fingerprintFromParts(base),
+    )
+  })
+
   it('is versioned so a layout change retires old reports', () => {
-    expect(FINGERPRINT_VERSION).toBeGreaterThanOrEqual(1)
+    expect(FINGERPRINT_VERSION).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('localDay', () => {
+  it('is the local calendar date, zero-padded', () => {
+    expect(localDay(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05')
+    expect(localDay(new Date(2026, 11, 31, 0, 0))).toBe('2026-12-31')
+  })
+
+  it('defaults to today', () => {
+    expect(localDay()).toBe(localDay(new Date()))
   })
 })
 

@@ -34,6 +34,7 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { isEntryScript } from './lib/entry-script.js'
 
 const selfPath = fileURLToPath(import.meta.url)
 const REPO_ROOT = path.resolve(path.dirname(selfPath), '..')
@@ -41,7 +42,13 @@ const OUTPUT_PATH = path.join(REPO_ROOT, 'lib', 'generated', 'test-report.json')
 const VITEST_ENTRY = path.join(REPO_ROOT, 'node_modules', 'vitest', 'vitest.mjs')
 
 /** Bump when the fingerprint's inputs or layout change, so old reports are not reused. */
-export const FINGERPRINT_VERSION = 1
+export const FINGERPRINT_VERSION = 2
+
+/** The local calendar day of `date`, as YYYY-MM-DD. */
+export function localDay(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
 
 /**
  * Paths out of `git status --porcelain=v1 -z --no-renames --untracked-files=all`.
@@ -59,10 +66,12 @@ export function parseStatusPaths(output) {
 /**
  * The fingerprint for one set of inputs. Entries are sorted by path here, so
  * the order git listed them in never matters. A deleted file has size -1.
+ * The calendar day is an input too: some tests read the real clock, so a
+ * report is good for the day it was written and no longer.
  */
-export function fingerprintFromParts({ head, entries, nodeVersion, platform }) {
+export function fingerprintFromParts({ head, entries, nodeVersion, platform, day }) {
   const hash = crypto.createHash('sha256')
-  hash.update(`${FINGERPRINT_VERSION}\n${nodeVersion}\n${platform}\n${head}\n`)
+  hash.update(`${FINGERPRINT_VERSION}\n${nodeVersion}\n${platform}\n${day}\n${head}\n`)
   for (const entry of [...entries].sort((a, b) =>
     a.path < b.path ? -1 : a.path > b.path ? 1 : 0,
   )) {
@@ -112,6 +121,7 @@ export function computeInputsFingerprint(root, options = {}) {
     entries,
     nodeVersion: options.nodeVersion ?? process.version,
     platform: options.platform ?? `${process.platform}-${process.arch}`,
+    day: options.day ?? localDay(),
   })
 }
 
@@ -246,21 +256,8 @@ export default function generateTestReport() {
   }
 }
 
-/**
- * Run only as the entry script, never when a test imports the module. Node
- * resolves symlinks in the entry it loads, so argv[1] is resolved the same way
- * before comparing: a checkout reached through a symlinked directory must run.
- */
-function isEntryScript() {
-  if (!process.argv[1]) return false
-  try {
-    return fs.realpathSync(process.argv[1]) === selfPath
-  } catch {
-    return false
-  }
-}
-
-if (isEntryScript()) {
+// Run only as the entry script, never when a test imports the module.
+if (isEntryScript(import.meta.url)) {
   generateTestReport()
   // Never fail the caller (predev/prebuild) on test failures or report issues.
   process.exit(0)

@@ -10,7 +10,6 @@ export const ErrorResponseSchema = z
         z.object({
           field: z.string(),
           message: z.string(),
-          received: z.unknown().optional(),
         })
       )
       .optional(),

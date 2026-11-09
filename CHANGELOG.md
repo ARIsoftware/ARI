@@ -54,7 +54,7 @@ lucide-react is now version 1, which removed brand icons such as `Github`.
 
 ### Startup
 
-- `./ari start` is about six seconds faster when nothing has changed: the unit-test report behind the Health page is reused instead of running the whole suite on every boot. The suite still runs whenever a file changed since the last report, whenever that report had a failure, and with `ARI_FORCE_TEST_REPORT=1`.
+- `./ari start` is about six seconds faster when nothing has changed: the unit-test report behind the Health page is reused instead of running the whole suite on every boot. The suite still runs whenever a file changed since the last report, whenever that report had a failure, on the first start of each day, and with `ARI_FORCE_TEST_REPORT=1`.
 
 ## 2.0.12
 

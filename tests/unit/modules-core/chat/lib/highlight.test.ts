@@ -116,4 +116,12 @@ describe('highlight', () => {
       { kind: 'plain', text: 'e' },
     ])
   })
+
+  it('treats a fence language named after an Object.prototype member as generic', () => {
+    for (const lang of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
+      const tokens = highlight('const x = 1', lang)
+      expect(joined(tokens)).toBe('const x = 1')
+      expect(kinds(tokens)).toContainEqual(['keyword', 'const'])
+    }
+  })
 })

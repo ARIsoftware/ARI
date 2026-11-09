@@ -161,7 +161,9 @@ export function ChatThread({
   const isStreaming = turn?.phase === 'streaming'
 
   // A stopped reply is saved by the server after the connection drops; keep
-  // showing the local copy and poll until the saved one arrives (or give up).
+  // showing the local copy and poll until the saved one arrives. When a slow
+  // save outlasts the polling, the copy stays: `liveTurn` hides it by itself
+  // the moment any later refetch brings the saved reply in.
   const stoppedTurn = turn?.phase === 'stopped' ? turn : null
   useEffect(() => {
     if (!stoppedTurn?.conversationId) return
@@ -169,17 +171,18 @@ export function ChatThread({
     let tries = 0
     const timer = setInterval(async () => {
       tries++
-      if (tries <= STOP_POLL_TRIES) {
-        try {
-          await queryClient.refetchQueries({ queryKey: conversationDetailKey(cid) })
-        } catch {
-          // Try again on the next tick.
-        }
-        const detail = queryClient.getQueryData<ConversationDetail>(conversationDetailKey(cid))
-        if (!detail || !replyLanded(stoppedTurn, detail.messages)) return
+      try {
+        await queryClient.refetchQueries({ queryKey: conversationDetailKey(cid) })
+      } catch {
+        // Try again on the next tick.
       }
+      const detail = queryClient.getQueryData<ConversationDetail>(conversationDetailKey(cid))
+      const landed = !!detail && replyLanded(stoppedTurn, detail.messages)
+      if (!landed && tries < STOP_POLL_TRIES) return
       clearInterval(timer)
-      setTurn((t) => (t === stoppedTurn ? null : t))
+      // Without the saved user turn's id the copy could never hide itself, so
+      // it is dropped rather than risk showing the reply twice.
+      if (landed || !stoppedTurn.userTurnId) setTurn((t) => (t === stoppedTurn ? null : t))
     }, STOP_POLL_MS)
     return () => clearInterval(timer)
   }, [stoppedTurn, queryClient])
