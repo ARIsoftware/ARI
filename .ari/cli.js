@@ -16,6 +16,7 @@ import { createRequire } from 'module';
 import { reconcileCustomModuleDeps } from '../scripts/reconcile-module-deps.js';
 import { parseYesNo } from '../scripts/lib/update-target.js';
 import { checkForRelease, readInstalledVersion, runUpdate, UPDATE_DOCS_URL } from '../scripts/lib/updater.js';
+import { stopChild } from '../scripts/lib/stop-child.js';
 
 const cjsRequire = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -804,25 +805,53 @@ function start(opts = {}) {
     }
   };
 
+  // How long the dev server gets to leave after being asked, before it is
+  // killed outright. Next.js normally takes well under two seconds.
+  const DEV_SERVER_STOP_GRACE_MS = 8000;
+
   const cleanup = () => {
+    if (shuttingDown) return;
     shuttingDown = true;
     stopSpinner();
     killTunnel();
-    if (child) child.kill();
-    if (mode === 'postgres') stopPgweb(log);
-    if (!quiet) {
-      if (mode === 'supabaselocal') {
-        console.log('\n  ' + DIM + 'Next.js stopped. Supabase containers are still running.' + RESET);
-        console.log('  ' + DIM + 'Run ./ari stop to shut them down.' + RESET + '\n');
-      } else {
-        console.log('\n  ' + DIM + 'Next.js stopped.' + RESET + '\n');
+    const finish = () => {
+      if (mode === 'postgres') stopPgweb(log);
+      if (!quiet) {
+        if (mode === 'supabaselocal') {
+          console.log('\n  ' + DIM + 'Next.js stopped. Supabase containers are still running.' + RESET);
+          console.log('  ' + DIM + 'Run ./ari stop to shut them down.' + RESET + '\n');
+        } else {
+          console.log('\n  ' + DIM + 'Next.js stopped.' + RESET + '\n');
+        }
       }
+      process.exit(0);
+    };
+    if (!child) {
+      finish();
+      return;
     }
-    process.exit(0);
+    // Ask the dev server to stop, then stay alive — still reading its output —
+    // until it is really gone. In a terminal, Ctrl+C reaches every process at
+    // once and this only orders the farewell message after the server's own
+    // output. Under a supervisor without a terminal (the ARI menu bar app, a
+    // service manager) only this process receives the stop signal, and its
+    // exit closes the pipe the dev server writes to: exiting the moment the
+    // signal was forwarded left the server shutting down into a closed pipe,
+    // and every log line it still wrote was an EPIPE crash in the log.
+    stopChild(child, DEV_SERVER_STOP_GRACE_MS).then(finish);
   };
 
   process.on('SIGINT', cleanup);
   process.on('SIGTERM', cleanup);
+  // When whatever reads this process's output goes away first (the menu bar
+  // app quitting), the next write fails with EPIPE. That is a stop request,
+  // not a reason to crash and leave the dev server running.
+  for (const stream of [process.stdout, process.stderr]) {
+    stream.on('error', (err) => {
+      if (err && err.code === 'EPIPE') cleanup();
+      else throw err;
+    });
+  }
   // Last resort for every other exit path (hard stops, dev-server crash):
   // never leave a cloudflared process holding a public URL open.
   process.on('exit', killTunnel);
@@ -957,6 +986,8 @@ function start(opts = {}) {
     });
 
     child.on('exit', (code) => {
+      // While stopping, cleanup() waits for the pipes too and exits itself.
+      if (shuttingDown) return;
       killTunnel();
       if (code && code !== 0 && stderrBuffer.trim()) {
         process.stderr.write('\n  ' + RED + '✘' + RESET + ' Dev server failed. stderr:\n');
