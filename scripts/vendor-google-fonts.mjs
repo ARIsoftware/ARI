@@ -32,6 +32,7 @@ const FILES_DIR = path.join(OUTPUT_DIR, 'files')
 // lib/theme/fonts.ts must be listed here (tests/unit/lib/theme/vendored-fonts.test.ts).
 export const FAMILIES = [
   { name: 'Crimson Pro', axes: 'ital,wght@0,200..900;1,200..900' },
+  { name: 'DM Sans', axes: 'ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000' },
   { name: 'Fira Code', axes: 'wght@300..700' },
   { name: 'Geist', axes: 'wght@100..900' },
   { name: 'Geist Mono', axes: 'wght@100..900' },

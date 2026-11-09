@@ -2,12 +2,10 @@
 
 import { useState } from 'react'
 import { AuthForm } from '@/components/auth/auth-form'
-import { DM_Sans } from "next/font/google"
 
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-})
+// The wordmark's font, self-hosted in app/fonts/ (scripts/vendor-google-fonts.mjs):
+// nothing is fetched from Google at build or run time.
+const dmSans = { fontFamily: "'DM Sans', sans-serif" }
 
 export default function SignInPage() {
   // The admin-configured login logo is served publicly from the DB. If none is
@@ -19,7 +17,7 @@ export default function SignInPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Top Bar */}
       <div className="topbar h-[35px] bg-black w-full relative z-50 flex items-center justify-center">
-        <span className={`text-white font-medium ${dmSans.className}`}>ARI</span>
+        <span className="text-white font-medium" style={dmSans}>ARI</span>
       </div>
 
       {/* Login Form */}

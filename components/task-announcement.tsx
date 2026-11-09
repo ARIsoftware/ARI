@@ -20,7 +20,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { DM_Sans } from "next/font/google"
 import { useAuth } from "@/components/providers"
 import { authClient } from "@/lib/auth-client"
 import { useCommandPalette } from "@/components/command-palette"
@@ -50,10 +49,9 @@ import {
 
 const globalTimerState = getGlobalTimerState()
 
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-})
+// The top bar wordmark's font, self-hosted in app/fonts/ (scripts/vendor-google-fonts.mjs):
+// nothing is fetched from Google at build or run time.
+const dmSans = { fontFamily: "'DM Sans', sans-serif" }
 
 const customMessage = process.env.NEXT_PUBLIC_TOP_BAR_MESSAGE
 const customColor = process.env.NEXT_PUBLIC_TOP_BAR_COLOR || '#000000'
@@ -476,7 +474,7 @@ export function TaskAnnouncement() {
       style={bgStyle}
     >
       <div className="flex-1" />
-      <span className={`text-topbar-foreground font-medium ${dmSans.className}`}>
+      <span className="text-topbar-foreground font-medium" style={dmSans}>
         {customMessage ?? "ARI"}
       </span>
       <div className="flex-1 flex justify-end">

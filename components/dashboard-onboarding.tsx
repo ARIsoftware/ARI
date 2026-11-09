@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { Space_Grotesk } from 'next/font/google'
 import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -20,10 +19,10 @@ import 'driver.js/dist/driver.css'
 // written through to user_preferences so other browsers stay quiet too.
 const LEGACY_DISMISS_KEY = 'ari:dashboard:welcomeDismissed'
 
-// preload: false — this font paints only the "ARI" wordmark inside a dialog
-// most users see once, so it isn't worth a render-blocking preload on every
-// authenticated page; it loads on demand when the dialog first renders.
-const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], weight: '500', preload: false })
+// The "ARI" wordmark's font, self-hosted in app/fonts/ (scripts/vendor-google-fonts.mjs):
+// nothing is fetched from Google at build or run time. The browser downloads the face
+// only when the dialog first renders it.
+const spaceGrotesk = { fontFamily: "'Space Grotesk', sans-serif" }
 
 /**
  * Welcome popup + guided tour for the dashboard. Mounted once in the (app)
@@ -271,7 +270,8 @@ export function DashboardOnboarding() {
             pair as the Start button); the body inherits DialogContent's. */}
         <div className="ari-welcome-brand -mx-6 -mt-6 mb-2 flex items-center justify-center rounded-t-lg bg-primary py-16">
           <span
-            className={`${spaceGrotesk.className} select-none text-[155px] font-medium leading-none text-primary-foreground`}
+            className="select-none text-[155px] font-medium leading-none text-primary-foreground"
+            style={spaceGrotesk}
             aria-hidden="true"
           >
             ARI

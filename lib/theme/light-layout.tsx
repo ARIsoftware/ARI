@@ -1,13 +1,9 @@
-import { Montserrat } from "next/font/google"
 import { getThemeById } from "./presets"
 import { CSS_VAR_MAP, type ThemeColors } from "./types"
 
-export const montserrat = Montserrat({
-  subsets: ["latin"],
-  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
-  style: ["normal", "italic"],
-  display: "swap",
-})
+// Pre-signin pages render in Montserrat, self-hosted in app/fonts/
+// (scripts/vendor-google-fonts.mjs): nothing is fetched from Google at build or run time.
+const MONTSERRAT = "'Montserrat', sans-serif"
 
 // Pre-signin layouts apply theme via inline `style=` because they render
 // before ThemeProvider mounts. Build the CSS-var object from the canonical
@@ -27,7 +23,7 @@ export const lightThemeStyles = presetToStyles("light")
 
 export function LightLayoutShell({ children }: { children: React.ReactNode }) {
   return (
-    <div style={lightThemeStyles} className={`light ${montserrat.className}`}>
+    <div style={{ ...lightThemeStyles, fontFamily: MONTSERRAT }} className="light">
       {children}
     </div>
   )

@@ -56,4 +56,26 @@ describe('vendored fonts', () => {
     const source = fs.readFileSync(path.join(ROOT, file), 'utf8')
     expect(source).not.toMatch(/fonts\.(googleapis|gstatic)\.com/)
   })
+
+  // next/font/google downloads the font on the server while a page compiles, so
+  // a build or dev server that cannot reach Google renders a fallback font
+  // instead. Every font comes from app/fonts/ (by family name) instead.
+  it('no source file loads a font through next/font/google', () => {
+    const offenders: string[] = []
+    const visit = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (entry.name === 'node_modules' || entry.name === 'generated') continue
+        const full = path.join(dir, entry.name)
+        if (entry.isDirectory()) visit(full)
+        else if (
+          /\.tsx?$/.test(entry.name) &&
+          fs.readFileSync(full, 'utf8').includes('next/font/google')
+        ) {
+          offenders.push(path.relative(ROOT, full))
+        }
+      }
+    }
+    for (const dir of ['app', 'components', 'lib', 'modules-core']) visit(path.join(ROOT, dir))
+    expect(offenders).toEqual([])
+  })
 })

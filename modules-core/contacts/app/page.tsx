@@ -2,7 +2,6 @@
 
 import type React from "react"
 import { useAuth } from "@/components/providers"
-import { DM_Sans } from "next/font/google"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -26,11 +25,6 @@ import {
 } from "@/modules/contacts/lib/contacts"
 import { useContacts } from "../hooks/use-contacts"
 import { useToast } from "@/hooks/use-toast"
-
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-})
 
 export default function ContactsPage() {
   const { session } = useAuth()
