@@ -1,6 +1,6 @@
 {
   "name": "ari.software",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.28.10",
