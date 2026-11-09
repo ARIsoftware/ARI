@@ -70,7 +70,7 @@
     "dotenv": "^18.0.9",
     "driver.js": "^1.10.2",
     "drizzle-orm": "^0.45.4",
-    "framer-motion": "^14.7.1",
+    "framer-motion": "^14.8.0",
     "ical-expander": "^3.2.0",
     "input-otp": "^1.5.0",
     "lucide-react": "^1.62.0",

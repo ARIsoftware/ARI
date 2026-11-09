@@ -4,6 +4,20 @@ What changed in each ARI release. `./ari update` links here when it offers a rel
 
 Releases are tags named `X.Y.Z` on `main`. Earlier releases are described by their commits: https://github.com/ARIsoftware/ARI/tags
 
+## Unreleased
+
+### Fonts
+
+- The sign-in page and top bar wordmark (DM Sans), the welcome dialog wordmark (Space Grotesk) and the setup pages (Montserrat) still loaded their fonts through `next/font/google`, which downloads from Google while a page compiles. On a machine that can't reach Google they silently rendered in a fallback font and the log filled with "Failed to download" warnings. They now use the self-hosted files like everything else, DM Sans is vendored too, and a test fails if `next/font/google` comes back.
+
+### Startup
+
+- `./ari start` now waits for the dev server to exit before exiting itself. Stopped from the ARI menu bar app, or any supervisor without a terminal, it used to exit as soon as it had forwarded the stop signal, which closed the pipe the dev server was still writing to: every log line after that appeared as an `EPIPE` crash. If the server has not left after eight seconds it is killed.
+
+### Dependencies
+
+- framer-motion is now `^14.8.0`. A custom module declaring that range no longer triggers a version-conflict warning at startup.
+
 ## 2.1.0
 
 ### Timeline
