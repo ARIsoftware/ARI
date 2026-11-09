@@ -2,10 +2,9 @@
 
 import { useState } from 'react'
 import { AuthForm } from '@/components/auth/auth-form'
+import { WORDMARK_FONT_FAMILY } from '@/lib/theme/fonts'
 
-// The wordmark's font, self-hosted in app/fonts/ (scripts/vendor-google-fonts.mjs):
-// nothing is fetched from Google at build or run time.
-const dmSans = { fontFamily: "'DM Sans', sans-serif" }
+const dmSans = { fontFamily: WORDMARK_FONT_FAMILY }
 
 export default function SignInPage() {
   // The admin-configured login logo is served publicly from the DB. If none is

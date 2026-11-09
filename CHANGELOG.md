@@ -12,7 +12,7 @@ Releases are tags named `X.Y.Z` on `main`. Earlier releases are described by the
 
 ### Startup
 
-- `./ari start` now waits for the dev server to exit before exiting itself. Stopped from the ARI menu bar app, or any supervisor without a terminal, it used to exit as soon as it had forwarded the stop signal, which closed the pipe the dev server was still writing to: every log line after that appeared as an `EPIPE` crash. If the server has not left after eight seconds it is killed.
+- `./ari start` now waits for the dev server to exit before exiting itself. Stopped from the ARI menu bar app, or any supervisor without a terminal, it used to exit as soon as it had forwarded the stop signal, which closed the pipe the dev server was still writing to: every log line after that appeared as an `EPIPE` crash. The stop signal now reaches the whole process tree, not only the shell in front of it; if the server has not left after eight seconds it is killed, and a second Ctrl+C stops the wait at once.
 
 ### Dependencies
 

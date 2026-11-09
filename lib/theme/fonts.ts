@@ -79,6 +79,16 @@ export const FONTS: FontOption[] = [
   },
 ]
 
+/**
+ * Fonts used by name outside the picker: the "ARI" wordmark on the sign-in
+ * page and in the top bar, the welcome dialog's wordmark, and the pages shown
+ * before sign-in (welcome, setup-error). Vendored like FONTS — the same test
+ * checks they are in app/fonts/fonts.css — and never loaded from Google.
+ */
+export const WORDMARK_FONT_FAMILY = '"DM Sans", sans-serif'
+export const WELCOME_FONT_FAMILY = '"Space Grotesk", sans-serif'
+export const PRE_SIGNIN_FONT_FAMILY = '"Montserrat", sans-serif'
+
 // Default font ID
 export const DEFAULT_FONT_ID = 'space-grotesk'
 

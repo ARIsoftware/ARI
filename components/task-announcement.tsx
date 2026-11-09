@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/tooltip"
 import { useAuth } from "@/components/providers"
 import { authClient } from "@/lib/auth-client"
+import { WORDMARK_FONT_FAMILY } from "@/lib/theme/fonts"
 import { useCommandPalette } from "@/components/command-palette"
 import { useDragDropMode } from "@/components/drag-drop-mode-context"
 import { Button } from "@/components/ui/button"
@@ -49,9 +50,7 @@ import {
 
 const globalTimerState = getGlobalTimerState()
 
-// The top bar wordmark's font, self-hosted in app/fonts/ (scripts/vendor-google-fonts.mjs):
-// nothing is fetched from Google at build or run time.
-const dmSans = { fontFamily: "'DM Sans', sans-serif" }
+const dmSans = { fontFamily: WORDMARK_FONT_FAMILY }
 
 const customMessage = process.env.NEXT_PUBLIC_TOP_BAR_MESSAGE
 const customColor = process.env.NEXT_PUBLIC_TOP_BAR_COLOR || '#000000'

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { WELCOME_FONT_FAMILY } from '@/lib/theme/fonts'
 import {
   Dialog,
   DialogContent,
@@ -19,10 +20,8 @@ import 'driver.js/dist/driver.css'
 // written through to user_preferences so other browsers stay quiet too.
 const LEGACY_DISMISS_KEY = 'ari:dashboard:welcomeDismissed'
 
-// The "ARI" wordmark's font, self-hosted in app/fonts/ (scripts/vendor-google-fonts.mjs):
-// nothing is fetched from Google at build or run time. The browser downloads the face
-// only when the dialog first renders it.
-const spaceGrotesk = { fontFamily: "'Space Grotesk', sans-serif" }
+// The browser downloads the wordmark's face only when the dialog first renders it.
+const spaceGrotesk = { fontFamily: WELCOME_FONT_FAMILY }
 
 /**
  * Welcome popup + guided tour for the dashboard. Mounted once in the (app)

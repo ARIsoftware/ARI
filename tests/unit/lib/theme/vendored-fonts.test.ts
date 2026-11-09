@@ -6,7 +6,12 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { FONTS } from '@/lib/theme/fonts'
+import {
+  FONTS,
+  PRE_SIGNIN_FONT_FAMILY,
+  WELCOME_FONT_FAMILY,
+  WORDMARK_FONT_FAMILY,
+} from '@/lib/theme/fonts'
 
 const ROOT = path.resolve(__dirname, '..', '..', '..', '..')
 const FONTS_DIR = path.join(ROOT, 'app', 'fonts')
@@ -19,6 +24,17 @@ const declaredFamilies = new Set([...css.matchAll(/font-family:\s*'([^']+)'/g)].
 describe('vendored fonts', () => {
   // A picker font missing from fonts.css silently renders in a fallback font.
   it.each(FONTS.map((font) => [font.id, font.family]))('%s is self-hosted', (_id, family) => {
+    const primary = family.match(/^"([^"]+)"/)?.[1]
+    expect(primary).toBeDefined()
+    expect(declaredFamilies).toContain(primary)
+  })
+
+  // The fonts used by name outside the picker (wordmarks, pre-signin pages).
+  it.each([
+    ['wordmark', WORDMARK_FONT_FAMILY],
+    ['welcome dialog', WELCOME_FONT_FAMILY],
+    ['pre-signin', PRE_SIGNIN_FONT_FAMILY],
+  ])('the %s font is self-hosted', (_use, family) => {
     const primary = family.match(/^"([^"]+)"/)?.[1]
     expect(primary).toBeDefined()
     expect(declaredFamilies).toContain(primary)
@@ -59,23 +75,30 @@ describe('vendored fonts', () => {
 
   // next/font/google downloads the font on the server while a page compiles, so
   // a build or dev server that cannot reach Google renders a fallback font
-  // instead. Every font comes from app/fonts/ (by family name) instead.
-  it('no source file loads a font through next/font/google', () => {
+  // instead. Every font comes from app/fonts/, by family name, instead.
+  it('no source file imports next/font/google', () => {
+    const IMPORT = /(?:from|require\()\s*['"]next\/font\/google['"]/
+    const SOURCE = /\.(?:[cm]?js|tsx?)$/
     const offenders: string[] = []
+    const check = (file: string) => {
+      if (SOURCE.test(file) && IMPORT.test(fs.readFileSync(file, 'utf8'))) {
+        offenders.push(path.relative(ROOT, file))
+      }
+    }
     const visit = (dir: string) => {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         if (entry.name === 'node_modules' || entry.name === 'generated') continue
         const full = path.join(dir, entry.name)
         if (entry.isDirectory()) visit(full)
-        else if (
-          /\.tsx?$/.test(entry.name) &&
-          fs.readFileSync(full, 'utf8').includes('next/font/google')
-        ) {
-          offenders.push(path.relative(ROOT, full))
-        }
+        else check(full)
       }
     }
-    for (const dir of ['app', 'components', 'lib', 'modules-core']) visit(path.join(ROOT, dir))
+    for (const dir of ['app', 'components', 'hooks', 'lib', 'modules-core']) {
+      if (fs.existsSync(path.join(ROOT, dir))) visit(path.join(ROOT, dir))
+    }
+    for (const file of ['proxy.ts', 'instrumentation.ts', 'next.config.mjs']) {
+      if (fs.existsSync(path.join(ROOT, file))) check(path.join(ROOT, file))
+    }
     expect(offenders).toEqual([])
   })
 })

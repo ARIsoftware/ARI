@@ -1,9 +1,6 @@
+import { PRE_SIGNIN_FONT_FAMILY } from "./fonts"
 import { getThemeById } from "./presets"
 import { CSS_VAR_MAP, type ThemeColors } from "./types"
-
-// Pre-signin pages render in Montserrat, self-hosted in app/fonts/
-// (scripts/vendor-google-fonts.mjs): nothing is fetched from Google at build or run time.
-const MONTSERRAT = "'Montserrat', sans-serif"
 
 // Pre-signin layouts apply theme via inline `style=` because they render
 // before ThemeProvider mounts. Build the CSS-var object from the canonical
@@ -23,7 +20,7 @@ export const lightThemeStyles = presetToStyles("light")
 
 export function LightLayoutShell({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ ...lightThemeStyles, fontFamily: MONTSERRAT }} className="light">
+    <div style={{ ...lightThemeStyles, fontFamily: PRE_SIGNIN_FONT_FAMILY }} className="light">
       {children}
     </div>
   )

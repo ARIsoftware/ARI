@@ -16,7 +16,7 @@ import { createRequire } from 'module';
 import { reconcileCustomModuleDeps } from '../scripts/reconcile-module-deps.js';
 import { parseYesNo } from '../scripts/lib/update-target.js';
 import { checkForRelease, readInstalledVersion, runUpdate, UPDATE_DOCS_URL } from '../scripts/lib/updater.js';
-import { stopChild } from '../scripts/lib/stop-child.js';
+import { killTree, stopChild } from '../scripts/lib/stop-child.js';
 
 const cjsRequire = createRequire(import.meta.url);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -808,37 +808,56 @@ function start(opts = {}) {
   // How long the dev server gets to leave after being asked, before it is
   // killed outright. Next.js normally takes well under two seconds.
   const DEV_SERVER_STOP_GRACE_MS = 8000;
+  // The dev server runs in a process group of its own (see launchDevServer),
+  // so a signal reaches pnpm, next and the server next forks — not only the
+  // shell in front of them. Windows has no groups; there taskkill ends the tree.
+  const DEV_GROUP = { group: !IS_WIN };
+
+  let finished = false;
+  const finish = (how) => {
+    if (finished) return;
+    finished = true;
+    if (mode === 'postgres') stopPgweb(log);
+    if (!quiet) {
+      if (how === 'killed') {
+        console.log('\n  ' + YELLOW + '⚠' + RESET + ` The dev server did not stop within ${DEV_SERVER_STOP_GRACE_MS / 1000}s and was killed.`);
+      } else if (how === 'forced') {
+        console.log('\n  ' + YELLOW + '⚠' + RESET + ' Stopped without waiting for the dev server.');
+      }
+      if (mode === 'supabaselocal') {
+        console.log('\n  ' + DIM + 'Next.js stopped. Supabase containers are still running.' + RESET);
+        console.log('  ' + DIM + 'Run ./ari stop to shut them down.' + RESET + '\n');
+      } else {
+        console.log('\n  ' + DIM + 'Next.js stopped.' + RESET + '\n');
+      }
+    }
+    process.exit(0);
+  };
 
   const cleanup = () => {
-    if (shuttingDown) return;
+    if (shuttingDown) {
+      // A second Ctrl+C or signal while waiting: stop waiting.
+      if (child) killTree(child, DEV_GROUP);
+      finish('forced');
+      return;
+    }
     shuttingDown = true;
     stopSpinner();
     killTunnel();
-    const finish = () => {
-      if (mode === 'postgres') stopPgweb(log);
-      if (!quiet) {
-        if (mode === 'supabaselocal') {
-          console.log('\n  ' + DIM + 'Next.js stopped. Supabase containers are still running.' + RESET);
-          console.log('  ' + DIM + 'Run ./ari stop to shut them down.' + RESET + '\n');
-        } else {
-          console.log('\n  ' + DIM + 'Next.js stopped.' + RESET + '\n');
-        }
-      }
-      process.exit(0);
-    };
     if (!child) {
-      finish();
+      finish('stopped');
       return;
     }
     // Ask the dev server to stop, then stay alive — still reading its output —
-    // until it is really gone. In a terminal, Ctrl+C reaches every process at
-    // once and this only orders the farewell message after the server's own
-    // output. Under a supervisor without a terminal (the ARI menu bar app, a
-    // service manager) only this process receives the stop signal, and its
-    // exit closes the pipe the dev server writes to: exiting the moment the
-    // signal was forwarded left the server shutting down into a closed pipe,
-    // and every log line it still wrote was an EPIPE crash in the log.
-    stopChild(child, DEV_SERVER_STOP_GRACE_MS).then(finish);
+    // until it is really gone. Under a supervisor without a terminal (the ARI
+    // menu bar app, a service manager) only this process receives the stop
+    // signal, and its exit closes the pipe the dev server writes to: exiting
+    // the moment the signal was forwarded left the server shutting down into
+    // a closed pipe, and every log line it still wrote was an EPIPE crash in
+    // the log. In a terminal the same path runs on Ctrl+C: the signal is
+    // passed on to the server's process group and the farewell message
+    // follows the server's own output.
+    stopChild(child, DEV_SERVER_STOP_GRACE_MS, DEV_GROUP).then(finish);
   };
 
   process.on('SIGINT', cleanup);
@@ -880,6 +899,10 @@ function start(opts = {}) {
       stdio: ['inherit', 'pipe', quiet ? 'pipe' : 'inherit'],
       cwd: ROOT,
       shell: true,
+      // A process group of its own (POSIX), so stopping reaches pnpm, next and
+      // the server next forks, not only the shell in front of them. The
+      // terminal's Ctrl+C then arrives here alone; cleanup() passes it on.
+      detached: !IS_WIN,
       env: { ...process.env, ...(tunnelUrl ? { ARI_TUNNEL_ORIGIN: tunnelUrl } : {}) },
     });
 
@@ -947,7 +970,7 @@ function start(opts = {}) {
           // Defensive: -p makes this impossible, but a tunnel must never be
           // left pointing at a port the dev server isn't on.
           if (tunnelUrl && Number(match[1]) !== tunnelPort) {
-            child.kill();
+            killTree(child, DEV_GROUP);
             fail(`Dev server started on ${url} but the tunnel targets port ${tunnelPort}.`);
           }
           waitForReady(probeUrl).then(async () => {
