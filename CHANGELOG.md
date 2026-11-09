@@ -4,7 +4,7 @@ What changed in each ARI release. `./ari update` links here when it offers a rel
 
 Releases are tags named `X.Y.Z` on `main`. Earlier releases are described by their commits: https://github.com/ARIsoftware/ARI/tags
 
-## Unreleased
+## 2.1.1
 
 ### Fonts
 
