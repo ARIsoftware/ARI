@@ -128,8 +128,6 @@ lib/db/migrations/
 /public/workbox-*.js
 
 # Local testing
-/playwright-report/
-/playwright/.cache/
 /test-results/
 
 # Claude Code
